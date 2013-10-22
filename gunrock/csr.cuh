@@ -185,10 +185,10 @@ struct Csr
 	{
 		printf("Input Graph:\n");
 		for (VertexId node = 0; node < nodes; node++) {
-			PrintValue(node);
+			util::PrintValue(node);
 			printf(": ");
 			for (SizeT edge = row_offsets[node]; edge < row_offsets[node + 1]; edge++) {
-				PrintValue(column_indices[edge]);
+				util::PrintValue(column_indices[edge]);
 				printf(", ");
 			}
 			printf("\n");

@@ -305,6 +305,13 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
 	                    sizeof(VertexId),
 	                    cudaMemcpyHostToDevice),
 	                "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
+        VertexId src_pred = -1; 
+        if (retval = util::GRError(cudaMemcpy(
+	                    data_slices[0]->d_preds+src,
+	                    &src_pred,
+	                    sizeof(VertexId),
+	                    cudaMemcpyHostToDevice),
+	                "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
 
 	    return retval;
 	}

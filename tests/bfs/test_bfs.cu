@@ -404,6 +404,9 @@ int main( int argc, char** argv)
 			return 1;
 		}
 
+        csr.DisplayGraph();
+        fflush(stdout);
+
 		// Run tests
 		RunTests(csr, args);
 
