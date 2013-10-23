@@ -7,9 +7,9 @@
 
 /**
  * @file
- * bfs_problem.cuh
+ * cc_problem.cuh
  *
- * @brief GPU Storage management Structure for BFS Problem Data
+ * @brief GPU Storage management Structure for CC Problem Data
  */
 
 #pragma once
@@ -19,7 +19,7 @@
 
 namespace gunrock {
 namespace app {
-namespace bfs {
+namespace cc {
 
 template <
 	typename 	VertexId,						// Type of signed integer to use as vertex id (e.g., uint32)
@@ -32,7 +32,7 @@ template <
 	util::io::ld::CacheModifier _ROW_OFFSET_UNALIGNED_READ_MODIFIER,	// Load instruction cache-modifier for reading CSR row-offsets (when 4-byte aligned)
 	util::io::st::CacheModifier _QUEUE_WRITE_MODIFIER,					// Store instruction cache-modifier for writing outgoign frontier vertex-ids. Valid on SM2.0 or newer, where util::io::st::cg is req'd for fused-iteration implementations incorporating software global barriers.
 	bool 		_MARK_PREDECESSORS>				// Whether to mark predecessor-vertices
-struct BFSProblem : ProblemBase<VertexId, SizeT,
+struct CCProblem : ProblemBase<VertexId, SizeT,
                                 _QUEUE_READ_MODIFIER,
                                 _COLUMN_READ_MODIFIER,
                                 _EDGE_VALUES_READ_MODIFIER,
@@ -47,8 +47,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
     struct DataSlice
     {
         // device storage arrays
-        VertexId        *d_labels;              // Used for source distance
-        VertexId        *d_preds;               // Used for predecessor
+        VertexId        *d_component_ids;               // Used for component id
+        char            *d_masks;                       // Size equals to node number, show if a node is the root
+        bool            *d_marks;                       // Size equals to edge number, show if two vertices belong to the same component
     };
 
     // Members
@@ -76,12 +77,12 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
      * Constructor
      */
 
-    BFSProblem():
+    CCProblem():
     nodes(0),
     edges(0),
     num_gpus(0) {}
 
-    BFSProblem(bool        stream_from_host,       // Only meaningful for single-GPU
+    CCProblem(bool        stream_from_host,       // Only meaningful for single-GPU
 	        SizeT       nodes,
 	        SizeT       edges,
 	        SizeT       *h_row_offsets,
@@ -103,25 +104,26 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
     /**
      * Destructor
      */
-    ~BFSProblem()
+    ~CCProblem()
     {
         for (int i = 0; i < num_gpus; ++i)
         {
             if (util::GRError(cudaSetDevice(gpu_idx[i]),
-                "~BFSProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
-            if (data_slices[i]->d_labels)      util::GRError(cudaFree(data_slices[i]->d_labels), "GpuSlice cudaFree d_labels failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_preds)      util::GRError(cudaFree(data_slices[i]->d_preds), "GpuSlice cudaFree d_preds failed", __FILE__, __LINE__);
-            if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
+                "~CCProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
+            if (data_slices[i]->d_component_ids)    util::GRError(cudaFree(data_slices[i]->d_component_ids), "GpuSlice cudaFree d_component_ids failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_marks)            util::GRError(cudaFree(data_slices[i]->d_marks), "GpuSlice cudaFree d_marks failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_masks)            util::GRError(cudaFree(data_slices[i]->d_masks), "GpuSlice cudaFree d_masks failed", __FILE__, __LINE__);
+            if (d_data_slices[i])                   util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
         }
         if (d_data_slices)  delete[] d_data_slices;
         if (data_slices) delete[] data_slices;
     }
 
     /**
-     * Extract into a single host vector the BFS results disseminated across
+     * Extract into a single host vector the CC results disseminated across
      * all GPUs
      */
-    cudaError_t Extract(VertexId *h_labels, VertexId *h_preds)
+    cudaError_t Extract(VertexId *h_component_ids)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -130,24 +132,14 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
 
                 // Set device
                 if (util::GRError(cudaSetDevice(gpu_idx[0]),
-                            "BFSProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
+                            "CCProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
 
                 if (retval = util::GRError(cudaMemcpy(
-                                h_labels,
-                                data_slices[0]->d_labels,
+                                h_component_ids,
+                                data_slices[0]->d_component_ids,
                                 sizeof(VertexId) * nodes,
                                 cudaMemcpyDeviceToHost),
-                            "BFSProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) break;
-
-                if (_MARK_PREDECESSORS) {
-                    if (retval = util::GRError(cudaMemcpy(
-                                    h_preds,
-                                    data_slices[0]->d_preds,
-                                    sizeof(VertexId) * nodes,
-                                    cudaMemcpyDeviceToHost),
-                                "BFSProblem cudaMemcpy d_preds failed", __FILE__, __LINE__)) break;
-                }
-
+                            "CCProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) break;
             } else {
                 // TODO: multi-GPU extract result
             } //end if (data_slices.size() ==1)
@@ -195,29 +187,36 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
 	            gpu_idx = (int*)malloc(sizeof(int));
 	            // Create a single data slice for the currently-set gpu
 	            int gpu;
-	            if (retval = util::GRError(cudaGetDevice(&gpu), "BFSProblem cudaGetDevice failed", __FILE__, __LINE__)) break;
+	            if (retval = util::GRError(cudaGetDevice(&gpu), "CCProblem cudaGetDevice failed", __FILE__, __LINE__)) break;
 	            gpu_idx[0] = gpu;
 
 	            data_slices[0] = new DataSlice;
 	            if (retval = util::GRError(cudaMalloc(
 	                            (void**)&d_data_slices[0],
 	                            sizeof(DataSlice)),
-	                        "BFSProblem cudaMalloc d_data_slices failed", __FILE__, __LINE__)) return retval;
+	                        "CCProblem cudaMalloc d_data_slices failed", __FILE__, __LINE__)) return retval;
 
                 // Create SoA on device
-	            VertexId    *d_labels;
+	            VertexId    *d_component_ids;
 	            if (retval = util::GRError(cudaMalloc(
-	                    (void**)&d_labels,
+	                    (void**)&d_component_ids,
 	                    nodes * sizeof(VertexId)),
-	                "BFSProblem cudaMalloc d_labels failed", __FILE__, __LINE__)) return retval;
-	            data_slices[0]->d_labels = d_labels;
+	                "CCProblem cudaMalloc d_component_ids failed", __FILE__, __LINE__)) return retval;
+	            data_slices[0]->d_component_ids = d_component_ids;
  
-	            VertexId   *d_preds;
+	            char   *d_masks;
                     if (retval = util::GRError(cudaMalloc(
-	                    (void**)&d_preds,
-	                    nodes * sizeof(VertexId)),
-	                "BFSProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
-	            data_slices[0]->d_preds = d_preds;
+	                    (void**)&d_masks,
+	                    nodes * sizeof(char)),
+	                "CCProblem cudaMalloc d_masks failed", __FILE__, __LINE__)) return retval;
+	            data_slices[0]->d_masks = d_masks;
+
+                bool   *d_marks;
+                    if (retval = util::GRError(cudaMalloc(
+	                    (void**)&d_marks,
+	                    edges * sizeof(bool)),
+	                "CCProblem cudaMalloc d_marks failed", __FILE__, __LINE__)) return retval;
+	            data_slices[0]->d_marks = d_marks;
 
 	        }
 	        //TODO: add multi-GPU allocation code
@@ -227,8 +226,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
 	}
 
 	/**
-	 * Performs any initialization work needed for BFS problem type. Must be called
-	 * prior to each BFS run
+	 * Performs any initialization work needed for CC problem type. Must be called
+	 * prior to each CC run
 	 */
 	cudaError_t Reset(
 	        VertexId    src,
@@ -253,68 +252,55 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
 	        if (retval = util::GRError(cudaSetDevice(gpu_idx[gpu]),
 	                    "BSFProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
 
-	        // Allocate output labels if necessary
-	        if (!data_slices[gpu]->d_labels) {
-                VertexId    *d_labels;
+	        // Allocate output component_ids if necessary
+	        if (!data_slices[gpu]->d_component_ids) {
+                VertexId    *d_component_ids;
 	            if (retval = util::GRError(cudaMalloc(
-	                            (void**)&d_labels,
+	                            (void**)&d_component_ids,
 	                            nodes * sizeof(VertexId)),
-	                        "BFSProblem cudaMalloc d_labels failed", __FILE__, __LINE__)) return retval;
-	            data_slices[gpu]->d_labels = d_labels;
+	                        "CCProblem cudaMalloc d_component_ids failed", __FILE__, __LINE__)) return retval;
+	            data_slices[gpu]->d_component_ids = d_component_ids;
 	        }
 
-	        util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_labels, -1, nodes);
+	        util::MemsetIdxKernel<<<128, 128>>>(data_slices[gpu]->d_component_ids, nodes);
 
-	        // Allocate preds if necessary
-	            if (!data_slices[gpu]->d_preds) {
-	                VertexId    *d_preds;
-                    if (retval = util::GRError(cudaMalloc(
-	                                (void**)&d_preds,
-	                                nodes * sizeof(VertexId)),
-	                            "BFSProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
-                    data_slices[gpu]->d_preds = d_preds;
-                }
-                
-	            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_preds, -2, nodes);
+            // Allocate marks if necessary
+            if (!data_slices[gpu]->d_marks) {
+                bool    *d_marks;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_marks,
+                                edges * sizeof(bool)),
+                            "CCProblem cudaMalloc d_marks failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_marks = d_marks;
+            }
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_marks, false, edges);
+
+            // Allocate masks if necessary
+            if (!data_slices[gpu]->d_masks) {
+                char    *d_masks;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_masks,
+                                nodes * sizeof(char)),
+                            "CCProblem cudaMalloc d_masks failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_masks = d_masks;
+            }
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_masks, 0, nodes);
                 
             if (retval = util::GRError(cudaMemcpy(
 	                        d_data_slices[gpu],
 	                        data_slices[gpu],
 	                        sizeof(DataSlice),
 	                        cudaMemcpyHostToDevice),
-	                    "BFSProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
+	                    "CCProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
 
 	    }
 	    
-        // Fillin the initial input_queue for BFS problem, this needs to be modified
-	    // in multi-GPU scene
-	    if (retval = util::GRError(cudaMemcpy(
-	                    BaseProblem::graph_slices[0]->frontier_queues.d_keys[0],
-	                    &src,
-	                    sizeof(VertexId),
-	                    cudaMemcpyHostToDevice),
-	                "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
-        VertexId src_label = 0; 
-        if (retval = util::GRError(cudaMemcpy(
-	                    data_slices[0]->d_labels+src,
-	                    &src_label,
-	                    sizeof(VertexId),
-	                    cudaMemcpyHostToDevice),
-	                "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
-        VertexId src_pred = -1; 
-        if (retval = util::GRError(cudaMemcpy(
-	                    data_slices[0]->d_preds+src,
-	                    &src_pred,
-	                    sizeof(VertexId),
-	                    cudaMemcpyHostToDevice),
-	                "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
-
 	    return retval;
 	}
 
 };
 
-} //namespace bfs
+} //namespace cc
 } //namespace app
 } //namespace gunrock
 

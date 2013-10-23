@@ -34,6 +34,18 @@ __global__ void MemsetKernel(T *d_out, T value, int length)
 	}
 }
 
+/**
+ * Memset a device vector using indices
+ */
+template <typename T>
+__global__ void MemsetIdxKernel(T *d_out, int length)
+{
+	const int STRIDE = gridDim.x * blockDim.x;
+	for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x; idx < length; idx += STRIDE) {
+		d_out[idx] = idx;
+	}
+}
+
 
 } // namespace util
 } // namespace gunrock

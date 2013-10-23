@@ -138,7 +138,6 @@ struct KernelPolicy
 			// Amount of storage we can use for hashing scratch space under target occupancy
 			FULL_OCCUPANCY_BYTES				= (GR_SMEM_BYTES(CUDA_ARCH) / _MIN_CTA_OCCUPANCY)
 													- sizeof(State)
-												    - ProblemData::SMEM_SIZE	
 													- 128,												// Fudge-factor to guarantee occupancy
 
 		};

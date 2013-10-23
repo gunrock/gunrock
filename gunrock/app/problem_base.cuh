@@ -45,7 +45,6 @@ enum FrontierType {
 template <
 	typename 	_VertexId,						                        // Type of signed integer to use as vertex id (e.g., uint32)
 	typename 	_SizeT,							                        // Type of unsigned integer to use for array indexing (e.g., uint32)
-	typename	_Value,						                            // Type of edge value (e.g., float)
     util::io::ld::CacheModifier _QUEUE_READ_MODIFIER,					// Load instruction cache-modifier for reading incoming frontier vertex-ids. Valid on SM2.0 or newer, where util::io::ld::cg is req'd for fused-iteration implementations incorporating software global barriers.
 	util::io::ld::CacheModifier _COLUMN_READ_MODIFIER,					// Load instruction cache-modifier for reading CSR column-indices
     util::io::ld::CacheModifier _EDGE_VALUES_READ_MODIFIER,             // Load instruction cache-modifier for reading edge values
@@ -58,7 +57,6 @@ struct ProblemBase
 {
     typedef _VertexId           VertexId;
     typedef _SizeT              SizeT;
-    typedef _Value              Value;
 
     static const util::io::ld::CacheModifier QUEUE_READ_MODIFIER 					= _QUEUE_READ_MODIFIER;
 	static const util::io::ld::CacheModifier COLUMN_READ_MODIFIER 					= _COLUMN_READ_MODIFIER;
