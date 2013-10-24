@@ -12,17 +12,6 @@ struct BFSFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
-    /*static cudaError_t Init(VertexId src, VertexId *queue)
-    {
-        cudaError_t retval = cudaSuccess;
-        if (retval = util::GRError(cudaMemset(
-	                    queue,
-	                    src,
-	                    sizeof(VertexId)),
-	                "BFSProblem cudaMemset d_in_queue failed", __FILE__, __LINE__)) return retval;
-	    return retval;
-    }*/
-
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
     {
         // Check if the destination node has been claimed as someone's child
@@ -39,6 +28,11 @@ struct BFSFunctor
             label, problem->d_labels + s_id);
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
             label+1, problem->d_labels + d_id);
+    }
+
+    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
+    {
+        return node != -1;
     }
 
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
