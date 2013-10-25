@@ -38,11 +38,14 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                                 _EDGE_VALUES_READ_MODIFIER,
                                 _ROW_OFFSET_ALIGNED_READ_MODIFIER,
                                 _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER,
-                                _MARK_PREDECESSORS>
+                                _QUEUE_WRITE_MODIFIER>
 {
+
+	static const bool MARK_PREDECESSORS		= _MARK_PREDECESSORS;
+
     //Helper structures
-/** * Data slice per GPU
+    /**
+     * Data slice per GPU
      */
     struct DataSlice
     {
@@ -173,8 +176,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                                 _EDGE_VALUES_READ_MODIFIER,
                                 _ROW_OFFSET_ALIGNED_READ_MODIFIER,
                                 _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER,
-                                _MARK_PREDECESSORS>::Init(stream_from_host,
+                                _QUEUE_WRITE_MODIFIER>::Init(stream_from_host,
 	                                    nodes,
 	                                    edges,
 	                                    h_row_offsets,
@@ -241,10 +243,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                                 _EDGE_VALUES_READ_MODIFIER,
                                 _ROW_OFFSET_ALIGNED_READ_MODIFIER,
                                 _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER,
-                                _MARK_PREDECESSORS> BaseProblem;
+                                _QUEUE_WRITE_MODIFIER> BaseProblem;
 	    //load ProblemBase Reset
-	    BaseProblem::Reset(src, frontier_type, queue_sizing);
+	    BaseProblem::Reset(frontier_type, queue_sizing);
 
 	    cudaError_t retval = cudaSuccess;
 
@@ -285,6 +286,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
 	                    "BFSProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
 
 	    }
+
 	    
         // Fillin the initial input_queue for BFS problem, this needs to be modified
 	    // in multi-GPU scene

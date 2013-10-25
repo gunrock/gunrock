@@ -188,6 +188,7 @@ struct ModifiedStore
 	#endif
 
 	GR_STORE_BASE(signed char, s8, r, unsigned int)		// Only need to define base: char2,char4, etc already defined from char
+	GR_STORE_BASE(bool, s8, r, unsigned int)
 
 
 	/**
@@ -202,7 +203,6 @@ struct ModifiedStore
 	GR_STORE_BASE_ONE_TWO(long, 					long, 					long, 		s64, l, long)
 	GR_STORE_BASE_ONE_TWO(unsigned long, 			unsigned long, 			ulong, 		u64, l, unsigned long)
 	#endif
-
 	/**
 	 * Undefine macros
 	 */

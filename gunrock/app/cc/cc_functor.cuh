@@ -14,13 +14,13 @@ struct HookMinFunctor
 
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
-        return problem->d_marks[node];
+        return !problem->d_marks[node];
     }
 
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
-        VertexId parent_from = problem->d_column_ids[problem->d_froms[node]];
-        VertexId parent_to = problem->d_column_ids[problem->d_tos[node]];
+        VertexId parent_from = problem->d_component_ids[problem->d_froms[node]];
+        VertexId parent_to = problem->d_component_ids[problem->d_tos[node]];
         VertexId max_node = parent_from > parent_to ? parent_from : parent_to;
         VertexId min_node = parent_from + parent_to - max_node;
         if (max_node == min_node)
@@ -39,13 +39,13 @@ struct HookMaxFunctor
 
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
-        return problem->d_marks[node];
+        return !problem->d_marks[node];
     }
 
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
-        VertexId parent_from = problem->d_column_ids[problem->d_froms[node]];
-        VertexId parent_to = problem->d_column_ids[problem->d_tos[node]];
+        VertexId parent_from = problem->d_component_ids[problem->d_froms[node]];
+        VertexId parent_to = problem->d_component_ids[problem->d_tos[node]];
         VertexId max_node = parent_from > parent_to ? parent_from : parent_to;
         VertexId min_node = parent_from + parent_to - max_node;
         if (max_node == min_node)
@@ -64,7 +64,7 @@ struct PtrJumpFunctor
 
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
-        return problem->d_masks[node] == 0;
+        return problem->d_masks[node];
     }
 
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
@@ -76,7 +76,7 @@ struct PtrJumpFunctor
             grand_parent, problem->d_component_ids + node);
         else
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-            -1, problem->d_masks + node);
+            false, problem->d_masks + node);
     }
 };
 

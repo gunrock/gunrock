@@ -200,7 +200,7 @@ class CCEnactor : public EnactorBase
             fflush(stdout);
             // HookMin/Max iterations
             while (done[0] < 0) {
-                
+               
                 // Vertex Map
                 if (iteration & 1) {
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMinFunctor>
@@ -278,11 +278,13 @@ class CCEnactor : public EnactorBase
             num_elements        = graph_slice->nodes;
 
             queue_reset         = true;
+            done[0]             = -1;
 
             util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[selector], graph_slice->nodes);
 
             // Pointer Jumping Iterations
             while (done[0] < 0) {
+
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpFunctor>
                     <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                             queue_reset,
@@ -336,12 +338,12 @@ class CCEnactor : public EnactorBase
             if (retval) break;
 
             // Check if any of the frontiers overflowed due to redundant expansion
-            bool overflowed = false;
+            /*bool overflowed = false;
             if (retval = work_progress.CheckOverflow<SizeT>(overflowed)) break;
             if (overflowed) {
                 retval = util::GRError(cudaErrorInvalidConfiguration, "Frontier queue overflow. Please increase queue-sizing factor.",__FILE__, __LINE__);
                 break;
-            }
+            }*/
 
         } while(0);
 

@@ -50,9 +50,8 @@ template <
     util::io::ld::CacheModifier _EDGE_VALUES_READ_MODIFIER,             // Load instruction cache-modifier for reading edge values
 	util::io::ld::CacheModifier _ROW_OFFSET_ALIGNED_READ_MODIFIER,		// Load instruction cache-modifier for reading CSR row-offsets (when 8-byte aligned)
 	util::io::ld::CacheModifier _ROW_OFFSET_UNALIGNED_READ_MODIFIER,	// Load instruction cache-modifier for reading CSR row-offsets (when 4-byte aligned)
-	util::io::st::CacheModifier _QUEUE_WRITE_MODIFIER,					// Store instruction cache-modifier for writing outgoign frontier vertex-ids. Valid on SM2.0 or newer, where util::io::st::cg is req'd for fused-iteration implementations incorporating software global barriers.
+	util::io::st::CacheModifier _QUEUE_WRITE_MODIFIER>					// Store instruction cache-modifier for writing outgoign frontier vertex-ids. Valid on SM2.0 or newer, where util::io::st::cg is req'd for fused-iteration implementations incorporating software global barriers.
 
-	bool 		_MARK_PREDECESSORS>				// Whether to mark predecessor-vertices (vs. distance-from-source)
 struct ProblemBase
 {
     typedef _VertexId           VertexId;
@@ -64,8 +63,6 @@ struct ProblemBase
 	static const util::io::ld::CacheModifier ROW_OFFSET_ALIGNED_READ_MODIFIER 		= _ROW_OFFSET_ALIGNED_READ_MODIFIER;
 	static const util::io::ld::CacheModifier ROW_OFFSET_UNALIGNED_READ_MODIFIER 	= _ROW_OFFSET_UNALIGNED_READ_MODIFIER;
 	static const util::io::st::CacheModifier QUEUE_WRITE_MODIFIER 					= _QUEUE_WRITE_MODIFIER;
-
-	static const bool MARK_PREDECESSORS		= _MARK_PREDECESSORS;
 
 	/**
 	 * Graph Slice which contains common graph structural data
@@ -277,7 +274,6 @@ struct ProblemBase
 	 * prior to each search
 	 */
 	cudaError_t Reset(
-	    VertexId    src,
 	    FrontierType frontier_type,     // The frontier type (i.e., edge/vertex/mixed)
 	    double queue_sizing)            // Size scaling factor for work queue allocation
 	    {
