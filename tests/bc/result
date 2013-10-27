@@ -1,0 +1,50 @@
+mkdir -p bin
+"/usr/local/cuda-5.5/bin/nvcc"  -gencode=arch=compute_30,code=\"sm_30,compute_30\"   -o bin/test_bc_5.5_x86_64 test_bc.cu -Xptxas -v -Xcudafe -# -Xptxas -abi=no -m64 -I"/usr/local/cuda-5.5/bin/../include" -I"../../../../../boost_1_53_0" -I.. -I../.. -lcuda -O3  
+test_bc.cu(232): error: identifier "eles" is undefined
+          detected during instantiation of "void RunTests(gunrock::Csr<VertexId, Value, SizeT> &, gunrock::util::CommandLineArgs &) [with VertexId=int, Value=float, SizeT=int]" 
+(382): here
+
+test_bc.cu(233): error: expected a ";"
+          detected during instantiation of "void RunTests(gunrock::Csr<VertexId, Value, SizeT> &, gunrock::util::CommandLineArgs &) [with VertexId=int, Value=float, SizeT=int]" 
+(382): here
+
+test_bc.cu(251): warning: parsing restarts here after previous syntax error
+          detected during instantiation of "void RunTests(gunrock::Csr<VertexId, Value, SizeT> &, gunrock::util::CommandLineArgs &) [with VertexId=int, Value=float, SizeT=int]" 
+(382): here
+
+test_bc.cu(220): warning: variable "retval" was declared but never referenced
+          detected during instantiation of "void RunTests(gunrock::Csr<VertexId, Value, SizeT> &, gunrock::util::CommandLineArgs &) [with VertexId=int, Value=float, SizeT=int]" 
+(382): here
+
+test_bc.cu(225): warning: variable "start_src" was set but never used
+          detected during:
+            instantiation of "void RunTests<VertexId,Value,SizeT,INSTRUMENT>(const gunrock::Csr<VertexId, Value, SizeT> &, VertexId, int, int, double) [with VertexId=int, Value=float, SizeT=int, INSTRUMENT=true]" 
+(310): here
+            instantiation of "void RunTests(gunrock::Csr<VertexId, Value, SizeT> &, gunrock::util::CommandLineArgs &) [with VertexId=int, Value=float, SizeT=int]" 
+(382): here
+
+test_bc.cu(226): warning: variable "end_src" was set but never used
+          detected during:
+            instantiation of "void RunTests<VertexId,Value,SizeT,INSTRUMENT>(const gunrock::Csr<VertexId, Value, SizeT> &, VertexId, int, int, double) [with VertexId=int, Value=float, SizeT=int, INSTRUMENT=true]" 
+(310): here
+            instantiation of "void RunTests(gunrock::Csr<VertexId, Value, SizeT> &, gunrock::util::CommandLineArgs &) [with VertexId=int, Value=float, SizeT=int]" 
+(382): here
+
+test_bc.cu(225): warning: variable "start_src" was set but never used
+          detected during:
+            instantiation of "void RunTests<VertexId,Value,SizeT,INSTRUMENT>(const gunrock::Csr<VertexId, Value, SizeT> &, VertexId, int, int, double) [with VertexId=int, Value=float, SizeT=int, INSTRUMENT=false]" 
+(317): here
+            instantiation of "void RunTests(gunrock::Csr<VertexId, Value, SizeT> &, gunrock::util::CommandLineArgs &) [with VertexId=int, Value=float, SizeT=int]" 
+(382): here
+
+test_bc.cu(226): warning: variable "end_src" was set but never used
+          detected during:
+            instantiation of "void RunTests<VertexId,Value,SizeT,INSTRUMENT>(const gunrock::Csr<VertexId, Value, SizeT> &, VertexId, int, int, double) [with VertexId=int, Value=float, SizeT=int, INSTRUMENT=false]" 
+(317): here
+            instantiation of "void RunTests(gunrock::Csr<VertexId, Value, SizeT> &, gunrock::util::CommandLineArgs &) [with VertexId=int, Value=float, SizeT=int]" 
+(382): here
+
+Front end time                       0.83 (CPU)       1.00 (elapsed)
+2 errors detected in the compilation of "/tmp/tmpxft_00003c85_00000000-8_test_bc.cpp1.ii".
+Total compilation time               0.83 (CPU)       1.00 (elapsed)
+make: *** [bin/test_bc_5.5_x86_64] Error 2

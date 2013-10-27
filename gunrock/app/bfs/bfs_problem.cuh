@@ -277,6 +277,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                 }
                 
 	            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_preds, -2, nodes);
+
                 
             if (retval = util::GRError(cudaMemcpy(
 	                        d_data_slices[gpu],

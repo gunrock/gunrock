@@ -30,16 +30,14 @@ template <
     util::io::ld::CacheModifier _EDGE_VALUES_READ_MODIFIER,             // Load instruction cache-modifier for reading edge values
 	util::io::ld::CacheModifier _ROW_OFFSET_ALIGNED_READ_MODIFIER,		// Load instruction cache-modifier for reading CSR row-offsets (when 8-byte aligned)
 	util::io::ld::CacheModifier _ROW_OFFSET_UNALIGNED_READ_MODIFIER,	// Load instruction cache-modifier for reading CSR row-offsets (when 4-byte aligned)
-	util::io::st::CacheModifier _QUEUE_WRITE_MODIFIER,					// Store instruction cache-modifier for writing outgoign frontier vertex-ids. Valid on SM2.0 or newer, where util::io::st::cg is req'd for fused-iteration implementations incorporating software global barriers.
-	bool 		_MARK_PREDECESSORS>				// Whether to mark predecessor-vertices
+	util::io::st::CacheModifier _QUEUE_WRITE_MODIFIER>					// Store instruction cache-modifier for writing outgoign frontier vertex-ids. Valid on SM2.0 or newer, where util::io::st::cg is req'd for fused-iteration implementations incorporating software global barriers.
 struct BCProblem : ProblemBase<VertexId, SizeT,
                                 _QUEUE_READ_MODIFIER,
                                 _COLUMN_READ_MODIFIER,
                                 _EDGE_VALUES_READ_MODIFIER,
                                 _ROW_OFFSET_ALIGNED_READ_MODIFIER,
                                 _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER,
-                                _MARK_PREDECESSORS>
+                                _QUEUE_WRITE_MODIFIER>
 {
     //Helper structures
 /** * Data slice per GPU
@@ -127,7 +125,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT,
      * Extract into a single host vector the BC results disseminated across
      * all GPUs
      */
-    cudaError_t Extract(Value *h_bc_values)
+    cudaError_t Extract(Value *h_sigmas, Value *h_bc_values)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -144,6 +142,13 @@ struct BCProblem : ProblemBase<VertexId, SizeT,
                                 sizeof(Value) * nodes,
                                 cudaMemcpyDeviceToHost),
                             "BCProblem cudaMemcpy d_bc_values failed", __FILE__, __LINE__)) break;
+
+                if (retval = util::GRError(cudaMemcpy(
+                                h_sigmas,
+                                data_slices[0]->d_sigmas,
+                                sizeof(Value) * nodes,
+                                cudaMemcpyDeviceToHost),
+                            "BCProblem cudaMemcpy d_sigmas failed", __FILE__, __LINE__)) break;
             } else {
                 // TODO: multi-GPU extract result
             } //end if (data_slices.size() ==1)
@@ -169,8 +174,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT,
                                 _EDGE_VALUES_READ_MODIFIER,
                                 _ROW_OFFSET_ALIGNED_READ_MODIFIER,
                                 _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER,
-                                _MARK_PREDECESSORS>::Init(stream_from_host,
+                                _QUEUE_WRITE_MODIFIER>::Init(stream_from_host,
 	                                    nodes,
 	                                    edges,
 	                                    h_row_offsets,
@@ -213,14 +217,18 @@ struct BCProblem : ProblemBase<VertexId, SizeT,
 	                    (void**)&d_preds,
 	                    nodes * sizeof(VertexId)),
 	                "BCProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
-	            data_slices[0]->d_labels = d_labels;
+	            data_slices[0]->d_preds = d_preds;
  
 	            Value   *d_bc_values;
                     if (retval = util::GRError(cudaMalloc(
 	                    (void**)&d_bc_values,
 	                    nodes * sizeof(Value)),
 	                "BCProblem cudaMalloc d_bc_values failed", __FILE__, __LINE__)) return retval;
+
 	            data_slices[0]->d_bc_values = d_bc_values;
+
+                util::MemsetKernel<<<128, 128>>>(data_slices[0]->d_bc_values, (Value)0.0f, nodes);
+
 
                 Value   *d_sigmas;
                     if (retval = util::GRError(cudaMalloc(
@@ -258,10 +266,9 @@ struct BCProblem : ProblemBase<VertexId, SizeT,
                                 _EDGE_VALUES_READ_MODIFIER,
                                 _ROW_OFFSET_ALIGNED_READ_MODIFIER,
                                 _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER,
-                                _MARK_PREDECESSORS> BaseProblem;
+                                _QUEUE_WRITE_MODIFIER> BaseProblem;
 	    //load ProblemBase Reset
-	    BaseProblem::Reset(src, frontier_type, queue_sizing);
+	    BaseProblem::Reset(frontier_type, queue_sizing);
 
 	    cudaError_t retval = cudaSuccess;
 
@@ -280,7 +287,6 @@ struct BCProblem : ProblemBase<VertexId, SizeT,
                             "BCProblem cudaMalloc d_labels failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_labels = d_labels;
             }
-
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_labels, -1, nodes);
 
             // Allocate preds if necessary
@@ -294,8 +300,18 @@ struct BCProblem : ProblemBase<VertexId, SizeT,
             }
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_preds, -2, nodes);
 
+            // Allocate bc_values if necessary
+            if (!data_slices[gpu]->d_bc_values) {
+                Value    *d_bc_values;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_bc_values,
+                                nodes * sizeof(Value)),
+                            "BCProblem cudaMalloc d_bc_values failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_bc_values = d_bc_values;
+            }
+
             // Allocate deltas if necessary
-            if (!data_slices[gpu]->d_preds) {
+            if (!data_slices[gpu]->d_deltas) {
                 Value    *d_deltas;
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_deltas,
@@ -303,10 +319,10 @@ struct BCProblem : ProblemBase<VertexId, SizeT,
                             "BCProblem cudaMalloc d_deltas failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_deltas = d_deltas;
             }
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_deltas, 0.0f, nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_deltas, (Value)0.0f, nodes);
 
             // Allocate deltas if necessary
-            if (!data_slices[gpu]->d_preds) {
+            if (!data_slices[gpu]->d_sigmas) {
                 Value    *d_sigmas;
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_sigmas,
@@ -314,8 +330,9 @@ struct BCProblem : ProblemBase<VertexId, SizeT,
                             "BCProblem cudaMalloc d_sigmas failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_sigmas = d_sigmas;
             }
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_sigmas, 0.0f, nodes);
-                
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_sigmas, (Value)0.0f, nodes);
+
+
             if (retval = util::GRError(cudaMemcpy(
 	                        d_data_slices[gpu],
 	                        data_slices[gpu],
@@ -338,14 +355,21 @@ struct BCProblem : ProblemBase<VertexId, SizeT,
 	                    &src_label,
 	                    sizeof(VertexId),
 	                    cudaMemcpyHostToDevice),
-	                "BCProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
+	                "BCProblem cudaMemcpy labels failed", __FILE__, __LINE__)) return retval;
         VertexId src_pred = -1; 
         if (retval = util::GRError(cudaMemcpy(
 	                    data_slices[0]->d_preds+src,
 	                    &src_pred,
 	                    sizeof(VertexId),
 	                    cudaMemcpyHostToDevice),
-	                "BCProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
+	                "BCProblem cudaMemcpy preds failed", __FILE__, __LINE__)) return retval;
+        Value src_sigma = 1.0f;
+        if (retval = util::GRError(cudaMemcpy(
+	                    data_slices[0]->d_sigmas+src,
+	                    &src_sigma,
+	                    sizeof(Value),
+	                    cudaMemcpyHostToDevice),
+	                "BCProblem cudaMemcpy sigmas failed", __FILE__, __LINE__)) return retval;
 
 	    return retval;
 	}
