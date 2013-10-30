@@ -288,10 +288,11 @@ void PrintValue<unsigned long long>(unsigned long long val) {
 template <typename T, typename SizeT>
 int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
 {
+    int flag = 0;
 	for (SizeT i = 0; i < len; i++) {
 
 		if (computed[i] != reference[i]) {
-			printf("INCORRECT: [%lu]: ", (unsigned long) i);
+			printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
 			PrintValue<T>(computed[i]);
 			printf(" != ");
 			PrintValue<T>(reference[i]);
@@ -310,13 +311,14 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
 				}
 				printf("...]");
 			}
-
-			return 1;
+			flag = 1;
+			return flag;
 		}
 	}
-
-	printf("CORRECT");
-	return 0;
+	printf("\n");
+    if (!flag)
+	    printf("CORRECT");
+	return flag;
 }
 
 

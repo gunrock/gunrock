@@ -34,6 +34,7 @@ struct Sweep
         int                                     &num_gpus,
         typename KernelPolicy::VertexId         *&d_in_queue,
         typename KernelPolicy::VertexId         *&d_out_queue,
+        typename KernelPolicy::VertexId         *&d_column_indices,
         typename ProblemData::DataSlice         *&problem,
         typename KernelPolicy::SmemStorage      &smem_storage,
         util::CtaWorkProgress                   &work_progress,
@@ -61,6 +62,7 @@ struct Sweep
                 smem_storage,
                 d_in_queue,
                 d_out_queue,
+                d_column_indices,
                 problem,
                 work_progress,
                 max_out_frontier);
@@ -106,6 +108,7 @@ struct Dispatch
         volatile int                *&d_done,
         VertexId                    *&d_in_queue,
         VertexId                    *&d_out_queue,
+        VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
         util::CtaWorkProgress       &work_progress,
         SizeT                       &max_in_frontier,
@@ -135,6 +138,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         volatile int                *&d_done,
         VertexId                    *&d_in_queue,
         VertexId                    *&d_out_queue,
+        VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
         util::CtaWorkProgress       &work_progress,
         SizeT                       &max_in_frontier,
@@ -198,6 +202,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 num_gpus,
                 d_in_queue,
                 d_out_queue, 
+                d_column_indices,
                 problem,
                 smem_storage,
                 work_progress,
@@ -226,6 +231,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 	                volatile int 							*d_done,					// Flag to set when we detect incoming edge frontier is empty
 	                typename KernelPolicy::VertexId 		*d_in_queue,			    // Incoming vertex frontier
 	                typename KernelPolicy::VertexId 		*d_out_queue,			    // Outgoing edge frontier
+	                typename KernelPolicy::VertexId         *d_column_indices,          // Column Indices queue
                     typename ProblemData::DataSlice         *problem,                    // Problem Object
 	                util::CtaWorkProgress 					work_progress,				// Atomic workstealing and queueing counters
 	                typename KernelPolicy::SizeT			max_in_frontier, 		    // Maximum number of elements we can place into the outgoing vertex frontier
@@ -240,6 +246,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 		    d_done,
 		    d_in_queue,
 		    d_out_queue,
+		    d_column_indices,
 		    problem,
 		    work_progress,
 		    max_in_frontier,

@@ -70,6 +70,8 @@ bool g_stream_from_host;
  template<typename VertexId, typename SizeT>
  void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes, bool MARK_PREDECESSORS)
  {
+    if (nodes > 40)
+        nodes = 40;
     printf("[");
     for (VertexId i = 0; i < nodes; ++i) {
         PrintValue(i);
@@ -268,7 +270,7 @@ void RunTests(
             printf("Validity: ");
             CompareResults(h_labels, reference_check, graph.nodes, true);
         }
-        
+       
         // Display Solution
         DisplaySolution(h_labels, h_preds, graph.nodes, MARK_PREDECESSORS);
 

@@ -42,13 +42,13 @@ namespace edge_map_forward {
     template <typename SizeT>
         texture<SizeT, cudaTextureType1D, cudaReadModeElementType> RowOffsetTex<SizeT>::ref;
 
-    template <typename VertexId>
+    /*template <typename VertexId>
         struct ColumnIndicesTex
         {
             static texture<VertexId, cudaTextureType1D, cudaReadModeElementType> ref;
         };
     template <typename VertexId>
-        texture<VertexId, cudaTextureType1D, cudaReadModeElementType> ColumnIndicesTex<VertexId>::ref;
+        texture<VertexId, cudaTextureType1D, cudaReadModeElementType> ColumnIndicesTex<VertexId>::ref;*/
 
 
     /**
@@ -84,6 +84,7 @@ namespace edge_map_forward {
             // Input and output device pointers
             VertexId                *d_in;                      // Incoming frontier
             VertexId                *d_out;                     // Outgoing frontier
+            VertexId                *d_column_indices;          // Column Indices Queue
             DataSlice               *problem;                   // Problem Data
 
             // Work progress
@@ -231,7 +232,10 @@ namespace edge_map_forward {
                                     while (coop_offset + KernelPolicy::THREADS < coop_oob) {
 
                                         // Gather
-                                        neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+threadIdx.x);
+                                        //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+threadIdx.x);
+                                        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                                neighbor_id,
+                                                cta->d_column_indices + coop_offset+threadIdx.x);
 
                                         // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id) (done)
                                         // if Cond(neighbor_id) returns true
@@ -254,7 +258,10 @@ namespace edge_map_forward {
                                     if (coop_offset + threadIdx.x < coop_oob) {
 
                                         // Gather
-                                        neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+threadIdx.x);
+                                        //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+threadIdx.x);
+                                        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                                neighbor_id,
+                                                cta->d_column_indices + coop_offset+threadIdx.x);
 
                                         // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
                                         // if Cond(neighbor_id) returns true
@@ -316,7 +323,10 @@ namespace edge_map_forward {
                                         while (coop_offset + GR_WARP_THREADS(KernelPolicy::CUDA_ARCH) < coop_oob) {
 
                                             // Gather
-                                            neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+lane_id);
+                                            //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+lane_id);
+                                            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                                neighbor_id,
+                                                cta->d_column_indices + coop_offset+lane_id);
                                             
                                             // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
                                             // if Cond(neighbor_id) returns true
@@ -338,7 +348,10 @@ namespace edge_map_forward {
 
                                         if (coop_offset + lane_id < coop_oob) {
                                             // Gather
-                                            neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+lane_id);
+                                            //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+lane_id);
+                                            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                                neighbor_id,
+                                                cta->d_column_indices + coop_offset+lane_id);
 
                                             // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
                                             // if Cond(neighbor_id) returns true
@@ -525,6 +538,7 @@ namespace edge_map_forward {
                 SmemStorage                 &smem_storage,
                 VertexId                    *d_in_queue,
                 VertexId                    *d_out_queue,
+                VertexId                    *d_column_indices,
                 DataSlice                   *problem,
                 util::CtaWorkProgress       &work_progress,
                 SizeT                       max_out_frontier) :
@@ -542,6 +556,7 @@ namespace edge_map_forward {
                     TileTuple(0,0)),
             d_in(d_in_queue),
             d_out(d_out_queue),
+            d_column_indices(d_column_indices),
             problem(problem),
             work_progress(work_progress),
             max_out_frontier(max_out_frontier)
@@ -645,7 +660,10 @@ namespace edge_map_forward {
                     {
                         // Gather a neighbor
                         VertexId neighbor_id;
-                        neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, smem_storage.gather_offsets[scratch_offset]);
+                        //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, smem_storage.gather_offsets[scratch_offset]);
+                        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                                neighbor_id,
+                                                d_column_indices + smem_storage.gather_offsets[scratch_offset]);
 
                         VertexId predecessor_id = smem_storage.gather_predecessors[scratch_offset];
 

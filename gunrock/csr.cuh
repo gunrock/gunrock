@@ -183,8 +183,9 @@ struct Csr
 	 */
 	void DisplayGraph()
 	{
+	    SizeT displayed_node_num = (nodes > 40) ? 40:nodes;
 		printf("Input Graph:\n");
-		for (VertexId node = 0; node < nodes; node++) {
+		for (SizeT node = 0; node < displayed_node_num; node++) {
 			util::PrintValue(node);
 			printf(": ");
 			for (SizeT edge = row_offsets[node]; edge < row_offsets[node + 1]; edge++) {
