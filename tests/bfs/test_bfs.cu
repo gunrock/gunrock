@@ -405,6 +405,11 @@ int main( int argc, char** argv)
 		{
 			return 1;
 		}
+		for (int i = 0; i < csr.nodes+1; ++i)
+		{
+		    if (csr.row_offsets[i+1] - csr.row_offsets[i] >= 512)
+		        printf("got one large neighbor list.\n");
+		}
 
         csr.DisplayGraph();
         fflush(stdout);

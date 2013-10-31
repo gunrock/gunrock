@@ -59,7 +59,7 @@ bool g_stream_from_host;
         "\n"
         "Graph types and args:\n"
         "  market [<file>]\n"
-        "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
+        "    Reads a Matrix-Market coordinate-formatted graph of undirected\n"
         "    edges from stdin (or from the optionally-specified file).\n"
         "--src=<source index>: When source index is -1, compute BC value for each\n"
         "node. Otherwise, debug the delta value for one node\n"
@@ -72,7 +72,7 @@ bool g_stream_from_host;
  template<typename Value, typename SizeT>
  void DisplaySolution(Value *sigmas, Value *bc_values, SizeT nodes)
  {
-     if (nodes < 20) {
+     if (nodes < 40) {
          printf("[");
          for (SizeT i = 0; i < nodes; ++i) {
              PrintValue(i);
@@ -341,7 +341,7 @@ int main( int argc, char** argv)
 	//srand(time(NULL));
 
 	// Parse graph-contruction params
-	g_undirected = false;
+	g_undirected = true;
 
 	std::string graph_type = argv[1];
 	int flags = args.ParsedArgc();

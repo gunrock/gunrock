@@ -118,14 +118,14 @@ class BCEnactor : public EnactorBase
                     (graph_slice->nodes + 1) * sizeof(SizeT)),
                         "BCEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
 
-            cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
+            /*cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
             if (retval = util::GRError(cudaBindTexture(
                             0,
                             gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref,
                             graph_slice->d_column_indices,
                             column_indices_desc,
                             graph_slice->edges * sizeof(VertexId)),
-                        "BCEnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;
+                        "BCEnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;*/
         } while (0);
         
         return retval;
@@ -192,8 +192,9 @@ class BCEnactor : public EnactorBase
     typename BCProblem::VertexId       src,
     int                                 max_grid_size = 0)
     {
-        typedef typename BCProblem::SizeT      SizeT;
-        typedef typename BCProblem::VertexId   VertexId;
+        typedef typename BCProblem::SizeT       SizeT;
+        typedef typename BCProblem::VertexId    VertexId;
+        typedef typename BCProblem::Value       Value;
 
         cudaError_t retval = cudaSuccess;
 
@@ -231,8 +232,44 @@ class BCEnactor : public EnactorBase
 
             fflush(stdout);
 
+            //VertexId *vids = new VertexId[graph_slice->edges*2];
+            //VertexId *labels = new VertexId[graph_slice->nodes];
+            //Value *sigmas = new Value[graph_slice->nodes];
             // Forward BC iteration
             while (done[0] < 0) {
+
+                /*if (DEBUG) {
+                    printf("Edge Map Input:\n");
+
+                    if (retval = util::GRError(cudaMemcpy(
+                                    vids,
+                                    graph_slice->frontier_queues.d_keys[selector],
+                                    sizeof(VertexId) * queue_length,
+                                    cudaMemcpyDeviceToHost),
+                                "BFSProblem cudaMemcpy d_vids failed", __FILE__, __LINE__)) break;
+
+                    if (retval = util::GRError(cudaMemcpy(
+                                    labels,
+                                    problem->data_slices[0]->d_labels,
+                                    sizeof(VertexId) * graph_slice->nodes,
+                                    cudaMemcpyDeviceToHost),
+                                "BFSProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) break;
+
+                    if (retval = util::GRError(cudaMemcpy(
+                                    sigmas,
+                                    problem->data_slices[0]->d_sigmas,
+                                    sizeof(Value) * graph_slice->nodes,
+                                    cudaMemcpyDeviceToHost),
+                                "BFSProblem cudaMemcpy d_sigmas failed", __FILE__, __LINE__)) break;
+                    for (int i = 0; i < queue_length; ++i)
+                    {
+                        if (i % 5 == 0)
+                            printf("\n");
+                        printf(" |%d:label:%d,sigma:%f| ",vids[i],labels[vids[i]], sigmas[vids[i]]);
+                        
+                    }
+                    printf("\n");
+                }*/
 
                 // Edge Map
                 gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, BCProblem, ForwardFunctor>
@@ -244,6 +281,7 @@ class BCEnactor : public EnactorBase
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
                     graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
+                    graph_slice->d_column_indices,
                     data_slice,
                     this->work_progress,
                     graph_slice->frontier_elements[selector],                   // max_in_queue
@@ -327,6 +365,9 @@ class BCEnactor : public EnactorBase
                 if (DEBUG) printf("\n%lld", (long long) iteration);
 
             }
+            //delete[] sigmas;
+            //delete[] labels;
+            //delete[] vids;
 
             iteration           = iteration - 2;
 
@@ -415,6 +456,7 @@ class BCEnactor : public EnactorBase
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
                     graph_slice->frontier_queues.d_keys[selector],            // d_out_queue
+                    graph_slice->d_column_indices,
                     data_slice,
                     this->work_progress,
                     graph_slice->frontier_elements[selector],                   // max_in_queue
@@ -493,10 +535,10 @@ class BCEnactor : public EnactorBase
                 INSTRUMENT,                         // INSTRUMENT
                 8,                                  // MIN_CTA_OCCUPANCY
                 7,                                  // LOG_THREADS
-                0,                                  // LOG_LOAD_VEC_SIZE
+                1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
-                32,                                 // WARP_GATHER_THRESHOLD
+                128 * 4,                                 // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7>                                  // LOG_SCHEDULE_GRANULARITY
                 EdgeMapPolicy;

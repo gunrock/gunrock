@@ -230,43 +230,8 @@ class BFSEnactor : public EnactorBase
 
             fflush(stdout);
             // Step through BFS iterations
-            VertexId *vids = new VertexId[graph_slice->edges*2];
-            VertexId *labels = new VertexId[graph_slice->nodes];
-            VertexId *preds = new VertexId[graph_slice->nodes];
+            
             while (done[0] < 0) {
-
-                if (DEBUG) {
-                    printf("Edge Map Input:\n");
-
-                    if (retval = util::GRError(cudaMemcpy(
-                                vids,
-                                graph_slice->frontier_queues.d_keys[selector],
-                                sizeof(VertexId) * queue_length,
-                                cudaMemcpyDeviceToHost),
-                            "BFSProblem cudaMemcpy d_vids failed", __FILE__, __LINE__)) break;
-
-                    if (retval = util::GRError(cudaMemcpy(
-                                labels,
-                                problem->data_slices[0]->d_labels,
-                                sizeof(VertexId) * graph_slice->nodes,
-                                cudaMemcpyDeviceToHost),
-                            "BFSProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) break;
-
-                    if (retval = util::GRError(cudaMemcpy(
-                                preds,
-                                problem->data_slices[0]->d_preds,
-                                sizeof(VertexId) * graph_slice->nodes,
-                                cudaMemcpyDeviceToHost),
-                            "BFSProblem cudaMemcpy d_preds failed", __FILE__, __LINE__)) break;
-                    for (int i = 0; i < queue_length; ++i)
-                    {
-                        printf("%d:%d, p:%d ",vids[i],labels[vids[i]], preds[vids[i]]);
-                    }
-                    printf("\n");
-                }
-
-
-                if (iteration > 2) break;
 
                 // Edge Map
                 gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, BFSProblem, BFSFunctor>
@@ -284,8 +249,6 @@ class BFSEnactor : public EnactorBase
                     graph_slice->frontier_elements[selector],                   // max_in_queue
                     graph_slice->frontier_elements[selector^1],                 // max_out_queue
                     this->edge_map_kernel_stats);
-
-
 
 
                 // Only need to reset queue for once
@@ -310,8 +273,6 @@ class BFSEnactor : public EnactorBase
                         total_runtimes,
                         total_lifetimes)) break;
                 }
-
-                util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
 
                 // Throttle
                 if (iteration & 1) {
@@ -366,9 +327,6 @@ class BFSEnactor : public EnactorBase
                 if (DEBUG) printf("\n%lld", (long long) iteration);
 
             }
-            delete[] preds;
-            delete[] labels;
-            delete[] vids;
 
             if (retval) break;
 
@@ -417,9 +375,9 @@ class BFSEnactor : public EnactorBase
                 8,                                  // MIN_CTA_OCCUPANCY
                 7,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
+                3,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
-                32,                                 // WARP_GATHER_THRESHOLD
+                128 * 4,                            // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7>                                  // LOG_SCHEDULE_GRANULARITY
                 EdgeMapPolicy;

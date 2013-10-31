@@ -84,7 +84,7 @@ namespace edge_map_forward {
             // Input and output device pointers
             VertexId                *d_in;                      // Incoming frontier
             VertexId                *d_out;                     // Outgoing frontier
-            VertexId                *d_column_indices;          // Column Indices Queue
+            VertexId                *d_column_indices;
             DataSlice               *problem;                   // Problem Data
 
             // Work progress
@@ -134,6 +134,7 @@ namespace edge_map_forward {
                 // Progress for scan-based forward edge map gather offsets
                 SizeT                   row_progress[LOADS_PER_TILE][LOAD_VEC_SIZE];
                 SizeT                   progress;
+                int zero_idx_load, zero_idx_vec;
 
                 /**
                  * Iterate next vector element
@@ -213,6 +214,8 @@ namespace edge_map_forward {
                                         cta->smem_storage.state.warp_comm[0][1] = tile->coarse_row_rank[LOAD][VEC];                             // queue rank
                                         cta->smem_storage.state.warp_comm[0][2] = tile->row_offset[LOAD][VEC] + tile->row_length[LOAD][VEC];    // oob
                                         cta->smem_storage.state.warp_comm[0][3] = tile->vertex_id[LOAD][VEC];                                   // predecessor
+                                        // Unset row length
+                                        tile->row_length[LOAD][VEC] = 0;
 
                                         // Unset my command
                                         cta->smem_storage.state.cta_comm = KernelPolicy::THREADS;   // So that we won't repeatedly expand this node
@@ -325,9 +328,9 @@ namespace edge_map_forward {
                                             // Gather
                                             //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+lane_id);
                                             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                                                neighbor_id,
-                                                cta->d_column_indices + coop_offset+lane_id);
-                                            
+                                                    neighbor_id,
+                                                    cta->d_column_indices + coop_offset+lane_id);
+
                                             // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
                                             // if Cond(neighbor_id) returns true
                                             // if Cond(neighbor_id) returns false or Apply returns false
@@ -336,7 +339,7 @@ namespace edge_map_forward {
                                                 Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
                                             else
                                                 neighbor_id = -1;
-                                            
+
                                             // Scatter neighbor
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                     neighbor_id,
@@ -350,8 +353,8 @@ namespace edge_map_forward {
                                             // Gather
                                             //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+lane_id);
                                             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                                                neighbor_id,
-                                                cta->d_column_indices + coop_offset+lane_id);
+                                                    neighbor_id,
+                                                    cta->d_column_indices + coop_offset+lane_id);
 
                                             // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
                                             // if Cond(neighbor_id) returns true
@@ -362,7 +365,6 @@ namespace edge_map_forward {
                                             else
                                                 neighbor_id = -1;
 
-                                            
                                             // Scatter neighbor
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                     neighbor_id,
@@ -487,6 +489,8 @@ namespace edge_map_forward {
                  __device__ __forceinline__ Tile()
                  {
                     Iterate<0, 0>::Init(this);
+                    zero_idx_load = -1;
+                    zero_idx_vec = -1;
                  }
 
                  /**
@@ -669,13 +673,12 @@ namespace edge_map_forward {
 
                         // if Cond(neighbor_id) returns true
                         // if Cond(neighbor_id) returns false or Apply returns false
-                        // set neighbor_id to -1 for invalid    
+                        // set neighbor_id to -1 for invalid
                         
                         if (Functor::CondEdge(predecessor_id, neighbor_id, problem))
                             Functor::ApplyEdge(predecessor_id, neighbor_id, problem);
                         else
                             neighbor_id = -1;
-                        
                         // Scatter into out_queue
                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                             neighbor_id,

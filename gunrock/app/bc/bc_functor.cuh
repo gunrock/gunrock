@@ -16,33 +16,40 @@ struct ForwardFunctor
     {
         // Check if the destination node has been claimed as someone's child
         bool child_available = (atomicCAS(&problem->d_preds[d_id], -2, s_id) == -2) ? true : false;
-        if (child_available)
+        
+        if (!child_available)
         {
+            //Two conditions will lead the code here.
+            //1) multiple parents try to claim a same child,
+            //and some parent other than you succeeded. In
+            //this case the label of the child should be -1.
+            //2) The child is from the same layer or maybe
+            //the upper layer of the graph and it has been
+            //labeled already.
+            //We do an atomicCAS to make sure the child be
+            //labeled.
+            VertexId label;
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    label, problem->d_labels + s_id);
+            atomicCAS(&problem->d_labels[d_id], -1, label+1);
+            if (problem->d_labels[d_id] == label + 1)
+            {
+                //Accumulate sigma value
+                atomicAdd(&problem->d_sigmas[d_id], problem->d_sigmas[s_id]);
+            }
+        }
+        return child_available;
+    }
+
+    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
+    { 
+            // Succeeded in claiming child, safe to set label to child
             VertexId label;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                     label, problem->d_labels + s_id);
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                     label+1, problem->d_labels + d_id);
-        }
-        VertexId s_label;
-        VertexId d_label;
-        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                s_label, problem->d_labels + s_id);
-        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                d_label, problem->d_labels + d_id);
-        if (d_label == s_label + 1)
-        {
-            //Accumulate sigma value
             atomicAdd(&problem->d_sigmas[d_id], problem->d_sigmas[s_id]);
-        }
-        return child_available;
-
-    }
-
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
-    {
-        
-        //for simple BC, Apply doing nothing
         
     }
 
@@ -76,7 +83,6 @@ struct BackwardFunctor
 
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
     {
-        //for simple BC, Apply doing nothing
         //set d_labels[d_id] to be d_labels[s_id]+1
         Value from_sigma;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
