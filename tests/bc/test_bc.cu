@@ -17,6 +17,8 @@
 #include <deque>
 #include <vector>
 #include <iostream>
+#include <fstream>
+#include <algorithm>
 
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
@@ -32,6 +34,13 @@
 // Operator includes
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/vertex_map/kernel.cuh>
+
+// Boost includes
+#include <boost/config.hpp>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/connected_components.hpp>
+#include <boost/graph/bc_clustering.hpp>
+#include <boost/graph/iteration_macros.hpp>
 
 using namespace gunrock;
 using namespace gunrock::util;
@@ -116,6 +125,12 @@ bool g_stream_from_host;
  * BC Testing Routines
  *****************************************************************************/
 
+// Graph edge properties (bundled properties)
+struct EdgeProperties
+{
+    int weight;
+};
+
  /**
   * A simple CPU-based reference BC ranking implementation.
   */
@@ -125,19 +140,57 @@ bool g_stream_from_host;
     typename SizeT>
 void RefCPUBC(
     const Csr<VertexId, Value, SizeT>       &graph,
-    Value                                   *sigmas,
     Value                                   *bc_values,
     VertexId                                src)
 {
+
+    using namespace boost;
+    typedef adjacency_list <setS, vecS, undirectedS, no_property, EdgeProperties> Graph;
+    typedef Graph::vertex_descriptor Vertex;
+    typedef Graph::edge_descriptor Edge;
+
+    Graph G;
+    for (int i = 0; i < graph.nodes; ++i)
+    {
+        for (int j = graph.row_offsets[i]; j < graph.row_offsets[i+1]; ++j)
+        {
+            add_edge(vertex(i, G), vertex(graph.column_indices[j], G), G);
+        }
+    }
+
+    typedef std::map<Edge, int> StdEdgeIndexMap;
+    StdEdgeIndexMap my_e_index;
+    typedef boost::associative_property_map< StdEdgeIndexMap > EdgeIndexMap;
+    EdgeIndexMap e_index(my_e_index);
+
+    // Define EdgeCentralityMap
+    std::vector< double > e_centrality_vec(boost::num_edges(G), 0.0);
+    // Create the external property map
+    boost::iterator_property_map< std::vector< double >::iterator, EdgeIndexMap >
+    e_centrality_map(e_centrality_vec.begin(), e_index);
+
+    // Define VertexCentralityMap
+    typedef boost::property_map< Graph, boost::vertex_index_t>::type VertexIndexMap;
+    VertexIndexMap v_index = get(boost::vertex_index, G);
+    std::vector< double > v_centrality_vec(boost::num_vertices(G), 0.0);
+    
+    // Create the external property map
+    boost::iterator_property_map< std::vector< double >::iterator, VertexIndexMap>
+    v_centrality_map(v_centrality_vec.begin(), v_index);
+
     //
     //Perform BC
-    //
-
+    // 
     CpuTimer cpu_timer;
     cpu_timer.Start();
-    
+    brandes_betweenness_centrality( G, v_centrality_map, e_centrality_map );
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
+
+    BGL_FORALL_VERTICES(vertex, G, Graph)
+    {
+        bc_values[vertex] = (Value)v_centrality_map[vertex];
+    }
 
     printf("CPU BC finished in %lf msec.", elapsed);
 }
@@ -182,10 +235,8 @@ void RunTests(
 
         // Allocate host-side array (for both reference and gpu-computed results)
         Value       *reference_bc_values        = (Value*)malloc(sizeof(Value) * graph.nodes);
-        Value       *reference_sigmas           = (Value*)malloc(sizeof(Value) * graph.nodes);
         Value       *h_sigmas                   = (Value*)malloc(sizeof(Value) * graph.nodes);
         Value       *h_bc_values                = (Value*)malloc(sizeof(Value) * graph.nodes);
-        Value       *reference_check_sigmas     = (g_quick) ? NULL : reference_sigmas;
         Value       *reference_check_bc_values  = (g_quick) ? NULL : reference_bc_values;
 
         // Allocate BC enactor map
@@ -211,7 +262,6 @@ void RunTests(
             printf("compute ref value\n");
             RefCPUBC(
                     graph,
-                    reference_check_sigmas,
                     reference_check_bc_values,
                     src);
             printf("\n");
@@ -247,6 +297,8 @@ void RunTests(
                 exit(1);
             }
         }
+        
+        util::MemsetScaleKernel<<<128, 128>>>(csr_problem->data_slices[0]->d_bc_values, 0.5f, graph.nodes);
 
         float elapsed = gpu_timer.ElapsedMillis();
 
@@ -266,7 +318,6 @@ void RunTests(
         // Cleanup
         if (csr_problem) delete csr_problem;
         if (reference_bc_values) free(reference_bc_values);
-        if (reference_sigmas) free(reference_sigmas);
         if (h_sigmas) free(h_sigmas);
         if (h_bc_values) free(h_bc_values);
 

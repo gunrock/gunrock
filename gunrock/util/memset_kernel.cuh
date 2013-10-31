@@ -47,7 +47,7 @@ __global__ void MemsetIdxKernel(T *d_out, int length)
 }
 
 /**
- * Add to each element in the array. (only support type with operator+)
+ * Add to each element in the array. (only support type with operator +)
  */
 template <typename T>
 __global__ void MemsetAddKernel(T *d_out, T value, int length)
@@ -55,6 +55,18 @@ __global__ void MemsetAddKernel(T *d_out, T value, int length)
     const int STRIDE = gridDim.x * blockDim.x;
     for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x; idx < length; idx += STRIDE) {
         d_out[idx] += value;
+    }
+}
+
+/**
+ * Scale to each element in the array. (only support type with operator *)
+ */
+template <typename T>
+__global__ void MemsetScaleKernel(T *d_out, T value, int length)
+{
+    const int STRIDE = gridDim.x * blockDim.x;
+    for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x; idx < length; idx += STRIDE) {
+        d_out[idx] *= value;
     }
 }
 

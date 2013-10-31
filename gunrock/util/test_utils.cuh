@@ -321,6 +321,46 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
 	return flag;
 }
 
+/**
+ * Compares the equivalence of two arrays
+ */
+template <typename SizeT>
+int CompareResults(float* computed, float* reference, SizeT len, bool verbose = true)
+{
+    float THRESHOLD = 0.01f;
+    int flag = 0;
+	for (SizeT i = 0; i < len; i++) {
+
+		if (fabs(computed[i] - reference[i]) > THRESHOLD) {
+			printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
+			PrintValue<float>(computed[i]);
+			printf(" != ");
+			PrintValue<float>(reference[i]);
+
+			if (verbose) {
+				printf("\nresult[...");
+				for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+					PrintValue<float>(computed[j]);
+					printf(", ");
+				}
+				printf("...]");
+				printf("\nreference[...");
+				for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+					PrintValue<float>(reference[j]);
+					printf(", ");
+				}
+				printf("...]");
+			}
+			flag = 1;
+			return flag;
+		}
+	}
+	printf("\n");
+    if (!flag)
+	    printf("CORRECT");
+	return flag;
+}
+
 
 /**
  * Verify the contents of a device array match those
