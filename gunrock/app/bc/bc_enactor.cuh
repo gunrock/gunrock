@@ -379,10 +379,6 @@ class BCEnactor : public EnactorBase
             done[0]             = -1;
 
 
-            // Fill in the frontier_queues
-            util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[0], graph_slice->nodes);
-
-
             // Prepare the label array
             VertexId            label_adjust = -iteration; 
             util::MemsetAddKernel<<<128, 128>>>(problem->data_slices[0]->d_labels, label_adjust, graph_slice->nodes);
@@ -393,7 +389,9 @@ class BCEnactor : public EnactorBase
             // Backward BC iteration
             for (;iteration > 0; --iteration) {
                 num_elements        = graph_slice->nodes;
-                
+                // Fill in the frontier_queues
+                util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[selector], num_elements);
+
                 // Vertex Map
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, BCProblem, BackwardFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(

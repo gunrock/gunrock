@@ -141,58 +141,137 @@ struct EdgeProperties
 void RefCPUBC(
     const Csr<VertexId, Value, SizeT>       &graph,
     Value                                   *bc_values,
+    Value                                   *sigmas,
     VertexId                                src)
 {
+    if (src == -1) {
+        // Perform full exact BC using BGL
 
-    using namespace boost;
-    typedef adjacency_list <setS, vecS, undirectedS, no_property, EdgeProperties> Graph;
-    typedef Graph::vertex_descriptor Vertex;
-    typedef Graph::edge_descriptor Edge;
+        using namespace boost;
+        typedef adjacency_list <setS, vecS, undirectedS, no_property, EdgeProperties> Graph;
+        typedef Graph::vertex_descriptor Vertex;
+        typedef Graph::edge_descriptor Edge;
 
-    Graph G;
-    for (int i = 0; i < graph.nodes; ++i)
-    {
-        for (int j = graph.row_offsets[i]; j < graph.row_offsets[i+1]; ++j)
+        Graph G;
+        for (int i = 0; i < graph.nodes; ++i)
         {
-            add_edge(vertex(i, G), vertex(graph.column_indices[j], G), G);
+            for (int j = graph.row_offsets[i]; j < graph.row_offsets[i+1]; ++j)
+            {
+                add_edge(vertex(i, G), vertex(graph.column_indices[j], G), G);
+            }
         }
+
+        typedef std::map<Edge, int> StdEdgeIndexMap;
+        StdEdgeIndexMap my_e_index;
+        typedef boost::associative_property_map< StdEdgeIndexMap > EdgeIndexMap;
+        EdgeIndexMap e_index(my_e_index);
+
+        // Define EdgeCentralityMap
+        std::vector< double > e_centrality_vec(boost::num_edges(G), 0.0);
+        // Create the external property map
+        boost::iterator_property_map< std::vector< double >::iterator, EdgeIndexMap >
+            e_centrality_map(e_centrality_vec.begin(), e_index);
+
+        // Define VertexCentralityMap
+        typedef boost::property_map< Graph, boost::vertex_index_t>::type VertexIndexMap;
+        VertexIndexMap v_index = get(boost::vertex_index, G);
+        std::vector< double > v_centrality_vec(boost::num_vertices(G), 0.0);
+
+        // Create the external property map
+        boost::iterator_property_map< std::vector< double >::iterator, VertexIndexMap>
+            v_centrality_map(v_centrality_vec.begin(), v_index);
+
+        //
+        //Perform BC
+        // 
+        CpuTimer cpu_timer;
+        cpu_timer.Start();
+        brandes_betweenness_centrality( G, v_centrality_map, e_centrality_map );
+        cpu_timer.Stop();
+        float elapsed = cpu_timer.ElapsedMillis();
+
+        BGL_FORALL_VERTICES(vertex, G, Graph)
+        {
+            bc_values[vertex] = (Value)v_centrality_map[vertex];
+        }
+
+        printf("CPU BC finished in %lf msec.", elapsed);
     }
+    else {
+        //Simple BFS pass to get single pass BC
+        VertexId *source_path = new VertexId[graph.nodes];
 
-    typedef std::map<Edge, int> StdEdgeIndexMap;
-    StdEdgeIndexMap my_e_index;
-    typedef boost::associative_property_map< StdEdgeIndexMap > EdgeIndexMap;
-    EdgeIndexMap e_index(my_e_index);
+        //initialize distances
+        for (VertexId i = 0; i < graph.nodes; ++i) {
+            source_path[i] = -1;
+            bc_values[i] = 0;
+            sigmas[i] = 0;
+        }
+        source_path[src] = 0;
+        VertexId search_depth = 0;
+        sigmas[src] = 1;
 
-    // Define EdgeCentralityMap
-    std::vector< double > e_centrality_vec(boost::num_edges(G), 0.0);
-    // Create the external property map
-    boost::iterator_property_map< std::vector< double >::iterator, EdgeIndexMap >
-    e_centrality_map(e_centrality_vec.begin(), e_index);
+        // Initialize queue for managing previously-discovered nodes
+        std::deque<VertexId> frontier;
+        frontier.push_back(src);
 
-    // Define VertexCentralityMap
-    typedef boost::property_map< Graph, boost::vertex_index_t>::type VertexIndexMap;
-    VertexIndexMap v_index = get(boost::vertex_index, G);
-    std::vector< double > v_centrality_vec(boost::num_vertices(G), 0.0);
-    
-    // Create the external property map
-    boost::iterator_property_map< std::vector< double >::iterator, VertexIndexMap>
-    v_centrality_map(v_centrality_vec.begin(), v_index);
+        //
+        //Perform one pass of BFS for one source
+        //
 
-    //
-    //Perform BC
-    // 
-    CpuTimer cpu_timer;
-    cpu_timer.Start();
-    brandes_betweenness_centrality( G, v_centrality_map, e_centrality_map );
-    cpu_timer.Stop();
-    float elapsed = cpu_timer.ElapsedMillis();
+        CpuTimer cpu_timer;
+        cpu_timer.Start();
+        while (!frontier.empty()) {
 
-    BGL_FORALL_VERTICES(vertex, G, Graph)
-    {
-        bc_values[vertex] = (Value)v_centrality_map[vertex];
+            // Dequeue node from frontier
+            VertexId dequeued_node = frontier.front();
+            frontier.pop_front();
+            VertexId neighbor_dist = source_path[dequeued_node] + 1;
+
+            // Locate adjacency list
+            int edges_begin = graph.row_offsets[dequeued_node];
+            int edges_end = graph.row_offsets[dequeued_node + 1];
+
+            for (int edge = edges_begin; edge < edges_end; ++edge) {
+                // Lookup neighbor and enqueue if undiscovered
+                VertexId neighbor = graph.column_indices[edge];
+                if (source_path[neighbor] == -1) {
+                    source_path[neighbor] = neighbor_dist;
+                    sigmas[neighbor] += sigmas[dequeued_node];
+                    if (search_depth < neighbor_dist) {
+                        search_depth = neighbor_dist;
+                    }
+                    frontier.push_back(neighbor);
+                }
+            }
+        }
+        search_depth++;
+
+        for (int iter = search_depth - 2; iter > 0; --iter)
+        {
+            for (int node = 0; node < graph.nodes; ++node)
+            {
+                if (source_path[node] == iter) {
+                    int edges_begin = graph.row_offsets[node];
+                    int edges_end = graph.row_offsets[node+1];
+
+                    for (int edge = edges_begin; edge < edges_end; ++edge) {
+                        VertexId neighbor = graph.column_indices[edge];
+                        if (source_path[neighbor] == iter + 1) {
+                            bc_values[node] += 1.0f * sigmas[node] / sigmas[neighbor] * (1.0f + bc_values[neighbor]);
+                        }
+                    }
+                }
+            }
+        }
+
+        cpu_timer.Stop();
+        float elapsed = cpu_timer.ElapsedMillis();
+
+        printf("CPU BFS finished in %lf msec. Search depth is:%d\n", elapsed, search_depth);
+
+        delete[] source_path;
     }
-
-    printf("CPU BC finished in %lf msec.", elapsed);
 }
 
 /**
@@ -236,9 +315,11 @@ void RunTests(
 
         // Allocate host-side array (for both reference and gpu-computed results)
         Value       *reference_bc_values        = (Value*)malloc(sizeof(Value) * graph.nodes);
+        Value       *reference_sigmas           = (Value*)malloc(sizeof(Value) * graph.nodes);
         Value       *h_sigmas                   = (Value*)malloc(sizeof(Value) * graph.nodes);
         Value       *h_bc_values                = (Value*)malloc(sizeof(Value) * graph.nodes);
         Value       *reference_check_bc_values  = (g_quick) ? NULL : reference_bc_values;
+        Value       *reference_check_sigmas     = (g_quick || (src == -1)) ? NULL : reference_sigmas;
 
         // Allocate BC enactor map
         BCEnactor<INSTRUMENT> bc_enactor(g_verbose);
@@ -264,6 +345,7 @@ void RunTests(
             RefCPUBC(
                     graph,
                     reference_check_bc_values,
+                    reference_sigmas,
                     src);
             printf("\n");
         }
@@ -308,8 +390,14 @@ void RunTests(
 
         // Verify the result
         if (reference_check_bc_values != NULL) {
-            printf("Validity: ");
+            printf("Validity BC Value: ");
             CompareResults(h_bc_values, reference_check_bc_values, graph.nodes, true);
+            printf("\n"); 
+        }
+        if (reference_check_sigmas != NULL) {
+            printf("Validity Sigma: ");
+            CompareResults(h_sigmas, reference_check_sigmas, graph.nodes, true);
+            printf("\n");
         }
         
         // Display Solution
@@ -318,6 +406,7 @@ void RunTests(
 
         // Cleanup
         if (csr_problem) delete csr_problem;
+        if (reference_sigmas) free(reference_sigmas);
         if (reference_bc_values) free(reference_bc_values);
         if (h_sigmas) free(h_sigmas);
         if (h_bc_values) free(h_bc_values);
