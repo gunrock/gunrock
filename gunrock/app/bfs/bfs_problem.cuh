@@ -31,14 +31,16 @@ template <
 	util::io::ld::CacheModifier _ROW_OFFSET_ALIGNED_READ_MODIFIER,		// Load instruction cache-modifier for reading CSR row-offsets (when 8-byte aligned)
 	util::io::ld::CacheModifier _ROW_OFFSET_UNALIGNED_READ_MODIFIER,	// Load instruction cache-modifier for reading CSR row-offsets (when 4-byte aligned)
 	util::io::st::CacheModifier _QUEUE_WRITE_MODIFIER,					// Store instruction cache-modifier for writing outgoign frontier vertex-ids. Valid on SM2.0 or newer, where util::io::st::cg is req'd for fused-iteration implementations incorporating software global barriers.
-	bool 		_MARK_PREDECESSORS>				// Whether to mark predecessor-vertices
+	bool 		_MARK_PREDECESSORS,				// Whether to mark predecessor-vertices
+	bool        _USE_DOUBLE_BUFFER>
 struct BFSProblem : ProblemBase<VertexId, SizeT,
                                 _QUEUE_READ_MODIFIER,
                                 _COLUMN_READ_MODIFIER,
                                 _EDGE_VALUES_READ_MODIFIER,
                                 _ROW_OFFSET_ALIGNED_READ_MODIFIER,
                                 _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER>
+                                _QUEUE_WRITE_MODIFIER,
+                                _USE_DOUBLE_BUFFER>
 {
 
 	static const bool MARK_PREDECESSORS		= _MARK_PREDECESSORS;
@@ -176,7 +178,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                                 _EDGE_VALUES_READ_MODIFIER,
                                 _ROW_OFFSET_ALIGNED_READ_MODIFIER,
                                 _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER>::Init(stream_from_host,
+                                _QUEUE_WRITE_MODIFIER,
+                                _USE_DOUBLE_BUFFER>::Init(stream_from_host,
 	                                    nodes,
 	                                    edges,
 	                                    h_row_offsets,
@@ -243,7 +246,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                                 _EDGE_VALUES_READ_MODIFIER,
                                 _ROW_OFFSET_ALIGNED_READ_MODIFIER,
                                 _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER> BaseProblem;
+                                _QUEUE_WRITE_MODIFIER,
+                                _USE_DOUBLE_BUFFER> BaseProblem;
 	    //load ProblemBase Reset
 	    BaseProblem::Reset(frontier_type, queue_sizing);
 

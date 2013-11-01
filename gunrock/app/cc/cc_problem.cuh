@@ -30,14 +30,16 @@ template <
     util::io::ld::CacheModifier _EDGE_VALUES_READ_MODIFIER,             // Load instruction cache-modifier for reading edge values
 	util::io::ld::CacheModifier _ROW_OFFSET_ALIGNED_READ_MODIFIER,		// Load instruction cache-modifier for reading CSR row-offsets (when 8-byte aligned)
 	util::io::ld::CacheModifier _ROW_OFFSET_UNALIGNED_READ_MODIFIER,	// Load instruction cache-modifier for reading CSR row-offsets (when 4-byte aligned)
-	util::io::st::CacheModifier _QUEUE_WRITE_MODIFIER>					// Store instruction cache-modifier for writing outgoign frontier vertex-ids. Valid on SM2.0 or newer, where util::io::st::cg is req'd for fused-iteration implementations incorporating software global barriers.
+	util::io::st::CacheModifier _QUEUE_WRITE_MODIFIER,					// Store instruction cache-modifier for writing outgoign frontier vertex-ids. Valid on SM2.0 or newer, where util::io::st::cg is req'd for fused-iteration implementations incorporating software global barriers.
+	bool        _USE_DOUBLE_BUFFER>
 struct CCProblem : ProblemBase<VertexId, SizeT,
                                 _QUEUE_READ_MODIFIER,
                                 _COLUMN_READ_MODIFIER,
                                 _EDGE_VALUES_READ_MODIFIER,
                                 _ROW_OFFSET_ALIGNED_READ_MODIFIER,
                                 _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER>
+                                _QUEUE_WRITE_MODIFIER,
+                                _USE_DOUBLE_BUFFER>
 {
     //Helper structures
 /** * Data slice per GPU
@@ -46,7 +48,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
     {
         // device storage arrays
         VertexId        *d_component_ids;               // Used for component id
-        bool            *d_masks;                       // Size equals to node number, show if a node is the root
+        int             *d_masks;                       // Size equals to node number, show if a node is the root
         bool            *d_marks;                       // Size equals to edge number, show if two vertices belong to the same component
         VertexId        *d_froms;                        // Size equals to edge number, from vertex of one edge
         VertexId        *d_tos;                          // Size equals to edge number, to vertex of one edge
@@ -205,7 +207,8 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
                                 _EDGE_VALUES_READ_MODIFIER,
                                 _ROW_OFFSET_ALIGNED_READ_MODIFIER,
                                 _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER>::Init(stream_from_host,
+                                _QUEUE_WRITE_MODIFIER,
+                                _USE_DOUBLE_BUFFER>::Init(stream_from_host,
 	                                    nodes,
 	                                    edges,
 	                                    h_row_offsets,
@@ -289,10 +292,10 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
 	                "CCProblem cudaMalloc d_component_ids failed", __FILE__, __LINE__)) return retval;
 	            data_slices[0]->d_component_ids = d_component_ids;
  
-	            bool   *d_masks;
+	            int   *d_masks;
                     if (retval = util::GRError(cudaMalloc(
 	                    (void**)&d_masks,
-	                    nodes * sizeof(bool)),
+	                    nodes * sizeof(int)),
 	                "CCProblem cudaMalloc d_masks failed", __FILE__, __LINE__)) return retval;
 	            data_slices[0]->d_masks = d_masks;
 
@@ -324,7 +327,8 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
                                 _EDGE_VALUES_READ_MODIFIER,
                                 _ROW_OFFSET_ALIGNED_READ_MODIFIER,
                                 _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER> BaseProblem;
+                                _QUEUE_WRITE_MODIFIER,
+                                _USE_DOUBLE_BUFFER> BaseProblem;
 	    //load ProblemBase Reset
 	    BaseProblem::Reset(frontier_type, queue_sizing);
 
@@ -360,14 +364,14 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
 
             // Allocate masks if necessary
             if (!data_slices[gpu]->d_masks) {
-                bool    *d_masks;
+                int    *d_masks;
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_masks,
-                                nodes * sizeof(bool)),
+                                nodes * sizeof(int)),
                             "CCProblem cudaMalloc d_masks failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_masks = d_masks;
             }
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_masks, true, nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_masks, 0, nodes);
                 
             if (retval = util::GRError(cudaMemcpy(
 	                        d_data_slices[gpu],
@@ -377,8 +381,11 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
 	                    "CCProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
 	    }
 
-	    // Initialize frontier_queue as the idx
+	    // Initialize edge frontier_queue
 	    util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], edges);
+
+	    // Initialize vertex frontier queue
+	    util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_values[0], nodes);
 	    
 	    return retval;
 	}

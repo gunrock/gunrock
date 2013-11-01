@@ -219,7 +219,8 @@ void RunTests(
         io::ld::NONE,
         io::ld::cg,
         io::ld::NONE,
-        io::st::cg> Problem;
+        io::st::cg,
+        false> Problem; //does not use double buffer
 
     typedef ForwardFunctor<
         VertexId,

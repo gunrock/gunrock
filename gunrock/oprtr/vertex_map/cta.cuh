@@ -138,15 +138,16 @@ struct Cta
 				Cta *cta,
 				Tile *tile)
 			{
+                if (tile->vertex_id[LOAD][VEC] >= 0) {
+				    // Row index on our GPU (for multi-gpu, vertex ids are striped across GPUs)
+			        VertexId row_id = (tile->vertex_id[LOAD][VEC]) / cta->num_gpus;
 
-				// Row index on our GPU (for multi-gpu, vertex ids are striped across GPUs)
-			    VertexId row_id = (tile->vertex_id[LOAD][VEC]) / cta->num_gpus;
-
-				if (Functor::CondVertex(row_id, cta->problem)) {
-					// ApplyVertex(row_id)
-					Functor::ApplyVertex(row_id, cta->problem);
+				    if (Functor::CondVertex(row_id, cta->problem)) {
+					    // ApplyVertex(row_id)
+					    Functor::ApplyVertex(row_id, cta->problem);
+				    }
+				    else tile->vertex_id[LOAD][VEC] = -1;
 				}
-				else tile->vertex_id[LOAD][VEC] = -1;
 
 				// Next
 				Iterate<LOAD, VEC + 1>::VertexCull(cta, tile);

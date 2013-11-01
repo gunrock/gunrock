@@ -276,6 +276,14 @@ void PrintValue<unsigned long long>(unsigned long long val) {
 	printf("%llu", val);
 }
 
+template<>
+void PrintValue<bool>(bool val) {
+	if (val)
+	    printf("true");
+	else
+	    printf("false");
+}
+
 
 
 /******************************************************************************

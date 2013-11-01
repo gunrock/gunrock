@@ -51,6 +51,8 @@ class CCEnactor : public EnactorBase
      */
     volatile int        *done;
     int                 *d_done;
+    volatile int        *flag;
+    int                 *d_flag;
     cudaEvent_t         throttle_event;
 
     /**
@@ -75,21 +77,32 @@ class CCEnactor : public EnactorBase
         cudaError_t retval = cudaSuccess;
 
         do {
+
+            int flags = cudaHostAllocMapped;
             //initialize the host-mapped "done"
             if (!done) {
-                int flags = cudaHostAllocMapped;
-
                 // Allocate pinned memory for done
                 if (retval = util::GRError(cudaHostAlloc((void**)&done, sizeof(int) * 1, flags),
                     "CCEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) break;
 
                 // Map done into GPU space
                 if (retval = util::GRError(cudaHostGetDevicePointer((void**)&d_done, (void*) done, 0),
-                    "CCEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) break;
+                    "CCEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) break; 
 
                 // Create throttle event
                 if (retval = util::GRError(cudaEventCreateWithFlags(&throttle_event, cudaEventDisableTiming),
                     "CCEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) break;
+            }
+
+            if (!flag) {
+                
+                // Allocate pinned memory for flag
+                if (retval = util::GRError(cudaHostAlloc((void**)&flag, sizeof(int) * 1, flags),
+                    "CCEnactor cudaHostAlloc flag failed", __FILE__, __LINE__)) break;
+
+                // Map flag into GPU space
+                if (retval = util::GRError(cudaHostGetDevicePointer((void**)&d_flag, (void*) flag, 0),
+                    "CCEnactor cudaHostGetDevicePointer flag failed", __FILE__, __LINE__)) break;
             }
 
             //initialize runtime stats
@@ -101,6 +114,7 @@ class CCEnactor : public EnactorBase
             total_lifetimes     = 0;
             total_queued        = 0;
             done[0]             = -1;
+            flag[0]             = -1;
 
         } while (0);
         
@@ -117,7 +131,9 @@ class CCEnactor : public EnactorBase
         iteration(0),
         total_queued(0),
         done(NULL),
-        d_done(NULL)
+        d_done(NULL),
+        flag(NULL),
+        d_flag(NULL)
     {}
 
     /**
@@ -131,6 +147,12 @@ class CCEnactor : public EnactorBase
 
             util::GRError(cudaEventDestroy(throttle_event),
                 "CCEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
+        }
+
+        if (flag) {
+            util::GRError(cudaFreeHost((void*)flag),
+                "CCEnactor cudaFreeHost done failed", __FILE__, __LINE__);
+
         }
     }
 
@@ -160,9 +182,11 @@ class CCEnactor : public EnactorBase
     template<
         typename VertexMapPolicy,
         typename CCProblem,
+        typename UpdateMaskFunctor,
         typename HookMinFunctor,
         typename HookMaxFunctor,
-        typename PtrJumpFunctor>
+        typename PtrJumpMaskFunctor,
+        typename PtrJumpUnmaskFunctor>
     cudaError_t Enact(
     CCProblem                          *problem,
     int                                 max_grid_size = 0)
@@ -172,6 +196,11 @@ class CCEnactor : public EnactorBase
 
         cudaError_t retval = cudaSuccess;
 
+            printf("Edge Info:\n");
+            //util::DisplayDeviceResults(problem->data_slices[0]->d_froms, problem->graph_slices[0]->edges);
+            //util::DisplayDeviceResults(problem->data_slices[0]->d_tos, problem->graph_slices[0]->edges);
+            printf("\n\n");
+
         do {
             // Determine grid size(s)
             int vertex_map_occupancy    = VertexMapPolicy::CTA_OCCUPANCY;
@@ -180,7 +209,6 @@ class CCEnactor : public EnactorBase
             if (DEBUG) {
                 printf("CC vertex map occupancy %d, level-grid size %d\n",
                         vertex_map_occupancy, vertex_map_grid_size);
-                printf("0");
             }
 
             // Lazy initialization
@@ -190,20 +218,20 @@ class CCEnactor : public EnactorBase
             typename CCProblem::GraphSlice *graph_slice = problem->graph_slices[0];
             typename CCProblem::DataSlice *data_slice = problem->d_data_slices[0];
 
-            SizeT queue_length          = 0;
+            SizeT queue_length          = graph_slice->edges;
             VertexId queue_index        = 0;        // Work queue index
             int selector                = 0;
             SizeT num_elements          = graph_slice->edges;
+            bool queue_reset            = true; 
 
-            bool queue_reset = true; 
+            // Initial Hook Operation
+            printf("initial hook, upperlimit:%d\n", graph_slice->frontier_elements[selector]);
 
-            fflush(stdout);
-            // HookMin/Max iterations
-            while (done[0] < 0) {
-               
-                // Vertex Map
-                if (iteration & 1) {
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMinFunctor>
+            //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
+            //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
+            //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
+            //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
+            gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMinFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                     queue_reset,
                     queue_index,
@@ -217,92 +245,41 @@ class CCEnactor : public EnactorBase
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
                     this->vertex_map_kernel_stats);
-                }
-                else {
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMaxFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
-                    queue_reset,
-                    queue_index,
-                    1,
-                    num_elements,
-                    d_done,
-                    graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
-                    graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
-                    data_slice,
-                    work_progress,
-                    graph_slice->frontier_elements[selector],           // max_in_queue
-                    graph_slice->frontier_elements[selector^1],         // max_out_queue
-                    this->vertex_map_kernel_stats);
-                }
 
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
+            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookMin Operation failed", __FILE__, __LINE__))) break; 
 
-                if (queue_reset) queue_reset = false;
+            queue_length = graph_slice->nodes;
+            queue_index = 0;
+            selector = 0;
+            num_elements = graph_slice->nodes;
+            iteration = 0;
 
-                // Throttle
-                if (iteration & 1) {
-                    if (retval = util::GRError(cudaEventRecord(throttle_event),
-                        "CCEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
-                } else {
-                    if (retval = util::GRError(cudaEventSynchronize(throttle_event),
-                        "CCEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
-                }
-
-                queue_index++;
-                selector ^= 1;
-                iteration++;
-
-                if (INSTRUMENT || DEBUG) {
-                    if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-                    total_queued += queue_length;
-                    if (DEBUG) printf(", %lld", (long long) queue_length);
-                    if (INSTRUMENT) {
-                        if (retval = vertex_map_kernel_stats.Accumulate(
-                            vertex_map_grid_size,
-                            total_runtimes,
-                            total_lifetimes)) break;
-                    }
-                }
-                // Check if done
-                if (done[0] == 0) break;
-
-                if (DEBUG) printf("\n%lld", (long long) iteration);
-
-            }
-          
-
-            queue_length        = 0;
-            queue_index         = 0;        // Work queue index
-            selector            = 0;
-            num_elements        = graph_slice->nodes;
-
-            queue_reset         = true;
-            done[0]             = -1;
-
-            util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[selector], graph_slice->nodes);
-
-            // Pointer Jumping Iterations
+            // First Pointer Jumping Round
             while (done[0] < 0) {
+                printf("first ptr jump\n");
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
+                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], queue_length);
 
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpFunctor>
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpMaskFunctor>
                     <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                             queue_reset,
                             queue_index,
                             1,
                             num_elements,
                             d_done,
-                            graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
-                            graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
+                            graph_slice->frontier_queues.d_values[selector],      // d_in_queue
+                            graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
                             data_slice,
                             work_progress,
                             graph_slice->frontier_elements[selector],           // max_in_queue
                             graph_slice->frontier_elements[selector^1],         // max_out_queue
                             this->vertex_map_kernel_stats);
 
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel failed", __FILE__, __LINE__))) break;
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel First Pointer Jumping Round failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
-
+                
                 if (queue_reset) queue_reset = false;
 
                 // Throttle
@@ -321,7 +298,6 @@ class CCEnactor : public EnactorBase
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                     total_queued += queue_length;
-                    if (DEBUG) printf(", %lld", (long long) queue_length);
                     if (INSTRUMENT) {
                         if (retval = vertex_map_kernel_stats.Accumulate(
                                     vertex_map_grid_size,
@@ -331,10 +307,260 @@ class CCEnactor : public EnactorBase
                 }
                 // Check if done
                 if (done[0] == 0) break;
-
-                if (DEBUG) printf("\n%lld", (long long) iteration);
-
             }
+
+            queue_length = graph_slice->nodes;
+            queue_index = 0;
+            selector = 0;
+            num_elements = graph_slice->nodes;
+            queue_reset = true;
+            util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_values[selector], graph_slice->nodes);
+
+            printf("update mask\n");
+            //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
+            //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
+            //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
+            //util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], queue_length);
+
+            // Initial Update Mask Operation
+            gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, UpdateMaskFunctor>
+                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                    queue_reset,
+                    queue_index,
+                    1,
+                    num_elements,
+                    d_done,
+                    graph_slice->frontier_queues.d_values[selector],
+                    graph_slice->frontier_queues.d_values[selector^1],
+                    data_slice,
+                    work_progress,
+                    graph_slice->frontier_elements[selector],
+                    graph_slice->frontier_elements[selector^1],
+                    this->vertex_map_kernel_stats);
+
+            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial Update Mask failed", __FILE__, __LINE__))) break;
+
+            queue_length = graph_slice->edges;
+            queue_index = 0;
+            selector = 0;
+            num_elements = graph_slice->edges;
+            iteration = 1;
+            done[0] = -1;
+            
+            while (done[0] < 0) {
+                
+                // Set new queue_length
+                if (retval = work_progress.SetQueueLength(queue_index, queue_length)) break;
+                if (iteration & 11) {
+                    printf("hook min\n");
+                    //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
+                    //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
+                    //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
+                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMinFunctor>
+                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                    queue_reset,
+                    queue_index,
+                    1,
+                    num_elements,
+                    d_done,
+                    graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                    graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
+                    data_slice,
+                    work_progress,
+                    graph_slice->frontier_elements[selector],           // max_in_queue
+                    graph_slice->frontier_elements[selector^1],         // max_out_queue
+                    this->vertex_map_kernel_stats);
+                }
+                else {
+                    printf("hook max\n");
+                    //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
+                    //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
+                    //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
+                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
+
+                    gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMaxFunctor>
+                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                    queue_reset,
+                    queue_index,
+                    1,
+                    num_elements,
+                    d_done,
+                    graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                    graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
+                    data_slice,
+                    work_progress,
+                    graph_slice->frontier_elements[selector],           // max_in_queue
+                    graph_slice->frontier_elements[selector^1],         // max_out_queue
+                    this->vertex_map_kernel_stats);
+                }
+
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Hook Min/Max Operation failed", __FILE__, __LINE__))) break;
+                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
+
+                if (queue_reset) queue_reset = false;
+
+                // Throttle
+                if (iteration & 1) {
+                    if (retval = util::GRError(cudaEventRecord(throttle_event),
+                        "CCEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
+                } else {
+                    if (retval = util::GRError(cudaEventSynchronize(throttle_event),
+                        "CCEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
+                }
+
+                queue_index++;
+                selector ^= 1;
+                iteration++;
+                
+                // Save current queue_length
+                if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
+
+                if (INSTRUMENT || DEBUG) {
+                    
+                    total_queued += queue_length;
+                    if (INSTRUMENT) {
+                        if (retval = vertex_map_kernel_stats.Accumulate(
+                            vertex_map_grid_size,
+                            total_runtimes,
+                            total_lifetimes)) break;
+                    }
+                }
+                // Check if done
+                if (done[0] == 0) break;
+
+                int ptrj_queue_length        = graph_slice->nodes;
+                int ptrj_queue_index         = 0;        // Work queue index
+                int ptrj_selector            = 0;
+                int ptrj_num_elements        = graph_slice->nodes;
+
+                int ptrj_queue_reset         = true;
+                flag[0]                      = -1;
+                int ptrj_iteration           = 0;
+
+
+                // Pointer Jumping Iterations
+                while (flag[0] < 0) {
+                    printf("ptr jump mask\n");
+                    //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
+                    //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
+                    //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
+                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], queue_length);
+
+                    gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpMaskFunctor>
+                        <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                                ptrj_queue_reset,
+                                ptrj_queue_index,
+                                1,
+                                ptrj_num_elements,
+                                d_flag,
+                                graph_slice->frontier_queues.d_values[selector],      // d_in_queue
+                                graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
+                                data_slice,
+                                work_progress,
+                                graph_slice->frontier_elements[selector],           // max_in_queue
+                                graph_slice->frontier_elements[selector^1],         // max_out_queue
+                                this->vertex_map_kernel_stats);
+
+                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Pointer Jumping Mask failed", __FILE__, __LINE__))) break;
+                    cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
+
+                    if (ptrj_queue_reset) ptrj_queue_reset = false;
+
+                    // Throttle
+                    if (ptrj_iteration & 1) {
+                        if (retval = util::GRError(cudaEventRecord(throttle_event),
+                                    "CCEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
+                    } else {
+                        if (retval = util::GRError(cudaEventSynchronize(throttle_event),
+                                    "CCEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
+                    }
+
+                    ptrj_queue_index++;
+                    ptrj_selector ^= 1;
+                    ptrj_iteration++;
+
+                    if (INSTRUMENT || DEBUG) {
+                        if (retval = work_progress.GetQueueLength(ptrj_queue_index, ptrj_queue_length)) break;
+                        total_queued += ptrj_queue_length;
+                        if (INSTRUMENT) {
+                            if (retval = vertex_map_kernel_stats.Accumulate(
+                                        vertex_map_grid_size,
+                                        total_runtimes,
+                                        total_lifetimes)) break;
+                        }
+                    }
+                    // Check if done
+                    if (flag[0] == 0) break;
+
+                }
+
+                ptrj_queue_length        = graph_slice->nodes;
+                ptrj_queue_index         = 0;        // Work queue index
+                ptrj_selector            = 0;
+                ptrj_num_elements        = graph_slice->nodes;
+
+                ptrj_queue_reset         = true;
+                flag[0]                  = -1;
+                
+                if (retval = work_progress.GetQueueLength(ptrj_queue_index, ptrj_queue_length)) break;
+                util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_values[selector], graph_slice->nodes);
+
+                printf("ptr jump unmask\n");
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
+                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], ptrj_queue_length);
+
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpUnmaskFunctor>
+                    <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                            ptrj_queue_reset,
+                            ptrj_queue_index,
+                            1,
+                            ptrj_num_elements,
+                            d_flag,
+                            graph_slice->frontier_queues.d_values[selector],      // d_in_queue
+                            graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
+                            data_slice,
+                            work_progress,
+                            graph_slice->frontier_elements[selector],           // max_in_queue
+                            graph_slice->frontier_elements[selector^1],         // max_out_queue
+                            this->vertex_map_kernel_stats);
+
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Pointer Jumping Unmask failed", __FILE__, __LINE__))) break;
+
+                ptrj_queue_length = 0;
+                ptrj_queue_index = 0;
+                ptrj_selector = 0;
+                ptrj_num_elements = graph_slice->nodes;
+                ptrj_queue_reset = true;
+                flag[0] = -1;
+                util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_values[selector], graph_slice->nodes);
+
+                printf("update mask\n");
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
+                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], ptrj_queue_length);
+                // Update Mask Operation
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, UpdateMaskFunctor>
+                    <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                            queue_reset,
+                            queue_index,
+                            1,
+                            num_elements,
+                            d_flag,
+                            graph_slice->frontier_queues.d_values[selector],
+                            graph_slice->frontier_queues.d_values[selector^1],
+                            data_slice,
+                            work_progress,
+                            graph_slice->frontier_elements[selector],
+                            graph_slice->frontier_elements[selector^1],
+                            this->vertex_map_kernel_stats);
+
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Update Mask failed", __FILE__, __LINE__))) break;
+            }
+            
             if (retval) break;
 
             // Check if any of the frontiers overflowed due to redundant expansion
@@ -354,7 +580,12 @@ class CCEnactor : public EnactorBase
     /**
      * Enact Kernel Entry, specify KernelPolicy
      */
-    template <typename CCProblem, typename HookMinFunctor, typename HookMaxFunctor, typename PtrJumpFunctor>
+    template <typename CCProblem,
+              typename UpdateMaskFunctor,
+              typename HookMinFunctor,
+              typename HookMaxFunctor,
+              typename PtrJumpMaskFunctor,
+              typename PtrJumpUnmaskFunctor>
     cudaError_t Enact(
         CCProblem                      *problem,
         int                             max_grid_size = 0)
@@ -374,7 +605,7 @@ class CCEnactor : public EnactorBase
                 8>                                  // LOG_SCHEDULE_GRANULARITY
                 VertexMapPolicy;
                 
-                return Enact<VertexMapPolicy, CCProblem, HookMinFunctor, HookMaxFunctor, PtrJumpFunctor>(
+                return Enact<VertexMapPolicy, CCProblem, UpdateMaskFunctor, HookMinFunctor, HookMaxFunctor, PtrJumpMaskFunctor, PtrJumpUnmaskFunctor>(
                 problem, max_grid_size);
         }
 

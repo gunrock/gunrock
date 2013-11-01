@@ -50,7 +50,8 @@ template <
     util::io::ld::CacheModifier _EDGE_VALUES_READ_MODIFIER,             // Load instruction cache-modifier for reading edge values
 	util::io::ld::CacheModifier _ROW_OFFSET_ALIGNED_READ_MODIFIER,		// Load instruction cache-modifier for reading CSR row-offsets (when 8-byte aligned)
 	util::io::ld::CacheModifier _ROW_OFFSET_UNALIGNED_READ_MODIFIER,	// Load instruction cache-modifier for reading CSR row-offsets (when 4-byte aligned)
-	util::io::st::CacheModifier _QUEUE_WRITE_MODIFIER>					// Store instruction cache-modifier for writing outgoign frontier vertex-ids. Valid on SM2.0 or newer, where util::io::st::cg is req'd for fused-iteration implementations incorporating software global barriers.
+	util::io::st::CacheModifier _QUEUE_WRITE_MODIFIER,					// Store instruction cache-modifier for writing outgoign frontier vertex-ids. Valid on SM2.0 or newer, where util::io::st::cg is req'd for fused-iteration implementations incorporating software global barriers.
+	bool        _USE_DOUBLE_BUFFER>                                     // Whether to use double buffer
 
 struct ProblemBase
 {
@@ -327,12 +328,27 @@ struct ProblemBase
 								        "GpuSlice cudaFree frontier_queues.d_keys failed", __FILE__, __LINE__)) return retval;
 					    }
 
+                        // Free if previously allocated
+                        if (_USE_DOUBLE_BUFFER) {
+					        if (graph_slices[gpu]->frontier_queues.d_values[i]) {
+						        if (retval = util::GRError(cudaFree(
+							                    graph_slices[gpu]->frontier_queues.d_values[i]),
+								            "GpuSlice cudaFree frontier_queues.d_values failed", __FILE__, __LINE__)) return retval;
+					        }
+					    }
+
 					    graph_slices[gpu]->frontier_elements[i] = new_frontier_elements[i];
 
 					    if (retval = util::GRError(cudaMalloc(
 						                (void**) &graph_slices[gpu]->frontier_queues.d_keys[i],
 						                graph_slices[gpu]->frontier_elements[i] * sizeof(VertexId)),
 							        "ProblemBase cudaMalloc frontier_queues.d_keys failed", __FILE__, __LINE__)) return retval;
+                        if (_USE_DOUBLE_BUFFER) {
+                            if (retval = util::GRError(cudaMalloc(
+						                    (void**) &graph_slices[gpu]->frontier_queues.d_values[i],
+						                    graph_slices[gpu]->frontier_elements[i] * sizeof(VertexId)),
+							            "ProblemBase cudaMalloc frontier_queues.d_values failed", __FILE__, __LINE__)) return retval;
+						}
 				    }
 			    }
 	        }

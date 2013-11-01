@@ -201,7 +201,8 @@ void RunTests(
         io::ld::cg,
         io::ld::NONE,
         io::st::cg,
-        MARK_PREDECESSORS> Problem;
+        MARK_PREDECESSORS,
+        false> Problem; // does not use double buffer
 
     typedef BFSFunctor<
         VertexId,

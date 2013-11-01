@@ -201,7 +201,14 @@ void RunTests(
         io::ld::NONE,
         io::ld::cg,
         io::ld::NONE,
-        io::st::cg> Problem;
+        io::st::cg,
+        true> Problem; //use double buffer for edgemap and vertexmap.
+
+    typedef UpdateMaskFunctor<
+        VertexId,
+        SizeT,
+        Value,
+        Problem> UpdateMaskFunctor;
 
     typedef HookMinFunctor<
         VertexId,
@@ -215,11 +222,17 @@ void RunTests(
         Value,
         Problem> HookMaxFunctor;
 
-    typedef PtrJumpFunctor<
+    typedef PtrJumpMaskFunctor<
         VertexId,
         SizeT,
         Value,
-        Problem> PtrJumpFunctor;
+        Problem> PtrJumpMaskFunctor;
+
+    typedef PtrJumpUnmaskFunctor<
+        VertexId,
+        SizeT,
+        Value,
+        Problem> PtrJumpUnmaskFunctor;
 
 
         // Allocate host-side label array (for both reference and gpu-computed results)
@@ -262,7 +275,12 @@ void RunTests(
 
         if (retval = csr_problem->Reset(cc_enactor.GetFrontierType(), 1.0)) exit(1);
         gpu_timer.Start();
-        if (retval = cc_enactor.template Enact<Problem, HookMinFunctor, HookMaxFunctor, PtrJumpFunctor>(csr_problem, max_grid_size)) exit(1);
+        if (retval = cc_enactor.template Enact<Problem,
+                                            UpdateMaskFunctor,
+                                            HookMinFunctor,
+                                            HookMaxFunctor,
+                                            PtrJumpMaskFunctor,
+                                            PtrJumpUnmaskFunctor>(csr_problem, max_grid_size)) exit(1);
         gpu_timer.Stop();
 
         if (retval && (retval != cudaErrorInvalidDeviceFunction)) {
@@ -354,7 +372,7 @@ int main( int argc, char** argv)
 	//srand(time(NULL));
 
 	// Parse graph-contruction params
-	g_undirected = true; //Only works for undirected graph
+	g_undirected = false; //Does not make undirected graph
 
 	std::string graph_type = argv[1];
 	int flags = args.ParsedArgc();
