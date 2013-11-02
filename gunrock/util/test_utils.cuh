@@ -330,7 +330,7 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
 }
 
 /**
- * Compares the equivalence of two arrays
+ * Compares the equivalence of two float arrays
  */
 template <typename SizeT>
 int CompareResults(float* computed, float* reference, SizeT len, bool verbose = true)
@@ -339,7 +339,8 @@ int CompareResults(float* computed, float* reference, SizeT len, bool verbose = 
     int flag = 0;
 	for (SizeT i = 0; i < len; i++) {
 
-		if (fabs(computed[i] - reference[i]) > THRESHOLD) {
+        // Use relative error rate here.
+		if (fabs((computed[i] - reference[i])/reference[i]) > THRESHOLD) {
 			printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
 			PrintValue<float>(computed[i]);
 			printf(" != ");

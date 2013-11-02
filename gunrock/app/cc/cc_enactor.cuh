@@ -185,6 +185,7 @@ class CCEnactor : public EnactorBase
         typename UpdateMaskFunctor,
         typename HookMinFunctor,
         typename HookMaxFunctor,
+        typename PtrJumpFunctor,
         typename PtrJumpMaskFunctor,
         typename PtrJumpUnmaskFunctor>
     cudaError_t Enact(
@@ -195,11 +196,6 @@ class CCEnactor : public EnactorBase
         typedef typename CCProblem::VertexId   VertexId;
 
         cudaError_t retval = cudaSuccess;
-
-            printf("Edge Info:\n");
-            //util::DisplayDeviceResults(problem->data_slices[0]->d_froms, problem->graph_slices[0]->edges);
-            //util::DisplayDeviceResults(problem->data_slices[0]->d_tos, problem->graph_slices[0]->edges);
-            printf("\n\n");
 
         do {
             // Determine grid size(s)
@@ -225,13 +221,7 @@ class CCEnactor : public EnactorBase
             bool queue_reset            = true; 
 
             // Initial Hook Operation
-            printf("initial hook, upperlimit:%d\n", graph_slice->frontier_elements[selector]);
-
-            //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
-            //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
-            //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
-            //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
-            gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMinFunctor>
+            gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMaxFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                     queue_reset,
                     queue_index,
@@ -256,13 +246,7 @@ class CCEnactor : public EnactorBase
 
             // First Pointer Jumping Round
             while (done[0] < 0) {
-                printf("first ptr jump\n");
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
-                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], queue_length);
-
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpMaskFunctor>
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpFunctor>
                     <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                             queue_reset,
                             queue_index,
@@ -316,12 +300,6 @@ class CCEnactor : public EnactorBase
             queue_reset = true;
             util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_values[selector], graph_slice->nodes);
 
-            printf("update mask\n");
-            //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
-            //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
-            //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
-            //util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], queue_length);
-
             // Initial Update Mask Operation
             gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, UpdateMaskFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
@@ -352,11 +330,6 @@ class CCEnactor : public EnactorBase
                 // Set new queue_length
                 if (retval = work_progress.SetQueueLength(queue_index, queue_length)) break;
                 if (iteration & 11) {
-                    printf("hook min\n");
-                    //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
-                    //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
-                    //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
-                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMinFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                     queue_reset,
@@ -373,12 +346,6 @@ class CCEnactor : public EnactorBase
                     this->vertex_map_kernel_stats);
                 }
                 else {
-                    printf("hook max\n");
-                    //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
-                    //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
-                    //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
-                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
-
                     gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMaxFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                     queue_reset,
@@ -441,12 +408,6 @@ class CCEnactor : public EnactorBase
 
                 // Pointer Jumping Iterations
                 while (flag[0] < 0) {
-                    printf("ptr jump mask\n");
-                    //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
-                    //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
-                    //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
-                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], queue_length);
-
                     gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpMaskFunctor>
                         <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                                 ptrj_queue_reset,
@@ -506,12 +467,6 @@ class CCEnactor : public EnactorBase
                 if (retval = work_progress.GetQueueLength(ptrj_queue_index, ptrj_queue_length)) break;
                 util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_values[selector], graph_slice->nodes);
 
-                printf("ptr jump unmask\n");
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
-                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], ptrj_queue_length);
-
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpUnmaskFunctor>
                     <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                             ptrj_queue_reset,
@@ -537,11 +492,6 @@ class CCEnactor : public EnactorBase
                 flag[0] = -1;
                 util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_values[selector], graph_slice->nodes);
 
-                printf("update mask\n");
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_masks, graph_slice->nodes);
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_marks, graph_slice->edges);
-                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], ptrj_queue_length);
                 // Update Mask Operation
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, UpdateMaskFunctor>
                     <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
@@ -584,6 +534,7 @@ class CCEnactor : public EnactorBase
               typename UpdateMaskFunctor,
               typename HookMinFunctor,
               typename HookMaxFunctor,
+              typename PtrJumpFunctor,
               typename PtrJumpMaskFunctor,
               typename PtrJumpUnmaskFunctor>
     cudaError_t Enact(
@@ -605,7 +556,7 @@ class CCEnactor : public EnactorBase
                 8>                                  // LOG_SCHEDULE_GRANULARITY
                 VertexMapPolicy;
                 
-                return Enact<VertexMapPolicy, CCProblem, UpdateMaskFunctor, HookMinFunctor, HookMaxFunctor, PtrJumpMaskFunctor, PtrJumpUnmaskFunctor>(
+                return Enact<VertexMapPolicy, CCProblem, UpdateMaskFunctor, HookMinFunctor, HookMaxFunctor, PtrJumpFunctor, PtrJumpMaskFunctor, PtrJumpUnmaskFunctor>(
                 problem, max_grid_size);
         }
 

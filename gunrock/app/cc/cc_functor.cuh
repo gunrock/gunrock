@@ -106,6 +106,35 @@ struct HookMaxFunctor
 };
 
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+struct PtrJumpFunctor
+{
+    typedef typename ProblemData::DataSlice DataSlice;
+
+    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
+    {
+        VertexId parent;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                parent, problem->d_component_ids + node);
+        VertexId grand_parent;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                grand_parent, problem->d_component_ids + parent);
+        return (parent != grand_parent);
+    }
+
+    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
+    { 
+        VertexId parent;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                parent, problem->d_component_ids + node);
+        VertexId grand_parent;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                grand_parent, problem->d_component_ids + parent);
+        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                grand_parent, problem->d_component_ids + node);
+    }
+};
+
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct PtrJumpMaskFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;

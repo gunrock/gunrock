@@ -93,7 +93,7 @@ bool CCCompare(
     typedef CcList<VertexId> CcListType;
     printf("Number of components: %d\n", num_components);
 
-    if (nodes <= 20) {
+    if (nodes <= 40) {
         printf("[");
         for (VertexId i = 0; i < nodes; ++i) {
             PrintValue(i);
@@ -222,6 +222,12 @@ void RunTests(
         Value,
         Problem> HookMaxFunctor;
 
+    typedef PtrJumpFunctor<
+        VertexId,
+        SizeT,
+        Value,
+        Problem> PtrJumpFunctor;
+
     typedef PtrJumpMaskFunctor<
         VertexId,
         SizeT,
@@ -279,6 +285,7 @@ void RunTests(
                                             UpdateMaskFunctor,
                                             HookMinFunctor,
                                             HookMaxFunctor,
+                                            PtrJumpFunctor,
                                             PtrJumpMaskFunctor,
                                             PtrJumpUnmaskFunctor>(csr_problem, max_grid_size)) exit(1);
         gpu_timer.Stop();
@@ -310,6 +317,8 @@ void RunTests(
             //VertexId *comp_ids, SizeT nodes, unsigned int num_components, VertexId *roots, unsigned int *histogram
             DisplaySolution(h_component_ids, graph.nodes, ref_num_components, h_roots, h_histograms);
         }
+
+        printf("GPU Connected Component finished in %lf msec.\n", elapsed);
 
         // Cleanup
         if (csr_problem) delete csr_problem;

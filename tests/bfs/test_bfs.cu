@@ -111,6 +111,81 @@ bool g_stream_from_host;
     }
 };
 
+struct Stats {
+    char *name;
+    Statistic rate;
+    Statistic search_depth;
+    Statistic redundant_work;
+    Statistic duty;
+
+    Stats() : name(NULL), rate(), search_depth(), redundant_work(), duty() {}
+    Stats(char *name) : name(name), rate(), search_depth(), redundant_work(), duty() {}
+};
+
+/**
+ * Displays timing and correctness statistics
+ */
+template<
+    bool MARK_PREDECESSORS,
+    typename VertexId,
+    typename Value,
+    typename SizeT>
+void DisplayStats(
+    Stats               &stats,
+    VertexId            src,
+    VertexId            *h_labels,
+    const Csr<VertexId, Value, SizeT> &graph,
+    double              elapsed,
+    VertexId            search_depth,
+    long long           total_queued,
+    double              avg_duty)
+{
+    // Compute nodes and edges visited
+    SizeT edges_visited = 0;
+    SizeT nodes_visited = 0;
+    for (VertexId i = 0; i < graph.nodes; ++i) {
+        if (h_labels[i] > -1) {
+            ++nodes_visited;
+            edges_visited += graph.row_offsets[i+1] - graph.row_offsets[i];
+        }
+    }
+
+    double redundant_work = 0.0;
+    if (total_queued > 0) {
+        redundant_work = ((double) total_queued - edges_visited) / edges_visited;        // measure duplicate edges put through queue
+    }
+    redundant_work *= 100;
+
+    // Display test name
+    printf("[%s] finished. ", stats.name);
+
+    // Display statistics
+    if (nodes_visited < 5) {
+        printf("Fewer than 5 vertices visited.\n");
+    } else {
+        // Display the specific sample statistics
+        double m_teps = (double) edges_visited / (elapsed * 1000.0);
+        printf(" elapsed: %.3f ms, rate: %.3f MiEdges/s", elapsed, m_teps);
+        if (search_depth != 0) printf(", search_depth: %lld", (long long) search_depth);
+        if (avg_duty != 0) {
+            printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
+        }
+        printf("\n src: %lld, nodes_visited: %lld, edges visited: %lld",
+            (long long) src, (long long) nodes_visited, (long long) edges_visited);
+        if (total_queued > 0) {
+            printf(", total queued: %lld", total_queued);
+        }
+        if (redundant_work > 0) {
+            printf(", redundant work: %.2f%%", redundant_work);
+        }
+        printf("\n");
+    }
+    
+}
+
+
+
+
 /******************************************************************************
  * BFS Testing Routines
  *****************************************************************************/
@@ -249,6 +324,12 @@ void RunTests(
 
         cudaError_t         retval = cudaSuccess;
 
+        Stats *stats = new Stats("GPU BFS");
+
+        long long           total_queued = 0;
+        VertexId            search_depth = 0;
+        double              avg_duty = 0.0;
+
         // Perform BFS
         GpuTimer gpu_timer;
 
@@ -256,6 +337,8 @@ void RunTests(
         gpu_timer.Start();
         if (retval = bfs_enactor.template Enact<Problem, Functor>(csr_problem, src, max_grid_size)) exit(1);
         gpu_timer.Stop();
+
+        bfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
 
         if (retval && (retval != cudaErrorInvalidDeviceFunction)) {
             exit(1);
@@ -271,12 +354,23 @@ void RunTests(
             printf("Validity: ");
             CompareResults(h_labels, reference_check, graph.nodes, true);
         }
-       
+        printf("\nFirst 40 labels of the GPU result."); 
         // Display Solution
         DisplaySolution(h_labels, h_preds, graph.nodes, MARK_PREDECESSORS);
 
+        DisplayStats<MARK_PREDECESSORS>(
+            *stats,
+            src,
+            h_labels,
+            graph,
+            elapsed,
+            search_depth,
+            total_queued,
+            avg_duty);
+
 
         // Cleanup
+        delete stats;
         if (csr_problem) delete csr_problem;
         if (reference_labels) free(reference_labels);
         if (h_labels) free(h_labels);

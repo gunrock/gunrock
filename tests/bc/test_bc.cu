@@ -403,6 +403,8 @@ void RunTests(
         // Display Solution
         DisplaySolution(h_sigmas, h_bc_values, graph.nodes);
 
+        printf("GPU BC finished in %lf msec.\n", elapsed);
+
 
         // Cleanup
         if (csr_problem) delete csr_problem;
