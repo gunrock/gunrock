@@ -6,7 +6,8 @@
 // ----------------------------------------------------------------
 
 
-// Add Functor into Kernel Call (done)
+
+// TODO: update edge_map_backward operator
 
 /**
  * @file
@@ -204,11 +205,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     }
 
 };
-
-// Add __global__ kernel call (done)
-//TODO: put data in a long array,
-//sendin offsets as copy argument
-//sendin pointer of the long array
 
 /**
  * Edge Map Kernel Entry

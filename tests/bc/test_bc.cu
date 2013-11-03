@@ -352,7 +352,9 @@ void RunTests(
 
         cudaError_t         retval = cudaSuccess;
 
-        // Perform BFS
+        double              avg_duty = 0.0;
+
+        // Perform BC
         GpuTimer gpu_timer;
 
         VertexId start_src;
@@ -369,12 +371,11 @@ void RunTests(
         }
 
 
+        gpu_timer.Start();
         for (VertexId i = start_src; i < end_src; ++i)
         {
             if (retval = csr_problem->Reset(i, bc_enactor.GetFrontierType(), max_queue_sizing)) exit(1);
-            gpu_timer.Start();
             if (retval = bc_enactor.template Enact<Problem, FFunctor, BFunctor>(csr_problem, i, max_grid_size)) exit(1);
-            gpu_timer.Stop();
 
             if (retval && (retval != cudaErrorInvalidDeviceFunction)) {
                 exit(1);
@@ -382,8 +383,12 @@ void RunTests(
         }
         
         util::MemsetScaleKernel<<<128, 128>>>(csr_problem->data_slices[0]->d_bc_values, 0.5f, graph.nodes);
+        
+        gpu_timer.Stop();
 
         float elapsed = gpu_timer.ElapsedMillis();
+
+        bc_enactor.GetStatistics(avg_duty);
 
         // Copy out results
         if (csr_problem->Extract(h_sigmas, h_bc_values)) exit(1);
@@ -404,6 +409,8 @@ void RunTests(
         DisplaySolution(h_sigmas, h_bc_values, graph.nodes);
 
         printf("GPU BC finished in %lf msec.\n", elapsed);
+        if (avg_duty != 0)
+            printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
 
 
         // Cleanup

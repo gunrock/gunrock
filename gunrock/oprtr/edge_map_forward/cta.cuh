@@ -5,6 +5,9 @@
 // in the root directory of this source distribution.
 // ----------------------------------------------------------------
 
+
+// TODO: currently disabled WarpExpand. Enable it after bug fix
+
 /**
  * @file
  * cta.cuh

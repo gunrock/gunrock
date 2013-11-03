@@ -21,7 +21,6 @@ struct BFSFunctor
 
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
     {
-        //for simple BFS, Apply doing nothing
         //set d_labels[d_id] to be d_labels[s_id]+1
         VertexId label;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(

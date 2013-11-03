@@ -45,7 +45,6 @@ class BCEnactor : public EnactorBase
 
     unsigned long long total_runtimes;              // Total working time by each CTA
     unsigned long long total_lifetimes;             // Total life time of each CTA
-    unsigned long long total_queued;
 
     /**
      * A pinned, mapped word that the traversal kernels will signal when done
@@ -102,7 +101,6 @@ class BCEnactor : public EnactorBase
             iteration           = 0;
             total_runtimes      = 0;
             total_lifetimes     = 0;
-            total_queued        = 0;
             done[0]             = -1;
 
             //graph slice
@@ -139,7 +137,6 @@ class BCEnactor : public EnactorBase
     BCEnactor(bool DEBUG = false) :
         EnactorBase(EDGE_FRONTIERS, DEBUG),
         iteration(0),
-        total_queued(0),
         done(NULL),
         d_done(NULL)
     {}
@@ -161,16 +158,10 @@ class BCEnactor : public EnactorBase
     /**
      * Obtain statistics about the last BC search enacted
      */
-    template <typename VertexId>
     void GetStatistics(
-        long long &total_queued,
-        VertexId &search_depth,
         double &avg_duty)
     {
         cudaThreadSynchronize();
-
-        total_queued = this->total_queued;
-        search_depth = this->iteration;
 
         avg_duty = (total_lifetimes >0) ?
             double(total_runtimes) / total_lifetimes : 0.0;
@@ -350,7 +341,6 @@ class BCEnactor : public EnactorBase
 
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-                    total_queued += queue_length;
                     if (DEBUG) printf(", %lld", (long long) queue_length);
                     if (INSTRUMENT) {
                         if (retval = vertex_map_kernel_stats.Accumulate(
@@ -472,7 +462,6 @@ class BCEnactor : public EnactorBase
 
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-                    total_queued += queue_length;
                     if (DEBUG) printf(", %lld", (long long) queue_length);
                     if (INSTRUMENT) {
                         if (retval = vertex_map_kernel_stats.Accumulate(

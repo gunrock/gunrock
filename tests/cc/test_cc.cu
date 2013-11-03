@@ -314,7 +314,6 @@ void RunTests(
             csr_problem->ComputeDetails(h_component_ids, h_roots, h_histograms);
 
             // Display Solution
-            //VertexId *comp_ids, SizeT nodes, unsigned int num_components, VertexId *roots, unsigned int *histogram
             DisplaySolution(h_component_ids, graph.nodes, ref_num_components, h_roots, h_histograms);
         }
 
@@ -376,9 +375,6 @@ int main( int argc, char** argv)
 
 	DeviceInit(args);
 	cudaSetDeviceFlags(cudaDeviceMapHost);
-
-	//srand(0);									// Presently deterministic
-	//srand(time(NULL));
 
 	// Parse graph-contruction params
 	g_undirected = false; //Does not make undirected graph

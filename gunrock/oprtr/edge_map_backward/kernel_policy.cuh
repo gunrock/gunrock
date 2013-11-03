@@ -5,6 +5,9 @@
 // in the root directory of this source distribution.
 // ----------------------------------------------------------------
 
+
+// TODO: update edge_map_backward operator
+
 /**
  * @file
  * kernel_policy.cuh
