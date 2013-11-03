@@ -11,3 +11,13 @@
 *.lai
 *.la
 *.a
+
+# Ignore graph dataset files
+*.graph
+*.mtx
+
+# Ignore vim undo file
+*.un~
+
+# Ignore bin directory
+bin/
