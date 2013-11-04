@@ -68,6 +68,22 @@ operators for solving graph related problems and use these parallel
 -friendly abstractions to improve programmer productivity while
 maintaining high performance.
 
+Road Map
+========
+
+ - Framework: The structure of the operator code in Gunrock may
+   change a lot during the following development. Generally we
+   want to find the right set of operators which can abstract
+   most graph primitives.
+
+ - Primitives: The near-term goal is to implement the direction
+   optimal BFS (as described in the paper: Direction-Optimizing
+   Breadth-First Search ([DOI](http://dx.doi.org/10.1109/SC.2012.50))
+   by Scott Beamer, Krste Asanovic and David Patterson) using
+   the backward edge mapping operator in Gunrock. The long-term
+   goal includes other basic graph primitives such as shortest
+   path and minimal spanning tree.
+
 Credits
 =======
 
