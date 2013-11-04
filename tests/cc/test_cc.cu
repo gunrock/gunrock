@@ -121,6 +121,8 @@ bool CCCompare(
         {
             printf("CC ID: %d, CC Root: %d, CC Size: %d\n", i, cclist[i].root, cclist[i].histogram);
         }
+
+        free(cclist);
     }
  }
 
@@ -315,11 +317,14 @@ void RunTests(
 
             // Display Solution
             DisplaySolution(h_component_ids, graph.nodes, ref_num_components, h_roots, h_histograms);
+            
+            if (h_roots) delete[] h_roots;
+            if (h_histograms) delete[] h_histograms;
         }
 
         printf("GPU Connected Component finished in %lf msec.\n", elapsed);
 
-        // Cleanup
+        // Cleanup 
         if (csr_problem) delete csr_problem;
         if (reference_component_ids) free(reference_component_ids);
         if (h_component_ids) free(h_component_ids);
