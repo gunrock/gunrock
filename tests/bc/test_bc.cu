@@ -241,7 +241,12 @@ void RefCPUBC(
                     if (search_depth < neighbor_dist) {
                         search_depth = neighbor_dist;
                     }
+
                     frontier.push_back(neighbor);
+                }
+                else {
+                    if (source_path[neighbor] == source_path[dequeued_node]+1)
+                        sigmas[neighbor] += sigmas[dequeued_node];
                 }
             }
         }
@@ -263,6 +268,11 @@ void RefCPUBC(
                     }
                 }
             }
+        }
+
+        for (int i = 0; i < graph.nodes; ++i)
+        {
+            bc_values[i] *= 0.5f;
         }
 
         cpu_timer.Stop();
@@ -376,7 +386,6 @@ void RunTests(
         {
             if (retval = csr_problem->Reset(i, bc_enactor.GetFrontierType(), max_queue_sizing)) exit(1);
             if (retval = bc_enactor.template Enact<Problem, FFunctor, BFunctor>(csr_problem, i, max_grid_size)) exit(1);
-
             if (retval && (retval != cudaErrorInvalidDeviceFunction)) {
                 exit(1);
             }

@@ -112,27 +112,45 @@ struct Csr
 			std::stable_sort(coo, coo + coo_edges, RowFirstTupleCompare<Tuple>);
 		}
 
+        Tuple *new_coo = (Tuple*) malloc(sizeof(Tuple) * coo_edges);
+		SizeT real_edge = 1;
+		new_coo[0].row = coo[0].row;
+		new_coo[0].col = coo[0].col;
+		new_coo[0].val = coo[0].val;
+		for (int i = 0; i < coo_edges-1; ++i)
+		{
+		    if ((coo[i+1].col != coo[i].col) || (coo[i+1].row != coo[i].row))
+		    {
+		        new_coo[real_edge].col = coo[i+1].col;
+		        new_coo[real_edge].row = coo[i+1].row;
+		        new_coo[real_edge++].val = coo[i+1].val;
+		    }
+		}
+
+
 		VertexId prev_row = -1;
-		for (SizeT edge = 0; edge < edges; edge++) {
+		for (SizeT edge = 0; edge < real_edge; edge++) {
 			
-			VertexId current_row = coo[edge].row;
+			VertexId current_row = new_coo[edge].row;
 			
 			// Fill in rows up to and including the current row
 			for (VertexId row = prev_row + 1; row <= current_row; row++) {
 				row_offsets[row] = edge;
 			}
 			prev_row = current_row;
-			
-			column_indices[edge] = coo[edge].col;
+		
+			column_indices[edge] = new_coo[edge].col;
 			if (LOAD_EDGE_VALUES) {
-				coo[edge].Val(edge_values[edge]);
+				new_coo[edge].Val(edge_values[edge]);
 			}
 		}
 
 		// Fill out any trailing edgeless nodes (and the end-of-list element)
 		for (VertexId row = prev_row + 1; row <= nodes; row++) {
-			row_offsets[row] = edges;
+			row_offsets[row] = real_edge;
 		}
+
+		if (new_coo) free(new_coo);
 
 		time_t mark2 = time(NULL);
 		printf("Done converting (%ds).\n", (int) (mark2 - mark1));

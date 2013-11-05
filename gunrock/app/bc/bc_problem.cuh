@@ -148,12 +148,14 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
                                 cudaMemcpyDeviceToHost),
                             "BCProblem cudaMemcpy d_bc_values failed", __FILE__, __LINE__)) break;
 
-                if (retval = util::GRError(cudaMemcpy(
-                                h_sigmas,
-                                data_slices[0]->d_sigmas,
-                                sizeof(Value) * nodes,
-                                cudaMemcpyDeviceToHost),
-                            "BCProblem cudaMemcpy d_sigmas failed", __FILE__, __LINE__)) break;
+                if (h_sigmas) {
+                    if (retval = util::GRError(cudaMemcpy(
+                                    h_sigmas,
+                                    data_slices[0]->d_sigmas,
+                                    sizeof(Value) * nodes,
+                                    cudaMemcpyDeviceToHost),
+                                "BCProblem cudaMemcpy d_sigmas failed", __FILE__, __LINE__)) break;
+                }
             } else {
                 // TODO: multi-GPU extract result
             } //end if (data_slices.size() ==1)

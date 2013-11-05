@@ -32,13 +32,19 @@ struct ForwardFunctor
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                     label, problem->d_labels + s_id);
             atomicCAS(&problem->d_labels[d_id], -1, label+1);
-            if (problem->d_labels[d_id] == label + 1)
+            VertexId label_d;
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    label_d, problem->d_labels + d_id);
+            if (label_d == label + 1)
             {
                 //Accumulate sigma value
                 atomicAdd(&problem->d_sigmas[d_id], problem->d_sigmas[s_id]);
             }
+            return false;
         }
-        return child_available;
+        else {
+        return true;
+        }
     }
 
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem)

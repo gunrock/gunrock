@@ -284,7 +284,7 @@ class BCEnactor : public EnactorBase
                 if (queue_reset)
                     queue_reset = false;
 
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                if (/*DEBUG &&*/ (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates
 
 
@@ -331,7 +331,7 @@ class BCEnactor : public EnactorBase
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
                     this->vertex_map_kernel_stats);
 
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                if (/*DEBUG &&*/ (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
 
@@ -487,6 +487,9 @@ class BCEnactor : public EnactorBase
             }
             
         } while(0);
+
+        // Add delta value to BC value
+        //util::MemsetAddVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_bc_values, problem->data_slices[0]->d_deltas, problem->graph_slices[0]->nodes);
 
         if (DEBUG) printf("\nGPU BC Done.\n");
         return retval;
