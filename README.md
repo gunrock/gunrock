@@ -1,4 +1,4 @@
-Gunrock documentation               {#mainpage}
+Gunrock documentation
 =====================
 
 Introduction
@@ -18,14 +18,12 @@ Homepage for Gunrock: <http://gunrock.github.io/>
 Getting Started with Gunrock
 ----------------------------
 
-For information on building Gunrock, see [Building Gunrock](@ref
-building_gunrock).
+For information on building Gunrock, see [Building Gunrock](http://gunrock.github.io/gunrock/doc/simple_example.html).
 
 The "tests" subdirectory included with Gunrock has a comprehensive test
 application for all the functionality of Gunrock.
 
-We have also provided a code walkthrough of a [simple example](@ref
-simple_example).
+We have also provided a code walkthrough of a [simple example](http://gunrock.github.io/gunrock/doc/simple_example.html).
 
 Reporting Problems
 ==================
