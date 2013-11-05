@@ -40,8 +40,8 @@ Operating System Support and Requirements
 
 This release (0.1) has only been tested on Linux Mint 15 (64-bit) with
 CUDA 5.5 installed. We expect Gunrock to build and run correctly on
-other 64-bit and 32-bit Linux distributions. Current release (0.1) does
-not support cross-platform.
+other 64-bit and 32-bit Linux distributions. The current release (0.1)
+does not support any other platforms.
 
 Requirements
 ------------
@@ -64,25 +64,25 @@ Design Goals
 ============
 
 Gunrock aims to provide a core set of vertex-centric or edge-centric
-operators for solving graph related problems and use these parallel
--friendly abstractions to improve programmer productivity while
-maintaining high performance.
+operators for solving graph related problems and use these
+parallel-friendly abstractions to improve programmer productivity
+while maintaining high performance.
 
 Road Map
 ========
 
- - Framework: The structure of the operator code in Gunrock may
-   change a lot during the following development. Generally we
-   want to find the right set of operators which can abstract
-   most graph primitives.
+ - Framework: The structure of the operator code in Gunrock may change
+   significantly during near-term future development. Generally we
+   want to find the right set of operators that can abstract most
+   graph primitives while delivering high performance.
 
- - Primitives: The near-term goal is to implement the direction
-   optimal BFS (as described in the paper: Direction-Optimizing
-   Breadth-First Search ([DOI](http://dx.doi.org/10.1109/SC.2012.50))
-   by Scott Beamer, Krste Asanovic and David Patterson) using
-   the backward edge mapping operator in Gunrock. The long-term
-   goal includes other basic graph primitives such as shortest
-   path and minimal spanning tree.
+ - Primitives: Our near-term goal is to implement direction-optimal
+   BFS (as described in *Direction-Optimizing Breadth-First Search*
+   ([DOI](http://dx.doi.org/10.1109/SC.2012.50)) by Scott Beamer,
+   Krste Asanovic and David Patterson) using the backward edge-mapping
+   operator in Gunrock. The long-term goal includes other basic graph
+   primitives such as single-source shortest path and minimal spanning
+   tree.
 
 Credits
 =======
@@ -99,28 +99,32 @@ Gunrock Developers
 Acknowledgements
 ----------------
 
-Thanks to the following developers who contributed code: The connected
--component implementation was derived from code written by Jyothish
-Soman, Kothapalli Kishore, and P J Narayanan and described in their
-paper: A Fast GPU Algorithm for Graph Connectivity ([DOI](
-http://dx.doi.org/10.1109/IPDPSW.2010.5470817)). The breadth-first search
-implementation and many of the utility functions in Gunrock are derived
-from the[b40c](http://code.google.com/p/back40computing/) library of
-[Duane Merrill](https://sites.google.com/site/duanemerrill/). The algorithm
-is described in his paper: Scalable GPU Graph Traversal ([DOI](
-http://dx.doi.org/10.1145/2370036.2145832)).
-Thanks to Erich-Elsen and Vishal Vaidyanathan from [Royal Caliber](
-http://www.royal-caliber.com/)for their discussion on library development
-and the dataset auto-generating code.
+Thanks to the following developers who contributed code: The
+connected-component implementation was derived from code written by
+Jyothish Soman, Kothapalli Kishore, and P. J. Narayanan and described
+in their IPDPSW '10 paper *A Fast GPU Algorithm for Graph
+Connectivity* ([DOI](http://dx.doi.org/10.1109/IPDPSW.2010.5470817)).
+The breadth-first search implementation and many of the utility
+functions in Gunrock are derived from the
+[b40c](http://code.google.com/p/back40computing/) library of
+[Duane Merrill](https://sites.google.com/site/duanemerrill/). The
+algorithm is described in his PPoPP '12 paper *Scalable GPU Graph
+Traversal* ([DOI](http://dx.doi.org/10.1145/2370036.2145832)). Thanks
+to Erich Elsen and Vishal Vaidyanathan from
+[Royal Caliber](http://www.royal-caliber.com/) for their discussion on
+library development and the dataset auto-generating code.
 
-This work was (partially) funded by the DARPA XDATA program under AFRL
-Contract FA8750-13-C-0002.
+This work was funded by the DARPA XDATA program under AFRL Contract
+FA8750-13-C-0002 and by NSF awards CCF-1017399 and OCI-1032859. Our
+XDATA principal investigator is Eric Whyne of
+[Data Tactics Corporation](http://www.data-tactics.com/) and our DARPA
+program manager is
+[Dr. Christopher White](http://www.darpa.mil/Our_Work/I2O/Personnel/Dr_Christopher_White.aspx).
 
 Gunrock Copyright and Software License
 ======================================
 
-Gunrock is copyright the Regents of the University of California, Davis
-campus. The library, examples, and all source code are released under
+Gunrock is copyright The Regents of the University of
+California, 2013. The library, examples, and all source code are
+released under
 [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0).
-
-
