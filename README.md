@@ -19,13 +19,13 @@ Getting Started with Gunrock
 ----------------------------
 
 For information on building Gunrock, see [Building Gunrock](@ref
-building-gunrock).
+building_gunrock).
 
 The "tests" subdirectory included with Gunrock has a comprehensive test
 application for all the functionality of Gunrock.
 
-We have also provided a code walkthrough of a [simpleGunrock](@ref
-example) example.
+We have also provided a code walkthrough of a [simple example](@ref
+simple_example).
 
 Reporting Problems
 ==================

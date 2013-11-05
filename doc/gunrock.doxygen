@@ -674,7 +674,7 @@ WARN_LOGFILE           = warn.log
 
 INPUT                  = ../README.md \
                          ../gunrock \
-                         ../tests
+                         ../tests \
                          ./simple_example.dox \
                          ./building_gunrock.md
 
