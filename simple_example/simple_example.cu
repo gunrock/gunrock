@@ -439,12 +439,6 @@ void RunTests(
         VertexId,
         SizeT,
         Value,
-        io::ld::cg,
-        io::ld::NONE,
-        io::ld::NONE,
-        io::ld::cg,
-        io::ld::NONE,
-        io::st::cg,
         true> CCProblem_T; //use double buffer for edgemap and vertexmap.
 
     typedef UpdateMaskFunctor<
@@ -597,12 +591,6 @@ void RunTests(
         VertexId,
         SizeT,
         Value,
-        io::ld::cg,
-        io::ld::NONE,
-        io::ld::NONE,
-        io::ld::cg,
-        io::ld::NONE,
-        io::st::cg,
         true,                // Set MARK_PREDECESSORS flag true
         false> BFSProblem_T; // does not use double buffer
 
@@ -708,12 +696,6 @@ void RunTests(
             VertexId,
             SizeT,
             Value,
-            io::ld::cg,
-            io::ld::NONE,
-            io::ld::NONE,
-            io::ld::cg,
-            io::ld::NONE,
-            io::st::cg,
             false> BCProblem_T; //does not use double buffer
 
         typedef ForwardFunctor<

@@ -45,12 +45,6 @@ enum FrontierType {
 template <
 	typename 	_VertexId,						                        // Type of signed integer to use as vertex id (e.g., uint32)
 	typename 	_SizeT,							                        // Type of unsigned integer to use for array indexing (e.g., uint32)
-    util::io::ld::CacheModifier _QUEUE_READ_MODIFIER,					// Load instruction cache-modifier for reading incoming frontier vertex-ids. Valid on SM2.0 or newer, where util::io::ld::cg is req'd for fused-iteration implementations incorporating software global barriers.
-	util::io::ld::CacheModifier _COLUMN_READ_MODIFIER,					// Load instruction cache-modifier for reading CSR column-indices
-    util::io::ld::CacheModifier _EDGE_VALUES_READ_MODIFIER,             // Load instruction cache-modifier for reading edge values
-	util::io::ld::CacheModifier _ROW_OFFSET_ALIGNED_READ_MODIFIER,		// Load instruction cache-modifier for reading CSR row-offsets (when 8-byte aligned)
-	util::io::ld::CacheModifier _ROW_OFFSET_UNALIGNED_READ_MODIFIER,	// Load instruction cache-modifier for reading CSR row-offsets (when 4-byte aligned)
-	util::io::st::CacheModifier _QUEUE_WRITE_MODIFIER,					// Store instruction cache-modifier for writing outgoign frontier vertex-ids. Valid on SM2.0 or newer, where util::io::st::cg is req'd for fused-iteration implementations incorporating software global barriers.
 	bool        _USE_DOUBLE_BUFFER>                                     // Whether to use double buffer
 
 struct ProblemBase
@@ -58,12 +52,12 @@ struct ProblemBase
     typedef _VertexId           VertexId;
     typedef _SizeT              SizeT;
 
-    static const util::io::ld::CacheModifier QUEUE_READ_MODIFIER 					= _QUEUE_READ_MODIFIER;
-	static const util::io::ld::CacheModifier COLUMN_READ_MODIFIER 					= _COLUMN_READ_MODIFIER;
-    static const util::io::ld::CacheModifier EDGE_VALUES_READ_MODIFIER              = _EDGE_VALUES_READ_MODIFIER;
-	static const util::io::ld::CacheModifier ROW_OFFSET_ALIGNED_READ_MODIFIER 		= _ROW_OFFSET_ALIGNED_READ_MODIFIER;
-	static const util::io::ld::CacheModifier ROW_OFFSET_UNALIGNED_READ_MODIFIER 	= _ROW_OFFSET_UNALIGNED_READ_MODIFIER;
-	static const util::io::st::CacheModifier QUEUE_WRITE_MODIFIER 					= _QUEUE_WRITE_MODIFIER;
+    static const util::io::ld::CacheModifier QUEUE_READ_MODIFIER 					= util::io::ld::cg;             // Load instruction cache-modifier for reading incoming frontier vertex-ids. Valid on SM2.0 or newer
+	static const util::io::ld::CacheModifier COLUMN_READ_MODIFIER 					= util::io::ld::NONE;           // Load instruction cache-modifier for reading CSR column-indices.
+    static const util::io::ld::CacheModifier EDGE_VALUES_READ_MODIFIER              = util::io::ld::NONE;           // Load instruction cache-modifier for reading edge values.
+	static const util::io::ld::CacheModifier ROW_OFFSET_ALIGNED_READ_MODIFIER 		= util::io::ld::cg;             // Load instruction cache-modifier for reading CSR row-offsets (8-byte aligned)
+	static const util::io::ld::CacheModifier ROW_OFFSET_UNALIGNED_READ_MODIFIER 	= util::io::ld::NONE;           // Load instruction cache-modifier for reading CSR row-offsets (4-byte aligned)
+	static const util::io::st::CacheModifier QUEUE_WRITE_MODIFIER 					= util::io::st::cg;             // Store instruction cache-modifier for writing outgoing frontier vertex-ids. Valid on SM2.0 or newer
 
 	/**
 	 * Graph Slice which contains common graph structural data

@@ -25,25 +25,14 @@ template <
 	typename 	VertexId,						// Type of signed integer to use as vertex id (e.g., uint32)
 	typename 	SizeT,							// Type of unsigned integer to use for array indexing (e.g., uint32)
 	typename	Value,						    // Type of edge value (e.g., float)
-    util::io::ld::CacheModifier _QUEUE_READ_MODIFIER,					// Load instruction cache-modifier for reading incoming frontier vertex-ids. Valid on SM2.0 or newer, where util::io::ld::cg is req'd for fused-iteration implementations incorporating software global barriers.
-	util::io::ld::CacheModifier _COLUMN_READ_MODIFIER,					// Load instruction cache-modifier for reading CSR column-indices
-    util::io::ld::CacheModifier _EDGE_VALUES_READ_MODIFIER,             // Load instruction cache-modifier for reading edge values
-	util::io::ld::CacheModifier _ROW_OFFSET_ALIGNED_READ_MODIFIER,		// Load instruction cache-modifier for reading CSR row-offsets (when 8-byte aligned)
-	util::io::ld::CacheModifier _ROW_OFFSET_UNALIGNED_READ_MODIFIER,	// Load instruction cache-modifier for reading CSR row-offsets (when 4-byte aligned)
-	util::io::st::CacheModifier _QUEUE_WRITE_MODIFIER,					// Store instruction cache-modifier for writing outgoign frontier vertex-ids. Valid on SM2.0 or newer, where util::io::st::cg is req'd for fused-iteration implementations incorporating software global barriers.
 	bool 		_MARK_PREDECESSORS,				// Whether to mark predecessor-vertices
 	bool        _USE_DOUBLE_BUFFER>
 struct BFSProblem : ProblemBase<VertexId, SizeT,
-                                _QUEUE_READ_MODIFIER,
-                                _COLUMN_READ_MODIFIER,
-                                _EDGE_VALUES_READ_MODIFIER,
-                                _ROW_OFFSET_ALIGNED_READ_MODIFIER,
-                                _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER,
                                 _USE_DOUBLE_BUFFER>
 {
 
 	static const bool MARK_PREDECESSORS		= _MARK_PREDECESSORS;
+    
 
     //Helper structures
     /**
@@ -173,12 +162,6 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
 	    nodes = _nodes;
 	    edges = _edges;
 	    ProblemBase<VertexId, SizeT,
-                                _QUEUE_READ_MODIFIER,
-                                _COLUMN_READ_MODIFIER,
-                                _EDGE_VALUES_READ_MODIFIER,
-                                _ROW_OFFSET_ALIGNED_READ_MODIFIER,
-                                _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER,
                                 _USE_DOUBLE_BUFFER>::Init(stream_from_host,
 	                                    nodes,
 	                                    edges,
@@ -241,12 +224,6 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
 	        double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
 	{
 	    typedef ProblemBase<VertexId, SizeT,
-                                _QUEUE_READ_MODIFIER,
-                                _COLUMN_READ_MODIFIER,
-                                _EDGE_VALUES_READ_MODIFIER,
-                                _ROW_OFFSET_ALIGNED_READ_MODIFIER,
-                                _ROW_OFFSET_UNALIGNED_READ_MODIFIER,
-                                _QUEUE_WRITE_MODIFIER,
                                 _USE_DOUBLE_BUFFER> BaseProblem;
 	    //load ProblemBase Reset
 	    BaseProblem::Reset(frontier_type, queue_sizing);

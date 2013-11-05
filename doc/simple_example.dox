@@ -15,7 +15,7 @@
   results.
 
   \skip DeviceInit
-  \skip cudaSetDeviceFlags  
+  \until cudaSetDeviceFlags  
 
   The \c DeviceInit function will find the device which
   supports CUDA and initialize it.
@@ -53,8 +53,10 @@
   for a graph primitive. We want to compute connected component
   first.
 
+  \dontinclude simple_example.cu
+
   \skip typedef CCProblem
-  \until PtrJumpUnmaskFunctor
+  \until PtrJumpUnmaskFunctor;
 
   Then we allocate host-side array for reference check and GPU
   -computed results. We also need to initialize our problem
@@ -62,7 +64,7 @@
   enact function which has kernel entries for graph primitive
   kernel functions.
 
-  \skip VertexId *reference_component_ids
+  \skip reference_component_ids
   \until CCEnactor
 
   In the next step, we create a pointer of \c CCProblem type and
@@ -120,7 +122,7 @@
   the enact function as we did in CC graph primitive.
 
   \skip reference_labels
-  \gpu_timer.ElapsedMillis
+  \until gpu_timer.ElapsedMillis
 
   The extracting, validation and cleanup code are also quite
   similar.
@@ -138,13 +140,13 @@
   you can build your own approximate BC algorithm using this primitive.
 
   \skip i < end_src
-  \skip }
   \until }
+  \skipline }
 
   Note after the algorithm we need to call a scale kernel for
   normalization.
 
-  \skip MemsetScaleKernel
+  \skipline MemsetScaleKernel
 
   The final step is the cleanup code for BC primitive.
 

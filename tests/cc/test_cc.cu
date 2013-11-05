@@ -198,12 +198,6 @@ void RunTests(
         VertexId,
         SizeT,
         Value,
-        io::ld::cg,
-        io::ld::NONE,
-        io::ld::NONE,
-        io::ld::cg,
-        io::ld::NONE,
-        io::st::cg,
         true> Problem; //use double buffer for edgemap and vertexmap.
 
     typedef UpdateMaskFunctor<

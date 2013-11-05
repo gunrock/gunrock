@@ -19,6 +19,9 @@
 # Ignore vim undo file
 *.un~
 
+# Ignore tarball
+*.tar.gz
+
 # Ignore bin directory
 bin/
 
