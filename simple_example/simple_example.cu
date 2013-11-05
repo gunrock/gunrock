@@ -504,7 +504,7 @@ void RunTests(
             num_gpus)) exit(1);
 
         //
-        // Compute reference CPU BFS solution for source-distance
+        // Compute reference CPU CC solution for source-distance
         //
         if (reference_check != NULL)
         {
