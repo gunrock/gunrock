@@ -18,7 +18,7 @@ Homepage for Gunrock: <http://gunrock.github.io/>
 Getting Started with Gunrock
 ----------------------------
 
-For information on building Gunrock, see [Building Gunrock](http://gunrock.github.io/gunrock/doc/simple_example.html).
+For information on building Gunrock, see [Building Gunrock](http://gunrock.github.io/gunrock/doc/building_gunrock.html).
 
 The "tests" subdirectory included with Gunrock has a comprehensive test
 application for all the functionality of Gunrock.
