@@ -46,119 +46,123 @@ namespace graphio {
  */
 template<bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
 int ReadMarketStream(
-	FILE *f_in,
-	Csr<VertexId, Value, SizeT> &csr_graph,
-	bool undirected)
+    FILE *f_in,
+    Csr<VertexId, Value, SizeT> &csr_graph,
+    bool undirected)
 {
-	typedef Coo<VertexId, Value> EdgeTupleType;
-	
-	SizeT edges_read = -1;
-	SizeT nodes = 0;
-	SizeT edges = 0;
-	EdgeTupleType *coo = NULL;		// read in COO format
-	
-	time_t mark0 = time(NULL);
-	printf("  Parsing MARKET COO format ");
-	fflush(stdout);
+    typedef Coo<VertexId, Value> EdgeTupleType;
 
-	char line[1024];
+    SizeT edges_read = -1;
+    SizeT nodes = 0;
+    SizeT edges = 0;
+    EdgeTupleType *coo = NULL;          // read in COO format
 
-	bool ordered_rows = true;
+    time_t mark0 = time(NULL);
+    printf("  Parsing MARKET COO format ");
+    fflush(stdout);
 
-	while(true) {
+    char line[1024];
 
-		if (fscanf(f_in, "%[^\n]\n", line) <= 0) {
-			break;
-		}
+    bool ordered_rows = true;
 
-		if (line[0] == '%') {
+    while(true) {
 
-			// Comment
+        if (fscanf(f_in, "%[^\n]\n", line) <= 0) {
+            break;
+        }
 
-		} else if (edges_read == -1) {
+        if (line[0] == '%') {
 
-			// Problem description
-			long long ll_nodes_x, ll_nodes_y, ll_edges;
-			if (sscanf(line, "%lld %lld %lld", &ll_nodes_x, &ll_nodes_y, &ll_edges) != 3) {
-				fprintf(stderr, "Error parsing MARKET graph: invalid problem description\n");
-				return -1;
-			}
+            // Comment
 
-			if (ll_nodes_x != ll_nodes_y) {
-				fprintf(stderr, "Error parsing MARKET graph: not square (%lld, %lld)\n", ll_nodes_x, ll_nodes_y);
-				return -1;
-			}
+        } else if (edges_read == -1) {
 
-			nodes = ll_nodes_x;
-			edges = (undirected) ? ll_edges * 2 : ll_edges;
+            // Problem description
+            long long ll_nodes_x, ll_nodes_y, ll_edges;
+            if (sscanf(line, "%lld %lld %lld", &ll_nodes_x, &ll_nodes_y, &ll_edges) != 3) {
+                fprintf(stderr, "Error parsing MARKET graph: invalid problem description\n");
+                return -1;
+            }
 
-			printf(" (%lld nodes, %lld directed edges)... ",
-				(unsigned long long) ll_nodes_x, (unsigned long long) ll_edges);
-			fflush(stdout);
-			
-			// Allocate coo graph
-			coo = (EdgeTupleType*) malloc(sizeof(EdgeTupleType) * edges);
+            if (ll_nodes_x != ll_nodes_y) {
+                fprintf(stderr, "Error parsing MARKET graph: not square (%lld, %lld)\n", ll_nodes_x, ll_nodes_y);
+                return -1;
+            }
 
-			edges_read++;
+            nodes = ll_nodes_x;
+            edges = (undirected) ? ll_edges * 2 : ll_edges;
 
-		} else {
+            printf(" (%lld nodes, %lld directed edges)... ",
+                   (unsigned long long) ll_nodes_x, (unsigned long long) ll_edges);
+            fflush(stdout);
 
-			// Edge description (v -> w)
-			if (!coo) {
-				fprintf(stderr, "Error parsing MARKET graph: invalid format\n");
-				return -1;
-			}			
-			if (edges_read >= edges) {
-				fprintf(stderr, "Error parsing MARKET graph: encountered more than %d edges\n", edges);
-				if (coo) free(coo);
-				return -1;
-			}
+            // Allocate coo graph
+            coo = (EdgeTupleType*) malloc(sizeof(EdgeTupleType) * edges);
 
-			long long ll_row, ll_col;
-			if (sscanf(line, "%lld %lld", &ll_col, &ll_row) != 2) {
-				fprintf(stderr, "Error parsing MARKET graph: badly formed edge\n", edges);
-				if (coo) free(coo);
-				return -1;
-			}
+            edges_read++;
 
-			coo[edges_read].row = ll_row - 1;	// zero-based array
-			coo[edges_read].col = ll_col - 1;	// zero-based array
+        } else {
 
-			edges_read++;
+            // Edge description (v -> w)
+            if (!coo) {
+                fprintf(stderr, "Error parsing MARKET graph: invalid format\n");
+                return -1;
+            }
+            if (edges_read >= edges) {
+                fprintf(stderr, "Error parsing MARKET graph: encountered more than %d edges\n", edges);
+                if (coo) free(coo);
+                return -1;
+            }
 
-			if (undirected) {
-				// Go ahead and insert reverse edge
-				coo[edges_read].row = ll_col - 1;	// zero-based array
-				coo[edges_read].col = ll_row - 1;	// zero-based array
+            long long ll_row, ll_col;
+            if (sscanf(line, "%lld %lld", &ll_col, &ll_row) != 2) {
+                fprintf(stderr,
+                        "Error parsing MARKET graph: badly formed edge\n"
+                        /*, edges */
+                        /* JDO commented this out; it wasn't used and
+                         * generated a warning */);
+                if (coo) free(coo);
+                return -1;
+            }
 
-				ordered_rows = false;
-				edges_read++;
-			}
-		}
-	}
-	
-	if (coo == NULL) {
-		fprintf(stderr, "No graph found\n");
-		return -1;
-	}
+            coo[edges_read].row = ll_row - 1;   // zero-based array
+            coo[edges_read].col = ll_col - 1;   // zero-based array
 
-	if (edges_read != edges) {
-		fprintf(stderr, "Error parsing MARKET graph: only %d/%d edges read\n", edges_read, edges);
-		if (coo) free(coo);
-		return -1;
-	}
-	
-	time_t mark1 = time(NULL);
-	printf("Done parsing (%ds).\n", (int) (mark1 - mark0));
-	fflush(stdout);
-	
-	// Convert COO to CSR
-	csr_graph.template FromCoo<LOAD_VALUES>(coo, nodes, edges, ordered_rows);
-	free(coo);
+            edges_read++;
 
-	fflush(stdout);
-	
-	return 0;
+            if (undirected) {
+                // Go ahead and insert reverse edge
+                coo[edges_read].row = ll_col - 1;       // zero-based array
+                coo[edges_read].col = ll_row - 1;       // zero-based array
+
+                ordered_rows = false;
+                edges_read++;
+            }
+        }
+    }
+
+    if (coo == NULL) {
+        fprintf(stderr, "No graph found\n");
+        return -1;
+    }
+
+    if (edges_read != edges) {
+        fprintf(stderr, "Error parsing MARKET graph: only %d/%d edges read\n", edges_read, edges);
+        if (coo) free(coo);
+        return -1;
+    }
+
+    time_t mark1 = time(NULL);
+    printf("Done parsing (%ds).\n", (int) (mark1 - mark0));
+    fflush(stdout);
+
+    // Convert COO to CSR
+    csr_graph.template FromCoo<LOAD_VALUES>(coo, nodes, edges, ordered_rows);
+    free(coo);
+
+    fflush(stdout);
+
+    return 0;
 }
 
 
@@ -168,36 +172,36 @@ int ReadMarketStream(
  */
 template<bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
 int BuildMarketGraph(
-	char *dimacs_filename, 
-	Csr<VertexId, Value, SizeT> &csr_graph,
-	bool undirected)
-{ 
-	if (dimacs_filename == NULL) {
+    char *dimacs_filename,
+    Csr<VertexId, Value, SizeT> &csr_graph,
+    bool undirected)
+{
+    if (dimacs_filename == NULL) {
 
-		// Read from stdin
-		printf("Reading from stdin:\n");
-		if (ReadMarketStream<LOAD_VALUES>(stdin, csr_graph, undirected) != 0) {
-			return -1;
-		}
+        // Read from stdin
+        printf("Reading from stdin:\n");
+        if (ReadMarketStream<LOAD_VALUES>(stdin, csr_graph, undirected) != 0) {
+            return -1;
+        }
 
-	} else {
-	
-		// Read from file
-		FILE *f_in = fopen(dimacs_filename, "r");
-		if (f_in) {
-			printf("Reading from %s:\n", dimacs_filename);
-			if (ReadMarketStream<LOAD_VALUES>(f_in, csr_graph, undirected) != 0) {
-				fclose(f_in);
-				return -1;
-			}
-			fclose(f_in);
-		} else {
-			perror("Unable to open file");
-			return -1;
-		}
-	}
-	
-	return 0;
+    } else {
+
+        // Read from file
+        FILE *f_in = fopen(dimacs_filename, "r");
+        if (f_in) {
+            printf("Reading from %s:\n", dimacs_filename);
+            if (ReadMarketStream<LOAD_VALUES>(f_in, csr_graph, undirected) != 0) {
+                fclose(f_in);
+                return -1;
+            }
+            fclose(f_in);
+        } else {
+            perror("Unable to open file");
+            return -1;
+        }
+    }
+
+    return 0;
 }
 
 } // namespace graphio
