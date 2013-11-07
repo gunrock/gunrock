@@ -27,19 +27,19 @@ namespace util {
  * For example, consider the following copy kernel that uses vec-2 loads 
  * and stores:
  * 
- * 		template <typename T>
- * 		__global__ void CopyKernel(T *d_in, T *d_out) 
- * 		{
- * 			typedef typename VecType<T, 2>::Type Vector;
+ *      template <typename T>
+ *      __global__ void CopyKernel(T *d_in, T *d_out) 
+ *      {
+ *          typedef typename VecType<T, 2>::Type Vector;
  *
- * 			Vector datum;
+ *          Vector datum;
  * 
- * 			Vector *d_in_v2 = (Vector *) d_in;
- * 			Vector *d_out_v2 = (Vector *) d_out;
+ *          Vector *d_in_v2 = (Vector *) d_in;
+ *          Vector *d_out_v2 = (Vector *) d_out;
  * 
- * 			datum = d_in_v2[threadIdx.x];
- * 			d_out_v2[threadIdx.x] = datum;
- * 		} 
+ *          datum = d_in_v2[threadIdx.x];
+ *          d_out_v2[threadIdx.x] = datum;
+ *      } 
  * 
  */
 template <typename T, int vec_elements> struct VecType;
@@ -49,8 +49,8 @@ template <typename T, int vec_elements> struct VecType;
  */
 template <typename T> 
 struct VecType<T, 1> {
-	T x;
-	typedef VecType<T, 1> Type;
+    T x;
+    typedef VecType<T, 1> Type;
 };
 
 /**
@@ -58,9 +58,9 @@ struct VecType<T, 1> {
  */
 template <typename T> 
 struct VecType<T, 2> {
-	T x;
-	T y;
-	typedef VecType<T, 2> Type;
+    T x;
+    T y;
+    typedef VecType<T, 2> Type;
 };
 
 /**
@@ -68,11 +68,11 @@ struct VecType<T, 2> {
  */
 template <typename T> 
 struct VecType<T, 4> {
-	T x;
-	T y;
-	T z;
-	T w;
-	typedef VecType<T, 4> Type;
+    T x;
+    T y;
+    T z;
+    T w;
+    typedef VecType<T, 4> Type;
 };
 
 

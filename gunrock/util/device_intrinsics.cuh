@@ -24,8 +24,8 @@ namespace util {
  * Terminates the calling thread
  */
 __device__ __forceinline__ void ThreadExit() {
-	asm("exit;");
-}	
+    asm("exit;");
+}   
 
 
 /**
@@ -33,9 +33,9 @@ __device__ __forceinline__ void ThreadExit() {
  */
 __device__ __forceinline__ unsigned int LaneId()
 {
-	unsigned int ret;
-	asm("mov.u32 %0, %laneid;" : "=r"(ret) );
-	return ret;
+    unsigned int ret;
+    asm("mov.u32 %0, %laneid;" : "=r"(ret) );
+    return ret;
 }
 
 
@@ -45,9 +45,9 @@ __device__ __forceinline__ unsigned int LaneId()
 __device__ __forceinline__ unsigned int FastMul(unsigned int a, unsigned int b)
 {
 #if __CUDA_ARCH__ >= 200
-	return a * b;
+    return a * b;
 #else
-	return __umul24(a, b);
+    return __umul24(a, b);
 #endif
 }
 
@@ -58,10 +58,10 @@ __device__ __forceinline__ unsigned int FastMul(unsigned int a, unsigned int b)
 __device__ __forceinline__ int FastMul(int a, int b)
 {
 #if __CUDA_ARCH__ >= 200
-	return a * b;
+    return a * b;
 #else
-	return __mul24(a, b);
-#endif	
+    return __mul24(a, b);
+#endif  
 }
 
 
@@ -74,19 +74,19 @@ struct AtomicInt;
 template <typename T>
 struct AtomicInt<T, 4>
 {
-	static __device__ __forceinline__ T Add(T* ptr, T val)
-	{
-		return atomicAdd((unsigned int *) ptr, (unsigned int) val);
-	}
+    static __device__ __forceinline__ T Add(T* ptr, T val)
+    {
+        return atomicAdd((unsigned int *) ptr, (unsigned int) val);
+    }
 };
 
 template <typename T>
 struct AtomicInt<T, 8>
 {
-	static __device__ __forceinline__ T Add(T* ptr, T val)
-	{
-		return atomicAdd((unsigned long long int *) ptr, (unsigned long long int) val);
-	}
+    static __device__ __forceinline__ T Add(T* ptr, T val)
+    {
+        return atomicAdd((unsigned long long int *) ptr, (unsigned long long int) val);
+    }
 };
 
 

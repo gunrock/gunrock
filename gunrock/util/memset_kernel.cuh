@@ -28,10 +28,10 @@ namespace util {
 template <typename T>
 __global__ void MemsetKernel(T *d_out, T value, int length)
 {
-	const int STRIDE = gridDim.x * blockDim.x;
-	for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x; idx < length; idx += STRIDE) {
-		d_out[idx] = value;
-	}
+    const int STRIDE = gridDim.x * blockDim.x;
+    for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x; idx < length; idx += STRIDE) {
+        d_out[idx] = value;
+    }
 }
 
 /**
@@ -40,10 +40,10 @@ __global__ void MemsetKernel(T *d_out, T value, int length)
 template <typename T>
 __global__ void MemsetIdxKernel(T *d_out, int length)
 {
-	const int STRIDE = gridDim.x * blockDim.x;
-	for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x; idx < length; idx += STRIDE) {
-		d_out[idx] = idx;
-	}
+    const int STRIDE = gridDim.x * blockDim.x;
+    for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x; idx < length; idx += STRIDE) {
+        d_out[idx] = idx;
+    }
 }
 
 /**

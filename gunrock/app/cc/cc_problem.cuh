@@ -22,10 +22,10 @@ namespace app {
 namespace cc {
 
 template <
-	typename 	VertexId,						// Type of signed integer to use as vertex id (e.g., uint32)
-	typename 	SizeT,							// Type of unsigned integer to use for array indexing (e.g., uint32)
-	typename	Value,						    // Type of edge value (e.g., float)
-	bool        _USE_DOUBLE_BUFFER>
+    typename    VertexId,                       // Type of signed integer to use as vertex id (e.g., uint32)
+    typename    SizeT,                          // Type of unsigned integer to use for array indexing (e.g., uint32)
+    typename    Value,                          // Type of edge value (e.g., float)
+    bool        _USE_DOUBLE_BUFFER>
 struct CCProblem : ProblemBase<VertexId, SizeT,
                                 _USE_DOUBLE_BUFFER>
 {
@@ -75,22 +75,22 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
     num_components(0) {}
 
     CCProblem(bool      stream_from_host,       // Only meaningful for single-GPU
-	        SizeT       nodes,
-	        SizeT       edges,
-	        SizeT       *h_row_offsets,
-	        VertexId    *h_column_indices,
-	        int         num_gpus) :
+            SizeT       nodes,
+            SizeT       edges,
+            SizeT       *h_row_offsets,
+            VertexId    *h_column_indices,
+            int         num_gpus) :
         nodes(nodes),
         edges(edges),
         num_gpus(num_gpus)
     {
         Init(
-	        stream_from_host,
-	        nodes,
-	        edges,
-	        h_row_offsets,
-	        h_column_indices,
-	        num_gpus);
+            stream_from_host,
+            nodes,
+            edges,
+            h_row_offsets,
+            h_column_indices,
+            num_gpus);
     }
 
     /**
@@ -179,153 +179,153 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
     }
 
     cudaError_t Init(
-	        bool        stream_from_host,       // Only meaningful for single-GPU
-	        SizeT       _nodes,
-	        SizeT       _edges,
-	        SizeT       *h_row_offsets,
-	        VertexId    *h_column_indices,
-	        int         _num_gpus)
-	{
-	    num_gpus = _num_gpus;
-	    nodes = _nodes;
-	    edges = _edges;
-	    ProblemBase<VertexId, SizeT,
+            bool        stream_from_host,       // Only meaningful for single-GPU
+            SizeT       _nodes,
+            SizeT       _edges,
+            SizeT       *h_row_offsets,
+            VertexId    *h_column_indices,
+            int         _num_gpus)
+    {
+        num_gpus = _num_gpus;
+        nodes = _nodes;
+        edges = _edges;
+        ProblemBase<VertexId, SizeT,
                                 _USE_DOUBLE_BUFFER>::Init(stream_from_host,
-	                                    nodes,
-	                                    edges,
-	                                    h_row_offsets,
-	                                    h_column_indices,
-	                                    num_gpus);
+                                        nodes,
+                                        edges,
+                                        h_row_offsets,
+                                        h_column_indices,
+                                        num_gpus);
 
-	    // No data in DataSlice needs to be copied from host
-	     
-	    /**
-	     * Allocate output labels/preds
-	     */
-	    data_slices = new DataSlice*[num_gpus];
-	    d_data_slices = new DataSlice*[num_gpus];
+        // No data in DataSlice needs to be copied from host
+         
+        /**
+         * Allocate output labels/preds
+         */
+        data_slices = new DataSlice*[num_gpus];
+        d_data_slices = new DataSlice*[num_gpus];
 
-	
-	    cudaError_t retval = cudaSuccess;
-	    
-	    do {
-	        if (num_gpus <= 1) {
-	            gpu_idx = (int*)malloc(sizeof(int));
-	            // Create a single data slice for the currently-set gpu
-	            int gpu;
-	            if (retval = util::GRError(cudaGetDevice(&gpu), "CCProblem cudaGetDevice failed", __FILE__, __LINE__)) break;
-	            gpu_idx[0] = gpu;
+    
+        cudaError_t retval = cudaSuccess;
+        
+        do {
+            if (num_gpus <= 1) {
+                gpu_idx = (int*)malloc(sizeof(int));
+                // Create a single data slice for the currently-set gpu
+                int gpu;
+                if (retval = util::GRError(cudaGetDevice(&gpu), "CCProblem cudaGetDevice failed", __FILE__, __LINE__)) break;
+                gpu_idx[0] = gpu;
 
-	            data_slices[0] = new DataSlice;
+                data_slices[0] = new DataSlice;
 
                 // Construct coo from/to edge list from row_offsets and column_indices
-	            VertexId *froms = new VertexId[edges];
-	            VertexId *tos = new VertexId[edges];
-	            for (int i = 0; i < nodes; ++i)
-	            {
-	                for (int j = h_row_offsets[i]; j < h_row_offsets[i+1]; ++j)
-	                {
-	                    froms[j] = i;
-	                    tos[j] = h_column_indices[j];
-	                }
-	            }
+                VertexId *froms = new VertexId[edges];
+                VertexId *tos = new VertexId[edges];
+                for (int i = 0; i < nodes; ++i)
+                {
+                    for (int j = h_row_offsets[i]; j < h_row_offsets[i+1]; ++j)
+                    {
+                        froms[j] = i;
+                        tos[j] = h_column_indices[j];
+                    }
+                }
 
                 VertexId    *d_froms;
-	            if (retval = util::GRError(cudaMalloc(
-	                            (void**)&d_froms,
-	                            edges * sizeof(VertexId)),
-	                        "CCProblem cudaMalloc d_froms failed", __FILE__, __LINE__)) return retval;
-	            data_slices[0]->d_froms = d_froms;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_froms,
+                                edges * sizeof(VertexId)),
+                            "CCProblem cudaMalloc d_froms failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_froms = d_froms;
 
                 VertexId    *d_tos;
-	            if (retval = util::GRError(cudaMalloc(
-	                            (void**)&d_tos,
-	                            edges * sizeof(VertexId)),
-	                        "CCProblem cudaMalloc d_tos failed", __FILE__, __LINE__)) return retval;
-	            data_slices[0]->d_tos = d_tos;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_tos,
+                                edges * sizeof(VertexId)),
+                            "CCProblem cudaMalloc d_tos failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_tos = d_tos;
 
                 if (retval = util::GRError(cudaMemcpy(
-	                            d_froms,
-	                            froms,
-	                            edges * sizeof(VertexId),
-	                            cudaMemcpyHostToDevice),
-	                        "CCProblem cudaMemcpy froms to d_froms failed", __FILE__, __LINE__)) return retval;
+                                d_froms,
+                                froms,
+                                edges * sizeof(VertexId),
+                                cudaMemcpyHostToDevice),
+                            "CCProblem cudaMemcpy froms to d_froms failed", __FILE__, __LINE__)) return retval;
 
                 if (retval = util::GRError(cudaMemcpy(
-	                            d_tos,
-	                            tos,
-	                            edges * sizeof(VertexId),
-	                            cudaMemcpyHostToDevice),
-	                        "CCProblem cudaMemcpy tos to d_tos failed", __FILE__, __LINE__)) return retval; 
+                                d_tos,
+                                tos,
+                                edges * sizeof(VertexId),
+                                cudaMemcpyHostToDevice),
+                            "CCProblem cudaMemcpy tos to d_tos failed", __FILE__, __LINE__)) return retval; 
 
-	            if (froms) delete[] froms;
-	            if (tos) delete[] tos;
+                if (froms) delete[] froms;
+                if (tos) delete[] tos;
 
-	            if (retval = util::GRError(cudaMalloc(
-	                            (void**)&d_data_slices[0],
-	                            sizeof(DataSlice)),
-	                        "CCProblem cudaMalloc d_data_slices failed", __FILE__, __LINE__)) return retval;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_data_slices[0],
+                                sizeof(DataSlice)),
+                            "CCProblem cudaMalloc d_data_slices failed", __FILE__, __LINE__)) return retval;
 
                 // Create SoA on device
-	            VertexId    *d_component_ids;
-	            if (retval = util::GRError(cudaMalloc(
-	                    (void**)&d_component_ids,
-	                    nodes * sizeof(VertexId)),
-	                "CCProblem cudaMalloc d_component_ids failed", __FILE__, __LINE__)) return retval;
-	            data_slices[0]->d_component_ids = d_component_ids;
+                VertexId    *d_component_ids;
+                if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_component_ids,
+                        nodes * sizeof(VertexId)),
+                    "CCProblem cudaMalloc d_component_ids failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_component_ids = d_component_ids;
  
-	            int   *d_masks;
+                int   *d_masks;
                     if (retval = util::GRError(cudaMalloc(
-	                    (void**)&d_masks,
-	                    nodes * sizeof(int)),
-	                "CCProblem cudaMalloc d_masks failed", __FILE__, __LINE__)) return retval;
-	            data_slices[0]->d_masks = d_masks;
+                        (void**)&d_masks,
+                        nodes * sizeof(int)),
+                    "CCProblem cudaMalloc d_masks failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_masks = d_masks;
 
                 bool   *d_marks;
                     if (retval = util::GRError(cudaMalloc(
-	                    (void**)&d_marks,
-	                    edges * sizeof(bool)),
-	                "CCProblem cudaMalloc d_marks failed", __FILE__, __LINE__)) return retval;
-	            data_slices[0]->d_marks = d_marks;
+                        (void**)&d_marks,
+                        edges * sizeof(bool)),
+                    "CCProblem cudaMalloc d_marks failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_marks = d_marks;
 
-	        }
-	        //TODO: add multi-GPU allocation code
-	    } while (0);
+            }
+            //TODO: add multi-GPU allocation code
+        } while (0);
 
-	    return retval;
-	}
+        return retval;
+    }
 
-	/**
-	 * Performs any initialization work needed for CC problem type. Must be called
-	 * prior to each CC run
-	 */
-	cudaError_t Reset(
-	        FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
-	        double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
-	{
-	    typedef ProblemBase<VertexId, SizeT,
+    /**
+     * Performs any initialization work needed for CC problem type. Must be called
+     * prior to each CC run
+     */
+    cudaError_t Reset(
+            FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
+            double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
+    {
+        typedef ProblemBase<VertexId, SizeT,
                                 _USE_DOUBLE_BUFFER> BaseProblem;
-	    //load ProblemBase Reset
-	    BaseProblem::Reset(frontier_type, queue_sizing);
+        //load ProblemBase Reset
+        BaseProblem::Reset(frontier_type, queue_sizing);
 
-	    cudaError_t retval = cudaSuccess;
+        cudaError_t retval = cudaSuccess;
 
-	    for (int gpu = 0; gpu < num_gpus; ++gpu) {
-	        // Set device
-	        if (retval = util::GRError(cudaSetDevice(gpu_idx[gpu]),
-	                    "CCProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
+        for (int gpu = 0; gpu < num_gpus; ++gpu) {
+            // Set device
+            if (retval = util::GRError(cudaSetDevice(gpu_idx[gpu]),
+                        "CCProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
 
-	        // Allocate output component_ids if necessary
-	        if (!data_slices[gpu]->d_component_ids) {
+            // Allocate output component_ids if necessary
+            if (!data_slices[gpu]->d_component_ids) {
                 VertexId    *d_component_ids;
-	            if (retval = util::GRError(cudaMalloc(
-	                            (void**)&d_component_ids,
-	                            nodes * sizeof(VertexId)),
-	                        "CCProblem cudaMalloc d_component_ids failed", __FILE__, __LINE__)) return retval;
-	            data_slices[gpu]->d_component_ids = d_component_ids;
-	        }
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_component_ids,
+                                nodes * sizeof(VertexId)),
+                            "CCProblem cudaMalloc d_component_ids failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_component_ids = d_component_ids;
+            }
 
-	        util::MemsetIdxKernel<<<128, 128>>>(data_slices[gpu]->d_component_ids, nodes);
+            util::MemsetIdxKernel<<<128, 128>>>(data_slices[gpu]->d_component_ids, nodes);
 
             // Allocate marks if necessary
             if (!data_slices[gpu]->d_marks) {
@@ -350,21 +350,21 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_masks, 0, nodes);
                 
             if (retval = util::GRError(cudaMemcpy(
-	                        d_data_slices[gpu],
-	                        data_slices[gpu],
-	                        sizeof(DataSlice),
-	                        cudaMemcpyHostToDevice),
-	                    "CCProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
-	    }
+                            d_data_slices[gpu],
+                            data_slices[gpu],
+                            sizeof(DataSlice),
+                            cudaMemcpyHostToDevice),
+                        "CCProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
+        }
 
-	    // Initialize edge frontier_queue
-	    util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], edges);
+        // Initialize edge frontier_queue
+        util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], edges);
 
-	    // Initialize vertex frontier queue
-	    util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_values[0], nodes);
-	    
-	    return retval;
-	}
+        // Initialize vertex frontier queue
+        util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_values[0], nodes);
+        
+        return retval;
+    }
 
 };
 

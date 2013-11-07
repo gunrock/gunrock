@@ -157,9 +157,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         if (queue_reset)
         {
             if (threadIdx.x < util::CtaWorkProgress::COUNTERS) {
-	            //Reset all counters
-	            work_progress.template Reset<SizeT>();
-	        }   
+                //Reset all counters
+                work_progress.template Reset<SizeT>();
+            }   
         }
 
         // Determine work decomposition
@@ -225,33 +225,33 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             __global__
             void Kernel(
                     bool                                    queue_reset,                // If reset queue
-	                typename KernelPolicy::VertexId 		queue_index,				// Current frontier queue counter index
-	                int										num_gpus,					// Number of GPUs
-	                typename KernelPolicy::SizeT            num_elements,               // Number of elements
-	                volatile int 							*d_done,					// Flag to set when we detect incoming edge frontier is empty
-	                typename KernelPolicy::VertexId 		*d_in_queue,			    // Incoming vertex frontier
-	                typename KernelPolicy::VertexId 		*d_out_queue,			    // Outgoing edge frontier
-	                typename KernelPolicy::VertexId         *d_column_indices,
+                    typename KernelPolicy::VertexId         queue_index,                // Current frontier queue counter index
+                    int                                     num_gpus,                   // Number of GPUs
+                    typename KernelPolicy::SizeT            num_elements,               // Number of elements
+                    volatile int                            *d_done,                    // Flag to set when we detect incoming edge frontier is empty
+                    typename KernelPolicy::VertexId         *d_in_queue,                // Incoming vertex frontier
+                    typename KernelPolicy::VertexId         *d_out_queue,               // Outgoing edge frontier
+                    typename KernelPolicy::VertexId         *d_column_indices,
                     typename ProblemData::DataSlice         *problem,                    // Problem Object
-	                util::CtaWorkProgress 					work_progress,				// Atomic workstealing and queueing counters
-	                typename KernelPolicy::SizeT			max_in_frontier, 		    // Maximum number of elements we can place into the outgoing vertex frontier
-	                typename KernelPolicy::SizeT			max_out_frontier, 			// Maximum number of elements we can place into the outgoing edge frontier
-	                util::KernelRuntimeStats				kernel_stats)				// Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT)
+                    util::CtaWorkProgress                   work_progress,              // Atomic workstealing and queueing counters
+                    typename KernelPolicy::SizeT            max_in_frontier,            // Maximum number of elements we can place into the outgoing vertex frontier
+                    typename KernelPolicy::SizeT            max_out_frontier,           // Maximum number of elements we can place into the outgoing edge frontier
+                    util::KernelRuntimeStats                kernel_stats)               // Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT)
 {
-	Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
-	        queue_reset,	
-		    queue_index,
-		    num_gpus,
-		    num_elements,
-		    d_done,
-		    d_in_queue,
-		    d_out_queue,
-		    d_column_indices,
-		    problem,
-		    work_progress,
-		    max_in_frontier,
-		    max_out_frontier,
-		    kernel_stats);
+    Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
+            queue_reset,    
+            queue_index,
+            num_gpus,
+            num_elements,
+            d_done,
+            d_in_queue,
+            d_out_queue,
+            d_column_indices,
+            problem,
+            work_progress,
+            max_in_frontier,
+            max_out_frontier,
+            kernel_stats);
 }
 
 } //edge_map_forward

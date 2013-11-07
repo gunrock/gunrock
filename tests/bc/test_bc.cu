@@ -405,7 +405,7 @@ void RunTests(
         printf("\n");
     }
 
-    cudaError_t         retval = cudaSuccess;
+    /*cudaError_t         retval = cudaSuccess;
 
     double              avg_duty = 0.0;
 
@@ -468,7 +468,20 @@ void RunTests(
 
     printf("GPU BC finished in %lf msec.\n", elapsed);
     if (avg_duty != 0)
-        printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
+        printf("\n avg CTA duty: %.2f%%", avg_duty * 100);*/
+    std::ofstream fout;
+    //std::ifstream fin;
+    //fin.open("RESULT.dat", std::ios::binary);
+    fout.open("RESULT.dat", std::ios::binary);
+    for ( int i = 0; i < graph.nodes; ++i )
+    {
+        //float v;
+        //fin.read(reinterpret_cast<char*>(&v), sizeof(Value));
+        //printf("%d: %lf\n", i, v);
+        printf("%d: %lf\n", i, reference_check_bc_values[i]);
+        fout.write(reinterpret_cast<char*>(&reference_check_bc_values[i]), sizeof(Value));
+    }
+    
 
 
     // Cleanup

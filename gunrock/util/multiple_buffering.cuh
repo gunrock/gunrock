@@ -37,36 +37,36 @@ namespace util {
  * member to index which vector in each set is "currently valid".  I.e., the
  * valid data within "MultipleBuffer<2, int, int> b" is accessible by:
  * 
- * 		b.d_keys[b.selector];
+ *      b.d_keys[b.selector];
  * 
  */
 template <
-	int BUFFER_COUNT,
-	typename _KeyType,
-	typename _ValueType = util::NullType>
+    int BUFFER_COUNT,
+    typename _KeyType,
+    typename _ValueType = util::NullType>
 struct MultipleBuffer
 {
-	typedef _KeyType	KeyType;
-	typedef _ValueType 	ValueType;
+    typedef _KeyType    KeyType;
+    typedef _ValueType  ValueType;
 
-	// Set of device vector pointers for keys
-	KeyType* d_keys[BUFFER_COUNT];
-	
-	// Set of device vector pointers for values
-	ValueType* d_values[BUFFER_COUNT];
+    // Set of device vector pointers for keys
+    KeyType* d_keys[BUFFER_COUNT];
+    
+    // Set of device vector pointers for values
+    ValueType* d_values[BUFFER_COUNT];
 
-	// Selector into the set of device vector pointers (i.e., where the results are)
-	int selector;
+    // Selector into the set of device vector pointers (i.e., where the results are)
+    int selector;
 
-	// Constructor
-	MultipleBuffer()
-	{
-		selector = 0;
-		for (int i = 0; i < BUFFER_COUNT; i++) {
-			d_keys[i] = NULL;
-			d_values[i] = NULL;
-		}
-	}
+    // Constructor
+    MultipleBuffer()
+    {
+        selector = 0;
+        for (int i = 0; i < BUFFER_COUNT; i++) {
+            d_keys[i] = NULL;
+            d_values[i] = NULL;
+        }
+    }
 };
 
 
@@ -82,52 +82,52 @@ struct MultipleBuffer
  *
  * Declaring keys-only storage wrapper:
  *
- * 		DoubleBuffer<KeyType> key_storage;
+ *      DoubleBuffer<KeyType> key_storage;
  *
  * Declaring key-value storage wrapper:
  *
- * 		DoubleBuffer<KeyType, ValueType> key_value_storage;
+ *      DoubleBuffer<KeyType, ValueType> key_value_storage;
  *
  */
 template <
-	typename KeyType,
-	typename ValueType = util::NullType>
+    typename KeyType,
+    typename ValueType = util::NullType>
 struct DoubleBuffer : MultipleBuffer<2, KeyType, ValueType>
 {
-	typedef MultipleBuffer<2, KeyType, ValueType> ParentType;
+    typedef MultipleBuffer<2, KeyType, ValueType> ParentType;
 
-	// Constructor
-	DoubleBuffer() : ParentType() {}
+    // Constructor
+    DoubleBuffer() : ParentType() {}
 
-	// Constructor
-	DoubleBuffer(
-		KeyType* keys) : ParentType()
+    // Constructor
+    DoubleBuffer(
+        KeyType* keys) : ParentType()
 
-	{
-		this->d_keys[0] = keys;
-	}
+    {
+        this->d_keys[0] = keys;
+    }
 
-	// Constructor
-	DoubleBuffer(
-		KeyType* keys,
-		ValueType* values) : ParentType()
-	{
-		this->d_keys[0] = keys;
-		this->d_values[0] = values;
-	}
+    // Constructor
+    DoubleBuffer(
+        KeyType* keys,
+        ValueType* values) : ParentType()
+    {
+        this->d_keys[0] = keys;
+        this->d_values[0] = values;
+    }
 
-	// Constructor
-	DoubleBuffer(
-		KeyType* keys0,
-		KeyType* keys1,
-		ValueType* values0,
-		ValueType* values1) : ParentType()
-	{
-		this->d_keys[0] = keys0;
-		this->d_keys[1] = keys1;
-		this->d_values[0] = values0;
-		this->d_values[1] = values1;
-	}
+    // Constructor
+    DoubleBuffer(
+        KeyType* keys0,
+        KeyType* keys1,
+        ValueType* values0,
+        ValueType* values1) : ParentType()
+    {
+        this->d_keys[0] = keys0;
+        this->d_keys[1] = keys1;
+        this->d_values[0] = values0;
+        this->d_values[1] = values1;
+    }
 };
 
 
@@ -135,14 +135,14 @@ struct DoubleBuffer : MultipleBuffer<2, KeyType, ValueType>
  * Triple buffer version of the multi-buffer storage abstraction above.
  */
 template <
-	typename KeyType,
-	typename ValueType = util::NullType>
+    typename KeyType,
+    typename ValueType = util::NullType>
 struct TripleBuffer : MultipleBuffer<3, KeyType, ValueType>
 {
-	typedef MultipleBuffer<3, KeyType, ValueType> ParentType;
+    typedef MultipleBuffer<3, KeyType, ValueType> ParentType;
 
-	// Constructor
-	TripleBuffer() : ParentType() {}
+    // Constructor
+    TripleBuffer() : ParentType() {}
 };
 
 

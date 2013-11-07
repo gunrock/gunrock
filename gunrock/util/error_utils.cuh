@@ -24,49 +24,49 @@ namespace util {
  * Displays error message in accordance with debug mode
  */
 cudaError_t GRError(
-	cudaError_t error,
-	const char *message,
-	const char *filename,
-	int line,
-	bool print = true)
+    cudaError_t error,
+    const char *message,
+    const char *filename,
+    int line,
+    bool print = true)
 {
-	if (error && print) {
-		fprintf(stderr, "[%s, %d] %s (CUDA error %d: %s)\n", filename, line, message, error, cudaGetErrorString(error));
-		fflush(stderr);
-	}
-	return error;
+    if (error && print) {
+        fprintf(stderr, "[%s, %d] %s (CUDA error %d: %s)\n", filename, line, message, error, cudaGetErrorString(error));
+        fflush(stderr);
+    }
+    return error;
 }
 
 /**
  * Checks and resets last CUDA error.  If set, displays last error message in accordance with debug mode.
  */
 cudaError_t GRError(
-	const char *message,
-	const char *filename,
-	int line,
-	bool print = true)
+    const char *message,
+    const char *filename,
+    int line,
+    bool print = true)
 {
-	cudaError_t error = cudaGetLastError();
-	if (error && print) {
+    cudaError_t error = cudaGetLastError();
+    if (error && print) {
 
-		fprintf(stderr, "[%s, %d] %s (CUDA error %d: %s)\n", filename, line, message, error, cudaGetErrorString(error));
-		fflush(stderr);
-	}
-	return error;
+        fprintf(stderr, "[%s, %d] %s (CUDA error %d: %s)\n", filename, line, message, error, cudaGetErrorString(error));
+        fflush(stderr);
+    }
+    return error;
 }
 
 /**
  * Displays error message in accordance with debug mode
  */
 cudaError_t GRError(
-	cudaError_t error,
-	bool print = true)
+    cudaError_t error,
+    bool print = true)
 {
-	if (error && print) {
-		fprintf(stderr, "(CUDA error %d: %s)\n", error, cudaGetErrorString(error));
-		fflush(stderr);
-	}
-	return error;
+    if (error && print) {
+        fprintf(stderr, "(CUDA error %d: %s)\n", error, cudaGetErrorString(error));
+        fflush(stderr);
+    }
+    return error;
 }
 
 
@@ -74,14 +74,14 @@ cudaError_t GRError(
  * Checks and resets last CUDA error.  If set, displays last error message in accordance with debug mode.
  */
 cudaError_t GRError(
-	bool print = true)
+    bool print = true)
 {
-	cudaError_t error = cudaGetLastError();
-	if (error && print) {
-		fprintf(stderr, "(CUDA error %d: %s)\n", error, cudaGetErrorString(error));
-		fflush(stderr);
-	}
-	return error;
+    cudaError_t error = cudaGetLastError();
+    if (error && print) {
+        fprintf(stderr, "(CUDA error %d: %s)\n", error, cudaGetErrorString(error));
+        fflush(stderr);
+    }
+    return error;
 }
 
 

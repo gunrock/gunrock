@@ -214,29 +214,29 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             __global__
             void Kernel(
                     bool                                    queue_reset,                // If reset queue
-	                typename KernelPolicy::VertexId 		queue_index,				// Current frontier queue counter index
-	                int										num_gpus,					// Number of GPUs
-	                typename KernelPolicy::SizeT            num_elements,               // Number of Elements
-	                volatile int 							*d_done,					// Flag to set when we detect incoming edge frontier is empty
-	                typename KernelPolicy::VertexId 		*d_unvisited_node_queue,	// Incoming and output unvisited node queue
-	                typename KernelPolicy::SizeT            *d_frontier_bitmap_in,      // Incoming frontier bitmap
-	                typename KernelPolicy::SizeT            *d_frontier_bitmap_out,     // Outcoming frontier bitmap
+                    typename KernelPolicy::VertexId         queue_index,                // Current frontier queue counter index
+                    int                                     num_gpus,                   // Number of GPUs
+                    typename KernelPolicy::SizeT            num_elements,               // Number of Elements
+                    volatile int                            *d_done,                    // Flag to set when we detect incoming edge frontier is empty
+                    typename KernelPolicy::VertexId         *d_unvisited_node_queue,    // Incoming and output unvisited node queue
+                    typename KernelPolicy::SizeT            *d_frontier_bitmap_in,      // Incoming frontier bitmap
+                    typename KernelPolicy::SizeT            *d_frontier_bitmap_out,     // Outcoming frontier bitmap
                     typename ProblemData::DataSlice         *problem,                    // Problem Object
-	                util::CtaWorkProgress 					work_progress,				// Atomic workstealing and queueing counters
-	                util::KernelRuntimeStats				kernel_stats)				// Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT)
+                    util::CtaWorkProgress                   work_progress,              // Atomic workstealing and queueing counters
+                    util::KernelRuntimeStats                kernel_stats)               // Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT)
 {
-	Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
-	        queue_reset,	
-		    queue_index,
-		    num_gpus,
-		    num_elements,
-		    d_done,
-		    d_unvisited_node_queue,
-		    d_frontier_bitmap_in,
-		    d_frontier_bitmap_out,
-		    problem,
-		    work_progress,
-		    kernel_stats);
+    Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
+            queue_reset,    
+            queue_index,
+            num_gpus,
+            num_elements,
+            d_done,
+            d_unvisited_node_queue,
+            d_frontier_bitmap_in,
+            d_frontier_bitmap_out,
+            problem,
+            work_progress,
+            kernel_stats);
 }
 
 } //edge_map_backward
