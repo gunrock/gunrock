@@ -64,14 +64,21 @@ bool g_stream_from_host;
  {
  printf("\ntest_bc <graph type> <graph type args> [--device=<device_index>] "
         "[--instrumented] [--src=<source index>] [--quick] "
-        "[--num_gpus=<gpu number>] [--queue-sizing=<scale factor>]\n"
+        "[--queue-sizing=<scale factor>]\n"
         "\n"
         "Graph types and args:\n"
         "  market [<file>]\n"
         "    Reads a Matrix-Market coordinate-formatted graph of undirected\n"
-        "    edges from stdin (or from the optionally-specified file).\n"
-        "--src=<source index>: When source index is -1, compute BC value for each\n"
+        "    edges from stdin (or from the optionally-specified file).\n" 
+        "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
+        "  --undirected If set then treat the graph as undirected.\n"
+        "  --instrumented If set then kernels keep track of queue-search_depth\n"
+        "  and barrier duty (a relative indicator of load imbalance.)\n"
+        "  --src=<source index>: When source index is -1, compute BC value for each\n"
         "node. Otherwise, debug the delta value for one node\n"
+        "  --quick If set will skip the CPU validation code.\n"
+        "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
+        "  Default is 1.0\n"
         );
  }
 
@@ -450,7 +457,6 @@ void RunTests(
     }
 
     g_quick = args.CheckCmdLineFlag("quick");
-    args.GetCmdLineArgument("num-gpus", num_gpus);
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
     g_verbose = args.CheckCmdLineFlag("v");
 
@@ -480,67 +486,67 @@ void RunTests(
 
 int main( int argc, char** argv)
 {
-	CommandLineArgs args(argc, argv);
+    CommandLineArgs args(argc, argv);
 
-	if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
-		Usage();
-		return 1;
-	}
+    if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
+        Usage();
+        return 1;
+    }
 
-	DeviceInit(args);
-	cudaSetDeviceFlags(cudaDeviceMapHost);
+    DeviceInit(args);
+    cudaSetDeviceFlags(cudaDeviceMapHost);
 
-	//srand(0);									// Presently deterministic
-	//srand(time(NULL));
+    //srand(0);                                 // Presently deterministic
+    //srand(time(NULL));
 
-	// Parse graph-contruction params
-	g_undirected = true;
+    // Parse graph-contruction params
+    g_undirected = true;
 
-	std::string graph_type = argv[1];
-	int flags = args.ParsedArgc();
-	int graph_args = argc - flags - 1;
+    std::string graph_type = argv[1];
+    int flags = args.ParsedArgc();
+    int graph_args = argc - flags - 1;
 
-	if (graph_args < 1) {
-		Usage();
-		return 1;
-	}
-	
-	//
-	// Construct graph and perform search(es)
-	//
+    if (graph_args < 1) {
+        Usage();
+        return 1;
+    }
+    
+    //
+    // Construct graph and perform search(es)
+    //
 
-	if (graph_type == "market") {
+    if (graph_type == "market") {
 
-		// Matrix-market coordinate-formatted graph file
+        // Matrix-market coordinate-formatted graph file
 
-		typedef int VertexId;							// Use as the node identifier type
-		typedef float Value;								// Use as the value type
-		typedef int SizeT;								// Use as the graph size type
-		Csr<VertexId, Value, SizeT> csr(false);         // default value for stream_from_host is false
+        typedef int VertexId;                           // Use as the node identifier type
+        typedef float Value;                                // Use as the value type
+        typedef int SizeT;                              // Use as the graph size type
+        Csr<VertexId, Value, SizeT> csr(false);         // default value for stream_from_host is false
 
-		if (graph_args < 1) { Usage(); return 1; }
-		char *market_filename = (graph_args == 2) ? argv[2] : NULL;
-		if (graphio::BuildMarketGraph<false>(
-			market_filename, 
-			csr, 
-			g_undirected) != 0) 
-		{
-			return 1;
-		}
+        if (graph_args < 1) { Usage(); return 1; }
+        char *market_filename = (graph_args == 2) ? argv[2] : NULL;
+        if (graphio::BuildMarketGraph<false>(
+            market_filename, 
+            csr, 
+            g_undirected) != 0) 
+        {
+            return 1;
+        }
 
         csr.DisplayGraph();
         fflush(stdout);
 
-		// Run tests
-		RunTests(csr, args);
+        // Run tests
+        RunTests(csr, args);
 
-	} else {
+    } else {
 
-		// Unknown graph type
-		fprintf(stderr, "Unspecified graph type\n");
-		return 1;
+        // Unknown graph type
+        fprintf(stderr, "Unspecified graph type\n");
+        return 1;
 
-	}
+    }
 
-	return 0;
+    return 0;
 }

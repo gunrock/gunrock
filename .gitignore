@@ -25,6 +25,9 @@
 # Ignore bin directory
 bin/
 
+# Ignore eval directory
+eval/
+
 # Ignore doc generated files
 doc/warn.log
 doc/html

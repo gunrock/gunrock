@@ -197,6 +197,7 @@ class CCEnactor : public EnactorBase
 
         cudaError_t retval = cudaSuccess;
 
+        int kernel_num              = 0;
         do {
             // Determine grid size(s)
             int vertex_map_occupancy    = VertexMapPolicy::CTA_OCCUPANCY;
@@ -218,7 +219,7 @@ class CCEnactor : public EnactorBase
             VertexId queue_index        = 0;        // Work queue index
             int selector                = 0;
             SizeT num_elements          = graph_slice->edges;
-            bool queue_reset            = true; 
+            bool queue_reset            = true;
 
             // Initial Hook Operation
             gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMaxFunctor>
@@ -236,7 +237,10 @@ class CCEnactor : public EnactorBase
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
                     this->vertex_map_kernel_stats);
 
-            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookMin Operation failed", __FILE__, __LINE__))) break; 
+            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookMin Operation failed", __FILE__, __LINE__))) break;
+
+            printf("initial hookmax.\n");
+            kernel_num++;
 
             queue_length = graph_slice->nodes;
             queue_index = 0;
@@ -263,6 +267,9 @@ class CCEnactor : public EnactorBase
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel First Pointer Jumping Round failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
+ 
+                printf("ptrjump.\n");
+                kernel_num++;
                 
                 if (queue_reset) queue_reset = false;
 
@@ -318,6 +325,10 @@ class CCEnactor : public EnactorBase
 
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial Update Mask failed", __FILE__, __LINE__))) break;
 
+
+            printf("update mask.\n");
+            kernel_num++;
+
             queue_length = graph_slice->edges;
             queue_index = 0;
             selector = 0;
@@ -330,7 +341,7 @@ class CCEnactor : public EnactorBase
                 // Set new queue_length
                 if (retval = work_progress.SetQueueLength(queue_index, queue_length)) break;
                 if (iteration & 11) {
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMinFunctor>
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMaxFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                     queue_reset,
                     queue_index,
@@ -346,7 +357,7 @@ class CCEnactor : public EnactorBase
                     this->vertex_map_kernel_stats);
                 }
                 else {
-                    gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMaxFunctor>
+                    gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMinFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                     queue_reset,
                     queue_index,
@@ -364,6 +375,9 @@ class CCEnactor : public EnactorBase
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Hook Min/Max Operation failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
+
+                printf("hook min/max.\n");
+                kernel_num++;
 
                 if (queue_reset) queue_reset = false;
 
@@ -426,6 +440,9 @@ class CCEnactor : public EnactorBase
                     if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Pointer Jumping Mask failed", __FILE__, __LINE__))) break;
                     cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
+                    printf("ptr jump mask.\n");
+                    kernel_num++;
+
                     if (ptrj_queue_reset) ptrj_queue_reset = false;
 
                     // Throttle
@@ -484,6 +501,9 @@ class CCEnactor : public EnactorBase
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Pointer Jumping Unmask failed", __FILE__, __LINE__))) break;
 
+                printf("ptr jump unmask.\n");
+                kernel_num++;
+
                 ptrj_queue_length = 0;
                 ptrj_queue_index = 0;
                 ptrj_selector = 0;
@@ -508,6 +528,9 @@ class CCEnactor : public EnactorBase
                             graph_slice->frontier_elements[selector^1],
                             this->vertex_map_kernel_stats);
 
+                printf("update mask.\n");
+                kernel_num++;
+
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Update Mask failed", __FILE__, __LINE__))) break;
             }
             
@@ -523,6 +546,7 @@ class CCEnactor : public EnactorBase
 
         } while(0);
 
+        printf("total kernel call: %d\n", kernel_num);
         if (DEBUG) printf("\nGPU CC Done.\n");
         return retval;
     }

@@ -55,12 +55,23 @@ bool g_stream_from_host;
  {
  printf("\ntest_bfs <graph type> <graph type args> [--device=<device_index>] "
         "[--undirected] [--instrumented] [--src=<source index>] [--quick] "
-        "[--num_gpus=<gpu number>] [--mark-pred] [--queue-sizing=<scale factor>]\n"
+        "[--mark-pred] [--queue-sizing=<scale factor>]\n"
+        "[--v]\n"
         "\n"
         "Graph types and args:\n"
         "  market [<file>]\n"
         "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
         "    edges from stdin (or from the optionally-specified file).\n"
+        "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
+        "  --undirected If set then treat the graph as undirected.\n"
+        "  --instrumented If set then kernels keep track of queue-search_depth\n"
+        "  and barrier duty (a relative indicator of load imbalance.)\n"
+        "  --src Begins BFS from the vertex <source index>. If set as randomize\n"
+        "  then will begin with a random source vertex.\n"
+        "  --quick If set will skip the CPU validation code.\n"
+        "  --mark-pred If set then keep not only label info but also predecessor info.\n"
+        "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
+        "  Default is 1.0\n"
         );
  }
 
@@ -387,19 +398,20 @@ void RunTests(
     bool                mark_pred           = false;        // Whether or not to mark src-distance vs. parent vertices
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
     int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
-    double              max_queue_sizing    = 1.3;          // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
+    double              max_queue_sizing    = 1.0;          // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("src", src_str);
     if (src_str.empty()) {
         src = 0;
+    } else if (src_str.compare("randomize") == 0) {
+        src = graphio::RandomNode(graph.nodes);
     } else {
         args.GetCmdLineArgument("src", src);
     }
 
     g_quick = args.CheckCmdLineFlag("quick");
     mark_pred = args.CheckCmdLineFlag("mark-pred");
-    args.GetCmdLineArgument("num-gpus", num_gpus);
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
     g_verbose = args.CheckCmdLineFlag("v");
 
@@ -493,11 +505,6 @@ int main( int argc, char** argv)
 			g_undirected) != 0) 
 		{
 			return 1;
-		}
-		for (int i = 0; i < csr.nodes+1; ++i)
-		{
-		    if (csr.row_offsets[i+1] - csr.row_offsets[i] >= 512)
-		        printf("got one large neighbor list.\n");
 		}
 
         csr.DisplayGraph();

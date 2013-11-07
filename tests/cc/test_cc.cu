@@ -75,12 +75,16 @@ bool CCCompare(
  void Usage()
  {
  printf("\ntest_cc <graph type> <graph type args> [--device=<device_index>] "
-        "[--instrumented] [--quick] [--num_gpus=<gpu number>]\n"
+        "[--instrumented] [--quick]\n"
         "\n"
         "Graph types and args:\n"
         "  market [<file>]\n"
         "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
         "    edges from stdin (or from the optionally-specified file).\n"
+        "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
+        "  --instrumented If set then kernels keep track of queue-search_depth\n"
+        "  and barrier duty (a relative indicator of load imbalance.)\n"
+        "  --quick If set will skip the CPU validation code.\n"
         );
  }
 
@@ -341,7 +345,6 @@ void RunTests(
     instrumented = args.CheckCmdLineFlag("instrumented");
 
     g_quick = args.CheckCmdLineFlag("quick");
-    args.GetCmdLineArgument("num-gpus", num_gpus);
     g_verbose = args.CheckCmdLineFlag("v");
 
     if (instrumented) {
@@ -376,7 +379,7 @@ int main( int argc, char** argv)
 	cudaSetDeviceFlags(cudaDeviceMapHost);
 
 	// Parse graph-contruction params
-	g_undirected = false; //Does not make undirected graph
+	g_undirected = true; //Does not make undirected graph
 
 	std::string graph_type = argv[1];
 	int flags = args.ParsedArgc();
