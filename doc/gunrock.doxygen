@@ -150,7 +150,8 @@ STRIP_FROM_PATH        = ./ \
                          ./app \
                          ./app/bc \
                          ./app/bfs \
-                         ./app/cc
+                         ./app/cc \
+                         ./simple_example
 
 # The STRIP_FROM_INC_PATH tag can be used to strip a user-defined part of
 # the path mentioned in the documentation of a class, which tells
@@ -675,6 +676,7 @@ WARN_LOGFILE           = warn.log
 INPUT                  = ../README.md \
                          ../gunrock \
                          ../tests \
+                         ../simple_example \
                          ./simple_example.dox \
                          ./building_gunrock.md
 
