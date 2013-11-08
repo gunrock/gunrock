@@ -43,13 +43,13 @@ namespace edge_map_backward {
     template <typename SizeT>
         texture<SizeT, cudaTextureType1D, cudaReadModeElementType> RowOffsetTex<SizeT>::ref;
 
-    template <typename VertexId>
+    /*template <typename VertexId>
         struct ColumnIndicesTex
         {
             static texture<VertexId, cudaTextureType1D, cudaReadModeElementType> ref;
         };
     template <typename VertexId>
-        texture<VertexId, cudaTextureType1D, cudaReadModeElementType> ColumnIndicesTex<VertexId>::ref;
+        texture<VertexId, cudaTextureType1D, cudaReadModeElementType> ColumnIndicesTex<VertexId>::ref;*/
 
     /**
      * Derivation of KernelPolicy and ProblemData that encapsulates tile-processing routines
@@ -77,6 +77,7 @@ namespace edge_map_backward {
             VertexId                *d_queue;                       // Incoming and outgoing vertex frontier
             SizeT                   *d_bitmap_in;                   // Incoming frontier bitmap
             SizeT                   *d_bitmap_out;                  // Outgoing frontier bitmap
+            VertexId                *d_column_indices;
             DataSlice               *problem;                       // Problem Data
 
             // Work progress
@@ -217,7 +218,10 @@ namespace edge_map_backward {
                                     while ((coop_offset + KernelPolicy::THREADS < coop_oob) && (child_id >= 0)) {
 
                                         // Gather
-                                        parent_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+threadIdx.x);
+                                        //parent_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+threadIdx.x);
+                                        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                            parent_id,
+                                            cta->d_column_indices + coop_offset + threadIdx.x);
 
                                         // TODO:Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id) (done)
 
@@ -253,8 +257,10 @@ namespace edge_map_backward {
                                     if ((coop_offset + threadIdx.x < coop_oob) && (child_id >= 0)) {
 
                                         // Gather
-                                        parent_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+threadIdx.x);
-                                        // TODO:Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id) (done)
+                                        //parent_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+threadIdx.x);
+                                        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                            parent_id,
+                                            cta->d_column_indices + coop_offset + threadIdx.x);
 
                                         SizeT bitmap_in;
                                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -328,9 +334,11 @@ namespace edge_map_backward {
 
                                             // Gather
                                             
-                                            parent_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset + lane_id);
-
-                                            // TODO:Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
+                                            //parent_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset + lane_id);
+                                            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                                    parent_id,
+                                                    cta->d_column_indices + coop_offset + lane_id);
+                                            
 
                                             SizeT bitmap_in;
                                             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -364,8 +372,10 @@ namespace edge_map_backward {
 
                                         if ((coop_offset + lane_id < coop_oob)&&child_id>=0) {
                                             // Gather
-                                            parent_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset + lane_id);
-                                            // TODO:Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
+                                            //parent_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset + lane_id);
+                                            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                                    parent_id,
+                                                    cta->d_column_indices + coop_offset + lane_id);
 
                                             SizeT bitmap_in;
                                             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -566,9 +576,9 @@ namespace edge_map_backward {
                 VertexId                    *d_queue,
                 SizeT                       *d_bitmap_in,
                 SizeT                       *d_bitmap_out,
+                VertexId                    *d_column_indices,
                 DataSlice                   *problem,
-                util::CtaWorkProgress       &work_progress,
-                SizeT                       max_out_frontier) :
+                util::CtaWorkProgress       &work_progress) :
 
             queue_index(queue_index),
             num_gpus(num_gpus),
@@ -576,9 +586,9 @@ namespace edge_map_backward {
             d_queue(d_queue),
             d_bitmap_in(d_bitmap_in),
             d_bitmap_out(d_bitmap_out),
+            d_column_indices(d_column_indices),
             problem(problem),
-            work_progress(work_progress),
-            max_out_frontier(max_out_frontier)
+            work_progress(work_progress)
             {
                 if (threadIdx.x == 0) {
                     smem_storage.state.cta_comm = KernelPolicy::THREADS;
@@ -652,7 +662,13 @@ namespace edge_map_backward {
                     {
                         // Gather a incoming-neighbor
                         VertexId parent_id;
-                        parent_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, smem_storage.gather_offsets[scratch_offset]);
+                        //parent_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, smem_storage.gather_offsets[scratch_offset]);
+                        
+                        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                parent_id,
+                                cta->d_column_indices + smem_storage.gather_offsets[scratch_offset]);
+
+
                         VertexId child_id = smem_storage.gather_predecessors[scratch_offset];
                         SizeT bitmap_in;
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -690,4 +706,8 @@ namespace edge_map_backward {
 } //namespace oprtr
 } //namespace gunrock
 
-
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

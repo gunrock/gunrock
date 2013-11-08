@@ -64,7 +64,7 @@ void Usage()
 {
     printf("\ntest_bc <graph type> <graph type args> [--device=<device_index>] "
            "[--instrumented] [--src=<source index>] [--quick] [--v]"
-           "[--num_gpus=<gpu number>] [--queue-sizing=<scale factor>]\n"
+           "[--queue-sizing=<scale factor>] [--ref-file=<reference filename>]\n"
            "\n"
            "Graph types and args:\n"
            "  market [<file>]\n"
@@ -80,6 +80,7 @@ void Usage()
            "--queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
            "Default is 1.0.\n"
            "--v: If set, enable verbose output, keep track of the kernel running.\n"
+           "--ref-file: If set, use pre-computed result stored in ref-file to verify.\n"
            );
 }
 
@@ -346,6 +347,7 @@ template <
 void RunTests(
     const Csr<VertexId, Value, SizeT> &graph,
     VertexId src,
+    std::string &ref_filename,
     int max_grid_size,
     int num_gpus,
     double max_queue_sizing)
@@ -394,18 +396,27 @@ void RunTests(
     //
     // Compute reference CPU BC solution for source-distance
     //
-    if (reference_check_bc_values != NULL)
-    {
-        printf("compute ref value\n");
-        RefCPUBC(
-            graph,
-            reference_check_bc_values,
-            reference_sigmas,
-            src);
-        printf("\n");
+    if (reference_check_bc_values != NULL) {
+        if (ref_filename.empty()) {
+            printf("compute ref value\n");
+            RefCPUBC(
+                    graph,
+                    reference_check_bc_values,
+                    reference_sigmas,
+                    src);
+            printf("\n");
+        } else {
+            std::ifstream fin;
+            fin.open(ref_filename.c_str(), std::ios::binary);
+            for ( int i = 0; i < graph.nodes; ++i )
+            {
+                fin.read(reinterpret_cast<char*>(&reference_check_bc_values[i]), sizeof(Value));
+            }
+            fin.close();
+        }
     }
 
-    /*cudaError_t         retval = cudaSuccess;
+    cudaError_t         retval = cudaSuccess;
 
     double              avg_duty = 0.0;
 
@@ -468,22 +479,8 @@ void RunTests(
 
     printf("GPU BC finished in %lf msec.\n", elapsed);
     if (avg_duty != 0)
-        printf("\n avg CTA duty: %.2f%%", avg_duty * 100);*/
-    std::ofstream fout;
-    //std::ifstream fin;
-    //fin.open("RESULT.dat", std::ios::binary);
-    fout.open("RESULT.dat", std::ios::binary);
-    for ( int i = 0; i < graph.nodes; ++i )
-    {
-        //float v;
-        //fin.read(reinterpret_cast<char*>(&v), sizeof(Value));
-        //printf("%d: %lf\n", i, v);
-        printf("%d: %lf\n", i, reference_check_bc_values[i]);
-        fout.write(reinterpret_cast<char*>(&reference_check_bc_values[i]), sizeof(Value));
-    }
+        printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
     
-
-
     // Cleanup
     if (csr_problem) delete csr_problem;
     if (reference_sigmas) free(reference_sigmas);
@@ -504,6 +501,7 @@ void RunTests(
 {
     VertexId    src              = -1;    // Use whatever the specified graph-type's default is
     std::string src_str;
+    std::string ref_filename;
     bool        instrumented     = false; // Whether or not to collect instrumentation from kernels
     int         max_grid_size    = 0;     // maximum grid size (0: leave it up to the enactor)
     int         num_gpus         = 1;     // Number of GPUs for multi-gpu enactor to use
@@ -511,6 +509,7 @@ void RunTests(
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("src", src_str);
+    args.GetCmdLineArgument("ref-file", ref_filename);
     if (src_str.empty()) {
         src = 0;
     } else {
@@ -525,6 +524,7 @@ void RunTests(
         RunTests<VertexId, Value, SizeT, true>(
             graph,
             src,
+            ref_filename,
             max_grid_size,
             num_gpus,
             max_queue_sizing);
@@ -532,6 +532,7 @@ void RunTests(
         RunTests<VertexId, Value, SizeT, false>(
             graph,
             src,
+            ref_filename,
             max_grid_size,
             num_gpus,
             max_queue_sizing);
@@ -586,7 +587,7 @@ int main( int argc, char** argv)
         Csr<VertexId, Value, SizeT> csr(false); // default value for stream_from_host is false
 
         if (graph_args < 1) { Usage(); return 1; }
-        char *market_filename = (graph_args == 2) ? argv[2] : NULL;
+        char *market_filename = (graph_args == 2 || graph_args == 3) ? argv[2] : NULL;
         if (graphio::BuildMarketGraph<false>(
                 market_filename,
                 csr,

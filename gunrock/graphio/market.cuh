@@ -26,7 +26,7 @@ namespace graphio {
 
 
 /**
- * Reads a MARKET graph from an input-stream into a CSR sparse format
+ * @brief Reads a MARKET graph from an input-stream into a CSR sparse format
  *
  * Here is an example of the matrix market format
  * +----------------------------------------------+
@@ -43,6 +43,12 @@ namespace graphio {
  * +----------------------------------------------+
  *
  * Indices are 1-based i.2. A(1,1) is the first element.
+ *
+ * @param[in] f_in          Input MARKET graph file
+ * @param[in] csr_graph     Csr graph object to store the graph data
+ * @param[in] undirected    Is the graph undirected or not?
+ *
+ * \return If there is any File I/O error along the way.
  */
 template<bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
 int ReadMarketStream(
@@ -167,8 +173,14 @@ int ReadMarketStream(
 
 
 /**
- * Loads a MARKET-formatted CSR graph from the specified file.  If
- * dimacs_filename == NULL, then it is loaded from stdin.
+ * @brief Loads a MARKET-formatted CSR graph from the specified file.
+ *
+ * @param[in] dimacs_filename Graph file name,
+ * if dimacs_filename == NULL, then it is loaded from stdin.
+ * @param[in] csr_graph Csr graph object to store the graph data
+ * @param[in] undirected Is the graph undirected or not?
+ *
+ * \return If there is any File I/O error along the way.
  */
 template<bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
 int BuildMarketGraph(
@@ -206,3 +218,9 @@ int BuildMarketGraph(
 
 } // namespace graphio
 } // namespace gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

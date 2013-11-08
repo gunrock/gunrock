@@ -56,6 +56,12 @@ struct Csr
         this->pinned = pinned;
     }
 
+    /**
+     * @brief Allocate memory for CSR graph.
+     *
+     * @param[in] nodes Number of nodes in COO-format graph
+     * @param[in] edges Number of edges in COO-format graph
+     */
     template <bool LOAD_EDGE_VALUES, bool LOAD_NODE_VALUES>
     void FromScratch(SizeT nodes, SizeT edges)
     {
@@ -272,7 +278,7 @@ struct Csr
         }
         if (edge_values) { free (edge_values); edge_values = NULL; }
         if (node_values) { free (node_values); node_values = NULL; }
-
+        
         nodes = 0;
         edges = 0;
     }

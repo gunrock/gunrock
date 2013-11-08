@@ -30,7 +30,11 @@ namespace graphio {
 
 
 /**
- * Returns a random node-ID in the range of [0, num_nodes) 
+ * @brief Generates a random node-ID in the range of [0, num_nodes) 
+ *
+ * @param[in] num_nodes Number of nodes in Graph
+ *
+ * \return random node-ID
  */
 template<typename SizeT>
 SizeT RandomNode(SizeT num_nodes) {
@@ -43,3 +47,9 @@ SizeT RandomNode(SizeT num_nodes) {
 
 } // namespace graphio
 } // namespace gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

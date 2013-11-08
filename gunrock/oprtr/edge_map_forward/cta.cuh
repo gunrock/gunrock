@@ -700,4 +700,8 @@ namespace edge_map_forward {
 } //namespace oprtr
 } //namespace gunrock
 
-
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

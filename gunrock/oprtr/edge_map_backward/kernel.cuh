@@ -36,6 +36,7 @@ struct Sweep
         typename KernelPolicy::VertexId         *&d_unvisited_node_queue,
         typename KernelPolicy::SizeT            *&d_frontier_bitmap_in,
         typename KernelPolicy::SizeT            *&d_frontier_bitmap_out,
+        typename KernelPolicy::VertexId         *&d_column_indices,
         typename ProblemData::DataSlice         *&problem,
         typename KernelPolicy::SmemStorage      &smem_storage,
         util::CtaWorkProgress                   &work_progress,
@@ -63,6 +64,7 @@ struct Sweep
                 d_unvisited_node_queue,
                 d_frontier_bitmap_in,
                 d_frontier_bitmap_out,
+                d_column_indices,
                 problem,
                 work_progress);
 
@@ -108,6 +110,7 @@ struct Dispatch
         VertexId                    *&d_unvisited_node_queue,
         SizeT                       *&d_frontier_bitmap_in,
         SizeT                       *&d_frontier_bitmap_out,
+        VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
         util::CtaWorkProgress       &work_progress,
         util::KernelRuntimeStats    &kernel_stats)
@@ -136,6 +139,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         VertexId                    *&d_unvisited_node_queue,
         SizeT                       *&d_frontier_bitmap_in,
         SizeT                       *&d_frontier_bitmap_out,
+        VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
         util::CtaWorkProgress       &work_progress,
         util::KernelRuntimeStats    &kernel_stats)
@@ -150,7 +154,12 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         // workprogress reset
         if (queue_reset)
-            work_progress.template SetQueueLength<SizeT>(queue_index, num_elements);
+        {
+            if (threadIdx.x < util::CtaWorkProgress::COUNTERS) {
+                //Reset all counters
+                work_progress.template Reset<SizeT>();
+            }
+        }
 
         // Determine work decomposition
         if (threadIdx.x == 0) {
@@ -163,11 +172,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             else
             {
                 num_elements = work_progress.template LoadQueueLength<SizeT>(queue_index);
-
-                // Check if we previously overflowed
-                if (num_elements >= max_in_frontier) {
-                    num_elements = 0;
-                }
 
                 // Signal to host that we're done
                 if (num_elements == 0) {
@@ -193,6 +197,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 d_unvisited_node_queue,
                 d_frontier_bitmap_in,
                 d_frontier_bitmap_out,
+                d_column_indices,
                 problem,
                 smem_storage,
                 work_progress,
@@ -207,8 +212,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 };
 
 /**
- * Edge Map Kernel Entry
-         */
+ * Backward Edge Mapping Kernel Entry
+ */
         template <typename KernelPolicy, typename ProblemData, typename Functor>
             __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
             __global__
@@ -221,6 +226,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                     typename KernelPolicy::VertexId         *d_unvisited_node_queue,    // Incoming and output unvisited node queue
                     typename KernelPolicy::SizeT            *d_frontier_bitmap_in,      // Incoming frontier bitmap
                     typename KernelPolicy::SizeT            *d_frontier_bitmap_out,     // Outcoming frontier bitmap
+                    typename KernelPolicy::VertexId         *d_column_indices,
                     typename ProblemData::DataSlice         *problem,                    // Problem Object
                     util::CtaWorkProgress                   work_progress,              // Atomic workstealing and queueing counters
                     util::KernelRuntimeStats                kernel_stats)               // Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT)
@@ -234,6 +240,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             d_unvisited_node_queue,
             d_frontier_bitmap_in,
             d_frontier_bitmap_out,
+            d_column_indices,
             problem,
             work_progress,
             kernel_stats);
@@ -243,3 +250,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 } //oprtr
 } //gunrock
 
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

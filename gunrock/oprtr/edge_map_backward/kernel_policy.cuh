@@ -113,6 +113,9 @@ struct KernelPolicy
             // Type describing four shared memory channels per warp for intra-warp communication
             typedef SizeT                       WarpComm[WARPS][4];
 
+            // Whether or not we overflowed our outgoing frontier
+            bool                                overflowed;
+
             // Shared work-processing limits
             util::CtaWorkDistribution<SizeT>    work_decomposition;
 
@@ -159,3 +162,8 @@ struct KernelPolicy
 } // namespace oprtr
 } // namespace gunrock
 
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

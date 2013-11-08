@@ -40,7 +40,7 @@ enum FrontierType {
 
 
 /**
- * Type of problem
+ * Base Problem Structure
  */
 template <
     typename    _VertexId,                                              // Type of signed integer to use as vertex id (e.g., uint32)
@@ -354,3 +354,8 @@ struct ProblemBase
 } // namespace app
 } // namespace gunrock
 
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

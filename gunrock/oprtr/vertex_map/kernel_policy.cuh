@@ -29,7 +29,7 @@ namespace vertex_map {
 
 
 /**
- * Kernel configuration policy for BFS frontier contraction kernels.
+ * Kernel configuration policy for vertex mapping kernels.
  *
  * Parameterizations of this type encapsulate our kernel-tuning parameters
  * (i.e., they are reflected via the static fields).
@@ -156,3 +156,8 @@ struct KernelPolicy
 } // namespace oprtr
 } // namespace gunrock
 
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

@@ -302,3 +302,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
 } //namespace app
 } //namespace gunrock
 
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

@@ -258,3 +258,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 } //oprtr
 } //gunrock
 
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:
