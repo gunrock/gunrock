@@ -183,6 +183,7 @@ class CCEnactor : public EnactorBase
         typename VertexMapPolicy,
         typename CCProblem,
         typename UpdateMaskFunctor,
+        typename HookInitFunctor,
         typename HookMinFunctor,
         typename HookMaxFunctor,
         typename PtrJumpFunctor,
@@ -238,6 +239,9 @@ class CCEnactor : public EnactorBase
 
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookMin Operation failed", __FILE__, __LINE__))) break;
 
+            printf("init hook\n");
+            //util::MemsetKernel<<<128,128>>>(problem->data_slices[0]->d_marks, 0, graph_slice->edges);
+
             queue_length = graph_slice->nodes;
             queue_index = 0;
             selector = 0;
@@ -264,7 +268,7 @@ class CCEnactor : public EnactorBase
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel First Pointer Jumping Round failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
  
-                
+                printf("ptr jump.\n"); 
                 if (queue_reset) queue_reset = false;
 
                 // Throttle
@@ -279,7 +283,7 @@ class CCEnactor : public EnactorBase
                 queue_index++;
                 selector ^= 1;
                 iteration++;
-
+                
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                     total_queued += queue_length;
@@ -319,6 +323,8 @@ class CCEnactor : public EnactorBase
 
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial Update Mask failed", __FILE__, __LINE__))) break;
 
+            printf("update mask.\n");
+
             queue_length = graph_slice->edges;
             queue_index = 0;
             selector = 0;
@@ -326,11 +332,14 @@ class CCEnactor : public EnactorBase
             iteration = 1;
             done[0] = -1;
             
-            while (done[0] < 0) {
-                
+            while (done[0] < 0) { 
                 // Set new queue_length
                 if (retval = work_progress.SetQueueLength(queue_index, queue_length)) break;
-                if (iteration & 11) {
+                if (retval = work_progress.SetQueueLength(queue_index+1, 0)) break;
+                if (retval = work_progress.SetQueueLength(queue_index+2, 0)) break;
+                if (retval = work_progress.SetQueueLength(queue_index+3, 0)) break;
+                printf("iter:%ld, queue_length:%d\n", iteration, queue_length);
+                if (iteration & 1) {
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMaxFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                     queue_reset,
@@ -384,6 +393,8 @@ class CCEnactor : public EnactorBase
                 // Save current queue_length
                 if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
 
+                printf(" hook min/max itr:%ld, queue_length out:%d\n", iteration, queue_length);
+
                 if (INSTRUMENT || DEBUG) {
                     
                     total_queued += queue_length;
@@ -425,6 +436,7 @@ class CCEnactor : public EnactorBase
                                 this->vertex_map_kernel_stats);
 
                     if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Pointer Jumping Mask failed", __FILE__, __LINE__))) break;
+                    printf("ptr jump mask\n");
                     cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
                     if (ptrj_queue_reset) ptrj_queue_reset = false;
@@ -465,7 +477,6 @@ class CCEnactor : public EnactorBase
                 ptrj_queue_reset         = true;
                 flag[0]                  = -1;
                 
-                if (retval = work_progress.GetQueueLength(ptrj_queue_index, ptrj_queue_length)) break;
                 util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_values[selector], graph_slice->nodes);
 
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpUnmaskFunctor>
@@ -484,6 +495,7 @@ class CCEnactor : public EnactorBase
                             this->vertex_map_kernel_stats);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Pointer Jumping Unmask failed", __FILE__, __LINE__))) break;
+                printf("ptr jump unmask.\n");
 
                 ptrj_queue_length = 0;
                 ptrj_queue_index = 0;
@@ -510,6 +522,7 @@ class CCEnactor : public EnactorBase
                             this->vertex_map_kernel_stats);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Update Mask failed", __FILE__, __LINE__))) break;
+                printf("update mask.\n");
             }
             
             if (retval) break;
@@ -533,6 +546,7 @@ class CCEnactor : public EnactorBase
      */
     template <typename CCProblem,
               typename UpdateMaskFunctor,
+              typename HookInitFunctor,
               typename HookMinFunctor,
               typename HookMaxFunctor,
               typename PtrJumpFunctor,
@@ -557,7 +571,7 @@ class CCEnactor : public EnactorBase
                 8>                                  // LOG_SCHEDULE_GRANULARITY
                 VertexMapPolicy;
                 
-                return Enact<VertexMapPolicy, CCProblem, UpdateMaskFunctor, HookMinFunctor, HookMaxFunctor, PtrJumpFunctor, PtrJumpMaskFunctor, PtrJumpUnmaskFunctor>(
+                return Enact<VertexMapPolicy, CCProblem, UpdateMaskFunctor, HookInitFunctor, HookMinFunctor, HookMaxFunctor, PtrJumpFunctor, PtrJumpMaskFunctor, PtrJumpUnmaskFunctor>(
                 problem, max_grid_size);
         }
 

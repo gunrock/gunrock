@@ -210,6 +210,12 @@ void RunTests(
         Value,
         Problem> UpdateMaskFunctor;
 
+    typedef HookInitFunctor<
+        VertexId,
+        SizeT,
+        Value,
+        Problem> HookInitFunctor;
+    
     typedef HookMinFunctor<
         VertexId,
         SizeT,
@@ -283,6 +289,7 @@ void RunTests(
         gpu_timer.Start();
         if (retval = cc_enactor.template Enact<Problem,
                                             UpdateMaskFunctor,
+                                            HookInitFunctor,
                                             HookMinFunctor,
                                             HookMaxFunctor,
                                             PtrJumpFunctor,
@@ -305,7 +312,7 @@ void RunTests(
         else
             printf("INCORRECT. Ref Component Count: %d, GPU Computed Component Count: %d\n", ref_num_components, csr_problem->num_components);
 
-        if (ref_num_components == csr_problem->num_components)
+        //if (ref_num_components == csr_problem->num_components)
         {
             // Compute size and root of each component
             VertexId        *h_roots            = new VertexId[csr_problem->num_components];
