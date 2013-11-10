@@ -19,7 +19,6 @@ struct UpdateMaskFunctor
 
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
-        problem->d_masks[node] = (problem->d_component_ids[node] == node)?0:1;
         VertexId parent;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                 parent, problem->d_component_ids + node);
@@ -75,15 +74,22 @@ struct HookMinFunctor
                     from_node, problem->d_froms + node);
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                     to_node, problem->d_tos + node);
-            VertexId max_node = from_node > to_node ? from_node:to_node;
-            VertexId min_node = from_node + to_node - max_node;
+            VertexId parent_from;
+            VertexId parent_to;
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    parent_from, problem->d_component_ids + from_node);
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    parent_to, problem->d_component_ids + to_node);
+            VertexId max_node = parent_from > parent_to ? parent_from: parent_to;
+            VertexId min_node = parent_from + parent_to - max_node;
             if (max_node == min_node) {
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         true, problem->d_marks + node);
             } else {
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         max_node, problem->d_component_ids + min_node);
-                atomicCAS(&problem->d_edge_flag[0], 1, 0);
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        0, problem->d_edge_flag);
             }
         }
     }
@@ -111,15 +117,22 @@ struct HookMaxFunctor
                     from_node, problem->d_froms + node);
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                     to_node, problem->d_tos + node);
-            VertexId max_node = from_node > to_node ? from_node:to_node;
-            VertexId min_node = from_node + to_node - max_node;
+            VertexId parent_from;
+            VertexId parent_to;
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    parent_from, problem->d_component_ids + from_node);
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    parent_to, problem->d_component_ids + to_node);
+            VertexId max_node = parent_from > parent_to ? parent_from: parent_to;
+            VertexId min_node = parent_from + parent_to - max_node;
             if (max_node == min_node) {
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         true, problem->d_marks + node);
             } else {
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         min_node, problem->d_component_ids + max_node);
-                atomicCAS(&problem->d_edge_flag[0], 1, 0);
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        0, problem->d_edge_flag);
             }
         }
     }
@@ -144,7 +157,8 @@ struct PtrJumpFunctor
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                 grand_parent, problem->d_component_ids + parent);
         if (parent != grand_parent) {
-            atomicCAS(&problem->d_vertex_flag[0], 1, 0);
+            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        0, problem->d_vertex_flag);
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         grand_parent, problem->d_component_ids + node);
         }
@@ -174,7 +188,7 @@ struct PtrJumpMaskFunctor
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                     grand_parent, problem->d_component_ids + parent);
             if (parent != grand_parent) {
-                atomicCAS(&problem->d_vertex_flag[0], 1, 0);
+                problem->d_vertex_flag[0] = 0;
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         grand_parent, problem->d_component_ids + node);
             } else {
