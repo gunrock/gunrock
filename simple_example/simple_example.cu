@@ -191,37 +191,6 @@ void DisplayBCSolution(Value *bc_values, SizeT nodes)
  * Performance/Evaluation statistics
  */
 
-struct Statistic
-{
-    double mean;
-    double m2;
-    int count;
-
-    Statistic() : mean(0.0), m2(0.0), count(0) {}
-
-    /**
-     * @brief Updates running statistic, returning bias-corrected
-     * sample variance.
-     *
-     * Online method as per Knuth.
-     *
-     * @todo Create a test_util and move Statistic into it so it's not
-     * repeated across different test files. Also, why is this a
-     * struct and not a class?
-     *
-     * @param[in] sample
-     * @returns Something
-     */
-    double Update(double sample)
-    {
-        count++;
-        double delta = sample - mean;
-        mean = mean + (delta / count);
-        m2 = m2 + (delta * (sample - mean));
-        return m2 / (count - 1);                //bias-corrected
-    }
-};
-
 struct Stats {
     char *name;
     Statistic rate;
@@ -752,7 +721,6 @@ void RunTests(
     double              avg_duty = 0.0;
 
     // Perform BFS
-    gpu_timer;
 
     if (retval = bfs_problem->Reset(src, bfs_enactor.GetFrontierType(),
                                     max_queue_sizing)) {

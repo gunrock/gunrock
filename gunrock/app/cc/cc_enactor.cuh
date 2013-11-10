@@ -176,7 +176,6 @@ class CCEnactor : public EnactorBase
             typename CCProblem::GraphSlice *graph_slice = problem->graph_slices[0];
             typename CCProblem::DataSlice *data_slice = problem->d_data_slices[0];
 
-            SizeT queue_length          = graph_slice->edges;
             VertexId queue_index        = 0;        // Work queue index
             int selector                = 0;
             SizeT num_elements          = graph_slice->edges;
@@ -201,7 +200,6 @@ class CCEnactor : public EnactorBase
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) break;
 
             // Pointer Jumping 
-            queue_length = graph_slice->nodes;
             queue_index = 0;
             selector = 0;
             num_elements = graph_slice->nodes;
@@ -253,7 +251,6 @@ class CCEnactor : public EnactorBase
                 if (vertex_flag[0]) break;
             }
 
-            queue_length          = graph_slice->nodes;
             queue_index        = 0;        // Work queue index
             selector                = 0;
             num_elements          = graph_slice->nodes;
@@ -281,7 +278,6 @@ class CCEnactor : public EnactorBase
                 edge_flag[0] = 0;
                 while (!edge_flag[0]) {
 
-                    queue_length            = graph_slice->edges;
                     queue_index             = 0;        // Work queue index
                     num_elements            = graph_slice->edges;
                     selector                = 0;
@@ -344,7 +340,6 @@ class CCEnactor : public EnactorBase
 
                     ///////////////////////////////////////////
                     // Pointer Jumping 
-                    queue_length = graph_slice->nodes;
                     queue_index = 0;
                     selector = 0;
                     num_elements = graph_slice->nodes;
@@ -392,7 +387,6 @@ class CCEnactor : public EnactorBase
                         if (vertex_flag[0]) break;
                     }
 
-                    queue_length          = graph_slice->nodes;
                     queue_index        = 0;        // Work queue index
                     selector                = 0;
                     num_elements          = graph_slice->nodes;

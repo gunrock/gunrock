@@ -134,28 +134,6 @@ bool CCCompare(
   * Performance/Evaluation statistics
   */
 
- struct Statistic
- {
-    double mean;
-    double m2;
-    int count;
-
-    Statistic() : mean(0.0), m2(0.0), count(0) {}
-
-    /**
-     * Updates running statistic, returning bias-corrected sample variance.
-     * Online method as per Knuth.
-     */
-    double Update(double sample)
-    {
-        count++;
-        double delta = sample - mean;
-        mean = mean + (delta / count);
-        m2 = m2 + (delta * (sample - mean));
-        return m2 / (count - 1);                //bias-corrected
-    }
-};
-
 /******************************************************************************
  * CC Testing Routines
  *****************************************************************************/
