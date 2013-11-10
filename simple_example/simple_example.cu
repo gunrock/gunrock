@@ -101,8 +101,6 @@ void Usage()
            "    edges from stdin (or from the optionally-specified file).\n"
            "--instrumentd: If include then show detailed kernel running stats.\n"
            "--quick: If include then do not perform CPU validity code.\n"
-           "--num_gpus=<gpu number>: Using gpu number GPUs to compute,\n"
-           "default value is 1, currently only support single GPU."
            );
 }
 
@@ -326,7 +324,6 @@ void DisplayBFSStats(
  * @param[in] source_path
  * @param[in] src
  */
- */
 template<
     typename VertexId,
     typename Value,
@@ -401,8 +398,6 @@ struct EdgeProperties
  * @param[in] graph Reference to ...
  * @param[in] bc_values Pointer to ...
  * @param[in] src
- */
- *
  */
 template<
     typename VertexId,
@@ -538,6 +533,12 @@ void RunTests(
         Value,
         CCProblem_T> UpdateMaskFunctor;
 
+    typedef HookInitFunctor<
+        VertexId,
+        SizeT,
+        Value,
+        CCProblem_T> HookInitFunctor;
+
     typedef HookMinFunctor<
         VertexId,
         SizeT,
@@ -615,6 +616,7 @@ void RunTests(
     gpu_timer.Start();
     if (retval = cc_enactor.template Enact<CCProblem_T,
         UpdateMaskFunctor,
+        HookInitFunctor,
         HookMinFunctor,
         HookMaxFunctor,
         PtrJumpFunctor,
@@ -708,7 +710,7 @@ void RunTests(
     VertexId *reference_labels =
         (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
     VertexId *h_labels         =
-        VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+        (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
     reference_check            =
         (g_quick) ? NULL : reference_labels;
     VertexId *h_preds          =

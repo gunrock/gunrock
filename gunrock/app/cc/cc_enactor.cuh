@@ -49,13 +49,8 @@ class CCEnactor : public EnactorBase
     /**
      * A pinned, mapped word that the traversal kernels will signal when done
      */
-    volatile int        *done;
-    int                 *d_done;
-    volatile int        *flag;
-    int                 *d_flag;
     int                *vertex_flag;
     int                *edge_flag;
-    cudaEvent_t         throttle_event;
 
     /**
      * Current iteration
@@ -80,33 +75,6 @@ class CCEnactor : public EnactorBase
 
         do {
 
-            int flags = cudaHostAllocMapped;
-            //initialize the host-mapped "done"
-            if (!done) {
-                // Allocate pinned memory for done
-                if (retval = util::GRError(cudaHostAlloc((void**)&done, sizeof(int) * 1, flags),
-                    "CCEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) break;
-
-                // Map done into GPU space
-                if (retval = util::GRError(cudaHostGetDevicePointer((void**)&d_done, (void*) done, 0),
-                    "CCEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) break; 
-
-                // Create throttle event
-                if (retval = util::GRError(cudaEventCreateWithFlags(&throttle_event, cudaEventDisableTiming),
-                    "CCEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) break;
-            }
-
-            if (!flag) {
-                
-                // Allocate pinned memory for flag
-                if (retval = util::GRError(cudaHostAlloc((void**)&flag, sizeof(int) * 1, flags),
-                    "CCEnactor cudaHostAlloc flag failed", __FILE__, __LINE__)) break;
-
-                // Map flag into GPU space
-                if (retval = util::GRError(cudaHostGetDevicePointer((void**)&d_flag, (void*) flag, 0),
-                    "CCEnactor cudaHostGetDevicePointer flag failed", __FILE__, __LINE__)) break;
-            }
-
             //initialize runtime stats
             if (retval = vertex_map_kernel_stats.Setup(vertex_map_grid_size)) break;
 
@@ -115,8 +83,6 @@ class CCEnactor : public EnactorBase
             total_runtimes      = 0;
             total_lifetimes     = 0;
             total_queued        = 0;
-            done[0]             = -1;
-            flag[0]             = -1;
 
         } while (0);
         
@@ -132,10 +98,6 @@ class CCEnactor : public EnactorBase
         EnactorBase(EDGE_FRONTIERS, DEBUG),
         iteration(0),
         total_queued(0),
-        done(NULL),
-        d_done(NULL),
-        flag(NULL),
-        d_flag(NULL),
         vertex_flag(NULL),
         edge_flag(NULL)
     {
@@ -150,19 +112,7 @@ class CCEnactor : public EnactorBase
      */
     ~CCEnactor()
     {
-        if (done) {
-            util::GRError(cudaFreeHost((void*)done),
-                "CCEnactor cudaFreeHost done failed", __FILE__, __LINE__);
-
-            util::GRError(cudaEventDestroy(throttle_event),
-                "CCEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
-        }
-
-        if (flag) {
-            util::GRError(cudaFreeHost((void*)flag),
-                "CCEnactor cudaFreeHost done failed", __FILE__, __LINE__);
-
-        }
+        
         if (vertex_flag) delete vertex_flag;
         if (edge_flag) delete edge_flag;
     }
@@ -186,7 +136,7 @@ class CCEnactor : public EnactorBase
     }
 
     /**
-     * Enacts a breadth-first-search on the specified graph problem.
+     * Enacts a connected-component algorithm on the specified graph problem.
      *
      * @return cudaSuccess on success, error enumeration otherwise
      */
@@ -239,7 +189,7 @@ class CCEnactor : public EnactorBase
                         queue_index,
                         1,
                         num_elements,
-                        d_done,
+                        NULL,//d_done,
                         graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
                         graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                         data_slice,
@@ -274,7 +224,7 @@ class CCEnactor : public EnactorBase
                             queue_index,
                             1,
                             num_elements,
-                            d_done,
+                            NULL,//d_done,
                             graph_slice->frontier_queues.d_values[selector],      // d_in_queue
                             graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
                             data_slice,
@@ -315,7 +265,7 @@ class CCEnactor : public EnactorBase
                         queue_index,
                         1,
                         num_elements,
-                        d_done,
+                        NULL,//d_done,
                         graph_slice->frontier_queues.d_values[selector],      // d_in_queue
                         graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
                         data_slice,
@@ -324,7 +274,7 @@ class CCEnactor : public EnactorBase
                         graph_slice->frontier_elements[selector^1],         // max_out_queue
                         this->vertex_map_kernel_stats);
 
-            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) break;
+            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Update Mask Operation failed", __FILE__, __LINE__))) break;
 
                 int iteration           = 1;
 
@@ -352,7 +302,7 @@ class CCEnactor : public EnactorBase
                                     queue_index,
                                     1,
                                     num_elements,
-                                    d_done,
+                                    NULL,//d_done,
                                     graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
                                     graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                                     data_slice,
@@ -367,7 +317,7 @@ class CCEnactor : public EnactorBase
                                     queue_index,
                                     1,
                                     num_elements,
-                                    d_done,
+                                    NULL,//d_done,
                                     graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
                                     graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                                     data_slice,
@@ -377,7 +327,7 @@ class CCEnactor : public EnactorBase
                                     this->vertex_map_kernel_stats);
                     }
 
-                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookMin Operation failed", __FILE__, __LINE__))) break;
+                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Hook Min/Max Operation failed", __FILE__, __LINE__))) break;
                     if (queue_reset) queue_reset = false;
                     queue_index++;
                     selector ^= 1;
@@ -417,7 +367,7 @@ class CCEnactor : public EnactorBase
                                     queue_index,
                                     1,
                                     num_elements,
-                                    d_done,
+                                    NULL,//d_done,
                                     graph_slice->frontier_queues.d_values[selector],      // d_in_queue
                                     graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
                                     data_slice,
@@ -426,7 +376,7 @@ class CCEnactor : public EnactorBase
                                     graph_slice->frontier_elements[selector^1],         // max_out_queue
                                     this->vertex_map_kernel_stats);
 
-                        if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel First Pointer Jumping Round failed", __FILE__, __LINE__))) break;
+                        if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Pointer Jumping Mask failed", __FILE__, __LINE__))) break;
                         if (queue_reset) queue_reset = false;
 
                         queue_index++;
@@ -454,7 +404,7 @@ class CCEnactor : public EnactorBase
                                 queue_index,
                                 1,
                                 num_elements,
-                                d_done,
+                                NULL,//d_done,
                                 graph_slice->frontier_queues.d_values[selector],      // d_in_queue
                                 graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
                                 data_slice,
@@ -463,7 +413,7 @@ class CCEnactor : public EnactorBase
                                 graph_slice->frontier_elements[selector^1],         // max_out_queue
                                 this->vertex_map_kernel_stats);
 
-                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) break;
+                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Pointer Jumping Unmask Operation failed", __FILE__, __LINE__))) break;
 
                     gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, UpdateMaskFunctor>
                         <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
@@ -471,7 +421,7 @@ class CCEnactor : public EnactorBase
                                 queue_index,
                                 1,
                                 num_elements,
-                                d_done,
+                                NULL,//d_done,
                                 graph_slice->frontier_queues.d_values[selector],      // d_in_queue
                                 graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
                                 data_slice,
@@ -480,7 +430,7 @@ class CCEnactor : public EnactorBase
                                 graph_slice->frontier_elements[selector^1],         // max_out_queue
                                 this->vertex_map_kernel_stats);
 
-                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) break;
+                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Update Mask Operation failed", __FILE__, __LINE__))) break;
 
                     ///////////////////////////////////////////
                 } 
