@@ -40,8 +40,8 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
         bool            *d_marks;                       // Size equals to edge number, show if two vertices belong to the same component
         VertexId        *d_froms;                        // Size equals to edge number, from vertex of one edge
         VertexId        *d_tos;                          // Size equals to edge number, to vertex of one edge
-        bool            *d_vertex_flag;
-        bool            *d_edge_flag;
+        int             *d_vertex_flag;
+        int             *d_edge_flag;
     };
 
     // Members
@@ -292,17 +292,17 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
                     "CCProblem cudaMalloc d_marks failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_marks = d_marks;
 
-                bool   *d_vertex_flag;
+                int    *d_vertex_flag;
                     if (retval = util::GRError(cudaMalloc(
                         (void**)&d_vertex_flag,
-                        sizeof(bool)),
+                        sizeof(int)),
                     "CCProblem cudaMalloc d_vertex_flag failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_vertex_flag = d_vertex_flag;
 
-                bool   *d_edge_flag;
+                int    *d_edge_flag;
                     if (retval = util::GRError(cudaMalloc(
                         (void**)&d_edge_flag,
-                        sizeof(bool)),
+                        sizeof(int)),
                     "CCProblem cudaMalloc d_edge_flag failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_edge_flag = d_edge_flag;
             }
@@ -365,41 +365,41 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
                 data_slices[gpu]->d_masks = d_masks;
             }
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_masks, 0, nodes);
-            bool *vertex_flag = new bool;
-            bool *edge_flag = new bool;
+            int *vertex_flag = new int;
+            int *edge_flag = new int;
             // Allocate vertex_flag if necessary
             if (!data_slices[gpu]->d_vertex_flag) {
-                bool    *d_vertex_flag;
+                int    *d_vertex_flag;
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_vertex_flag,
-                                sizeof(bool)),
+                                sizeof(int)),
                             "CCProblem cudaMalloc d_vertex_flag failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_vertex_flag = d_vertex_flag;
             }
-            vertex_flag[0] = true;
+            vertex_flag[0] = 1;
             if (retval = util::GRError(cudaMemcpy(
                             data_slices[gpu]->d_vertex_flag,
                             vertex_flag,
-                            sizeof(bool),
+                            sizeof(int),
                             cudaMemcpyHostToDevice),
                         "CCProblem cudaMemcpy vertex_flag to d_vertex_flag failed", __FILE__, __LINE__)) return retval;
             delete vertex_flag;
 
             // Allocate edge_flag if necessary
             if (!data_slices[gpu]->d_edge_flag) {
-                bool    *d_edge_flag;
+                int    *d_edge_flag;
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_edge_flag,
-                                sizeof(bool)),
+                                sizeof(int)),
                             "CCProblem cudaMalloc d_edge_flag failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_edge_flag = d_edge_flag;
             }
 
-            edge_flag[0] = true;
+            edge_flag[0] = 1;
             if (retval = util::GRError(cudaMemcpy(
                             data_slices[gpu]->d_edge_flag,
                             edge_flag,
-                            sizeof(bool),
+                            sizeof(int),
                             cudaMemcpyHostToDevice),
                         "CCProblem cudaMemcpy edge_flag to d_edge_flag failed", __FILE__, __LINE__)) return retval;
             delete edge_flag;

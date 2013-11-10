@@ -83,8 +83,7 @@ struct HookMinFunctor
             } else {
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         max_node, problem->d_component_ids + min_node);
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        false, problem->d_edge_flag);
+                atomicCAS(&problem->d_edge_flag[0], 1, 0);
             }
         }
     }
@@ -120,8 +119,7 @@ struct HookMaxFunctor
             } else {
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         min_node, problem->d_component_ids + max_node);
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        false, problem->d_edge_flag);
+                atomicCAS(&problem->d_edge_flag[0], 1, 0);
             }
         }
     }
@@ -146,8 +144,7 @@ struct PtrJumpFunctor
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                 grand_parent, problem->d_component_ids + parent);
         if (parent != grand_parent) {
-            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        false, problem->d_vertex_flag);
+            atomicCAS(&problem->d_vertex_flag[0], 1, 0);
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         grand_parent, problem->d_component_ids + node);
         }
@@ -177,8 +174,7 @@ struct PtrJumpMaskFunctor
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                     grand_parent, problem->d_component_ids + parent);
             if (parent != grand_parent) {
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        false, problem->d_vertex_flag);
+                atomicCAS(&problem->d_vertex_flag[0], 1, 0);
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         grand_parent, problem->d_component_ids + node);
             } else {
