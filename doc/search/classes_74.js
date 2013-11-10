@@ -1,8 +1,8 @@
 var searchData=
 [
-  ['tile',['Tile',['../structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta_1_1_tile.html',1,'gunrock::oprtr::edge_map_backward::Cta']]],
   ['tile',['Tile',['../structgunrock_1_1oprtr_1_1edge__map__forward_1_1_cta_1_1_tile.html',1,'gunrock::oprtr::edge_map_forward::Cta']]],
   ['tile',['Tile',['../structgunrock_1_1oprtr_1_1vertex__map_1_1_cta_1_1_tile.html',1,'gunrock::oprtr::vertex_map::Cta']]],
+  ['tile',['Tile',['../structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta_1_1_tile.html',1,'gunrock::oprtr::edge_map_backward::Cta']]],
   ['totalrakingelements',['TotalRakingElements',['../structgunrock_1_1util_1_1_raking_grid_1_1_total_raking_elements.html',1,'gunrock::util::RakingGrid']]],
   ['treereduce',['TreeReduce',['../structgunrock_1_1util_1_1reduction_1_1_tree_reduce.html',1,'gunrock::util::reduction']]],
   ['triplebuffer',['TripleBuffer',['../structgunrock_1_1util_1_1_triple_buffer.html',1,'gunrock::util']]],

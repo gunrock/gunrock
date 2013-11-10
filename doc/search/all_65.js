@@ -1,5 +1,6 @@
 var searchData=
 [
+  ['edgeproperties',['EdgeProperties',['../struct_edge_properties.html',1,'']]],
   ['enactor_5fbase_2ecuh',['enactor_base.cuh',['../enactor__base_8cuh.html',1,'']]],
   ['enactorbase',['EnactorBase',['../classgunrock_1_1app_1_1_enactor_base.html',1,'gunrock::app']]],
   ['enactorbase',['EnactorBase',['../classgunrock_1_1app_1_1_enactor_base.html#a4f4af209ae120d1eefb1ade18ce5f1c9',1,'gunrock::app::EnactorBase']]],

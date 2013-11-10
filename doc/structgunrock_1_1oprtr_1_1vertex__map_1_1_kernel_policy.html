@@ -104,7 +104,7 @@ Data Structures</h2></td></tr>
 <div class="textblock"><h3>template&lt;typename _ProblemData, int _CUDA_ARCH, bool _INSTRUMENT, int _SATURATION_QUIT, bool _DEQUEUE_PROBLEM_SIZE, int _MIN_CTA_OCCUPANCY, int _LOG_THREADS, int _LOG_LOAD_VEC_SIZE, int _LOG_LOADS_PER_TILE, int _LOG_RAKING_THREADS, int _LOG_SCHEDULE_GRANULARITY&gt;<br/>
 struct gunrock::oprtr::vertex_map::KernelPolicy&lt; _ProblemData, _CUDA_ARCH, _INSTRUMENT, _SATURATION_QUIT, _DEQUEUE_PROBLEM_SIZE, _MIN_CTA_OCCUPANCY, _LOG_THREADS, _LOG_LOAD_VEC_SIZE, _LOG_LOADS_PER_TILE, _LOG_RAKING_THREADS, _LOG_SCHEDULE_GRANULARITY &gt;</h3>
 
-<p>Kernel configuration policy for BFS frontier contraction kernels.</p>
+<p>Kernel configuration policy for vertex mapping kernels.</p>
 <p>Parameterizations of this type encapsulate our kernel-tuning parameters (i.e., they are reflected via the static fields).</p>
 <p>Kernels can be specialized for problem-type, SM-version, etc. by parameterizing them with different performance-tuned parameterizations of this type. By incorporating this type into the kernel code itself, we guide the compiler in expanding/unrolling the kernel code for specific architectures and problem types. </p>
 </div><hr/>The documentation for this struct was generated from the following file:<ul>
@@ -113,7 +113,7 @@ struct gunrock::oprtr::vertex_map::KernelPolicy&lt; _ProblemData, _CUDA_ARCH, _I
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Nov 5 2013 15:11:45 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Sun Nov 10 2013 14:33:36 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.3.1
 </small></address>

@@ -120,19 +120,26 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Data Structures</h2></td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_statistic.html">Statistic</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Performance/Evaluation statistics. Updates running statistic, returning bias-corrected sample variance.  <a href="struct_statistic.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_edge_properties.html">EdgeProperties</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Graph edge properties (bundled properties)  <a href="struct_edge_properties.html#details">More...</a><br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:af388b732f48da33c8b8af965e025371b"><td class="memTemplParams" colspan="2">template&lt;typename Value , typename SizeT &gt; </td></tr>
 <tr class="memitem:af388b732f48da33c8b8af965e025371b"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="test__bc_8cu.html#af388b732f48da33c8b8af965e025371b">DisplaySolution</a> (Value *sigmas, Value *bc_values, SizeT nodes)</td></tr>
+<tr class="memdesc:af388b732f48da33c8b8af965e025371b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Displays the BC result (sigma value and BC value)  <a href="#af388b732f48da33c8b8af965e025371b">More...</a><br/></td></tr>
 <tr class="separator:af388b732f48da33c8b8af965e025371b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a453428c162b497dc9d4d1dbeca8a9b6b"><td class="memTemplParams" colspan="2">template&lt;typename VertexId , typename Value , typename SizeT &gt; </td></tr>
 <tr class="memitem:a453428c162b497dc9d4d1dbeca8a9b6b"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="test__bc_8cu.html#a453428c162b497dc9d4d1dbeca8a9b6b">RefCPUBC</a> (const <a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; &amp;graph, Value *bc_values, Value *sigmas, VertexId src)</td></tr>
+<tr class="memdesc:a453428c162b497dc9d4d1dbeca8a9b6b"><td class="mdescLeft">&#160;</td><td class="mdescRight">A simple CPU-based reference BC ranking implementation.  <a href="#a453428c162b497dc9d4d1dbeca8a9b6b">More...</a><br/></td></tr>
 <tr class="separator:a453428c162b497dc9d4d1dbeca8a9b6b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4d44b3fa71321b14c357e414d86f4b54"><td class="memTemplParams" colspan="2">template&lt;typename VertexId , typename Value , typename SizeT , bool INSTRUMENT&gt; </td></tr>
-<tr class="memitem:a4d44b3fa71321b14c357e414d86f4b54"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="test__bc_8cu.html#a4d44b3fa71321b14c357e414d86f4b54">RunTests</a> (const <a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; &amp;graph, VertexId src, int max_grid_size, int num_gpus, double max_queue_sizing)</td></tr>
-<tr class="separator:a4d44b3fa71321b14c357e414d86f4b54"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a50395408dd04f39b7ed4333d477f1a83"><td class="memTemplParams" colspan="2">template&lt;typename VertexId , typename Value , typename SizeT , bool INSTRUMENT&gt; </td></tr>
+<tr class="memitem:a50395408dd04f39b7ed4333d477f1a83"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="test__bc_8cu.html#a50395408dd04f39b7ed4333d477f1a83">RunTests</a> (const <a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; &amp;graph, VertexId src, std::string &amp;ref_filename, int max_grid_size, int num_gpus, double max_queue_sizing)</td></tr>
+<tr class="memdesc:a50395408dd04f39b7ed4333d477f1a83"><td class="mdescLeft">&#160;</td><td class="mdescRight">Run betweenness centrality tests.  <a href="#a50395408dd04f39b7ed4333d477f1a83">More...</a><br/></td></tr>
+<tr class="separator:a50395408dd04f39b7ed4333d477f1a83"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Simple test driver program for BFS. </p>
@@ -169,7 +176,16 @@ template&lt;typename Value , typename SizeT &gt; </div>
         </tr>
       </table>
 </div><div class="memdoc">
+
 <p>Displays the BC result (sigma value and BC value) </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">sigmas</td><td></td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">bc_values</td><td></td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">nodes</td><td></td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
@@ -210,11 +226,29 @@ template&lt;typename VertexId , typename Value , typename SizeT &gt; </div>
         </tr>
       </table>
 </div><div class="memdoc">
+
 <p>A simple CPU-based reference BC ranking implementation. </p>
+<dl class="tparams"><dt>Template Parameters</dt><dd>
+  <table class="tparams">
+    <tr><td class="paramname">VertexId</td><td></td></tr>
+    <tr><td class="paramname">Value</td><td></td></tr>
+    <tr><td class="paramname">SizeT</td><td></td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">graph</td><td>Reference to ... </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">bc_values</td><td>Pointer to ... </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">sigmas</td><td>Pointer to ... </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">src</td><td>VertexId of ... </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
-<a class="anchor" id="a4d44b3fa71321b14c357e414d86f4b54"></a>
+<a class="anchor" id="a50395408dd04f39b7ed4333d477f1a83"></a>
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
@@ -231,6 +265,12 @@ template&lt;typename VertexId , typename Value , typename SizeT , bool INSTRUMEN
           <td></td>
           <td class="paramtype">VertexId&#160;</td>
           <td class="paramname"><em>src</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">std::string &amp;&#160;</td>
+          <td class="paramname"><em>ref_filename</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -257,14 +297,34 @@ template&lt;typename VertexId , typename Value , typename SizeT , bool INSTRUMEN
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Run tests </p>
+
+<p>Run betweenness centrality tests. </p>
+<dl class="tparams"><dt>Template Parameters</dt><dd>
+  <table class="tparams">
+    <tr><td class="paramname">VertexId</td><td></td></tr>
+    <tr><td class="paramname">Value</td><td></td></tr>
+    <tr><td class="paramname">SizeT</td><td></td></tr>
+    <tr><td class="paramname">INSTRUMENT</td><td></td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">graph</td><td>Reference to ... </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">src</td><td></td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">max_grid_size</td><td></td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">num_gpus</td><td></td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">max_queue_sizing</td><td></td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Nov 5 2013 15:11:45 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Sun Nov 10 2013 14:33:36 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.3.1
 </small></address>

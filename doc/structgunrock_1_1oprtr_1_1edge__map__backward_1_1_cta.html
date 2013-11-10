@@ -110,8 +110,8 @@ Public Types</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:aa70f47993ba616071eaa48ca62c559ea"><td class="memItemLeft" align="right" valign="top">__device__ __forceinline__&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta.html#aa70f47993ba616071eaa48ca62c559ea">Cta</a> (<a class="el" href="structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta.html#ac33cf3dceaf3863e91762adffb1018e5">VertexId</a> queue_index, int num_gpus, <a class="el" href="structgunrock_1_1oprtr_1_1edge__map__backward_1_1_kernel_policy_1_1_smem_storage.html">SmemStorage</a> &amp;smem_storage, <a class="el" href="structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta.html#ac33cf3dceaf3863e91762adffb1018e5">VertexId</a> *<a class="el" href="structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta.html#a204a7790b0c5e5dd2f49245f9fb2bdeb">d_queue</a>, SizeT *d_bitmap_in, SizeT *d_bitmap_out, DataSlice *problem, <a class="el" href="classgunrock_1_1util_1_1_cta_work_progress.html">util::CtaWorkProgress</a> &amp;work_progress, SizeT max_out_frontier)</td></tr>
-<tr class="separator:aa70f47993ba616071eaa48ca62c559ea"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7650aca223d8a7b4028765e098a2a9f7"><td class="memItemLeft" align="right" valign="top">__device__ __forceinline__&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta.html#a7650aca223d8a7b4028765e098a2a9f7">Cta</a> (<a class="el" href="structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta.html#ac33cf3dceaf3863e91762adffb1018e5">VertexId</a> queue_index, int num_gpus, <a class="el" href="structgunrock_1_1oprtr_1_1edge__map__backward_1_1_kernel_policy_1_1_smem_storage.html">SmemStorage</a> &amp;smem_storage, <a class="el" href="structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta.html#ac33cf3dceaf3863e91762adffb1018e5">VertexId</a> *<a class="el" href="structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta.html#a204a7790b0c5e5dd2f49245f9fb2bdeb">d_queue</a>, SizeT *d_bitmap_in, SizeT *d_bitmap_out, <a class="el" href="structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta.html#ac33cf3dceaf3863e91762adffb1018e5">VertexId</a> *d_column_indices, DataSlice *problem, <a class="el" href="classgunrock_1_1util_1_1_cta_work_progress.html">util::CtaWorkProgress</a> &amp;work_progress)</td></tr>
+<tr class="separator:a7650aca223d8a7b4028765e098a2a9f7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adc8d441ed807bf2e0b93206bb63cd0ac"><td class="memItemLeft" align="right" valign="top">__device__ __forceinline__ void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta.html#adc8d441ed807bf2e0b93206bb63cd0ac">ProcessTile</a> (SizeT cta_offset, SizeT guarded_elements=KernelPolicy::TILE_ELEMENTS)</td></tr>
 <tr class="separator:adc8d441ed807bf2e0b93206bb63cd0ac"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
@@ -142,7 +142,7 @@ template&lt;typename KernelPolicy , typename ProblemData , typename Functor &gt;
 </div>
 </div>
 <h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a class="anchor" id="aa70f47993ba616071eaa48ca62c559ea"></a>
+<a class="anchor" id="a7650aca223d8a7b4028765e098a2a9f7"></a>
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
@@ -190,6 +190,12 @@ template&lt;typename KernelPolicy , typename ProblemData , typename Functor &gt;
         <tr>
           <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype"><a class="el" href="structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta.html#ac33cf3dceaf3863e91762adffb1018e5">VertexId</a> *&#160;</td>
+          <td class="paramname"><em>d_column_indices</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
           <td class="paramtype">DataSlice *&#160;</td>
           <td class="paramname"><em>problem</em>, </td>
         </tr>
@@ -197,13 +203,7 @@ template&lt;typename KernelPolicy , typename ProblemData , typename Functor &gt;
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype"><a class="el" href="classgunrock_1_1util_1_1_cta_work_progress.html">util::CtaWorkProgress</a> &amp;&#160;</td>
-          <td class="paramname"><em>work_progress</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">SizeT&#160;</td>
-          <td class="paramname"><em>max_out_frontier</em>&#160;</td>
+          <td class="paramname"><em>work_progress</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -281,7 +281,7 @@ template&lt;typename KernelPolicy , typename ProblemData , typename Functor &gt;
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Nov 5 2013 15:11:45 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Sun Nov 10 2013 14:33:36 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.3.1
 </small></address>

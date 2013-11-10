@@ -101,15 +101,15 @@ struct gunrock::util::DoubleBuffer&lt; KeyType, ValueType &gt;</h3>
 <p>Double buffer (a.k.a. page-flip, ping-pong, etc.) version of the multi-buffer storage abstraction above.</p>
 <p>Many of the B40C primitives are templated upon the <a class="el" href="structgunrock_1_1util_1_1_double_buffer.html">DoubleBuffer</a> type: they are compiled differently depending upon whether the declared type contains keys-only versus key-value pairs (i.e., whether ValueType is <a class="el" href="structgunrock_1_1util_1_1_null_type.html">util::NullType</a> or some real type).</p>
 <p>Declaring keys-only storage wrapper: </p>
-<pre class="fragment">            DoubleBuffer&lt;KeyType&gt; key_storage;
+<pre class="fragment"> DoubleBuffer&lt;KeyType&gt; key_storage;
 </pre><p>Declaring key-value storage wrapper: </p>
-<pre class="fragment">            DoubleBuffer&lt;KeyType, ValueType&gt; key_value_storage;</pre> </div><hr/>The documentation for this struct was generated from the following file:<ul>
+<pre class="fragment"> DoubleBuffer&lt;KeyType, ValueType&gt; key_value_storage;</pre> </div><hr/>The documentation for this struct was generated from the following file:<ul>
 <li>/home/yzh/gunrock/gunrock/util/<a class="el" href="multiple__buffering_8cuh.html">multiple_buffering.cuh</a></li>
 </ul>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Nov 5 2013 15:11:45 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Sun Nov 10 2013 14:33:36 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.3.1
 </small></address>
