@@ -20,6 +20,11 @@ struct UpdateMaskFunctor
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
         problem->d_masks[node] = (problem->d_component_ids[node] == node)?0:1;
+        VertexId parent;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                parent, problem->d_component_ids + node);
+        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                (parent == node)?0:1, problem->d_masks + node);
     }
 };
 
@@ -35,10 +40,16 @@ struct HookInitFunctor
 
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
-        
-        VertexId max_node = problem->d_froms[node] > problem->d_tos[node] ? problem->d_froms[node] : problem->d_tos[node];
-        VertexId min_node = problem->d_froms[node] + problem->d_tos[node] - max_node;
-        problem->d_component_ids[max_node] = min_node;
+        VertexId from_node;
+        VertexId to_node;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                from_node, problem->d_froms + node);
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                to_node, problem->d_tos + node);
+        VertexId max_node = from_node > to_node ? from_node:to_node;
+        VertexId min_node = from_node + to_node - max_node;
+        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                min_node, problem->d_component_ids + max_node);
     }
 };
 
@@ -49,27 +60,33 @@ struct HookMinFunctor
 
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
-        if (!problem->d_marks[node])
-        {
-            VertexId from_node = problem->d_froms[node];
-            VertexId to_node = problem->d_tos[node];
-            VertexId parent_from = problem->d_component_ids[from_node];
-            VertexId parent_to = problem->d_component_ids[to_node];
-            VertexId max_node = parent_from > parent_to ? parent_from : parent_to;
-            VertexId min_node = parent_from + parent_to - max_node;
-            if (max_node == min_node)
-                problem->d_marks[node] = true;
-            else
-                problem->d_component_ids[min_node] = max_node;
-            return true;
-        }
-        else
-            return false;
+        return true;
     }
 
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
-       //do nothing 
+        bool mark;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                mark, problem->d_marks + node);
+        if (!mark) {
+            VertexId from_node;
+            VertexId to_node;
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    from_node, problem->d_froms + node);
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    to_node, problem->d_tos + node);
+            VertexId max_node = from_node > to_node ? from_node:to_node;
+            VertexId min_node = from_node + to_node - max_node;
+            if (max_node == min_node) {
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        true, problem->d_marks + node);
+            } else {
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        max_node, problem->d_component_ids + min_node);
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        false, problem->d_edge_flag);
+            }
+        }
     }
 };
 
@@ -80,27 +97,33 @@ struct HookMaxFunctor
 
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
-        if (!problem->d_marks[node])
-        {
-            VertexId from_node = problem->d_froms[node];
-            VertexId to_node = problem->d_tos[node];
-            VertexId parent_from = problem->d_component_ids[from_node];
-            VertexId parent_to = problem->d_component_ids[to_node];
-            VertexId max_node = parent_from > parent_to ? parent_from : parent_to;
-            VertexId min_node = parent_from + parent_to - max_node;
-            if (max_node == min_node)
-                problem->d_marks[node] = true;
-            else
-                problem->d_component_ids[max_node] = min_node;
-            return true;
-        }
-        else
-            return false;
+       return true; 
     }
 
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
-        //do nothing
+        bool mark;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                mark, problem->d_marks + node);
+        if (!mark) {
+            VertexId from_node;
+            VertexId to_node;
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    from_node, problem->d_froms + node);
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    to_node, problem->d_tos + node);
+            VertexId max_node = from_node > to_node ? from_node:to_node;
+            VertexId min_node = from_node + to_node - max_node;
+            if (max_node == min_node) {
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        true, problem->d_marks + node);
+            } else {
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        min_node, problem->d_component_ids + max_node);
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        false, problem->d_edge_flag);
+            }
+        }
     }
 };
 
@@ -111,19 +134,23 @@ struct PtrJumpFunctor
 
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
-        VertexId parent = problem->d_component_ids[node];
-        VertexId grand_parent = problem->d_component_ids[parent];
-        if (parent != grand_parent) {
-            problem->d_component_ids[node] = grand_parent;
-            return true;
-        }
-        else
-            return false;
+        return true;
     }
 
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
-    { 
-        //do nothing
+    {
+        VertexId parent;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                parent, problem->d_component_ids + node);
+        VertexId grand_parent;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                grand_parent, problem->d_component_ids + parent);
+        if (parent != grand_parent) {
+            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        false, problem->d_vertex_flag);
+            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        grand_parent, problem->d_component_ids + node);
+        }
     }
 };
 
@@ -134,24 +161,31 @@ struct PtrJumpMaskFunctor
 
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
-        if (problem->d_masks[node] == 0)
-        {
-            VertexId parent = problem->d_component_ids[node];
-            VertexId grand_parent = problem->d_component_ids[parent];
-            if (parent != grand_parent) {
-                problem->d_component_ids[node] = grand_parent;
-                return true;
-            }
-            else
-                problem->d_masks[node] = -1;
-        }
-        else
-            return false;
+        return true; 
     }
 
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
-       //do nothing 
+        VertexId mask;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                mask, problem->d_masks + node);
+        if (mask == 0) {
+            VertexId parent;
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    parent, problem->d_component_ids + node);
+            VertexId grand_parent;
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    grand_parent, problem->d_component_ids + parent);
+            if (parent != grand_parent) {
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        false, problem->d_vertex_flag);
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        grand_parent, problem->d_component_ids + node);
+            } else {
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        -1, problem->d_masks + node);
+            }
+        }
     }
 };
 
@@ -162,18 +196,24 @@ struct PtrJumpUnmaskFunctor
 
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
-        if (problem->d_masks[node] == 1)
-        {
-            VertexId parent = problem->d_component_ids[node];
-            VertexId grand_parent = problem->d_component_ids[parent];
-            problem->d_component_ids[node] = grand_parent;
-        }
-            return true;
+        return true;
     }
 
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
-        //do nothing
+        VertexId mask;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                mask, problem->d_masks + node);
+        if (mask == 1) {
+            VertexId parent;
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    parent, problem->d_component_ids + node);
+            VertexId grand_parent;
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    grand_parent, problem->d_component_ids + parent);
+            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                    grand_parent, problem->d_component_ids + node);
+        }
     }
 };
 
