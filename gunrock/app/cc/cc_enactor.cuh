@@ -232,6 +232,7 @@ class CCEnactor : public EnactorBase
             SizeT num_elements          = graph_slice->edges;
             bool queue_reset            = true;
 
+
             gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookInitFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                         queue_reset,
@@ -248,8 +249,6 @@ class CCEnactor : public EnactorBase
                         this->vertex_map_kernel_stats);
 
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) break;
-
-            printf("Hook Init.\n");
 
             // Pointer Jumping 
             queue_length = graph_slice->nodes;
@@ -286,8 +285,6 @@ class CCEnactor : public EnactorBase
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel First Pointer Jumping Round failed", __FILE__, __LINE__))) break;
 
-                printf("Ptr Jump.\n");
-                
                 if (queue_reset) queue_reset = false;
 
                 queue_index++;
@@ -300,6 +297,8 @@ class CCEnactor : public EnactorBase
                                 sizeof(int),
                                 cudaMemcpyDeviceToHost),
                             "CCProblem cudaMemcpy d_vertex_flag to vertex_flag failed", __FILE__, __LINE__)) return retval;
+
+
                 // Check if done
                 if (vertex_flag[0]) break;
             }
@@ -327,8 +326,6 @@ class CCEnactor : public EnactorBase
 
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) break;
 
-            printf("Update Mask.\n");
- 
                 int iteration           = 1;
 
                 edge_flag[0] = 0;
@@ -381,8 +378,6 @@ class CCEnactor : public EnactorBase
                     }
 
                     if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookMin Operation failed", __FILE__, __LINE__))) break;
-                    printf("Hook Min/Max.\n");
-
                     if (queue_reset) queue_reset = false;
                     queue_index++;
                     selector ^= 1;
@@ -432,8 +427,6 @@ class CCEnactor : public EnactorBase
                                     this->vertex_map_kernel_stats);
 
                         if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel First Pointer Jumping Round failed", __FILE__, __LINE__))) break;
-                        printf("Ptr Jump Mask.\n");
-
                         if (queue_reset) queue_reset = false;
 
                         queue_index++;
@@ -472,8 +465,6 @@ class CCEnactor : public EnactorBase
 
                     if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) break;
 
-                    printf("Ptr Jump Unmask.\n");
-
                     gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, UpdateMaskFunctor>
                         <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                                 queue_reset,
@@ -491,7 +482,6 @@ class CCEnactor : public EnactorBase
 
                     if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) break;
 
-                    printf("Update Mask.\n");
                     ///////////////////////////////////////////
                 } 
 
