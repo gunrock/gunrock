@@ -29,7 +29,7 @@ namespace gunrock {
 namespace app {
 
 /**
- * Enumeration of global frontier queue configurations
+ * @brief Enumeration of global frontier queue configurations
  */
 
 enum FrontierType {
@@ -40,17 +40,25 @@ enum FrontierType {
 
 
 /**
- * Base Problem Structure
+ * @brief Base problem structure.
+ *
+ * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer
  */
 template <
-    typename    _VertexId,                                              // Type of signed integer to use as vertex id (e.g., uint32)
-    typename    _SizeT,                                                 // Type of unsigned integer to use for array indexing (e.g., uint32)
-    bool        _USE_DOUBLE_BUFFER>                                     // Whether to use double buffer
+    typename    _VertexId,
+    typename    _SizeT,
+    bool        _USE_DOUBLE_BUFFER>
 
 struct ProblemBase
 {
     typedef _VertexId           VertexId;
     typedef _SizeT              SizeT;
+
+    /**
+     * Load instruction cache-modifier const defines.
+     */
 
     static const util::io::ld::CacheModifier QUEUE_READ_MODIFIER                    = util::io::ld::cg;             // Load instruction cache-modifier for reading incoming frontier vertex-ids. Valid on SM2.0 or newer
     static const util::io::ld::CacheModifier COLUMN_READ_MODIFIER                   = util::io::ld::NONE;           // Load instruction cache-modifier for reading CSR column-indices.
@@ -60,8 +68,7 @@ struct ProblemBase
     static const util::io::st::CacheModifier QUEUE_WRITE_MODIFIER                   = util::io::st::cg;             // Store instruction cache-modifier for writing outgoing frontier vertex-ids. Valid on SM2.0 or newer
 
     /**
-     * Graph Slice which contains common graph structural data
-     * and input/output queue
+     * @brief Graph slice structure which contains common graph structural data and input/output queue.
      */
     struct GraphSlice
     {
@@ -83,7 +90,10 @@ struct ProblemBase
         cudaStream_t    stream;
 
         /**
-         * Constructor
+         * @brief GraphSlice Constructor
+         *
+         * @param[in] index GPU index, reserved for multi-GPU use in future.
+         * @param[in] stream CUDA Stream we use to allocate storage for this graph slice.
          */
         GraphSlice(int index, cudaStream_t stream) :
             index(index),
@@ -101,7 +111,7 @@ struct ProblemBase
         }
 
         /**
-         * Destructor
+         * @brief GraphSlice Destructor to free all device memories.
          */
         virtual ~GraphSlice()
         {
@@ -138,7 +148,7 @@ struct ProblemBase
     // Methods
     
     /**
-     * Constructor
+     * @brief ProblemBase default constructor
      */
     ProblemBase() :
         num_gpus(0),
@@ -147,7 +157,7 @@ struct ProblemBase
         {}
     
     /**
-     * Destructor
+     * @brief ProblemBase default destructor to free all graph slices allocated.
      */
     virtual ~ProblemBase()
     {
@@ -160,8 +170,11 @@ struct ProblemBase
     }
 
     /**
-     * Returns index of the gpu that owns the neighbor list of
-     * the specified vertex
+     * @brief Get the GPU index for a specified vertex id.
+     *
+     * @tparam VertexId Type of signed integer to use as vertex id
+     * @param[in] vertex Vertex Id to search
+     * \return Index of the gpu that owns the neighbor list of the specified vertex
      */
     template <typename VertexId>
     int GpuIndex(VertexId vertex)
@@ -177,8 +190,12 @@ struct ProblemBase
     }
 
     /**
-     * Returns the row within a gpu's GraphSlice row_offsets vector
-     * for the specified vertex
+     * @brief Get the row offset for a specified vertex id.
+     *
+     * @tparam VertexId Type of signed integer to use as vertex id
+     * @param[in] vertex Vertex Id to search
+     * \return Row offset of the specified vertex. If a single GPU is used,
+     * this will be the same as the vertex id.
      */
     template <typename VertexId>
     VertexId GraphSliceRow(VertexId vertex)
@@ -187,10 +204,19 @@ struct ProblemBase
     }
 
     /**
-     * Initialize from host CSR problem
+     * @brief Initialize problem from host CSR graph.
+     *
+     * @param[in] stream_from_host Whether to stream data from host.
+     * @param[in] nodes Number of nodes in the CSR graph.
+     * @param[in] edges Number of edges in the CSR graph.
+     * @param[in] h_row_offsets Host-side row offsets array.
+     * @param[in] h_column_indices Host-side column indices array.
+     * @param[in] num_gpus Number of the GPUs used.
+     *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Init(
-        bool        stream_from_host,       // Only meaningful for single-GPU
+        bool        stream_from_host,
         SizeT       nodes,
         SizeT       edges,
         SizeT       *h_row_offsets,
@@ -265,8 +291,12 @@ struct ProblemBase
     }
 
     /**
-     * Performs any initialization work needed for ProblemBase. Must be called
-     * prior to each search
+     * @brief Performs any initialization work needed for ProblemBase. Must be called prior to each search
+     *
+     * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
+     * @param[in] queue_sizing Sizing scaling factor for work queue allocation. 1.0 by default. Reserved for future use.
+     *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Reset(
         FrontierType frontier_type,     // The frontier type (i.e., edge/vertex/mixed)

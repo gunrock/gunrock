@@ -25,8 +25,7 @@ namespace gunrock {
 namespace app {
 
 /**
- * Base class for graph problem enactors.
- * 
+ * @brief Base class for graph problem enactors.
  */
 class EnactorBase
 {
@@ -50,7 +49,10 @@ public:
 protected:  
 
     /**
-     * Constructor.
+     * @brief Constructor
+     *
+     * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
+     * @param[in] DEBUG If set, will collect kernel running stats and display the running info.
      */
     EnactorBase(FrontierType frontier_type, bool DEBUG) :
         frontier_type(frontier_type),
@@ -62,41 +64,21 @@ protected:
     }
 
     /**
-     * Utility function: Returns the default maximum number of threadblocks
-     * this enactor class can launch.
+     * @brief Utility function for getting the max grid size.
+     *
+     * @param[in] cta_occupancy CTA occupancy for current architecture
+     * @param[in] max_grid_size Preset max grid size. If less or equal to 0, fully populate all SMs
+     *
+     * \return The maximum number of threadblocks this enactor class can launch.
      */
     int MaxGridSize(int cta_occupancy, int max_grid_size = 0)
     {
         if (max_grid_size <= 0) {
-            // No override: Fully populate all SMs
             max_grid_size = this->cuda_props.device_props.multiProcessorCount * cta_occupancy;
         }
 
         return max_grid_size;
-    }
-
-    /**
-     * Utility method to display the contents of a device array
-     */
-    template <typename T>
-    void DisplayDeviceResults(
-        T *d_data,
-        size_t num_elements)
-    {
-        // Allocate array on host and copy back
-        T *h_data = (T*) malloc(num_elements * sizeof(T));
-        cudaMemcpy(h_data, d_data, sizeof(T) * num_elements, cudaMemcpyDeviceToHost);
-
-        // Display data
-        for (int i = 0; i < num_elements; i++) {
-            util::PrintValue(h_data[i]);
-            printf(", ");
-        }
-        printf("\n\n");
-
-        // Cleanup
-        if (h_data) free(h_data);
-    }
+    } 
 };
 
 
