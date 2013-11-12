@@ -236,7 +236,7 @@ struct Csr
     void DisplayGraph()
     {
         SizeT displayed_node_num = (nodes > 40) ? 40:nodes;
-        printf("Input Graph:\n");
+        printf("First %d nodes's neighbor list of the input graph:\n", displayed_node_num);
         for (SizeT node = 0; node < displayed_node_num; node++) {
             util::PrintValue(node);
             printf(": ");

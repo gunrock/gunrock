@@ -362,7 +362,7 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
 template <typename SizeT>
 int CompareResults(float* computed, float* reference, SizeT len, bool verbose = true)
 {
-    float THRESHOLD = 0.01f;
+    float THRESHOLD = 0.05f;
     int flag = 0;
     for (SizeT i = 0; i < len; i++) {
 
