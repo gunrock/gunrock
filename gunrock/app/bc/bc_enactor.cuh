@@ -33,8 +33,10 @@ namespace bc {
 
 /**
  * @brief BC problem enactor class.
+ *
+ * @tparam INSTRUMENT Boolean type to show whether or not to collect per-CTA clock-count statistics
  */
-template<bool INSTRUMENT>                           // Whether or not to collect per-CTA clock-count statistics
+template<bool INSTRUMENT>
 class BCEnactor : public EnactorBase
 {
     // Members

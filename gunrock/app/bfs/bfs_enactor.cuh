@@ -31,7 +31,12 @@ namespace gunrock {
 namespace app {
 namespace bfs {
 
-template<bool INSTRUMENT>                           // Whether or not to collect per-CTA clock-count statistics
+/**
+ * @brief BFS problem enactor class.
+ *
+ * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA clock-count statistics
+ */
+template<bool INSTRUMENT>
 class BFSEnactor : public EnactorBase
 {
     // Members
@@ -63,7 +68,13 @@ class BFSEnactor : public EnactorBase
     protected:
 
     /**
-     * Prepare enactor for BFS. Must be called prior to each BFS search.
+     * @brief Prepare the enactor for BFS kernel call. Must be called prior to each BFS search.
+     *
+     * @param[in] BFS Problem object which holds the graph data and BFS problem data to compute.
+     * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
+     * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
+     *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template <typename ProblemData>
     cudaError_t Setup(
@@ -134,7 +145,7 @@ class BFSEnactor : public EnactorBase
     public:
 
     /**
-     * Constructor
+     * @brief BFSEnactor constructor
      */
     BFSEnactor(bool DEBUG = false) :
         EnactorBase(EDGE_FRONTIERS, DEBUG),
@@ -145,7 +156,7 @@ class BFSEnactor : public EnactorBase
     {}
 
     /**
-     * Destructor
+     * @brief BFSEnactor destructor
      */
     virtual ~BFSEnactor()
     {
@@ -159,7 +170,11 @@ class BFSEnactor : public EnactorBase
     }
 
     /**
-     * Obtain statistics about the last BFS search enacted
+     * @brief Obtain statistics about the last BFS search enacted.
+     *
+     * @param[out] total_queued Total queued elements in BFS kernel running.
+     * @param[out] search_depth Search depth of BFS algorithm.
+     * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
      */
     template <typename VertexId>
     void GetStatistics(
@@ -177,9 +192,16 @@ class BFSEnactor : public EnactorBase
     }
 
     /**
-     * Enacts a breadth-first-search on the specified graph problem.
+     * @brief Enacts a breadth-first search computing on the specified graph.
      *
-     * @return cudaSuccess on success, error enumeration otherwise
+     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
+     * @tparam VertexMapPolicy Kernel policy for vertex mapping.
+     * @tparam BFSProblem BFS Problem type.
+     * @tparam BFSFunctor Functor type used in edge mapping and vertex mapping.
+     * @param[in] problem BFSProblem object.
+     * @param[in] src Source node for BFS.
+     * @param[in] max_grid_size Max grid size for BC kernel calls.
+     *
      */
     template<
         typename EdgeMapPolicy,
@@ -345,7 +367,7 @@ class BFSEnactor : public EnactorBase
     }
 
     /**
-     * Enact Kernel Entry, specify KernelPolicy
+     * @brief Enact Kernel Entry, specify KernelPolicy.
      */
     template <typename BFSProblem, typename BFSFunctor>
     cudaError_t Enact(

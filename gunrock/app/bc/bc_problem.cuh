@@ -178,14 +178,14 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
     }
 
     /**
-     * @brief BCProblem constructor
+     * @brief BCProblem initialization
      *
      * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] nodes Number of nodes in the CSR graph.
-     * @param[in] edges Number of edges in the CSR graph.
+     * @param[in] _nodes Number of nodes in the CSR graph.
+     * @param[in] _edges Number of edges in the CSR graph.
      * @param[in] h_row_offsets Host-side row offsets array.
      * @param[in] h_column_indices Host-side column indices array.
-     * @param[in] num_gpus Number of the GPUs used.
+     * @param[in] _num_gpus Number of the GPUs used.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */

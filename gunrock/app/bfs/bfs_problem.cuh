@@ -21,11 +21,20 @@ namespace gunrock {
 namespace app {
 namespace bfs {
 
+/**
+ * @brief Breadth-First Search Problem structure.
+ *
+ * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam _Value               Type of float or double to use for computing BC value.
+ * @tparam _MARK_PREDECESSORS   Boolean type parameter which defines whether to mark predecessor value for each node.
+ * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer.
+ */
 template <
-    typename    VertexId,                       // Type of signed integer to use as vertex id (e.g., uint32)
-    typename    SizeT,                          // Type of unsigned integer to use for array indexing (e.g., uint32)
-    typename    Value,                          // Type of edge value (e.g., float)
-    bool        _MARK_PREDECESSORS,             // Whether to mark predecessor-vertices
+    typename    VertexId,                       
+    typename    SizeT,                          
+    typename    Value,                          
+    bool        _MARK_PREDECESSORS,             
     bool        _USE_DOUBLE_BUFFER>
 struct BFSProblem : ProblemBase<VertexId, SizeT,
                                 _USE_DOUBLE_BUFFER>
@@ -35,8 +44,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
     
 
     //Helper structures
+
     /**
-     * Data slice per GPU
+     * @brief Data slice structure which contains BFS problem specific data.
      */
     struct DataSlice
     {
@@ -67,7 +77,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
     // Methods
 
     /**
-     * Constructor
+     * @brief BFSProblem default constructor
      */
 
     BFSProblem():
@@ -75,6 +85,16 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
     edges(0),
     num_gpus(0) {}
 
+    /**
+     * @brief BFSProblem constructor
+     *
+     * @param[in] stream_from_host Whether to stream data from host.
+     * @param[in] nodes Number of nodes in the CSR graph.
+     * @param[in] edges Number of edges in the CSR graph.
+     * @param[in] h_row_offsets Host-side row offsets array.
+     * @param[in] h_column_indices Host-side column indices array.
+     * @param[in] num_gpus Number of the GPUs used.
+     */
     BFSProblem(bool        stream_from_host,       // Only meaningful for single-GPU
             SizeT       nodes,
             SizeT       edges,
@@ -95,7 +115,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
     }
 
     /**
-     * Destructor
+     * @brief BFSProblem default destructor
      */
     ~BFSProblem()
     {
@@ -112,8 +132,12 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
     }
 
     /**
-     * Extract into a single host vector the BFS results disseminated across
-     * all GPUs
+     * @brief Extract into a single host vector the BFS results disseminated across all GPUs.
+     *
+     * @param[out] h_labels host-side vector to store computed sigma values. (Meaningful only in single-pass BC)
+     * @param[out] h_preds host-side vector to store predecessor vertex ids.
+     *
+     *\return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Extract(VertexId *h_labels, VertexId *h_preds)
     {
@@ -150,6 +174,18 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
         return retval;
     }
 
+    /**
+     * @brief BFSProblem initialization
+     *
+     * @param[in] stream_from_host Whether to stream data from host.
+     * @param[in] _nodes Number of nodes in the CSR graph.
+     * @param[in] _edges Number of edges in the CSR graph.
+     * @param[in] h_row_offsets Host-side row offsets array.
+     * @param[in] h_column_indices Host-side column indices array.
+     * @param[in] _num_gpus Number of the GPUs used.
+     *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     */
     cudaError_t Init(
             bool        stream_from_host,       // Only meaningful for single-GPU
             SizeT       _nodes,
@@ -215,8 +251,13 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
     }
 
     /**
-     * Performs any initialization work needed for BFS problem type. Must be called
-     * prior to each BFS run
+     *  @brief Performs any initialization work needed for BFS problem type. Must be called prior to each BFS run.
+     *
+     *  @param[in] src Source node for one BFS computing pass.
+     *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
+     *  @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+     * 
+     *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Reset(
             VertexId    src,
