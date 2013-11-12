@@ -21,10 +21,18 @@ namespace gunrock {
 namespace app {
 namespace bc {
 
+/**
+ * @brief Betweenness Centrality Problem structure.
+ *
+ * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam _Value               Type of float or double to use for computing BC value.
+ * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer
+ */
 template <
-    typename    _VertexId,                      // Type of signed integer to use as vertex id (e.g., uint32)
-    typename    _SizeT,                         // Type of unsigned integer to use for array indexing (e.g., uint32)
-    typename    _Value,                         // Type of edge value (e.g., float)
+    typename    _VertexId,                      
+    typename    _SizeT,                        
+    typename    _Value,                       
     bool        _USE_DOUBLE_BUFFER>
 struct BCProblem : ProblemBase<_VertexId, _SizeT,
                                 _USE_DOUBLE_BUFFER>
@@ -32,8 +40,11 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
     typedef _VertexId       VertexId;
     typedef _SizeT          SizeT;
     typedef _Value          Value;
+    
     //Helper structures
-/** * Data slice per GPU
+    
+    /** 
+     * @brief Data slice structure which contains BC problem specific data.
      */
     struct DataSlice
     {
@@ -67,7 +78,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
     // Methods
 
     /**
-     * Constructor
+     * @brief BCProblem default constructor
      */
 
     BCProblem():
@@ -75,6 +86,16 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
     edges(0),
     num_gpus(0) {}
 
+    /**
+     * @brief BCProblem constructor
+     *
+     * @param[in] stream_from_host Whether to stream data from host.
+     * @param[in] nodes Number of nodes in the CSR graph.
+     * @param[in] edges Number of edges in the CSR graph.
+     * @param[in] h_row_offsets Host-side row offsets array.
+     * @param[in] h_column_indices Host-side column indices array.
+     * @param[in] num_gpus Number of the GPUs used.
+     */
     BCProblem(bool        stream_from_host,       // Only meaningful for single-GPU
             SizeT       nodes,
             SizeT       edges,
@@ -95,7 +116,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
     }
 
     /**
-     * Destructor
+     * @brief BCProblem default destructor
      */
     ~BCProblem()
     {
@@ -115,8 +136,12 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
     }
 
     /**
-     * Extract into a single host vector the BC results disseminated across
-     * all GPUs
+     * @brief Extract into a single host vector the BC results disseminated across all GPUs.
+     *
+     * @param[out] h_sigmas host-side vector to store computed sigma values. (Meaningful only in single-pass BC)
+     * @param[out] h_bc_values host-side vector to store BC_values.
+     *
+     *\return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Extract(Value *h_sigmas, Value *h_bc_values)
     {
@@ -152,6 +177,18 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
         return retval;
     }
 
+    /**
+     * @brief BCProblem constructor
+     *
+     * @param[in] stream_from_host Whether to stream data from host.
+     * @param[in] nodes Number of nodes in the CSR graph.
+     * @param[in] edges Number of edges in the CSR graph.
+     * @param[in] h_row_offsets Host-side row offsets array.
+     * @param[in] h_column_indices Host-side column indices array.
+     * @param[in] num_gpus Number of the GPUs used.
+     *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     */
     cudaError_t Init(
             bool        stream_from_host,       // Only meaningful for single-GPU
             SizeT       _nodes,
@@ -242,8 +279,13 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
     }
 
     /**
-     * Performs any initialization work needed for BC problem type. Must be called
-     * prior to each BC run
+     *  @brief Performs any initialization work needed for BC problem type. Must be called prior to each BC run.
+     *
+     *  @param[in] src Source node for one BC computing pass. If equals to -1 then compute BC value for each node.
+     *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
+     *  @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+     * 
+     *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Reset(
             VertexId    src,

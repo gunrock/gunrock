@@ -31,6 +31,9 @@ namespace gunrock {
 namespace app {
 namespace bc {
 
+/**
+ * @brief BC problem enactor class.
+ */
 template<bool INSTRUMENT>                           // Whether or not to collect per-CTA clock-count statistics
 class BCEnactor : public EnactorBase
 {
@@ -62,7 +65,13 @@ class BCEnactor : public EnactorBase
     protected:
 
     /**
-     * Prepare enactor for BC. Must be called prior to each BC search.
+     * @brief Prepare the enactor for BC kernel call. Must be called prior to each BC search.
+     *
+     * @param[in] BC Problem object which holds the graph data and BC problem data to compute.
+     * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
+     * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
+     *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template <typename ProblemData>
     cudaError_t Setup(
@@ -132,7 +141,7 @@ class BCEnactor : public EnactorBase
     public:
 
     /**
-     * Constructor
+     * @brief BCEnactor constructor
      */
     BCEnactor(bool DEBUG = false) :
         EnactorBase(EDGE_FRONTIERS, DEBUG),
@@ -142,7 +151,7 @@ class BCEnactor : public EnactorBase
     {}
 
     /**
-     * Destructor
+     * @brief BCEnactor destructor
      */
     virtual ~BCEnactor()
     {
@@ -156,7 +165,9 @@ class BCEnactor : public EnactorBase
     }
 
     /**
-     * Obtain statistics about the last BC search enacted
+     * @brief Obtain statistics about the last BC search enacted.
+     *
+     * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
      */
     void GetStatistics(
         double &avg_duty)
@@ -168,9 +179,17 @@ class BCEnactor : public EnactorBase
     }
 
     /**
-     * Enacts a breadth-first-search on the specified graph problem.
+     * @brief Enacts a brandes betweenness centrality computing on the specified graph.
      *
-     * @return cudaSuccess on success, error enumeration otherwise
+     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
+     * @tparam VertexMapPolicy Kernel policy for vertex mapping.
+     * @tparam BCProblem BC Problem type.
+     * @tparam ForwardFunctor Forward Functor type used in the forward sigma computing pass.
+     * @tparam BackwardFunctor Backward Functor type used in the backward bc value accumulation pass.
+     * @param[in] problem BCProblem object.
+     * @param[in] src Source node for BC. -1 to compute BC value for each node.
+     * @param[in] max_grid_size Max grid size for BC kernel calls.
+     *
      */
     template<
         typename EdgeMapPolicy,
@@ -496,7 +515,7 @@ class BCEnactor : public EnactorBase
     }
 
     /**
-     * Enact Kernel Entry, specify KernelPolicy
+     * @brief Enact Kernel Entry, specify KernelPolicy.
      */
     template <typename BCProblem, typename FFunctor, typename BFunctor>
     cudaError_t Enact(

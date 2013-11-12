@@ -1,3 +1,17 @@
+// ----------------------------------------------------------------
+// Gunrock -- Fast and Efficient GPU Graph Library
+// ----------------------------------------------------------------
+// This source code is distributed under the terms of LICENSE.TXT
+// in the root directory of this source distribution.
+// ----------------------------------------------------------------
+
+/**
+ * @file
+ * bc_functor.cuh
+ *
+ * @brief Device functions for BC problem.
+ */
+
 #pragma once
 
 #include <gunrock/app/problem_base.cuh>
@@ -7,11 +21,30 @@ namespace gunrock {
 namespace app {
 namespace bc {
 
+/**
+ * @brief Structure contains device functions in forward traversal pass.
+ *
+ * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam Value               Type of float or double to use for computing BC value.
+ * @tparam ProblemData         Problem data type which contains data slice for BC problem
+ *
+ */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct ForwardFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
+    /**
+     * @brief Forward Edge Mapping condition function. Check if the destination node
+     * has been claimed as someone else's child.
+     *
+     * @param[in] s_id Vertex Id of the edge source node
+     * @param[in] d_id Vertex Id of the edge destination node
+     * @param[in] problem Data slice object
+     *
+     * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
+     */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
     {
         // Check if the destination node has been claimed as someone's child
@@ -47,6 +80,16 @@ struct ForwardFunctor
         }
     }
 
+    /**
+     * @brief Forward Edge Mapping apply function. Now we know the source node
+     * has succeeded in claiming child, so it is safe to set label to its child
+     * node (destination node).
+     *
+     * @param[in] s_id Vertex Id of the edge source node
+     * @param[in] d_id Vertex Id of the edge destination node
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
     { 
             // Succeeded in claiming child, safe to set label to child
@@ -59,22 +102,55 @@ struct ForwardFunctor
         
     }
 
+    /**
+     * @brief Forward vertex mapping condition function. Check if the Vertex Id is valid (not equal to -1).
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
         return node != -1;
     }
 
+    /**
+     * @brief Forward vertex mapping apply function. Doing nothing for BC problem.
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
         // Doing nothing here
     }
 };
 
+/**
+ * @brief Structure contains device functions in backward traversal pass.
+ *
+ * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam Value               Type of float or double to use for computing BC value.
+ * @tparam ProblemData         Problem data type which contains data slice for BC problem
+ *
+ */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct BackwardFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
+    /**
+     * @brief Backward Edge Mapping condition function. Check if the destination node
+     * is the direct neighbor of the source node.
+     *
+     * @param[in] s_id Vertex Id of the edge source node
+     * @param[in] d_id Vertex Id of the edge destination node
+     * @param[in] problem Data slice object
+     *
+     * \return Whether to load the apply function for the edge.
+     */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
     {
         
@@ -87,6 +163,16 @@ struct BackwardFunctor
        return (d_label == s_label + 1);
     }
 
+    /**
+     * @brief Backward Edge Mapping apply function. Compute delta value using
+     * the formula: delta(s_id) = sigma(s_id)/sigma(d_id)(1+delta(d_id))
+     * then accumulate to BC value of the source node.
+     *
+     * @param[in] s_id Vertex Id of the edge source node
+     * @param[in] d_id Vertex Id of the edge destination node
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
     {
         //set d_labels[d_id] to be d_labels[s_id]+1
@@ -111,11 +197,25 @@ struct BackwardFunctor
         atomicAdd(&problem->d_bc_values[s_id], result);
     }
 
+    /**
+     * @brief Backward vertex mapping condition function. Check if the Vertex Id is valid (equal to 0).
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
         return problem->d_labels[node] == 0;
     }
 
+    /**
+     * @brief Backward vertex mapping apply function. doing nothing here.
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
         // Doing nothing here
