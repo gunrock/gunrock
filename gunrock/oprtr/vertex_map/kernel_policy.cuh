@@ -41,6 +41,7 @@ namespace vertex_map {
  *
  * @tparam _ProblemData                 Problem data type.
  * @tparam _CUDA_ARCH                   CUDA SM architecture to generate code for.
+ * @tparam _INSTRUMENT                  Whether or not we want instrumentation logic generated
  * @tparam _SATURATION_QUIT             If positive, signal that we're done with two-phase iterations if frontier size drops below (SATURATION_QUIT * grid_size).
  * @tparam _DEQUEUE_PROBLEM_SIZE        Whether we obtain problem size from device-side queue counters (true), or use the formal parameter (false).
  * @tparam _MIN_CTA_OCCUPANCY           Lower bound on number of CTAs to have resident per SM (influences per-CTA smem cache sizes and register allocation/spills).

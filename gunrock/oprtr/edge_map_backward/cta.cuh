@@ -6,8 +6,6 @@
 // ----------------------------------------------------------------
 
 
-// TODO: update edge_map_backward operator
-
 /**
  * @file
  * cta.cuh
@@ -52,7 +50,12 @@ namespace edge_map_backward {
         texture<VertexId, cudaTextureType1D, cudaReadModeElementType> ColumnIndicesTex<VertexId>::ref;*/
 
     /**
-     * Derivation of KernelPolicy and ProblemData that encapsulates tile-processing routines
+     * @brief CTA tile-processing abstraction for backward edge mapping operator.
+     *
+     * @tparam KernelPolicy Kernel policy type for backward edge mapping.
+     * @tparam ProblemData Problem data type for backward edge mapping.
+     * @tparam Functor Functor type for the specific problem type.
+     *
      */
     template <typename KernelPolicy, typename ProblemData, typename Functor>
         struct Cta
@@ -90,7 +93,10 @@ namespace edge_map_backward {
 
 
             /**
-             * Tile of incoming frontier to process
+             * @brief Tile of incoming frontier to process
+             *
+             * @tparam LOG_LOADS_PER_TILE   Size of the loads per tile.
+             * @tparam LOG_LOAD_VEC_SIZE    Size of the vector size per load.
              */
             template<int LOG_LOADS_PER_TILE, int LOG_LOAD_VEC_SIZE>
             struct Tile
@@ -126,13 +132,13 @@ namespace edge_map_backward {
                 SizeT                   cta_offset;                 // global offset of d_queue
 
                 /**
-                 * Iterate next vector element
+                 * @brief Iterate over vertex ids in tile.
                  */
                 template <int LOAD, int VEC, int dummy = 0>
                     struct Iterate
                     {
                         /**
-                         * Init
+                         * @brief Tile data initialization
                          */
                         template <typename Tile>
                             static __device__ __forceinline__ void Init(Tile *tile)
@@ -144,7 +150,12 @@ namespace edge_map_backward {
                             }
 
                         /**
-                         * Inspect
+                         * @brief Inspect the neighbor list size of each node in the frontier,
+                         *        prepare for neighbor list expansion.
+                         * @tparam Cta CTA tile-processing abstraction type
+                         * @tparam Tile Tile structure type
+                         * @param[in] cta CTA object
+                         * @param[in] tile Tile object
                          */
                         template <typename Cta, typename Tile>
                             static __device__ __forceinline__ void Inspect(Cta *cta, Tile *tile)
@@ -172,7 +183,11 @@ namespace edge_map_backward {
                             }
 
                         /**
-                         * CTA Expand
+                         * @brief Expand the node's neighbor list using the whole CTA.
+                         * @tparam Cta CTA tile-processing abstraction type
+                         * @tparam Tile Tile structure type
+                         * @param[in] cta CTA object
+                         * @param[in] tile Tile object
                          */
                         template <typename Cta, typename Tile>
                             static __device__ __forceinline__ void CtaExpand(Cta *cta, Tile *tile)
@@ -295,7 +310,11 @@ namespace edge_map_backward {
                             }
 
                         /**
-                         * Warp Expand
+                         * @brief Expand the node's neighbor list using a warp.
+                         * @tparam Cta CTA tile-processing abstraction type
+                         * @tparam Tile Tile structure type
+                         * @param[in] cta CTA object
+                         * @param[in] tile Tile object
                          */
                         template<typename cta, typename Tile>
                             static __device__ __forceinline__ void WarpExpand(Cta *cta, Tile *tile)
@@ -411,7 +430,11 @@ namespace edge_map_backward {
                             }
 
                         /**
-                         * Single-thread Expand (by scan)
+                         * @brief Expand the node's neighbor list using a single thread.
+                         * @tparam Cta CTA tile-processing abstraction type
+                         * @tparam Tile Tile structure type
+                         * @param[in] cta CTA object
+                         * @param[in] tile Tile object
                          */
                         template <typename Cta, typename Tile>
                             static __device__ __forceinline__ void ThreadExpand(Cta *cta, Tile *tile)
@@ -567,7 +590,7 @@ namespace edge_map_backward {
             // Methods
 
             /**
-             * Constructor
+             * CTA default constructor
              */
             __device__ __forceinline__ Cta(
                 VertexId                    queue_index,
@@ -597,7 +620,10 @@ namespace edge_map_backward {
             }
 
             /**
-             * Process a single tile
+             * @brief Process a single, full tile.
+             *
+             * @param[in] cta_offset Offset within the CTA where we want to start the tile processing.
+             * @param[in] guarded_elements The guarded elements to prevent the out-of-bound visit.
              */
             __device__ __forceinline__ void ProcessTile(
                 SizeT cta_offset,

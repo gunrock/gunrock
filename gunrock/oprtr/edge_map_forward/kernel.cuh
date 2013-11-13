@@ -26,6 +26,9 @@ namespace gunrock {
 namespace oprtr {
 namespace edge_map_forward {
 
+/**
+ * @brief Structure for invoking CTA processing tile over all elements.
+ */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Sweep
 {
@@ -121,7 +124,7 @@ struct Dispatch
 };
 
 /**
- * Valid for this arch (policy matches compiler-inserted macro)
+ * @brief Kernel dispatch code for different architectures
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Dispatch<KernelPolicy, ProblemData, Functor, true>
@@ -218,25 +221,43 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 };
 
 /**
- * Edge Map Kernel Entry
-         */
-        template <typename KernelPolicy, typename ProblemData, typename Functor>
-            __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
-            __global__
-            void Kernel(
-                    bool                                    queue_reset,                // If reset queue
-                    typename KernelPolicy::VertexId         queue_index,                // Current frontier queue counter index
-                    int                                     num_gpus,                   // Number of GPUs
-                    typename KernelPolicy::SizeT            num_elements,               // Number of elements
-                    volatile int                            *d_done,                    // Flag to set when we detect incoming edge frontier is empty
-                    typename KernelPolicy::VertexId         *d_in_queue,                // Incoming vertex frontier
-                    typename KernelPolicy::VertexId         *d_out_queue,               // Outgoing edge frontier
-                    typename KernelPolicy::VertexId         *d_column_indices,
-                    typename ProblemData::DataSlice         *problem,                    // Problem Object
-                    util::CtaWorkProgress                   work_progress,              // Atomic workstealing and queueing counters
-                    typename KernelPolicy::SizeT            max_in_frontier,            // Maximum number of elements we can place into the outgoing vertex frontier
-                    typename KernelPolicy::SizeT            max_out_frontier,           // Maximum number of elements we can place into the outgoing edge frontier
-                    util::KernelRuntimeStats                kernel_stats)               // Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT)
+ * @brief Forward edge map kernel entry point.
+ *
+ * @tparam KernelPolicy Kernel policy type for forward edge mapping.
+ * @tparam ProblemData Problem data type for forward edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
+ *
+ * @param[in] queue_reset       If reset queue counter
+ * @param[in] queue_index       Current frontier queue counter index
+ * @param[in] num_gpus          Number of GPUs
+ * @param[in] num_elements      Number of elements
+ * @param[in] d_done            Flag to set when we detect incoming frontier is empty
+ * @param[in] d_in_queue        Incoming frontier queue
+ * @param[in] d_out_queue       Outgoing frontier queue
+ * @param[in] d_column_indices  Column indices queue  
+ * @param[in] problem           Device pointer to the problem object
+ * @param[in] work_progress     queueing counters to record work progress
+ * @param[in] max_in_queue      Maximum number of elements we can place into the incoming frontier
+ * @param[in] max_out_queue     Maximum number of elements we can place into the outgoing frontier
+ * @param[in] kernel_stats      Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT is set)
+ */
+    template <typename KernelPolicy, typename ProblemData, typename Functor>
+__launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
+    __global__
+void Kernel(
+        bool                                    queue_reset,
+        typename KernelPolicy::VertexId         queue_index,
+        int                                     num_gpus,
+        typename KernelPolicy::SizeT            num_elements,
+        volatile int                            *d_done, 
+        typename KernelPolicy::VertexId         *d_in_queue,
+        typename KernelPolicy::VertexId         *d_out_queue,
+        typename KernelPolicy::VertexId         *d_column_indices,
+        typename ProblemData::DataSlice         *problem,
+        util::CtaWorkProgress                   work_progress,
+        typename KernelPolicy::SizeT            max_in_frontier,
+        typename KernelPolicy::SizeT            max_out_frontier,
+        util::KernelRuntimeStats                kernel_stats)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
             queue_reset,    

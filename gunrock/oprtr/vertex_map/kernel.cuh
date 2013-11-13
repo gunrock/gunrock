@@ -120,7 +120,7 @@ struct Dispatch
 
 
 /**
- * @brief Kernel dispatch code for different architecture
+ * @brief Kernel dispatch code for different architectures
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Dispatch<KernelPolicy, ProblemData, Functor, true>

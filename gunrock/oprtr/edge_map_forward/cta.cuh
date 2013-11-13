@@ -46,16 +46,21 @@ namespace edge_map_forward {
         texture<SizeT, cudaTextureType1D, cudaReadModeElementType> RowOffsetTex<SizeT>::ref;
 
     /*template <typename VertexId>
-        struct ColumnIndicesTex
-        {
-            static texture<VertexId, cudaTextureType1D, cudaReadModeElementType> ref;
-        };
-    template <typename VertexId>
-        texture<VertexId, cudaTextureType1D, cudaReadModeElementType> ColumnIndicesTex<VertexId>::ref;*/
+      struct ColumnIndicesTex
+      {
+      static texture<VertexId, cudaTextureType1D, cudaReadModeElementType> ref;
+      };
+      template <typename VertexId>
+      texture<VertexId, cudaTextureType1D, cudaReadModeElementType> ColumnIndicesTex<VertexId>::ref;*/
 
 
     /**
-     * Derivation of KernelPolicy and ProblemData that encapsulates tile-processing routines
+     * @brief CTA tile-processing abstraction for the vertex mapping operator.
+     *
+     * @tparam KernelPolicy Kernel policy type for the vertex mapping.
+     * @tparam ProblemData Problem data type for the vertex mapping.
+     * @tparam Functor Functor type for the specific problem type.
+     *
      */
     template <typename KernelPolicy, typename ProblemData, typename Functor>
         struct Cta
@@ -77,8 +82,8 @@ namespace edge_map_forward {
             typedef typename ProblemData::DataSlice         DataSlice;
 
             typedef util::Tuple<
-                    SizeT (*)[KernelPolicy::LOAD_VEC_SIZE],
-                    SizeT (*)[KernelPolicy::LOAD_VEC_SIZE]> RankSoa;
+                SizeT (*)[KernelPolicy::LOAD_VEC_SIZE],
+                      SizeT (*)[KernelPolicy::LOAD_VEC_SIZE]> RankSoa;
 
             /**
              * Members
@@ -103,241 +108,162 @@ namespace edge_map_forward {
             SmemStorage             &smem_storage;
 
             /**
-             * Tile of incoming frontier to process
+             * @brief Tile of incoming frontier to process
+             *
+             * @tparam LOG_LOADS_PER_TILE   Size of the loads per tile.
+             * @tparam LOG_LOAD_VEC_SIZE    Size of the vector size per load.
              */
             template<int LOG_LOADS_PER_TILE, int LOG_LOAD_VEC_SIZE>
-            struct Tile
-            {
-                /**
-                 * Typedefs and Constants
-                 */
+                struct Tile
+                {
+                    /**
+                     * Typedefs and Constants
+                     */
 
-                enum {
-                    LOADS_PER_TILE      = 1 << LOG_LOADS_PER_TILE,
-                    LOAD_VEC_SIZE       = 1 << LOG_LOAD_VEC_SIZE
-                };
+                    enum {
+                        LOADS_PER_TILE      = 1 << LOG_LOADS_PER_TILE,
+                        LOAD_VEC_SIZE       = 1 << LOG_LOAD_VEC_SIZE
+                    };
 
-                typedef typename util::VecType<SizeT, 2>::Type Vec2SizeT;
+                    typedef typename util::VecType<SizeT, 2>::Type Vec2SizeT;
 
-                /**
-                 * Members
-                 */
+                    /**
+                     * Members
+                     */
 
-                // Dequeued vertex ids
-                VertexId                vertex_id[LOADS_PER_TILE][LOAD_VEC_SIZE];
+                    // Dequeued vertex ids
+                    VertexId                vertex_id[LOADS_PER_TILE][LOAD_VEC_SIZE];
 
-                SizeT                   row_offset[LOADS_PER_TILE][LOAD_VEC_SIZE];
-                SizeT                   row_length[LOADS_PER_TILE][LOAD_VEC_SIZE];
+                    SizeT                   row_offset[LOADS_PER_TILE][LOAD_VEC_SIZE];
+                    SizeT                   row_length[LOADS_PER_TILE][LOAD_VEC_SIZE];
 
-                // Global scatter offsets. Coarse for CTA/warp-based scatters, fine for scan-based scatters
-                SizeT                   fine_count;
-                SizeT                   coarse_row_rank[LOADS_PER_TILE][LOAD_VEC_SIZE];
-                SizeT                   fine_row_rank[LOADS_PER_TILE][LOAD_VEC_SIZE];
+                    // Global scatter offsets. Coarse for CTA/warp-based scatters, fine for scan-based scatters
+                    SizeT                   fine_count;
+                    SizeT                   coarse_row_rank[LOADS_PER_TILE][LOAD_VEC_SIZE];
+                    SizeT                   fine_row_rank[LOADS_PER_TILE][LOAD_VEC_SIZE];
 
-                // Progress for scan-based forward edge map gather offsets
-                SizeT                   row_progress[LOADS_PER_TILE][LOAD_VEC_SIZE];
-                SizeT                   progress;
-                int zero_idx_load, zero_idx_vec;
+                    // Progress for scan-based forward edge map gather offsets
+                    SizeT                   row_progress[LOADS_PER_TILE][LOAD_VEC_SIZE];
+                    SizeT                   progress;
+                    int zero_idx_load, zero_idx_vec;
 
-                /**
-                 * Iterate next vector element
-                 */
-                template <int LOAD, int VEC, int dummy = 0>
-                    struct Iterate
-                    {
-                        /**
-                         * Init
-                         */
-                        template <typename Tile>
-                            static __device__ __forceinline__ void Init(Tile *tile)
-                            {
-                                tile->row_length[LOAD][VEC] = 0;
-                                tile->row_progress[LOAD][VEC] = 0;
+                    /**
+                     * @brief Iterate over vertex ids in tile.
+                     */
+                    template <int LOAD, int VEC, int dummy = 0>
+                        struct Iterate
+                        {
+                            /**
+                             * @brief Tile data initialization
+                             */
+                            template <typename Tile>
+                                static __device__ __forceinline__ void Init(Tile *tile)
+                                {
+                                    tile->row_length[LOAD][VEC] = 0;
+                                    tile->row_progress[LOAD][VEC] = 0;
 
-                                Iterate<LOAD, VEC + 1>::Init(tile);
-                            }
-
-                        /**
-                         * Inspect
-                         */
-                        template <typename Cta, typename Tile>
-                            static __device__ __forceinline__ void Inspect(Cta *cta, Tile *tile)
-                            {
-                                if (tile->vertex_id[LOAD][VEC] != -1) {
-
-                                    // Translate vertex-id into local gpu row-id (currently stride of num_gpu)
-                                    VertexId row_id = tile->vertex_id[LOAD][VEC] / cta->num_gpus;
-
-                                    // Load neighbor row range from d_row_offsets
-                                    Vec2SizeT   row_range;
-                                    row_range.x = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id);
-                                    row_range.y = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id + 1);
-
-                                    // compute row offset and length
-                                    tile->row_offset[LOAD][VEC] = row_range.x;
-                                    tile->row_length[LOAD][VEC] = row_range.y - row_range.x;
+                                    Iterate<LOAD, VEC + 1>::Init(tile);
                                 }
 
-                                tile->fine_row_rank[LOAD][VEC] = (tile->row_length[LOAD][VEC] < KernelPolicy::WARP_GATHER_THRESHOLD) ?
-                                    tile->row_length[LOAD][VEC] : 0;
+                            /**
+                             * @brief Inspect the neighbor list size of each node in the frontier,
+                             *        prepare for neighbor list expansion.
+                             * @tparam Cta CTA tile-processing abstraction type
+                             * @tparam Tile Tile structure type
+                             * @param[in] cta CTA object
+                             * @param[in] tile Tile object
+                             */
+                            template <typename Cta, typename Tile>
+                                static __device__ __forceinline__ void Inspect(Cta *cta, Tile *tile)
+                                {
+                                    if (tile->vertex_id[LOAD][VEC] != -1) {
 
-                                tile->coarse_row_rank[LOAD][VEC] = (tile->row_length[LOAD][VEC] < KernelPolicy::WARP_GATHER_THRESHOLD) ?
-                                    0 : tile->row_length[LOAD][VEC];
+                                        // Translate vertex-id into local gpu row-id (currently stride of num_gpu)
+                                        VertexId row_id = tile->vertex_id[LOAD][VEC] / cta->num_gpus;
 
-                                Iterate<LOAD, VEC + 1>::Inspect(cta, tile);
+                                        // Load neighbor row range from d_row_offsets
+                                        Vec2SizeT   row_range;
+                                        row_range.x = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id);
+                                        row_range.y = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id + 1);
 
-                            }
-
-                        /**
-                         * CTA Expand
-                         */
-                        template <typename Cta, typename Tile>
-                            static __device__ __forceinline__ void CtaExpand(Cta *cta, Tile *tile)
-                            {
-                                // CTA-based expansion/loading
-                                while(true) {
-
-                                    //All threads in block vie for the control of the block
-                                    if (tile->row_length[LOAD][VEC] >= KernelPolicy::CTA_GATHER_THRESHOLD) {
-                                        cta->smem_storage.state.cta_comm = threadIdx.x;
+                                        // compute row offset and length
+                                        tile->row_offset[LOAD][VEC] = row_range.x;
+                                        tile->row_length[LOAD][VEC] = row_range.y - row_range.x;
                                     }
 
-                                    __syncthreads();
+                                    tile->fine_row_rank[LOAD][VEC] = (tile->row_length[LOAD][VEC] < KernelPolicy::WARP_GATHER_THRESHOLD) ?
+                                        tile->row_length[LOAD][VEC] : 0;
 
-                                    // Check
-                                    int owner = cta->smem_storage.state.cta_comm;
-                                    if (owner == KernelPolicy::THREADS) {
-                                        // All threads in the block has less neighbor number for CTA Expand
-                                        break;
-                                    }
+                                    tile->coarse_row_rank[LOAD][VEC] = (tile->row_length[LOAD][VEC] < KernelPolicy::WARP_GATHER_THRESHOLD) ?
+                                        0 : tile->row_length[LOAD][VEC];
 
-                                    if (owner == threadIdx.x) {
-                                        // Got control of the CTA: command it
-                                        cta->smem_storage.state.warp_comm[0][0] = tile->row_offset[LOAD][VEC];                                  // start
-                                        cta->smem_storage.state.warp_comm[0][1] = tile->coarse_row_rank[LOAD][VEC];                             // queue rank
-                                        cta->smem_storage.state.warp_comm[0][2] = tile->row_offset[LOAD][VEC] + tile->row_length[LOAD][VEC];    // oob
-                                        cta->smem_storage.state.warp_comm[0][3] = tile->vertex_id[LOAD][VEC];                                   // predecessor
-                                        // Unset row length
-                                        tile->row_length[LOAD][VEC] = 0;
+                                    Iterate<LOAD, VEC + 1>::Inspect(cta, tile);
 
-                                        // Unset my command
-                                        cta->smem_storage.state.cta_comm = KernelPolicy::THREADS;   // So that we won't repeatedly expand this node
-                                    }
-                                    __syncthreads();
-
-                                    // Read commands
-                                    SizeT   coop_offset     = cta->smem_storage.state.warp_comm[0][0];
-                                    SizeT   coop_rank       = cta->smem_storage.state.warp_comm[0][1] + threadIdx.x;
-                                    SizeT   coop_oob        = cta->smem_storage.state.warp_comm[0][2];
-
-                                    VertexId pred_id;
-                                    pred_id = cta->smem_storage.state.warp_comm[0][3];
-
-                                    VertexId neighbor_id;
-
-                                    while (coop_offset + KernelPolicy::THREADS < coop_oob) {
-
-                                        // Gather
-                                        //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+threadIdx.x);
-                                        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                                                neighbor_id,
-                                                cta->d_column_indices + coop_offset+threadIdx.x);
-
-                                        // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id) (done)
-                                        // if Cond(neighbor_id) returns true
-                                        // if Cond(neighbor_id) returns false or Apply returns false
-                                        // set neighbor_id to -1 for invalid
-                                        if (Functor::CondEdge(pred_id, neighbor_id, cta->problem))
-                                            Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
-                                        else
-                                            neighbor_id = -1;
-
-                                        // Scatter neighbor
-                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                neighbor_id,
-                                                cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
-
-                                        coop_offset += KernelPolicy::THREADS;
-                                        coop_rank += KernelPolicy::THREADS;
-                                    }
-
-                                    if (coop_offset + threadIdx.x < coop_oob) {
-
-                                        // Gather
-                                        //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+threadIdx.x);
-                                        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                                                neighbor_id,
-                                                cta->d_column_indices + coop_offset+threadIdx.x);
-
-                                        // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
-                                        // if Cond(neighbor_id) returns true
-                                        // if Cond(neighbor_id) returns false or Apply returns false
-                                        // set neighbor_id to -1 for invalid                                    
-                                        if (Functor::CondEdge(pred_id, neighbor_id, cta->problem))
-                                            Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
-                                        else
-                                            neighbor_id = -1;
-
-
-                                        // Scatter neighbor
-                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                neighbor_id,
-                                                cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
-                                    }
                                 }
 
-                                // Next vector element
-                                Iterate<LOAD, VEC + 1>::CtaExpand(cta, tile);
-                            }
+                            /**
+                             * @brief Expand the node's neighbor list using the whole CTA.
+                             * @tparam Cta CTA tile-processing abstraction type
+                             * @tparam Tile Tile structure type
+                             * @param[in] cta CTA object
+                             * @param[in] tile Tile object
+                             */
+                            template <typename Cta, typename Tile>
+                                static __device__ __forceinline__ void CtaExpand(Cta *cta, Tile *tile)
+                                {
+                                    // CTA-based expansion/loading
+                                    while(true) {
 
-                        /**
-                         * Warp Expand
-                         */
-                        template<typename Cta, typename Tile>
-                            static __device__ __forceinline__ void WarpExpand(Cta *cta, Tile *tile)
-                            {
-                                if (KernelPolicy::WARP_GATHER_THRESHOLD < KernelPolicy::CTA_GATHER_THRESHOLD) {
-                                    // Warp-based expansion/loading
-                                    int warp_id = threadIdx.x >> GR_LOG_WARP_THREADS(KernelPolicy::CUDA_ARCH);
-                                    int lane_id = util::LaneId();
-
-                                    while (__any(tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD)) {
-                                        if (tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD) {
-                                            // All threads inside one warp vie for control of the warp
-                                            cta->smem_storage.state.warp_comm[warp_id][0] = lane_id;
+                                        //All threads in block vie for the control of the block
+                                        if (tile->row_length[LOAD][VEC] >= KernelPolicy::CTA_GATHER_THRESHOLD) {
+                                            cta->smem_storage.state.cta_comm = threadIdx.x;
                                         }
 
-                                        if (lane_id == cta->smem_storage.state.warp_comm[warp_id][0]) {
-                                            // Got control of the warp
-                                            cta->smem_storage.state.warp_comm[warp_id][0] = tile->row_offset[LOAD][VEC];                                    // start
-                                            cta->smem_storage.state.warp_comm[warp_id][1] = tile->coarse_row_rank[LOAD][VEC];                               // queue rank
-                                            cta->smem_storage.state.warp_comm[warp_id][2] = tile->row_offset[LOAD][VEC] + tile->row_length[LOAD][VEC];      // oob
-                                            cta->smem_storage.state.warp_comm[warp_id][3] = tile->vertex_id[LOAD][VEC];                                     // predecessor
+                                        __syncthreads();
+
+                                        // Check
+                                        int owner = cta->smem_storage.state.cta_comm;
+                                        if (owner == KernelPolicy::THREADS) {
+                                            // All threads in the block has less neighbor number for CTA Expand
+                                            break;
                                         }
 
-                                        // Unset row length
-                                        tile->row_length[LOAD][VEC] = 0; // So that we won't repeatedly expand this node
+                                        if (owner == threadIdx.x) {
+                                            // Got control of the CTA: command it
+                                            cta->smem_storage.state.warp_comm[0][0] = tile->row_offset[LOAD][VEC];                                  // start
+                                            cta->smem_storage.state.warp_comm[0][1] = tile->coarse_row_rank[LOAD][VEC];                             // queue rank
+                                            cta->smem_storage.state.warp_comm[0][2] = tile->row_offset[LOAD][VEC] + tile->row_length[LOAD][VEC];    // oob
+                                            cta->smem_storage.state.warp_comm[0][3] = tile->vertex_id[LOAD][VEC];                                   // predecessor
+                                            // Unset row length
+                                            tile->row_length[LOAD][VEC] = 0;
 
-                                        SizeT coop_offset   = cta->smem_storage.state.warp_comm[warp_id][0];
-                                        SizeT coop_rank     = cta->smem_storage.state.warp_comm[warp_id][1] + lane_id;
-                                        SizeT coop_oob      = cta->smem_storage.state.warp_comm[warp_id][2];
+                                            // Unset my command
+                                            cta->smem_storage.state.cta_comm = KernelPolicy::THREADS;   // So that we won't repeatedly expand this node
+                                        }
+                                        __syncthreads();
+
+                                        // Read commands
+                                        SizeT   coop_offset     = cta->smem_storage.state.warp_comm[0][0];
+                                        SizeT   coop_rank       = cta->smem_storage.state.warp_comm[0][1] + threadIdx.x;
+                                        SizeT   coop_oob        = cta->smem_storage.state.warp_comm[0][2];
 
                                         VertexId pred_id;
-                                        pred_id = cta->smem_storage.state.warp_comm[warp_id][3];
+                                        pred_id = cta->smem_storage.state.warp_comm[0][3];
 
                                         VertexId neighbor_id;
-                                        while (coop_offset + GR_WARP_THREADS(KernelPolicy::CUDA_ARCH) < coop_oob) {
+
+                                        while (coop_offset + KernelPolicy::THREADS < coop_oob) {
 
                                             // Gather
-                                            //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+lane_id);
+                                            //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+threadIdx.x);
                                             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                     neighbor_id,
-                                                    cta->d_column_indices + coop_offset+lane_id);
+                                                    cta->d_column_indices + coop_offset+threadIdx.x);
 
-                                            // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
+                                            // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id) (done)
                                             // if Cond(neighbor_id) returns true
                                             // if Cond(neighbor_id) returns false or Apply returns false
-                                            // set neighbor_id to -1 for invalid 
+                                            // set neighbor_id to -1 for invalid
                                             if (Functor::CondEdge(pred_id, neighbor_id, cta->problem))
                                                 Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
                                             else
@@ -348,25 +274,27 @@ namespace edge_map_forward {
                                                     neighbor_id,
                                                     cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
 
-                                            coop_offset += GR_WARP_THREADS(KernelPolicy::CUDA_ARCH);
-                                            coop_rank += GR_WARP_THREADS(KernelPolicy::CUDA_ARCH);
+                                            coop_offset += KernelPolicy::THREADS;
+                                            coop_rank += KernelPolicy::THREADS;
                                         }
 
-                                        if (coop_offset + lane_id < coop_oob) {
+                                        if (coop_offset + threadIdx.x < coop_oob) {
+
                                             // Gather
-                                            //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+lane_id);
+                                            //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+threadIdx.x);
                                             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                     neighbor_id,
-                                                    cta->d_column_indices + coop_offset+lane_id);
+                                                    cta->d_column_indices + coop_offset+threadIdx.x);
 
                                             // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
                                             // if Cond(neighbor_id) returns true
                                             // if Cond(neighbor_id) returns false or Apply returns false
-                                            // set neighbor_id to -1 for invalid                                            
+                                            // set neighbor_id to -1 for invalid                                    
                                             if (Functor::CondEdge(pred_id, neighbor_id, cta->problem))
                                                 Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
                                             else
                                                 neighbor_id = -1;
+
 
                                             // Scatter neighbor
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -376,16 +304,113 @@ namespace edge_map_forward {
                                     }
 
                                     // Next vector element
-                                    Iterate<LOAD, VEC + 1>::WarpExpand(cta, tile);
+                                    Iterate<LOAD, VEC + 1>::CtaExpand(cta, tile);
                                 }
-                            }
 
-                        /**
-                         * Single-thread Expand (by scan)
-                         */
-                        template <typename Cta, typename Tile>
-                            static __device__ __forceinline__ void ThreadExpand(Cta *cta, Tile *tile)
-                            {
+                            /**
+                             * @brief Expand the node's neighbor list using a warp. (Currently disabled in the enactor)
+                             * @tparam Cta CTA tile-processing abstraction type
+                             * @tparam Tile Tile structure type
+                             * @param[in] cta CTA object
+                             * @param[in] tile Tile object
+                             */
+                            template<typename Cta, typename Tile>
+                                static __device__ __forceinline__ void WarpExpand(Cta *cta, Tile *tile)
+                                {
+                                    if (KernelPolicy::WARP_GATHER_THRESHOLD < KernelPolicy::CTA_GATHER_THRESHOLD) {
+                                        // Warp-based expansion/loading
+                                        int warp_id = threadIdx.x >> GR_LOG_WARP_THREADS(KernelPolicy::CUDA_ARCH);
+                                        int lane_id = util::LaneId();
+
+                                        while (__any(tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD)) {
+                                            if (tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD) {
+                                                // All threads inside one warp vie for control of the warp
+                                                cta->smem_storage.state.warp_comm[warp_id][0] = lane_id;
+                                            }
+
+                                            if (lane_id == cta->smem_storage.state.warp_comm[warp_id][0]) {
+                                                // Got control of the warp
+                                                cta->smem_storage.state.warp_comm[warp_id][0] = tile->row_offset[LOAD][VEC];                                    // start
+                                                cta->smem_storage.state.warp_comm[warp_id][1] = tile->coarse_row_rank[LOAD][VEC];                               // queue rank
+                                                cta->smem_storage.state.warp_comm[warp_id][2] = tile->row_offset[LOAD][VEC] + tile->row_length[LOAD][VEC];      // oob
+                                                cta->smem_storage.state.warp_comm[warp_id][3] = tile->vertex_id[LOAD][VEC];                                     // predecessor
+                                            }
+
+                                            // Unset row length
+                                            tile->row_length[LOAD][VEC] = 0; // So that we won't repeatedly expand this node
+
+                                            SizeT coop_offset   = cta->smem_storage.state.warp_comm[warp_id][0];
+                                            SizeT coop_rank     = cta->smem_storage.state.warp_comm[warp_id][1] + lane_id;
+                                            SizeT coop_oob      = cta->smem_storage.state.warp_comm[warp_id][2];
+
+                                            VertexId pred_id;
+                                            pred_id = cta->smem_storage.state.warp_comm[warp_id][3];
+
+                                            VertexId neighbor_id;
+                                            while (coop_offset + GR_WARP_THREADS(KernelPolicy::CUDA_ARCH) < coop_oob) {
+
+                                                // Gather
+                                                //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+lane_id);
+                                                util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                                        neighbor_id,
+                                                        cta->d_column_indices + coop_offset+lane_id);
+
+                                                // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
+                                                // if Cond(neighbor_id) returns true
+                                                // if Cond(neighbor_id) returns false or Apply returns false
+                                                // set neighbor_id to -1 for invalid 
+                                                if (Functor::CondEdge(pred_id, neighbor_id, cta->problem))
+                                                    Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
+                                                else
+                                                    neighbor_id = -1;
+
+                                                // Scatter neighbor
+                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                        neighbor_id,
+                                                        cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+
+                                                coop_offset += GR_WARP_THREADS(KernelPolicy::CUDA_ARCH);
+                                                coop_rank += GR_WARP_THREADS(KernelPolicy::CUDA_ARCH);
+                                            }
+
+                                            if (coop_offset + lane_id < coop_oob) {
+                                                // Gather
+                                                //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+lane_id);
+                                                util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                                        neighbor_id,
+                                                        cta->d_column_indices + coop_offset+lane_id);
+
+                                                // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
+                                                // if Cond(neighbor_id) returns true
+                                                // if Cond(neighbor_id) returns false or Apply returns false
+                                                // set neighbor_id to -1 for invalid                                            
+                                                if (Functor::CondEdge(pred_id, neighbor_id, cta->problem))
+                                                    Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
+                                                else
+                                                    neighbor_id = -1;
+
+                                                // Scatter neighbor
+                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                        neighbor_id,
+                                                        cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            }
+                                        }
+
+                                        // Next vector element
+                                        Iterate<LOAD, VEC + 1>::WarpExpand(cta, tile);
+                                    }
+                                }
+
+                            /**
+                             * @brief Expand the node's neighbor list using a single thread (Scan).
+                             * @tparam Cta CTA tile-processing abstraction type
+                             * @tparam Tile Tile structure type
+                             * @param[in] cta CTA object
+                             * @param[in] tile Tile object
+                             */
+                            template <typename Cta, typename Tile>
+                                static __device__ __forceinline__ void ThreadExpand(Cta *cta, Tile *tile)
+                                {
                                     //Expand the neighbor list into scratch space
                                     SizeT scratch_offset = tile->fine_row_rank[LOAD][VEC] + tile->row_progress[LOAD][VEC] - tile->progress;
 
@@ -400,186 +425,189 @@ namespace edge_map_forward {
                                         scratch_offset++;
                                     }
 
-                                // Next vector element
-                                Iterate<LOAD, VEC + 1>::ThreadExpand(cta, tile);
-                            }
-                    };
+                                    // Next vector element
+                                    Iterate<LOAD, VEC + 1>::ThreadExpand(cta, tile);
+                                }
+                        };
 
-                /**
-                 * Iterate next load
-                 */
-                template <int LOAD, int dummy>
-                    struct Iterate<LOAD, LOAD_VEC_SIZE, dummy>
+                    /**
+                     * Iterate next load
+                     */
+                    template <int LOAD, int dummy>
+                        struct Iterate<LOAD, LOAD_VEC_SIZE, dummy>
+                        {
+                            /**
+                             * Init
+                             */
+                            template <typename Tile>
+                                static __device__ __forceinline__ void Init(Tile *tile)
+                                {
+                                    Iterate<LOAD + 1, 0>::Init(tile);
+                                }
+
+                            /**
+                             * Inspect
+                             */
+                            template <typename Cta, typename Tile>
+                                static __device__ __forceinline__ void Inspect(Cta *cta, Tile *tile)
+                                {
+                                    Iterate<LOAD + 1, 0>::Inspect(cta, tile);
+                                }
+
+                            /**
+                             * CtaExpand
+                             */
+                            template <typename Cta, typename Tile>
+                                static __device__ __forceinline__ void CtaExpand(Cta *cta, Tile *tile)
+                                {
+                                    Iterate<LOAD + 1, 0>::CtaExpand(cta, tile);
+                                }
+
+                            /**
+                             * WarpExpand
+                             */
+                            template <typename Cta, typename Tile>
+                                static __device__ __forceinline__ void WarpExpand(Cta *cta, Tile *tile)
+                                {
+                                    Iterate<LOAD + 1, 0>::WarpExpand(cta, tile);
+                                }
+
+                            /**
+                             * SingleThreadExpand
+                             */
+                            template <typename Cta, typename Tile>
+                                static __device__ __forceinline__ void ThreadExpand(Cta *cta, Tile *tile)
+                                {
+                                    Iterate<LOAD + 1, 0>::ThreadExpand(cta, tile);
+                                }
+                        };
+
+                    /**
+                     * Terminate Iterate
+                     */
+                    template <int dummy>
+                        struct Iterate<LOADS_PER_TILE, 0, dummy>
+                        {
+                            // Init
+                            template <typename Tile>
+                                static __device__ __forceinline__ void Init(Tile *tile) {}
+
+                            // Inspect
+                            template <typename Cta, typename Tile>
+                                static __device__ __forceinline__ void Inspect(Cta *cta, Tile *tile) {}
+
+                            // CtaExpand
+                            template<typename Cta, typename Tile>
+                                static __device__ __forceinline__ void CtaExpand(Cta *cta, Tile *tile) {}
+
+                            // WarpExpand
+                            template<typename Cta, typename Tile>
+                                static __device__ __forceinline__ void WarpExpand(Cta *cta, Tile *tile) {}
+
+                            // SingleThreadExpand
+                            template<typename Cta, typename Tile>
+                                static __device__ __forceinline__ void ThreadExpand(Cta *cta, Tile *tile) {}
+                        };
+
+                    //Iterate Interface
+
+                    /**
+                     * Constructor
+                     */
+                    __device__ __forceinline__ Tile()
                     {
-                        /**
-                         * Init
-                         */
-                        template <typename Tile>
-                            static __device__ __forceinline__ void Init(Tile *tile)
-                            {
-                                Iterate<LOAD + 1, 0>::Init(tile);
-                            }
-
-                        /**
-                         * Inspect
-                         */
-                        template <typename Cta, typename Tile>
-                            static __device__ __forceinline__ void Inspect(Cta *cta, Tile *tile)
-                            {
-                                Iterate<LOAD + 1, 0>::Inspect(cta, tile);
-                            }
-
-                        /**
-                         * CtaExpand
-                         */
-                        template <typename Cta, typename Tile>
-                            static __device__ __forceinline__ void CtaExpand(Cta *cta, Tile *tile)
-                            {
-                                Iterate<LOAD + 1, 0>::CtaExpand(cta, tile);
-                            }
-
-                        /**
-                         * WarpExpand
-                         */
-                        template <typename Cta, typename Tile>
-                            static __device__ __forceinline__ void WarpExpand(Cta *cta, Tile *tile)
-                            {
-                                Iterate<LOAD + 1, 0>::WarpExpand(cta, tile);
-                            }
-
-                        /**
-                         * SingleThreadExpand
-                         */
-                        template <typename Cta, typename Tile>
-                            static __device__ __forceinline__ void ThreadExpand(Cta *cta, Tile *tile)
-                            {
-                                Iterate<LOAD + 1, 0>::ThreadExpand(cta, tile);
-                            }
-                    };
-
-                /**
-                 * Terminate Iterate
-                 */
-                template <int dummy>
-                    struct Iterate<LOADS_PER_TILE, 0, dummy>
-                    {
-                        // Init
-                        template <typename Tile>
-                            static __device__ __forceinline__ void Init(Tile *tile) {}
-
-                        // Inspect
-                        template <typename Cta, typename Tile>
-                            static __device__ __forceinline__ void Inspect(Cta *cta, Tile *tile) {}
-
-                        // CtaExpand
-                        template<typename Cta, typename Tile>
-                            static __device__ __forceinline__ void CtaExpand(Cta *cta, Tile *tile) {}
-
-                        // WarpExpand
-                        template<typename Cta, typename Tile>
-                            static __device__ __forceinline__ void WarpExpand(Cta *cta, Tile *tile) {}
-
-                        // SingleThreadExpand
-                        template<typename Cta, typename Tile>
-                            static __device__ __forceinline__ void ThreadExpand(Cta *cta, Tile *tile) {}
-                    };
-
-                 //Iterate Interface
-
-                 /**
-                  * Constructor
-                  */
-                 __device__ __forceinline__ Tile()
-                 {
-                    Iterate<0, 0>::Init(this);
-                    zero_idx_load = -1;
-                    zero_idx_vec = -1;
-                 }
-
-                 /**
-                  * Inspect dequeued nodes
-                  */
-                 template <typename Cta>
-                    __device__ __forceinline__ void Inspect(Cta *cta)
-                    {
-                        Iterate<0, 0>::Inspect(cta, this);
+                        Iterate<0, 0>::Init(this);
+                        zero_idx_load = -1;
+                        zero_idx_vec = -1;
                     }
 
-                /**
-                 * CTA Expand
-                 */
-                template <typename Cta>
-                    __device__ __forceinline__ void CtaExpand(Cta *cta)
-                    {
-                        Iterate<0, 0>::CtaExpand(cta, this);
-                    }
+                    /**
+                     * Inspect dequeued nodes
+                     */
+                    template <typename Cta>
+                        __device__ __forceinline__ void Inspect(Cta *cta)
+                        {
+                            Iterate<0, 0>::Inspect(cta, this);
+                        }
 
-                /**
-                 * Warp Expand
-                 */
-                template <typename Cta>
-                    __device__ __forceinline__ void WarpExpand(Cta *cta)
-                    {
-                        Iterate<0, 0>::WarpExpand(cta, this);
-                    }
+                    /**
+                     * CTA Expand
+                     */
+                    template <typename Cta>
+                        __device__ __forceinline__ void CtaExpand(Cta *cta)
+                        {
+                            Iterate<0, 0>::CtaExpand(cta, this);
+                        }
 
-                /**
-                 * Single Thread Expand
-                 */
-                template <typename Cta>
-                    __device__ __forceinline__ void ThreadExpand(Cta *cta)
-                    {
-                        Iterate<0, 0>::ThreadExpand(cta, this);
-                    }
+                    /**
+                     * Warp Expand
+                     */
+                    template <typename Cta>
+                        __device__ __forceinline__ void WarpExpand(Cta *cta)
+                        {
+                            Iterate<0, 0>::WarpExpand(cta, this);
+                        }
 
-            };
+                    /**
+                     * Single Thread Expand
+                     */
+                    template <typename Cta>
+                        __device__ __forceinline__ void ThreadExpand(Cta *cta)
+                        {
+                            Iterate<0, 0>::ThreadExpand(cta, this);
+                        }
+
+                };
 
             // Methods
 
             /**
-             * Constructor
+             * @brief CTA default constructor
              */
             __device__ __forceinline__ Cta(
-                VertexId                    queue_index,
-                int                         num_gpus,
-                SmemStorage                 &smem_storage,
-                VertexId                    *d_in_queue,
-                VertexId                    *d_out_queue,
-                VertexId                    *d_column_indices,
-                DataSlice                   *problem,
-                util::CtaWorkProgress       &work_progress,
-                SizeT                       max_out_frontier) :
+                    VertexId                    queue_index,
+                    int                         num_gpus,
+                    SmemStorage                 &smem_storage,
+                    VertexId                    *d_in_queue,
+                    VertexId                    *d_out_queue,
+                    VertexId                    *d_column_indices,
+                    DataSlice                   *problem,
+                    util::CtaWorkProgress       &work_progress,
+                    SizeT                       max_out_frontier) :
 
-            queue_index(queue_index),
-            num_gpus(num_gpus),
-            smem_storage(smem_storage),
-            raking_soa_details(
-                typename RakingSoaDetails::GridStorageSoa(
-                    smem_storage.coarse_raking_elements,
-                    smem_storage.fine_raking_elements),
-                typename RakingSoaDetails::WarpscanSoa(
-                    smem_storage.state.coarse_warpscan,
-                    smem_storage.state.fine_warpscan),
-                    TileTuple(0,0)),
-            d_in(d_in_queue),
-            d_out(d_out_queue),
-            d_column_indices(d_column_indices),
-            problem(problem),
-            work_progress(work_progress),
-            max_out_frontier(max_out_frontier)
-            {
-                if (threadIdx.x == 0) {
-                    smem_storage.state.cta_comm = KernelPolicy::THREADS;
-                    smem_storage.state.overflowed = false;
+                queue_index(queue_index),
+                num_gpus(num_gpus),
+                smem_storage(smem_storage),
+                raking_soa_details(
+                        typename RakingSoaDetails::GridStorageSoa(
+                            smem_storage.coarse_raking_elements,
+                            smem_storage.fine_raking_elements),
+                        typename RakingSoaDetails::WarpscanSoa(
+                            smem_storage.state.coarse_warpscan,
+                            smem_storage.state.fine_warpscan),
+                        TileTuple(0,0)),
+                d_in(d_in_queue),
+                d_out(d_out_queue),
+                d_column_indices(d_column_indices),
+                problem(problem),
+                work_progress(work_progress),
+                max_out_frontier(max_out_frontier)
+                {
+                    if (threadIdx.x == 0) {
+                        smem_storage.state.cta_comm = KernelPolicy::THREADS;
+                        smem_storage.state.overflowed = false;
+                    }
                 }
-            }
 
             /**
-             * Process a single tile
+             * @brief Process a single, full tile.
+             *
+             * @param[in] cta_offset Offset within the CTA where we want to start the tile processing.
+             * @param[in] guarded_elements The guarded elements to prevent the out-of-bound visit.
              */
             __device__ __forceinline__ void ProcessTile(
-                SizeT cta_offset,
-                SizeT guarded_elements = KernelPolicy::TILE_ELEMENTS)
+                    SizeT cta_offset,
+                    SizeT guarded_elements = KernelPolicy::TILE_ELEMENTS)
             {
                 Tile<KernelPolicy::LOG_LOADS_PER_TILE, KernelPolicy::LOG_LOAD_VEC_SIZE> tile;
 
@@ -604,10 +632,10 @@ namespace edge_map_forward {
                 SoaScanOp scan_op;
                 TileTuple totals;
                 gunrock::util::scan::soa::CooperativeSoaTileScan<KernelPolicy::LOAD_VEC_SIZE>::ScanTile(
-                    totals,
-                    raking_soa_details,
-                    RankSoa(tile.coarse_row_rank, tile.fine_row_rank),
-                    scan_op);
+                        totals,
+                        raking_soa_details,
+                        RankSoa(tile.coarse_row_rank, tile.fine_row_rank),
+                        scan_op);
 
                 SizeT coarse_count = totals.t0;
                 tile.fine_count = totals.t1;
@@ -636,7 +664,7 @@ namespace edge_map_forward {
                     util::ThreadExit();
                 }
 
-                
+
                 if (coarse_count > 0)
                 {
                     // Enqueue valid edge lists into outgoing queue by CTA
@@ -662,30 +690,30 @@ namespace edge_map_forward {
                     int scratch_remainder = GR_MIN(SmemStorage::GATHER_ELEMENTS, tile.fine_count - tile.progress);
 
                     for (int scratch_offset = threadIdx.x;
-                             scratch_offset < scratch_remainder;
-                             scratch_offset += KernelPolicy::THREADS)
+                            scratch_offset < scratch_remainder;
+                            scratch_offset += KernelPolicy::THREADS)
                     {
                         // Gather a neighbor
                         VertexId neighbor_id;
                         //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, smem_storage.gather_offsets[scratch_offset]);
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                                                neighbor_id,
-                                                d_column_indices + smem_storage.gather_offsets[scratch_offset]);
+                                neighbor_id,
+                                d_column_indices + smem_storage.gather_offsets[scratch_offset]);
 
                         VertexId predecessor_id = smem_storage.gather_predecessors[scratch_offset];
 
                         // if Cond(neighbor_id) returns true
                         // if Cond(neighbor_id) returns false or Apply returns false
                         // set neighbor_id to -1 for invalid
-                        
+
                         if (Functor::CondEdge(predecessor_id, neighbor_id, problem))
                             Functor::ApplyEdge(predecessor_id, neighbor_id, problem);
                         else
                             neighbor_id = -1;
                         // Scatter into out_queue
                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                            neighbor_id,
-                            d_out + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                                neighbor_id,
+                                d_out + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
                     }
 
                     tile.progress += SmemStorage::GATHER_ELEMENTS;
