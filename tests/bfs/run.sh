@@ -10,7 +10,7 @@ SUFFIX="linuxmint15.gtx680"
 
 mkdir -p eval/$SUFFIX
 
-for i in ak2010 belgium_osm coAuthorsDBLP delaunay_n13 delaunay_n21 kron_g500-logn21 soc-LiveJournal1 webbase-1M
+for i in ak2010 belgium_osm coAuthorsDBLP delaunay_n13 delaunay_n21 kron_g500-logn21 webbase-1M
 do
     echo ./bin/test_bfs_5.5_x86_64 market ../../dataset/large/$i/$i.mtx --src=randomize $OPTION1
          ./bin/test_bfs_5.5_x86_64 market ../../dataset/large/$i/$i.mtx --src=randomize $OPTION1 > eval/$SUFFIX/$i.$SUFFIX.dir_no_mark_pred.txt
