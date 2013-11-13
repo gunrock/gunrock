@@ -10,6 +10,8 @@ for the implementation of connected component and betweenness centrality
 CPU reference implementation. You will need to download the boost source
 distribution, install it and modify the BOOST_INC variable in tests/cc/
 Makefile and tests/bc/Makefile to build test applications for CC and BC.
+To build simple example, you will also need to modify the BOOST_INC variable
+in simple_example/Makefile.
 
 Generating Datasets           {#generating_datasets}
 ===================
@@ -35,3 +37,5 @@ type "make".
 To run the tests for each graph primitive, go into tests/bfs, tests/bc
 or tests/cc and simply type "sh run.sh".
 
+The current release (v0.1) has only been tuned for architectures with the
+compute capability equal or larger than 3.0.
