@@ -31,6 +31,11 @@ namespace gunrock {
 namespace app {
 namespace cc {
 
+/**
+ * @brief BC problem enactor class.
+ *
+ * @tparam INSTRUMENT Boolean type to show whether or not to collect per-CTA clock-count statistics
+ */
 template<bool INSTRUMENT>                           // Whether or not to collect per-CTA clock-count statistics
 class CCEnactor : public EnactorBase
 {
@@ -61,7 +66,12 @@ class CCEnactor : public EnactorBase
     protected:
 
     /**
-     * Prepare enactor for CC. Must be called prior to each CC.
+     * @brief Prepare the enactor for CC kernel call. Must be called prior to each CC search.
+     *
+     * @param[in] CC Problem object which holds the graph data and CC problem data to compute.
+     * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
+     *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template <typename ProblemData>
     cudaError_t Setup(
@@ -92,7 +102,7 @@ class CCEnactor : public EnactorBase
     public:
 
     /**
-     * Constructor
+     * @brief CCEnactor default constructor
      */
     CCEnactor(bool DEBUG = false) :
         EnactorBase(EDGE_FRONTIERS, DEBUG),
@@ -108,7 +118,7 @@ class CCEnactor : public EnactorBase
         }
 
     /**
-     * Destructor
+     * @brief CCEnactor default destructor
      */
     ~CCEnactor()
     {
@@ -118,7 +128,11 @@ class CCEnactor : public EnactorBase
     }
 
     /**
-     * Obtain statistics about the last CC enacted
+     * @brief Obtain statistics about the last BFS search enacted.
+     *
+     * @param[out] total_queued Total queued elements in BFS kernel running.
+     * @param[out] search_depth Search depth of BFS algorithm.
+     * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
      */
     template <typename VertexId>
     void GetStatistics(
@@ -136,9 +150,20 @@ class CCEnactor : public EnactorBase
     }
 
     /**
-     * Enacts a connected-component algorithm on the specified graph problem.
+     * @brief Enacts a breadth-first search computing on the specified graph.
      *
-     * @return cudaSuccess on success, error enumeration otherwise
+     * @tparam VertexMapPolicy Kernel policy for vertex mapping.
+     * @tparam CCProblem CC Problem type.
+     * @tparam UpdateMaskFunctor Functor type used in mask updating.
+     * @tparam HookInitFunctor Functor type used in initializing hook operation.
+     * @tparam HookMinFunctor Functor type used in hook min operation.
+     * @tparam HookMaxFunctor Functor type used in hook max operation.
+     * @tparam PtrJumpFunctor Functor type used in pointer jumping operation.
+     * @tparam PtrJumpMaskFunctor Functor type used in pointer jumping opeartion for masked nodes.
+     * @tparam PtrJumpUnmaskFunctor Functor type used in pointer jumping operation for unmasked nodes.
+     * @param[in] problem CCProblem object.
+     * @param[in] max_grid_size Max grid size for CC kernel calls.
+     *
      */
     template<
         typename VertexMapPolicy,
@@ -439,7 +464,7 @@ class CCEnactor : public EnactorBase
     }
 
     /**
-     * Enact Kernel Entry, specify KernelPolicy
+     * @brief Enact Kernel Entry, specify KernelPolicy
      */
     template <typename CCProblem,
               typename UpdateMaskFunctor,

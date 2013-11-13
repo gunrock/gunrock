@@ -7,16 +7,40 @@ namespace gunrock {
 namespace app {
 namespace cc {
 
+/**
+ * @brief Structure contains device functions for doing mask update.
+ *
+ * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam Value               Type of float or double to use for computing connected component ids.
+ * @tparam ProblemData         Problem data type which contains data slice for CC problem
+ *
+ */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct UpdateMaskFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
+    /**
+     * @brief Vertex mapping condition function. The vertex id is always valid.
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
         return true;
     }
 
+    /**
+     * @brief Vertex mapping apply function. If the component id equals to the node id, set mask
+     * to 0, else set mask to 1.
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
         VertexId parent;
@@ -27,16 +51,40 @@ struct UpdateMaskFunctor
     }
 };
 
+/**
+ * @brief Structure contains device functions for initialization of hook operation.
+ *
+ * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam Value               Type of float or double to use for computing connected component ids.
+ * @tparam ProblemData         Problem data type which contains data slice for CC problem
+ *
+ */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct HookInitFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
+    /**
+     * @brief Vertex mapping condition function. The vertex id is always valid.
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
         return true; 
     }
 
+    /**
+     * @brief Vertex mapping apply function. Initialization of the hook operation. Set the component id
+     * of the node which has the min node id to the max node id.
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
         VertexId from_node;
@@ -52,16 +100,41 @@ struct HookInitFunctor
     }
 };
 
+/**
+ * @brief Structure contains device functions for doing hook max node to min node operation.
+ *
+ * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam Value               Type of float or double to use for computing connected component ids.
+ * @tparam ProblemData         Problem data type which contains data slice for CC problem
+ *
+ */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct HookMinFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
+    /**
+     * @brief Vertex mapping condition function. The vertex id is always valid.
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
         return true;
     }
 
+    /**
+     * @brief Vertex mapping apply function. Compute the hook operation. Set the component id
+     * of the node which has the min node id to the max node id.
+
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
         bool mark;
@@ -95,16 +168,41 @@ struct HookMinFunctor
     }
 };
 
+/**
+ * @brief Structure contains device functions for doing hook min node to max node operation.
+ *
+ * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam Value               Type of float or double to use for computing connected component ids.
+ * @tparam ProblemData         Problem data type which contains data slice for CC problem
+ *
+ */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct HookMaxFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
+    /**
+     * @brief Vertex mapping condition function. The vertex id is always valid.
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
        return true; 
     }
 
+    /**
+     * @brief Vertex mapping apply function. Compute the hook operation. Set the component id
+     * of the node which has the max node id to the min node id.
+
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
         bool mark;
@@ -138,16 +236,41 @@ struct HookMaxFunctor
     }
 };
 
+/**
+ * @brief Structure contains device functions for pointer jumping operation.
+ *
+ * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam Value               Type of float or double to use for computing connected component ids.
+ * @tparam ProblemData         Problem data type which contains data slice for CC problem
+ *
+ */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct PtrJumpFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
+    /**
+     * @brief Vertex mapping condition function. The vertex id is always valid.
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
         return true;
     }
 
+    /**
+     * @brief Vertex mapping apply function. Point the current node to the parent node
+     * of its parent node.
+
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
         VertexId parent;
@@ -165,16 +288,40 @@ struct PtrJumpFunctor
     }
 };
 
+/**
+ * @brief Structure contains device functions for doing pointer jumping only for masked nodes.
+ *
+ * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam Value               Type of float or double to use for computing connected component ids.
+ * @tparam ProblemData         Problem data type which contains data slice for CC problem
+ *
+ */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct PtrJumpMaskFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
+    /**
+     * @brief Vertex mapping condition function. The vertex id is always valid.
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
         return true; 
     }
 
+    /**
+     * @brief Vertex mapping apply function. Pointer jumping for the masked nodes. Point
+     * the current node to the parent node of its parent node.
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
         VertexId mask;
@@ -199,16 +346,40 @@ struct PtrJumpMaskFunctor
     }
 };
 
+/**
+ * @brief Structure contains device functions for doing pointer jumping for unmasked nodes.
+ *
+ * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam Value               Type of float or double to use for computing connected component ids.
+ * @tparam ProblemData         Problem data type which contains data slice for CC problem
+ *
+ */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct PtrJumpUnmaskFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
+    /**
+     * @brief Vertex mapping condition function. The vertex id is always valid.
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
         return true;
     }
 
+    /**
+     * @brief Vertex mapping apply function. Pointer jumping for the unmasked nodes. Point
+     * the current node to the parent node of its parent node.
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     */
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
         VertexId mask;

@@ -21,6 +21,14 @@ namespace gunrock {
 namespace app {
 namespace cc {
 
+/**
+ * @brief Connected Component Problem structure.
+ *
+ * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam _Value               Type of float or double to use for computing BC value.
+ * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer
+ */
 template <
     typename    VertexId,                       // Type of signed integer to use as vertex id (e.g., uint32)
     typename    SizeT,                          // Type of unsigned integer to use for array indexing (e.g., uint32)
@@ -30,7 +38,9 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
                                 _USE_DOUBLE_BUFFER>
 {
     //Helper structures
-/** * Data slice per GPU
+
+    /** 
+     * @brief Data slice structure which contains CC problem specific data.
      */
     struct DataSlice
     {
@@ -67,7 +77,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
     // Methods
 
     /**
-     * Constructor
+     * @brief CCProblem default constructor
      */
 
     CCProblem():
@@ -96,7 +106,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
     }
 
     /**
-     * Destructor
+     * @brief CCProblem default destructor
      */
     ~CCProblem()
     {
@@ -118,8 +128,11 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
     }
 
     /**
-     * Extract into a single host vector the CC results disseminated across
-     * all GPUs
+     * @brief Extract into a single host vector the CC results disseminated across all GPUs.
+     *
+     * @param[out] h_component_ids host-side vector to store computed component ids.
+     *
+     *\return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Extract(VertexId *h_component_ids)
     {
@@ -154,7 +167,14 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
         return retval;
     }
 
-    // Compute size and root of each component
+    /**
+     * @brief Compute histogram for component ids.
+     *
+     * @param[in] h_component_ids host-side vector stores  component ids.
+     * @param[out] h_roots host-side vector to store root node id for each component.
+     * @param[out] h_histograms host-side vector to store histograms.
+     *
+     */
     void ComputeDetails(VertexId *h_component_ids, VertexId *h_roots, unsigned int *h_histograms)
     {
             //Get roots for each component and the total number of component.
@@ -182,6 +202,18 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
             }
     }
 
+    /**
+     * @brief CCProblem initialization
+     *
+     * @param[in] stream_from_host Whether to stream data from host.
+     * @param[in] _nodes Number of nodes in the CSR graph.
+     * @param[in] _edges Number of edges in the CSR graph.
+     * @param[in] h_row_offsets Host-side row offsets array.
+     * @param[in] h_column_indices Host-side column indices array.
+     * @param[in] _num_gpus Number of the GPUs used.
+     *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     */
     cudaError_t Init(
             bool        stream_from_host,       // Only meaningful for single-GPU
             SizeT       _nodes,
@@ -313,8 +345,12 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
     }
 
     /**
-     * Performs any initialization work needed for CC problem type. Must be called
-     * prior to each CC run
+     *  @brief Performs any initialization work needed for CC problem type. Must be called prior to each BC run.
+     *
+     *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
+     *  @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+     * 
+     *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Reset(
             FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
