@@ -29,34 +29,44 @@ namespace vertex_map {
 
 
 /**
- * Kernel configuration policy for vertex mapping kernels.
+ * @brief Kernel configuration policy for vertex mapping kernels.
  *
  * Parameterizations of this type encapsulate our kernel-tuning parameters
- * (i.e., they are reflected via the static fields).
  *
  * Kernels can be specialized for problem-type, SM-version, etc. by parameterizing
  * them with different performance-tuned parameterizations of this type.  By
  * incorporating this type into the kernel code itself, we guide the compiler in
  * expanding/unrolling the kernel code for specific architectures and problem
  * types.
+ *
+ * @tparam _ProblemData                 Problem data type.
+ * @tparam _CUDA_ARCH                   CUDA SM architecture to generate code for.
+ * @tparam _SATURATION_QUIT             If positive, signal that we're done with two-phase iterations if frontier size drops below (SATURATION_QUIT * grid_size).
+ * @tparam _DEQUEUE_PROBLEM_SIZE        Whether we obtain problem size from device-side queue counters (true), or use the formal parameter (false).
+ * @tparam _MIN_CTA_OCCUPANCY           Lower bound on number of CTAs to have resident per SM (influences per-CTA smem cache sizes and register allocation/spills).
+ * @tparam _LOG_THREADS                 Number of threads per CTA (log).
+ * @tparam _LOG_LOAD_VEC_SIZE           Number of incoming frontier vertex-ids to dequeue in a single load (log).
+ * @tparam _LOG_LOADS_PER_TILE          Number of such loads that constitute a tile of incoming frontier vertex-ids (log)
+ * @tparam _LOG_RAKING_THREADS          Number of raking threads to use for prefix sum (log), range [5, LOG_THREADS]
+ * @tparam _LOG_SCHEDULE_GRANULARITY    The scheduling granularity of incoming frontier tiles (for even-share work distribution only) (log)
  */
 template <
-    typename _ProblemData,                              // Problem Data type
+    typename _ProblemData,                              
 
     // Machine parameters
-    int _CUDA_ARCH,                                     // CUDA SM architecture to generate code for
+    int _CUDA_ARCH,                                     
     bool _INSTRUMENT,
     // Behavioral control parameters
-    int _SATURATION_QUIT,                               // If positive, signal that we're done with two-phase iterations if frontier size drops below (SATURATION_QUIT * grid_size)
-    bool _DEQUEUE_PROBLEM_SIZE,                         // Whether we obtain problem size from device-side queue counters (true), or use the formal parameter (false)
+    int _SATURATION_QUIT,                                
+    bool _DEQUEUE_PROBLEM_SIZE,
 
     // Tunable parameters
-    int _MIN_CTA_OCCUPANCY,                             // Lower bound on number of CTAs to have resident per SM (influences per-CTA smem cache sizes and register allocation/spills)
-    int _LOG_THREADS,                                   // Number of threads per CTA (log)
-    int _LOG_LOAD_VEC_SIZE,                             // Number of incoming frontier vertex-ids to dequeue in a single load (log)
-    int _LOG_LOADS_PER_TILE,                            // Number of such loads that constitute a tile of incoming frontier vertex-ids (log)
-    int _LOG_RAKING_THREADS,                            // Number of raking threads to use for prefix sum (log), range [5, LOG_THREADS]
-    int _LOG_SCHEDULE_GRANULARITY>                      // The scheduling granularity of incoming frontier tiles (for even-share work distribution only) (log)
+    int _MIN_CTA_OCCUPANCY,
+    int _LOG_THREADS,                                   
+    int _LOG_LOAD_VEC_SIZE,                             
+    int _LOG_LOADS_PER_TILE,                            
+    int _LOG_RAKING_THREADS,                            
+    int _LOG_SCHEDULE_GRANULARITY>                      
 
 struct KernelPolicy
 {
@@ -114,7 +124,7 @@ struct KernelPolicy
     typedef util::RakingDetails<RakingGrid> RakingDetails;
 
     /**
-     * Shared memory storage type for the CTA
+     * @brief Shared memory storage type for the CTA
      */
     struct SmemStorage
     {

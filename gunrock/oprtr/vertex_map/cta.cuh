@@ -34,7 +34,12 @@ namespace vertex_map {
 
 
 /**
- * CTA tile-processing abstraction for BFS frontier contraction
+ * @brief CTA tile-processing abstraction for the vertex mapping operator.
+ *
+ * @tparam KernelPolicy Kernel policy type for the vertex mapping.
+ * @tparam ProblemData Problem data type for the vertex mapping.
+ * @tparam Functor Functor type for the specific problem type.
+ *
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Cta
@@ -77,7 +82,10 @@ struct Cta
     //---------------------------------------------------------------------
 
     /**
-     * Tile of incoming edge frontier to process
+     * @brief Tile of incoming frontier to process
+     *
+     * @tparam LOG_LOADS_PER_TILE   Size of the loads per tile.
+     * @tparam LOG_LOAD_VEC_SIZE    Size of the vector size per load.
      */
     template <
         int LOG_LOADS_PER_TILE,
@@ -113,13 +121,15 @@ struct Cta
         //---------------------------------------------------------------------
 
         /**
-         * Iterate over vertex id
+         * @brief Iterate over vertex ids in tile.
          */
         template <int LOAD, int VEC, int dummy = 0>
         struct Iterate
         {
             /**
-             * InitFlags
+             * @brief Initialize flag values for compact new frontier. If vertex id equals to -1, then discard it in the new frontier.
+             *
+             * @param[in] tile Tile object holds the vertex ids, ranks and flags.
              */
             static __device__ __forceinline__ void InitFlags(Tile *tile)
             {
@@ -132,7 +142,8 @@ struct Cta
             }
 
             /**
-             * VertexCull
+             * @brief Set vertex id to -1 if we want to cull this vertex from the outgoing frontier.
+             *
              */
             static __device__ __forceinline__ void VertexCull(
                 Cta *cta,
@@ -222,7 +233,7 @@ struct Cta
     //---------------------------------------------------------------------
 
     /**
-     * Constructor
+     * @brief CTA type default constructor
      */
     __device__ __forceinline__ Cta(
         VertexId                queue_index,
@@ -251,7 +262,10 @@ struct Cta
 
 
     /**
-     * Process a single, full tile
+     * @brief Process a single, full tile.
+     *
+     * @param[in] cta_offset Offset within the CTA where we want to start the tile processing.
+     * @param[in] guarded_elements The guarded elements to prevent the out-of-bound visit.
      */
     __device__ __forceinline__ void ProcessTile(
         SizeT cta_offset,
