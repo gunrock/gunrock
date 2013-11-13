@@ -108,6 +108,7 @@ struct ForwardFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      *
+     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
@@ -203,6 +204,7 @@ struct BackwardFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      *
+     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {

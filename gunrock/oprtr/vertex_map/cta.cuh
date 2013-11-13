@@ -207,17 +207,13 @@ struct Cta
         // Interface
         //---------------------------------------------------------------------
 
-        /**
-         * Initializer
-         */
+        // Initializer
         __device__ __forceinline__ void InitFlags()
         {
             Iterate<0, 0>::InitFlags(this);
         }
 
-        /**
-         * Culls vertices
-         */
+        // Culls vertices
         __device__ __forceinline__ void VertexCull(Cta *cta)
         {
             Iterate<0, 0>::VertexCull(cta, this);

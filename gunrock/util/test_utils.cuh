@@ -80,9 +80,7 @@ public:
         }
     }
 
-    /**
-     * Checks whether a flag "--<flag>" is present in the commandline
-     */
+    // Checks whether a flag "--<flag>" is present in the commandline
     bool CheckCmdLineFlag(const char* arg_name)
     {
         using namespace std;
@@ -93,21 +91,15 @@ public:
         return false;
     }
 
-    /**
-     * Returns the value specified for a given commandline parameter --<flag>=<value>
-     */
+    // Returns the value specified for a given commandline parameter --<flag>=<value>
     template <typename T>
     void GetCmdLineArgument(const char *arg_name, T &val);
 
-    /**
-     * Returns the values specified for a given commandline parameter --<flag>=<value>,<value>*
-     */
+    // Returns the values specified for a given commandline parameter --<flag>=<value>,<value>*
     template <typename T>
     void GetCmdLineArguments(const char *arg_name, std::vector<T> &vals);
 
-    /**
-     * The number of pairs parsed
-     */
+    // The number of pairs parsed
     int ParsedArgc()
     {
         return pairs.size();

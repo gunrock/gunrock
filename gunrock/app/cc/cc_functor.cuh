@@ -27,6 +27,7 @@ struct UpdateMaskFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      *
+     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
@@ -71,6 +72,7 @@ struct HookInitFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      *
+     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
@@ -120,6 +122,7 @@ struct HookMinFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      *
+     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
@@ -188,6 +191,7 @@ struct HookMaxFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      *
+     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
@@ -256,6 +260,7 @@ struct PtrJumpFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      *
+     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
@@ -308,6 +313,7 @@ struct PtrJumpMaskFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      *
+     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {
@@ -366,6 +372,7 @@ struct PtrJumpUnmaskFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      *
+     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
     {

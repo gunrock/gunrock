@@ -217,7 +217,7 @@ struct ScatterTile
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Scatter to destination with transform.  The write is
      * predicated on the element's index in
      * the tile is not exceeding the partial tile size
@@ -246,7 +246,7 @@ struct ScatterTile
         }
     }
 
-    /**
+    /*
      * Scatter to destination.  The write is predicated on the element's index in
      * the tile is not exceeding the partial tile size
      */
@@ -261,7 +261,7 @@ struct ScatterTile
             dest, data, scatter_offsets, partial_tile_size);
     }
 
-    /**
+    /*
      * Scatter to destination with transform.  The write is
      * predicated on valid flags and that the element's index in
      * the tile is not exceeding the partial tile size
@@ -292,7 +292,7 @@ struct ScatterTile
         }
     }
 
-    /**
+    /*
      * Scatter to destination.  The write is
      * predicated on valid flags and that the element's index in
      * the tile is not exceeding the partial tile size

@@ -291,7 +291,7 @@ struct LoadTile
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Load a full tile with transform
      */
     template <
@@ -324,7 +324,7 @@ struct LoadTile
     }
 
 
-    /**
+    /*
      * Load a full tile
      */
     template <
@@ -339,7 +339,7 @@ struct LoadTile
     }
 
 
-    /**
+    /*
      * Load guarded_elements of a tile with transform and out-of-bounds default
      */
     template <
@@ -362,7 +362,7 @@ struct LoadTile
     }
 
 
-    /**
+    /*
      * Load guarded_elements of a tile with transform
      */
     template <
@@ -384,7 +384,7 @@ struct LoadTile
     }
 
 
-    /**
+    /*
      * Load guarded_elements of a tile and out_of_bounds default
      */
     template <
@@ -402,7 +402,7 @@ struct LoadTile
     }
 
 
-    /**
+    /*
      * Load guarded_elements of a tile
      */
     template <

@@ -198,7 +198,7 @@ struct InitializeTile
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Copy source to target
      */
     template <typename T, typename S>
@@ -210,7 +210,7 @@ struct InitializeTile
     }
 
 
-    /**
+    /*
      * Initialize target with datum
      */
     template <typename T, typename S>
@@ -222,7 +222,7 @@ struct InitializeTile
     }
 
 
-    /**
+    /*
      * Apply unary transform_op operator to source
      */
     template <typename T, typename S, typename TransformOp>
@@ -234,7 +234,7 @@ struct InitializeTile
         Iterate<0, 0>::Transform(target, source, transform_op);
     }
 
-    /**
+    /*
      * Apply unary transform_op operator to source (guarded)
      */
     template <typename T, typename S, typename TransformOp, typename SizeT>
@@ -262,7 +262,7 @@ struct InitializeTile
         }
     }
 
-    /**
+    /*
      * Apply structure-of-array transform_op operator to source
      */
     template <typename SoaT, typename SoaS, typename TransformOp>

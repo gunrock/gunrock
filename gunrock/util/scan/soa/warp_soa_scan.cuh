@@ -105,7 +105,7 @@ struct WarpSoaScan
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Cooperative warp-scan.  Returns the calling thread's scanned partial.
      */
     template <
@@ -141,7 +141,7 @@ struct WarpSoaScan
         }
     }
 
-    /**
+    /*
      * Cooperative warp-scan.  Returns the calling thread's scanned partial.
      */
     template <

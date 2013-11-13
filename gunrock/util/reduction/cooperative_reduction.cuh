@@ -83,7 +83,7 @@ struct CooperativeTileReduction
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Reduce a single tile.  Carry is computed (or updated if REDUCE_INTO_CARRY is set)
      * only in last raking thread
      *
@@ -108,7 +108,7 @@ struct CooperativeTileReduction
             raking_details, carry, reduction_op);
     }
 
-    /**
+    /*
      * Reduce a single tile.  Result is computed and returned in all threads.
      *
      * No post-synchronization needed before grid reuse.
@@ -144,7 +144,7 @@ struct CooperativeGridReduction<RakingDetails, NullType>
 {
     typedef typename RakingDetails::T T;
 
-    /**
+    /*
      * Reduction in last-level raking grid.  Carry is assigned (or reduced into
      * if REDUCE_INTO_CARRY is set), but only in last raking thread
      */
@@ -173,7 +173,7 @@ struct CooperativeGridReduction<RakingDetails, NullType>
     }
 
 
-    /**
+    /*
      * Reduction in last-level raking grid.  Result is computed in all threads.
      */
     template <typename ReductionOp>
@@ -208,7 +208,7 @@ struct CooperativeGridReduction
 {
     typedef typename RakingDetails::T T;
 
-    /**
+    /*
      * Reduction in raking grid.  Carry-in/out is updated only in raking threads (homogeneously)
      */
     template <bool REDUCE_INTO_CARRY, typename ReductionOp>
@@ -235,7 +235,7 @@ struct CooperativeGridReduction
     }
 
 
-    /**
+    /*
      * Reduction in raking grid.  Result is computed in all threads.
      */
     template <typename ReductionOp>

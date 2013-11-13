@@ -68,7 +68,7 @@ class CCEnactor : public EnactorBase
     /**
      * @brief Prepare the enactor for CC kernel call. Must be called prior to each CC search.
      *
-     * @param[in] CC Problem object which holds the graph data and CC problem data to compute.
+     * @param[in] problem CC Problem object which holds the graph data and CC problem data to compute.
      * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -164,6 +164,7 @@ class CCEnactor : public EnactorBase
      * @param[in] problem CCProblem object.
      * @param[in] max_grid_size Max grid size for CC kernel calls.
      *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template<
         typename VertexMapPolicy,

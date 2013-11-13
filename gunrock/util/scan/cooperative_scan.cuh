@@ -86,7 +86,7 @@ struct CooperativeTileScan
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Scan a single tile.  Total aggregate is computed and returned in all threads.
      *
      * No post-synchronization needed before grid reuse.
@@ -116,7 +116,7 @@ struct CooperativeTileScan
         return raking_details.CumulativePartial();
     }
 
-    /**
+    /*
      * Scan a single tile where carry is updated with the total aggregate only
      * in raking threads.
      *
@@ -146,7 +146,7 @@ struct CooperativeTileScan
     }
 
 
-    /**
+    /*
      * Scan a single tile with atomic enqueue.  Returns updated queue offset.
      *
      * No post-synchronization needed before grid reuse.
@@ -177,7 +177,7 @@ struct CooperativeTileScan
     }
 
 
-    /**
+    /*
      * Scan a single tile with atomic enqueue.  Local aggregate is computed and
      * returned in all threads.  Enqueue offset is returned in all threads.
      *
@@ -226,7 +226,7 @@ struct CooperativeGridScan<RakingDetails, NullType>
 {
     typedef typename RakingDetails::T T;
 
-    /**
+    /*
      * Scan in last-level raking grid.
      */
     template <typename ReductionOp>
@@ -252,7 +252,7 @@ struct CooperativeGridScan<RakingDetails, NullType>
     }
 
 
-    /**
+    /*
      * Scan in last-level raking grid.  Carry-in/out is updated only in raking threads
      */
     template <typename ReductionOp>
@@ -285,7 +285,7 @@ struct CooperativeGridScan<RakingDetails, NullType>
     }
 
 
-    /**
+    /*
      * Scan in last-level raking grid with atomic enqueue
      */
     template <typename ReductionOp>
@@ -324,7 +324,7 @@ struct CooperativeGridScan<RakingDetails, NullType>
         }
     }
 
-    /**
+    /*
      * Scan in last-level raking grid with atomic enqueue
      */
     template <typename ReductionOp>
@@ -370,7 +370,7 @@ struct CooperativeGridScan
 {
     typedef typename RakingDetails::T T;
 
-    /**
+    /*
      * Scan in raking grid.
      */
     template <typename ReductionOp>
@@ -407,7 +407,7 @@ struct CooperativeGridScan
         }
     }
 
-    /**
+    /*
      * Scan in raking grid.  Carry-in/out is updated only in raking threads (homogeneously)
      */
     template <typename ReductionOp>
@@ -445,7 +445,7 @@ struct CooperativeGridScan
         }
     }
 
-    /**
+    /*
      * Scan in raking grid.  Carry-in/out is updated only in raking threads (homogeneously)
      */
     template <typename ReductionOp>

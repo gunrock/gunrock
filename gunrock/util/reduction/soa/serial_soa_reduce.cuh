@@ -119,7 +119,7 @@ struct SerialSoaReduce
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Reduce a structure-of-array RakingSoa into a single Tuple "slice"
      */
     template <
@@ -139,7 +139,7 @@ struct SerialSoaReduce
             raking_partials, current_partial, reduction_op);
     }
 
-    /**
+    /*
      * Reduce a structure-of-array RakingSoa into a single Tuple "slice", seeded
      * with exclusive_partial
      */
@@ -157,7 +157,7 @@ struct SerialSoaReduce
     }
 
 
-    /**
+    /*
      * Reduce one row of a 2D structure-of-array RakingSoa into a single Tuple "slice"
      */
     template <
@@ -179,7 +179,7 @@ struct SerialSoaReduce
     }
 
 
-    /**
+    /*
      * Reduce one row of a 2D structure-of-array RakingSoa into a single Tuple "slice", seeded
      * with exclusive_partial
      */

@@ -93,7 +93,7 @@ struct CooperativeSoaTileScan
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Scan a single tile where carry is assigned (or updated if REDUCE_INTO_CARRY is set)
      * with the total aggregate only in raking threads.
      *
@@ -129,7 +129,7 @@ struct CooperativeSoaTileScan
     }
 
 
-    /**
+    /*
      * Scan a single tile.  Total aggregate is computed and returned in all threads.
      *
      * No post-synchronization needed before grid reuse.
@@ -182,7 +182,7 @@ struct CooperativeSoaGridScan<RakingSoaDetails, NullType>
     typedef typename RakingSoaDetails::TileTuple TileTuple;
 
 
-    /**
+    /*
      * Scan in last-level raking grid.
      */
     template <typename ReductionOp>
@@ -212,7 +212,7 @@ struct CooperativeSoaGridScan<RakingSoaDetails, NullType>
     }
 
 
-    /**
+    /*
      * Scan in last-level raking grid.  Carry-in/out is updated only in raking threads (homogeneously)
      */
     template <
@@ -286,7 +286,7 @@ struct CooperativeSoaGridScan
 {
     typedef typename RakingSoaDetails::TileTuple TileTuple;
 
-    /**
+    /*
      * Scan in last-level raking grid.
      */
     template <typename ReductionOp>
@@ -332,7 +332,7 @@ struct CooperativeSoaGridScan
 
     }
 
-    /**
+    /*
      * Scan in last-level raking grid.  Carry-in/out is updated only in raking threads (homogeneously)
      */
     template <

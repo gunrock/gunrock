@@ -69,7 +69,7 @@ class BCEnactor : public EnactorBase
     /**
      * @brief Prepare the enactor for BC kernel call. Must be called prior to each BC search.
      *
-     * @param[in] BC Problem object which holds the graph data and BC problem data to compute.
+     * @param[in] problem BC Problem object which holds the graph data and BC problem data to compute.
      * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
      * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
      *
@@ -192,6 +192,7 @@ class BCEnactor : public EnactorBase
      * @param[in] src Source node for BC. -1 to compute BC value for each node.
      * @param[in] max_grid_size Max grid size for BC kernel calls.
      *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template<
         typename EdgeMapPolicy,

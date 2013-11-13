@@ -26,9 +26,7 @@ namespace util {
 template <typename T, typename R = T>
 struct Operators
 {
-    /**
-     * Empty default transform function
-     */
+    // Empty default transform function
     static __device__ __forceinline__ void NopTransform(T &val) {}
 
 };

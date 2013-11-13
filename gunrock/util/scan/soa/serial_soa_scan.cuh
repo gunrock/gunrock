@@ -141,7 +141,7 @@ struct SerialSoaScan
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Scan a 2D structure-of-array RakingSoa, seeded  with exclusive_partial.
      * The tuple returned is the inclusive total.
      */
@@ -159,7 +159,7 @@ struct SerialSoaScan
     }
 
 
-    /**
+    /*
      * Scan a 2D structure-of-array RakingSoa, seeded  with exclusive_partial.
      * The tuple returned is the inclusive total.
      */
@@ -178,7 +178,7 @@ struct SerialSoaScan
     }
 
 
-    /**
+    /*
      * Scan one row of a 2D structure-of-array RakingSoa, seeded
      * with exclusive_partial.  The tuple returned is the inclusive total.
      */
@@ -197,7 +197,7 @@ struct SerialSoaScan
     }
 
 
-    /**
+    /*
      * Scan one row of a 2D structure-of-array RakingSoa, seeded
      * with exclusive_partial.  The tuple returned is the inclusive total.
      */

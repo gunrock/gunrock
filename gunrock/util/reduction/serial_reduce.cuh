@@ -73,7 +73,7 @@ struct SerialReduce
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Serial reduction with the specified operator
      */
     template <typename T, typename ReductionOp>
@@ -85,7 +85,7 @@ struct SerialReduce
     }
 
 
-    /**
+    /*
      * Serial reduction with the addition operator
      */
     template <typename T>
@@ -97,7 +97,7 @@ struct SerialReduce
     }
 
 
-    /**
+    /*
      * Serial reduction with the specified operator, seeded with the
      * given exclusive partial
      */
@@ -112,7 +112,7 @@ struct SerialReduce
             Invoke(partials, reduction_op));
     }
 
-    /**
+    /*
      * Serial reduction with the addition operator, seeded with the
      * given exclusive partial
      */

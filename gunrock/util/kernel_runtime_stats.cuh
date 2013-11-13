@@ -46,25 +46,19 @@ protected :
 
 public:
 
-    /**
-     * Constructor
-     */
+    // Constructor
     KernelRuntimeStats() :
         d_stat(NULL),
         clocks(0),
         aggregate(0) {}
 
-    /**
-     * Marks start time.  Typically called by thread-0.
-     */
+    // Marks start time.  Typically called by thread-0.
     __device__ __forceinline__ void MarkStart()
     {
         start = clock();
     }
 
-    /**
-     * Marks stop time.  Typically called by thread-0.
-     */
+    // Marks stop time.  Typically called by thread-0.
     __device__ __forceinline__ void MarkStop()
     {
         clock_t stop = clock();
@@ -74,19 +68,15 @@ public:
         clocks += runtime;
     }
 
-    /**
-     * Increments the aggregate counter by the specified amount.
-     * Typically called by thread-0.
-     */
+    // Increments the aggregate counter by the specified amount.
+    // Typically called by thread-0.
     template <typename T>
     __device__ __forceinline__ void Aggregate(T increment)
     {
         aggregate += increment;
     }
 
-    /**
-     * Flushes statistics to global mem
-     */
+    // Flushes statistics to global mem
     __device__ __forceinline__ void Flush()
     {
         if (d_stat != NULL) {
@@ -95,9 +85,7 @@ public:
         }
     }
 
-    /**
-     * Resets statistics. Typically called by thread-0.
-     */
+    // Resets statistics. Typically called by thread-0.
     __device__ __forceinline__ void Reset() const
     {
         if (d_stat != NULL) {
@@ -127,18 +115,14 @@ protected:
 
 public:
 
-    /**
-     * Constructor
-     */
+    // Constructor
     KernelRuntimeStatsLifetime() :
         KernelRuntimeStats(),
         stat_bytes(0),
         gpu(GR_INVALID_DEVICE) {}
 
 
-    /**
-     * Deallocates and resets the progress counters
-     */
+    // Deallocates and resets the progress counters
     cudaError_t HostReset()
     {
         cudaError_t retval = cudaSuccess;
@@ -174,19 +158,15 @@ public:
     }
 
 
-    /**
-     * Destructor
-     */
+    // Destructor
     virtual ~KernelRuntimeStatsLifetime()
     {
         HostReset();
     }
 
 
-    /**
-     * Sets up the progress counters for the next kernel launch (lazily
-     * allocating and initializing them if necessary)
-     */
+    // Sets up the progress counters for the next kernel launch (lazily
+    // allocating and initializing them if necessary)
     cudaError_t Setup(int grid_size)
     {
         cudaError_t retval = cudaSuccess;
@@ -219,9 +199,7 @@ public:
     }
 
 
-    /**
-     * Accumulates avg live, max live, and total aggregate
-     */
+    // Accumulates avg live, max live, and total aggregate
     cudaError_t Accumulate(
         int grid_size,
         unsigned long long &total_runtimes,
@@ -278,9 +256,7 @@ public:
     }
 
 
-    /**
-     * Accumulates avg live, max live
-     */
+    // Accumulates avg live, max live
     cudaError_t Accumulate(
         int grid_size,
         unsigned long long &total_runtimes,

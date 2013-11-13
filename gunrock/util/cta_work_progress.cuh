@@ -94,11 +94,9 @@ public:
     // Work-stealing
     //---------------------------------------------------------------------
 
-    /**
-     * Steals work from the host-indexed progress counter, returning
-     * the offset of that work (from zero) and incrementing it by count.
-     * Typically called by thread-0
-     */
+    // Steals work from the host-indexed progress counter, returning
+    // the offset of that work (from zero) and incrementing it by count.
+    // Typically called by thread-0
     template <typename SizeT>
     __device__ __forceinline__ SizeT Steal(int count)
     {
@@ -106,11 +104,9 @@ public:
         return util::AtomicInt<SizeT>::Add(d_steal_counters + progress_selector, count);
     }
 
-    /**
-     * Steals work from the specified iteration's progress counter, returning the
-     * offset of that work (from zero) and incrementing it by count.
-     * Typically called by thread-0
-     */
+    // Steals work from the specified iteration's progress counter, returning the
+    // offset of that work (from zero) and incrementing it by count.
+    // Typically called by thread-0
     template <typename SizeT, typename IterationT>
     __device__ __forceinline__ SizeT Steal(int count, IterationT iteration)
     {
@@ -118,10 +114,8 @@ public:
         return util::AtomicInt<SizeT>::Add(d_steal_counters + (iteration & 1), count);
     }
 
-    /**
-     * Resets the work progress for the next host-indexed work-stealing
-     * pass.  Typically called by thread-0 in block-0.
-     */
+    // Resets the work progress for the next host-indexed work-stealing
+    // pass.  Typically called by thread-0 in block-0.
     template <typename SizeT>
     __device__ __forceinline__ void PrepResetSteal()
     {
@@ -131,10 +125,8 @@ public:
                 reset_val, d_steal_counters + (progress_selector ^ 1));
     }
 
-    /**
-     * Resets the work progress for the specified work-stealing iteration.
-     * Typically called by thread-0 in block-0.
-     */
+    // Resets the work progress for the specified work-stealing iteration.
+    // Typically called by thread-0 in block-0.
     template <typename SizeT, typename IterationT>
     __device__ __forceinline__ void PrepResetSteal(IterationT iteration)
     {
@@ -149,18 +141,14 @@ public:
     // Queuing
     //---------------------------------------------------------------------
 
-    /**
-     * Get counter for specified iteration
-     */
+    // Get counter for specified iteration
     template <typename SizeT, typename IterationT>
     __device__ __forceinline__ SizeT* GetQueueCounter(IterationT iteration)
     {
         return ((SizeT*) d_counters) + (iteration & 3);
     }
 
-    /**
-     * Load work queue length for specified iteration
-     */
+    // Load work queue length for specified iteration
     template <typename SizeT, typename IterationT>
     __device__ __forceinline__ SizeT LoadQueueLength(IterationT iteration)
     {
@@ -170,9 +158,7 @@ public:
         return queue_length;
     }
 
-    /**
-     * Store work queue length for specified iteration
-     */
+    // Store work queue length for specified iteration
     template <typename SizeT, typename IterationT>
     __device__ __forceinline__ void StoreQueueLength(SizeT queue_length, IterationT iteration)
     {
@@ -180,11 +166,9 @@ public:
             queue_length, GetQueueCounter<SizeT>(iteration));
     }
 
-    /**
-     * Enqueues work from the specified iteration's queue counter, returning the
-     * offset of that work (from zero) and incrementing it by count.
-     * Typically called by thread-0
-     */
+    // Enqueues work from the specified iteration's queue counter, returning the
+    // offset of that work (from zero) and incrementing it by count.
+    // Typically called by thread-0
     template <typename SizeT, typename IterationT>
     __device__ __forceinline__ SizeT Enqueue(SizeT count, IterationT iteration)
     {
@@ -193,9 +177,7 @@ public:
             count);
     }
 
-    /**
-     * Sets the overflow counter to non-zero
-     */
+    // Sets the overflow counter to non-zero
     template <typename SizeT>
     __device__ __forceinline__ void SetOverflow ()
     {
@@ -228,9 +210,7 @@ public:
         gpu(GR_INVALID_DEVICE) {}
 
 
-    /**
-     * Deallocates and resets the progress counters
-     */
+    // Deallocates and resets the progress counters
     cudaError_t HostReset()
     {
         cudaError_t retval = cudaSuccess;
@@ -274,10 +254,8 @@ public:
     }
 
 
-    /**
-     * Sets up the progress counters for the next kernel launch (lazily
-     * allocating and initializing them if necessary)
-     */
+    // Sets up the progress counters for the next kernel launch (lazily
+    // allocating and initializing them if necessary)
     cudaError_t Setup()
     {
         cudaError_t retval = cudaSuccess;
@@ -309,9 +287,7 @@ public:
     }
 
 
-    /**
-     * Checks if overflow counter is set
-     */
+    // Checks if overflow counter is set
     template <typename SizeT>
     cudaError_t CheckOverflow(bool &overflow)   // out param
     {
@@ -335,9 +311,7 @@ public:
     }
 
 
-    /**
-     * Acquire work queue length
-     */
+    // Acquire work queue length
     template <typename IterationT, typename SizeT>
     cudaError_t GetQueueLength(
         IterationT iteration,
@@ -361,9 +335,7 @@ public:
     }
 
 
-    /**
-     * Set work queue length
-     */
+    // Set work queue length
     template <typename IterationT, typename SizeT>
     cudaError_t SetQueueLength(
         IterationT iteration,

@@ -58,13 +58,13 @@ namespace ld {
 template <ld::CacheModifier CACHE_MODIFIER>
 struct ModifiedLoad
 {
-    /**
+    /*
      * Load operation we will provide specializations for
      */
     template <typename T>
     __device__ __forceinline__ static void Ld(T &val, T *ptr);
 
-    /**
+    /*
      * Vec-4 loads for 64-bit types are implemented as two vec-2 loads
      */
     __device__ __forceinline__ static void Ld(double4 &val, double4* ptr)

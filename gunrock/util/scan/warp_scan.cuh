@@ -91,7 +91,7 @@ struct WarpScan
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Warpscan with the specified operator
      */
     template <typename T, typename WarpscanT, typename ReductionOp>
@@ -123,7 +123,7 @@ struct WarpScan
     }
 
 
-    /**
+    /*
      * Warpscan with the addition operator
      */
     template <typename T, typename WarpscanT>
@@ -141,7 +141,7 @@ struct WarpScan
     }
 
 
-    /**
+    /*
      * Warpscan with the specified operator, returning the cumulative reduction
      */
     template <typename T, typename WarpscanT, typename ReductionOp>
@@ -177,7 +177,7 @@ struct WarpScan
         }
     }
 
-    /**
+    /*
      * Warpscan with the addition operator, returning the cumulative reduction
      */
     template <typename T, typename WarpscanT>

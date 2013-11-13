@@ -152,7 +152,7 @@ struct StoreTile
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Store a full tile
      */
     template <typename T, typename SizeT>
@@ -181,7 +181,7 @@ struct StoreTile
         }
     }
 
-    /**
+    /*
      * Store guarded_elements of a tile
      */
     template <typename T, typename SizeT>

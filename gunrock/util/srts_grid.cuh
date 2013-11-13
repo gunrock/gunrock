@@ -197,11 +197,9 @@ struct RakingGrid
     typedef T* RakingSegment;
 
 
-    /**
-     * Returns the location in the smem grid where the calling thread can insert/extract
-     * its partial for raking reduction/scan into the first lane.  Positions in subsequent
-     * lanes can be obtained via increments of LANE_STRIDE.
-     */
+    // Returns the location in the smem grid where the calling thread can insert/extract
+    // its partial for raking reduction/scan into the first lane.  Positions in subsequent
+    // lanes can be obtained via increments of LANE_STRIDE.
     static __host__ __device__ __forceinline__  LanePartial MyLanePartial(T *smem)
     {
         int row = threadIdx.x >> LOG_PARTIALS_PER_ROW;
@@ -211,10 +209,8 @@ struct RakingGrid
     }
 
 
-    /**
-     * Returns the location in the smem grid where the calling thread can begin serial
-     * raking/scanning
-     */
+    // Returns the location in the smem grid where the calling thread can begin serial
+    // raking/scanning
     static __host__ __device__ __forceinline__  RakingSegment MyRakingSegment(T *smem)
     {
         int row = threadIdx.x >> LOG_SEGS_PER_ROW;

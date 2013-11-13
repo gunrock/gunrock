@@ -9,7 +9,7 @@
  * @file
  * test_bfs.cu
  *
- * @brief Simple test driver program for BFS.
+ * @brief Simple test driver program for breadth-first search.
  */
 
 #include <stdio.h> 
@@ -76,7 +76,12 @@ bool g_stream_from_host;
  }
 
  /**
-  * Displays the BFS result (i.e., distance from source)
+  * @brief Displays the BFS result (i.e., distance from source)
+  *
+  * @param[in] source_path Search depth from the source for each node.
+  * @param[in] preds Predecessor node id for each node.
+  * @param[in] nodes Number of nodes in the graph.
+  * @param[in] MARK_PREDECESSORS Whether to show predecessor of each node.
   */
  template<typename VertexId, typename SizeT>
  void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes, bool MARK_PREDECESSORS)
@@ -112,7 +117,21 @@ struct Stats {
 };
 
 /**
- * Displays timing and correctness statistics
+ * @brief Displays timing and correctness statistics
+ *
+ * @tparam MARK_PREDECESSORS
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * 
+ * @param[in] stats Reference to the Stats object defined in RunTests
+ * @param[in] src Source node where BFS starts
+ * @param[in] h_labels Host-side vector stores computed labels for validation
+ * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] elapsed Total elapsed kernel running time
+ * @param[in] search_depth Maximum search depth of the BFS algorithm
+ * @param[in] total_queued Total element queued in BFS kernel running process
+ * @param[in] avg_duty Average duty of the BFS kernels
  */
 template<
     bool MARK_PREDECESSORS,
@@ -180,7 +199,15 @@ void DisplayStats(
  *****************************************************************************/
 
  /**
-  * A simple CPU-based reference BFS ranking implementation.
+  * @brief A simple CPU-based reference BFS ranking implementation.
+  *
+  * @tparam VertexId
+  * @tparam Value
+  * @tparam SizeT
+  *
+  * @param[in] graph Reference to the CSR graph we process on
+  * @param[in] source_path Host-side vector to store CPU computed labels for each node
+  * @param[in] src Source node where BFS starts
   */
  template<
     typename VertexId,
@@ -240,7 +267,20 @@ void SimpleReferenceBfs(
 }
 
 /**
- * Run tests
+ * @brief Run BFS tests
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam MARK_PREDECESSORS
+ *
+ * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] src Source node where BFS starts
+ * @param[in] max_grid_size Maximum CTA occupancy
+ * @param[in] num_gpus Number of GPUs
+ * @param[in] max_queue_sizing Scaling factor used in edge mapping
+ *
  */
 template <
     typename VertexId,
@@ -362,6 +402,16 @@ void RunTests(
         cudaDeviceSynchronize();
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] args Reference to the command line arguments
+ */
 template <
     typename VertexId,
     typename Value,
@@ -432,8 +482,8 @@ void RunTests(
 
 
 /******************************************************************************
- * Main
- ******************************************************************************/
+* Main
+******************************************************************************/
 
 int main( int argc, char** argv)
 {

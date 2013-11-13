@@ -31,14 +31,10 @@ struct CtaWorkLimits
     SizeT   out_of_bounds;      // Offset at which this CTA is out-of-bounds
     bool    last_block;         // If this block is the last block in the grid with any work
 
-    /**
-     * Constructor
-     */
+    // Default constructor
     __host__ __device__ __forceinline__ CtaWorkLimits() {}
 
-    /**
-     * Constructor
-     */
+    // Constructor
     __host__ __device__ __forceinline__ CtaWorkLimits(
         SizeT   offset,
         SizeT   elements,
@@ -74,9 +70,7 @@ struct CtaWorkDistribution
     int     grid_size;          // Number of CTAs
 
 
-    /**
-     * Initializer
-     */
+    // Initializer
     template <int LOG_SCHEDULE_GRANULARITY>
     __host__ __device__ __forceinline__ void Init(
         SizeT num_elements,
@@ -91,9 +85,7 @@ struct CtaWorkDistribution
         this->grid_size         = grid_size;
     }
 
-    /**
-     * Initializer
-     */
+    // Initializer
     __host__ __device__ __forceinline__ void Init(
         SizeT num_elements,
         int grid_size,
@@ -109,9 +101,7 @@ struct CtaWorkDistribution
     }
 
 
-    /**
-     * Computes work limits for the current CTA
-     */ 
+    // Computes work limits for the current CTA
     template <
         int LOG_TILE_ELEMENTS,          // CTA tile size, i.e., granularity by which the CTA processes work
         int LOG_SCHEDULE_GRANULARITY>   // Problem granularity by which work is distributed amongst CTA threadblocks
@@ -158,9 +148,7 @@ struct CtaWorkDistribution
     }
 
 
-    /**
-     * Print to stdout
-     */
+    // Print to stdout
     void Print()
     {
         printf("num_elements: %lu, total_grains: %lu, grains_per_cta: %lu, extra_grains: %lu, grid_size: %lu\n",

@@ -180,7 +180,7 @@ struct TreeReduce
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Perform a cooperative tree reduction.  Threads with ranks less than
      * num_elements contribute one reduction partial.
      */
@@ -214,7 +214,7 @@ struct TreeReduce
     }
 
 
-    /**
+    /*
      * Perform a cooperative tree reduction.  Each thread contributes one
      * reduction partial.
      *
@@ -248,7 +248,7 @@ struct TreeReduce
     }
 
 
-    /**
+    /*
      * Perform a cooperative tree reduction using the addition operator.
      * Threads with ranks less than num_elements contribute one reduction partial.
      */
@@ -265,7 +265,7 @@ struct TreeReduce
     }
 
 
-    /**
+    /*
      * Perform a cooperative tree reduction using the addition operator.
      * Each thread contributes one reduction partial.
      *

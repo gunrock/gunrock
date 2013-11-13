@@ -38,9 +38,7 @@ protected :
     // Counters in global device memory
     SyncFlag* d_sync;
 
-    /**
-     * Simple wrapper for returning a CG-loaded SyncFlag at the specified pointer
-     */
+    // Simple wrapper for returning a CG-loaded SyncFlag at the specified pointer
     __device__ __forceinline__ SyncFlag LoadCG(SyncFlag* d_ptr) const
     {
         SyncFlag retval;
@@ -124,15 +122,11 @@ protected:
 
 public:
 
-    /**
-     * Constructor
-     */
+    // Constructor
     GlobalBarrierLifetime() : GlobalBarrier(), sync_bytes(0) {}
 
 
-    /**
-     * Deallocates and resets the progress counters
-     */
+    // Deallocates and resets the progress counters
     cudaError_t HostReset()
     {
         cudaError_t retval = cudaSuccess;
@@ -145,19 +139,15 @@ public:
     }
 
 
-    /**
-     * Destructor
-     */
+    // Destructor
     virtual ~GlobalBarrierLifetime()
     {
         HostReset();
     }
 
 
-    /**
-     * Sets up the progress counters for the next kernel launch (lazily
-     * allocating and initializing them if necessary)
-     */
+    // Sets up the progress counters for the next kernel launch (lazily
+    // allocating and initializing them if necessary)
     cudaError_t Setup(int sweep_grid_size)
     {
         cudaError_t retval = cudaSuccess;

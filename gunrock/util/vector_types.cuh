@@ -18,7 +18,7 @@ namespace gunrock {
 namespace util {
 
 
-/**
+/*
  * Specializations of this vector-type template can be used to indicate the 
  * proper vector type for a given typename and vector size. We can use the ::Type
  * typedef to declare and work with the appropriate vectorized type for a given 

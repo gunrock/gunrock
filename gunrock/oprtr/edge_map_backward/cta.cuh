@@ -466,45 +466,35 @@ namespace edge_map_backward {
                 template <int LOAD, int dummy>
                     struct Iterate<LOAD, LOAD_VEC_SIZE, dummy>
                     {
-                        /**
-                         * Init
-                         */
+                        // Init
                         template <typename Tile>
                             static __device__ __forceinline__ void Init(Tile *tile)
                             {
                                 Iterate<LOAD + 1, 0>::Init(tile);
                             }
 
-                        /**
-                         * Inspect
-                         */
+                        // Inspect
                         template <typename Cta, typename Tile>
                             static __device__ __forceinline__ void Inspect(Cta *cta, Tile *tile)
                             {
                                 Iterate<LOAD + 1, 0>::Inspect(cta, tile);
                             }
 
-                        /**
-                         * CtaExpand
-                         */
+                        // CTA Expand
                         template <typename Cta, typename Tile>
                             static __device__ __forceinline__ void CtaExpand(Cta *cta, Tile *tile)
                             {
                                 Iterate<LOAD + 1, 0>::CtaExpand(cta, tile);
                             }
 
-                        /**
-                         * WarpExpand
-                         */
+                        // Warp Expand
                         template <typename Cta, typename Tile>
                             static __device__ __forceinline__ void WarpExpand(Cta *cta, Tile *tile)
                             {
                                 Iterate<LOAD + 1, 0>::WarpExpand(cta, tile);
                             }
 
-                        /**
-                         * SingleThreadExpand
-                         */
+                        // Single Thread Expand
                         template <typename Cta, typename Tile>
                             static __device__ __forceinline__ void ThreadExpand(Cta *cta, Tile *tile)
                             {
@@ -541,44 +531,34 @@ namespace edge_map_backward {
 
                  //Iterate Interface
 
-                 /**
-                  * Constructor
-                  */
+                 // Constructor
                  __device__ __forceinline__ Tile()
                  {
                     Iterate<0, 0>::Init(this);
                  }
 
-                 /**
-                  * Inspect dequeued nodes
-                  */
+                 // Inspect dequeued nodes
                  template <typename Cta>
                     __device__ __forceinline__ void Inspect(Cta *cta)
                     {
                         Iterate<0, 0>::Inspect(cta, this);
                     }
 
-                /**
-                 * CTA Expand
-                 */
+                // CTA Expand
                 template <typename Cta>
                     __device__ __forceinline__ void CtaExpand(Cta *cta)
                     {
                         Iterate<0, 0>::CtaExpand(cta, this);
                     }
 
-                /**
-                 * Warp Expand
-                 */
+                // Warp Expand
                 template <typename Cta>
                     __device__ __forceinline__ void WarpExpand(Cta *cta)
                     {
                         Iterate<0, 0>::WarpExpand(cta, this);
                     }
 
-                /**
-                 * Single Thread Expand
-                 */
+                // Single Thread Expand
                 template <typename Cta>
                     __device__ __forceinline__ void ThreadExpand(Cta *cta)
                     {
@@ -590,7 +570,7 @@ namespace edge_map_backward {
             // Methods
 
             /**
-             * CTA default constructor
+             * @brief CTA default constructor
              */
             __device__ __forceinline__ Cta(
                 VertexId                    queue_index,

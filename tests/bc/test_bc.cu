@@ -9,7 +9,7 @@
  * @file
  * test_bc.cu
  *
- * @brief Simple test driver program for BFS.
+ * @brief Simple test driver program for BC.
  */
 
 #include <stdio.h>
@@ -108,14 +108,9 @@ void DisplaySolution(Value *sigmas, Value *bc_values, SizeT nodes)
     }
 }
 
-/**
- * @brief Performance/Evaluation statistics. Updates running
- * statistic, returning bias-corrected sample variance.
- */
-
 /******************************************************************************
- * BC Testing Routines
- *****************************************************************************/
+* BC Testing Routines
+*****************************************************************************/
 
 /**
  * @brief Graph edge properties (bundled properties)
@@ -302,8 +297,9 @@ void RefCPUBC(
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] graph Reference to ...
+ * @param[in] graph Reference to the CSR graph object defined in main driver
  * @param[in] src
+ * @param[in] ref_filename 
  * @param[in] max_grid_size
  * @param[in] num_gpus
  * @param[in] max_queue_sizing

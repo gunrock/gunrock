@@ -103,7 +103,7 @@ struct WarpSoaReduce
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Warp-reduction.  Result is returned in all warpscan threads.
      */
     template <
@@ -130,7 +130,7 @@ struct WarpSoaReduce
     }
 
 
-    /**
+    /*
      * Warp-reduction.  Result is returned in last warpscan thread.
      */
     template <

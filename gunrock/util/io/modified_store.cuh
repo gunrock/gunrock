@@ -48,13 +48,13 @@ namespace st {
 template <st::CacheModifier CACHE_MODIFIER>
 struct ModifiedStore
 {
-    /**
+    /*
      * Store operation we will provide specializations for
      */
     template <typename T>
     __device__ __forceinline__ static void St(T val, T *ptr);
 
-    /**
+    /*
      * Vec-4 stores for 64-bit types are implemented as two vec-2 stores
      */
     __device__ __forceinline__ static void St(double4 val, double4* ptr)

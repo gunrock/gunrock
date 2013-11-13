@@ -91,7 +91,7 @@ struct CooperativeSoaTileReduction
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Reduce a single tile.  Carry is computed (or updated if REDUCE_INTO_CARRY is set)
      * only in last raking thread
      *
@@ -119,7 +119,7 @@ struct CooperativeSoaTileReduction
             raking_soa_details, carry, reduction_op);
     }
 
-    /**
+    /*
      * Reduce a single tile.  Result is computed and returned in all threads.
      *
      * No post-synchronization needed before raking_details reuse.
@@ -161,7 +161,7 @@ struct CooperativeSoaGridReduction<RakingSoaDetails, NullType>
 {
     typedef typename RakingSoaDetails::TileTuple TileTuple;
 
-    /**
+    /*
      * Reduction in last-level raking grid.  Carry is assigned (or reduced into
      * if REDUCE_INTO_CARRY is set), but only in last raking thread
      */
@@ -203,7 +203,7 @@ struct CooperativeSoaGridReduction<RakingSoaDetails, NullType>
     }
 
 
-    /**
+    /*
      * Reduction in last-level raking grid.  Result is computed in all threads.
      */
     template <typename ReductionOp>

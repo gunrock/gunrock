@@ -66,7 +66,7 @@ struct SerialScan
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Serial scan with the specified operator
      */
     template <typename T, typename ReductionOp>
@@ -79,7 +79,7 @@ struct SerialScan
             partials, partials, exclusive_partial, scan_op);
     }
 
-    /**
+    /*
      * Serial scan with the addition operator
      */
     template <typename T>
@@ -92,7 +92,7 @@ struct SerialScan
     }
 
 
-    /**
+    /*
      * Serial scan with the specified operator
      */
     template <typename T, typename ReductionOp>
@@ -106,7 +106,7 @@ struct SerialScan
             partials, results, exclusive_partial, scan_op);
     }
 
-    /**
+    /*
      * Serial scan with the addition operator
      */
     template <typename T>

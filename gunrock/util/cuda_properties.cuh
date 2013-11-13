@@ -133,9 +133,7 @@ public:
     
 public:
     
-    /**
-     * Constructor
-     */
+    // Default constructor
     CudaProperties() 
     {
         // Get current device properties 
@@ -150,9 +148,7 @@ public:
         kernel_ptx_version = flush_kernel_attrs.ptxVersion * 10;
     }
 
-    /**
-     * Constructor
-     */
+    // Constructor
     CudaProperties(int gpu)
     {
         // Get current device properties

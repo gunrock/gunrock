@@ -92,7 +92,7 @@ struct WarpReduce
     // Interface
     //---------------------------------------------------------------------
 
-    /**
+    /*
      * Warp reduction with the specified operator, result is returned in last warpscan thread
      */
     template <typename T, typename WarpscanT, typename ReductionOp>
@@ -107,7 +107,7 @@ struct WarpReduce
     }
 
 
-    /**
+    /*
      * Warp reduction with the addition operator, result is returned in last warpscan thread
      */
     template <typename T, typename WarpscanT>
@@ -121,7 +121,7 @@ struct WarpReduce
     }
 
 
-    /**
+    /*
      * Warp reduction with the specified operator, result is returned in all warpscan threads)
      */
     template <typename T, typename WarpscanT, typename ReductionOp>
@@ -144,7 +144,7 @@ struct WarpReduce
     }
 
 
-    /**
+    /*
      * Warp reduction with the addition operator, result is returned in all warpscan threads)
      */
     template <typename T, typename WarpscanT>

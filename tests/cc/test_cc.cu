@@ -9,7 +9,7 @@
  * @file
  * test_cc.cu
  *
- * @brief Simple test driver program for CC.
+ * @brief Simple test driver program for connected component.
  */
 
 #include <stdio.h> 
@@ -89,7 +89,16 @@ bool CCCompare(
  }
 
  /**
-  * Displays the CC result (i.e., number of components)
+  * @brief Displays the CC result (i.e., number of components)
+  *
+  * @tparam VertexId
+  * @tparam SizeT
+  *
+  * @param[in] comp_ids Host-side vector to store computed component id for each node
+  * @param[in] nodes Number of nodes in the graph
+  * @param[in] num_components Number of connected components in the graph
+  * @param[in] roots Host-side vector stores the root for each node in the graph
+  * @param[in] histogram Histogram of connected component ids
   */
  template<typename VertexId, typename SizeT>
  void DisplaySolution(VertexId *comp_ids, SizeT nodes, unsigned int num_components, VertexId *roots, unsigned int *histogram)
@@ -139,7 +148,17 @@ bool CCCompare(
  *****************************************************************************/
 
 /**
- * CPU-based reference CC algorithm using Boost Graph Library
+ * @brief CPU-based reference CC algorithm using Boost Graph Library
+ *
+ * @tparam VertexId
+ * @tparam SizeT
+ *
+ * @param[in] row_offsets Host-side vector stores row offsets for each node in the graph
+ * @param[in] column_indices Host-side vector stores column indices for each edge in the graph
+ * @param[in] num_nodes
+ * @param[out] labels Host-side vector to store the component id for each node in the graph
+ *
+ * \return Number of connected components in the graph
  */
 template<typename VertexId, typename SizeT>
 unsigned int RefCPUCC(SizeT *row_offsets, VertexId *column_indices, int num_nodes, int *labels)
@@ -164,7 +183,16 @@ unsigned int RefCPUCC(SizeT *row_offsets, VertexId *column_indices, int num_node
 }
 
 /**
- * Run tests
+ * @brief Run tests for connected component algorithm
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ *
+ * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] max_grid_size Maximum CTA occupancy for CC kernels
+ * @param[in] num_gpus Number of GPUs
  */
 template <
     typename VertexId,
@@ -315,6 +343,16 @@ void RunTests(
         cudaDeviceSynchronize();
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] args Reference to the command line arguments
+ */
 template <
     typename VertexId,
     typename Value,
