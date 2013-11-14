@@ -24,20 +24,22 @@
 namespace gunrock {
 
 /**
- * CSR sparse format graph
+ * @brief CSR data structure which uses Compressed Sparse Row
+ * format to store a graph. It is a compressed way to present
+ * the graph as a sparse matrix.
  */
 template<typename VertexId, typename Value, typename SizeT>
 struct Csr
 {
-    SizeT nodes;
-    SizeT edges;
+    SizeT nodes;    /**< Number of nodes in the graph. */
+    SizeT edges;    /**< Number of edges in the graph. */
 
-    SizeT       *row_offsets;
-    VertexId    *column_indices;
-    Value       *edge_values;
-    Value       *node_values;
+    VertexId    *column_indices;/**< Column indices corresponding to all the non-zero values in the sparse matrix. */
+    SizeT       *row_offsets;   /**< List of indices where each row of the sparse matrix starts. */
+    Value       *edge_values;   /**< List of values attached to edges in the graph. */
+    Value       *node_values;   /**< List of values attached to nodes in the graph. */
 
-    bool         pinned;
+    bool         pinned;        /**< Whether to use pinned memory */
 
     /**
      * @brief CSR Constructor
@@ -190,7 +192,12 @@ struct Csr
     }
 
     /**
-     * @brief Print log-histogram
+     * \addtogroup PublicInterface
+     * @{
+     */
+
+    /**
+     * @brief Print log-scale degree histogram of the graph.
      */
     void PrintHistogram()
     {
@@ -248,8 +255,9 @@ struct Csr
             }
             printf("\n");
         }
-
     }
+
+    /**@}*/
 
     /**
      * @brief Deallocates CSR graph

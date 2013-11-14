@@ -486,7 +486,18 @@ class CCEnactor : public EnactorBase
     }
 
     /**
+     * \addtogroup PublicInterface
+     * @{
+     */
+
+    /**
      * @brief Enact Kernel Entry, specify KernelPolicy
+     *
+     * @tparam CCProblem CC Problem type. @see CCProblem
+     * @param[in] problem Pointer to CCProblem object.
+     * @param[in] max_grid_size Max grid size for CC kernel calls. 
+     *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template <typename CCProblem>
     cudaError_t Enact(
@@ -518,6 +529,8 @@ class CCEnactor : public EnactorBase
         printf("Not yet tuned for this architecture\n");
         return cudaErrorInvalidDeviceFunction;
     }
+
+    /** @} */
 
 };
 

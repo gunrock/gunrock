@@ -22,7 +22,7 @@ namespace app {
 namespace cc {
 
 /**
- * @brief Connected Component Problem structure.
+ * @brief Connected Component Problem structure stores device-side vectors for doing connected component computing on the GPU.
  *
  * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
@@ -45,13 +45,13 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
     struct DataSlice
     {
         // device storage arrays
-        VertexId        *d_component_ids;               // Used for component id
-        int             *d_masks;                       // Size equals to node number, show if a node is the root
-        bool            *d_marks;                       // Size equals to edge number, show if two vertices belong to the same component
-        VertexId        *d_froms;                        // Size equals to edge number, from vertex of one edge
-        VertexId        *d_tos;                          // Size equals to edge number, to vertex of one edge
-        int             *d_vertex_flag;
-        int             *d_edge_flag;
+        VertexId        *d_component_ids;               /**< Used for component id */
+        int             *d_masks;                       /**< Size equals to node number, show if a node is the root */
+        bool            *d_marks;                       /**< Size equals to edge number, show if two vertices belong to the same component */
+        VertexId        *d_froms;                       /**< Size equals to edge number, from vertex of one edge */
+        VertexId        *d_tos;                         /**< Size equals to edge number, to vertex of one edge */
+        int             *d_vertex_flag;                 /**< Finish flag for per-vertex kernels in CC algorithm */
+        int             *d_edge_flag;                   /**< Finish flag for per-edge kernels in CC algorithm */
     };
 
     // Members
@@ -86,15 +86,22 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
     num_gpus(0),
     num_components(0) {}
 
+    /**
+     * @brief CCProblem constructor
+     *
+     * @param[in] stream_from_host Whether to stream data from host.
+     * @param[in] graph Reference to the CSR graph object we process on.
+     * @param[in] num_gpus Number of the GPUs used.
+     */
     CCProblem(bool      stream_from_host,       // Only meaningful for single-GPU
               const Csr<VertexId, Value, SizeT> &graph,
-            int         num_gpus) :
+              int         num_gpus) :
         num_gpus(num_gpus)
     {
         Init(
-            stream_from_host,
-            graph,
-            num_gpus);
+                stream_from_host,
+                graph,
+                num_gpus);
     }
 
     /**
@@ -120,7 +127,12 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
     }
 
     /**
-     * @brief Extract into a single host vector the CC results disseminated across all GPUs.
+     * \addtogroup PublicInterface
+     * @{
+     */
+
+    /**
+     * @brief Copy result component ids computed on the GPU back to a host-side vector.
      *
      * @param[out] h_component_ids host-side vector to store computed component ids.
      *
@@ -198,10 +210,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
      * @brief CCProblem initialization
      *
      * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] _nodes Number of nodes in the CSR graph.
-     * @param[in] _edges Number of edges in the CSR graph.
-     * @param[in] h_row_offsets Host-side row offsets array.
-     * @param[in] h_column_indices Host-side column indices array.
+     * @param[in] graph Reference to the CSR graph object we process on. @see Csr
      * @param[in] _num_gpus Number of the GPUs used.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -336,21 +345,19 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
     }
 
     /**
-     *  @brief Performs any initialization work needed for CC problem type. Must be called prior to each BC run.
+     *  @brief Performs any initialization work needed for CC problem type. Must be called prior to each CC run.
      *
      *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
-     *  @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
      * 
      *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Reset(
-            FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
-            double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
+            FrontierType frontier_type)             // The frontier type (i.e., edge/vertex/mixed)
     {
         typedef ProblemBase<VertexId, SizeT,
                                 _USE_DOUBLE_BUFFER> BaseProblem;
         //load ProblemBase Reset
-        BaseProblem::Reset(frontier_type, queue_sizing);
+        BaseProblem::Reset(frontier_type, 1.0);
 
         cudaError_t retval = cudaSuccess;
 
@@ -447,6 +454,10 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
         
         return retval;
     }
+
+    /** @} */
+
+
 
 };
 

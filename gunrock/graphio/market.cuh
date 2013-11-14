@@ -171,24 +171,27 @@ int ReadMarketStream(
     return 0;
 }
 
+/**
+ * \defgroup PublicInterface Gunrock Public Interface
+ * @{
+ */
 
 /**
  * @brief Loads a MARKET-formatted CSR graph from the specified file.
  *
- * @param[in] dimacs_filename Graph file name,
- * if dimacs_filename == NULL, then it is loaded from stdin.
- * @param[in] csr_graph Csr graph object to store the graph data
+ * @param[in] mm_filename Graph file name, if empty, then it is loaded from stdin.
+ * @param[in] csr_graph Reference to CSR graph object. @see Csr
  * @param[in] undirected Is the graph undirected or not?
  *
- * \return If there is any File I/O error along the way.
+ * \return If there is any File I/O error along the way. 0 for no error.
  */
 template<bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
 int BuildMarketGraph(
-    char *dimacs_filename,
+    char *mm_filename,
     Csr<VertexId, Value, SizeT> &csr_graph,
     bool undirected)
 {
-    if (dimacs_filename == NULL) {
+    if (mm_filename == NULL) {
 
         // Read from stdin
         printf("Reading from stdin:\n");
@@ -199,9 +202,9 @@ int BuildMarketGraph(
     } else {
 
         // Read from file
-        FILE *f_in = fopen(dimacs_filename, "r");
+        FILE *f_in = fopen(mm_filename, "r");
         if (f_in) {
-            printf("Reading from %s:\n", dimacs_filename);
+            printf("Reading from %s:\n", mm_filename);
             if (ReadMarketStream<LOAD_VALUES>(f_in, csr_graph, undirected) != 0) {
                 fclose(f_in);
                 return -1;
@@ -215,6 +218,8 @@ int BuildMarketGraph(
 
     return 0;
 }
+
+/**@}*/
 
 } // namespace graphio
 } // namespace gunrock

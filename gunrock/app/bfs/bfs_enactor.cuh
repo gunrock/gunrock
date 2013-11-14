@@ -200,7 +200,7 @@ class BFSEnactor : public EnactorBase
      *
      * @param[in] problem BFSProblem object.
      * @param[in] src Source node for BFS.
-     * @param[in] max_grid_size Max grid size for BC kernel calls.
+     * @param[in] max_grid_size Max grid size for BFS kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -372,7 +372,20 @@ class BFSEnactor : public EnactorBase
     }
 
     /**
-     * @brief Enact Kernel Entry, specify KernelPolicy.
+     * \addtogroup PublicInterface
+     * @{
+     */
+
+    /**
+     * @brief BFS Enact kernel entry.
+     *
+     * @tparam BFSProblem BFS Problem type. @see BFSProblem
+     *
+     * @param[in] problem Pointer to BFSProblem object.
+     * @param[in] src Source node for BFS.
+     * @param[in] max_grid_size Max grid size for BFS kernel calls.
+     *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template <typename BFSProblem>
     cudaError_t Enact(
@@ -419,6 +432,8 @@ class BFSEnactor : public EnactorBase
         printf("Not yet tuned for this architecture\n");
         return cudaErrorInvalidDeviceFunction;
     }
+
+    /** @} */
 
 };
 

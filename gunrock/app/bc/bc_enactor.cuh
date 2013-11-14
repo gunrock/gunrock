@@ -492,7 +492,20 @@ class BCEnactor : public EnactorBase
     }
 
     /**
-     * @brief Enact Kernel Entry, specify KernelPolicy.
+     * \addtogroup PublicInterface
+     * @{
+     */
+
+    /**
+     * @brief BC Enact kernel entry.
+     *
+     * @tparam BCProblem BC Problem type. @see BCProblem
+     *
+     * @param[in] problem Pointer to BCProblem object.
+     * @param[in] src Source node for BC. -1 indicates computing BC value for all nodes.
+     * @param[in] max_grid_size Max grid size for BC kernel calls.
+     *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template <typename BCProblem>
     cudaError_t Enact(
@@ -539,6 +552,8 @@ class BCEnactor : public EnactorBase
         printf("Not yet tuned for this architecture\n");
         return cudaErrorInvalidDeviceFunction;
     }
+
+    /** @} */
 
 };
 

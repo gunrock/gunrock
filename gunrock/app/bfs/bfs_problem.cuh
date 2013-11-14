@@ -22,7 +22,7 @@ namespace app {
 namespace bfs {
 
 /**
- * @brief Breadth-First Search Problem structure.
+ * @brief Breadth-First Search Problem structure stores device-side vectors for doing BFS computing on the GPU.
  *
  * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
@@ -51,8 +51,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
     struct DataSlice
     {
         // device storage arrays
-        VertexId        *d_labels;              // Used for source distance
-        VertexId        *d_preds;               // Used for predecessor
+        VertexId        *d_labels;              /**< Used for source distance */
+        VertexId        *d_preds;               /**< Used for predecessor */
     };
 
     // Members
@@ -89,10 +89,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
      * @brief BFSProblem constructor
      *
      * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] nodes Number of nodes in the CSR graph.
-     * @param[in] edges Number of edges in the CSR graph.
-     * @param[in] h_row_offsets Host-side row offsets array.
-     * @param[in] h_column_indices Host-side column indices array.
+     * @param[in] graph Reference to the CSR graph object we process on.
      * @param[in] num_gpus Number of the GPUs used.
      */
     BFSProblem(bool        stream_from_host,       // Only meaningful for single-GPU
@@ -124,9 +121,14 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
     }
 
     /**
-     * @brief Extract into a single host vector the BFS results disseminated across all GPUs.
+     * \addtogroup PublicInterface
+     * @{
+     */
+
+    /**
+     * @brief Copy result labels and/or predecessors computed on the GPU back to host-side vectors.
      *
-     * @param[out] h_labels host-side vector to store computed sigma values. (Meaningful only in single-pass BC)
+     * @param[out] h_labels host-side vector to store computed node labels (distances from the source).
      * @param[out] h_preds host-side vector to store predecessor vertex ids.
      *
      *\return cudaError_t object which indicates the success of all CUDA function calls.
@@ -170,10 +172,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
      * @brief BFSProblem initialization
      *
      * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] _nodes Number of nodes in the CSR graph.
-     * @param[in] _edges Number of edges in the CSR graph.
-     * @param[in] h_row_offsets Host-side row offsets array.
-     * @param[in] h_column_indices Host-side column indices array.
+     * @param[in] graph Reference to the CSR graph object we process on. @see Csr
      * @param[in] _num_gpus Number of the GPUs used.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -327,6 +326,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
 
         return retval;
     }
+
+    /** @} */
 
 };
 
