@@ -167,7 +167,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
      * @param[out] h_histograms host-side vector to store histograms.
      *
      */
-    void ComputeDetails(VertexId *h_component_ids, VertexId *h_roots, unsigned int *h_histograms)
+    void ComputeCCHistogram(VertexId *h_component_ids, VertexId *h_roots, unsigned int *h_histograms)
     {
             //Get roots for each component and the total number of component.
             num_components = 0;

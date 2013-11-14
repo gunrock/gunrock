@@ -561,7 +561,7 @@ void RunTests(
     unsigned int    *h_histograms       =
         new unsigned int[cc_problem->num_components];
 
-    cc_problem->ComputeDetails(h_component_ids, h_roots, h_histograms);
+    cc_problem->ComputeCCHistogram(h_component_ids, h_roots, h_histograms);
 
     // Display Solution
     DisplayCCSolution(h_component_ids, graph.nodes, ref_num_components);

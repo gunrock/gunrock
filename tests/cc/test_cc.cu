@@ -267,7 +267,7 @@ void RunTests(
             VertexId        *h_roots            = new VertexId[csr_problem->num_components];
             unsigned int    *h_histograms       = new unsigned int[csr_problem->num_components];
 
-            csr_problem->ComputeDetails(h_component_ids, h_roots, h_histograms);
+            csr_problem->ComputeCCHistogram(h_component_ids, h_roots, h_histograms);
 
             // Display Solution
             DisplaySolution(h_component_ids, graph.nodes, ref_num_components, h_roots, h_histograms);
