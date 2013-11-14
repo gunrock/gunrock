@@ -302,13 +302,6 @@ void RunTests(
         MARK_PREDECESSORS,
         false> Problem; // does not use double buffer
 
-    typedef BFSFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        Problem> Functor;
-
-
         // Allocate host-side label array (for both reference and gpu-computed results)
         VertexId    *reference_labels       = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
         VertexId    *h_labels               = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
@@ -324,13 +317,10 @@ void RunTests(
 
         // Allocate problem on GPU
         Problem *csr_problem = new Problem;
-        if (csr_problem->Init(
+        util::GRError(csr_problem->Init(
             g_stream_from_host,
-            graph.nodes,
-            graph.edges,
-            graph.row_offsets,
-            graph.column_indices,
-            num_gpus)) exit(1);
+            graph,
+            num_gpus), "Problem BFS Initialization Failed", __FILE__, __LINE__);
 
         //
         // Compute reference CPU BFS solution for source-distance
@@ -345,8 +335,6 @@ void RunTests(
             printf("\n");
         }
 
-        cudaError_t         retval = cudaSuccess;
-
         Stats *stats = new Stats("GPU BFS");
 
         long long           total_queued = 0;
@@ -356,21 +344,17 @@ void RunTests(
         // Perform BFS
         GpuTimer gpu_timer;
 
-        if (retval = csr_problem->Reset(src, bfs_enactor.GetFrontierType(), max_queue_sizing)) exit(1);
+        util::GRError(csr_problem->Reset(src, bfs_enactor.GetFrontierType(), max_queue_sizing), "BFS Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
-        if (retval = bfs_enactor.template Enact<Problem, Functor>(csr_problem, src, max_grid_size)) exit(1);
+        util::GRError(bfs_enactor.template Enact<Problem>(csr_problem, src, max_grid_size), "BFS Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
 
         bfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
 
-        if (retval && (retval != cudaErrorInvalidDeviceFunction)) {
-            exit(1);
-        }
-
         float elapsed = gpu_timer.ElapsedMillis();
 
         // Copy out results
-        if (csr_problem->Extract(h_labels, h_preds)) exit(1);
+        util::GRError(csr_problem->Extract(h_labels, h_preds), "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
 
         // Verify the result
         if (reference_check != NULL) {

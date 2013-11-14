@@ -129,7 +129,7 @@ struct Cta
             /**
              * @brief Initialize flag values for compact new frontier. If vertex id equals to -1, then discard it in the new frontier.
              *
-             * @param[in] tile Tile object holds the vertex ids, ranks and flags.
+             * @param[in] tile Pointer to Tile object holds the vertex ids, ranks and flags.
              */
             static __device__ __forceinline__ void InitFlags(Tile *tile)
             {

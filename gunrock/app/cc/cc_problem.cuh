@@ -87,21 +87,13 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
     num_components(0) {}
 
     CCProblem(bool      stream_from_host,       // Only meaningful for single-GPU
-            SizeT       nodes,
-            SizeT       edges,
-            SizeT       *h_row_offsets,
-            VertexId    *h_column_indices,
+              const Csr<VertexId, Value, SizeT> &graph,
             int         num_gpus) :
-        nodes(nodes),
-        edges(edges),
         num_gpus(num_gpus)
     {
         Init(
             stream_from_host,
-            nodes,
-            edges,
-            h_row_offsets,
-            h_column_indices,
+            graph,
             num_gpus);
     }
 
@@ -216,15 +208,14 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
      */
     cudaError_t Init(
             bool        stream_from_host,       // Only meaningful for single-GPU
-            SizeT       _nodes,
-            SizeT       _edges,
-            SizeT       *h_row_offsets,
-            VertexId    *h_column_indices,
+            const Csr<VertexId, Value, SizeT> &graph,
             int         _num_gpus)
     {
         num_gpus = _num_gpus;
-        nodes = _nodes;
-        edges = _edges;
+        nodes = graph.nodes;
+        edges = graph.edges;
+        VertexId *h_row_offsets = graph.row_offsets;
+        VertexId *h_column_indices = graph.column_indices;
         ProblemBase<VertexId, SizeT,
                                 _USE_DOUBLE_BUFFER>::Init(stream_from_host,
                                         nodes,

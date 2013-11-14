@@ -197,7 +197,7 @@ class BFSEnactor : public EnactorBase
      * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
      * @tparam VertexMapPolicy Kernel policy for vertex mapping.
      * @tparam BFSProblem BFS Problem type.
-     * @tparam BFSFunctor Functor type used in edge mapping and vertex mapping.
+     *
      * @param[in] problem BFSProblem object.
      * @param[in] src Source node for BFS.
      * @param[in] max_grid_size Max grid size for BC kernel calls.
@@ -207,15 +207,19 @@ class BFSEnactor : public EnactorBase
     template<
         typename EdgeMapPolicy,
         typename VertexMapPolicy,
-        typename BFSProblem,
-        typename BFSFunctor>
-    cudaError_t Enact(
+        typename BFSProblem>
+    cudaError_t EnactBFS(
     BFSProblem                          *problem,
     typename BFSProblem::VertexId       src,
     int                                 max_grid_size = 0)
     {
         typedef typename BFSProblem::SizeT      SizeT;
         typedef typename BFSProblem::VertexId   VertexId;
+
+        typedef BFSFunctor<
+            VertexId,
+            SizeT,
+            BFSProblem> BfsFunctor;
 
         cudaError_t retval = cudaSuccess;
 
@@ -257,7 +261,7 @@ class BFSEnactor : public EnactorBase
             while (done[0] < 0) {
 
                 // Edge Map
-                gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, BFSProblem, BFSFunctor>
+                gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, BFSProblem, BfsFunctor>
                 <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
                     queue_reset,
                     queue_index,
@@ -310,7 +314,7 @@ class BFSEnactor : public EnactorBase
                 if (done[0] == 0) break;
 
                 // Vertex Map
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, BFSProblem, BFSFunctor>
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, BFSProblem, BfsFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                     queue_reset,
                     queue_index,
@@ -370,7 +374,7 @@ class BFSEnactor : public EnactorBase
     /**
      * @brief Enact Kernel Entry, specify KernelPolicy.
      */
-    template <typename BFSProblem, typename BFSFunctor>
+    template <typename BFSProblem>
     cudaError_t Enact(
         BFSProblem                      *problem,
         typename BFSProblem::VertexId    src,
@@ -405,7 +409,7 @@ class BFSEnactor : public EnactorBase
                 7>                                  // LOG_SCHEDULE_GRANULARITY
                 EdgeMapPolicy;
 
-                return Enact<EdgeMapPolicy, VertexMapPolicy, BFSProblem, BFSFunctor>(
+                return EnactBFS<EdgeMapPolicy, VertexMapPolicy, BFSProblem>(
                 problem, src, max_grid_size);
         }
 

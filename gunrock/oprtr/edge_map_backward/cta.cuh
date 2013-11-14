@@ -154,8 +154,8 @@ namespace edge_map_backward {
                          *        prepare for neighbor list expansion.
                          * @tparam Cta CTA tile-processing abstraction type
                          * @tparam Tile Tile structure type
-                         * @param[in] cta CTA object
-                         * @param[in] tile Tile object
+                         * @param[in] cta Pointer to CTA object
+                         * @param[in] tile Pointer to Tile object
                          */
                         template <typename Cta, typename Tile>
                             static __device__ __forceinline__ void Inspect(Cta *cta, Tile *tile)
@@ -186,8 +186,8 @@ namespace edge_map_backward {
                          * @brief Expand the node's neighbor list using the whole CTA.
                          * @tparam Cta CTA tile-processing abstraction type
                          * @tparam Tile Tile structure type
-                         * @param[in] cta CTA object
-                         * @param[in] tile Tile object
+                         * @param[in] cta Pointer to CTA object
+                         * @param[in] tile Pointer to Tile object
                          */
                         template <typename Cta, typename Tile>
                             static __device__ __forceinline__ void CtaExpand(Cta *cta, Tile *tile)
@@ -313,8 +313,8 @@ namespace edge_map_backward {
                          * @brief Expand the node's neighbor list using a warp.
                          * @tparam Cta CTA tile-processing abstraction type
                          * @tparam Tile Tile structure type
-                         * @param[in] cta CTA object
-                         * @param[in] tile Tile object
+                         * @param[in] cta Pointer to CTA object
+                         * @param[in] tile Pointer to Tile object
                          */
                         template<typename cta, typename Tile>
                             static __device__ __forceinline__ void WarpExpand(Cta *cta, Tile *tile)
@@ -433,8 +433,8 @@ namespace edge_map_backward {
                          * @brief Expand the node's neighbor list using a single thread.
                          * @tparam Cta CTA tile-processing abstraction type
                          * @tparam Tile Tile structure type
-                         * @param[in] cta CTA object
-                         * @param[in] tile Tile object
+                         * @param[in] cta Pointer to CTA object
+                         * @param[in] tile Pointer to Tile object
                          */
                         template <typename Cta, typename Tile>
                             static __device__ __forceinline__ void ThreadExpand(Cta *cta, Tile *tile)

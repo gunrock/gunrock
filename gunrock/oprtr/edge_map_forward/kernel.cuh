@@ -231,10 +231,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @param[in] queue_index       Current frontier queue counter index
  * @param[in] num_gpus          Number of GPUs
  * @param[in] num_elements      Number of elements
- * @param[in] d_done            Flag to set when we detect incoming frontier is empty
- * @param[in] d_in_queue        Incoming frontier queue
- * @param[in] d_out_queue       Outgoing frontier queue
- * @param[in] d_column_indices  Column indices queue  
+ * @param[in] d_done            Pointer of volatile int to the flag to set when we detect incoming frontier is empty
+ * @param[in] d_in_queue        Device pointer of VertexId to the incoming frontier queue
+ * @param[in] d_out_queue       Device pointer of VertexId to the outgoing frontier queue
+ * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue  
  * @param[in] problem           Device pointer to the problem object
  * @param[in] work_progress     queueing counters to record work progress
  * @param[in] max_in_queue      Maximum number of elements we can place into the incoming frontier

@@ -323,18 +323,6 @@ void RunTests(
         Value,
         false> Problem; //does not use double buffer
 
-    typedef ForwardFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        Problem> FFunctor;
-    typedef BackwardFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        Problem> BFunctor;
-
-
     // Allocate host-side array (for both reference and gpu-computed results)
     Value *reference_bc_values = (Value*)malloc(sizeof(Value) * graph.nodes);
     Value *reference_sigmas    = (Value*)malloc(sizeof(Value) * graph.nodes);
@@ -350,13 +338,10 @@ void RunTests(
 
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
-    if (csr_problem->Init(
+    util::GRError(csr_problem->Init(
             g_stream_from_host,
-            graph.nodes,
-            graph.edges,
-            graph.row_offsets,
-            graph.column_indices,
-            num_gpus)) exit(1);
+            graph,
+            num_gpus), "BC Problem Initialization Failed", __FILE__, __LINE__);
 
     //
     // Compute reference CPU BC solution for source-distance
@@ -381,8 +366,6 @@ void RunTests(
         }
     }
 
-    cudaError_t         retval = cudaSuccess;
-
     double              avg_duty = 0.0;
 
     // Perform BC
@@ -405,13 +388,8 @@ void RunTests(
     gpu_timer.Start();
     for (VertexId i = start_src; i < end_src; ++i)
     {
-        if (retval = csr_problem->Reset(i, bc_enactor.GetFrontierType(),
-                                        max_queue_sizing)) exit(1);
-        if (retval = bc_enactor.template Enact<Problem, FFunctor, BFunctor>
-            (csr_problem, i, max_grid_size)) exit(1);
-        if (retval && (retval != cudaErrorInvalidDeviceFunction)) {
-            exit(1);
-        }
+        util::GRError(csr_problem->Reset(i, bc_enactor.GetFrontierType(), max_queue_sizing), "BC Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(bc_enactor.template Enact<Problem>(csr_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
     }
 
     util::MemsetScaleKernel<<<128, 128>>>
@@ -424,7 +402,7 @@ void RunTests(
     bc_enactor.GetStatistics(avg_duty);
 
     // Copy out results
-    if (csr_problem->Extract(h_sigmas, h_bc_values)) exit(1);
+    util::GRError(csr_problem->Extract(h_sigmas, h_bc_values), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // Verify the result
     if (reference_check_bc_values != NULL) {

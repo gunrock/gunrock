@@ -197,10 +197,8 @@ class BCEnactor : public EnactorBase
     template<
         typename EdgeMapPolicy,
         typename VertexMapPolicy,
-        typename BCProblem,
-        typename ForwardFunctor,
-        typename BackwardFunctor>
-    cudaError_t Enact(
+        typename BCProblem>
+    cudaError_t EnactBC(
     BCProblem                          *problem,
     typename BCProblem::VertexId       src,
     int                                 max_grid_size = 0)
@@ -208,6 +206,18 @@ class BCEnactor : public EnactorBase
         typedef typename BCProblem::SizeT       SizeT;
         typedef typename BCProblem::VertexId    VertexId;
         typedef typename BCProblem::Value       Value;
+
+        typedef ForwardFunctor<
+            VertexId,
+            SizeT,
+            Value,
+            BCProblem> ForwardFunctor;
+
+        typedef BackwardFunctor<
+            VertexId,
+            SizeT,
+            Value,
+            BCProblem> BackwardFunctor;
 
         cudaError_t retval = cudaSuccess;
 
@@ -250,39 +260,6 @@ class BCEnactor : public EnactorBase
             //Value *sigmas = new Value[graph_slice->nodes];
             // Forward BC iteration
             while (done[0] < 0) {
-
-                /*if (DEBUG) {
-                    printf("Edge Map Input:\n");
-
-                    if (retval = util::GRError(cudaMemcpy(
-                                    vids,
-                                    graph_slice->frontier_queues.d_keys[selector],
-                                    sizeof(VertexId) * queue_length,
-                                    cudaMemcpyDeviceToHost),
-                                "BFSProblem cudaMemcpy d_vids failed", __FILE__, __LINE__)) break;
-
-                    if (retval = util::GRError(cudaMemcpy(
-                                    labels,
-                                    problem->data_slices[0]->d_labels,
-                                    sizeof(VertexId) * graph_slice->nodes,
-                                    cudaMemcpyDeviceToHost),
-                                "BFSProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) break;
-
-                    if (retval = util::GRError(cudaMemcpy(
-                                    sigmas,
-                                    problem->data_slices[0]->d_sigmas,
-                                    sizeof(Value) * graph_slice->nodes,
-                                    cudaMemcpyDeviceToHost),
-                                "BFSProblem cudaMemcpy d_sigmas failed", __FILE__, __LINE__)) break;
-                    for (int i = 0; i < queue_length; ++i)
-                    {
-                        if (i % 5 == 0)
-                            printf("\n");
-                        printf(" |%d:label:%d,sigma:%f| ",vids[i],labels[vids[i]], sigmas[vids[i]]);
-                        
-                    }
-                    printf("\n");
-                }*/
 
                 // Edge Map
                 gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, BCProblem, ForwardFunctor>
@@ -510,9 +487,6 @@ class BCEnactor : public EnactorBase
             
         } while(0);
 
-        // Add delta value to BC value
-        //util::MemsetAddVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_bc_values, problem->data_slices[0]->d_deltas, problem->graph_slices[0]->nodes);
-
         if (DEBUG) printf("\nGPU BC Done.\n");
         return retval;
     }
@@ -520,7 +494,7 @@ class BCEnactor : public EnactorBase
     /**
      * @brief Enact Kernel Entry, specify KernelPolicy.
      */
-    template <typename BCProblem, typename FFunctor, typename BFunctor>
+    template <typename BCProblem>
     cudaError_t Enact(
         BCProblem                      *problem,
         typename BCProblem::VertexId    src,
@@ -555,7 +529,7 @@ class BCEnactor : public EnactorBase
                 7>                                  // LOG_SCHEDULE_GRANULARITY
                 EdgeMapPolicy;
 
-                return Enact<EdgeMapPolicy, VertexMapPolicy, BCProblem, FFunctor, BFunctor>(
+                return EnactBC<EdgeMapPolicy, VertexMapPolicy, BCProblem>(
                 problem, src, max_grid_size);
         }
 

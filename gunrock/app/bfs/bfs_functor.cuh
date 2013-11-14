@@ -26,11 +26,10 @@ namespace bfs {
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam Value               Type of float or double to use for computing BC value.
- * @tparam ProblemData         Problem data type which contains data slice for BC problem
+ * @tparam ProblemData         Problem data type which contains data slice for BFS problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename ProblemData>
 struct BFSFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;

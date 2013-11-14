@@ -496,49 +496,6 @@ void RunTests(
         Value,
         true> CCProblem_T; //use double buffer for edgemap and vertexmap.
 
-    typedef UpdateMaskFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        CCProblem_T> UpdateMaskFunctor;
-
-    typedef HookInitFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        CCProblem_T> HookInitFunctor;
-
-    typedef HookMinFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        CCProblem_T> HookMinFunctor;
-
-    typedef HookMaxFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        CCProblem_T> HookMaxFunctor;
-
-    typedef PtrJumpFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        CCProblem_T> PtrJumpFunctor;
-
-    typedef PtrJumpMaskFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        CCProblem_T> PtrJumpMaskFunctor;
-
-    typedef PtrJumpUnmaskFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        CCProblem_T> PtrJumpUnmaskFunctor;
-
-
     // Allocate host-side label array (for both reference and
     // gpu-computed results)
     VertexId    *reference_component_ids        =
@@ -554,13 +511,10 @@ void RunTests(
 
     // Allocate problem on GPU
     CCProblem_T *cc_problem = new CCProblem_T;
-    if (cc_problem->Init(
+    util::GRError(cc_problem->Init(
             g_stream_from_host,
-            graph.nodes,
-            graph.edges,
-            graph.row_offsets,
-            graph.column_indices,
-            num_gpus)) exit(1);
+            graph,
+            num_gpus), "CC Problem Initialization Failed", __FILE__, __LINE__);
 
     //
     // Compute reference CPU CC solution for source-distance
@@ -581,26 +535,15 @@ void RunTests(
     // Perform CC
     GpuTimer gpu_timer;
 
-    if (retval = cc_problem->Reset(cc_enactor.GetFrontierType(), 1.0)) exit(1);
+    util::GRError(cc_problem->Reset(cc_enactor.GetFrontierType(), 1.0), "CC Problem Data Reset Failed", __FILE__, __LINE__);
     gpu_timer.Start();
-    if (retval = cc_enactor.template Enact<CCProblem_T,
-        UpdateMaskFunctor,
-        HookInitFunctor,
-        HookMinFunctor,
-        HookMaxFunctor,
-        PtrJumpFunctor,
-        PtrJumpMaskFunctor,
-        PtrJumpUnmaskFunctor>(cc_problem, max_grid_size)) exit(1);
+    util::GRError(cc_enactor.template Enact<CCProblem_T>(cc_problem, max_grid_size), "CC Problem Enact Failed", __FILE__, __LINE__);
     gpu_timer.Stop();
-
-    if (retval && (retval != cudaErrorInvalidDeviceFunction)) {
-        exit(1);
-    }
 
     float elapsed = gpu_timer.ElapsedMillis();
 
     // Copy out results
-    if (cc_problem->Extract(h_component_ids)) exit(1);
+    util::GRError(cc_problem->Extract(h_component_ids), "CC Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // Validity
     if (ref_num_components == cc_problem->num_components)
@@ -667,13 +610,6 @@ void RunTests(
         true,                // Set MARK_PREDECESSORS flag true
         false> BFSProblem_T; // does not use double buffer
 
-    typedef BFSFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        BFSProblem_T> BfsFunctor;
-
-
     // Allocate host-side label array (for both reference and
     // gpu-computed results)
     VertexId *reference_labels =
@@ -691,13 +627,10 @@ void RunTests(
 
     // Allocate problem on GPU
     BFSProblem_T *bfs_problem = new BFSProblem_T;
-    if (bfs_problem->Init(
+    util::GRError(bfs_problem->Init(
             g_stream_from_host,
-            graph.nodes,
-            graph.edges,
-            graph.row_offsets,
-            graph.column_indices,
-            num_gpus)) exit(1);
+            graph,
+            num_gpus), "BFS Problem Initialization Failed", __FILE__, __LINE__);
 
     //
     // Compute reference CPU BFS solution for source-distance
@@ -722,26 +655,18 @@ void RunTests(
 
     // Perform BFS
 
-    if (retval = bfs_problem->Reset(src, bfs_enactor.GetFrontierType(),
-                                    max_queue_sizing)) {
-        exit(1);
-    }
+    util::GRError(bfs_problem->Reset(src, bfs_enactor.GetFrontierType(),
+                                    max_queue_sizing), "BFS Problem Data Reset Failed", __FILE__, __LINE__);
     gpu_timer.Start();
-    if (retval = bfs_enactor.template Enact<BFSProblem_T, BfsFunctor>(bfs_problem, src, max_grid_size)) {
-        exit(1);
-    }
+    util::GRError(bfs_enactor.template Enact<BFSProblem_T>(bfs_problem, src, max_grid_size), "BFS Problem Enact Failed", __FILE__, __LINE__);
     gpu_timer.Stop();
 
     bfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
 
-    if (retval && (retval != cudaErrorInvalidDeviceFunction)) {
-        exit(1);
-    }
-
     elapsed = gpu_timer.ElapsedMillis();
 
     // Copy out results
-    if (bfs_problem->Extract(h_labels, h_preds)) exit(1);
+    util::GRError(bfs_problem->Extract(h_labels, h_preds), "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // Verify the result
     if (reference_check != NULL) {
@@ -780,19 +705,6 @@ void RunTests(
         Value,
         false> BCProblem_T; //does not use double buffer
 
-    typedef ForwardFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        BCProblem_T> FFunctor;
-
-    typedef BackwardFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        BCProblem_T> BFunctor;
-
-
     // Allocate host-side array (for both reference and gpu-computed results)
     Value *reference_bc_values       =
         (Value*)malloc(sizeof(Value) * graph.nodes);
@@ -805,13 +717,10 @@ void RunTests(
 
     // Allocate problem on GPU
     BCProblem_T *bc_problem = new BCProblem_T;
-    if (bc_problem->Init(
+    util::GRError(bc_problem->Init(
             g_stream_from_host,
-            graph.nodes,
-            graph.edges,
-            graph.row_offsets,
-            graph.column_indices,
-            num_gpus)) exit(1);
+            graph,
+            num_gpus), "BC Problem Initialization Failed", __FILE__, __LINE__);
 
     //
     // Compute reference CPU BC solution for source-distance
@@ -837,17 +746,9 @@ void RunTests(
     gpu_timer.Start();
     for (VertexId i = start_src; i < end_src; ++i)
     {
-        if (retval = bc_problem->Reset(i, bc_enactor.GetFrontierType(),
-                                       max_queue_sizing)) {
-            exit(1);
-        }
-        if (retval = bc_enactor.template Enact<BCProblem_T, FFunctor, BFunctor>
-            (bc_problem, i, max_grid_size)) {
-            exit(1);
-        }
-        if (retval && (retval != cudaErrorInvalidDeviceFunction)) {
-            exit(1);
-        }
+        util::GRError(bc_problem->Reset(i, bc_enactor.GetFrontierType(),
+                                       max_queue_sizing), "BC Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(bc_enactor.template Enact<BCProblem_T>(bc_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
     }
 
     // Normalize BC value
@@ -861,7 +762,7 @@ void RunTests(
     bc_enactor.GetStatistics(avg_duty);
 
     // Copy out results
-    if (bc_problem->Extract(NULL, h_bc_values)) exit(1);
+    util::GRError(bc_problem->Extract(NULL, h_bc_values), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // Verify the result
     if (reference_check_bc_values != NULL) {

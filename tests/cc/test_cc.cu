@@ -210,49 +210,6 @@ void RunTests(
         Value,
         true> Problem; //use double buffer for edgemap and vertexmap.
 
-    typedef UpdateMaskFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        Problem> UpdateMaskFunctor;
-
-    typedef HookInitFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        Problem> HookInitFunctor;
-    
-    typedef HookMinFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        Problem> HookMinFunctor;
-    
-    typedef HookMaxFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        Problem> HookMaxFunctor;
-
-    typedef PtrJumpFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        Problem> PtrJumpFunctor;
-
-    typedef PtrJumpMaskFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        Problem> PtrJumpMaskFunctor;
-
-    typedef PtrJumpUnmaskFunctor<
-        VertexId,
-        SizeT,
-        Value,
-        Problem> PtrJumpUnmaskFunctor;
-
-
         // Allocate host-side label array (for both reference and gpu-computed results)
         VertexId    *reference_component_ids        = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
         VertexId    *h_component_ids                = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
@@ -264,13 +221,10 @@ void RunTests(
 
         // Allocate problem on GPU
         Problem *csr_problem = new Problem;
-        if (csr_problem->Init(
+        util::GRError(csr_problem->Init(
             g_stream_from_host,
-            graph.nodes,
-            graph.edges,
-            graph.row_offsets,
-            graph.column_indices,
-            num_gpus)) exit(1);
+            graph,
+            num_gpus), "CC Problem Initialization Failed", __FILE__, __LINE__);
 
         //
         // Compute reference CPU BFS solution for source-distance
@@ -291,26 +245,15 @@ void RunTests(
         // Perform CC
         GpuTimer gpu_timer;
 
-        if (retval = csr_problem->Reset(cc_enactor.GetFrontierType(), 1.0)) exit(1);
+        util::GRError(csr_problem->Reset(cc_enactor.GetFrontierType(), 1.0), "CC Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
-        if (retval = cc_enactor.template Enact<Problem,
-                                            UpdateMaskFunctor,
-                                            HookInitFunctor,
-                                            HookMinFunctor,
-                                            HookMaxFunctor,
-                                            PtrJumpFunctor,
-                                            PtrJumpMaskFunctor,
-                                            PtrJumpUnmaskFunctor>(csr_problem, max_grid_size)) exit(1);
+        util::GRError(cc_enactor.template Enact<Problem>(csr_problem, max_grid_size), "CC Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
-
-        if (retval && (retval != cudaErrorInvalidDeviceFunction)) {
-            exit(1);
-        }
 
         float elapsed = gpu_timer.ElapsedMillis();
 
         // Copy out results
-        if (csr_problem->Extract(h_component_ids)) exit(1);
+        util::GRError(csr_problem->Extract(h_component_ids), "CC Problem Data Extraction Failed", __FILE__, __LINE__);
 
         // Validity
         if (ref_num_components == csr_problem->num_components)

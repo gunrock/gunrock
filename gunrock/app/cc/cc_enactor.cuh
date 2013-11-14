@@ -150,17 +150,10 @@ class CCEnactor : public EnactorBase
     }
 
     /**
-     * @brief Enacts a breadth-first search computing on the specified graph.
+     * @brief Enacts a connected component computing on the specified graph.
      *
      * @tparam VertexMapPolicy Kernel policy for vertex mapping.
      * @tparam CCProblem CC Problem type.
-     * @tparam UpdateMaskFunctor Functor type used in mask updating.
-     * @tparam HookInitFunctor Functor type used in initializing hook operation.
-     * @tparam HookMinFunctor Functor type used in hook min operation.
-     * @tparam HookMaxFunctor Functor type used in hook max operation.
-     * @tparam PtrJumpFunctor Functor type used in pointer jumping operation.
-     * @tparam PtrJumpMaskFunctor Functor type used in pointer jumping opeartion for masked nodes.
-     * @tparam PtrJumpUnmaskFunctor Functor type used in pointer jumping operation for unmasked nodes.
      * @param[in] problem CCProblem object.
      * @param[in] max_grid_size Max grid size for CC kernel calls.
      *
@@ -168,20 +161,48 @@ class CCEnactor : public EnactorBase
      */
     template<
         typename VertexMapPolicy,
-        typename CCProblem,
-        typename UpdateMaskFunctor,
-        typename HookInitFunctor,
-        typename HookMinFunctor,
-        typename HookMaxFunctor,
-        typename PtrJumpFunctor,
-        typename PtrJumpMaskFunctor,
-        typename PtrJumpUnmaskFunctor>
-    cudaError_t Enact(
+        typename CCProblem>
+    cudaError_t EnactCC(
     CCProblem                          *problem,
     int                                 max_grid_size = 0)
     {
         typedef typename CCProblem::SizeT      SizeT;
         typedef typename CCProblem::VertexId   VertexId;
+
+        typedef UpdateMaskFunctor<
+            VertexId,
+            SizeT,
+            CCProblem> UpdateMaskFunctor;
+
+        typedef HookInitFunctor<
+            VertexId,
+            SizeT,
+            CCProblem> HookInitFunctor;
+
+        typedef HookMinFunctor<
+            VertexId,
+            SizeT,
+            CCProblem> HookMinFunctor;
+
+        typedef HookMaxFunctor<
+            VertexId,
+            SizeT,
+            CCProblem> HookMaxFunctor;
+
+        typedef PtrJumpFunctor<
+            VertexId,
+            SizeT,
+            CCProblem> PtrJumpFunctor;
+
+        typedef PtrJumpMaskFunctor<
+            VertexId,
+            SizeT,
+            CCProblem> PtrJumpMaskFunctor;
+
+        typedef PtrJumpUnmaskFunctor<
+            VertexId,
+            SizeT,
+            CCProblem> PtrJumpUnmaskFunctor;
 
         cudaError_t retval = cudaSuccess;
 
@@ -467,14 +488,7 @@ class CCEnactor : public EnactorBase
     /**
      * @brief Enact Kernel Entry, specify KernelPolicy
      */
-    template <typename CCProblem,
-              typename UpdateMaskFunctor,
-              typename HookInitFunctor,
-              typename HookMinFunctor,
-              typename HookMaxFunctor,
-              typename PtrJumpFunctor,
-              typename PtrJumpMaskFunctor,
-              typename PtrJumpUnmaskFunctor>
+    template <typename CCProblem>
     cudaError_t Enact(
         CCProblem                      *problem,
         int                             max_grid_size = 0)
@@ -494,7 +508,7 @@ class CCEnactor : public EnactorBase
                 8>                                  // LOG_SCHEDULE_GRANULARITY
                 VertexMapPolicy;
                 
-                return Enact<VertexMapPolicy, CCProblem, UpdateMaskFunctor, HookInitFunctor, HookMinFunctor, HookMaxFunctor, PtrJumpFunctor, PtrJumpMaskFunctor, PtrJumpUnmaskFunctor>(
+                return EnactCC<VertexMapPolicy, CCProblem>(
                 problem, max_grid_size);
         }
 

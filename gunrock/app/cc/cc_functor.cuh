@@ -12,11 +12,10 @@ namespace cc {
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam Value               Type of float or double to use for computing connected component ids.
  * @tparam ProblemData         Problem data type which contains data slice for CC problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename ProblemData>
 struct UpdateMaskFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
@@ -57,11 +56,10 @@ struct UpdateMaskFunctor
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam Value               Type of float or double to use for computing connected component ids.
  * @tparam ProblemData         Problem data type which contains data slice for CC problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename ProblemData>
 struct HookInitFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
@@ -107,11 +105,10 @@ struct HookInitFunctor
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam Value               Type of float or double to use for computing connected component ids.
  * @tparam ProblemData         Problem data type which contains data slice for CC problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename ProblemData>
 struct HookMinFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
@@ -176,11 +173,10 @@ struct HookMinFunctor
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam Value               Type of float or double to use for computing connected component ids.
  * @tparam ProblemData         Problem data type which contains data slice for CC problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename ProblemData>
 struct HookMaxFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
@@ -245,11 +241,10 @@ struct HookMaxFunctor
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam Value               Type of float or double to use for computing connected component ids.
  * @tparam ProblemData         Problem data type which contains data slice for CC problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename ProblemData>
 struct PtrJumpFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
@@ -298,11 +293,10 @@ struct PtrJumpFunctor
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam Value               Type of float or double to use for computing connected component ids.
  * @tparam ProblemData         Problem data type which contains data slice for CC problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename ProblemData>
 struct PtrJumpMaskFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
@@ -357,11 +351,10 @@ struct PtrJumpMaskFunctor
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam Value               Type of float or double to use for computing connected component ids.
  * @tparam ProblemData         Problem data type which contains data slice for CC problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename ProblemData>
 struct PtrJumpUnmaskFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
