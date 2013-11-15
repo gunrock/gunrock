@@ -240,12 +240,10 @@ void RunTests(
             printf("\n");
         }
 
-        cudaError_t         retval = cudaSuccess;
-
         // Perform CC
         GpuTimer gpu_timer;
 
-        util::GRError(csr_problem->Reset(cc_enactor.GetFrontierType(), 1.0), "CC Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(csr_problem->Reset(cc_enactor.GetFrontierType()), "CC Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
         util::GRError(cc_enactor.template Enact<Problem>(csr_problem, max_grid_size), "CC Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
