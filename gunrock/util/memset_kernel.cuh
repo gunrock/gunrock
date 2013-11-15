@@ -23,7 +23,18 @@ namespace gunrock {
 namespace util {
 
 /**
- * Memset a device vector.
+ * \addtogroup PublicInterface
+ * @{
+ */
+
+/**
+ * @brief Memset a device vector.
+ *
+ * @tparam T datatype of the vector.
+ *
+ * @param[in] d_out Device-side vector we need to process on
+ * @param[in] value Value we want to set
+ * @param[in] length Vector length
  */
 template <typename T>
 __global__ void MemsetKernel(T *d_out, T value, int length)
@@ -35,7 +46,12 @@ __global__ void MemsetKernel(T *d_out, T value, int length)
 }
 
 /**
- * Memset a device vector using indices
+ * @brief Memset a device vector with the element's index in the vector
+ *
+ * @tparam T datatype of the vector.
+ *
+ * @param[in] d_out Device-side vector we need to process on
+ * @param[in] length Vector length
  */
 template <typename T>
 __global__ void MemsetIdxKernel(T *d_out, int length)
@@ -47,19 +63,30 @@ __global__ void MemsetIdxKernel(T *d_out, int length)
 }
 
 /**
- * Add to each element in the array. (only support type with operator +)
+ * @brief Add value to each element in a device vector.
+ *
+ * @tparam T datatype of the vector.
+ *
+ * @param[in] d_out Device-side vector we need to process on
+ * @param[in] value Value we want to add to each element in the vector
+ * @param[in] length Vector length
  */
 template <typename T>
 __global__ void MemsetAddKernel(T *d_out, T value, int length)
 {
-    const int STRIDE = gridDim.x * blockDim.x;
-    for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x; idx < length; idx += STRIDE) {
+    const int STRIDE = gridDim.x * blockDim.x; for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x; idx < length; idx += STRIDE) {
         d_out[idx] += value;
     }
 }
 
 /**
- * Scale to each element in the array. (only support type with operator *)
+ * @brief Scale each element in a device vector to a certain factor.
+ *
+ * @tparam T datatype of the vector.
+ *
+ * @param[in] d_out Device-side vector we need to process on
+ * @param[in] value Scale factor
+ * @param[in] length Vector length
  */
 template <typename T>
 __global__ void MemsetScaleKernel(T *d_out, T value, int length)
@@ -71,7 +98,13 @@ __global__ void MemsetScaleKernel(T *d_out, T value, int length)
 }
 
 /**
- * Add  source vector to destination vector. Two vectors should have the same length. (only support type with operator +)
+ * @brief Add the source vector to the destination vector with the same length
+ *
+ * @tparam T datatype of the vector.
+ *
+ * @param[in] d_dst Destination device-side vector
+ * @param[in] d_src Source device-side vector
+ * @param[in] length Vector length
  */
 template <typename T>
 __global__ void MemsetAddVectorKernel(T *d_dst, T *d_src, int length)
@@ -81,6 +114,8 @@ __global__ void MemsetAddVectorKernel(T *d_dst, T *d_src, int length)
         d_dst[idx] += d_src[idx];
     }
 }
+
+/** @} */
 
 } // namespace util
 } // namespace gunrock

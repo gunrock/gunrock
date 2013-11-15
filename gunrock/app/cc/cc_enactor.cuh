@@ -128,26 +128,30 @@ class CCEnactor : public EnactorBase
     }
 
     /**
+     * \addtogroup PublicInterface
+     * @{
+     */
+
+    /**
      * @brief Obtain statistics about the last BFS search enacted.
      *
      * @param[out] total_queued Total queued elements in BFS kernel running.
-     * @param[out] search_depth Search depth of BFS algorithm.
      * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
      */
     template <typename VertexId>
     void GetStatistics(
         long long &total_queued,
-        VertexId &search_depth,
         double &avg_duty)
     {
         cudaThreadSynchronize();
 
         total_queued = this->total_queued;
-        search_depth = this->iteration;
 
         avg_duty = (total_lifetimes >0) ?
             double(total_runtimes) / total_lifetimes : 0.0;
     }
+
+    /** @} */
 
     /**
      * @brief Enacts a connected component computing on the specified graph.
@@ -320,7 +324,7 @@ class CCEnactor : public EnactorBase
 
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Update Mask Operation failed", __FILE__, __LINE__))) break;
 
-                int iteration           = 1;
+                iteration           = 1;
 
                 edge_flag[0] = 0;
                 while (!edge_flag[0]) {

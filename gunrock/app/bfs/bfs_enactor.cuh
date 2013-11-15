@@ -170,6 +170,11 @@ class BFSEnactor : public EnactorBase
     }
 
     /**
+     * \addtogroup PublicInterface
+     * @{
+     */
+
+    /**
      * @brief Obtain statistics about the last BFS search enacted.
      *
      * @param[out] total_queued Total queued elements in BFS kernel running.
@@ -190,6 +195,8 @@ class BFSEnactor : public EnactorBase
         avg_duty = (total_lifetimes >0) ?
             double(total_runtimes) / total_lifetimes : 0.0;
     }
+
+    /** @} */
 
     /**
      * @brief Enacts a breadth-first search computing on the specified graph.

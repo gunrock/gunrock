@@ -24,7 +24,7 @@ pinned host memory that is accessible to the device.
 \skip g_undirected = true;
 \until }
 
-The following few lines will parse the command line arguments. In this
+The above chunk of code will parse the command line arguments. In this
 example, we set \c g_undirected to be true to imply that the input
 graph is undirected.
 
@@ -32,167 +32,165 @@ graph is undirected.
 \until fflush(stdout);
 
 The current version of Gunrock only supports input graphs stored in
-matrix-market coordinate-formatted files. After we set the type info
-for the node identifier, the graph size and the value to compute. We
-declare an object \c csr of \c Csr<VertexId, Value, SizeT>. The <a
+matrix-market coordinate-formatted files. When we read a graph from a
+file, we must store it into a data structure. Gunrock uses a <a
 href=
 "http://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_.28CSR_or_CRS.29">
-compressed sparse row (CSR)</a> data structure is the primary data
-structure we use in this library. We then use \c
-graphio::BuildMarketGraph to build the graph data structure from the
-input file. In this example, we suppose the graph has no edge weight.
-Calling \c DisplayGraph displays the graph as the CSR data structure.
+compressed sparse row (CSR)</a> data
+structure internally. Before we define an object of CSR data structure, we must define
+the datatypes in this data structure. In general, we need three
+datatypes in our CSR data structure. \c VertexId is used as the node
+identifier type, here we set it as \c int. \c Value is used as the
+type of values attached to edge or node in the graph. Here we set it
+as \c float. Most of the time, either \c VertexId or \c Value will
+serve as the datatype for any computational results we get from the
+graph algorithm. \c SizeT datatype is used as the datatype for storing
+the number of nodes in the graph and the number of edges in the graph.
+We usually set it as \c int or <tt> unsigned long </tt>. We then
+define an object with the default argument stream_from_host \c false.
+This will disable streaming from host memory when we later fill data
+in the object. BuildMarketGraph() reads from a Matrix Market-stored
+file into a CSR data structure. In this example, we suppose the graph
+has no edge weight, so we use \c false as the template argument. As a
+test utility function, DisplayGraph() will display the first 40 nodes
+and their neighbor lists in the graph in the following format:
 
-\attention This description explains what the code is doing but does
-not provide the more valuable *why* it is doing what it's doing. 
-http://cudpp.github.io/cudpp/2.1/example_simple_c_u_d_p_p.html
-is more along the lines of what I want to see. For instance: 
-- What do \c VertexId, \c Value, and \c SizeT actually mean?
-Do they refer to the datatypes in the MM file or instead the datatypes
-that will store them internally during computation? (Or both?) What is
-"graph size"? Is "value type" a data value per vertex or per edge? Is
-it the component number? That's what you need to say here.
-- More useful would be "When we read a graph from a
-file, we must store it into a data structure. Gunrock uses a CSR data
-structure internally This chunk of code reads from a Matrix
-Market-stored file into a CSR data structure. We must define the
-datatypes in this data structure.
-- What do the arguments to \c BuildMarketGraph actually mean? Does
-"false" correspond to "no edge weight"? It would be helpful to link to
-the \c BuildMarketGraph documentation (then you only have to explain
-it there). 
-- What does \c DisplayGraph actually do? Maybe show a few (example)
-lines of what it outputs.
+<tt>
+<br>node_id_0: neighbor_node_id_0, neighbor_node_id_1, ..., neighbor_node_id_n
+<br>node_id_1: neighbor_node_id_0, neighbor_node_id_1, ..., neighbor_node_id_n
+<br>...
+</tt>
 
 The main function in this example is \c RunTests(csr, args);
 
 \subsection RunTests RunTests Function
 
-\c RunTests starts by declaring problem type and functor types
-for a graph primitive. We want to compute connected component
-first.
-
-\attention What *is* a problem type and a functor type? What do their
-template arguments actually mean? The reader here is thinking "why do
-I need all these functors? I don't even know what they do."
+\c RunTests starts by defining the problem data structure for a graph
+primitive. A problem data structure stores the graph structural data,
+edge or node value data, and all other data we need for running the
+graph algorithm. It has four template arguments. We have explained the
+first three arguments in the previous section, the last argument is
+a boolean flag which specifies whether we need only one set of
+ping-pong storage or two. A set of ping-pong storage contains two
+buffers for storing both the input and the output queue GPU kernel
+functions process on. At the beginning of the first iteration of
+the GPU kernel function call, we put the input data in one queue
+of the ping-pong storage, after the first function call, we store
+the output in the other queue of the ping-pong storage. In the next
+iteration of the GPU kernel function call, we switch two queues,
+use the output of the previous function call as the input of the
+new function call. Among all three graph primitives in Gunrock, only
+connected component needs two sets of ping-pong storage, other two
+primitives only need one set of ping-pong storage.
 
 \dontinclude simple_example.cu
 
 \skip typedef CCProblem
-\until PtrJumpUnmaskFunctor;
+\until CCProblem_T;
 
-Then we allocate host-side array for reference check and GPU-computed
-results. We also need to initialize our problem enactor of \c
-CCEnactor type. The enactor object contains the enact function which
-has kernel entries for graph primitive kernel functions.
-
-\attention What is an enactor? What is an enactor map? The description
-of enactor here is not helpful for the uninformed reader. What is the
-template argument to the enactor? What is its function argument?
-(Again a link to the documentation for this function would be useful.)
-"Kernel" is kind of a loaded word here. You might want to define it.
+Then we allocate host-side arrays for reference check and GPU-computed
+results. For connected component primitive, there is only one array of
+the GPU computed result: the component ID for each node. To actually
+run the graph algorithm on the GPU, we need to define a CCEnactor object.
+An enactor class serves as the manager of the running of a graph algorithm.
+Gunrock divides a graph algorithm into several device functions running
+on the GPU. We call such functions kernel functions. Each graph algorithm
+may consist a set of kernel functions. The enactor class manage how we
+run these functions to get the results. It also collects statistical data
+for these kernel functions, such as running time, total elements sent to
+kernel functions and the load balancing matric (average duty). The
+template argument \c INSTRUMENT is a boolean flag which speifies whether
+we want to keep such statistical data.
 
 \skip reference_component_ids
 \until CCEnactor
 
-In the next step, we create a pointer of \c CCProblem type and
-initialize it with CSR graph data on host. The problem object
-will hold data on device for each graph primitive in Gunrock
-library.
+In the next step, we create a pointer of CCProblem type. the
+gunrock::app::cc::CCProblem::Init() function will first copy all the graph
+-related data from CPU to GPU and then initialize other data members in
+gunrock::app::cc::CCProblem::DataSlice. After this we will be ready to
+run the graph algorithm on the GPU. 
 
-\attention Does this copy the data from CPU to GPU? If so, just say
-that, and say that the \c cc_problem instance contains a pointer to
-that data. Why aren't we just passing in \c graph rather than all
-those \c graph members? And if \c init fails, shouldn't we at least
-print a message to stderr before exiting? There's a bunch of places
-where we just exit(1) without printing an error message, which IMHO is
-not good practice.
-
-\skip CCProblem_T *cc_problem
-\until exit(1);
+\skip cc_problem
+\until num_gpus
 
 We next compute the reference solution for CC on the CPU, storing the
 result in \c reference_check.
 
-\attention Again, why not pass in \c graph rather than a bunch of \c
-graph members?
-
-\skip // Compute reference CPU CC solution
+\skip Compute reference CPU CC solution
 \until }
 
-Now we can run our connected component primitive on GPU. To record
-kernel running time, simply define a \c gpu_timer of \c GpuTimer type.
-Note that we need to call the \c Reset function for each problem
-before the running of our GPU algorithm. We then call the enact
-function, and send all the functor types we need for this graph
-primitive to the function as template parameters.
-
-\attention What does that \c Reset call actually do? That "template
-Enact" call looks like weird C to me; there's some template magic I
-don't know here. (Don't fix it, this is my problem.) What you *should*
-say is the input and the output to this call. Presumably the input is
-\c cc_problem. Where's the output? Presumably it sets a field within
-\c cc_problem. Which field?
+Now we can run the connected component primitive on the GPU. To record
+the kernel running time, simply define a \c gpu_timer of \c GpuTimer
+type. Note that we need to call the gunrock::app::cc::CCProblem::Reset()
+function before the \c Enact function to reset values in
+gunrock::app::cc::CCProblem::DataSlice. The gunrock::app::cc::CCEnactor::Enact()
+takes a pointer of gunrock::app::cc::CCProblem type as the input, runs
+the connected component primitive, and stores the result in
+gunrock::app::cc::CCProblem::DataSlice::d_component_ids. We store the
+GPU running time in a \c float variable \c elapsed.
 
 \skip // Perform CC
-\until gpu_timer.Stop
+\until ElapsedMillis();
 
-After the connected component GPU function, we need to call
-\c Extract function to extract results from device memory. Then
-we can run some validation code, get the top 10 largest connected
-components, and print their root node ids. We can set the source
-node for Breadth-First Search as the root of the largest connected
-component.
-
-\attention "extract results from device memory" -> "copy the result
-from the \c cc_problem data structure on the GPU into \c
-h_component_ids". You might note what \c ComputeDetails actually does.
-(Is it CC-specific?) What does \c DisplaySolution actually do?
-Providing a snippet of its sample output would be useful. Where is \a
-elapsed actually set?
+After the \c Enact function, we need to copy the result from the \c cc_problem
+data structure on the GPU into \c h_component_ids. We can further call
+gunrock::app::cc::CCProblem::ComputeCCHistogram() to compute the histogram
+for the connected components of the graph. Finally we can run some
+validation code, get the top 10 largest connected components, and print
+their root node ids. DisplayCCSolution() will print the component ids of
+the first 40 nodes for testing purpose. Now we can set the source node for
+Breadth-First Search as the root of the largest connected component.
 
 \skip cc_problem->Extract
 \until src = cclist[0].root
 
 The final step of a graph primitive process is cleanup. Note we only
-need to delete the problem object; its destructor function will
+need to delete the problem object, its destructor function will
 release the device memory for us. We finally call \c
-cudaDeviceSynchronize to make sure the device has completed all
+cudaDeviceSynchronize to make sure the GPU device has completed all
 preceding requested tasks.
 
 \skip delete cc_problem
 \until cudaDeviceSync
 
 For Breadth-First Search primitive, the process is the same. We
-first declare the problem type and functor type for BFS.
+first define a pointer to the gunrock::app::bfs::BFSProblem type.
+Here we set the template argument \c MARK_PREDECESSORS to \c true
+to specify that we want the algorithm to keep both the distances
+from source and the predecessor node id as the result.
 
-\attention What do these template args mean? What is \c
-MARK_PREDECESSORS? Do you have to set it?
 
-\skip bool MARK_PREDECESSORS
-\until BfsFunctor
+\skip typedef BFSProblem
+\until BFSProblem_T;
 
-Then we allocate a host-side array for a reference check and
-GPU-computed results, initialize our problem enactor of the \c
-BFSEnactor type, run the CPU BFS reference algorithm, and load the
-enact function, just as we did in the CC graph primitive.
-
-\attention What is \c INSTRUMENT? Why does BFS have a \c GetStatistics
-but CC did not, and what are those statistics? What are the \c Reset
-arguments?
+Then we allocate a host-side array for doing reference check and
+storing GPU-computed results, for BFS problem, the results include
+gunrock::app::bfs::BFSProblem::DataSlice::d_labels and
+gunrock::app::bfs::BFSProblem::DataSlice::d_preds. We then define
+the bfs enactor object of the gunrock::app::bfs::BFSEnactor type,
+initialize the gunrock::app::bfs::BFSProblem type bfs problem object,
+and run the CPU and the GPU BFS reference algorithm. Just like what
+we do in the CC graph primitive. If the template argument
+\c INSTRUMENT is set, we can use \c GetStatistics function to get
+total elements queued, average kernel duty (a load balancing metric),
+and for BFS, the searching depth from the enactor object. In this
+example we only shows how to get statistical data and display them
+for BFS problem but all three graph primitives have \c GetStatistics
+function as public interfaces users can call. 
 
 \skip reference_labels
 \until gpu_timer.ElapsedMillis
 
-The extracting, validation and cleanup code are also quite
-similar.
-
-\attention Does \c CompareResults actually print something? It
-shouldn't; it should return something (true or false). What do its
-arguments mean? Provide a sample output for \c DisplayBFSSolution and
-\c DisplayBFSStats, and say what their arguments mean. I believe both
-\c free and \c delete will do the right thing if you try to delete a
-null pointer, so get rid of the \c if statements.
+When we finish the BFS algorithm, we copy the results from GPU to CPU
+using \c Extract function. We also use gunrock::util::CompareResults()
+to validate the computed results we get. Here we only do this for the
+distance from source value of each node. DisplayBFSSolution() function
+will display the distance from source value and the predecessor id value
+for the first 40 nodes in the graph. DisplayBFSStats() function will
+display the total queued element number, the maximum search depth, and
+the average GPU kernel function duty as the statistical data. Users can
+also implement their own version of these display functions.
 
 \skip bfs_problem->Extract
 \until cudaDeviceSynchronize
@@ -200,26 +198,22 @@ null pointer, so get rid of the \c if statements.
 The third graph primitive we want to run is Brandes's Betweenness
 Centrality. We first set the source node to -1 to inform the algorithm
 to compute the BC values for all nodes in the graph. The preparation
-steps are similar to those of the previous two primitives. In the
-actual computing process, we need to manually iterate over all the
-nodes in the graph. We design the BC primitive this way to provide
+steps are similar to those of the previous two primitives.
+
+\skip src = -1;
+\until BC Problem Initialization Failed
+
+In the actual computing process, we need to manually iterate over all 
+the nodes in the graph. We design the BC primitive this way to provide
 more flexible use of BC value computing. For example, you can build
 your own approximate BC algorithm using this primitive.
 
-\attention Not sure why you picked the code below to snip. If I picked
-anything, I'd pick the actual BC call, not the reset call. If you're
-going to discuss something (e.g. -1), at least show the code that does
-it. I think I would show both the initialization and the manual
-iteration. 
-
-\skip i < end_src
+\skip start_src = 0;
 \until }
-\skipline }
 
-Note after the algorithm we need to call a scale kernel for
-normalization.
-
-\attention Why? Explain why. The why is important.
+Note after the algorithm we need to call gunrock::util::MemsetScaleKernel()
+for normalization. Because we consider the graph as undirected, each node's
+BC value is thus doubled, we need to half them to get the correct values. 
 
 \skipline MemsetScaleKernel
 

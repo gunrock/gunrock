@@ -310,7 +310,25 @@ void PrintValue<bool>(bool val) {
  ******************************************************************************/
 
 /**
- * Compares the equivalence of two arrays
+ * \addtogroup PublicInterface
+ * @{
+ */
+
+/**
+ * @brief Compares the equivalence of two arrays. If incorrect, print the location
+ * of the first incorrect value appears, the incorrect value, and the reference
+ * value.
+ *
+ * @tparam T datatype of the values being compared with.
+ * @tparam SizeT datatype of the array length.
+ *
+ * @param[in] computed Vector of values to be compared.
+ * @param[in] reference Vector of reference values
+ * @param[in] len Vector length
+ * @param[in] verbose Whether to print values around the incorrect one.
+ *
+ * \return Zero if two vectors are exactly the same, non-zero if there is any difference.
+ *
  */
 template <typename T, typename SizeT>
 int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
@@ -348,8 +366,24 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
     return flag;
 }
 
+
 /**
- * Compares the equivalence of two float arrays
+ * @brief Compares the equivalence of two arrays. Partial specialization for
+ * float type. If incorrect, print the location of the first incorrect value
+ * appears, the incorrect value, and the reference value.
+ *
+ * @tparam T datatype of the values being compared with.
+ * @tparam SizeT datatype of the array length.
+ *
+ * @param[in] computed Vector of values to be compared.
+ * @param[in] reference Vector of reference values
+ * @param[in] len Vector length
+ * @param[in] verbose Whether to print values around the incorrect one.
+ *
+ * \return Zero if difference between each element of the two vectors are less
+ * than a certain threshold, non-zero if any difference is equal to or larger
+ * than the threshold.
+ *
  */
 template <typename SizeT>
 int CompareResults(float* computed, float* reference, SizeT len, bool verbose = true)
@@ -388,6 +422,8 @@ int CompareResults(float* computed, float* reference, SizeT len, bool verbose = 
         printf("CORRECT");
     return flag;
 }
+
+/** @} */
 
 
 /**

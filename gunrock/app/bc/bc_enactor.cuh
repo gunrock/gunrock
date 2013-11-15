@@ -167,6 +167,11 @@ class BCEnactor : public EnactorBase
     }
 
     /**
+     * \addtogroup PublicInterface
+     * @{
+     */
+
+    /**
      * @brief Obtain statistics about the last BC search enacted.
      *
      * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
@@ -179,6 +184,8 @@ class BCEnactor : public EnactorBase
         avg_duty = (total_lifetimes >0) ?
             double(total_runtimes) / total_lifetimes : 0.0;
     }
+
+    /** @} */
 
     /**
      * @brief Enacts a brandes betweenness centrality computing on the specified graph.

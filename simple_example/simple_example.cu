@@ -221,7 +221,6 @@ struct Stats {
  * @param[in] avg_duty
  */
 template<
-    bool MARK_PREDECESSORS,
     typename VertexId,
     typename Value,
     typename SizeT>
@@ -506,7 +505,7 @@ void RunTests(
         (g_quick) ? NULL : reference_component_ids;
     unsigned int ref_num_components             = 0;
 
-    // Allocate CC enactor map
+    // Allocate CC enactor
     CCEnactor<INSTRUMENT> cc_enactor(g_verbose);
 
     // Allocate problem on GPU
@@ -530,12 +529,10 @@ void RunTests(
         printf("\n");
     }
 
-    cudaError_t         retval = cudaSuccess;
-
     // Perform CC
     GpuTimer gpu_timer;
 
-    util::GRError(cc_problem->Reset(cc_enactor.GetFrontierType(), 1.0), "CC Problem Data Reset Failed", __FILE__, __LINE__);
+    util::GRError(cc_problem->Reset(cc_enactor.GetFrontierType()), "CC Problem Data Reset Failed", __FILE__, __LINE__);
     gpu_timer.Start();
     util::GRError(cc_enactor.template Enact<CCProblem_T>(cc_problem, max_grid_size), "CC Problem Enact Failed", __FILE__, __LINE__);
     gpu_timer.Stop();
@@ -592,16 +589,14 @@ void RunTests(
                                         // components as BFS source
 
     // Cleanup
-    if (cc_problem) delete cc_problem;
-    if (h_roots) delete[] h_roots;
-    if (h_histograms) delete[] h_histograms;
-    if (cclist) free(cclist);
-    if (reference_component_ids) free(reference_component_ids);
-    if (h_component_ids) free(h_component_ids);
+    delete cc_problem;
+    delete[] h_roots;
+    delete[] h_histograms;
+    free(cclist);
+    free(reference_component_ids);
+    free(h_component_ids);
 
     cudaDeviceSynchronize();
-
-    bool MARK_PREDECESSORS = true; // Set MARK_PREDECESSORS flag
 
     typedef BFSProblem<
         VertexId,
@@ -622,7 +617,7 @@ void RunTests(
         (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
 
 
-    // Allocate BFS enactor map
+    // Allocate BFS enactor
     BFSEnactor<INSTRUMENT> bfs_enactor(g_verbose);
 
     // Allocate problem on GPU
@@ -644,8 +639,6 @@ void RunTests(
             src);
         printf("\n");
     }
-
-    retval = cudaSuccess;
 
     Stats *stats = new Stats("GPU BFS");
 
@@ -671,13 +664,13 @@ void RunTests(
     // Verify the result
     if (reference_check != NULL) {
         printf("Validity: ");
-        CompareResults(h_labels, reference_check, graph.nodes, true);
+        CompareResults(h_labels, reference_check, graph.nodes);
     }
     printf("\nFirst 40 labels of the GPU result.");
     // Display Solution
-    DisplayBFSSolution(h_labels, h_preds, graph.nodes, MARK_PREDECESSORS);
+    DisplayBFSSolution(h_labels, h_preds, graph.nodes, true);
 
-    DisplayBFSStats<true>( //set MARK_PREDECESSORS flag
+    DisplayBFSStats(
         *stats,
         src,
         h_labels,
@@ -690,10 +683,10 @@ void RunTests(
 
     // Cleanup
     delete stats;
-    if (bfs_problem) delete bfs_problem;
-    if (reference_labels) free(reference_labels);
-    if (h_labels) free(h_labels);
-    if (h_preds) free(h_preds);
+    delete bfs_problem;
+    free(reference_labels);
+    free(h_labels);
+    free(h_preds);
 
     cudaDeviceSynchronize();
 
@@ -712,7 +705,7 @@ void RunTests(
         (Value*)malloc(sizeof(Value) * graph.nodes);
     Value *reference_check_bc_values = (g_quick) ? NULL : reference_bc_values;
 
-    // Allocate BC enactor map
+    // Allocate BC enactor
     BCEnactor<INSTRUMENT> bc_enactor(g_verbose);
 
     // Allocate problem on GPU
@@ -734,8 +727,6 @@ void RunTests(
             src);
         printf("\n");
     }
-
-    retval = cudaSuccess;
 
     avg_duty = 0.0;
 
@@ -782,9 +773,9 @@ void RunTests(
 
 
     // Cleanup
-    if (bc_problem) delete bc_problem;
-    if (reference_bc_values) free(reference_bc_values);
-    if (h_bc_values) free(h_bc_values);
+    delete bc_problem;
+    free(reference_bc_values);
+    free(h_bc_values);
 
     cudaDeviceSynchronize();
 }
