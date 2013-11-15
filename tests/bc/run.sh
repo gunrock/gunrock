@@ -14,7 +14,7 @@ done
 
 for i in chesapeake test_bc
 do
-    echo ./bin/test_bc_5.5_x86_64 market ../../dataset/small/$i/$i.mtx --src=-1
-         ./bin/test_bc_5.5_x86_64 market ../../dataset/small/$i/$i.mtx --src=-1 > eval/$SUFFIX/$i.$SUFFIX.txt
+    echo ./bin/test_bc_5.5_x86_64 market ../../dataset/small/$i.mtx --src=-1
+         ./bin/test_bc_5.5_x86_64 market ../../dataset/small/$i.mtx --src=-1 > eval/$SUFFIX/$i.$SUFFIX.txt
     sleep 10
 done
