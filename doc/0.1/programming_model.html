@@ -86,31 +86,31 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <h1><a class="anchor" id="operators"></a>
 Operators                       </h1>
 <p>Gunrock supports three operators that form the basis of graph computation:</p>
-<ol type="1">
+<ul>
 <li>Forward edge mapping: This operator inputs a vertex frontier, traverses all the edges that start with vertices in this frontier, and returns all unvisited vertices as the new frontier.</li>
-</ol>
-<ol type="1">
+</ul>
+<ul>
 <li>Backward edge mapping: This operator also inputs a vertex frontier and outputs a new frontier. However, it instead traverses all <em>unvisited</em> vertices and outputs unvisited vertices that share an edge with current vertices.</li>
-</ol>
-<ol type="1">
+</ul>
+<ul>
 <li>Vertex mapping: This operator inputs a queue of vertices, culls some vertices, and outputs the rest into a new vertex queue. It can also operate on edges as what we have done in CC problem.</li>
-</ol>
+</ul>
 <h1><a class="anchor" id="functors"></a>
 Functors                        </h1>
 <p>The operators traverse edges and vertices in a graph. To do the actual computation, we need functors. Functors are divided into two categories:</p>
-<ol type="1">
+<ul>
 <li>Cond Functor: Cond functors input either a vertex id (as in <code>VertexCond</code>) or the source id and the dest id of an edge (as in <code>EdgeCond</code>). They also input data specific to the problem being solved to decide whether the vertex or the edge is valid in the outgoing frontier.</li>
-</ol>
-<ol type="1">
+</ul>
+<ul>
 <li>Apply Functor: Apply functors take the same set of arguments as Cond functors, but perform user-specified computation on the problem-specific data.</li>
-</ol>
+</ul>
 <h1><a class="anchor" id="new_primitive"></a>
 Create New Graph Primitive         </h1>
 <p>To create a new graph primitive, we first put all the problem-specific data into a data structure. For BFS, we need a per-node label value and a per-node predecessor value; for CC, we need a per-edge mark value, a per-node component id value, etc. Then we map the algorithm into the combination of the above three operators. Next, we need to write different functors for these operators. Some graph algorithms require only one functor (BFS), but some graph algorithms need more (CC needs seven). Finally, we write an enactor to load the proper operator with the proper functor. </p>
 </div></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Thu Nov 14 2013 22:13:54 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Thu Nov 14 2013 23:21:11 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.3.1
 </small></address>
