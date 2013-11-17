@@ -33,13 +33,13 @@ namespace edge_map_backward {
     /**
      * 1D texture setting for efficiently fetch data from graph_row_offsets
      */
-    template <typename SizeT>
+    /*template <typename SizeT>
         struct RowOffsetTex
         {
             static texture<SizeT, cudaTextureType1D, cudaReadModeElementType> ref;
         };
     template <typename SizeT>
-        texture<SizeT, cudaTextureType1D, cudaReadModeElementType> RowOffsetTex<SizeT>::ref;
+        texture<SizeT, cudaTextureType1D, cudaReadModeElementType> RowOffsetTex<SizeT>::ref;*/
 
     /*template <typename VertexId>
         struct ColumnIndicesTex
@@ -168,8 +168,14 @@ namespace edge_map_backward {
 
                                     // Load neighbor row range from d_row_offsets
                                     Vec2SizeT   row_range;
-                                    row_range.x = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id);
-                                    row_range.y = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id + 1);
+                                    util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                            row_range.x,
+                                            cta->d_row_offsets + row_id);
+                                    util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                            row_range.y,
+                                            cta->d_row_offsets + row_id+1);
+                                    //row_range.x = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id);
+                                    //row_range.y = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id + 1);
 
                                     // compute row offset and length
                                     tile->row_offset[LOAD][VEC] = row_range.x;
