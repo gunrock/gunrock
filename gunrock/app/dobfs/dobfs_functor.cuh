@@ -15,7 +15,7 @@
 #pragma once
 
 #include <gunrock/app/problem_base.cuh>
-#include <gunrock/app/bfs/dobfs_problem.cuh>
+#include <gunrock/app/dobfs/dobfs_problem.cuh>
 
 namespace gunrock {
 namespace app {

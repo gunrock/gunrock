@@ -15,7 +15,7 @@
 
 #pragma once
 #include <gunrock/util/cta_work_distribution.cuh>
-#include <gunrock/util/cta_progress.cuh>
+#include <gunrock/util/cta_work_progress.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
 
 #include <gunrock/oprtr/edge_map_backward/cta.cuh>
@@ -36,6 +36,7 @@ struct Sweep
         typename KernelPolicy::VertexId         *&d_unvisited_node_queue,
         bool                                    *&d_frontier_bitmap_in,
         bool                                    *&d_frontier_bitmap_out,
+        typename KernelPolicy::SizeT            *&d_row_offsets,
         typename KernelPolicy::VertexId         *&d_column_indices,
         typename ProblemData::DataSlice         *&problem,
         typename KernelPolicy::SmemStorage      &smem_storage,
@@ -64,6 +65,7 @@ struct Sweep
                 d_unvisited_node_queue,
                 d_frontier_bitmap_in,
                 d_frontier_bitmap_out,
+                d_row_offsets,
                 d_column_indices,
                 problem,
                 work_progress);
@@ -110,6 +112,7 @@ struct Dispatch
         VertexId                    *&d_unvisited_node_queue,
         bool                        *&d_frontier_bitmap_in,
         bool                        *&d_frontier_bitmap_out,
+        SizeT                       *&d_row_offsets,
         VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
         util::CtaWorkProgress       &work_progress,
@@ -139,6 +142,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         VertexId                    *&d_unvisited_node_queue,
         bool                        *&d_frontier_bitmap_in,
         bool                        *&d_frontier_bitmap_out,
+        SizeT                       *&d_row_offsets,
         VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
         util::CtaWorkProgress       &work_progress,
@@ -197,6 +201,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 d_unvisited_node_queue,
                 d_frontier_bitmap_in,
                 d_frontier_bitmap_out,
+                d_row_offsets,
                 d_column_indices,
                 problem,
                 smem_storage,
@@ -226,6 +231,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @param[in] d_unvisited_node_queue    Incoming frontier queue
  * @param[in] d_frontier_bitmap_in      Incoming frontier bitmap (set for nodes in the frontier)
  * @param[in] d_frontier_bitmap_out     Outgoing frontier bitmap (set for nodes in the next layer of frontier)
+ * @param[in] d_row_offsets             Row offsets queue
  * @param[in] d_column_indices          Column indices queue
  * @param[in] problem                   Device pointer to the problem object
  * @param[in] work_progress             queueing counters to record work progress
@@ -243,6 +249,7 @@ void Kernel(
         typename KernelPolicy::VertexId         *d_unvisited_node_queue,    // Incoming and output unvisited node queue
         bool                                    *d_frontier_bitmap_in,      // Incoming frontier bitmap
         bool                                    *d_frontier_bitmap_out,     // Outcoming frontier bitmap
+        typename KernelPolicy::SizeT            *d_row_offsets,
         typename KernelPolicy::VertexId         *d_column_indices,
         typename ProblemData::DataSlice         *problem,                    // Problem Object
         util::CtaWorkProgress                   work_progress,              // Atomic workstealing and queueing counters
@@ -257,6 +264,7 @@ void Kernel(
             d_unvisited_node_queue,
             d_frontier_bitmap_in,
             d_frontier_bitmap_out,
+            d_row_offsets,
             d_column_indices,
             problem,
             work_progress,

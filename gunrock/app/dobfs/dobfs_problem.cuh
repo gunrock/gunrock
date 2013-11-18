@@ -271,9 +271,9 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
                             "DOBFSProblem cudaMalloc d_row_indices failed", __FILE__, __LINE__)) return retval;
 
                 if (retval = util::GRError(cudaMemcpy(
-                        graph_slices[0]->d_row_indices,
+                        d_row_indices,
                         h_row_indices,
-                        graph_slices[0]->edges * sizeof(VertexId),
+                        edges * sizeof(VertexId),
                         cudaMemcpyHostToDevice),
                         "ProblemBase cudaMemcpy d_row_indices failed", __FILE__, __LINE__)) break;
                 data_slices[gpu]->d_row_indices = d_row_indices;

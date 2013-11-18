@@ -19,6 +19,11 @@
 #include <gunrock/util/basic_utils.cuh>
 #include <gunrock/util/cuda_properties.cuh>
 #include <gunrock/util/cta_work_distribution.cuh>
+#include <gunrock/util/soa_tuple.cuh>
+#include <gunrock/util/srts_grid.cuh>
+#include <gunrock/util/srts_soa_details.cuh>
+#include <gunrock/util/io/modified_load.cuh>
+#include <gunrock/util/io/modified_store.cuh>
 #include <gunrock/util/operators.cuh>
 
 #include <gunrock/app/problem_base.cuh>
@@ -26,7 +31,6 @@
 namespace gunrock {
 namespace oprtr {
 namespace edge_map_backward {
-
 
 /**
  * @brief Kernel configuration policy for forward edge mapping kernels.
@@ -64,6 +68,7 @@ template <
     int _LOG_THREADS,
     int _LOG_LOAD_VEC_SIZE,
     int _LOG_LOADS_PER_TILE,
+    int _LOG_RAKING_THREADS,
     int _WARP_GATHER_THRESHOLD,
     int _CTA_GATHER_THRESHOLD,
     int _LOG_SCHEDULE_GRANULARITY>
@@ -92,6 +97,9 @@ struct KernelPolicy
         LOG_LOADS_PER_TILE              = _LOG_LOADS_PER_TILE,
         LOADS_PER_TILE                  = 1 << LOG_LOADS_PER_TILE,
 
+        LOG_RAKING_THREADS              = _LOG_RAKING_THREADS,
+        RAKING_THREADS                  = 1 << LOG_RAKING_THREADS,
+
         LOG_WARPS                       = LOG_THREADS - GR_LOG_WARP_THREADS(CUDA_ARCH),
         WARPS                           = 1 << LOG_WARPS,
 
@@ -106,6 +114,63 @@ struct KernelPolicy
 
         WARP_GATHER_THRESHOLD           = _WARP_GATHER_THRESHOLD,
         CTA_GATHER_THRESHOLD            = _CTA_GATHER_THRESHOLD,
+    };
+
+    // Prefix sum raking grid for coarse-grained expansion allocations
+    typedef util::RakingGrid<
+        CUDA_ARCH,
+        SizeT,
+        LOG_THREADS,
+        LOG_LOADS_PER_TILE,
+        LOG_RAKING_THREADS,
+        true>
+            CoarseGrid;
+
+    // Prefix sum raking grid for fine-grained expansion allocations
+    typedef util::RakingGrid<
+        CUDA_ARCH,
+        SizeT,
+        LOG_THREADS,
+        LOG_LOADS_PER_TILE,
+        LOG_RAKING_THREADS,
+        true>
+            FineGrid;
+
+    // Type for (coarse-partial, fine-partial) tuples
+    typedef util::Tuple<SizeT, SizeT> TileTuple;
+
+    // structure-of-array (SOA) prefix sum raking grid type (CoarseGrid, FineGrid)
+    typedef util::Tuple<
+    CoarseGrid,
+    FineGrid> RakingGridTuple;
+
+    // Operational details type for SOA raking grid
+    typedef util::RakingSoaDetails<
+        TileTuple,
+        RakingGridTuple> RakingSoaDetails;
+
+   /**
+    * @brief Prefix sum tuple operator for SOA raking grid
+    */
+    struct SoaScanOp
+    {
+        enum {
+            IDENTITY_STRIDES = true,            // There is an "identity" region of warpscan storage exists for strides to index into
+        };
+
+        // SOA scan operator
+        __device__ __forceinline__ TileTuple operator()(
+            const TileTuple &first,
+            const TileTuple &second)
+        {
+            return TileTuple(first.t0 + second.t0, first.t1 + second.t1);
+        }
+
+        // SOA identity operator
+        __device__ __forceinline__ TileTuple operator()()
+        {
+            return TileTuple(0,0);
+        }
     };
 
     
@@ -129,6 +194,15 @@ struct KernelPolicy
             // Shared memory channels for intra-warp communication
             volatile WarpComm                   warp_comm;
             int                                 cta_comm;
+
+            // Storage for scanning local contract-expand ranks
+            SizeT                               coarse_warpscan[2][GR_WARP_THREADS(CUDA_ARCH)];
+            SizeT                               fine_warpscan[2][GR_WARP_THREADS(CUDA_ARCH)];
+
+            // Enqueue offset for neighbors of the current tile
+            SizeT                               coarse_enqueue_offset;
+            SizeT                               fine_enqueue_offset;
+
         } state;
 
         enum {
@@ -143,15 +217,20 @@ struct KernelPolicy
             PARENT_ELEMENTS                 = GATHER_ELEMENTS,
         };
 
-        //union {
-            
+        union {
+            // Raking elements
+            struct {
+                SizeT                       coarse_raking_elements[CoarseGrid::TOTAL_RAKING_ELEMENTS];
+                SizeT                       fine_raking_elements[FineGrid::TOTAL_RAKING_ELEMENTS];
+            };
+
             // Scratch elements
             struct {
                 SizeT                       gather_offsets[GATHER_ELEMENTS];
                 SizeT                       gather_offsets2[GATHER_ELEMENTS];
                 VertexId                    gather_predecessors[PARENT_ELEMENTS];
             };
-        //};
+        };
 
     };
 
