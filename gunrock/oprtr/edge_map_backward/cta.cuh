@@ -78,8 +78,8 @@ namespace edge_map_backward {
 
             // Input and output device pointers
             VertexId                *d_queue;                       // Incoming and outgoing vertex frontier
-            SizeT                   *d_bitmap_in;                   // Incoming frontier bitmap
-            SizeT                   *d_bitmap_out;                  // Outgoing frontier bitmap
+            bool                   *d_bitmap_in;                   // Incoming frontier bitmap
+            bool                   *d_bitmap_out;                  // Outgoing frontier bitmap
             VertexId                *d_column_indices;
             DataSlice               *problem;                       // Problem Data
 
@@ -246,11 +246,11 @@ namespace edge_map_backward {
 
                                         // TODO:Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id) (done)
 
-                                        SizeT bitmap_in;
+                                        bool bitmap_in;
                                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                 bitmap_in,
                                                 d_bitmap_in + parent_id);
-                                        if (bitmap_in > 0)
+                                        if (bitmap_in)
                                         {
 
                                             if (Functor::CondEdge(parent_id, child_id, problem))
@@ -266,9 +266,9 @@ namespace edge_map_backward {
                                                 -1,
                                                 d_queue + cta_offset + LOAD*KernelPolicy::LOAD_VEC_SIZE + VEC);
                                             
-                                            //Set bitmap_out to 1
+                                            //Set bitmap_out to true
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                    1,
+                                                    true,
                                                     d_bitmap_out + cta->smem_storage.state.warp_comm[0][3]);
                                         }
                                         
@@ -283,11 +283,11 @@ namespace edge_map_backward {
                                             parent_id,
                                             cta->d_column_indices + coop_offset + threadIdx.x);
 
-                                        SizeT bitmap_in;
+                                        bool bitmap_in;
                                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                 bitmap_in,
                                                 d_bitmap_in + parent_id);
-                                        if (bitmap_in > 0)
+                                        if (bitmap_in)
                                         {
 
                                             if (Functor::CondEdge(parent_id, child_id, problem))
@@ -303,9 +303,9 @@ namespace edge_map_backward {
                                                 -1,
                                                 d_queue + cta_offset + LOAD*KernelPolicy::LOAD_VEC_SIZE + VEC);
                                             
-                                            //Set bitmap_out to 1
+                                            //Set bitmap_out to true
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                    1,
+                                                    true,
                                                     d_bitmap_out + cta->smem_storage.state.warp_comm[0][3]);
                                         }
                                     }
@@ -365,11 +365,11 @@ namespace edge_map_backward {
                                                     cta->d_column_indices + coop_offset + lane_id);
                                             
 
-                                            SizeT bitmap_in;
+                                            bool bitmap_in;
                                             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                     bitmap_in,
                                                     d_bitmap_in + parent_id);
-                                            if (bitmap_in > 0)
+                                            if (bitmap_in)
                                             {
 
                                                 if (Functor::CondEdge(parent_id, child_id, problem))
@@ -385,9 +385,9 @@ namespace edge_map_backward {
                                                         -1,
                                                         d_queue + cta_offset + LOAD*KernelPolicy::LOAD_VEC_SIZE + VEC);
 
-                                                //Set bitmap_out to 1
+                                                //Set bitmap_out to true
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                        1,
+                                                        true,
                                                         d_bitmap_out + cta->smem_storage.state.warp_comm[warp_id][3]);
                                             }
 
@@ -402,11 +402,11 @@ namespace edge_map_backward {
                                                     parent_id,
                                                     cta->d_column_indices + coop_offset + lane_id);
 
-                                            SizeT bitmap_in;
+                                            bool bitmap_in;
                                             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                     bitmap_in,
                                                     d_bitmap_in + parent_id);
-                                            if (bitmap_in > 0)
+                                            if (bitmap_in)
                                             {
 
                                                 if (Functor::CondEdge(parent_id, child_id, problem))
@@ -422,9 +422,9 @@ namespace edge_map_backward {
                                                         -1,
                                                         d_queue + cta_offset + LOAD*KernelPolicy::LOAD_VEC_SIZE + VEC);
 
-                                                //Set bitmap_out to 1
+                                                //Set bitmap_out to true
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                        1,
+                                                        true,
                                                         d_bitmap_out + cta->smem_storage.state.warp_comm[warp_id][3]);
                                             }
                                         }
@@ -583,8 +583,8 @@ namespace edge_map_backward {
                 int                         num_gpus,
                 SmemStorage                 &smem_storage,
                 VertexId                    *d_queue,
-                SizeT                       *d_bitmap_in,
-                SizeT                       *d_bitmap_out,
+                bool                        *d_bitmap_in,
+                bool                        *d_bitmap_out,
                 VertexId                    *d_column_indices,
                 DataSlice                   *problem,
                 util::CtaWorkProgress       &work_progress) :
@@ -682,11 +682,11 @@ namespace edge_map_backward {
 
 
                         VertexId child_id = smem_storage.gather_predecessors[scratch_offset];
-                        SizeT bitmap_in;
+                        bool bitmap_in;
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                             bitmap_in,
                             d_bitmap_in + parent_id);
-                        if (bitmap_in > 0)
+                        if (bitmap_in)
                         {
                             if (Functor::CondEdge(predecessor_id, neighbor_id, problem))
                                 Functor::ApplyEdge(predecessor_id, neighbor_id, problem);
@@ -700,9 +700,9 @@ namespace edge_map_backward {
                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                             -1,
                             d_queue + smem_storage.gather_offests2[scratch_offset]+tile.cta_offset);
-                        //Set bitmap_out to 1
+                        //Set bitmap_out to true
                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                            1,
+                            true,
                             d_bitmap_out + smem_storage.gather_predecessors[scratch_offset]);
                         }
                     }

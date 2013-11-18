@@ -34,8 +34,8 @@ struct Sweep
         typename KernelPolicy::VertexId         &queue_index,
         int                                     &num_gpus,
         typename KernelPolicy::VertexId         *&d_unvisited_node_queue,
-        typename KernelPolicy::SizeT            *&d_frontier_bitmap_in,
-        typename KernelPolicy::SizeT            *&d_frontier_bitmap_out,
+        bool                                    *&d_frontier_bitmap_in,
+        bool                                    *&d_frontier_bitmap_out,
         typename KernelPolicy::VertexId         *&d_column_indices,
         typename ProblemData::DataSlice         *&problem,
         typename KernelPolicy::SmemStorage      &smem_storage,
@@ -108,8 +108,8 @@ struct Dispatch
         SizeT                       &num_elements,
         volatile int                *&d_done,
         VertexId                    *&d_unvisited_node_queue,
-        SizeT                       *&d_frontier_bitmap_in,
-        SizeT                       *&d_frontier_bitmap_out,
+        bool                        *&d_frontier_bitmap_in,
+        bool                        *&d_frontier_bitmap_out,
         VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
         util::CtaWorkProgress       &work_progress,
@@ -137,8 +137,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         SizeT                       &num_elements,
         volatile int                *&d_done,
         VertexId                    *&d_unvisited_node_queue,
-        SizeT                       *&d_frontier_bitmap_in,
-        SizeT                       *&d_frontier_bitmap_out,
+        bool                        *&d_frontier_bitmap_in,
+        bool                        *&d_frontier_bitmap_out,
         VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
         util::CtaWorkProgress       &work_progress,
@@ -241,8 +241,8 @@ void Kernel(
         typename KernelPolicy::SizeT            num_elements,               // Number of Elements
         volatile int                            *d_done,                    // Flag to set when we detect incoming edge frontier is empty
         typename KernelPolicy::VertexId         *d_unvisited_node_queue,    // Incoming and output unvisited node queue
-        typename KernelPolicy::SizeT            *d_frontier_bitmap_in,      // Incoming frontier bitmap
-        typename KernelPolicy::SizeT            *d_frontier_bitmap_out,     // Outcoming frontier bitmap
+        bool                                    *d_frontier_bitmap_in,      // Incoming frontier bitmap
+        bool                                    *d_frontier_bitmap_out,     // Outcoming frontier bitmap
         typename KernelPolicy::VertexId         *d_column_indices,
         typename ProblemData::DataSlice         *problem,                    // Problem Object
         util::CtaWorkProgress                   work_progress,              // Atomic workstealing and queueing counters

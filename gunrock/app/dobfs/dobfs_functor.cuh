@@ -32,15 +32,199 @@ namespace dobfs {
 //   set their frontier_map_in value as 1
 // 3) clear all frontier_map_in value as 0
 //
+
+/**
+ * @brief Structure contains device functions for Reverse BFS Preparation
+ *
+ * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam ProblemData         Problem data type which contains data slice for BFS problem
+ *
+ */
+template<typename VertexId, typename SizeT, typename ProblemData>
+struct PrepareUnvisitedQueueFunctor
+{
+    typedef typename ProblemData::DataSlice DataSlice;
+
+    /**
+     * @brief Vertex mapping condition function. Check if the Vertex Id is valid.
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
+     */
+    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
+    {
+       return true; 
+    }
+
+    /**
+     * @brief Vertex mapping apply function. Set frontier_map_in
+     */
+    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
+    {
+        util::io::ModifiedLoad<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+            true, problem->d_frontier_map_in + node);
+    }
+};
+
+/**
+ * @brief Structure contains device functions for Reverse BFS Preparation
+ *
+ * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam ProblemData         Problem data type which contains data slice for BFS problem
+ *
+ */
+template<typename VertexId, typename SizeT, typename ProblemData>
+struct PrepareInputFrontierMapFunctor
+{
+    typedef typename ProblemData::DataSlice DataSlice; 
+
+    /**
+     * @brief Vertex mapping condition function. Check if the Vertex Id is valid (label equals to -1).
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
+     */
+    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
+    {
+        VertexId label;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+            label, problem->d_labels + node);
+        return (label == -1);
+    }
+
+    /**
+     * @brief Vertex mapping apply function. Doing nothing.
+     */
+    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
+    {
+        // Doing nothing here
+    }
+};
+
 // During the reverse BFS (third functor set)
 // 1) BackwardEdgeMap
 // 2) Clear frontier_map_in
 // 3) VertexMap
 //
+/**
+ * @brief Structure contains device functions for Reverse BFS Preparation
+ *
+ * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam ProblemData         Problem data type which contains data slice for BFS problem
+ *
+ */
+template<typename VertexId, typename SizeT, typename ProblemData>
+struct ReverseBFSFunctor
+{
+    typedef typename ProblemData::DataSlice DataSlice;
+
+    /**
+     * @brief Forward Edge Mapping condition function. Check if the destination node
+     * has been claimed as someone else's child.
+     *
+     * @param[in] s_id Vertex Id of the edge source node
+     * @param[in] d_id Vertex Id of the edge destination node
+     * @param[in] problem Data slice object
+     *
+     * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
+     */
+    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
+    {
+        // Check if the destination node has been claimed as someone's child
+        return (atomicCAS(&problem->d_preds[d_id], -2, s_id) == -2) ? true : false;
+
+    }
+
+    /**
+     * @brief Forward Edge Mapping apply function. Now we know the source node
+     * has succeeded in claiming child, so it is safe to set label to its child
+     * node (destination node).
+     *
+     * @param[in] s_id Vertex Id of the edge source node
+     * @param[in] d_id Vertex Id of the edge destination node
+     * @param[in] problem Data slice object
+     *
+     */
+    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
+    {
+        //set d_labels[d_id] to be d_labels[s_id]+1
+        VertexId label;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+            label, problem->d_labels + s_id);
+        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+            label+1, problem->d_labels + d_id);
+    }
+
+    /**
+     * @brief Vertex mapping condition function. Check if the Vertex Id is valid (not equals to -1).
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
+     */
+    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
+    {
+        return (node != -1);
+    }
+
+    /**
+     * @brief Vertex mapping apply function. Doing nothing.
+     */
+    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
+    {
+        // Doing nothing here
+    }
+};
+//
 // Switch back to normal BFS (final functor set)
 // 1) prepare current frontier
 // VertexMap for all nodes, select whose frontier_map_out is 1
 //
+/**
+ * @brief Structure contains device functions for Switching back to normal BFS
+ *
+ * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam ProblemData         Problem data type which contains data slice for BFS problem
+ *
+ */
+template<typename VertexId, typename SizeT, typename ProblemData>
+struct SwitchToNormalFunctor
+{
+    typedef typename ProblemData::DataSlice DataSlice; 
+
+    /**
+     * @brief Vertex mapping condition function. Check if the Vertex Id is valid (label equals to -1).
+     *
+     * @param[in] node Vertex Id
+     * @param[in] problem Data slice object
+     *
+     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
+     */
+    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
+    {
+        bool flag;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+            flag, problem->d_frontier_map_out + node);
+        return (flag);
+    }
+
+    /**
+     * @brief Vertex mapping apply function. Doing nothing.
+     */
+    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
+    {
+        // Doing nothing here
+    }
+};
 
 } // dobfs
 } // app
