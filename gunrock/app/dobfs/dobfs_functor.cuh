@@ -64,7 +64,7 @@ struct PrepareUnvisitedQueueFunctor
      */
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
     {
-        util::io::ModifiedLoad<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
             true, problem->d_frontier_map_in + node);
     }
 };

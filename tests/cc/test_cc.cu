@@ -372,7 +372,8 @@ int main( int argc, char** argv)
 		if (graphio::BuildMarketGraph<false>(
 			market_filename, 
 			csr, 
-			g_undirected) != 0) 
+			g_undirected,
+			false) != 0) // no inverse graph
 		{
 			return 1;
 		}

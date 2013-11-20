@@ -195,7 +195,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         // Barrier to protect work decomposition
         __syncthreads();
 
-        Sweep<KernelPolicy, ProblemData, Functor>Invoke(
+        Sweep<KernelPolicy, ProblemData, Functor>::Invoke(
                 queue_index,
                 num_gpus,
                 d_unvisited_node_queue,

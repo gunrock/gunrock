@@ -252,7 +252,7 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
                 SizeT    *d_col_offsets;
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_col_offsets,
-                                nodes * sizeof(SizeT)),
+                                (nodes+1) * sizeof(SizeT)),
                             "DOBFSProblem cudaMalloc d_col_offsets failed", __FILE__, __LINE__)) return retval;
 
                 if (retval = util::GRError(cudaMemcpy(
@@ -260,14 +260,14 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
                         h_col_offsets,
                         (nodes+1) * sizeof(SizeT),
                         cudaMemcpyHostToDevice),
-                        "ProblemBase cudaMemcpy d_col_offsets failed", __FILE__, __LINE__)) break;
+                        "DOBFSProblem cudaMemcpy d_col_offsets failed", __FILE__, __LINE__)) break;
 
                 data_slices[gpu]->d_col_offsets = d_col_offsets;
 
                 VertexId    *d_row_indices;
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_row_indices,
-                                nodes * sizeof(VertexId)),
+                                edges * sizeof(VertexId)),
                             "DOBFSProblem cudaMalloc d_row_indices failed", __FILE__, __LINE__)) return retval;
 
                 if (retval = util::GRError(cudaMemcpy(
