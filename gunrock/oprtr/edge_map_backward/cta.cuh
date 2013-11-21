@@ -87,6 +87,7 @@ namespace edge_map_backward {
 
             // Input and output device pointers
             VertexId                *d_queue;                       // Incoming and outgoing vertex frontier
+            VertexId                *d_index;                       // Incoming vertex frontier index
             bool                   *d_bitmap_in;                   // Incoming frontier bitmap
             bool                   *d_bitmap_out;                  // Outgoing frontier bitmap
             SizeT                   *d_row_offsets;
@@ -131,6 +132,7 @@ namespace edge_map_backward {
 
                 // Dequeued vertex ids
                 VertexId                vertex_id[LOADS_PER_TILE][LOAD_VEC_SIZE];
+                VertexId                vertex_idx[LOADS_PER_TILE][LOAD_VEC_SIZE];
 
                 SizeT                   row_offset[LOADS_PER_TILE][LOAD_VEC_SIZE];
                 SizeT                   row_length[LOADS_PER_TILE][LOAD_VEC_SIZE];
@@ -142,7 +144,6 @@ namespace edge_map_backward {
                 // Progress for scan-based backward edge map gather offsets
                 SizeT                   row_progress[LOADS_PER_TILE][LOAD_VEC_SIZE];
                 SizeT                   progress;
-                SizeT                   cta_offset;                 // global offset of d_queue
 
                 /**
                  * @brief Iterate over vertex ids in tile.
@@ -280,7 +281,7 @@ namespace edge_map_backward {
                                             // during next vertex_map
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                 -1,
-                                                cta->d_queue + tile->cta_offset + LOAD*KernelPolicy::LOAD_VEC_SIZE + VEC);
+                                                cta->d_queue + tile->vertex_idx[LOAD][VEC]);
                                             
                                             //Set bitmap_out to true
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -317,7 +318,7 @@ namespace edge_map_backward {
                                             // during next vertex_map
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                 -1,
-                                                cta->d_queue + tile->cta_offset + LOAD*KernelPolicy::LOAD_VEC_SIZE + VEC);
+                                                cta->d_queue + tile->vertex_idx[LOAD][VEC]);
                                             
                                             //Set bitmap_out to true
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -399,7 +400,7 @@ namespace edge_map_backward {
                                                 // during next vertex_map
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                         -1,
-                                                        cta->d_queue + tile->cta_offset + LOAD*KernelPolicy::LOAD_VEC_SIZE + VEC);
+                                                        cta->d_queue + tile->vertex_idx[LOAD][VEC]);
 
                                                 //Set bitmap_out to true
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -436,7 +437,7 @@ namespace edge_map_backward {
                                                 // during next vertex_map
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                         -1,
-                                                        cta->d_queue + tile->cta_offset + LOAD*KernelPolicy::LOAD_VEC_SIZE + VEC);
+                                                        cta->d_queue + tile->vertex_idx[LOAD][VEC]);
 
                                                 //Set bitmap_out to true
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -471,7 +472,7 @@ namespace edge_map_backward {
                                     cta->smem_storage.gather_offsets[scratch_offset] = tile->row_offset[LOAD][VEC] + tile->row_progress[LOAD][VEC];
                                     // In edge_map_backward, gather_predecessors actually store vertex_ids as child_id
                                     cta->smem_storage.gather_predecessors[scratch_offset] = tile->vertex_id[LOAD][VEC];
-                                    cta->smem_storage.gather_offsets2[scratch_offset] = LOAD*KernelPolicy::LOAD_VEC_SIZE + VEC;
+                                    cta->smem_storage.gather_offsets2[scratch_offset] = tile->vertex_idx[LOAD][VEC];
 
                                     tile->row_progress[LOAD][VEC]++;
                                     scratch_offset++;
@@ -599,6 +600,7 @@ namespace edge_map_backward {
                 int                         num_gpus,
                 SmemStorage                 &smem_storage,
                 VertexId                    *d_queue,
+                VertexId                    *d_index,
                 bool                        *d_bitmap_in,
                 bool                        *d_bitmap_out,
                 SizeT                       *d_row_offsets,
@@ -618,6 +620,7 @@ namespace edge_map_backward {
                             smem_storage.state.fine_warpscan),
                         TileTuple(0,0)),
                 d_queue(d_queue),
+                d_index(d_index),
                 d_bitmap_in(d_bitmap_in),
                 d_bitmap_out(d_bitmap_out),
                 d_row_offsets(d_row_offsets),
@@ -655,7 +658,18 @@ namespace edge_map_backward {
                             cta_offset,
                             guarded_elements,
                             (VertexId) -1);
-                tile.cta_offset = cta_offset;
+                
+                util::io::LoadTile<
+                    KernelPolicy::LOG_LOADS_PER_TILE,
+                    KernelPolicy::LOG_LOAD_VEC_SIZE,
+                    KernelPolicy::THREADS,
+                    ProblemData::QUEUE_READ_MODIFIER,
+                    false>::LoadValid(
+                            tile.vertex_idx,
+                            d_index,
+                            cta_offset,
+                            guarded_elements,
+                            (VertexId) -1);
 
                 // Inspect dequeued nodes, updating label and obtaining
                 // edge-list details
@@ -735,7 +749,7 @@ namespace edge_map_backward {
                         // during next vertex_map
                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                             -1,
-                            d_queue + smem_storage.gather_offsets2[scratch_offset]+tile.cta_offset);
+                            d_queue + smem_storage.gather_offsets2[scratch_offset]);
                         //Set bitmap_out to true
                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                             true,

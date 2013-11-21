@@ -42,7 +42,7 @@ namespace dobfs {
  *
  */
 template<typename VertexId, typename SizeT, typename ProblemData>
-struct PrepareUnvisitedQueueFunctor
+struct PrepareInputFrontierMapFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
@@ -78,7 +78,7 @@ struct PrepareUnvisitedQueueFunctor
  *
  */
 template<typename VertexId, typename SizeT, typename ProblemData>
-struct PrepareInputFrontierMapFunctor
+struct PrepareUnvisitedQueueFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice; 
 

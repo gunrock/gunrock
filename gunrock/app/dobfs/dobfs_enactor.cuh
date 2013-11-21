@@ -328,8 +328,17 @@ class DOBFSEnactor : public EnactorBase
 
             // Now the unvisited queue is frontier_queues.d_keys[0], frontier_map_in and frontier_map_out are both ready too
             // Start Reverse BFS
+            //util::DisplayDeviceResults(problem->data_slices[0]->d_frontier_map_in, graph_slice->nodes);
+            //util::DisplayDeviceResults(problem->data_slices[0]->d_frontier_map_out, graph_slice->nodes);
 
+            SizeT last_queue_length = 0;
             while (done[0] < 0) {
+                
+                if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
+                if (last_queue_length == queue_length) break;
+                last_queue_length = queue_length;
+                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
+                util::MemsetIdxKernel<<<128,128>>>(graph_slice->frontier_queues.d_keys[selector^1], queue_length);
 
                 if (selector == 0) {
                 // Edge Map
@@ -341,6 +350,7 @@ class DOBFSEnactor : public EnactorBase
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
+                    graph_slice->frontier_queues.d_keys[selector^1],            // d_in_index_queue
                     problem->data_slices[0]->d_frontier_map_in,
                     problem->data_slices[0]->d_frontier_map_out,
                     problem->data_slices[0]->d_col_offsets,
@@ -358,6 +368,7 @@ class DOBFSEnactor : public EnactorBase
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
+                    graph_slice->frontier_queues.d_keys[selector^1],            // d_in_index_queue
                     problem->data_slices[0]->d_frontier_map_out,
                     problem->data_slices[0]->d_frontier_map_in,
                     problem->data_slices[0]->d_col_offsets,
@@ -373,12 +384,15 @@ class DOBFSEnactor : public EnactorBase
                     queue_reset = false;
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates 
+                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates  
 
-                if (selector == 0)
+                if (selector == 0) {
                     util::MemsetKernel<<<128,128>>>(problem->data_slices[0]->d_frontier_map_in, false, graph_slice->nodes);
-                else
+                    //util::DisplayDeviceResults(problem->data_slices[0]->d_frontier_map_out, graph_slice->nodes);
+                } else {
                     util::MemsetKernel<<<128,128>>>(problem->data_slices[0]->d_frontier_map_out, false, graph_slice->nodes);
+                    //util::DisplayDeviceResults(problem->data_slices[0]->d_frontier_map_in, graph_slice->nodes);
+                }
 
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;

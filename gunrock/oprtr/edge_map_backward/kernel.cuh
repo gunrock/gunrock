@@ -34,6 +34,7 @@ struct Sweep
         typename KernelPolicy::VertexId         &queue_index,
         int                                     &num_gpus,
         typename KernelPolicy::VertexId         *&d_unvisited_node_queue,
+        typename KernelPolicy::VertexId         *&d_unvisited_index_queue,
         bool                                    *&d_frontier_bitmap_in,
         bool                                    *&d_frontier_bitmap_out,
         typename KernelPolicy::SizeT            *&d_row_offsets,
@@ -63,6 +64,7 @@ struct Sweep
                 num_gpus,
                 smem_storage,
                 d_unvisited_node_queue,
+                d_unvisited_index_queue,
                 d_frontier_bitmap_in,
                 d_frontier_bitmap_out,
                 d_row_offsets,
@@ -110,6 +112,7 @@ struct Dispatch
         SizeT                       &num_elements,
         volatile int                *&d_done,
         VertexId                    *&d_unvisited_node_queue,
+        VertexId                    *&d_unvisited_index_queue,
         bool                        *&d_frontier_bitmap_in,
         bool                        *&d_frontier_bitmap_out,
         SizeT                       *&d_row_offsets,
@@ -140,6 +143,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         SizeT                       &num_elements,
         volatile int                *&d_done,
         VertexId                    *&d_unvisited_node_queue,
+        VertexId                    *&d_unvisited_index_queue,
         bool                        *&d_frontier_bitmap_in,
         bool                        *&d_frontier_bitmap_out,
         SizeT                       *&d_row_offsets,
@@ -199,6 +203,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 queue_index,
                 num_gpus,
                 d_unvisited_node_queue,
+                d_unvisited_index_queue,
                 d_frontier_bitmap_in,
                 d_frontier_bitmap_out,
                 d_row_offsets,
@@ -229,6 +234,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @param[in] num_elements              Number of elements
  * @param[in] d_done                    Flag to set when we detect incoming frontier is empty
  * @param[in] d_unvisited_node_queue    Incoming frontier queue
+ * @param[in] d_unvisited_index_queue   Incoming frontier index queue
  * @param[in] d_frontier_bitmap_in      Incoming frontier bitmap (set for nodes in the frontier)
  * @param[in] d_frontier_bitmap_out     Outgoing frontier bitmap (set for nodes in the next layer of frontier)
  * @param[in] d_row_offsets             Row offsets queue
@@ -247,6 +253,7 @@ void Kernel(
         typename KernelPolicy::SizeT            num_elements,               // Number of Elements
         volatile int                            *d_done,                    // Flag to set when we detect incoming edge frontier is empty
         typename KernelPolicy::VertexId         *d_unvisited_node_queue,    // Incoming and output unvisited node queue
+        typename KernelPolicy::VertexId         *d_unvisited_index_queue,
         bool                                    *d_frontier_bitmap_in,      // Incoming frontier bitmap
         bool                                    *d_frontier_bitmap_out,     // Outcoming frontier bitmap
         typename KernelPolicy::SizeT            *d_row_offsets,
@@ -262,6 +269,7 @@ void Kernel(
             num_elements,
             d_done,
             d_unvisited_node_queue,
+            d_unvisited_index_queue,
             d_frontier_bitmap_in,
             d_frontier_bitmap_out,
             d_row_offsets,
