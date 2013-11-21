@@ -79,6 +79,8 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
     // Device indices for each data slice
     int                 *gpu_idx;
 
+    bool                undirected;
+
     // Methods
 
     /**
@@ -94,18 +96,22 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
      * @brief DOBFSProblem constructor
      *
      * @param[in] stream_from_host Whether to stream data from host.
+     * @param[in] undirected Whether the input graph is undirected.
      * @param[in] graph Reference to the CSR graph object we process on.
      * @param[in] inv_graph Reference to the inverse (CSC) graph object we process on.
      * @param[in] num_gpus Number of the GPUs used.
      */
     DOBFSProblem(bool        stream_from_host,       // Only meaningful for single-GPU
+                 bool        undirected,
                  const Csr<VertexId, Value, SizeT> &graph,
                  const Csr<VertexId, Value, SizeT> &inv_graph,
                int         num_gpus) :
-        num_gpus(num_gpus)
+        num_gpus(num_gpus),
+        undirected(undirected)
     {
         Init(
             stream_from_host,
+            undirected,
             graph,
             inv_graph,
             num_gpus);
@@ -122,8 +128,10 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
                 "~DOBFSProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
             if (data_slices[i]->d_labels)       util::GRError(cudaFree(data_slices[i]->d_labels), "GpuSlice cudaFree d_labels failed", __FILE__, __LINE__);
             if (data_slices[i]->d_preds)        util::GRError(cudaFree(data_slices[i]->d_preds), "GpuSlice cudaFree d_preds failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_col_offsets)  util::GRError(cudaFree(data_slices[i]->d_col_offsets), "GpuSlice cudaFree d_col_offsets failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_row_indices)  util::GRError(cudaFree(data_slices[i]->d_row_indices), "GpuSlice cudaFree d_row_indices failed", __FILE__, __LINE__);
+            if (!undirected) {
+                if (data_slices[i]->d_col_offsets)  util::GRError(cudaFree(data_slices[i]->d_col_offsets), "GpuSlice cudaFree d_col_offsets failed", __FILE__, __LINE__);
+                if (data_slices[i]->d_row_indices)  util::GRError(cudaFree(data_slices[i]->d_row_indices), "GpuSlice cudaFree d_row_indices failed", __FILE__, __LINE__);
+            }
             if (data_slices[i]->d_frontier_map_in)  util::GRError(cudaFree(data_slices[i]->d_frontier_map_in), "GpuSlice cudaFree d_frontier_map_in failed", __FILE__, __LINE__);
             if (data_slices[i]->d_frontier_map_out)  util::GRError(cudaFree(data_slices[i]->d_frontier_map_out), "GpuSlice cudaFree d_frontier_map_out failed", __FILE__, __LINE__);
             if (d_data_slices[i])               util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
@@ -184,6 +192,7 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
      * @brief DOBFSProblem initialization
      *
      * @param[in] stream_from_host Whether to stream data from host.
+     * @param[in] undirected Whether the input graph is undirected.
      * @param[in] graph Reference to the CSR graph object we process on. @see Csr
      * @param[in] inv_graph Reference to the inverse (CSC) graph object we process on.
      * @param[in] _num_gpus Number of the GPUs used.
@@ -192,11 +201,13 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
      */
     cudaError_t Init(
             bool        stream_from_host,       // Only meaningful for single-GPU
+            bool        _undirected,
             const Csr<VertexId, Value, SizeT> &graph,
             const Csr<VertexId, Value, SizeT> &inv_graph,
             int         _num_gpus)
     {
         num_gpus = _num_gpus;
+        undirected = _undirected;
         nodes = graph.nodes;
         edges = graph.edges;
         VertexId *h_row_offsets = graph.row_offsets;
@@ -249,34 +260,39 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
                     "DOBFSProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_preds = d_preds;
 
-                SizeT    *d_col_offsets;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_col_offsets,
-                                (nodes+1) * sizeof(SizeT)),
-                            "DOBFSProblem cudaMalloc d_col_offsets failed", __FILE__, __LINE__)) return retval;
+                if (!undirected) {
+                    SizeT    *d_col_offsets;
+                    if (retval = util::GRError(cudaMalloc(
+                                    (void**)&d_col_offsets,
+                                    (nodes+1) * sizeof(SizeT)),
+                                "DOBFSProblem cudaMalloc d_col_offsets failed", __FILE__, __LINE__)) return retval;
 
-                if (retval = util::GRError(cudaMemcpy(
-                        d_col_offsets,
-                        h_col_offsets,
-                        (nodes+1) * sizeof(SizeT),
-                        cudaMemcpyHostToDevice),
-                        "DOBFSProblem cudaMemcpy d_col_offsets failed", __FILE__, __LINE__)) break;
+                    if (retval = util::GRError(cudaMemcpy(
+                                    d_col_offsets,
+                                    h_col_offsets,
+                                    (nodes+1) * sizeof(SizeT),
+                                    cudaMemcpyHostToDevice),
+                                "DOBFSProblem cudaMemcpy d_col_offsets failed", __FILE__, __LINE__)) break;
 
-                data_slices[gpu]->d_col_offsets = d_col_offsets;
+                    data_slices[gpu]->d_col_offsets = d_col_offsets;
 
-                VertexId    *d_row_indices;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_row_indices,
-                                edges * sizeof(VertexId)),
-                            "DOBFSProblem cudaMalloc d_row_indices failed", __FILE__, __LINE__)) return retval;
+                    VertexId    *d_row_indices;
+                    if (retval = util::GRError(cudaMalloc(
+                                    (void**)&d_row_indices,
+                                    edges * sizeof(VertexId)),
+                                "DOBFSProblem cudaMalloc d_row_indices failed", __FILE__, __LINE__)) return retval;
 
-                if (retval = util::GRError(cudaMemcpy(
-                        d_row_indices,
-                        h_row_indices,
-                        edges * sizeof(VertexId),
-                        cudaMemcpyHostToDevice),
-                        "ProblemBase cudaMemcpy d_row_indices failed", __FILE__, __LINE__)) break;
-                data_slices[gpu]->d_row_indices = d_row_indices;
+                    if (retval = util::GRError(cudaMemcpy(
+                                    d_row_indices,
+                                    h_row_indices,
+                                    edges * sizeof(VertexId),
+                                    cudaMemcpyHostToDevice),
+                                "ProblemBase cudaMemcpy d_row_indices failed", __FILE__, __LINE__)) break;
+                    data_slices[gpu]->d_row_indices = d_row_indices;
+                } else {
+                    data_slices[gpu]->d_col_offsets = ProblemBase<VertexId, SizeT,_USE_DOUBLE_BUFFER>::graph_slices[gpu]->d_row_offsets;
+                    data_slices[gpu]->d_row_indices = ProblemBase<VertexId, SizeT,_USE_DOUBLE_BUFFER>::graph_slices[gpu]->d_column_indices;
+                }
 
                 bool    *d_frontier_map_in;
                 if (retval = util::GRError(cudaMalloc(
