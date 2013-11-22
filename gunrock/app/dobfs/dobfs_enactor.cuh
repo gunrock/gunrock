@@ -150,7 +150,7 @@ class DOBFSEnactor : public EnactorBase
      * @brief DOBFSEnactor constructor
      */
     DOBFSEnactor(bool DEBUG = false) :
-        EnactorBase(EDGE_FRONTIERS, DEBUG),
+        EnactorBase(VERTEX_FRONTIERS, DEBUG),
         iteration(0),
         total_queued(0),
         done(NULL),
@@ -299,9 +299,9 @@ class DOBFSEnactor : public EnactorBase
                         this->vertex_map_kernel_stats);
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_prepare_input_frontier::Kernel failed", __FILE__, __LINE__))) break;
             
-            queue_length          = graph_slice->nodes;
-            queue_index        = 0;        // Work queue index
-            selector                = 1;
+            queue_length            = graph_slice->nodes;
+            queue_index             = 0;        // Work queue index
+            selector                = 0;
             num_elements          = graph_slice->nodes;
 
             util::MemsetIdxKernel<<<128,128>>>(graph_slice->frontier_queues.d_keys[selector], graph_slice->nodes);
@@ -333,14 +333,13 @@ class DOBFSEnactor : public EnactorBase
 
             SizeT last_queue_length = 0;
             while (done[0] < 0) {
-                
                 if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                 if (last_queue_length == queue_length) break;
                 last_queue_length = queue_length;
                 //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
                 util::MemsetIdxKernel<<<128,128>>>(graph_slice->frontier_queues.d_keys[selector^1], queue_length);
 
-                if (selector == 0) {
+                if (selector == 1) {
                 // Edge Map
                 gunrock::oprtr::edge_map_backward::Kernel<EdgeMapPolicy, DOBFSProblem, RBFSFunctor>
                 <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
@@ -386,7 +385,7 @@ class DOBFSEnactor : public EnactorBase
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates  
 
-                if (selector == 0) {
+                if (selector == 1) {
                     util::MemsetKernel<<<128,128>>>(problem->data_slices[0]->d_frontier_map_in, false, graph_slice->nodes);
                     //util::DisplayDeviceResults(problem->data_slices[0]->d_frontier_map_out, graph_slice->nodes);
                 } else {

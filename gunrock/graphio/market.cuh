@@ -170,7 +170,7 @@ int ReadMarketStream(
     fflush(stdout);
 
     // Convert COO to CSR
-    csr_graph.template FromCoo<LOAD_VALUES>(coo, nodes, edges, ordered_rows);
+    csr_graph.template FromCoo<LOAD_VALUES>(coo, nodes, edges, ordered_rows, reversed);
     free(coo);
 
     fflush(stdout);

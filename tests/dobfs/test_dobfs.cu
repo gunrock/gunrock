@@ -548,7 +548,12 @@ int main( int argc, char** argv)
 		    }
 		}
 
-        csr.DisplayGraph();
+        if (!g_undirected) {
+            csr.DisplayGraph();
+            inv_csr.DisplayGraph();
+        } else {
+            csr.DisplayGraph();
+        }
         fflush(stdout);
 
         if (!g_undirected) {

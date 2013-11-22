@@ -131,15 +131,18 @@ struct Csr
         Tuple *coo,
         SizeT coo_nodes,
         SizeT coo_edges,
-        bool ordered_rows = false)
+        bool ordered_rows = false,
+        bool reversed = false)
     {
         printf("  Converting %d vertices, %d directed edges (%s tuples) "
-               "to CSR format... ",
+               "to CSR format... \n",
                coo_nodes, coo_edges, ordered_rows ? "ordered" : "unordered");
         time_t mark1 = time(NULL);
         fflush(stdout);
 
         FromScratch<LOAD_EDGE_VALUES, false>(coo_nodes, coo_edges);
+
+        
 
         // Sort COO by row
         if (!ordered_rows) {
@@ -153,6 +156,7 @@ struct Csr
         new_coo[0].val = coo[0].val;
         for (int i = 0; i < coo_edges-1; ++i)
         {
+
             if ((coo[i+1].col != coo[i].col) || (coo[i+1].row != coo[i].row))
             {
                 new_coo[real_edge].col = coo[i+1].col;
@@ -161,10 +165,8 @@ struct Csr
             }
         }
 
-
         VertexId prev_row = -1;
         for (SizeT edge = 0; edge < real_edge; edge++) {
-
             VertexId current_row = new_coo[edge].row;
 
             // Fill in rows up to and including the current row

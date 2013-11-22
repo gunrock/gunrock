@@ -88,8 +88,8 @@ namespace edge_map_backward {
             // Input and output device pointers
             VertexId                *d_queue;                       // Incoming and outgoing vertex frontier
             VertexId                *d_index;                       // Incoming vertex frontier index
-            bool                   *d_bitmap_in;                   // Incoming frontier bitmap
-            bool                   *d_bitmap_out;                  // Outgoing frontier bitmap
+            bool                    *d_bitmap_in;                   // Incoming frontier bitmap
+            bool                    *d_bitmap_out;                  // Outgoing frontier bitmap
             SizeT                   *d_row_offsets;
             VertexId                *d_column_indices;
             DataSlice               *problem;                       // Problem Data
@@ -200,6 +200,8 @@ namespace edge_map_backward {
 
                                     tile->coarse_row_rank[LOAD][VEC] = (tile->row_length[LOAD][VEC] < KernelPolicy::WARP_GATHER_THRESHOLD) ?
                                         0 : tile->row_length[LOAD][VEC];
+                                    //tile->fine_row_rank[LOAD][VEC] = (tile->row_length[LOAD][VEC] > 0) ? tile->row_length[LOAD][VEC] : 0;
+                                    //tile->coarse_row_rank[LOAD][VEC] = 0;
 
                                     Iterate<LOAD, VEC + 1>::Inspect(cta, tile);
 
@@ -238,6 +240,9 @@ namespace edge_map_backward {
                                         cta->smem_storage.state.warp_comm[0][1] = tile->coarse_row_rank[LOAD][VEC];                             // queue rank
                                         cta->smem_storage.state.warp_comm[0][2] = tile->row_offset[LOAD][VEC] + tile->row_length[LOAD][VEC];    // oob
                                         cta->smem_storage.state.warp_comm[0][3] = tile->vertex_id[LOAD][VEC];                                   // predecessor
+                                        
+                                        // Unset row length
+                                        tile->row_length[LOAD][VEC] = 0;
 
                                         // Unset my command
                                         cta->smem_storage.state.cta_comm = KernelPolicy::THREADS;   // So that we won't repeatedly expand this node
