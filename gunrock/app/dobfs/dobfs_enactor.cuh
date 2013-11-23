@@ -304,7 +304,6 @@ class DOBFSEnactor : public EnactorBase
             selector                = 0;
             num_elements          = graph_slice->nodes;
 
-            util::MemsetIdxKernel<<<128,128>>>(graph_slice->frontier_queues.d_keys[selector], graph_slice->nodes);
             gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, UnvisitedQueueFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                         queue_reset,
@@ -312,7 +311,7 @@ class DOBFSEnactor : public EnactorBase
                         1,
                         num_elements,
                         d_done,
-                        graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                        problem->data_slices[0]->d_index_queue,             // d_in_queue
                         graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                         data_slice,
                         work_progress,
@@ -337,7 +336,6 @@ class DOBFSEnactor : public EnactorBase
                 if (last_queue_length == queue_length) break;
                 last_queue_length = queue_length;
                 //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
-                util::MemsetIdxKernel<<<128,128>>>(graph_slice->frontier_queues.d_keys[selector^1], queue_length);
 
                 if (selector == 1) {
                 // Edge Map
@@ -349,7 +347,7 @@ class DOBFSEnactor : public EnactorBase
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
-                    graph_slice->frontier_queues.d_keys[selector^1],            // d_in_index_queue
+                    problem->data_slices[0]->d_index_queue,            // d_in_index_queue
                     problem->data_slices[0]->d_frontier_map_in,
                     problem->data_slices[0]->d_frontier_map_out,
                     problem->data_slices[0]->d_col_offsets,
@@ -367,7 +365,7 @@ class DOBFSEnactor : public EnactorBase
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
-                    graph_slice->frontier_queues.d_keys[selector^1],            // d_in_index_queue
+                    problem->data_slices[0]->d_index_queue,            // d_in_index_queue
                     problem->data_slices[0]->d_frontier_map_out,
                     problem->data_slices[0]->d_frontier_map_in,
                     problem->data_slices[0]->d_col_offsets,
@@ -384,14 +382,7 @@ class DOBFSEnactor : public EnactorBase
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates  
-
-                if (selector == 1) {
-                    util::MemsetKernel<<<128,128>>>(problem->data_slices[0]->d_frontier_map_in, false, graph_slice->nodes);
-                    //util::DisplayDeviceResults(problem->data_slices[0]->d_frontier_map_out, graph_slice->nodes);
-                } else {
-                    util::MemsetKernel<<<128,128>>>(problem->data_slices[0]->d_frontier_map_out, false, graph_slice->nodes);
-                    //util::DisplayDeviceResults(problem->data_slices[0]->d_frontier_map_in, graph_slice->nodes);
-                }
+                
 
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;

@@ -57,7 +57,7 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
         VertexId        *d_row_indices;         /**< CSC format row indices on device memory */
         bool            *d_frontier_map_in;     /**< Input frontier bitmap */
         bool            *d_frontier_map_out;    /**< Output frontier bitmap */
-
+        VertexId        *d_index_queue;         /**< Index of unvisited queue */
     };
 
     // Members
@@ -134,6 +134,7 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
             }
             if (data_slices[i]->d_frontier_map_in)  util::GRError(cudaFree(data_slices[i]->d_frontier_map_in), "GpuSlice cudaFree d_frontier_map_in failed", __FILE__, __LINE__);
             if (data_slices[i]->d_frontier_map_out)  util::GRError(cudaFree(data_slices[i]->d_frontier_map_out), "GpuSlice cudaFree d_frontier_map_out failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_index_queue)  util::GRError(cudaFree(data_slices[i]->d_index_queue), "GpuSlice cudaFree d_index_queue failed", __FILE__, __LINE__);
             if (d_data_slices[i])               util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
         }
         if (d_data_slices)  delete[] d_data_slices;
@@ -308,6 +309,13 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
                     "DOBFSProblem cudaMalloc d_frontier_map_out failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_frontier_map_out = d_frontier_map_out;
 
+                VertexId    *d_index_queue;
+                if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_index_queue,
+                        nodes * sizeof(VertexId)),
+                    "DOBFSProblem cudaMalloc d_index_queue failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_index_queue = d_index_queue;
+
             }
             //TODO: add multi-GPU allocation code
         } while (0);
@@ -386,6 +394,16 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
 
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_frontier_map_in, false, nodes);
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_frontier_map_out, false, nodes);
+
+            if (!data_slices[gpu]->d_index_queue) {
+                VertexId    *d_index_queue;
+                if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_index_queue,
+                        nodes * sizeof(VertexId)),
+                    "DOBFSProblem cudaMalloc d_index_queue failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_index_queue = d_index_queue;
+            }
+            util::MemsetIdxKernel<<<128, 128>>>(data_slices[gpu]->d_index_queue, nodes);
                 
             if (retval = util::GRError(cudaMemcpy(
                             d_data_slices[gpu],

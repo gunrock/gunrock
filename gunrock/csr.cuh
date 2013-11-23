@@ -259,6 +259,17 @@ struct Csr
         }
     }
 
+    void DisplayNeighborList(VertexId node)
+    {
+        for (SizeT edge = row_offsets[node];
+                 edge < row_offsets[node + 1];
+                 edge++) {
+                util::PrintValue(column_indices[edge]);
+                printf(", ");
+            }
+            printf("\n");
+    }
+
     /**@}*/
 
     /**
