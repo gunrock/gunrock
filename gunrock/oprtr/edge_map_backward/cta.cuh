@@ -237,7 +237,7 @@ namespace edge_map_backward {
                                     if (owner == threadIdx.x) {
                                         // Got control of the CTA: command it
                                         cta->smem_storage.state.warp_comm[0][0] = tile->row_offset[LOAD][VEC];                                  // start
-                                        cta->smem_storage.state.warp_comm[0][1] = tile->coarse_row_rank[LOAD][VEC];                             // queue rank
+                                        cta->smem_storage.state.warp_comm[0][1] = tile->vertex_idx[LOAD][VEC];                             // queue rank
                                         cta->smem_storage.state.warp_comm[0][2] = tile->row_offset[LOAD][VEC] + tile->row_length[LOAD][VEC];    // oob
                                         cta->smem_storage.state.warp_comm[0][3] = tile->vertex_id[LOAD][VEC];                                   // predecessor
                                         
@@ -278,6 +278,7 @@ namespace edge_map_backward {
                                             if (Functor::CondEdge(parent_id, child_id, cta->problem))
                                                 Functor::ApplyEdge(parent_id, child_id, cta->problem);
                                             child_id = -1;
+                                            
                                         }
 
                                         if (child_id == -1)
@@ -286,7 +287,7 @@ namespace edge_map_backward {
                                             // during next vertex_map
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                 -1,
-                                                cta->d_queue + tile->vertex_idx[LOAD][VEC]);
+                                                cta->d_queue + cta->smem_storage.state.warp_comm[0][1]);
                                             
                                             //Set bitmap_out to true
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -323,7 +324,7 @@ namespace edge_map_backward {
                                             // during next vertex_map
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                 -1,
-                                                cta->d_queue + tile->vertex_idx[LOAD][VEC]);
+                                                cta->d_queue + cta->smem_storage.state.warp_comm[0][1]);
                                             
                                             //Set bitmap_out to true
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(

@@ -551,6 +551,8 @@ int main( int argc, char** argv)
         if (!g_undirected) {
             csr.DisplayGraph();
             inv_csr.DisplayGraph();
+            //csr.DisplayNeighborList(13415);
+            //inv_csr.DisplayNeighborList(13415);
         } else {
             csr.DisplayGraph();
         }
