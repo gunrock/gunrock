@@ -202,7 +202,7 @@ struct SwitchToNormalFunctor
     typedef typename ProblemData::DataSlice DataSlice; 
 
     /**
-     * @brief Vertex mapping condition function. Check if the Vertex Id is valid (label equals to -1).
+     * @brief Vertex mapping condition function. Check if the Vertex Id is valid (frontier_map_out is set).
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object

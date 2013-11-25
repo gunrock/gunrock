@@ -405,6 +405,7 @@ class DOBFSEnactor : public EnactorBase
               
             // Reverse BFS
             if (done[0] < 0) {
+                printf("in RBFS.\n");
 
             //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[0], graph_slice->nodes);
             SizeT queue_length          = current_frontier_size;
@@ -465,7 +466,6 @@ class DOBFSEnactor : public EnactorBase
 
             SizeT last_queue_length = 0;
             while (done[0] < 0) {
-                if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                 if (last_queue_length == queue_length) break;
                 last_queue_length = queue_length;
 
@@ -564,8 +564,8 @@ class DOBFSEnactor : public EnactorBase
                 selector ^= 1;
                 iteration++;
 
+                if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                 if (INSTRUMENT || DEBUG) {
-                    if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                     total_queued += queue_length;
                     if (DEBUG) printf(", %lld", (long long) queue_length);
                     if (INSTRUMENT) {
@@ -575,6 +575,8 @@ class DOBFSEnactor : public EnactorBase
                             total_lifetimes)) break;
                     }
                 }
+                if (queue_length < graph_slice->nodes/24) break;
+
                 // Check if done
                 if (done[0] == 0) break;
 
@@ -586,8 +588,140 @@ class DOBFSEnactor : public EnactorBase
 
             }
 
-            // Normal BFS
+            printf("iter: %d\n", iteration);
 
+            // Normal BFS
+            {
+                printf("back to normal BFS.\n");
+            SizeT queue_length          = graph_slice->nodes;
+            VertexId queue_index        = 0;        // Work queue index
+            int selector                = 0;
+            SizeT num_elements          = queue_length;
+
+            bool queue_reset = true;
+
+            gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, SwitchFunctor>
+                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                        queue_reset,
+                        queue_index,
+                        1,
+                        num_elements,
+                        d_done,
+                        problem->data_slices[0]->d_index_queue,             // d_in_queue
+                        graph_slice->frontier_queues.d_keys[selector],    // d_out_queue
+                        data_slice,
+                        work_progress,
+                        graph_slice->frontier_elements[selector],           // max_in_queue
+                        graph_slice->frontier_elements[selector^1],         // max_out_queue
+                        this->vertex_map_kernel_stats);
+            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_switch_to_normal::Kernel failed", __FILE__, __LINE__))) break;
+
+            queue_index++;
+            if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
+
+            // Step through BFS iterations
+            num_elements = queue_length;
+            queue_index = 0;
+            
+            while (done[0] < 0) {
+
+                // Edge Map
+                gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, DOBFSProblem, BfsFunctor>
+                <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
+                    queue_reset,
+                    queue_index,
+                    1,
+                    num_elements,
+                    d_done,
+                    graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
+                    graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
+                    graph_slice->d_column_indices,
+                    data_slice,
+                    this->work_progress,
+                    graph_slice->frontier_elements[selector],                   // max_in_queue
+                    graph_slice->frontier_elements[selector^1],                 // max_out_queue
+                    this->edge_map_kernel_stats);
+
+
+                // Only need to reset queue for once
+                if (queue_reset)
+                    queue_reset = false;
+
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates 
+
+
+                queue_index++;
+                selector ^= 1;
+                
+                if (DEBUG) {
+                    if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
+                    printf(", %lld", (long long) queue_length);
+                }
+
+                if (INSTRUMENT) {
+                    if (retval = edge_map_kernel_stats.Accumulate(
+                        edge_map_grid_size,
+                        total_runtimes,
+                        total_lifetimes)) break;
+                }
+
+                // Throttle
+                if (iteration & 1) {
+                    if (retval = util::GRError(cudaEventRecord(throttle_event),
+                        "BFSEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
+                } else {
+                    if (retval = util::GRError(cudaEventSynchronize(throttle_event),
+                        "BFSEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
+                }
+
+                // Check if done
+                if (done[0] == 0) break;
+
+                // Vertex Map
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, BfsFunctor>
+                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                    queue_reset,
+                    queue_index,
+                    1,
+                    num_elements,
+                    d_done,
+                    graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                    graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
+                    data_slice,
+                    work_progress,
+                    graph_slice->frontier_elements[selector],           // max_in_queue
+                    graph_slice->frontier_elements[selector^1],         // max_out_queue
+                    this->vertex_map_kernel_stats);
+
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
+
+
+                queue_index++;
+                selector ^= 1;
+                iteration++;
+                if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
+
+                if (INSTRUMENT || DEBUG) {
+                    total_queued += queue_length;
+                    if (DEBUG) printf(", %lld", (long long) queue_length);
+                    if (INSTRUMENT) {
+                        if (retval = vertex_map_kernel_stats.Accumulate(
+                            vertex_map_grid_size,
+                            total_runtimes,
+                            total_lifetimes)) break;
+                    }
+                }
+                
+                // Check if done
+                if (done[0] == 0) break;
+
+                if (DEBUG) printf("\n%lld", (long long) iteration);
+
+            }
+            if (retval) break;
+            }
             
         } while(0);
 
