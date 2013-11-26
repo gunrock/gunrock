@@ -54,6 +54,8 @@ bool g_verbose;
 bool g_undirected;
 bool g_quick;
 bool g_stream_from_host;
+float g_alpha;
+float g_beta;
 
 /******************************************************************************
  * Housekeeping Routines
@@ -301,7 +303,9 @@ void RunTests(
     VertexId src,
     int max_grid_size,
     int num_gpus,
-    double max_queue_sizing)
+    double max_queue_sizing,
+    float alpha,        // Tuning parameter for switching to reverse bfs
+    float beta)         // Tuning parameter for switching back to normal bfs
 {
     typedef DOBFSProblem<
         VertexId,
@@ -325,12 +329,15 @@ void RunTests(
 
         // Allocate problem on GPU
         Problem *csr_problem = new Problem;
+
         util::GRError(csr_problem->Init(
             g_stream_from_host,
             g_undirected,
             graph,
             inv_graph,
-            num_gpus), "Problem DOBFS Initialization Failed", __FILE__, __LINE__);
+            num_gpus,
+            alpha,
+            beta), "Problem DOBFS Initialization Failed", __FILE__, __LINE__);
 
         //
         // Compute reference CPU BFS solution for source-distance
@@ -437,6 +444,13 @@ void RunTests(
     mark_pred = args.CheckCmdLineFlag("mark-pred");
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
     g_verbose = args.CheckCmdLineFlag("v");
+    args.GetCmdLineArgument("alpha", g_alpha);
+    args.GetCmdLineArgument("beta", g_beta);
+
+    if (g_alpha == 0.0f)
+        g_alpha = 12.0f;
+    if (g_beta == 0.0f)
+        g_beta = 24.0f;
 
     if (instrumented) {
         if (mark_pred) {
@@ -446,7 +460,9 @@ void RunTests(
                 src,
                 max_grid_size,
                 num_gpus,
-                max_queue_sizing);
+                max_queue_sizing,
+                g_alpha,
+                g_beta);
         } else {
             RunTests<VertexId, Value, SizeT, true, false>(
                 graph,
@@ -454,7 +470,9 @@ void RunTests(
                 src,
                 max_grid_size,
                 num_gpus,
-                max_queue_sizing);
+                max_queue_sizing,
+                g_alpha,
+                g_beta);
         }
     } else {
         if (mark_pred) {
@@ -464,7 +482,9 @@ void RunTests(
                 src,
                 max_grid_size,
                 num_gpus,
-                max_queue_sizing);
+                max_queue_sizing,
+                g_alpha,
+                g_beta);
         } else {
             RunTests<VertexId, Value, SizeT, false, false>(
                 graph,
@@ -472,7 +492,9 @@ void RunTests(
                 src,
                 max_grid_size,
                 num_gpus,
-                max_queue_sizing);
+                max_queue_sizing,
+                g_alpha,
+                g_beta);
         }
     }
 

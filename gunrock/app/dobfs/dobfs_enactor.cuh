@@ -389,7 +389,7 @@ class DOBFSEnactor : public EnactorBase
 
                 num_unvisited_nodes -= queue_length;
                 current_frontier_size = queue_length;
-                if (num_unvisited_nodes < current_frontier_size)
+                if (num_unvisited_nodes < current_frontier_size*problem->alpha)
                     break;
 
                 // Check if done
@@ -401,7 +401,7 @@ class DOBFSEnactor : public EnactorBase
 
             if (retval) break;
             }
-            printf("iter: %d\n", iteration);
+            printf("iter: %lld\n, alpha %f\n", iteration, problem->alpha);
               
             // Reverse BFS
             if (done[0] < 0) {
@@ -575,7 +575,7 @@ class DOBFSEnactor : public EnactorBase
                             total_lifetimes)) break;
                     }
                 }
-                if (queue_length < graph_slice->nodes/24) break;
+                if (queue_length < graph_slice->nodes/problem->beta) break;
 
                 // Check if done
                 if (done[0] == 0) break;
@@ -588,10 +588,10 @@ class DOBFSEnactor : public EnactorBase
 
             }
 
-            printf("iter: %d\n", iteration);
+            printf("iter: %lld\n", iteration);
 
             // Normal BFS
-            {
+            if (done[0] < 0) {
                 printf("back to normal BFS.\n");
             SizeT queue_length          = graph_slice->nodes;
             VertexId queue_index        = 0;        // Work queue index

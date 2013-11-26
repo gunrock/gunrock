@@ -81,6 +81,10 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
 
     bool                undirected;
 
+    // Tuning parameters
+    float               alpha;
+    float               beta;
+
     // Methods
 
     /**
@@ -105,7 +109,9 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
                  bool        undirected,
                  const Csr<VertexId, Value, SizeT> &graph,
                  const Csr<VertexId, Value, SizeT> &inv_graph,
-               int         num_gpus) :
+                 int         num_gpus,
+                 float       alpha,
+                 float       beta) :
         num_gpus(num_gpus),
         undirected(undirected)
     {
@@ -114,7 +120,9 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
             undirected,
             graph,
             inv_graph,
-            num_gpus);
+            num_gpus,
+            alpha,
+            beta);
     }
 
     /**
@@ -205,12 +213,16 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
             bool        _undirected,
             const Csr<VertexId, Value, SizeT> &graph,
             const Csr<VertexId, Value, SizeT> &inv_graph,
-            int         _num_gpus)
+            int         _num_gpus,
+            float       _alpha,
+            float       _beta)
     {
         num_gpus = _num_gpus;
         undirected = _undirected;
         nodes = graph.nodes;
         edges = graph.edges;
+        alpha = _alpha;
+        beta = _beta;
         VertexId *h_row_offsets = graph.row_offsets;
         VertexId *h_column_indices = graph.column_indices;
         VertexId *h_col_offsets = inv_graph.row_offsets;
