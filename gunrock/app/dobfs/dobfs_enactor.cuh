@@ -401,11 +401,11 @@ class DOBFSEnactor : public EnactorBase
 
             if (retval) break;
             }
-            //printf("iter: %lld\n, alpha %f\n", iteration, problem->alpha);
+            printf("iter: %lld\n, alpha %f\n", iteration, problem->alpha);
               
             // Reverse BFS
             if (done[0] < 0) {
-                //printf("in RBFS.\n");
+                printf("in RBFS.\n");
 
             //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[0], graph_slice->nodes);
             SizeT queue_length          = current_frontier_size;
@@ -588,11 +588,11 @@ class DOBFSEnactor : public EnactorBase
 
             }
 
-            //printf("iter: %lld\n", iteration);
+            printf("iter: %lld\n", iteration);
 
             // Normal BFS
             if (done[0] < 0) {
-                //printf("back to normal BFS.\n");
+                printf("back to normal BFS.\n");
             SizeT queue_length          = graph_slice->nodes;
             VertexId queue_index        = 0;        // Work queue index
             int selector                = 0;
@@ -775,7 +775,7 @@ class DOBFSEnactor : public EnactorBase
                 1,                                  // LOG_LOAD_VEC_SIZE
                 3,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
-                128 * 4,                            // WARP_GATHER_THRESHOLD
+                32,                            // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7>                                  // LOG_SCHEDULE_GRANULARITY
                 EdgeMapPolicy;

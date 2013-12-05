@@ -424,7 +424,7 @@ class BFSEnactor : public EnactorBase
                 1,                                  // LOG_LOAD_VEC_SIZE
                 3,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
-                128 * 4,                            // WARP_GATHER_THRESHOLD
+                32,                            // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7>                                  // LOG_SCHEDULE_GRANULARITY
                 EdgeMapPolicy;

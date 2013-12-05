@@ -357,7 +357,7 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
                 printf("...]");
             }
             flag = 1;
-            return flag;
+            //return flag;
         }
     }
     printf("\n");

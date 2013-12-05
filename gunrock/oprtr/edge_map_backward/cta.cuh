@@ -365,10 +365,10 @@ namespace edge_map_backward {
                                             cta->smem_storage.state.warp_comm[warp_id][1] = tile->coarse_row_rank[LOAD][VEC];                               // queue rank
                                             cta->smem_storage.state.warp_comm[warp_id][2] = tile->row_offset[LOAD][VEC] + tile->row_length[LOAD][VEC];      // oob
                                             cta->smem_storage.state.warp_comm[warp_id][3] = tile->vertex_id[LOAD][VEC];                                     // predecessor
-                                        }
 
-                                        // Unset row length
-                                        tile->row_length[LOAD][VEC] = 0; // So that we won't repeatedly expand this node
+                                            // Unset row length
+                                            tile->row_length[LOAD][VEC] = 0; // So that we won't repeatedly expand this node
+                                        }
 
                                         SizeT coop_offset   = cta->smem_storage.state.warp_comm[warp_id][0];
                                         SizeT coop_rank     = cta->smem_storage.state.warp_comm[warp_id][1] + lane_id;

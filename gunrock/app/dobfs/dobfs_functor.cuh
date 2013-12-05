@@ -138,8 +138,10 @@ struct ReverseBFSFunctor
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
     {
         // Check if the destination node has been claimed as someone's child
-        return (atomicCAS(&problem->d_preds[d_id], -2, s_id) == -2) ? true : false;
-        
+        //return (atomicCAS(&problem->d_preds[d_id], -2, s_id) == -2) ? true : false;
+        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+            s_id, problem->d_preds + d_id);
+        return true; 
     }
 
     /**
