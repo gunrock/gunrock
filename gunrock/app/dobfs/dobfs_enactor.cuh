@@ -304,6 +304,7 @@ class DOBFSEnactor : public EnactorBase
                     queue_reset,
                     queue_index,
                     1,
+                    iteration,
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
@@ -462,12 +463,13 @@ class DOBFSEnactor : public EnactorBase
             // Start Reverse BFS
 
             //util::DisplayDeviceResults(problem->data_slices[0]->d_frontier_map_in, graph_slice->nodes);
-            //util::DisplayDeviceResults(problem->graph_slices[0]->frontier_queues.d_keys[1], queue_length);
 
             SizeT last_queue_length = 0;
             while (done[0] < 0) {
                 if (last_queue_length == queue_length) break;
                 last_queue_length = queue_length;
+
+                //util::DisplayDeviceResults(problem->graph_slices[0]->frontier_queues.d_keys[selector], queue_length);
 
                 if (selector == 1) {
                 // Edge Map
@@ -631,6 +633,7 @@ class DOBFSEnactor : public EnactorBase
                     queue_reset,
                     queue_index,
                     1,
+                    iteration,
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
@@ -775,7 +778,7 @@ class DOBFSEnactor : public EnactorBase
                 1,                                  // LOG_LOAD_VEC_SIZE
                 3,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
-                32,                            // WARP_GATHER_THRESHOLD
+                32,                                 // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7>                                  // LOG_SCHEDULE_GRANULARITY
                 EdgeMapPolicy;

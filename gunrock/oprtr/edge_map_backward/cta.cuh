@@ -362,7 +362,7 @@ namespace edge_map_backward {
                                         if (lane_id == cta->smem_storage.state.warp_comm[warp_id][0]) {
                                             // Got control of the warp
                                             cta->smem_storage.state.warp_comm[warp_id][0] = tile->row_offset[LOAD][VEC];                                    // start
-                                            cta->smem_storage.state.warp_comm[warp_id][1] = tile->coarse_row_rank[LOAD][VEC];                               // queue rank
+                                            cta->smem_storage.state.warp_comm[warp_id][1] = tile->vertex_idx[LOAD][VEC];;                               // queue rank
                                             cta->smem_storage.state.warp_comm[warp_id][2] = tile->row_offset[LOAD][VEC] + tile->row_length[LOAD][VEC];      // oob
                                             cta->smem_storage.state.warp_comm[warp_id][3] = tile->vertex_id[LOAD][VEC];                                     // predecessor
 
@@ -371,7 +371,6 @@ namespace edge_map_backward {
                                         }
 
                                         SizeT coop_offset   = cta->smem_storage.state.warp_comm[warp_id][0];
-                                        SizeT coop_rank     = cta->smem_storage.state.warp_comm[warp_id][1] + lane_id;
                                         SizeT coop_oob      = cta->smem_storage.state.warp_comm[warp_id][2];
 
                                         VertexId child_id;
@@ -406,7 +405,7 @@ namespace edge_map_backward {
                                                 // during next vertex_map
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                         -1,
-                                                        cta->d_queue + tile->vertex_idx[LOAD][VEC]);
+                                                        cta->d_queue + cta->smem_storage.state.warp_comm[warp_id][1]);
 
                                                 //Set bitmap_out to true
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -443,7 +442,7 @@ namespace edge_map_backward {
                                                 // during next vertex_map
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                         -1,
-                                                        cta->d_queue + tile->vertex_idx[LOAD][VEC]);
+                                                        cta->d_queue + cta->smem_storage.state.warp_comm[warp_id][1]);
 
                                                 //Set bitmap_out to true
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(

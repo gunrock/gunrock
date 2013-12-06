@@ -139,8 +139,9 @@ struct ReverseBFSFunctor
     {
         // Check if the destination node has been claimed as someone's child
         //return (atomicCAS(&problem->d_preds[d_id], -2, s_id) == -2) ? true : false;
-        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-            s_id, problem->d_preds + d_id);
+        if (ProblemData::MARK_PREDECESSORS)
+            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                    s_id, problem->d_preds + d_id);
         return true; 
     }
 
