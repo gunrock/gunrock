@@ -156,7 +156,6 @@ struct Csr
         new_coo[0].val = coo[0].val;
         for (int i = 0; i < coo_edges-1; ++i)
         {
-
             if ((coo[i+1].col != coo[i].col) || (coo[i+1].row != coo[i].row))
             {
                 new_coo[real_edge].col = coo[i+1].col;
@@ -167,6 +166,7 @@ struct Csr
 
         VertexId prev_row = -1;
         for (SizeT edge = 0; edge < real_edge; edge++) {
+
             VertexId current_row = new_coo[edge].row;
 
             // Fill in rows up to and including the current row
@@ -257,6 +257,23 @@ struct Csr
             }
             printf("\n");
         }
+    }
+
+    /**
+     * @brief Find node with largest neighbor list
+     */
+    int GetNodeWithHighestDegree()
+    {
+        int degree = 0;
+        int src = 0;
+        for (SizeT node = 0; node < nodes; node++) {
+            if (row_offsets[node+1] - row_offsets[node] > degree)
+            {
+                degree = row_offsets[node+1]-row_offsets[node];
+                src = node;
+            }
+        }
+        return src;
     }
 
     void DisplayNeighborList(VertexId node)

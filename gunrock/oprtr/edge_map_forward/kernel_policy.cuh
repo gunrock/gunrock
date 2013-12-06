@@ -214,10 +214,10 @@ struct KernelPolicy
                                                 - sizeof(State)
                                                 - 128,                                          // Fudge-factor to guarantee occupancy
 
-            SCRATCH_ELEMENT_SIZE            = sizeof(SizeT) + sizeof(VertexId),                 // Both gather offset and predecessor
+            SCRATCH_ELEMENT_SIZE            = (ProblemData::MARK_PREDECESSORS) ? sizeof(SizeT) + sizeof(VertexId) : sizeof(SizeT),                 // Both gather offset and predecessor
 
             GATHER_ELEMENTS                 = MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE,
-            PARENT_ELEMENTS                 = GATHER_ELEMENTS,
+            PARENT_ELEMENTS                 = (ProblemData::MARK_PREDECESSORS) ? GATHER_ELEMENTS : 0,
         };
 
         union {

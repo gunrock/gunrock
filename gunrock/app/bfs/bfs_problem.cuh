@@ -226,13 +226,14 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                     "BFSProblem cudaMalloc d_labels failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_labels = d_labels;
  
-                VertexId   *d_preds;
+                VertexId   *d_preds = NULL;
+                if (_MARK_PREDECESSORS) {
                     if (retval = util::GRError(cudaMalloc(
                         (void**)&d_preds,
                         nodes * sizeof(VertexId)),
                     "BFSProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
+                }
                 data_slices[0]->d_preds = d_preds;
-
             }
             //TODO: add multi-GPU allocation code
         } while (0);
@@ -279,15 +280,16 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_labels, -1, nodes);
 
             // Allocate preds if necessary
-                if (!data_slices[gpu]->d_preds) {
-                    VertexId    *d_preds;
-                    if (retval = util::GRError(cudaMalloc(
-                                    (void**)&d_preds,
-                                    nodes * sizeof(VertexId)),
-                                "BFSProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
-                    data_slices[gpu]->d_preds = d_preds;
-                }
-                
+            if (_MARK_PREDECESSORS && !data_slices[gpu]->d_preds) {
+                VertexId    *d_preds;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_preds,
+                                nodes * sizeof(VertexId)),
+                            "BFSProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_preds = d_preds;
+            }
+            
+            if (_MARK_PREDECESSORS)
                 util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_preds, -2, nodes);
 
                 
@@ -316,13 +318,15 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                         sizeof(VertexId),
                         cudaMemcpyHostToDevice),
                     "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
-        VertexId src_pred = -1; 
-        if (retval = util::GRError(cudaMemcpy(
-                        data_slices[0]->d_preds+src,
-                        &src_pred,
-                        sizeof(VertexId),
-                        cudaMemcpyHostToDevice),
-                    "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
+        if (_MARK_PREDECESSORS) {
+            VertexId src_pred = -1; 
+            if (retval = util::GRError(cudaMemcpy(
+                            data_slices[0]->d_preds+src,
+                            &src_pred,
+                            sizeof(VertexId),
+                            cudaMemcpyHostToDevice),
+                        "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
+        }
 
         return retval;
     }

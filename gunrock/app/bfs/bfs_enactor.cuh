@@ -265,6 +265,7 @@ class BFSEnactor : public EnactorBase
             fflush(stdout);
             // Step through BFS iterations
             
+            VertexId *h_cur_queue = new VertexId[graph_slice->edges];
             while (done[0] < 0) {
 
                 // Edge Map
@@ -273,6 +274,7 @@ class BFSEnactor : public EnactorBase
                     queue_reset,
                     queue_index,
                     1,
+                    iteration,
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
@@ -299,6 +301,18 @@ class BFSEnactor : public EnactorBase
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                     printf(", %lld", (long long) queue_length);
+
+                    if (iteration == 2) {
+                        cudaMemcpy(h_cur_queue, graph_slice->frontier_queues.d_keys[selector], sizeof(VertexId)*queue_length, cudaMemcpyDeviceToHost);
+                        int neg_num = 0;
+                        std::sort(h_cur_queue, h_cur_queue + queue_length);
+                        for (int i = 0; i < queue_length; ++i)
+                        {
+                            if (h_cur_queue[i] == -1)
+                                neg_num++;
+                        }
+                        printf("(%d)", neg_num);
+                    }
                 }
 
                 if (INSTRUMENT) {
@@ -362,6 +376,7 @@ class BFSEnactor : public EnactorBase
 
             }
 
+            delete[] h_cur_queue;
             if (retval) break;
 
             // Check if any of the frontiers overflowed due to redundant expansion

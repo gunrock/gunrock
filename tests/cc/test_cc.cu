@@ -343,7 +343,7 @@ int main( int argc, char** argv)
 	cudaSetDeviceFlags(cudaDeviceMapHost);
 
 	// Parse graph-contruction params
-	g_undirected = true; //Does not make undirected graph
+	g_undirected = false; //Does not make undirected graph
 
 	std::string graph_type = argv[1];
 	int flags = args.ParsedArgc();

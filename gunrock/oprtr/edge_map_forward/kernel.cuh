@@ -35,6 +35,7 @@ struct Sweep
     static __device__ __forceinline__ void Invoke(
         typename KernelPolicy::VertexId         &queue_index,
         int                                     &num_gpus,
+        int                                     &label,
         typename KernelPolicy::VertexId         *&d_in_queue,
         typename KernelPolicy::VertexId         *&d_out_queue,
         typename KernelPolicy::VertexId         *&d_column_indices,
@@ -62,6 +63,7 @@ struct Sweep
             Cta cta(
                 queue_index,
                 num_gpus,
+                label,
                 smem_storage,
                 d_in_queue,
                 d_out_queue,
@@ -107,6 +109,7 @@ struct Dispatch
         bool                        &queue_reset,
         VertexId                    &queue_index,
         int                         &num_gpus,
+        int                         &label,
         SizeT                       &num_elements,
         volatile int                *&d_done,
         VertexId                    *&d_in_queue,
@@ -137,6 +140,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         bool                        &queue_reset,
         VertexId                    &queue_index,
         int                         &num_gpus,
+        int                         &label,
         SizeT                       &num_elements,
         volatile int                *&d_done,
         VertexId                    *&d_in_queue,
@@ -203,6 +207,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         Sweep<KernelPolicy, ProblemData, Functor>::Invoke(
                 queue_index,
                 num_gpus,
+                label,
                 d_in_queue,
                 d_out_queue, 
                 d_column_indices,
@@ -230,6 +235,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @param[in] queue_reset       If reset queue counter
  * @param[in] queue_index       Current frontier queue counter index
  * @param[in] num_gpus          Number of GPUs
+ * @param[in] label             Distance from source (label) of current frontier
  * @param[in] num_elements      Number of elements
  * @param[in] d_done            Pointer of volatile int to the flag to set when we detect incoming frontier is empty
  * @param[in] d_in_queue        Device pointer of VertexId to the incoming frontier queue
@@ -248,6 +254,7 @@ void Kernel(
         bool                                    queue_reset,
         typename KernelPolicy::VertexId         queue_index,
         int                                     num_gpus,
+        int                                     label,
         typename KernelPolicy::SizeT            num_elements,
         volatile int                            *d_done, 
         typename KernelPolicy::VertexId         *d_in_queue,
@@ -263,6 +270,7 @@ void Kernel(
             queue_reset,    
             queue_index,
             num_gpus,
+            label,
             num_elements,
             d_done,
             d_in_queue,

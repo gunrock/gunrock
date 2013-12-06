@@ -47,8 +47,11 @@ struct BFSFunctor
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
     {
         // Check if the destination node has been claimed as someone's child
-        return (atomicCAS(&problem->d_preds[d_id], -2, s_id) == -2) ? true : false;
-
+        if (ProblemData::MARK_PREDECESSORS)
+            return (atomicCAS(&problem->d_preds[d_id], -2, s_id) == -2) ? true : false;
+        else { 
+            return (atomicCAS(&problem->d_labels[d_id], -1, s_id+1) == -1) ? true : false;
+        }
     }
 
     /**
@@ -64,11 +67,13 @@ struct BFSFunctor
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
     {
         //set d_labels[d_id] to be d_labels[s_id]+1
-        VertexId label;
-        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            label, problem->d_labels + s_id);
-        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-            label+1, problem->d_labels + d_id);
+        if (ProblemData::MARK_PREDECESSORS) {
+            VertexId label;
+            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    label, problem->d_labels + s_id);
+            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                    label+1, problem->d_labels + d_id);
+        }
     }
 
     /**

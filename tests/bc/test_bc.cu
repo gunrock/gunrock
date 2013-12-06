@@ -321,6 +321,7 @@ void RunTests(
         VertexId,
         SizeT,
         Value,
+        true,   // MARK_PREDECESSORS
         false> Problem; //does not use double buffer
 
     // Allocate host-side array (for both reference and gpu-computed results)

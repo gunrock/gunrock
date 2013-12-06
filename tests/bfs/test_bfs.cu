@@ -295,6 +295,7 @@ void RunTests(
     int num_gpus,
     double max_queue_sizing)
 {
+    
     typedef BFSProblem<
         VertexId,
         SizeT,
@@ -422,6 +423,9 @@ void RunTests(
         args.GetCmdLineArgument("src", src);
     }
 
+    //printf("Display neighbor list of src:\n");
+    //graph.DisplayNeighborList(src);
+
     g_quick = args.CheckCmdLineFlag("quick");
     mark_pred = args.CheckCmdLineFlag("mark-pred");
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
@@ -520,7 +524,10 @@ int main( int argc, char** argv)
 			return 1;
 		}
 
-        csr.DisplayGraph();
+        SizeT node_num = csr.GetNodeWithHighestDegree();
+        printf("largest degree node:%d\n", node_num);
+        //csr.DisplayGraph();
+        csr.DisplayNeighborList(node_num);
         fflush(stdout);
 
 		// Run tests

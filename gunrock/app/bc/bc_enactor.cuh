@@ -274,6 +274,7 @@ class BCEnactor : public EnactorBase
                     queue_reset,
                     queue_index,
                     1,
+                    iteration,
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
@@ -446,6 +447,7 @@ class BCEnactor : public EnactorBase
                     queue_reset,
                     queue_index,
                     1,
+                    iteration,
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue

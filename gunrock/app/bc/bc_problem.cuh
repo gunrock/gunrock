@@ -33,6 +33,7 @@ template <
     typename    _VertexId,                      
     typename    _SizeT,                        
     typename    _Value,                       
+    bool        _MARK_PREDECESSORS,
     bool        _USE_DOUBLE_BUFFER>
 struct BCProblem : ProblemBase<_VertexId, _SizeT,
                                 _USE_DOUBLE_BUFFER>
@@ -40,6 +41,8 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
     typedef _VertexId       VertexId;
     typedef _SizeT          SizeT;
     typedef _Value          Value;
+
+    static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
     
     //Helper structures
     
