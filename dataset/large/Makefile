@@ -3,7 +3,7 @@
 #testing borrowed from Royal Caliber
 
 #Each graph lives in its own directory
-SUBDIRS = ak2010 belgium_osm delaunay_n13 delaunay_n21 delaunay_n23 coAuthorsDBLP kron_g500-logn21 soc-LiveJournal1 webbase-1M 
+SUBDIRS = ak2010 belgium_osm delaunay_n13 delaunay_n21 coAuthorsDBLP kron_g500-logn21 soc-LiveJournal1 webbase-1M 
 
 .PHONY: $(GRAPHS)
 

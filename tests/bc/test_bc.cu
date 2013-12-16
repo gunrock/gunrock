@@ -541,7 +541,7 @@ int main( int argc, char** argv)
             return 1;
         }
 
-        csr.DisplayGraph();
+        csr.PrintHistogram();
         fflush(stdout);
 
         // Run tests

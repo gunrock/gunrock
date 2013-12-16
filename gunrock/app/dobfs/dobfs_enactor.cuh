@@ -402,11 +402,11 @@ class DOBFSEnactor : public EnactorBase
 
             if (retval) break;
             }
-            printf("iter: %lld\n, alpha %f\n", iteration, problem->alpha);
+            if (DEBUG) printf("iter: %lld\n, alpha %f\n", iteration, problem->alpha);
               
             // Reverse BFS
             if (done[0] < 0) {
-                printf("in RBFS.\n");
+            if (DEBUG) printf("in RBFS.\n");
 
             //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[0], graph_slice->nodes);
             SizeT queue_length          = current_frontier_size;
@@ -590,11 +590,11 @@ class DOBFSEnactor : public EnactorBase
 
             }
 
-            printf("iter: %lld\n", iteration);
+            if (DEBUG) printf("iter: %lld\n, beta %f\n", iteration, problem->beta);
 
             // Normal BFS
             if (done[0] < 0) {
-                printf("back to normal BFS.\n");
+                if (DEBUG) printf("back to normal BFS.\n");
             SizeT queue_length          = graph_slice->nodes;
             VertexId queue_index        = 0;        // Work queue index
             int selector                = 0;
@@ -762,7 +762,7 @@ class DOBFSEnactor : public EnactorBase
                 0,                                  // SATURATION QUIT
                 true,                               // DEQUEUE_PROBLEM_SIZE
                 8,                                  // MIN_CTA_OCCUPANCY
-                7,                                  // LOG_THREADS
+                6,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
@@ -774,9 +774,9 @@ class DOBFSEnactor : public EnactorBase
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 8,                                  // MIN_CTA_OCCUPANCY
-                7,                                  // LOG_THREADS
+                6,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
-                3,                                  // LOG_LOADS_PER_TILE
+                0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
                 32,                                 // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD

@@ -199,6 +199,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             // Reset our next outgoing queue counter to zero
             work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
 
+            work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
+
         }
 
         // Barrier to protect work decomposition

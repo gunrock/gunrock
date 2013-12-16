@@ -68,6 +68,8 @@ bool g_stream_from_host;
         "  and barrier duty (a relative indicator of load imbalance.)\n"
         "  --src Begins BFS from the vertex <source index>. If set as randomize\n"
         "  then will begin with a random source vertex.\n"
+        "  If set as largestdegree then will begin with the node which has\n"
+        "  largest degree.\n"
         "  --quick If set will skip the CPU validation code.\n"
         "  --mark-pred If set then keep not only label info but also predecessor info.\n"
         "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
@@ -419,6 +421,8 @@ void RunTests(
         src = 0;
     } else if (src_str.compare("randomize") == 0) {
         src = graphio::RandomNode(graph.nodes);
+    } else if (src_str.compare("largestdegree") == 0) {
+        src = graph.GetNodeWithHighestDegree();
     } else {
         args.GetCmdLineArgument("src", src);
     }
@@ -524,11 +528,7 @@ int main( int argc, char** argv)
 			return 1;
 		}
 
-        SizeT node_num = csr.GetNodeWithHighestDegree();
-        printf("largest degree node:%d\n", node_num);
-        //csr.DisplayGraph();
-        csr.DisplayNeighborList(node_num);
-        fflush(stdout);
+		csr.PrintHistogram();
 
 		// Run tests
 		RunTests(csr, args);

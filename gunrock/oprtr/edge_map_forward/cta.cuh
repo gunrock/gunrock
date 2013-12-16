@@ -6,8 +6,6 @@
 // ----------------------------------------------------------------
 
 
-// TODO: currently disabled WarpExpand. Enable it after bug fix
-
 /**
  * @file
  * cta.cuh
@@ -143,7 +141,6 @@ namespace edge_map_forward {
                     // Progress for scan-based forward edge map gather offsets
                     SizeT                   row_progress[LOADS_PER_TILE][LOAD_VEC_SIZE];
                     SizeT                   progress;
-                    int zero_idx_load, zero_idx_vec;
 
                     /**
                      * @brief Iterate over vertex ids in tile.
@@ -265,15 +262,17 @@ namespace edge_map_forward {
                                             // if Cond(neighbor_id) returns true
                                             // if Cond(neighbor_id) returns false or Apply returns false
                                             // set neighbor_id to -1 for invalid
-                                            if (Functor::CondEdge(pred_id, neighbor_id, cta->problem))
+                                            if (Functor::CondEdge(pred_id, neighbor_id, cta->problem)) {
                                                 Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
-                                            else
-                                                neighbor_id = -1;
-
-                                            // Scatter neighbor
-                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                     neighbor_id,
                                                     cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            }
+                                            else {
+                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    -1,
+                                                    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            }
 
                                             coop_offset += KernelPolicy::THREADS;
                                             coop_rank += KernelPolicy::THREADS;
@@ -291,16 +290,18 @@ namespace edge_map_forward {
                                             // if Cond(neighbor_id) returns true
                                             // if Cond(neighbor_id) returns false or Apply returns false
                                             // set neighbor_id to -1 for invalid                                    
-                                            if (Functor::CondEdge(pred_id, neighbor_id, cta->problem))
+                                            if (Functor::CondEdge(pred_id, neighbor_id, cta->problem)) {
                                                 Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
-                                            else
-                                                neighbor_id = -1;
-
-
-                                            // Scatter neighbor
-                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                     neighbor_id,
                                                     cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            }
+                                            else {
+                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    -1,
+                                                    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            }
+
                                         }
                                     }
 
@@ -511,8 +512,6 @@ namespace edge_map_forward {
                     __device__ __forceinline__ Tile()
                     {
                         Iterate<0, 0>::Init(this);
-                        zero_idx_load = -1;
-                        zero_idx_vec = -1;
                     }
 
                     // Inspect dequeued nodes
@@ -638,7 +637,7 @@ namespace edge_map_forward {
                     smem_storage.state.fine_enqueue_offset = enqueue_offset + coarse_count;
 
                     // Check for queue overflow due to redundant expansion
-                    if (enqueue_offset + enqueue_amt >= max_out_frontier) {
+                    if (enqueue_offset + enqueue_amt > max_out_frontier) {
                         smem_storage.state.overflowed = true;
                         work_progress.SetOverflow<SizeT>();
                     }

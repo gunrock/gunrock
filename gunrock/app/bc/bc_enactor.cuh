@@ -530,7 +530,7 @@ class BCEnactor : public EnactorBase
                 0,                                  // SATURATION QUIT
                 true,                               // DEQUEUE_PROBLEM_SIZE
                 8,                                  // MIN_CTA_OCCUPANCY
-                7,                                  // LOG_THREADS
+                6,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
@@ -542,11 +542,11 @@ class BCEnactor : public EnactorBase
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 8,                                  // MIN_CTA_OCCUPANCY
-                7,                                  // LOG_THREADS
+                6,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
-                128 * 4,                                 // WARP_GATHER_THRESHOLD
+                32,                                 // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7>                                  // LOG_SCHEDULE_GRANULARITY
                 EdgeMapPolicy;
