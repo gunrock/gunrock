@@ -54,7 +54,8 @@ template<bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
 int ReadMarketStream(
     FILE *f_in,
     Csr<VertexId, Value, SizeT> &csr_graph,
-    bool undirected)
+    bool undirected,
+    bool reversed)
 {
     typedef Coo<VertexId, Value> EdgeTupleType;
 
@@ -131,8 +132,14 @@ int ReadMarketStream(
                 return -1;
             }
 
-            coo[edges_read].row = ll_row - 1;   // zero-based array
-            coo[edges_read].col = ll_col - 1;   // zero-based array
+            if (reversed && !undirected) {
+                coo[edges_read].col = ll_row - 1;   // zero-based array
+                coo[edges_read].row = ll_col - 1;   // zero-based array
+                ordered_rows = false;
+            } else {
+                coo[edges_read].row = ll_row - 1;   // zero-based array
+                coo[edges_read].col = ll_col - 1;   // zero-based array
+            }
 
             edges_read++;
 
@@ -163,7 +170,7 @@ int ReadMarketStream(
     fflush(stdout);
 
     // Convert COO to CSR
-    csr_graph.template FromCoo<LOAD_VALUES>(coo, nodes, edges, ordered_rows);
+    csr_graph.template FromCoo<LOAD_VALUES>(coo, nodes, edges, ordered_rows, reversed);
     free(coo);
 
     fflush(stdout);
@@ -189,13 +196,14 @@ template<bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
 int BuildMarketGraph(
     char *mm_filename,
     Csr<VertexId, Value, SizeT> &csr_graph,
-    bool undirected)
+    bool undirected,
+    bool reversed)
 {
     if (mm_filename == NULL) {
 
         // Read from stdin
         printf("Reading from stdin:\n");
-        if (ReadMarketStream<LOAD_VALUES>(stdin, csr_graph, undirected) != 0) {
+        if (ReadMarketStream<LOAD_VALUES>(stdin, csr_graph, undirected, reversed) != 0) {
             return -1;
         }
 
@@ -205,7 +213,7 @@ int BuildMarketGraph(
         FILE *f_in = fopen(mm_filename, "r");
         if (f_in) {
             printf("Reading from %s:\n", mm_filename);
-            if (ReadMarketStream<LOAD_VALUES>(f_in, csr_graph, undirected) != 0) {
+            if (ReadMarketStream<LOAD_VALUES>(f_in, csr_graph, undirected, reversed) != 0) {
                 fclose(f_in);
                 return -1;
             }

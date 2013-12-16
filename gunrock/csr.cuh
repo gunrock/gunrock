@@ -131,15 +131,18 @@ struct Csr
         Tuple *coo,
         SizeT coo_nodes,
         SizeT coo_edges,
-        bool ordered_rows = false)
+        bool ordered_rows = false,
+        bool reversed = false)
     {
         printf("  Converting %d vertices, %d directed edges (%s tuples) "
-               "to CSR format... ",
+               "to CSR format... \n",
                coo_nodes, coo_edges, ordered_rows ? "ordered" : "unordered");
         time_t mark1 = time(NULL);
         fflush(stdout);
 
         FromScratch<LOAD_EDGE_VALUES, false>(coo_nodes, coo_edges);
+
+        
 
         // Sort COO by row
         if (!ordered_rows) {
@@ -160,7 +163,6 @@ struct Csr
                 new_coo[real_edge++].val = coo[i+1].val;
             }
         }
-
 
         VertexId prev_row = -1;
         for (SizeT edge = 0; edge < real_edge; edge++) {
@@ -255,6 +257,34 @@ struct Csr
             }
             printf("\n");
         }
+    }
+
+    /**
+     * @brief Find node with largest neighbor list
+     */
+    int GetNodeWithHighestDegree()
+    {
+        int degree = 0;
+        int src = 0;
+        for (SizeT node = 0; node < nodes; node++) {
+            if (row_offsets[node+1] - row_offsets[node] > degree)
+            {
+                degree = row_offsets[node+1]-row_offsets[node];
+                src = node;
+            }
+        }
+        return src;
+    }
+
+    void DisplayNeighborList(VertexId node)
+    {
+        for (SizeT edge = row_offsets[node];
+                 edge < row_offsets[node + 1];
+                 edge++) {
+                util::PrintValue(column_indices[edge]);
+                printf(", ");
+            }
+            printf("\n");
     }
 
     /**@}*/

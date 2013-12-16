@@ -6,8 +6,6 @@
 // ----------------------------------------------------------------
 
 
-// TODO: currently disabled WarpExpand. Enable it after bug fix
-
 /**
  * @file
  * cta.cuh
@@ -73,10 +71,7 @@ namespace edge_map_forward {
             typedef typename KernelPolicy::VertexId         VertexId;
             typedef typename KernelPolicy::SizeT            SizeT;
 
-            typedef typename KernelPolicy::SmemStorage      SmemStorage;
-
-            typedef typename KernelPolicy::SoaScanOp        SoaScanOp;
-            typedef typename KernelPolicy::RakingSoaDetails RakingSoaDetails;
+            typedef typename KernelPolicy::SmemStorage      SmemStorage; typedef typename KernelPolicy::SoaScanOp        SoaScanOp; typedef typename KernelPolicy::RakingSoaDetails RakingSoaDetails;
             typedef typename KernelPolicy::TileTuple        TileTuple;
 
             typedef typename ProblemData::DataSlice         DataSlice;
@@ -100,6 +95,7 @@ namespace edge_map_forward {
             util::CtaWorkProgress   &work_progress;             // Atomic queueing counters
             SizeT                   max_out_frontier;           // Maximum size (in elements) of outgoing frontier
             int                     num_gpus;                   // Number of GPUs
+            int                     label;                      // Current label of the frontier
 
             // Operational details for raking grid
             RakingSoaDetails        raking_soa_details;
@@ -145,7 +141,6 @@ namespace edge_map_forward {
                     // Progress for scan-based forward edge map gather offsets
                     SizeT                   row_progress[LOADS_PER_TILE][LOAD_VEC_SIZE];
                     SizeT                   progress;
-                    int zero_idx_load, zero_idx_vec;
 
                     /**
                      * @brief Iterate over vertex ids in tile.
@@ -248,7 +243,10 @@ namespace edge_map_forward {
                                         SizeT   coop_oob        = cta->smem_storage.state.warp_comm[0][2];
 
                                         VertexId pred_id;
-                                        pred_id = cta->smem_storage.state.warp_comm[0][3];
+                                        if (ProblemData::MARK_PREDECESSORS)
+                                            pred_id = cta->smem_storage.state.warp_comm[0][3];
+                                        else
+                                            pred_id = cta->label;
 
                                         VertexId neighbor_id;
 
@@ -264,15 +262,17 @@ namespace edge_map_forward {
                                             // if Cond(neighbor_id) returns true
                                             // if Cond(neighbor_id) returns false or Apply returns false
                                             // set neighbor_id to -1 for invalid
-                                            if (Functor::CondEdge(pred_id, neighbor_id, cta->problem))
+                                            if (Functor::CondEdge(pred_id, neighbor_id, cta->problem)) {
                                                 Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
-                                            else
-                                                neighbor_id = -1;
-
-                                            // Scatter neighbor
-                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                     neighbor_id,
                                                     cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            }
+                                            else {
+                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    -1,
+                                                    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            }
 
                                             coop_offset += KernelPolicy::THREADS;
                                             coop_rank += KernelPolicy::THREADS;
@@ -290,16 +290,18 @@ namespace edge_map_forward {
                                             // if Cond(neighbor_id) returns true
                                             // if Cond(neighbor_id) returns false or Apply returns false
                                             // set neighbor_id to -1 for invalid                                    
-                                            if (Functor::CondEdge(pred_id, neighbor_id, cta->problem))
+                                            if (Functor::CondEdge(pred_id, neighbor_id, cta->problem)) {
                                                 Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
-                                            else
-                                                neighbor_id = -1;
-
-
-                                            // Scatter neighbor
-                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                     neighbor_id,
                                                     cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            }
+                                            else {
+                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    -1,
+                                                    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            }
+
                                         }
                                     }
 
@@ -334,17 +336,21 @@ namespace edge_map_forward {
                                                 cta->smem_storage.state.warp_comm[warp_id][1] = tile->coarse_row_rank[LOAD][VEC];                               // queue rank
                                                 cta->smem_storage.state.warp_comm[warp_id][2] = tile->row_offset[LOAD][VEC] + tile->row_length[LOAD][VEC];      // oob
                                                 cta->smem_storage.state.warp_comm[warp_id][3] = tile->vertex_id[LOAD][VEC];                                     // predecessor
+                                                // Unset row length
+                                                tile->row_length[LOAD][VEC] = 0; // So that we won't repeatedly expand this node
+
                                             }
 
-                                            // Unset row length
-                                            tile->row_length[LOAD][VEC] = 0; // So that we won't repeatedly expand this node
-
+                                            
                                             SizeT coop_offset   = cta->smem_storage.state.warp_comm[warp_id][0];
                                             SizeT coop_rank     = cta->smem_storage.state.warp_comm[warp_id][1] + lane_id;
                                             SizeT coop_oob      = cta->smem_storage.state.warp_comm[warp_id][2];
 
                                             VertexId pred_id;
-                                            pred_id = cta->smem_storage.state.warp_comm[warp_id][3];
+                                            if (ProblemData::MARK_PREDECESSORS)
+                                                pred_id = cta->smem_storage.state.warp_comm[warp_id][3];
+                                            else
+                                                pred_id = cta->label;
 
                                             VertexId neighbor_id;
                                             while (coop_offset + GR_WARP_THREADS(KernelPolicy::CUDA_ARCH) < coop_oob) {
@@ -419,7 +425,8 @@ namespace edge_map_forward {
                                     {
                                         // Put gather offset into scratch space
                                         cta->smem_storage.gather_offsets[scratch_offset] = tile->row_offset[LOAD][VEC] + tile->row_progress[LOAD][VEC];
-                                        cta->smem_storage.gather_predecessors[scratch_offset] = tile->vertex_id[LOAD][VEC];
+                                        if (ProblemData::MARK_PREDECESSORS)
+                                            cta->smem_storage.gather_predecessors[scratch_offset] = tile->vertex_id[LOAD][VEC];
 
                                         tile->row_progress[LOAD][VEC]++;
                                         scratch_offset++;
@@ -505,8 +512,6 @@ namespace edge_map_forward {
                     __device__ __forceinline__ Tile()
                     {
                         Iterate<0, 0>::Init(this);
-                        zero_idx_load = -1;
-                        zero_idx_vec = -1;
                     }
 
                     // Inspect dequeued nodes
@@ -547,6 +552,7 @@ namespace edge_map_forward {
             __device__ __forceinline__ Cta(
                     VertexId                    queue_index,
                     int                         num_gpus,
+                    int                         label,
                     SmemStorage                 &smem_storage,
                     VertexId                    *d_in_queue,
                     VertexId                    *d_out_queue,
@@ -557,6 +563,7 @@ namespace edge_map_forward {
 
                 queue_index(queue_index),
                 num_gpus(num_gpus),
+                label(label),
                 smem_storage(smem_storage),
                 raking_soa_details(
                         typename RakingSoaDetails::GridStorageSoa(
@@ -630,7 +637,7 @@ namespace edge_map_forward {
                     smem_storage.state.fine_enqueue_offset = enqueue_offset + coarse_count;
 
                     // Check for queue overflow due to redundant expansion
-                    if (enqueue_offset + enqueue_amt >= max_out_frontier) {
+                    if (enqueue_offset + enqueue_amt > max_out_frontier) {
                         smem_storage.state.overflowed = true;
                         work_progress.SetOverflow<SizeT>();
                     }
@@ -679,8 +686,11 @@ namespace edge_map_forward {
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                 neighbor_id,
                                 d_column_indices + smem_storage.gather_offsets[scratch_offset]);
-
-                        VertexId predecessor_id = smem_storage.gather_predecessors[scratch_offset];
+                        VertexId predecessor_id;
+                        if (ProblemData::MARK_PREDECESSORS)
+                            predecessor_id = smem_storage.gather_predecessors[scratch_offset];
+                        else
+                            predecessor_id = label;
 
                         // if Cond(neighbor_id) returns true
                         // if Cond(neighbor_id) returns false or Apply returns false
@@ -698,7 +708,6 @@ namespace edge_map_forward {
 
                     tile.progress += SmemStorage::GATHER_ELEMENTS;
 
-                    __syncthreads();
                     __syncthreads();
                 }
             }

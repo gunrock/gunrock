@@ -29,14 +29,21 @@
 #include <gunrock/app/bfs/bfs_problem.cuh>
 #include <gunrock/app/bfs/bfs_functor.cuh>
 
+// DOBFS includes
+#include <gunrock/app/dobfs/dobfs_enactor.cuh>
+#include <gunrock/app/dobfs/dobfs_problem.cuh>
+#include <gunrock/app/dobfs/dobfs_functor.cuh>
+
 // Operator includes
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
+#include <gunrock/oprtr/edge_map_backward/kernel.cuh>
 #include <gunrock/oprtr/vertex_map/kernel.cuh>
 
 using namespace gunrock;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::bfs;
+using namespace gunrock::app::dobfs;
 
 
 /******************************************************************************
@@ -47,13 +54,15 @@ bool g_verbose;
 bool g_undirected;
 bool g_quick;
 bool g_stream_from_host;
+float g_alpha;
+float g_beta;
 
 /******************************************************************************
  * Housekeeping Routines
  ******************************************************************************/
  void Usage()
  {
- printf("\ntest_bfs <graph type> <graph type args> [--device=<device_index>] "
+ printf("\ntest_dobfs <graph type> <graph type args> [--device=<device_index>] "
         "[--undirected] [--instrumented] [--src=<source index>] [--quick] "
         "[--mark-pred] [--queue-sizing=<scale factor>]\n"
         "[--v]\n"
@@ -292,13 +301,15 @@ template <
     bool MARK_PREDECESSORS>
 void RunTests(
     const Csr<VertexId, Value, SizeT> &graph,
+    const Csr<VertexId, Value, SizeT> &inv_graph,
     VertexId src,
     int max_grid_size,
     int num_gpus,
-    double max_queue_sizing)
+    double max_queue_sizing,
+    float alpha,        // Tuning parameter for switching to reverse bfs
+    float beta)         // Tuning parameter for switching back to normal bfs
 {
-    
-    typedef BFSProblem<
+    typedef DOBFSProblem<
         VertexId,
         SizeT,
         Value,
@@ -316,14 +327,19 @@ void RunTests(
 
 
         // Allocate BFS enactor map
-        BFSEnactor<INSTRUMENT> bfs_enactor(g_verbose);
+        DOBFSEnactor<INSTRUMENT> dobfs_enactor(g_verbose);
 
         // Allocate problem on GPU
         Problem *csr_problem = new Problem;
+
         util::GRError(csr_problem->Init(
             g_stream_from_host,
+            g_undirected,
             graph,
-            num_gpus), "Problem BFS Initialization Failed", __FILE__, __LINE__);
+            inv_graph,
+            num_gpus,
+            alpha,
+            beta), "Problem DOBFS Initialization Failed", __FILE__, __LINE__);
 
         //
         // Compute reference CPU BFS solution for source-distance
@@ -338,7 +354,7 @@ void RunTests(
             printf("\n");
         }
 
-        Stats *stats = new Stats("GPU BFS");
+        Stats *stats = new Stats("GPU DOBFS");
 
         long long           total_queued = 0;
         VertexId            search_depth = 0;
@@ -347,17 +363,17 @@ void RunTests(
         // Perform BFS
         GpuTimer gpu_timer;
 
-        util::GRError(csr_problem->Reset(src, bfs_enactor.GetFrontierType(), max_queue_sizing), "BFS Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(csr_problem->Reset(src, dobfs_enactor.GetFrontierType(), max_queue_sizing), "DOBFS Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
-        util::GRError(bfs_enactor.template Enact<Problem>(csr_problem, src, max_grid_size), "BFS Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(dobfs_enactor.template Enact<Problem>(csr_problem, src, max_grid_size), "DOBFS Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
 
-        bfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
+        dobfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
 
         float elapsed = gpu_timer.ElapsedMillis();
 
         // Copy out results
-        util::GRError(csr_problem->Extract(h_labels, h_preds), "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
+        util::GRError(csr_problem->Extract(h_labels, h_preds), "DOBFS Problem Data Extraction Failed", __FILE__, __LINE__);
 
         // Verify the result
         if (reference_check != NULL) {
@@ -405,6 +421,7 @@ template <
     typename SizeT>
 void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
+    Csr<VertexId, Value, SizeT> &inv_graph,
     CommandLineArgs &args)
 {
     VertexId            src                 = -1;           // Use whatever the specified graph-type's default is
@@ -427,45 +444,61 @@ void RunTests(
         args.GetCmdLineArgument("src", src);
     }
 
-    //printf("Display neighbor list of src:\n");
-    //graph.DisplayNeighborList(src);
-
     g_quick = args.CheckCmdLineFlag("quick");
     mark_pred = args.CheckCmdLineFlag("mark-pred");
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
     g_verbose = args.CheckCmdLineFlag("v");
+    args.GetCmdLineArgument("alpha", g_alpha);
+    args.GetCmdLineArgument("beta", g_beta);
+
+    if (g_alpha == 0.0f)
+        g_alpha = 12.0f;
+    if (g_beta == 0.0f)
+        g_beta = 24.0f;
 
     if (instrumented) {
         if (mark_pred) {
             RunTests<VertexId, Value, SizeT, true, true>(
                 graph,
+                inv_graph,
                 src,
                 max_grid_size,
                 num_gpus,
-                max_queue_sizing);
+                max_queue_sizing,
+                g_alpha,
+                g_beta);
         } else {
             RunTests<VertexId, Value, SizeT, true, false>(
                 graph,
+                inv_graph,
                 src,
                 max_grid_size,
                 num_gpus,
-                max_queue_sizing);
+                max_queue_sizing,
+                g_alpha,
+                g_beta);
         }
     } else {
         if (mark_pred) {
             RunTests<VertexId, Value, SizeT, false, true>(
                 graph,
+                inv_graph,
                 src,
                 max_grid_size,
                 num_gpus,
-                max_queue_sizing);
+                max_queue_sizing,
+                g_alpha,
+                g_beta);
         } else {
             RunTests<VertexId, Value, SizeT, false, false>(
                 graph,
+                inv_graph,
                 src,
                 max_grid_size,
                 num_gpus,
-                max_queue_sizing);
+                max_queue_sizing,
+                g_alpha,
+                g_beta);
         }
     }
 
@@ -517,21 +550,38 @@ int main( int argc, char** argv)
 		typedef int SizeT;								// Use as the graph size type
 		Csr<VertexId, Value, SizeT> csr(false);         // default value for stream_from_host is false
 
+		Csr<VertexId, Value, SizeT> inv_csr(false);
+
 		if (graph_args < 1) { Usage(); return 1; }
 		char *market_filename = (graph_args == 2) ? argv[2] : NULL;
 		if (graphio::BuildMarketGraph<false>(
 			market_filename, 
 			csr, 
 			g_undirected,
-			false) != 0) // no inverse graph
+			false) != 0) 
 		{
 			return 1;
 		}
 
+        if (!g_undirected) {
+            if (graphio::BuildMarketGraph<false>(
+			            market_filename, 
+			            inv_csr, 
+			            g_undirected,
+			            true) != 0) 
+		    {
+			    return 1;
+		    }
+		}
+
 		csr.PrintHistogram();
 
-		// Run tests
-		RunTests(csr, args);
+        if (!g_undirected) {
+		    // Run tests
+		    RunTests(csr, inv_csr, args);
+		} else {
+		    RunTests(csr, csr, args);
+		}
 
 	} else {
 

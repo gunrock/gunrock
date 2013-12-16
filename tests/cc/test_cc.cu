@@ -343,7 +343,7 @@ int main( int argc, char** argv)
 	cudaSetDeviceFlags(cudaDeviceMapHost);
 
 	// Parse graph-contruction params
-	g_undirected = true; //Does not make undirected graph
+	g_undirected = false; //Does not make undirected graph
 
 	std::string graph_type = argv[1];
 	int flags = args.ParsedArgc();
@@ -372,12 +372,13 @@ int main( int argc, char** argv)
 		if (graphio::BuildMarketGraph<false>(
 			market_filename, 
 			csr, 
-			g_undirected) != 0) 
+			g_undirected,
+			false) != 0) // no inverse graph
 		{
 			return 1;
 		}
 
-        csr.DisplayGraph();
+        csr.PrintHistogram();
         fflush(stdout);
 
 		// Run tests

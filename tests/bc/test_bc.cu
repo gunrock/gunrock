@@ -321,6 +321,7 @@ void RunTests(
         VertexId,
         SizeT,
         Value,
+        true,   // MARK_PREDECESSORS
         false> Problem; //does not use double buffer
 
     // Allocate host-side array (for both reference and gpu-computed results)
@@ -534,12 +535,13 @@ int main( int argc, char** argv)
         if (graphio::BuildMarketGraph<false>(
                 market_filename,
                 csr,
-                g_undirected) != 0)
+                g_undirected,
+                false) != 0)    //no inverse graph
         {
             return 1;
         }
 
-        csr.DisplayGraph();
+        csr.PrintHistogram();
         fflush(stdout);
 
         // Run tests
