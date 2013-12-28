@@ -33,9 +33,10 @@ namespace edge_map_partitioned {
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 {
-    typedef typename KernelPolicy::VertexId VertexId;
-    typedef typename KernelPolicy::SizeT    SizeT;
-    typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename KernelPolicy::VertexId         VertexId;
+    typedef typename KernelPolicy::SizeT            SizeT;
+    typedef typename ProblemData::DataSlice         DataSlice;
+    typedef typename KernelPolicy::SmemStorage      SmemStorage;
 
     __device__ __forceinline__ SizeT GetNeighborListLength(
                             VertexId    &*d_row_offsets,
@@ -111,7 +112,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         int my_start_partition = partition_starts[bid];
         int my_end_partition = bid < num_partitions - 1 ? partition_starts[bid+1]+1 : input_queue_len;
 
-        __shared__ typename KernelPolicy::SmemStorage smem_storage;
+        __shared__ SmemStorage smem_storage;
         // smem_storage.s_edges[NT]
         // smem_storage.s_vertices[NT]
 
