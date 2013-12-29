@@ -32,9 +32,6 @@ namespace gunrock {
 namespace oprtr {
 namespace edge_map_partitioned {
 
-// TODO: decide what to put here?
-// Smemstorage s_edges/s_vertices
-// other macros
 /**
  * @brief Kernel configuration policy for partitioned edge mapping kernels.
  *
@@ -56,7 +53,6 @@ template <
     typename _ProblemData,
     // Machine parameters
     int _CUDA_ARCH,
-
     // Behavioral control parameters
     bool _INSTRUMENT,
     // Tunable parameters
