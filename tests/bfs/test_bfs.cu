@@ -29,6 +29,8 @@
 #include <gunrock/app/bfs/bfs_problem.cuh>
 #include <gunrock/app/bfs/bfs_functor.cuh>
 
+#include <gunrock/app/pbfs/pbfs_enactor.cuh>
+
 // Operator includes
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/vertex_map/kernel.cuh>

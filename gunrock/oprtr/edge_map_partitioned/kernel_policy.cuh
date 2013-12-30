@@ -90,7 +90,7 @@ struct KernelPolicy
 
             SCRATCH_ELEMENT_SIZE            = sizeof(VertexId) + sizeof(VertexId),
 
-            SCRATCH_ELEMENTS                 = (THREADS > MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE) ? MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE : THREADS;
+            SCRATCH_ELEMENTS                 = (THREADS > MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE) ? MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE : THREADS,
         };
 
         // Scratch elements
@@ -105,7 +105,7 @@ struct KernelPolicy
         SMEM_OCCUPANCY                  = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
         CTA_OCCUPANCY                   = GR_MIN(_MIN_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
 
-        VALID                           = (CTA_OCCUPANCY > 0) || (SCRATCH_ELEMENTS == THREADS),
+        VALID                           = (CTA_OCCUPANCY > 0),
     };
 };
 

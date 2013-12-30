@@ -24,8 +24,6 @@
 
 #include <gunrock/util/scan/soa/cooperative_soa_scan.cuh>
 
-#include <gunrock/oprtr/cta_util.cuh>
-
 
 //TODO: use CUB for SOA scan
 

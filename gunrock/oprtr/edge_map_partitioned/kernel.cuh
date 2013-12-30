@@ -30,6 +30,91 @@ namespace edge_map_partitioned {
 //
 // RelaxPartitionedEdges
 
+/**
+ * Arch dispatch
+ */
+
+/**
+ * Not valid for this arch (default)
+ */
+template<
+    typename    KernelPolicy,
+    typename    ProblemData,
+    typename    Functor,
+    bool        VALID = (__GR_CUDA_ARCH__ >= KernelPolicy::CUDA_ARCH)>
+struct Dispatch
+{
+    typedef typename KernelPolicy::VertexId VertexId;
+    typedef typename KernelPolicy::SizeT    SizeT;
+    typedef typename ProblemData::DataSlice DataSlice;
+
+    static __device__ __forceinline__ SizeT GetNeighborListLength(
+                            VertexId    *&d_row_offsets,
+                            VertexId    &d_vertex_id,
+                            SizeT       &max_vertex,
+                            SizeT       &max_edge)
+    {
+    }
+
+    static __device__ __forceinline__ void GetEdgeCounts(
+                                SizeT *&d_row_offsets,
+                                VertexId *&d_queue,
+                                SizeT *&d_scanned_edges,
+                                SizeT &num_elements,
+                                SizeT &max_vertex,
+                                SizeT &max_edge)
+    {
+    }
+
+    static __device__ __forceinline__ void MarkPartitionSizes(
+                                unsigned int *&needles,
+                                unsigned int &split_val,
+                                int &size)
+    {
+    }
+
+    static __device__ __forceinline__ void RelaxPartitionedEdges(
+                                bool &queue_reset,
+                                VertexId &queue_index,
+                                SizeT *&d_row_offsets,
+                                VertexId *&d_column_indices,
+                                SizeT *&d_scanned_edges,
+                                unsigned int *&partition_starts,
+                                unsigned int &num_partitions,
+                                volatile int *&d_done,
+                                VertexId *&d_queue,
+                                VertexId *&d_out,
+                                DataSlice *&problem,
+                                SizeT &input_queue_len,
+                                SizeT &output_queue_len,
+                                SizeT &partition_size,
+                                SizeT &max_vertices,
+                                SizeT &max_edges,
+                                util::CtaWorkProgress &work_progress,
+                                util::KernelRuntimeStats &kernel_stats)
+    {
+    }
+
+    static __device__ __forceinline__ void RelaxLightEdges(
+                                bool &queue_reset,
+                                VertexId &queue_index,
+                                SizeT *&d_row_offsets,
+                                VertexId *&d_column_indices,
+                                SizeT *&d_scanned_edges,
+                                volatile int *&d_done,
+                                VertexId *&d_queue,
+                                VertexId *&d_out,
+                                DataSlice *&problem,
+                                SizeT &input_queue_len,
+                                SizeT &output_queue_len,
+                                SizeT &max_vertices,
+                                SizeT &max_edges,
+                                util::CtaWorkProgress &work_progress,
+                                util::KernelRuntimeStats &kernel_stats)
+    {
+    }
+
+};
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 {
@@ -37,7 +122,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     typedef typename KernelPolicy::SizeT            SizeT;
     typedef typename ProblemData::DataSlice         DataSlice;
 
-    __device__ __forceinline__ SizeT GetNeighborListLength(
+    static __device__ __forceinline__ SizeT GetNeighborListLength(
                             VertexId    *&d_row_offsets,
                             VertexId    &d_vertex_id,
                             SizeT       &max_vertex,
@@ -58,10 +143,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 SizeT &max_edge)
     {
         int tid = threadIdx.x;
-        int bit = blockIdx.x;
+        int bid = blockIdx.x;
 
         int my_id = bid*blockDim.x + tid;
-        if (my_id >= num_elements || my_idx >= max_edges)
+        if (my_id >= num_elements || my_id >= max_edge)
             return;
         VertexId v_id = d_queue[my_id];
         SizeT num_edges = GetNeighborListLength(d_row_offsets, v_id, max_vertex, max_edge);
@@ -82,11 +167,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     }
 
     static __device__ __forceinline__ void RelaxPartitionedEdges(
+                                bool &queue_reset,
+                                VertexId &queue_index,
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
                                 SizeT *&d_scanned_edges,
                                 unsigned int *&partition_starts,
                                 unsigned int &num_partitions,
+                                volatile int *&d_done,
                                 VertexId *&d_queue,
                                 VertexId *&d_out,
                                 DataSlice *&problem,
@@ -94,11 +182,53 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 SizeT &output_queue_len,
                                 SizeT &partition_size,
                                 SizeT &max_vertices,
-                                SizeT &max_edges)
+                                SizeT &max_edges,
+                                util::CtaWorkProgress &work_progress,
+                                util::KernelRuntimeStats &kernel_stats)
     {
+        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+            kernel_stats.MarkStart();
+        }
+
+        // Reset work progress
+        if (queue_reset)
+        {
+            if (threadIdx.x < util::CtaWorkProgress::COUNTERS) {
+                //Reset all counters
+                work_progress.template Reset<SizeT>();
+            }
+        }
+
+        // Determine work decomposition
+        if (threadIdx.x == 0) {
+
+            // obtain problem size
+            if (queue_reset)
+            {
+                work_progress.StoreQueueLength<SizeT>(input_queue_len, queue_index);
+            }
+            else
+            {
+                input_queue_len = work_progress.template LoadQueueLength<SizeT>(queue_index);
+                
+                // Signal to host that we're done
+                if (input_queue_len == 0) {
+                    if (d_done) d_done[0] = input_queue_len;
+                }
+            }
+
+            work_progress.Enqueue(output_queue_len, queue_index+1);
+
+            // Reset our next outgoing queue counter to zero
+            work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
+            work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
+        }
+
+        // Barrier to protect work decomposition
+        __syncthreads();
+
         int tid = threadIdx.x;
         int bid = blockIdx.x;
-        int my_id = threadIdx.x + blockIdx.x*blockDim.x;
 
         int my_thread_start, my_thread_end;
 
@@ -174,18 +304,71 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             my_start_partition += KernelPolicy::THREADS;
             e_offset = 0;
         }
+
+        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+            kernel_stats.MarkStop();
+            kernel_stats.Flush();
+        }
     }
 
     static __device__ __forceinline__ void RelaxLightEdges(
+                                bool &queue_reset,
+                                VertexId &queue_index,
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
                                 SizeT *&d_scanned_edges,
+                                volatile int *&d_done,
                                 VertexId *&d_queue,
                                 VertexId *&d_out,
                                 DataSlice *&problem,
+                                SizeT &input_queue_len,
+                                SizeT &output_queue_len,
                                 SizeT &max_vertices,
-                                SizeT &max_edges)
+                                SizeT &max_edges,
+                                util::CtaWorkProgress &work_progress,
+                                util::KernelRuntimeStats &kernel_stats)
     {
+        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+            kernel_stats.MarkStart();
+        }
+
+        // Reset work progress
+        if (queue_reset)
+        {
+            if (threadIdx.x < util::CtaWorkProgress::COUNTERS) {
+                //Reset all counters
+                work_progress.template Reset<SizeT>();
+            }
+        }
+
+        // Determine work decomposition
+        if (threadIdx.x == 0) {
+
+            // obtain problem size
+            if (queue_reset)
+            {
+                work_progress.StoreQueueLength<SizeT>(input_queue_len, queue_index);
+            }
+            else
+            {
+                input_queue_len = work_progress.template LoadQueueLength<SizeT>(queue_index);
+                
+                // Signal to host that we're done
+                if (input_queue_len == 0) {
+                    if (d_done) d_done[0] = input_queue_len;
+                }
+            }
+
+            work_progress.Enqueue(output_queue_len, queue_index+1);
+
+            // Reset our next outgoing queue counter to zero
+            work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
+            work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
+        }
+
+        // Barrier to protect work decomposition
+        __syncthreads();
+
         unsigned int range = input_queue_len;
         int tid = threadIdx.x;
         int bid = blockIdx.x;
@@ -206,7 +389,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         VertexId v, e;
 
-        int v_index = BinarySearch<KernelPolicy::THREADS>(tid, smeme_storage.s_edges);
+        int v_index = BinarySearch<KernelPolicy::THREADS>(tid, smem_storage.s_edges);
         v = smem_storage.s_vertices[v_index];
         int end_last = (v_index < KernelPolicy::THREADS ? smem_storage.s_edges[v_index] : max_vertices);
 
@@ -216,7 +399,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             {
                 v_index = BinarySearch<KernelPolicy::THREADS>(i, smem_storage.s_edges);
                 v = smem_storage.s_vertices[v_index];
-                end_last = (v_indedx < KernelPolicy::THREADS ? smem_storage.s_edges[v_index] : max_vertices);
+                end_last = (v_index < KernelPolicy::THREADS ? smem_storage.s_edges[v_index] : max_vertices);
             }
 
             int internal_offset = v_index > 0 ? smem_storage.s_edges[v_index-1] : 0;
@@ -238,6 +421,11 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                         d_out + offset+i);
             }
         }
+
+        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+            kernel_stats.MarkStop();
+            kernel_stats.Flush();
+        }
     }
 
 };
@@ -249,11 +437,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @tparam ProblemData Problem data type for partitioned edge mapping.
  * @tparam Functor Functor type for the specific problem type.
  *
+ * @param[in] queue_reset       If reset queue counter
+ * @param[in] queue_index       Current frontier queue counter index
  * @param[in] d_row_offset      Device pointer of SizeT to the row offsets queue
  * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
  * @param[in] d_scanned_edges   Device pointer of scanned neighbor list queue of the current frontier
  * @param[in] partition_starts  Device pointer of partition start index computed by sorted search in moderngpu lib
  * @param[in] num_partitions    Number of partitions in the current frontier
+ * @param[in] d_done            Pointer of volatile int to the flag to set when we detect incoming frontier is empty
  * @param[in] d_queue           Device pointer of VertexId to the incoming frontier queue
  * @param[out] d_out            Device pointer of VertexId to the outgoing frontier queue
  * @param[in] problem           Device pointer to the problem object
@@ -261,16 +452,21 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @param[in] output_queue_len  Length of the outgoing frontier queue
  * @param[in] max_vertices      Maximum number of elements we can place into the incoming frontier
  * @param[in] max_edges         Maximum number of elements we can place into the outgoing frontier
+ * @param[in] work_progress     queueing counters to record work progress
+ * @param[in] kernel_stats      Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT is set)
  */
     template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
     __global__
 void RelaxPartitionedEdges(
+        bool                                    queue_reset,
+        typename KernelPolicy::VertexId         queue_index,
         typename KernelPolicy::SizeT            *d_row_offsets,
         typename KernelPolicy::VertexId         *d_column_indices,
         typename KernelPolicy::SizeT            *d_scanned_edges,
         unsigned int                            *partition_starts,
         unsigned int                            num_partitions,
+        volatile int                            *d_done,
         typename KernelPolicy::VertexId         *d_queue,
         typename KernelPolicy::VertexId         *d_out,
         typename ProblemData::DataSlice         *problem,
@@ -278,14 +474,19 @@ void RelaxPartitionedEdges(
         typename KernelPolicy::SizeT            output_queue_len,
         typename KernelPolicy::SizeT            partition_size,
         typename KernelPolicy::SizeT            max_vertices,
-        typename KernelPolicy::SizeT            max_edges)
+        typename KernelPolicy::SizeT            max_edges,
+        util::CtaWorkProgress                   work_progress,
+        util::KernelRuntimeStats                kernel_stats)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::RelaxPartitionedEdges(
+            queue_reset,
+            queue_index,
             d_row_offsets,
             d_column_indices,
             d_scanned_edges,
             partition_starts,
             num_partitions,
+            d_done,
             d_queue,
             d_out,
             problem,
@@ -293,7 +494,9 @@ void RelaxPartitionedEdges(
             output_queue_len,
             partition_size,
             max_vertices,
-            max_edges);
+            max_edges,
+            work_progress,
+            kernel_stats);
 }
 
 /**
@@ -303,37 +506,58 @@ void RelaxPartitionedEdges(
  * @tparam ProblemData Problem data type for partitioned edge mapping.
  * @tparam Functor Functor type for the specific problem type.
  *
+ * @param[in] queue_reset       If reset queue counter
+ * @param[in] queue_index       Current frontier queue counter index
  * @param[in] d_row_offset      Device pointer of SizeT to the row offsets queue
  * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
  * @param[in] d_scanned_edges   Device pointer of scanned neighbor list queue of the current frontier
+ * @param[in] d_done            Pointer of volatile int to the flag to set when we detect incoming frontier is empty
  * @param[in] d_queue           Device pointer of VertexId to the incoming frontier queue
  * @param[out] d_out            Device pointer of VertexId to the outgoing frontier queue
  * @param[in] problem           Device pointer to the problem object
+ * @param[in] input_queue_len   Length of the incoming frontier queue
+ * @param[in] output_queue_len  Length of the outgoing frontier queue
  * @param[in] max_vertices      Maximum number of elements we can place into the incoming frontier
  * @param[in] max_edges         Maximum number of elements we can place into the outgoing frontier
+ * @param[in] work_progress     queueing counters to record work progress
+ * @param[in] kernel_stats      Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT is set)
  */
     template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
     __global__
 void RelaxLightEdges(
+        bool                            queue_reset,
+        typename KernelPolicy::VertexId queue_index,
         typename KernelPolicy::SizeT    *d_row_offsets,
         typename KernelPolicy::VertexId *d_column_indices,
         typename KernelPolicy::SizeT    *d_scanned_edges,
+        volatile int                    *d_done,
         typename KernelPolicy::VertexId *d_queue,
         typename KernelPolicy::VertexId *d_out,
         typename ProblemData::DataSlice *problem,
+        typename KernelPolicy::SizeT    input_queue_len,
+        typename KernelPolicy::SizeT    output_queue_len,
         typename KernelPolicy::SizeT    max_vertices,
-        typename KernelPolicy::SizeT    max_edges)
+        typename KernelPolicy::SizeT    max_edges,
+        util::CtaWorkProgress           work_progress,
+        util::KernelRuntimeStats        kernel_stats)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::RelaxLightEdges(
+                                queue_reset,
+                                queue_index,
                                 d_row_offsets,
                                 d_column_indices,
                                 d_scanned_edges,
+                                d_done,
                                 d_queue,
                                 d_out,
                                 problem,
+                                input_queue_len,
+                                output_queue_len,
                                 max_vertices,
-                                max_edges);
+                                max_edges,
+                                work_progress,
+                                kernel_stats);
 }
 
 /**
