@@ -25,9 +25,12 @@
 #include <gunrock/oprtr/vertex_map/kernel_policy.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
-#include <gunrock/app/bfs/bfs_problem.cuh>
+#include <gunrock/app/pbfs/pbfs_problem.cuh>
 #include <gunrock/app/bfs/bfs_functor.cuh>
 
+#include <moderngpu.cuh>
+
+using namespace mgpu;
 
 namespace gunrock {
 namespace app {
@@ -184,9 +187,9 @@ class PBFSEnactor : public EnactorBase
      *
      * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
      * @tparam VertexMapPolicy Kernel policy for vertex mapping.
-     * @tparam BFSProblem BFS Problem type.
+     * @tparam PBFSProblem PBFS Problem type.
      *
-     * @param[in] problem BFSProblem object.
+     * @param[in] problem PBFSProblem object.
      * @param[in] src Source node for BFS.
      * @param[in] max_grid_size Max grid size for BFS kernel calls.
      *
@@ -195,19 +198,20 @@ class PBFSEnactor : public EnactorBase
     template<
         typename EdgeMapPolicy,
         typename VertexMapPolicy,
-        typename BFSProblem>
+        typename PBFSProblem>
     cudaError_t EnactPBFS(
-    BFSProblem                          *problem,
-    typename BFSProblem::VertexId       src,
+    CudaContext                          &context,
+    PBFSProblem                          *problem,
+    typename PBFSProblem::VertexId       src,
     int                                 max_grid_size = 0)
     {
-        typedef typename BFSProblem::SizeT      SizeT;
-        typedef typename BFSProblem::VertexId   VertexId;
+        typedef typename PBFSProblem::SizeT      SizeT;
+        typedef typename PBFSProblem::VertexId   VertexId;
 
         typedef BFSFunctor<
             VertexId,
             SizeT,
-            BFSProblem> BfsFunctor;
+            PBFSProblem> BfsFunctor;
 
         cudaError_t retval = cudaSuccess;
 
@@ -231,8 +235,8 @@ class PBFSEnactor : public EnactorBase
             if (retval = Setup(problem, edge_map_grid_size, vertex_map_grid_size)) break;
 
             // Single-gpu graph slice
-            typename BFSProblem::GraphSlice *graph_slice = problem->graph_slices[0];
-            typename BFSProblem::DataSlice *data_slice = problem->d_data_slices[0];
+            typename PBFSProblem::GraphSlice *graph_slice = problem->graph_slices[0];
+            typename PBFSProblem::DataSlice *data_slice = problem->d_data_slices[0];
 
             SizeT queue_length      = 1;
             VertexId queue_index    = 0;
@@ -244,12 +248,78 @@ class PBFSEnactor : public EnactorBase
             while (done[0] < 0) {
 
                 //Partitioned Edge Map
-                //TODO:
+                //
                 // Get Rowoffsets
                 // Use scan to compute edge_offsets for each vertex in the frontier
                 // MarkPartitionSizes
                 // Use sorted sort to compute partition bound for each work-chunk
                 // load edge-expand-partitioned kernel
+                int num_block = (queue_length + EdgeMapPolicy::THREADS - 1)/EdgeMapPolicy::THREADS;
+                gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< num_block, EdgeMapPolicy::THREADS >>>(
+                                        graph_slice->d_row_offsets,
+                                        graph_slice->frontier_queues.d_keys[selector],
+                                        data_slice->d_scanned_edges,
+                                        queue_length,
+                                        graph_slice->frontier_elements[selector],
+                                        graph_slice->frontier_elements[selector^1]);
+                Scan<MgpuScanTypeInc>(data_slice->d_scanned_edges, queue_length, context);
+                SizeT *temp = new SizeT[1];
+                cudaMemcpy(temp, data_slice->d_scanned_edges+queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
+                SizeT output_queue_len = temp[0];
+                
+                // Edge Expand Kernel
+                {
+                    if (output_queue_len < EdgeMapPolicy::LIGHT_EDGE_THRESHOLD)
+                    {
+                        gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< num_block, EdgeMapPolicy::THREADS >>>(
+                                        queue_reset,
+                                        queue_index,
+                                        graph_slice->d_row_offsets,
+                                        graph_slice->d_column_indices,
+                                        data_slice->d_scanned_edges,
+                                        d_done,
+                                        graph_slice->frontier_queues.d_keys[selector],
+                                        graph_slice->frontier_queues.d_keys[selector^1],
+                                        data_slice,
+                                        queue_length,
+                                        output_queue_len,
+                                        graph_slice->frontier_elements[selector],
+                                        graph_slice->frontier_elements[selector^1],
+                                        work_progress,
+                                        this->edge_map_kernel_stats);
+                    }
+                    else
+                    {
+                        unsigned int split_val = (output_queue_len + EdgeMapPolicy::BLOCKS - 1) / EdgeMapPolicy::BLOCKS;
+                        num_block = (EdgeMapPolicy::BLOCKS + EdgeMapPolicy::THREADS - 1)/EdgeMapPolicy::THREADS;
+                        gunrock::oprtr::edge_map_partitioned::MarkPartitionSizes<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< num_block, EdgeMapPolicy::THREADS >>>(
+                                        data_slice->d_node_locks,
+                                        split_val,
+                                        EdgeMapPolicy::BLOCKS);
+                        SortedSearch<MgpuBoundsLower>(data_slice->d_node_locks, EdgeMapPolicy::BLOCKS, data_slice->d_scanned_edges, queue_length, data_slice->d_node_locks, context);
+
+                         gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< EdgeMapPolicy::BLOCKS, EdgeMapPolicy::THREADS >>>(
+                                        queue_reset,
+                                        queue_index,
+                                        graph_slice->d_row_offsets,
+                                        graph_slice->d_column_indices,
+                                        data_slice->d_scanned_edges,
+                                        data_slice->d_node_locks,
+                                        EdgeMapPolicy::BLOCKS,
+                                        d_done,
+                                        graph_slice->frontier_queues.d_keys[selector],
+                                        graph_slice->frontier_queues.d_keys[selector^1],
+                                        data_slice,
+                                        queue_length,
+                                        output_queue_len,
+                                        split_val,
+                                        graph_slice->frontier_elements[selector],
+                                        graph_slice->frontier_elements[selector^1],
+                                        work_progress,
+                                        this->edge_map_kernel_stats);   
+
+                    }
+                }
 
                 //Only need to reset queue for once
                 if (queue_reset)
@@ -284,7 +354,7 @@ class PBFSEnactor : public EnactorBase
                 if (done[0] == 0) break;
 
                 // Vertex Map
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, BFSProblem, BfsFunctor>
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, PBFSProblem, BfsFunctor>
                     <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                             queue_reset,
                             queue_index,
@@ -306,8 +376,9 @@ class PBFSEnactor : public EnactorBase
                 selector ^= 1;
                 iteration++;
 
+                
+                if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                 if (INSTRUMENT || DEBUG) {
-                    if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                     total_queued += queue_length;
                     if (DEBUG) printf(", %lld", (long long) queue_length);
                     if (INSTRUMENT) {
@@ -340,25 +411,26 @@ class PBFSEnactor : public EnactorBase
     /**
      * @brief Partitioned BFS Enact kernel entry.
      *
-     * @tparam BFSProblem BFS Problem type. @see BFSProblem
+     * @tparam PBFSProblem BFS Problem type. @see PBFSProblem
      *
-     * @param[in] problem Pointer to BFSProblem object.
+     * @param[in] problem Pointer to PBFSProblem object.
      * @param[in] src Source node for BFS.
      * @param[in] max_grid_size Max grid size for BFS kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
-    template <typename BFSProblem>
+    template <typename PBFSProblem>
     cudaError_t Enact(
-        BFSProblem                      *problem,
-        typename BFSProblem::VertexId    src,
+        CudaContext                      &context,
+        PBFSProblem                      *problem,
+        typename PBFSProblem::VertexId    src,
         int                             max_grid_size = 0)
     {
        // Define Kernel Policy
        // Load Enactor
         if (this->cuda_props.device_sm_version >= 300) {
             typedef gunrock::oprtr::vertex_map::KernelPolicy<
-                BFSProblem,                         // Problem data type
+                PBFSProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 0,                                  // SATURATION QUIT
@@ -372,15 +444,17 @@ class PBFSEnactor : public EnactorBase
                 VertexMapPolicy;
 
                 typedef gunrock::oprtr::edge_map_partitioned::KernelPolicy<
-                BFSProblem,                         // Problem data type
+                PBFSProblem,                        // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 8,                                  // MIN_CTA_OCCUPANCY
-                6>                                  // LOG_THREADS
+                6,                                  // LOG_THREADS
+                8,                                  // LOG_BLOCKS
+                32 * 1024>                          // LIGHT_EDGE_THRESHOLD
                 EdgeMapPolicy;
 
-                return EnactPBFS<EdgeMapPolicy, VertexMapPolicy, BFSProblem>(
-                problem, src, max_grid_size);
+                return EnactPBFS<EdgeMapPolicy, VertexMapPolicy, PBFSProblem>(
+                context, problem, src, max_grid_size);
         }
 
         //to reduce compile time, get rid of other architecture for now

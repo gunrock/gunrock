@@ -15,7 +15,6 @@
 
 
 #pragma once
-
 #include <gunrock/util/basic_utils.cuh>
 #include <gunrock/util/cuda_properties.cuh>
 #include <gunrock/util/cta_work_distribution.cuh>
@@ -57,7 +56,9 @@ template <
     bool _INSTRUMENT,
     // Tunable parameters
     int _MIN_CTA_OCCUPANCY,                                             
-    int _LOG_THREADS>
+    int _LOG_THREADS,
+    int _LOG_BLOCKS,
+    int _LIGHT_EDGE_THRESHOLD>
 
 struct KernelPolicy
 {
@@ -76,6 +77,9 @@ struct KernelPolicy
 
         LOG_THREADS                     = _LOG_THREADS,
         THREADS                         = 1 << LOG_THREADS,
+        LOG_BLOCKS                      = _LOG_BLOCKS,
+        BLOCKS                          = 1 << LOG_BLOCKS,
+        LIGHT_EDGE_THRESHOLD            = _LIGHT_EDGE_THRESHOLD,
     };
     
     /**

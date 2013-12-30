@@ -35,6 +35,7 @@
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/vertex_map/kernel.cuh>
 
+
 using namespace gunrock;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
