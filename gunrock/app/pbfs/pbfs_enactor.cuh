@@ -238,7 +238,7 @@ class PBFSEnactor : public EnactorBase
             typename PBFSProblem::GraphSlice *graph_slice = problem->graph_slices[0];
             typename PBFSProblem::DataSlice *data_slice = problem->d_data_slices[0];
 
-            SizeT queue_length      = 1;
+            unsigned int queue_length      = 1;
             VertexId queue_index    = 0;
             int selector            = 0;
             SizeT num_elements      = 1;
@@ -262,7 +262,7 @@ class PBFSEnactor : public EnactorBase
                                         queue_length,
                                         graph_slice->frontier_elements[selector],
                                         graph_slice->frontier_elements[selector^1]);
-                Scan<MgpuScanTypeInc>(data_slice->d_scanned_edges, queue_length, context);
+                Scan<MgpuScanTypeInc>((unsigned int*)data_slice->d_scanned_edges, queue_length, context);
                 SizeT *temp = new SizeT[1];
                 cudaMemcpy(temp, data_slice->d_scanned_edges+queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
                 SizeT output_queue_len = temp[0];

@@ -244,6 +244,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
         // smem_storage.s_edges[NT]
         // smem_storage.s_vertices[NT]
+        unsigned int* s_edges = (unsigned int*) &smem_storage.s_edges[0];
+        unsigned int* s_vertices = (unsigned int*) &smem_storage.s_vertices[0];
 
         int my_work_size = my_thread_end - my_thread_start;
         int out_offset = bid * partition_size;
@@ -257,28 +259,28 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
             __syncthreads();
 
-            smem_storage.s_edges[tid] = (my_start_partition + tid < my_end_partition ? d_scanned_edges[my_start_partition + tid] - pre_offset : max_edges);
-            smem_storage.s_vertices[tid] = my_start_partition + tid < my_end_partition ? d_queue[my_start_partition+tid] : -1;
+            s_edges[tid] = (my_start_partition + tid < my_end_partition ? d_scanned_edges[my_start_partition + tid] - pre_offset : max_edges);
+            s_vertices[tid] = my_start_partition + tid < my_end_partition ? d_queue[my_start_partition+tid] : -1;
 
             int last = my_start_partition + KernelPolicy::THREADS >= my_end_partition ? my_end_partition - my_start_partition - 1 : KernelPolicy::THREADS - 1;
 
             __syncthreads();
 
-            SizeT e_last = min(smem_storage.s_edges[last] - e_offset, my_work_size - edges_processed);
-            SizeT v_index = BinarySearch<KernelPolicy::THREADS>(tid+e_offset, smem_storage.s_edges);
+            SizeT e_last = min(s_edges[last] - e_offset, my_work_size - edges_processed);
+            SizeT v_index = BinarySearch<KernelPolicy::THREADS>(tid+e_offset, s_edges);
             VertexId v = d_queue[v_index];
-            SizeT end_last = (v_index < my_end_partition ? smem_storage.s_edges[v_index] : max_edges);
-            SizeT internal_offset = v_index > 0 ? smem_storage.s_edges[v_index-1] : 0;
+            SizeT end_last = (v_index < my_end_partition ? s_edges[v_index] : max_edges);
+            SizeT internal_offset = v_index > 0 ? s_edges[v_index-1] : 0;
             SizeT lookup_offset = d_row_offsets[v];
 
             for (int i = (tid + e_offset); i < e_last + e_offset; i+=KernelPolicy::THREADS)
             {
                 if (i >= end_last)
                 {
-                    v_index = BinarySearch<KernelPolicy::THREADS>(i, smem_storage.s_edges);
+                    v_index = BinarySearch<KernelPolicy::THREADS>(i, s_edges);
                     v = d_queue[v_index];
-                    end_last = (v_index < KernelPolicy::THREADS ? smem_storage.s_edges[v_index] : max_edges);
-                    internal_offset = v_index > 0 ? smem_storage.s_edges[v_index-1] : 0;
+                    end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_edges);
+                    internal_offset = v_index > 0 ? s_edges[v_index-1] : 0;
                     lookup_offset = d_row_offsets[v];
                 }
 
@@ -376,33 +378,35 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
 
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
+        unsigned int* s_edges = (unsigned int*) &smem_storage.s_edges[0];
+        unsigned int* s_vertices = (unsigned int*) &smem_storage.s_vertices[0];
 
         int offset = (KernelPolicy::THREADS*bid - 1) > 0 ? d_scanned_edges[KernelPolicy::THREADS*bid-1] : 0;
         int end_id = (KernelPolicy::THREADS*(bid+1)) >= range ? range - 1 : KernelPolicy::THREADS*(bid+1) - 1;
 
         end_id = end_id % KernelPolicy::THREADS;
-        smem_storage.s_edges[tid] = (my_id < range ? d_scanned_edges[my_id] - offset : max_edges);
-        smem_storage.s_vertices[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
+        s_edges[tid] = (my_id < range ? d_scanned_edges[my_id] - offset : max_edges);
+        s_vertices[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
 
         __syncthreads();
-        unsigned int size = smem_storage.s_edges[end_id];
+        unsigned int size = s_edges[end_id];
 
         VertexId v, e;
 
-        int v_index = BinarySearch<KernelPolicy::THREADS>(tid, smem_storage.s_edges);
-        v = smem_storage.s_vertices[v_index];
-        int end_last = (v_index < KernelPolicy::THREADS ? smem_storage.s_edges[v_index] : max_vertices);
+        int v_index = BinarySearch<KernelPolicy::THREADS>(tid, s_edges);
+        v = s_vertices[v_index];
+        int end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
 
         for (int i = tid; i < size; i += KernelPolicy::THREADS)
         {
             if (i >= end_last)
             {
-                v_index = BinarySearch<KernelPolicy::THREADS>(i, smem_storage.s_edges);
-                v = smem_storage.s_vertices[v_index];
-                end_last = (v_index < KernelPolicy::THREADS ? smem_storage.s_edges[v_index] : max_vertices);
+                v_index = BinarySearch<KernelPolicy::THREADS>(i, s_edges);
+                v = s_vertices[v_index];
+                end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
             }
 
-            int internal_offset = v_index > 0 ? smem_storage.s_edges[v_index-1] : 0;
+            int internal_offset = v_index > 0 ? s_edges[v_index-1] : 0;
             e = i - internal_offset;
 
             int lookup = d_row_offsets[v] + e;
