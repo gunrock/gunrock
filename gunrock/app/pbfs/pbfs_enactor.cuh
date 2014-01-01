@@ -238,6 +238,7 @@ class PBFSEnactor : public EnactorBase
             typename PBFSProblem::GraphSlice *graph_slice = problem->graph_slices[0];
             typename PBFSProblem::DataSlice *data_slice = problem->d_data_slices[0];
 
+
             unsigned int queue_length      = 1;
             VertexId queue_index    = 0;
             int selector            = 0;
@@ -258,13 +259,17 @@ class PBFSEnactor : public EnactorBase
                 gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< num_block, EdgeMapPolicy::THREADS >>>(
                                         graph_slice->d_row_offsets,
                                         graph_slice->frontier_queues.d_keys[selector],
-                                        data_slice->d_scanned_edges,
+                                       problem->data_slices[0]->d_scanned_edges,
                                         queue_length,
                                         graph_slice->frontier_elements[selector],
                                         graph_slice->frontier_elements[selector^1]);
-                Scan<MgpuScanTypeInc>((unsigned int*)data_slice->d_scanned_edges, queue_length, context);
+
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_partitioned kernel failed", __FILE__, __LINE__))) break;
+                //Scan<MgpuScanTypeInc>((unsigned int*)data_slice->d_scanned_edges, queue_length, context);
+                Scan<MgpuScanTypeInc>((int*)problem->data_slices[0]->d_scanned_edges, queue_length, INT_MIN, mgpu::maximum<int>(),
+		(int*)0, (int*)0, (int*)problem->data_slices[0]->d_scanned_edges, context);
                 SizeT *temp = new SizeT[1];
-                cudaMemcpy(temp, data_slice->d_scanned_edges+queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
+                cudaMemcpy(temp, problem->data_slices[0]->d_scanned_edges+queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
                 SizeT output_queue_len = temp[0];
                 
                 // Edge Expand Kernel
@@ -276,7 +281,7 @@ class PBFSEnactor : public EnactorBase
                                         queue_index,
                                         graph_slice->d_row_offsets,
                                         graph_slice->d_column_indices,
-                                        data_slice->d_scanned_edges,
+                                        problem->data_slices[0]->d_scanned_edges,
                                         d_done,
                                         graph_slice->frontier_queues.d_keys[selector],
                                         graph_slice->frontier_queues.d_keys[selector^1],
@@ -293,18 +298,18 @@ class PBFSEnactor : public EnactorBase
                         unsigned int split_val = (output_queue_len + EdgeMapPolicy::BLOCKS - 1) / EdgeMapPolicy::BLOCKS;
                         num_block = (EdgeMapPolicy::BLOCKS + EdgeMapPolicy::THREADS - 1)/EdgeMapPolicy::THREADS;
                         gunrock::oprtr::edge_map_partitioned::MarkPartitionSizes<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< num_block, EdgeMapPolicy::THREADS >>>(
-                                        data_slice->d_node_locks,
+                                        problem->data_slices[0]->d_node_locks,
                                         split_val,
                                         EdgeMapPolicy::BLOCKS);
-                        SortedSearch<MgpuBoundsLower>(data_slice->d_node_locks, EdgeMapPolicy::BLOCKS, data_slice->d_scanned_edges, queue_length, data_slice->d_node_locks, context);
+                        SortedSearch<MgpuBoundsLower>(problem->data_slices[0]->d_node_locks, EdgeMapPolicy::BLOCKS, problem->data_slices[0]->d_scanned_edges, queue_length, problem->data_slices[0]->d_node_locks, context);
 
                          gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< EdgeMapPolicy::BLOCKS, EdgeMapPolicy::THREADS >>>(
                                         queue_reset,
                                         queue_index,
                                         graph_slice->d_row_offsets,
                                         graph_slice->d_column_indices,
-                                        data_slice->d_scanned_edges,
-                                        data_slice->d_node_locks,
+                                        problem->data_slices[0]->d_scanned_edges,
+                                        problem->data_slices[0]->d_node_locks,
                                         EdgeMapPolicy::BLOCKS,
                                         d_done,
                                         graph_slice->frontier_queues.d_keys[selector],

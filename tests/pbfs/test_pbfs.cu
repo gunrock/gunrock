@@ -300,7 +300,8 @@ void RunTests(
     VertexId src,
     int max_grid_size,
     int num_gpus,
-    double max_queue_sizing)
+    double max_queue_sizing,
+    CudaContext& context)
 {
     
     typedef PBFSProblem<
@@ -352,11 +353,9 @@ void RunTests(
         // Perform BFS
         GpuTimer gpu_timer;
 
-        ContextPtr context = mgpu::CreateCudaDevice(0);
-
         util::GRError(csr_problem->Reset(src, bfs_enactor.GetFrontierType(), max_queue_sizing), "PBFS Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
-        util::GRError(bfs_enactor.template Enact<Problem>(*context, csr_problem, src, max_grid_size), "PBFS Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(bfs_enactor.template Enact<Problem>(context, csr_problem, src, max_grid_size), "PBFS Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
 
         bfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
@@ -412,7 +411,8 @@ template <
     typename SizeT>
 void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
-    CommandLineArgs &args)
+    CommandLineArgs &args,
+    CudaContext& context)
 {
     VertexId            src                 = -1;           // Use whatever the specified graph-type's default is
     std::string         src_str;
@@ -449,14 +449,16 @@ void RunTests(
                 src,
                 max_grid_size,
                 num_gpus,
-                max_queue_sizing);
+                max_queue_sizing,
+                context);
         } else {
             RunTests<VertexId, Value, SizeT, true, false>(
                 graph,
                 src,
                 max_grid_size,
                 num_gpus,
-                max_queue_sizing);
+                max_queue_sizing,
+                context);
         }
     } else {
         if (mark_pred) {
@@ -465,14 +467,16 @@ void RunTests(
                 src,
                 max_grid_size,
                 num_gpus,
-                max_queue_sizing);
+                max_queue_sizing,
+                context);
         } else {
             RunTests<VertexId, Value, SizeT, false, false>(
                 graph,
                 src,
                 max_grid_size,
                 num_gpus,
-                max_queue_sizing);
+                max_queue_sizing,
+                context);
         }
     }
 
@@ -537,8 +541,10 @@ int main( int argc, char** argv)
 
 		csr.PrintHistogram();
 
+        ContextPtr context = mgpu::CreateCudaDevice(0);
+
 		// Run tests
-		RunTests(csr, args);
+		RunTests(csr, args, *context);
 
 	} else {
 

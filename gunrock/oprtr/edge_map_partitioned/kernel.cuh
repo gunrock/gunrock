@@ -123,10 +123,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     typedef typename ProblemData::DataSlice         DataSlice;
 
     static __device__ __forceinline__ SizeT GetNeighborListLength(
-                            VertexId    *&d_row_offsets,
-                            VertexId    &d_vertex_id,
-                            SizeT       &max_vertex,
-                            SizeT       &max_edge)
+                            VertexId    *d_row_offsets,
+                            VertexId    d_vertex_id,
+                            SizeT       max_vertex,
+                            SizeT       max_edge)
     {
         SizeT first = d_vertex_id >= max_vertex ? max_edge : d_row_offsets[d_vertex_id];
         SizeT second = (d_vertex_id + 1) >= max_vertex ? max_edge : d_row_offsets[d_vertex_id+1];
@@ -371,7 +371,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         // Barrier to protect work decomposition
         __syncthreads();
 
-        unsigned int range = input_queue_len;
+        /*unsigned int range = input_queue_len;
         int tid = threadIdx.x;
         int bid = blockIdx.x;
         int my_id = bid * KernelPolicy::THREADS + tid;
@@ -424,7 +424,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                         -1,
                         d_out + offset+i);
             }
-        }
+        }*/
 
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
             kernel_stats.MarkStop();
