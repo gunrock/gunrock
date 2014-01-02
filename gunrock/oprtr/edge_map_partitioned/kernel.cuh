@@ -123,10 +123,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     typedef typename ProblemData::DataSlice         DataSlice;
 
     static __device__ __forceinline__ SizeT GetNeighborListLength(
-                            VertexId    *d_row_offsets,
-                            VertexId    d_vertex_id,
-                            SizeT       max_vertex,
-                            SizeT       max_edge)
+                            VertexId    *&d_row_offsets,
+                            VertexId    &d_vertex_id,
+                            SizeT       &max_vertex,
+                            SizeT       &max_edge)
     {
         SizeT first = d_vertex_id >= max_vertex ? max_edge : d_row_offsets[d_vertex_id];
         SizeT second = (d_vertex_id + 1) >= max_vertex ? max_edge : d_row_offsets[d_vertex_id+1];
