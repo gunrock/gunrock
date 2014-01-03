@@ -296,7 +296,7 @@ class PBFSEnactor : public EnactorBase
                 
                 // Edge Expand Kernel
                 {
-                    if (output_queue_len < EdgeMapPolicy::LIGHT_EDGE_THRESHOLD)
+                    /*if (output_queue_len < EdgeMapPolicy::LIGHT_EDGE_THRESHOLD)
                     {
                         gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< num_block, EdgeMapPolicy::THREADS >>>(
                                         queue_reset,
@@ -315,8 +315,8 @@ class PBFSEnactor : public EnactorBase
                                         graph_slice->frontier_elements[selector^1],
                                         work_progress,
                                         this->edge_map_kernel_stats);
-                    }
-                    else
+                    }*/
+                    //else
                     {
                         unsigned int split_val = (output_queue_len + EdgeMapPolicy::BLOCKS - 1) / EdgeMapPolicy::BLOCKS;
                         num_block = (EdgeMapPolicy::BLOCKS + EdgeMapPolicy::THREADS - 1)/EdgeMapPolicy::THREADS;

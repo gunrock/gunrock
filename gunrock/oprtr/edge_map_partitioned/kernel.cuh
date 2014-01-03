@@ -189,21 +189,21 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats)
     {
-        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0 && blockIdx.x == 0)) {
             kernel_stats.MarkStart();
         }
 
         // Reset work progress
         if (queue_reset)
         {
-            if (threadIdx.x < util::CtaWorkProgress::COUNTERS) {
+            if (blockIdx.x == 0 && threadIdx.x < util::CtaWorkProgress::COUNTERS) {
                 //Reset all counters
                 work_progress.template Reset<SizeT>();
             }
         }
 
         // Determine work decomposition
-        if (threadIdx.x == 0) {
+        if (threadIdx.x == 0 && blockIdx.x == 0) {
 
             // obtain problem size
             if (queue_reset)
@@ -312,7 +312,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             e_offset = 0;
         }
 
-        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+        if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
             kernel_stats.MarkStop();
             kernel_stats.Flush();
         }
