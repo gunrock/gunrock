@@ -46,9 +46,10 @@ __device__ int BinarySearch(unsigned int i, unsigned int *queue)
         mid = queue[mid] > i ? mid - 128 : mid + 128;
     if (NT > 128)
         mid = queue[mid] > i ? mid - 64 : mid + 64;
-
-    mid = queue[mid] > i ? mid - 32 : mid + 32;
-    mid = queue[mid] > i ? mid - 16 : mid + 16;
+    if (NT > 64)
+        mid = queue[mid] > i ? mid - 32 : mid + 32;
+    if (NT > 32)
+        mid = queue[mid] > i ? mid - 16 : mid + 16;
     mid = queue[mid] > i ? mid - 8 : mid + 8;
     mid = queue[mid] > i ? mid - 4 : mid + 4;
     mid = queue[mid] > i ? mid - 2 : mid + 2;

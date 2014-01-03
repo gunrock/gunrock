@@ -247,7 +247,7 @@ class PBFSEnactor : public EnactorBase
             bool queue_reset        = true;
 
             while (done[0] < 0) {
-
+                if (queue_length == 0) break;
                 //Partitioned Edge Map
                 //
                 // Get Rowoffsets
@@ -266,11 +266,33 @@ class PBFSEnactor : public EnactorBase
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_partitioned kernel failed", __FILE__, __LINE__))) break;
                 //Scan<MgpuScanTypeInc>((unsigned int*)data_slice->d_scanned_edges, queue_length, context);
-                Scan<MgpuScanTypeInc>((int*)problem->data_slices[0]->d_scanned_edges, queue_length, INT_MIN, mgpu::maximum<int>(),
+                Scan<MgpuScanTypeInc>((int*)problem->data_slices[0]->d_scanned_edges, queue_length, (int)0, mgpu::plus<int>(),
 		(int*)0, (int*)0, (int*)problem->data_slices[0]->d_scanned_edges, context);
+
+		        /*//Test Scan
+		        int *t_scan = new int[10];
+		        for (int i = 0; i < 10; ++i) {
+		            t_scan[i] = 1;
+		        }
+		        int *d_t_scan;
+		        cudaMalloc((void**)&d_t_scan, sizeof(int)*10);
+                if (retval = util::GRError(cudaMemcpy(
+                                d_t_scan,
+                                t_scan,
+                                sizeof(int)*10,
+                                cudaMemcpyHostToDevice),
+                            "test scan failed", __FILE__, __LINE__)) return retval;
+                Scan<MgpuScanTypeInc>(d_t_scan, 10, (int)0, mgpu::plus<int>(),
+		            (int*)0, (int*)0, d_t_scan, context);
+
+                util::DisplayDeviceResults(d_t_scan, 10);
+                cudaFree(d_t_scan);
+                delete[] t_scan;*/
+
                 SizeT *temp = new SizeT[1];
                 cudaMemcpy(temp, problem->data_slices[0]->d_scanned_edges+queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
                 SizeT output_queue_len = temp[0];
+                printf("scanned length:%d\n", output_queue_len);
                 
                 // Edge Expand Kernel
                 {
@@ -279,6 +301,7 @@ class PBFSEnactor : public EnactorBase
                         gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< num_block, EdgeMapPolicy::THREADS >>>(
                                         queue_reset,
                                         queue_index,
+                                        iteration,
                                         graph_slice->d_row_offsets,
                                         graph_slice->d_column_indices,
                                         problem->data_slices[0]->d_scanned_edges,
@@ -306,6 +329,7 @@ class PBFSEnactor : public EnactorBase
                          gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< EdgeMapPolicy::BLOCKS, EdgeMapPolicy::THREADS >>>(
                                         queue_reset,
                                         queue_index,
+                                        iteration,
                                         graph_slice->d_row_offsets,
                                         graph_slice->d_column_indices,
                                         problem->data_slices[0]->d_scanned_edges,
@@ -333,11 +357,13 @@ class PBFSEnactor : public EnactorBase
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_partitioned kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); //give host memory mapped visibility to GPU updates
 
+
                 queue_index++;
                 selector ^= 1;
 
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
+                    util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
                     printf(", %lld", (long long) queue_length);
                 }
 

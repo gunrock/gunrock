@@ -76,6 +76,7 @@ struct Dispatch
     static __device__ __forceinline__ void RelaxPartitionedEdges(
                                 bool &queue_reset,
                                 VertexId &queue_index,
+                                int &label,
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
                                 SizeT *&d_scanned_edges,
@@ -98,6 +99,7 @@ struct Dispatch
     static __device__ __forceinline__ void RelaxLightEdges(
                                 bool &queue_reset,
                                 VertexId &queue_index,
+                                int &label,
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
                                 SizeT *&d_scanned_edges,
@@ -169,6 +171,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     static __device__ __forceinline__ void RelaxPartitionedEdges(
                                 bool &queue_reset,
                                 VertexId &queue_index,
+                                int &label,
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
                                 SizeT *&d_scanned_edges,
@@ -289,6 +292,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 VertexId u = d_column_indices[lookup];
                 SizeT out_index = out_offset+edges_processed+(i-e_offset);
 
+                if (!ProblemData::MARK_PREDECESSORS)
+                    v = label;
                 if (Functor::CondEdge(v, u, problem)) {
                     Functor::ApplyEdge(v, u, problem);
                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -316,6 +321,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     static __device__ __forceinline__ void RelaxLightEdges(
                                 bool &queue_reset,
                                 VertexId &queue_index,
+                                int &label,
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
                                 SizeT *&d_scanned_edges,
@@ -371,7 +377,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         // Barrier to protect work decomposition
         __syncthreads();
 
-        /*unsigned int range = input_queue_len;
+        unsigned int range = input_queue_len;
         int tid = threadIdx.x;
         int bid = blockIdx.x;
         int my_id = bid * KernelPolicy::THREADS + tid;
@@ -411,7 +417,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
             int lookup = d_row_offsets[v] + e;
             VertexId u = d_column_indices[lookup];
-            
+           
+            if (!ProblemData::MARK_PREDECESSORS)
+                v = label;
             //v:pre, u:neighbor, outoffset:offset+i
             if (Functor::CondEdge(v, u, problem)) {
                 Functor::ApplyEdge(v, u, problem);
@@ -424,7 +432,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                         -1,
                         d_out + offset+i);
             }
-        }*/
+        }
 
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
             kernel_stats.MarkStop();
@@ -465,6 +473,7 @@ __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
 void RelaxPartitionedEdges(
         bool                                    queue_reset,
         typename KernelPolicy::VertexId         queue_index,
+        int                                     label,
         typename KernelPolicy::SizeT            *d_row_offsets,
         typename KernelPolicy::VertexId         *d_column_indices,
         typename KernelPolicy::SizeT            *d_scanned_edges,
@@ -485,6 +494,7 @@ void RelaxPartitionedEdges(
     Dispatch<KernelPolicy, ProblemData, Functor>::RelaxPartitionedEdges(
             queue_reset,
             queue_index,
+            label,
             d_row_offsets,
             d_column_indices,
             d_scanned_edges,
@@ -532,6 +542,7 @@ __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
 void RelaxLightEdges(
         bool                            queue_reset,
         typename KernelPolicy::VertexId queue_index,
+        int                             label,
         typename KernelPolicy::SizeT    *d_row_offsets,
         typename KernelPolicy::VertexId *d_column_indices,
         typename KernelPolicy::SizeT    *d_scanned_edges,
@@ -549,6 +560,7 @@ void RelaxLightEdges(
     Dispatch<KernelPolicy, ProblemData, Functor>::RelaxLightEdges(
                                 queue_reset,
                                 queue_index,
+                                label,
                                 d_row_offsets,
                                 d_column_indices,
                                 d_scanned_edges,
