@@ -53,8 +53,7 @@ struct PBFSProblem : ProblemBase<VertexId, SizeT,
         // device storage arrays
         VertexId        *d_labels;              /**< Used for source distance */
         VertexId        *d_preds;               /**< Used for predecessor */
-        SizeT           *d_scanned_edges;       /**< Used for scanned row offsets for edge to expand in the current frontier */
-        unsigned int    *d_node_locks;          /**< Used for mark the mark the starting and ending indices for work-chunks for each block */ 
+        unsigned int    *d_scanned_edges;       /**< Used for scanned row offsets for edge to expand in the current frontier */
     };
 
     // Members
@@ -117,7 +116,6 @@ struct PBFSProblem : ProblemBase<VertexId, SizeT,
             if (data_slices[i]->d_labels)      util::GRError(cudaFree(data_slices[i]->d_labels), "GpuSlice cudaFree d_labels failed", __FILE__, __LINE__);
             if (data_slices[i]->d_preds)      util::GRError(cudaFree(data_slices[i]->d_preds), "GpuSlice cudaFree d_preds failed", __FILE__, __LINE__);
             if (data_slices[i]->d_scanned_edges)      util::GRError(cudaFree(data_slices[i]->d_scanned_edges), "GpuSlice cudaFree d_scanned_edges failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_node_locks)      util::GRError(cudaFree(data_slices[i]->d_node_locks), "GpuSlice cudaFree d_node_locks failed", __FILE__, __LINE__);
             if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
         }
         if (d_data_slices)  delete[] d_data_slices;
@@ -239,19 +237,13 @@ struct PBFSProblem : ProblemBase<VertexId, SizeT,
                 }
                 data_slices[0]->d_preds = d_preds;
 
-                SizeT    *d_scanned_edges;
+                unsigned int    *d_scanned_edges;
                 if (retval = util::GRError(cudaMalloc(
                         (void**)&d_scanned_edges,
-                        edges * sizeof(SizeT)),
+                        edges * sizeof(unsigned int)),
                     "PBFSProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_scanned_edges = d_scanned_edges;
-
-                unsigned int    *d_node_locks;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_node_locks,
-                        nodes * sizeof(unsigned int)),
-                    "PBFSProblem cudaMalloc d_node_locks failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_node_locks = d_node_locks;
+            
             }
             //TODO: add multi-GPU allocation code
         } while (0);

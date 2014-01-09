@@ -222,6 +222,8 @@ class PBFSEnactor : public EnactorBase
             int vertex_map_occupancy    = VertexMapPolicy::CTA_OCCUPANCY;
             int vertex_map_grid_size    = MaxGridSize(vertex_map_occupancy, max_grid_size);
 
+            printf("scratch size:%d\n", EdgeMapPolicy::SmemStorage::SCRATCH_ELEMENTS);
+
             if (DEBUG) {
                 printf("Partitioned BFS edge map occupancy %d, level-grid size %d\n",
                 edge_map_occupancy, edge_map_grid_size);
@@ -245,6 +247,19 @@ class PBFSEnactor : public EnactorBase
             SizeT num_elements      = 1;
 
             bool queue_reset        = true;
+
+            unsigned int *d_node_locks;
+            unsigned int *d_node_locks_out;
+
+            if (retval = util::GRError(cudaMalloc(
+                            (void**)&d_node_locks,
+                            EdgeMapPolicy::BLOCKS * sizeof(unsigned int)),
+                        "PBFSProblem cudaMalloc d_node_locks failed", __FILE__, __LINE__)) return retval;
+
+            if (retval = util::GRError(cudaMalloc(
+                            (void**)&d_node_locks_out,
+                            EdgeMapPolicy::BLOCKS * sizeof(unsigned int)),
+                        "PBFSProblem cudaMalloc d_node_locks_out failed", __FILE__, __LINE__)) return retval;
 
             while (done[0] < 0) {
                 if (queue_length == 0) break;
@@ -292,7 +307,7 @@ class PBFSEnactor : public EnactorBase
                 SizeT *temp = new SizeT[1];
                 cudaMemcpy(temp, problem->data_slices[0]->d_scanned_edges+queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
                 SizeT output_queue_len = temp[0];
-                printf("scanned length:%d\n", output_queue_len);
+                printf("num block:%d, scanned length:%d\n", num_block, output_queue_len);
                 
                 // Edge Expand Kernel
                 {
@@ -315,16 +330,23 @@ class PBFSEnactor : public EnactorBase
                                         graph_slice->frontier_elements[selector^1],
                                         work_progress,
                                         this->edge_map_kernel_stats);
-                    }*/
-                    //else
+                    }
+                    else*/
                     {
+
                         unsigned int split_val = (output_queue_len + EdgeMapPolicy::BLOCKS - 1) / EdgeMapPolicy::BLOCKS;
                         num_block = (EdgeMapPolicy::BLOCKS + EdgeMapPolicy::THREADS - 1)/EdgeMapPolicy::THREADS;
                         gunrock::oprtr::edge_map_partitioned::MarkPartitionSizes<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< num_block, EdgeMapPolicy::THREADS >>>(
-                                        problem->data_slices[0]->d_node_locks,
+                                        d_node_locks,
                                         split_val,
                                         EdgeMapPolicy::BLOCKS);
-                        SortedSearch<MgpuBoundsLower>(problem->data_slices[0]->d_node_locks, EdgeMapPolicy::BLOCKS, problem->data_slices[0]->d_scanned_edges, queue_length, problem->data_slices[0]->d_node_locks, context);
+                        SortedSearch<MgpuBoundsLower>(d_node_locks, EdgeMapPolicy::BLOCKS, problem->data_slices[0]->d_scanned_edges, queue_length, d_node_locks_out, context);
+                        /*printf("scanned edge:\n");
+                        util::DisplayDeviceResults(problem->data_slices[0]->d_scanned_edges, queue_length);
+                        printf("split val:\n");
+                        util::DisplayDeviceResults(d_node_locks, EdgeMapPolicy::BLOCKS);
+                        util::DisplayDeviceResults(d_node_locks_out, EdgeMapPolicy::BLOCKS);*/
+
 
                          gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< EdgeMapPolicy::BLOCKS, EdgeMapPolicy::THREADS >>>(
                                         queue_reset,
@@ -333,7 +355,8 @@ class PBFSEnactor : public EnactorBase
                                         graph_slice->d_row_offsets,
                                         graph_slice->d_column_indices,
                                         problem->data_slices[0]->d_scanned_edges,
-                                        problem->data_slices[0]->d_node_locks,
+                                        d_node_locks_out,
+                                        //thrust::raw_pointer_cast(&needle_output[0]),
                                         EdgeMapPolicy::BLOCKS,
                                         d_done,
                                         graph_slice->frontier_queues.d_keys[selector],
@@ -363,7 +386,7 @@ class PBFSEnactor : public EnactorBase
 
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-                    util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
+                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
                     printf(", %lld", (long long) queue_length);
                 }
 
@@ -426,6 +449,9 @@ class PBFSEnactor : public EnactorBase
 
             }
 
+            util::GRError(cudaFree(d_node_locks), "GpuSlice cudaFree d_node_locks failed", __FILE__, __LINE__);
+            util::GRError(cudaFree(d_node_locks_out), "GpuSlice cudaFree d_node_locks_out failed", __FILE__, __LINE__);
+
             if (retval) break;
 
         } while(0);
@@ -479,7 +505,7 @@ class PBFSEnactor : public EnactorBase
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 8,                                  // MIN_CTA_OCCUPANCY
-                6,                                  // LOG_THREADS
+                7,                                  // LOG_THREADS
                 8,                                  // LOG_BLOCKS
                 32 * 1024>                          // LIGHT_EDGE_THRESHOLD
                 EdgeMapPolicy;

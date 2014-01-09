@@ -302,6 +302,7 @@ class BFSEnactor : public EnactorBase
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                     printf(", %lld", (long long) queue_length);
+                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
 
                     /*if (iteration == 2) {
                         cudaMemcpy(h_cur_queue, graph_slice->frontier_queues.d_keys[selector], sizeof(VertexId)*queue_length, cudaMemcpyDeviceToHost);

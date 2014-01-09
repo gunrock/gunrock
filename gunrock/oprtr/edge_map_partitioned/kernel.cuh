@@ -59,7 +59,7 @@ struct Dispatch
     static __device__ __forceinline__ void GetEdgeCounts(
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_queue,
-                                SizeT *&d_scanned_edges,
+                                unsigned int *&d_scanned_edges,
                                 SizeT &num_elements,
                                 SizeT &max_vertex,
                                 SizeT &max_edge)
@@ -79,7 +79,7 @@ struct Dispatch
                                 int &label,
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
-                                SizeT *&d_scanned_edges,
+                                unsigned int *&d_scanned_edges,
                                 unsigned int *&partition_starts,
                                 unsigned int &num_partitions,
                                 volatile int *&d_done,
@@ -102,7 +102,7 @@ struct Dispatch
                                 int &label,
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
-                                SizeT *&d_scanned_edges,
+                                unsigned int *&d_scanned_edges,
                                 volatile int *&d_done,
                                 VertexId *&d_queue,
                                 VertexId *&d_out,
@@ -139,7 +139,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     static __device__ __forceinline__ void GetEdgeCounts(
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_queue,
-                                SizeT *&d_scanned_edges,
+                                unsigned int *&d_scanned_edges,
                                 SizeT &num_elements,
                                 SizeT &max_vertex,
                                 SizeT &max_edge)
@@ -174,7 +174,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 int &label,
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
-                                SizeT *&d_scanned_edges,
+                                unsigned int *&d_scanned_edges,
                                 unsigned int *&partition_starts,
                                 unsigned int &num_partitions,
                                 volatile int *&d_done,
@@ -271,7 +271,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
             SizeT e_last = min(s_edges[last] - e_offset, my_work_size - edges_processed);
             SizeT v_index = BinarySearch<KernelPolicy::THREADS>(tid+e_offset, s_edges);
-            VertexId v = d_queue[v_index];
+            VertexId v = s_vertices[v_index];
             SizeT end_last = (v_index < my_end_partition ? s_edges[v_index] : max_edges);
             SizeT internal_offset = v_index > 0 ? s_edges[v_index-1] : 0;
             SizeT lookup_offset = d_row_offsets[v];
@@ -292,18 +292,47 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 VertexId u = d_column_indices[lookup];
                 SizeT out_index = out_offset+edges_processed+(i-e_offset);
 
-                if (!ProblemData::MARK_PREDECESSORS)
-                    v = label;
-                if (Functor::CondEdge(v, u, problem)) {
-                    Functor::ApplyEdge(v, u, problem);
-                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                            u,
-                            d_out + out_index);
-                }
-                else {
-                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                            -1,
-                            d_out + out_index);
+                /*if (label == 1) {
+                    if (!ProblemData::MARK_PREDECESSORS) {
+                        if (Functor::CondEdge(label, u, problem)) {
+                            Functor::ApplyEdge(label, u, problem);
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    (int)s_edges[0],
+                                    d_out + out_index);
+                        }
+                        else {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    (int)s_edges[0],
+                                    d_out + out_index);
+                        }
+                    }
+                } else*/
+                {
+                    if (!ProblemData::MARK_PREDECESSORS) {
+                        if (Functor::CondEdge(label, u, problem)) {
+                            Functor::ApplyEdge(label, u, problem);
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    u,
+                                    d_out + out_index);
+                        }
+                        else {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    -1,
+                                    d_out + out_index);
+                        }
+                    } else {
+                        if (Functor::CondEdge(v, u, problem)) {
+                            Functor::ApplyEdge(v, u, problem);
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    u,
+                                    d_out + out_index);
+                        }
+                        else {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    -1,
+                                    d_out + out_index);
+                        }
+                    }
                 }
 
             }
@@ -324,7 +353,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 int &label,
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
-                                SizeT *&d_scanned_edges,
+                                unsigned int *&d_scanned_edges,
                                 volatile int *&d_done,
                                 VertexId *&d_queue,
                                 VertexId *&d_out,
@@ -336,21 +365,21 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats)
     {
-        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+        if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
             kernel_stats.MarkStart();
         }
 
         // Reset work progress
         if (queue_reset)
         {
-            if (threadIdx.x < util::CtaWorkProgress::COUNTERS) {
+            if (blockIdx.x == 0 && threadIdx.x < util::CtaWorkProgress::COUNTERS) {
                 //Reset all counters
                 work_progress.template Reset<SizeT>();
             }
         }
 
         // Determine work decomposition
-        if (threadIdx.x == 0) {
+        if (blockIdx.x == 0 && threadIdx.x == 0) {
 
             // obtain problem size
             if (queue_reset)
@@ -418,23 +447,35 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             int lookup = d_row_offsets[v] + e;
             VertexId u = d_column_indices[lookup];
            
-            if (!ProblemData::MARK_PREDECESSORS)
-                v = label;
-            //v:pre, u:neighbor, outoffset:offset+i
-            if (Functor::CondEdge(v, u, problem)) {
-                Functor::ApplyEdge(v, u, problem);
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        u,
-                        d_out + offset+i);
-            }
-            else {
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        -1,
-                        d_out + offset+i);
+            if (!ProblemData::MARK_PREDECESSORS) {
+                if (Functor::CondEdge(label, u, problem)) {
+                    Functor::ApplyEdge(label, u, problem);
+                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                            u,
+                            d_out + offset+i);
+                }
+                else {
+                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                            -1,
+                            d_out + offset+i);
+                }
+            } else {
+                //v:pre, u:neighbor, outoffset:offset+i
+                if (Functor::CondEdge(v, u, problem)) {
+                    Functor::ApplyEdge(v, u, problem);
+                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                            u,
+                            d_out + offset+i);
+                }
+                else {
+                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                            -1,
+                            d_out + offset+i);
+                }
             }
         }
 
-        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+        if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
             kernel_stats.MarkStop();
             kernel_stats.Flush();
         }
@@ -476,7 +517,7 @@ void RelaxPartitionedEdges(
         int                                     label,
         typename KernelPolicy::SizeT            *d_row_offsets,
         typename KernelPolicy::VertexId         *d_column_indices,
-        typename KernelPolicy::SizeT            *d_scanned_edges,
+        unsigned int                            *d_scanned_edges,
         unsigned int                            *partition_starts,
         unsigned int                            num_partitions,
         volatile int                            *d_done,
@@ -545,7 +586,7 @@ void RelaxLightEdges(
         int                             label,
         typename KernelPolicy::SizeT    *d_row_offsets,
         typename KernelPolicy::VertexId *d_column_indices,
-        typename KernelPolicy::SizeT    *d_scanned_edges,
+        unsigned int    *d_scanned_edges,
         volatile int                    *d_done,
         typename KernelPolicy::VertexId *d_queue,
         typename KernelPolicy::VertexId *d_out,
@@ -596,7 +637,7 @@ __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
 void GetEdgeCounts(
                                 typename KernelPolicy::SizeT *d_row_offsets,
                                 typename KernelPolicy::VertexId *d_queue,
-                                typename KernelPolicy::SizeT *d_scanned_edges,
+                                unsigned int *d_scanned_edges,
                                 typename KernelPolicy::SizeT num_elements,
                                 typename KernelPolicy::SizeT max_vertex,
                                 typename KernelPolicy::SizeT max_edge)

@@ -497,8 +497,11 @@ int main( int argc, char** argv)
 		return 1;
 	}
 
-	DeviceInit(args);
-	cudaSetDeviceFlags(cudaDeviceMapHost);
+	//DeviceInit(args);
+	//cudaSetDeviceFlags(cudaDeviceMapHost);
+	int dev = 0;
+    args.GetCmdLineArgument("device", dev);
+    ContextPtr context = mgpu::CreateCudaDevice(dev);
 
 	//srand(0);									// Presently deterministic
 	//srand(time(NULL));
@@ -540,11 +543,11 @@ int main( int argc, char** argv)
 		}
 
 		csr.PrintHistogram();
-
-        ContextPtr context = mgpu::CreateCudaDevice(0);
+		csr.DisplayGraph();
 
 		// Run tests
 		RunTests(csr, args, *context);
+
 
 	} else {
 
