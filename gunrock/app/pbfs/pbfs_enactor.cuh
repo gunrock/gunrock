@@ -267,7 +267,6 @@ class PBFSEnactor : public EnactorBase
                 //
                 // Get Rowoffsets
                 // Use scan to compute edge_offsets for each vertex in the frontier
-                // MarkPartitionSizes
                 // Use sorted sort to compute partition bound for each work-chunk
                 // load edge-expand-partitioned kernel
                 int num_block = (queue_length + EdgeMapPolicy::THREADS - 1)/EdgeMapPolicy::THREADS;
@@ -311,7 +310,7 @@ class PBFSEnactor : public EnactorBase
                 
                 // Edge Expand Kernel
                 {
-                    /*if (output_queue_len < EdgeMapPolicy::LIGHT_EDGE_THRESHOLD)
+                    if (output_queue_len < EdgeMapPolicy::LIGHT_EDGE_THRESHOLD)
                     {
                         gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< num_block, EdgeMapPolicy::THREADS >>>(
                                         queue_reset,
@@ -331,22 +330,17 @@ class PBFSEnactor : public EnactorBase
                                         work_progress,
                                         this->edge_map_kernel_stats);
                     }
-                    else*/
+                    else
                     {
 
                         unsigned int split_val = (output_queue_len + EdgeMapPolicy::BLOCKS - 1) / EdgeMapPolicy::BLOCKS;
-                        num_block = (EdgeMapPolicy::BLOCKS + EdgeMapPolicy::THREADS - 1)/EdgeMapPolicy::THREADS;
-                        gunrock::oprtr::edge_map_partitioned::MarkPartitionSizes<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< num_block, EdgeMapPolicy::THREADS >>>(
-                                        d_node_locks,
-                                        split_val,
-                                        EdgeMapPolicy::BLOCKS);
+                        util::MemsetIdxKernel<<<128, 128>>>(d_node_locks, EdgeMapPolicy::BLOCKS, split_val);
                         SortedSearch<MgpuBoundsLower>(d_node_locks, EdgeMapPolicy::BLOCKS, problem->data_slices[0]->d_scanned_edges, queue_length, d_node_locks_out, context);
                         /*printf("scanned edge:\n");
                         util::DisplayDeviceResults(problem->data_slices[0]->d_scanned_edges, queue_length);
                         printf("split val:\n");
                         util::DisplayDeviceResults(d_node_locks, EdgeMapPolicy::BLOCKS);
                         util::DisplayDeviceResults(d_node_locks_out, EdgeMapPolicy::BLOCKS);*/
-
 
                          gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges<EdgeMapPolicy, PBFSProblem, BfsFunctor> <<< EdgeMapPolicy::BLOCKS, EdgeMapPolicy::THREADS >>>(
                                         queue_reset,
@@ -356,7 +350,6 @@ class PBFSEnactor : public EnactorBase
                                         graph_slice->d_column_indices,
                                         problem->data_slices[0]->d_scanned_edges,
                                         d_node_locks_out,
-                                        //thrust::raw_pointer_cast(&needle_output[0]),
                                         EdgeMapPolicy::BLOCKS,
                                         d_done,
                                         graph_slice->frontier_queues.d_keys[selector],
@@ -493,7 +486,7 @@ class PBFSEnactor : public EnactorBase
                 0,                                  // SATURATION QUIT
                 true,                               // DEQUEUE_PROBLEM_SIZE
                 8,                                  // MIN_CTA_OCCUPANCY
-                6,                                  // LOG_THREADS
+                7,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
@@ -504,8 +497,8 @@ class PBFSEnactor : public EnactorBase
                 PBFSProblem,                        // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                7,                                  // LOG_THREADS
+                1,                                  // MIN_CTA_OCCUPANCY
+                10,                                  // LOG_THREADS
                 8,                                  // LOG_BLOCKS
                 32 * 1024>                          // LIGHT_EDGE_THRESHOLD
                 EdgeMapPolicy;

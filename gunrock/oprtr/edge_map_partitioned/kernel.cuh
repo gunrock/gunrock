@@ -26,8 +26,6 @@ namespace edge_map_partitioned {
 
 // GetRowOffsets
 //
-// MarkPartitionSize
-//
 // RelaxPartitionedEdges
 
 /**
@@ -63,13 +61,6 @@ struct Dispatch
                                 SizeT &num_elements,
                                 SizeT &max_vertex,
                                 SizeT &max_edge)
-    {
-    }
-
-    static __device__ __forceinline__ void MarkPartitionSizes(
-                                unsigned int *&needles,
-                                unsigned int &split_val,
-                                int &size)
     {
     }
 
@@ -153,19 +144,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         VertexId v_id = d_queue[my_id];
         SizeT num_edges = GetNeighborListLength(d_row_offsets, v_id, max_vertex, max_edge);
         d_scanned_edges[my_id] = num_edges;
-    }
-
-    static __device__ __forceinline__ void MarkPartitionSizes(
-                                unsigned int *&needles,
-                                unsigned int &split_val,
-                                int &size)
-    {
-        int my_id = threadIdx.x + blockIdx.x*blockDim.x;
-
-        if (my_id >= size)
-            return;
-
-        needles[my_id] = split_val * my_id;
     }
 
     static __device__ __forceinline__ void RelaxPartitionedEdges(
@@ -649,31 +627,6 @@ void GetEdgeCounts(
                                     num_elements,
                                     max_vertex,
                                     max_edge);
-}
-
-/**
- * @brief Kernel entry for computing partition splitter indices
- *
- * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
- * @tparam ProblemData Problem data type for partitioned edge mapping.
- * @tparam Functor Functor type for the specific problem type.
- *
- * @param[out] needles              Device pointer of the partition splitter indices queue
- * @param[in] split_val             Partition size
- * @param[in] size                  Length of the partition splitter indices queue
- */
-template <typename KernelPolicy, typename ProblemData, typename Functor>
-__launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
-    __global__
-void MarkPartitionSizes(
-                                unsigned int *needles,
-                                unsigned int split_val,
-                                int size)
-{
-    Dispatch<KernelPolicy, ProblemData, Functor>::MarkPartitionSizes(
-                                    needles,
-                                    split_val,
-                                    size);
 }
 
 } //edge_map_partitioned

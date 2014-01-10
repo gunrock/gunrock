@@ -54,11 +54,11 @@ __global__ void MemsetKernel(T *d_out, T value, int length)
  * @param[in] length Vector length
  */
 template <typename T>
-__global__ void MemsetIdxKernel(T *d_out, int length)
+__global__ void MemsetIdxKernel(T *d_out, int length, int scale=1)
 {
     const int STRIDE = gridDim.x * blockDim.x;
     for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x; idx < length; idx += STRIDE) {
-        d_out[idx] = idx;
+        d_out[idx] = idx*scale;
     }
 }
 
