@@ -31,11 +31,14 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct SweepPass
 {
     static __device__ __forceinline__ void Invoke(
+        typename KernelPolicy::VertexId         &iteration,
         typename KernelPolicy::VertexId         &queue_index,
         int                                     &num_gpus,
         typename KernelPolicy::VertexId         *&d_in,
+        typename KernelPolicy::VertexId         *&d_pred_in,
         typename KernelPolicy::VertexId         *&d_out,
         typename ProblemData::DataSlice         *&problem,
+        unsigned int                            *&d_visited_mask,
         typename KernelPolicy::SmemStorage      &smem_storage,
         util::CtaWorkProgress                   &work_progress,
         util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition,
@@ -57,12 +60,15 @@ struct SweepPass
 
         // CTA processing abstraction
         Cta cta(
+            iteration,
             queue_index,
             num_gpus,
             smem_storage,
             d_in,
+            d_pred_in,
             d_out,
             problem,
+            d_visited_mask,
             work_progress,
             max_out_frontier);
 
@@ -101,14 +107,17 @@ struct Dispatch
     typedef typename ProblemData::DataSlice DataSlice;
 
     static __device__ __forceinline__ void Kernel(
+        VertexId                    &iteration,
         bool                        &queue_reset,
         VertexId                    &queue_index,
         int                         &num_gpus,
         SizeT                       &num_elements,
         volatile int                *&d_done,
         VertexId                    *&d_in,
+        VertexId                    *&d_pred_in,
         VertexId                    *&d_out,
         DataSlice                   *&problem,
+        unsigned int                *&d_visited_mask,
         util::CtaWorkProgress       &work_progress,
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
@@ -130,14 +139,17 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     typedef typename ProblemData::DataSlice DataSlice;
 
     static __device__ __forceinline__ void Kernel(
+        VertexId                    &iteration,
         bool                        &queue_reset,
         VertexId                    &queue_index,
         int                         &num_gpus,
         SizeT                       &num_elements,
         volatile int                *&d_done,
         VertexId                    *&d_in,
+        VertexId                    *&d_pred_in,
         VertexId                    *&d_out,
         DataSlice                   *&problem,
+        unsigned int                *&d_visited_mask,
         util::CtaWorkProgress       &work_progress,
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
@@ -198,11 +210,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         __syncthreads();
 
         SweepPass<KernelPolicy, ProblemData, Functor>::Invoke(
+                iteration,
                 queue_index,
                 num_gpus,
                 d_in,
+                d_pred_in,
                 d_out,
                 problem,
+                d_visited_mask,
                 smem_storage,
                 work_progress,
                 smem_storage.state.work_decomposition,
@@ -222,14 +237,17 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @tparam ProblemData Problem data type for the vertex mapping.
  * @tparam Functor Functor type for the specific problem type.
  *
+ * @param[in] iteration     Current graph traversal iteration
  * @param[in] queue_reset   If reset queue counter
  * @param[in] queue_index   Current frontier queue counter index
  * @param[in] num_gpus      Number of GPUs
  * @param[in] num_elements  Number of elements
  * @param[in] d_done        pointer of volatile int to the flag to set when we detect incoming frontier is empty
  * @param[in] d_in_queue    pointer of VertexId to the incoming frontier queue
+ * @param[in] d_in_predecessor_queue pointer of VertexId to the incoming predecessor queue (only used when both mark_predecessor and enable_idempotence are set)
  * @param[in] d_out_queue   pointer of VertexId to the outgoing frontier queue
  * @param[in] problem       Device pointer to the problem object
+ * @param[in] d_visited_mask Device pointer to the visited mask queue
  * @param[in] work_progress queueing counters to record work progress
  * @param[in] max_in_queue  Maximum number of elements we can place into the incoming frontier
  * @param[in] max_out_queue Maximum number of elements we can place into the outgoing frontier
@@ -239,28 +257,34 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
 __global__
 void Kernel(
+    typename KernelPolicy::VertexId         iteration,
     bool                                    queue_reset,
     typename KernelPolicy::VertexId         queue_index,                
     int                                     num_gpus,                  
     typename KernelPolicy::SizeT            num_elements,             
     volatile int                            *d_done,                 
     typename KernelPolicy::VertexId         *d_in_queue,            
+    typename KernelPolicy::VertexId         *d_in_predecessor_queue,
     typename KernelPolicy::VertexId         *d_out_queue,          
     typename ProblemData::DataSlice         *problem,
+    unsigned int                            *d_visited_mask,
     util::CtaWorkProgress                   work_progress,        
     typename KernelPolicy::SizeT            max_in_queue,        
     typename KernelPolicy::SizeT            max_out_queue,      
     util::KernelRuntimeStats                kernel_stats)      
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
+        iteration,
         queue_reset,
         queue_index,
         num_gpus,
         num_elements,
         d_done,
         d_in_queue,
+        d_in_predecessor_queue,
         d_out_queue,
         problem,
+        d_visited_mask.
         work_progress,
         max_in_queue,
         max_out_queue,

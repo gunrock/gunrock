@@ -37,6 +37,7 @@ struct Sweep
         int                                     &num_gpus,
         int                                     &label,
         typename KernelPolicy::VertexId         *&d_in_queue,
+        typename KernelPolicy::VertexId         *&d_pred_out,
         typename KernelPolicy::VertexId         *&d_out_queue,
         typename KernelPolicy::VertexId         *&d_column_indices,
         typename ProblemData::DataSlice         *&problem,
@@ -66,6 +67,7 @@ struct Sweep
                 label,
                 smem_storage,
                 d_in_queue,
+                d_pred_out,
                 d_out_queue,
                 d_column_indices,
                 problem,
@@ -113,6 +115,7 @@ struct Dispatch
         SizeT                       &num_elements,
         volatile int                *&d_done,
         VertexId                    *&d_in_queue,
+        VertexId                    *&d_pred_out,
         VertexId                    *&d_out_queue,
         VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
@@ -144,6 +147,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         SizeT                       &num_elements,
         volatile int                *&d_done,
         VertexId                    *&d_in_queue,
+        VertexId                    *&d_pred_out,
         VertexId                    *&d_out_queue,
         VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
@@ -211,6 +215,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 num_gpus,
                 label,
                 d_in_queue,
+                d_pred_out,
                 d_out_queue, 
                 d_column_indices,
                 problem,
@@ -241,6 +246,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @param[in] num_elements      Number of elements
  * @param[in] d_done            Pointer of volatile int to the flag to set when we detect incoming frontier is empty
  * @param[in] d_in_queue        Device pointer of VertexId to the incoming frontier queue
+ * @param[in] d_pred_out         Device pointer of VertexId to the outgoing predecessor queue (only used when both mark_pred and enable_idempotence are set)
  * @param[in] d_out_queue       Device pointer of VertexId to the outgoing frontier queue
  * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue  
  * @param[in] problem           Device pointer to the problem object
@@ -260,6 +266,7 @@ void Kernel(
         typename KernelPolicy::SizeT            num_elements,
         volatile int                            *d_done, 
         typename KernelPolicy::VertexId         *d_in_queue,
+        typename KernelPolicy::VertexId         *d_pred_out,
         typename KernelPolicy::VertexId         *d_out_queue,
         typename KernelPolicy::VertexId         *d_column_indices,
         typename ProblemData::DataSlice         *problem,
@@ -276,6 +283,7 @@ void Kernel(
             num_elements,
             d_done,
             d_in_queue,
+            d_pred_out,
             d_out_queue,
             d_column_indices,
             problem,

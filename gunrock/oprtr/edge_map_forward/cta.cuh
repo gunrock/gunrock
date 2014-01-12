@@ -86,6 +86,7 @@ namespace edge_map_forward {
 
             // Input and output device pointers
             VertexId                *d_in;                      // Incoming frontier
+            VertexId                *d_pred_out;                 // Incoming predecessor frontier
             VertexId                *d_out;                     // Outgoing frontier
             VertexId                *d_column_indices;
             DataSlice               *problem;                   // Problem Data
@@ -267,6 +268,11 @@ namespace edge_map_forward {
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                     neighbor_id,
                                                     cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS) {
+                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                            pred_id,
+                                                            cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                }
                                             }
                                             else {
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -295,6 +301,11 @@ namespace edge_map_forward {
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                     neighbor_id,
                                                     cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS) {
+                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                            pred_id,
+                                                            cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                }
                                             }
                                             else {
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -365,8 +376,14 @@ namespace edge_map_forward {
                                                 // if Cond(neighbor_id) returns true
                                                 // if Cond(neighbor_id) returns false or Apply returns false
                                                 // set neighbor_id to -1 for invalid 
-                                                if (Functor::CondEdge(pred_id, neighbor_id, cta->problem))
+                                                if (Functor::CondEdge(pred_id, neighbor_id, cta->problem)) {
                                                     Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
+                                                    if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS) {
+                                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                pred_id,
+                                                                cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                    }
+                                                }
                                                 else
                                                     neighbor_id = -1;
 
@@ -390,8 +407,14 @@ namespace edge_map_forward {
                                                 // if Cond(neighbor_id) returns true
                                                 // if Cond(neighbor_id) returns false or Apply returns false
                                                 // set neighbor_id to -1 for invalid                                            
-                                                if (Functor::CondEdge(pred_id, neighbor_id, cta->problem))
+                                                if (Functor::CondEdge(pred_id, neighbor_id, cta->problem)) {
                                                     Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
+                                                    if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS) {
+                                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                pred_id,
+                                                                cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                    }
+                                                }
                                                 else
                                                     neighbor_id = -1;
 
@@ -555,6 +578,7 @@ namespace edge_map_forward {
                     int                         label,
                     SmemStorage                 &smem_storage,
                     VertexId                    *d_in_queue,
+                    VertexId                    *d_pred_out,
                     VertexId                    *d_out_queue,
                     VertexId                    *d_column_indices,
                     DataSlice                   *problem,
@@ -574,6 +598,7 @@ namespace edge_map_forward {
                             smem_storage.state.fine_warpscan),
                         TileTuple(0,0)),
                 d_in(d_in_queue),
+                d_pred_in(d_pred_out),
                 d_out(d_out_queue),
                 d_column_indices(d_column_indices),
                 problem(problem),
@@ -704,6 +729,12 @@ namespace edge_map_forward {
                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                 neighbor_id,
                                 d_out + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+
+                        if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS) {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    predecessor_id,
+                                    d_pred_out + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                        }
                     }
 
                     tile.progress += SmemStorage::GATHER_ELEMENTS;

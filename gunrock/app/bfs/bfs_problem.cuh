@@ -35,12 +35,15 @@ template <
     typename    SizeT,                          
     typename    Value,                          
     bool        _MARK_PREDECESSORS,             
+    bool        _ENABLE_IDEMPOTENCE,
     bool        _USE_DOUBLE_BUFFER>
 struct BFSProblem : ProblemBase<VertexId, SizeT,
                                 _USE_DOUBLE_BUFFER>
 {
 
     static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
+    static const bool ENABLE_IDEMPOTENCE    = _ENABLE_IDEMPOTENCE;
+    static const bool USE_DOUBLE_BUFFER     = (_ENABLE_IDEMPOTENCE && _MARK_PREDECESSORS) || _USE_DOUBLE_BUFFER;    // If enable idempotence and mark predecessor, then must use double buffer (for predecessor)
     
 
     //Helper structures
@@ -188,7 +191,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
         VertexId *h_row_offsets = graph.row_offsets;
         VertexId *h_column_indices = graph.column_indices;
         ProblemBase<VertexId, SizeT,
-                                _USE_DOUBLE_BUFFER>::Init(stream_from_host,
+                                USE_DOUBLE_BUFFER>::Init(stream_from_host,
                                         nodes,
                                         edges,
                                         h_row_offsets,
@@ -256,7 +259,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
             double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
     {
         typedef ProblemBase<VertexId, SizeT,
-                                _USE_DOUBLE_BUFFER> BaseProblem;
+                                USE_DOUBLE_BUFFER> BaseProblem;
         //load ProblemBase Reset
         BaseProblem::Reset(frontier_type, queue_sizing);
 
