@@ -241,8 +241,8 @@ struct Cta
                             // ApplyVertex(row_id)
                             Functor::ApplyVertex(row_id, cta->problem);
                         }
+                        else tile->vertex_id[LOAD][VEC] = -1;
                     }
-                    else tile->vertex_id[LOAD][VEC] = -1;
                 }
 
                 // Next

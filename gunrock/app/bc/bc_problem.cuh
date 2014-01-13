@@ -43,6 +43,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
     typedef _Value          Value;
 
     static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
+    static const bool ENABLE_IDEMPOTENCE    = false;
     
     //Helper structures
     

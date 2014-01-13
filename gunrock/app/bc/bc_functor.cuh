@@ -25,7 +25,7 @@ namespace bc {
  * @brief Structure contains device functions in forward traversal pass.
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32
  * @tparam Value               Type of float or double to use for computing BC value.
  * @tparam ProblemData         Problem data type which contains data slice for BC problem
  *
@@ -110,7 +110,7 @@ struct ForwardFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
+    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
         return node != -1;
     }
@@ -122,7 +122,7 @@ struct ForwardFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
+    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
         // Doing nothing here
     }
@@ -206,7 +206,7 @@ struct BackwardFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
+    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
         return problem->d_labels[node] == 0;
     }
@@ -218,7 +218,7 @@ struct BackwardFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
+    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
         // Doing nothing here
     }

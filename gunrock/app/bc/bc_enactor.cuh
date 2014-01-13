@@ -278,6 +278,7 @@ class BCEnactor : public EnactorBase
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
+                    NULL,
                     graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
                     graph_slice->d_column_indices,
                     data_slice,
@@ -325,14 +326,17 @@ class BCEnactor : public EnactorBase
                 // Vertex Map
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, BCProblem, ForwardFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                    0,
                     queue_reset,
                     queue_index,
                     1,
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                    NULL,
                     graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                     data_slice,
+                    NULL,
                     work_progress,
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -392,14 +396,17 @@ class BCEnactor : public EnactorBase
                 // Vertex Map
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, BCProblem, BackwardFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                    0,
                     queue_reset,
                     queue_index,
                     1,
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                    NULL,
                     graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                     data_slice,
+                    NULL,
                     work_progress,
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -451,6 +458,7 @@ class BCEnactor : public EnactorBase
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
+                    NULL,                                                       // d_out_pred
                     graph_slice->frontier_queues.d_keys[selector],            // d_out_queue
                     graph_slice->d_column_indices,
                     data_slice,
@@ -534,6 +542,7 @@ class BCEnactor : public EnactorBase
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
+                0,                                  // END BIT_MASK (no bitmask cull in BC)
                 8>                                  // LOG_SCHEDULE_GRANULARITY
                 VertexMapPolicy;
 
