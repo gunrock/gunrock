@@ -107,7 +107,7 @@ struct BFSFunctor
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
         if (ProblemData::ENABLE_IDEMPOTENCE) {
-            util::io::ModifiedStore<util::io::st::cg>::Ld(
+            util::io::ModifiedStore<util::io::st::cg>::St(
                     v, problem->d_labels + node);
         } else {
         // Doing nothing here

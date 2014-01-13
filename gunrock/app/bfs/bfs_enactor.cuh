@@ -118,8 +118,9 @@ class BFSEnactor : public EnactorBase
 
             //graph slice
             typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
+            typename ProblemData::DataSlice *data_slice = problem->data_slices[0];
 
-            // Bind row-offsets and column_indices texture
+            // Bind row-offsets and bitmask texture
             cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
             if (retval = util::GRError(cudaBindTexture(
                     0,
@@ -128,6 +129,18 @@ class BFSEnactor : public EnactorBase
                     row_offsets_desc,
                     (graph_slice->nodes + 1) * sizeof(SizeT)),
                         "BFSEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
+
+            if (ProblemData::ENABLE_IDEMPOTENCE) {
+                int bytes = (graph_slice->nodes + 8 - 1) / 8;
+                cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
+                if (retval = util::GRError(cudaBindTexture(
+                                0,
+                                gunrock::oprtr::vertex_map::BitmaskTex<unsigned char>::ref,
+                                data_slice->d_visited_mask,
+                                bitmask_desc,
+                                bytes),
+                            "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
+            }
 
             /*cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
             if (retval = util::GRError(cudaBindTexture(
@@ -226,6 +239,7 @@ class BFSEnactor : public EnactorBase
         typedef BFSFunctor<
             VertexId,
             SizeT,
+            VertexId,
             BFSProblem> BfsFunctor;
 
         cudaError_t retval = cudaSuccess;
@@ -340,6 +354,7 @@ class BFSEnactor : public EnactorBase
                 // Vertex Map
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, BFSProblem, BfsFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                    iteration+1,
                     queue_reset,
                     queue_index,
                     1,
@@ -349,6 +364,7 @@ class BFSEnactor : public EnactorBase
                     graph_slice->frontier_queues.d_values[selector],    // d_pred_in_queue
                     graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                     data_slice,
+                    problem->data_slices[0]->d_visited_mask,
                     work_progress,
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -431,6 +447,7 @@ class BFSEnactor : public EnactorBase
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
+                5,                                  // END_BITMASK_CULL
                 8>                                  // LOG_SCHEDULE_GRANULARITY
                 VertexMapPolicy;
 

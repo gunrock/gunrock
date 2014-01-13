@@ -29,8 +29,6 @@
 #include <gunrock/app/bfs/bfs_problem.cuh>
 #include <gunrock/app/bfs/bfs_functor.cuh>
 
-#include <gunrock/app/pbfs/pbfs_enactor.cuh>
-
 // Operator includes
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/vertex_map/kernel.cuh>
@@ -292,7 +290,8 @@ template <
     typename Value,
     typename SizeT,
     bool INSTRUMENT,
-    bool MARK_PREDECESSORS>
+    bool MARK_PREDECESSORS,
+    bool ENABLE_IDEMPOTENCE>
 void RunTests(
     const Csr<VertexId, Value, SizeT> &graph,
     VertexId src,
@@ -300,13 +299,13 @@ void RunTests(
     int num_gpus,
     double max_queue_sizing)
 {
-    
-    typedef BFSProblem<
-        VertexId,
-        SizeT,
-        Value,
-        MARK_PREDECESSORS,
-        false> Problem; // does not use double buffer
+        typedef BFSProblem<
+            VertexId,
+            SizeT,
+            Value,
+            MARK_PREDECESSORS,
+            ENABLE_IDEMPOTENCE,
+            (MARK_PREDECESSORS && ENABLE_IDEMPOTENCE)> Problem; // does not use double buffer
 
         // Allocate host-side label array (for both reference and gpu-computed results)
         VertexId    *reference_labels       = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
@@ -414,6 +413,7 @@ void RunTests(
     std::string         src_str;
     bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
     bool                mark_pred           = false;        // Whether or not to mark src-distance vs. parent vertices
+    bool                idempotence         = false;        // Whether or not to enable idempotence operation
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
     int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
     double              max_queue_sizing    = 1.0;          // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
@@ -435,40 +435,77 @@ void RunTests(
 
     g_quick = args.CheckCmdLineFlag("quick");
     mark_pred = args.CheckCmdLineFlag("mark-pred");
+    idempotence = args.CheckCmdLineFlag("idempotence");
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
     g_verbose = args.CheckCmdLineFlag("v");
 
     if (instrumented) {
         if (mark_pred) {
-            RunTests<VertexId, Value, SizeT, true, true>(
-                graph,
-                src,
-                max_grid_size,
-                num_gpus,
-                max_queue_sizing);
+            if (idempotence) {
+                RunTests<VertexId, Value, SizeT, true, true, true>(
+                        graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing);
+            } else {
+                RunTests<VertexId, Value, SizeT, true, true, false>(
+                        graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing);
+            }
         } else {
-            RunTests<VertexId, Value, SizeT, true, false>(
-                graph,
-                src,
-                max_grid_size,
-                num_gpus,
-                max_queue_sizing);
+            if (idempotence) {
+                RunTests<VertexId, Value, SizeT, true, false, true>(
+                        graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing);
+            } else {
+                RunTests<VertexId, Value, SizeT, true, false, false>(
+                        graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing);
+            }
         }
     } else {
         if (mark_pred) {
-            RunTests<VertexId, Value, SizeT, false, true>(
-                graph,
-                src,
-                max_grid_size,
-                num_gpus,
-                max_queue_sizing);
+            if (idempotence) {
+                RunTests<VertexId, Value, SizeT, false, true, true>(
+                        graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing);
+            } else {
+                RunTests<VertexId, Value, SizeT, false, true, false>(
+                        graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing);
+            }
         } else {
-            RunTests<VertexId, Value, SizeT, false, false>(
-                graph,
-                src,
-                max_grid_size,
-                num_gpus,
-                max_queue_sizing);
+            if (idempotence) {
+                RunTests<VertexId, Value, SizeT, false, false, true>(
+                        graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing);
+            } else {
+                RunTests<VertexId, Value, SizeT, false, false, false>(
+                        graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing);
+            }
         }
     }
 
@@ -532,6 +569,7 @@ int main( int argc, char** argv)
 		}
 
 		csr.PrintHistogram();
+		csr.DisplayGraph();
 
 		// Run tests
 		RunTests(csr, args);

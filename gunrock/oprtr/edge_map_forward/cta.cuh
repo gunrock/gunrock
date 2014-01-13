@@ -598,7 +598,7 @@ namespace edge_map_forward {
                             smem_storage.state.fine_warpscan),
                         TileTuple(0,0)),
                 d_in(d_in_queue),
-                d_pred_in(d_pred_out),
+                d_pred_out(d_pred_out),
                 d_out(d_out_queue),
                 d_column_indices(d_column_indices),
                 problem(problem),

@@ -28,6 +28,7 @@ namespace bfs {
  * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
  * @tparam _Value               Type of float or double to use for computing BC value.
  * @tparam _MARK_PREDECESSORS   Boolean type parameter which defines whether to mark predecessor value for each node.
+ * @tparam _ENABLE_IDEMPOTENCE  Boolean type parameter which defines whether to enable idempotence operation for graph traverse.
  * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer.
  */
 template <
@@ -43,8 +44,6 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
 
     static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
     static const bool ENABLE_IDEMPOTENCE    = _ENABLE_IDEMPOTENCE;
-    static const bool USE_DOUBLE_BUFFER     = (_ENABLE_IDEMPOTENCE && _MARK_PREDECESSORS) || _USE_DOUBLE_BUFFER;    // If enable idempotence and mark predecessor, then must use double buffer (for predecessor)
-    
 
     //Helper structures
 
@@ -56,6 +55,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
         // device storage arrays
         VertexId        *d_labels;              /**< Used for source distance */
         VertexId        *d_preds;               /**< Used for predecessor */
+        unsigned char   *d_visited_mask;        /**< Used for bitmask for visited nodes */
     };
 
     // Members
@@ -117,6 +117,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                 "~BFSProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
             if (data_slices[i]->d_labels)      util::GRError(cudaFree(data_slices[i]->d_labels), "GpuSlice cudaFree d_labels failed", __FILE__, __LINE__);
             if (data_slices[i]->d_preds)      util::GRError(cudaFree(data_slices[i]->d_preds), "GpuSlice cudaFree d_preds failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_visited_mask)      util::GRError(cudaFree(data_slices[i]->d_visited_mask), "GpuSlice cudaFree d_visited_mask failed", __FILE__, __LINE__);
             if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
         }
         if (d_data_slices)  delete[] d_data_slices;
@@ -190,13 +191,12 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
         edges = graph.edges;
         VertexId *h_row_offsets = graph.row_offsets;
         VertexId *h_column_indices = graph.column_indices;
-        ProblemBase<VertexId, SizeT,
-                                USE_DOUBLE_BUFFER>::Init(stream_from_host,
-                                        nodes,
-                                        edges,
-                                        h_row_offsets,
-                                        h_column_indices,
-                                        num_gpus);
+            ProblemBase<VertexId, SizeT, _USE_DOUBLE_BUFFER>::Init(stream_from_host,
+                    nodes,
+                    edges,
+                    h_row_offsets,
+                    h_column_indices,
+                    num_gpus);
 
         // No data in DataSlice needs to be copied from host
 
@@ -237,6 +237,16 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                     "BFSProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
                 }
                 data_slices[0]->d_preds = d_preds;
+
+                unsigned char *d_visited_mask = NULL;
+                int visited_mask_bytes  = ((nodes * sizeof(unsigned char))+7)/8;
+                if (_ENABLE_IDEMPOTENCE) {
+                    if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_visited_mask,
+                        visited_mask_bytes),
+                    "BFSProblem cudaMalloc d_visited_mask failed", __FILE__, __LINE__)) return retval;
+                }
+                data_slices[0]->d_visited_mask = d_visited_mask;
             }
             //TODO: add multi-GPU allocation code
         } while (0);
@@ -258,8 +268,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
             FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
             double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
     {
-        typedef ProblemBase<VertexId, SizeT,
-                                USE_DOUBLE_BUFFER> BaseProblem;
+        typedef ProblemBase<VertexId, SizeT, _USE_DOUBLE_BUFFER> BaseProblem;
         //load ProblemBase Reset
         BaseProblem::Reset(frontier_type, queue_sizing);
 
@@ -291,10 +300,15 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                             "BFSProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_preds = d_preds;
             }
-            
+
             if (_MARK_PREDECESSORS)
                 util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_preds, -2, nodes);
 
+            if (_ENABLE_IDEMPOTENCE) {
+                int visited_mask_bytes  = ((nodes * sizeof(unsigned char))+7)/8;
+                int visited_mask_elements = visited_mask_bytes * sizeof(unsigned char);
+                util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_visited_mask, (unsigned char)0, visited_mask_elements);
+            }
                 
             if (retval = util::GRError(cudaMemcpy(
                             d_data_slices[gpu],

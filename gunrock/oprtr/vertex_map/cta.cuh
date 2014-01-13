@@ -32,6 +32,17 @@ namespace gunrock {
 namespace oprtr {
 namespace vertex_map {
 
+/**
+* Templated texture reference for visited mask
+*/
+template <typename VisitedMask>
+struct BitmaskTex
+{
+   static texture<VisitedMask, cudaTextureType1D, cudaReadModeElementType> ref;
+};
+template <typename VisitedMask>
+texture<VisitedMask, cudaTextureType1D, cudaReadModeElementType> BitmaskTex<VisitedMask>::ref;
+
 
 /**
  * @brief CTA tile-processing abstraction for the vertex mapping operator.
@@ -65,7 +76,7 @@ struct Cta
     VertexId                *d_pred_in;                 // Incoming predecessor frontier
     VertexId                *d_out;                     // Outgoing vertex frontier
     DataSlice               *problem;                   // Problem data
-    unsigned int            *d_visited_mask;            // Mask for detecting visited status
+    unsigned char           *d_visited_mask;            // Mask for detecting visited status
 
     // Work progress
     VertexId                iteration;                  // Current graph traversal iteration
@@ -155,23 +166,23 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                if (tile->vertex_id[LOAD][VEC] != -1) {
+                if (tile->vertex_id[LOAD][VEC] >= 0) {
                     // Location of mask byte to read
                     SizeT mask_byte_offset = (tile->vertex_id[LOAD][VEC] & KernelPolicy::VERTEX_ID_MASK) >> 3;
 
                     // Bit in mask byte corresponding to current vertex id
-                    unsigned int mask_bit = 1 << (tile->vertex_id[LOAD][VEC] & 7);
+                    unsigned char mask_bit = 1 << (tile->vertex_id[LOAD][VEC] & 7);
 
                     // Read byte from visited mask in tex
-                    unsigned int tex_mask_byte = tex1Dfetch(
-                        BitmaskTex<unsigned int>::ref,
+                    unsigned char tex_mask_byte = tex1Dfetch(
+                        BitmaskTex<unsigned char>::ref,
                         mask_byte_offset);
 
                     if (mask_bit & tex_mask_byte) {
                         // Seen it
                         tile->vertex_id[LOAD][VEC] = -1;
                     } else {
-                        unsigned int mask_byte;
+                        unsigned char mask_byte;
                         util::io::ModifiedLoad<util::io::ld::cg>::Ld(
                             mask_byte, cta->d_visited_mask + mask_byte_offset);
 
@@ -202,20 +213,33 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                if (tile->vertex_id[LOAD][VEC] >= 0) {
-                    // Row index on our GPU (for multi-gpu, vertex ids are striped across GPUs)
-                    VertexId row_id = (tile->vertex_id[LOAD][VEC]) / cta->num_gpus;
+                if (ProblemData::ENABLE_IDEMPOTENCE) {
+                    if (tile->vertex_id[LOAD][VEC] >= 0) {
+                        VertexId row_id = (tile->vertex_id[LOAD][VEC]&KernelPolicy::VERTEX_ID_MASK)/cta->num_gpus;
 
-                    if (Functor::CondVertex(row_id, cta->problem)) {
-                        // ApplyVertex(row_id)
-                        if (!ProblemData::ENABLE_IDEMPOTENCE) {
-                            Functor::ApplyVertex(row_id, cta->problem);
+                        VertexId label;
+                        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                                    label,
+                                                    cta->problem->d_labels + row_id);
+                        if (label != -1) {
+                            // Seen it
+                            tile->vertex_id[LOAD][VEC] = -1;
                         } else {
                             if (ProblemData::MARK_PREDECESSORS) {
                                 Functor::ApplyVertex(row_id, cta->problem, tile->pred_id[LOAD][VEC]);
                             } else {
-                                Functor::ApplyVertex(row_id, cta->problem, iteration);
+                                Functor::ApplyVertex(row_id, cta->problem, cta->iteration);
                             }
+                        }
+                    }
+                } else {
+                    if (tile->vertex_id[LOAD][VEC] >= 0) {
+                        // Row index on our GPU (for multi-gpu, vertex ids are striped across GPUs)
+                        VertexId row_id = (tile->vertex_id[LOAD][VEC]) / cta->num_gpus;
+
+                        if (Functor::CondVertex(row_id, cta->problem)) {
+                            // ApplyVertex(row_id)
+                            Functor::ApplyVertex(row_id, cta->problem);
                         }
                     }
                     else tile->vertex_id[LOAD][VEC] = -1;
@@ -258,9 +282,9 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                if (tile->vertex_id[LOAD][VEC] != -1) {
+                if (tile->vertex_id[LOAD][VEC] >= 0) {
                     int warp_id = threadIdx.x >> 5;
-                    int hash    = tile->vertex_id[LOAD][VEC] & (smem_storage::WARP_HASH_ELEMENTS - 1);
+                    int hash    = tile->vertex_id[LOAD][VEC] & (SmemStorage::WARP_HASH_ELEMENTS - 1);
 
                     cta->smem_storage.state.vid_hashtable[warp_id][hash] = tile->vertex_id[LOAD][VEC];
                     VertexId retrieved = cta->smem_storage.state.vid_hashtable[warp_id][hash];
@@ -275,7 +299,7 @@ struct Cta
                 }
 
                 // Next
-                Iterate<LOAD, VEC + 1>::WarpCall(cta, tile);
+                Iterate<LOAD, VEC + 1>::WarpCull(cta, tile);
             }
 
         };
@@ -305,10 +329,16 @@ struct Cta
                 Iterate<LOAD + 1, 0>::VertexCull(cta, tile);
             }
 
+            // WarpCull
+            static __device__ __forceinline__ void WarpCull(Cta *cta, Tile *tile)
+            {
+                Iterate<LOAD + 1, 0>::WarpCull(cta, tile);
+            }
+
             // HistoryCull
             static __device__ __forceinline__ void HistoryCull(Cta *cta, Tile *tile)
             {
-                Iterate<LOAD + 1, 0>::WarpCull(cta, tile);
+                Iterate<LOAD + 1, 0>::HistoryCull(cta, tile);
             }
         };
 
@@ -326,7 +356,7 @@ struct Cta
             // BitmaskCull
             static __device__ __forceinline__ void BitmaskCull(Cta *cta, Tile *tile) {}
 
-i           // VertexCull
+            // VertexCull
             static __device__ __forceinline__ void VertexCull(Cta *cta, Tile *tile) {}
             
             // HistoryCull
@@ -393,7 +423,7 @@ i           // VertexCull
         VertexId                *d_pred_in,
         VertexId                *d_out,
         DataSlice               *problem,
-        unsigned int            *d_visited_mask,
+        unsigned char           *d_visited_mask,
         util::CtaWorkProgress   &work_progress,
         SizeT                   max_out_frontier) :
             iteration(iteration),

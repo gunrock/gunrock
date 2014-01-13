@@ -175,6 +175,7 @@ struct KernelPolicy
         SMEM_OCCUPANCY      = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
         CTA_OCCUPANCY       = GR_MIN(_MIN_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
         VALID               = (CTA_OCCUPANCY > 0),
+	    VERTEX_ID_MASK	    = ~(1<<(sizeof(VertexId)*8-2)),								// Bitmask for masking off the upper control bits in vertex identifier
     };
 };
 
