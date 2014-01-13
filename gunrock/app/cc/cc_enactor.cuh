@@ -176,36 +176,43 @@ class CCEnactor : public EnactorBase
         typedef UpdateMaskFunctor<
             VertexId,
             SizeT,
+            VertexId,
             CCProblem> UpdateMaskFunctor;
 
         typedef HookInitFunctor<
             VertexId,
             SizeT,
+            VertexId,
             CCProblem> HookInitFunctor;
 
         typedef HookMinFunctor<
             VertexId,
             SizeT,
+            VertexId,
             CCProblem> HookMinFunctor;
 
         typedef HookMaxFunctor<
             VertexId,
             SizeT,
+            VertexId,
             CCProblem> HookMaxFunctor;
 
         typedef PtrJumpFunctor<
             VertexId,
             SizeT,
+            VertexId,
             CCProblem> PtrJumpFunctor;
 
         typedef PtrJumpMaskFunctor<
             VertexId,
             SizeT,
+            VertexId,
             CCProblem> PtrJumpMaskFunctor;
 
         typedef PtrJumpUnmaskFunctor<
             VertexId,
             SizeT,
+            VertexId,
             CCProblem> PtrJumpUnmaskFunctor;
 
         cudaError_t retval = cudaSuccess;
@@ -235,14 +242,17 @@ class CCEnactor : public EnactorBase
 
             gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookInitFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                        0,  //iteration, not used in CC
                         queue_reset,
                         queue_index,
                         1,
                         num_elements,
                         NULL,//d_done,
                         graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                        NULL,   //pred_queue, not used in CC
                         graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                         data_slice,
+                        NULL,   //d_visited_mask, not used in CC
                         work_progress,
                         graph_slice->frontier_elements[selector],           // max_in_queue
                         graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -269,14 +279,17 @@ class CCEnactor : public EnactorBase
 
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpFunctor>
                     <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                            0,
                             queue_reset,
                             queue_index,
                             1,
                             num_elements,
                             NULL,//d_done,
                             graph_slice->frontier_queues.d_values[selector],      // d_in_queue
+                            NULL,
                             graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
                             data_slice,
+                            NULL,
                             work_progress,
                             graph_slice->frontier_elements[selector],           // max_in_queue
                             graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -309,14 +322,17 @@ class CCEnactor : public EnactorBase
 
             gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, UpdateMaskFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                        0,
                         queue_reset,
                         queue_index,
                         1,
                         num_elements,
                         NULL,//d_done,
                         graph_slice->frontier_queues.d_values[selector],      // d_in_queue
+                        NULL,
                         graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
                         data_slice,
+                        NULL,
                         work_progress,
                         graph_slice->frontier_elements[selector],           // max_in_queue
                         graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -345,14 +361,17 @@ class CCEnactor : public EnactorBase
                     if (iteration & 3) {
                         gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMinFunctor>
                             <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                                    0,
                                     queue_reset,
                                     queue_index,
                                     1,
                                     num_elements,
                                     NULL,//d_done,
                                     graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                                    NULL,
                                     graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                                     data_slice,
+                                    NULL,
                                     work_progress,
                                     graph_slice->frontier_elements[selector],           // max_in_queue
                                     graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -360,14 +379,17 @@ class CCEnactor : public EnactorBase
                     } else {
                         gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMaxFunctor>
                             <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                                    0,
                                     queue_reset,
                                     queue_index,
                                     1,
                                     num_elements,
                                     NULL,//d_done,
                                     graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                                    NULL,
                                     graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                                     data_slice,
+                                    NULL,
                                     work_progress,
                                     graph_slice->frontier_elements[selector],           // max_in_queue
                                     graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -409,14 +431,17 @@ class CCEnactor : public EnactorBase
 
                         gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpMaskFunctor>
                             <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                                    0,
                                     queue_reset,
                                     queue_index,
                                     1,
                                     num_elements,
                                     NULL,//d_done,
                                     graph_slice->frontier_queues.d_values[selector],      // d_in_queue
+                                    NULL,
                                     graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
                                     data_slice,
+                                    NULL,
                                     work_progress,
                                     graph_slice->frontier_elements[selector],           // max_in_queue
                                     graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -445,14 +470,17 @@ class CCEnactor : public EnactorBase
 
                     gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpUnmaskFunctor>
                         <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                                0,
                                 queue_reset,
                                 queue_index,
                                 1,
                                 num_elements,
                                 NULL,//d_done,
                                 graph_slice->frontier_queues.d_values[selector],      // d_in_queue
+                                NULL,
                                 graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
                                 data_slice,
+                                NULL,
                                 work_progress,
                                 graph_slice->frontier_elements[selector],           // max_in_queue
                                 graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -462,14 +490,17 @@ class CCEnactor : public EnactorBase
 
                     gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, UpdateMaskFunctor>
                         <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                                0,
                                 queue_reset,
                                 queue_index,
                                 1,
                                 num_elements,
                                 NULL,//d_done,
                                 graph_slice->frontier_queues.d_values[selector],      // d_in_queue
+                                NULL,
                                 graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
                                 data_slice,
+                                NULL,
                                 work_progress,
                                 graph_slice->frontier_elements[selector],           // max_in_queue
                                 graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -520,6 +551,7 @@ class CCEnactor : public EnactorBase
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
+                0,                                  // END_BITMASK (no bitmask for cc)
                 8>                                  // LOG_SCHEDULE_GRANULARITY
                 VertexMapPolicy;
                 

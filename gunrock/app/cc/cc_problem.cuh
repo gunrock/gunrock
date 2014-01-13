@@ -37,6 +37,8 @@ template <
 struct CCProblem : ProblemBase<VertexId, SizeT,
                                 _USE_DOUBLE_BUFFER>
 {
+    static const bool ENABLE_IDEMPOTENCE    = false;
+    static const bool MARK_PREDECESSORS     = false;
     //Helper structures
 
     /** 
@@ -52,6 +54,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
         VertexId        *d_tos;                         /**< Size equals to edge number, to vertex of one edge */
         int             *d_vertex_flag;                 /**< Finish flag for per-vertex kernels in CC algorithm */
         int             *d_edge_flag;                   /**< Finish flag for per-edge kernels in CC algorithm */
+        VertexId        *d_labels;
     };
 
     // Members
@@ -337,6 +340,8 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
                         sizeof(int)),
                     "CCProblem cudaMalloc d_edge_flag failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_edge_flag = d_edge_flag;
+
+                data_slices[0]->d_labels = NULL;
             }
             //TODO: add multi-GPU allocation code
         } while (0);
