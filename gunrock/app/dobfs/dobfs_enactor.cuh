@@ -121,6 +121,7 @@ class DOBFSEnactor : public EnactorBase
 
             //graph slice
             typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
+            typename ProblemData::DataSlice *data_slice = problem->data_slices[0];
 
             // Bind row-offsets texture
             cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
@@ -131,6 +132,18 @@ class DOBFSEnactor : public EnactorBase
                     row_offsets_desc,
                     (graph_slice->nodes + 1) * sizeof(SizeT)),
                         "BFSEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
+
+            if (ProblemData::ENABLE_IDEMPOTENCE) {
+                int bytes = (graph_slice->nodes + 8 - 1) / 8;
+                cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
+                if (retval = util::GRError(cudaBindTexture(
+                                0,
+                                gunrock::oprtr::vertex_map::BitmaskTex<unsigned char>::ref,
+                                data_slice->d_visited_mask,
+                                bitmask_desc,
+                                bytes),
+                            "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
+            }
 
             /*cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
             if (retval = util::GRError(cudaBindTexture(
@@ -230,27 +243,32 @@ class DOBFSEnactor : public EnactorBase
         typedef PrepareUnvisitedQueueFunctor<
             VertexId,
             SizeT,
+            VertexId,
             DOBFSProblem> UnvisitedQueueFunctor;
 
         typedef PrepareInputFrontierMapFunctor<
             VertexId,
             SizeT,
+            VertexId,
             DOBFSProblem> InputFrontierFunctor;
 
         typedef ReverseBFSFunctor<
             VertexId,
             SizeT,
+            VertexId,
             DOBFSProblem> RBFSFunctor;
 
         typedef SwitchToNormalFunctor<
             VertexId,
             SizeT,
+            VertexId,
             DOBFSProblem> SwitchFunctor;
 
         // Functors for BFS
         typedef gunrock::app::bfs::BFSFunctor<
             VertexId,
             SizeT,
+            VertexId,
             DOBFSProblem> BfsFunctor;
 
         cudaError_t retval = cudaSuccess;
@@ -308,6 +326,7 @@ class DOBFSEnactor : public EnactorBase
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
+                    graph_slice->frontier_queues.d_values[selector^1],          // d_pred_out_queue
                     graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
                     graph_slice->d_column_indices,
                     data_slice,
@@ -355,14 +374,17 @@ class DOBFSEnactor : public EnactorBase
                 // Vertex Map
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, BfsFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                    iteration + 1,
                     queue_reset,
                     queue_index,
                     1,
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                    graph_slice->frontier_queues.d_values[selector],    // d_pred_in_queue
                     graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                     data_slice,
+                    problem->data_slices[0]->d_visited_mask,
                     work_progress,
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -419,14 +441,17 @@ class DOBFSEnactor : public EnactorBase
             // Prepare unvisited queue
             gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, InputFrontierFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                        iteration+1,
                         queue_reset,
                         queue_index,
                         1,
                         num_elements,
                         d_done,
                         graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                        graph_slice->frontier_queues.d_values[selector],    // d_pred_in_queue
                         graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                         data_slice,
+                        problem->data_slices[0]->d_visited_mask,
                         work_progress,
                         graph_slice->frontier_elements[selector],           // max_in_queue
                         graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -440,14 +465,17 @@ class DOBFSEnactor : public EnactorBase
 
             gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, UnvisitedQueueFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                        iteration+1,
                         queue_reset,
                         queue_index,
                         1,
                         num_elements,
                         d_done,
                         problem->data_slices[0]->d_index_queue,             // d_in_queue
+                        graph_slice->frontier_queues.d_values[selector],    // d_pred_in_queue
                         graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                         data_slice,
+                        problem->data_slices[0]->d_visited_mask,
                         work_progress,
                         graph_slice->frontier_elements[selector],           // max_in_queue
                         graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -545,14 +573,17 @@ class DOBFSEnactor : public EnactorBase
                 // Vertex Map
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, RBFSFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                    iteration+1,
                     queue_reset,
                     queue_index,
                     1,
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                    graph_slice->frontier_queues.d_values[selector],  // d_pred_in_queue,
                     graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                     data_slice,
+                    problem->data_slices[0]->d_visited_mask,
                     work_progress,
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -604,14 +635,17 @@ class DOBFSEnactor : public EnactorBase
 
             gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, SwitchFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                        iteration+1,
                         queue_reset,
                         queue_index,
                         1,
                         num_elements,
                         d_done,
                         problem->data_slices[0]->d_index_queue,             // d_in_queue
+                        graph_slice->frontier_queues.d_values[selector^1],  // d_pred_in_queue
                         graph_slice->frontier_queues.d_keys[selector],    // d_out_queue
                         data_slice,
+                        problem->data_slices[0]->d_visited_mask,
                         work_progress,
                         graph_slice->frontier_elements[selector],           // max_in_queue
                         graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -637,6 +671,7 @@ class DOBFSEnactor : public EnactorBase
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
+                    graph_slice->frontier_queues.d_values[selector^1],          // d_pred_out_queue
                     graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
                     graph_slice->d_column_indices,
                     data_slice,
@@ -684,14 +719,17 @@ class DOBFSEnactor : public EnactorBase
                 // Vertex Map
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, BfsFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                    iteration,
                     queue_reset,
                     queue_index,
                     1,
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                    graph_slice->frontier_queues.d_values[selector],    // d_pred_in_queue
                     graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                     data_slice,
+                    problem->data_slices[0]->d_visited_mask,
                     work_progress,
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
@@ -766,6 +804,7 @@ class DOBFSEnactor : public EnactorBase
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
+                0,                                  // END_BIT_MASK
                 8>                                  // LOG_SCHEDULE_GRANULARITY
                 VertexMapPolicy;
                 

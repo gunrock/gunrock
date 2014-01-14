@@ -28,6 +28,7 @@ namespace dobfs {
  * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
  * @tparam _Value               Type of float or double to use for computing BC value.
  * @tparam _MARK_PREDECESSORS   Boolean type parameter which defines whether to mark predecessor value for each node.
+ * @tparam _ENABLE_IDEMPOTENCE  Boolean type parameter which defines whether to enable idempotent operation.
  * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer.
  */
 template <
@@ -35,12 +36,14 @@ template <
     typename    SizeT,                          
     typename    Value,                          
     bool        _MARK_PREDECESSORS,             
+    bool        _ENABLE_IDEMPOTENCE,
     bool        _USE_DOUBLE_BUFFER>
 struct DOBFSProblem : ProblemBase<VertexId, SizeT,
                                 _USE_DOUBLE_BUFFER>
 {
 
     static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
+    static const bool ENABLE_IDEMPOTENCE    = _ENABLE_IDEMPOTENCE;
     
 
     //Helper structures
@@ -58,6 +61,7 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
         bool            *d_frontier_map_in;     /**< Input frontier bitmap */
         bool            *d_frontier_map_out;    /**< Output frontier bitmap */
         VertexId        *d_index_queue;         /**< Index of unvisited queue */
+        unsigned char   *d_visited_mask;        /**< Used for bitmask for visited nodes */
     };
 
     // Members
@@ -143,6 +147,7 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
             if (data_slices[i]->d_frontier_map_in)  util::GRError(cudaFree(data_slices[i]->d_frontier_map_in), "GpuSlice cudaFree d_frontier_map_in failed", __FILE__, __LINE__);
             if (data_slices[i]->d_frontier_map_out)  util::GRError(cudaFree(data_slices[i]->d_frontier_map_out), "GpuSlice cudaFree d_frontier_map_out failed", __FILE__, __LINE__);
             if (data_slices[i]->d_index_queue)  util::GRError(cudaFree(data_slices[i]->d_index_queue), "GpuSlice cudaFree d_index_queue failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_visited_mask)  util::GRError(cudaFree(data_slices[i]->d_visited_mask), "GpuSlice cudaFree d_index_queue failed", __FILE__, __LINE__);
             if (d_data_slices[i])               util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
         }
         if (d_data_slices)  delete[] d_data_slices;
@@ -328,6 +333,16 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
                     "DOBFSProblem cudaMalloc d_index_queue failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_index_queue = d_index_queue;
 
+                unsigned char *d_visited_mask = NULL;
+                int visited_mask_bytes  = ((nodes * sizeof(unsigned char))+7)/8;
+                if (_ENABLE_IDEMPOTENCE) {
+                    if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_visited_mask,
+                        visited_mask_bytes),
+                    "BFSProblem cudaMalloc d_visited_mask failed", __FILE__, __LINE__)) return retval;
+                }
+                data_slices[0]->d_visited_mask = d_visited_mask;
+
             }
             //TODO: add multi-GPU allocation code
         } while (0);
@@ -416,6 +431,12 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
                 data_slices[gpu]->d_index_queue = d_index_queue;
             }
             util::MemsetIdxKernel<<<128, 128>>>(data_slices[gpu]->d_index_queue, nodes);
+
+            if (_ENABLE_IDEMPOTENCE) {
+                int visited_mask_bytes  = ((nodes * sizeof(unsigned char))+7)/8;
+                int visited_mask_elements = visited_mask_bytes * sizeof(unsigned char);
+                util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_visited_mask, (unsigned char)0, visited_mask_elements);
+            }
                 
             if (retval = util::GRError(cudaMemcpy(
                             d_data_slices[gpu],

@@ -226,8 +226,10 @@ struct Cta
                             tile->vertex_id[LOAD][VEC] = -1;
                         } else {
                             if (ProblemData::MARK_PREDECESSORS) {
+                                if (Functor::CondVertex(row_id, cta->problem))
                                 Functor::ApplyVertex(row_id, cta->problem, tile->pred_id[LOAD][VEC]);
                             } else {
+                                if (Functor::CondVertex(row_id, cta->problem))
                                 Functor::ApplyVertex(row_id, cta->problem, cta->iteration);
                             }
                         }
