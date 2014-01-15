@@ -135,7 +135,7 @@ struct KernelPolicy
     {
 
         enum {
-            WARP_HASH_ELEMENTS          = (ProblemData::ENABLE_IDEMPOTENCE) ? 128 : 0,          // Collision hash table size (per warp)
+            WARP_HASH_ELEMENTS          = 128,          // Collision hash table size (per warp)
         };
 
         // Persistent shared state for the CTA
@@ -161,7 +161,7 @@ struct KernelPolicy
             FULL_OCCUPANCY_BYTES                = (GR_SMEM_BYTES(CUDA_ARCH) / _MIN_CTA_OCCUPANCY)
                                                     - sizeof(State)
                                                     - 128,                                              // Fudge-factor to guarantee occupancy
-            HISTORY_HASH_ELEMENTS               = (ProblemData::ENABLE_IDEMPOTENCE) ? FULL_OCCUPANCY_BYTES / sizeof(VertexId) : 0,
+            HISTORY_HASH_ELEMENTS               = FULL_OCCUPANCY_BYTES / sizeof(VertexId),
 
         };
 

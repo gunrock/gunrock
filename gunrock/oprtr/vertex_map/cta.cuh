@@ -213,7 +213,7 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                if (ProblemData::ENABLE_IDEMPOTENCE) {
+                if (ProblemData::ENABLE_IDEMPOTENCE && cta->iteration != -1) {
                     if (tile->vertex_id[LOAD][VEC] >= 0) {
                         VertexId row_id = (tile->vertex_id[LOAD][VEC]&KernelPolicy::VERTEX_ID_MASK)/cta->num_gpus;
 
@@ -482,7 +482,7 @@ struct Cta
                 guarded_elements,
                 (VertexId) -1);
         
-        if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS) {
+        if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && d_pred_in != NULL) {
             util::io::LoadTile<
             KernelPolicy::LOG_LOADS_PER_TILE,
             KernelPolicy::LOG_LOAD_VEC_SIZE,
@@ -495,13 +495,13 @@ struct Cta
                 guarded_elements);
         }
 
-        if (ProblemData::ENABLE_IDEMPOTENCE && bitmask_cull) {
+        if (ProblemData::ENABLE_IDEMPOTENCE && bitmask_cull && d_visited_mask != NULL) {
             tile.BitmaskCull(this);
         }
         
         tile.VertexCull(this);          // using vertex visitation status (update discovered vertices)
         
-        if (ProblemData::ENABLE_IDEMPOTENCE) {
+        if (ProblemData::ENABLE_IDEMPOTENCE && iteration != -1) {
             tile.HistoryCull(this);
             tile.WarpCull(this);
         }
