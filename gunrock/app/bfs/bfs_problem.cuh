@@ -155,7 +155,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                                 cudaMemcpyDeviceToHost),
                             "BFSProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) break;
 
-                if (_MARK_PREDECESSORS) {
+                if (_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE) {
                     if (retval = util::GRError(cudaMemcpy(
                                     h_preds,
                                     data_slices[0]->d_preds,
@@ -230,7 +230,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                 data_slices[0]->d_labels = d_labels;
  
                 VertexId   *d_preds = NULL;
-                if (_MARK_PREDECESSORS) {
+                if (_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE) {
                     if (retval = util::GRError(cudaMalloc(
                         (void**)&d_preds,
                         nodes * sizeof(VertexId)),
@@ -292,7 +292,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_labels, -1, nodes);
 
             // Allocate preds if necessary
-            if (_MARK_PREDECESSORS && !data_slices[gpu]->d_preds) {
+            if (_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE && !data_slices[gpu]->d_preds) {
                 VertexId    *d_preds;
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_preds,
@@ -301,7 +301,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                 data_slices[gpu]->d_preds = d_preds;
             }
 
-            if (_MARK_PREDECESSORS)
+            if (_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE)
                 util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_preds, -2, nodes);
 
             if (_ENABLE_IDEMPOTENCE) {
@@ -335,7 +335,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT,
                         sizeof(VertexId),
                         cudaMemcpyHostToDevice),
                     "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
-        if (_MARK_PREDECESSORS) {
+        if (_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE) {
             VertexId src_pred = -1; 
             if (retval = util::GRError(cudaMemcpy(
                             data_slices[0]->d_preds+src,

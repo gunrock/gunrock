@@ -87,7 +87,7 @@ bool g_stream_from_host;
   * @param[in] MARK_PREDECESSORS Whether to show predecessor of each node.
   */
  template<typename VertexId, typename SizeT>
- void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes, bool MARK_PREDECESSORS)
+ void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes, bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE)
  {
     if (nodes > 40)
         nodes = 40;
@@ -96,9 +96,10 @@ bool g_stream_from_host;
         PrintValue(i);
         printf(":");
         PrintValue(source_path[i]);
-        printf(",");
-        if (MARK_PREDECESSORS)
+        if (MARK_PREDECESSORS && !ENABLE_IDEMPOTENCE) {
+            printf(",");
             PrintValue(preds[i]);
+        }
         printf(" ");
     }
     printf("]\n");
@@ -215,15 +216,19 @@ void DisplayStats(
  template<
     typename VertexId,
     typename Value,
-    typename SizeT>
+    typename SizeT,
+    bool MARK_PREDECESSORS>
 void SimpleReferenceBfs(
     const Csr<VertexId, Value, SizeT>       &graph,
     VertexId                                *source_path,
+    VertexId                                *predecessor,
     VertexId                                src)
 {
     //initialize distances
     for (VertexId i = 0; i < graph.nodes; ++i) {
         source_path[i] = -1;
+        if (MARK_PREDECESSORS)
+            predecessor[i] = -1;
     }
     source_path[src] = 0;
     VertexId search_depth = 0;
@@ -254,6 +259,8 @@ void SimpleReferenceBfs(
             VertexId neighbor = graph.column_indices[edge];
             if (source_path[neighbor] == -1) {
                 source_path[neighbor] = neighbor_dist;
+                if (MARK_PREDECESSORS)
+                    predecessor[neighbor] = dequeued_node;
                 if (search_depth < neighbor_dist) {
                     search_depth = neighbor_dist;
                 }
@@ -261,6 +268,9 @@ void SimpleReferenceBfs(
             }
         }
     }
+
+    if (MARK_PREDECESSORS)
+        predecessor[src] = -1;
 
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
@@ -309,11 +319,17 @@ void RunTests(
 
         // Allocate host-side label array (for both reference and gpu-computed results)
         VertexId    *reference_labels       = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+        VertexId    *reference_preds        = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
         VertexId    *h_labels               = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-        VertexId    *reference_check        = (g_quick) ? NULL : reference_labels;
+        VertexId    *reference_check_label  = (g_quick) ? NULL : reference_labels;
+        VertexId    *reference_check_preds  = NULL;
         VertexId    *h_preds                = NULL;
         if (MARK_PREDECESSORS) {
             h_preds = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+            if (!g_quick) {
+                reference_check_preds = reference_preds;
+            }
+            
         }
 
 
@@ -330,12 +346,13 @@ void RunTests(
         //
         // Compute reference CPU BFS solution for source-distance
         //
-        if (reference_check != NULL)
+        if (reference_check_label != NULL)
         {
             printf("compute ref value\n");
-            SimpleReferenceBfs(
+            SimpleReferenceBfs<VertexId, Value, SizeT, MARK_PREDECESSORS>(
                     graph,
-                    reference_check,
+                    reference_check_label,
+                    reference_check_preds,
                     src);
             printf("\n");
         }
@@ -362,13 +379,20 @@ void RunTests(
         util::GRError(csr_problem->Extract(h_labels, h_preds), "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
 
         // Verify the result
-        if (reference_check != NULL) {
-            printf("Validity: ");
-            CompareResults(h_labels, reference_check, graph.nodes, true);
+        if (reference_check_label != NULL) {
+            if (!ENABLE_IDEMPOTENCE) {
+                printf("Label Validity: ");
+                CompareResults(h_labels, reference_check_label, graph.nodes, true);
+            } else {
+                if (!MARK_PREDECESSORS) {
+                    printf("Label Validity: ");
+                    CompareResults(h_labels, reference_check_label, graph.nodes, true);
+                }
+            }
         }
         printf("\nFirst 40 labels of the GPU result."); 
         // Display Solution
-        DisplaySolution(h_labels, h_preds, graph.nodes, MARK_PREDECESSORS);
+        DisplaySolution(h_labels, h_preds, graph.nodes, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE);
 
         DisplayStats<MARK_PREDECESSORS>(
             *stats,

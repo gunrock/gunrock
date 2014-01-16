@@ -228,7 +228,9 @@ class DOBFSEnactor : public EnactorBase
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template<
+        typename NormalEdgeMapPolicy,
         typename EdgeMapPolicy,
+        typename NormalVertexMapPolicy,
         typename VertexMapPolicy,
         typename DOBFSProblem>
     cudaError_t EnactDOBFS(
@@ -317,7 +319,7 @@ class DOBFSEnactor : public EnactorBase
                 while (done[0] < 0) {
 
                     // Edge Map
-                    gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, DOBFSProblem, BfsFunctor>
+                    gunrock::oprtr::edge_map_forward::Kernel<NormalEdgeMapPolicy, DOBFSProblem, BfsFunctor>
                         <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
                                 queue_reset,
                                 queue_index,
@@ -372,7 +374,7 @@ class DOBFSEnactor : public EnactorBase
                     if (done[0] == 0) break;
 
                     // Vertex Map
-                    gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, BfsFunctor>
+                    gunrock::oprtr::vertex_map::Kernel<NormalVertexMapPolicy, DOBFSProblem, BfsFunctor>
                         <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                                 iteration + 1,
                                 queue_reset,
@@ -412,8 +414,8 @@ class DOBFSEnactor : public EnactorBase
 
                     num_unvisited_nodes -= queue_length;
                     current_frontier_size = queue_length;
-                    if (num_unvisited_nodes < current_frontier_size*problem->alpha)
-                        break;
+                    //if (num_unvisited_nodes < current_frontier_size*problem->alpha)
+                    //    break;
 
                     // Check if done
                     if (done[0] == 0) break;
@@ -580,7 +582,7 @@ class DOBFSEnactor : public EnactorBase
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
-                    NULL,
+                    graph_slice->frontier_queues.d_values[selector],    // d_pred_in_queue
                     graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                     data_slice,
                     NULL,
@@ -662,7 +664,7 @@ class DOBFSEnactor : public EnactorBase
             while (done[0] < 0) {
 
                 // Edge Map
-                gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, DOBFSProblem, BfsFunctor>
+                gunrock::oprtr::edge_map_forward::Kernel<NormalEdgeMapPolicy, DOBFSProblem, BfsFunctor>
                 <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
                     queue_reset,
                     queue_index,
@@ -717,7 +719,7 @@ class DOBFSEnactor : public EnactorBase
                 if (done[0] == 0) break;
 
                 // Vertex Map
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, BfsFunctor>
+                gunrock::oprtr::vertex_map::Kernel<NormalVertexMapPolicy, DOBFSProblem, BfsFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                     iteration + 1,
                     queue_reset,
@@ -792,39 +794,74 @@ class DOBFSEnactor : public EnactorBase
         typename DOBFSProblem::VertexId    src,
         int                             max_grid_size = 0)
     {
-        if (this->cuda_props.device_sm_version >= 300) {
-            typedef gunrock::oprtr::vertex_map::KernelPolicy<
-                DOBFSProblem,                         // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                0,                                  // SATURATION QUIT
-                true,                               // DEQUEUE_PROBLEM_SIZE
-                8,                                  // MIN_CTA_OCCUPANCY
-                6,                                  // LOG_THREADS
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                5,                                  // END_BIT_MASK
-                8>                                  // LOG_SCHEDULE_GRANULARITY
-                VertexMapPolicy;
-                
-                typedef gunrock::oprtr::edge_map_backward::KernelPolicy<
-                DOBFSProblem,                         // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                6,                                  // LOG_THREADS
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                                 // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7>                                  // LOG_SCHEDULE_GRANULARITY
-                EdgeMapPolicy;
+            
+            if (this->cuda_props.device_sm_version >= 300) {
+                typedef gunrock::oprtr::vertex_map::KernelPolicy<
+                    DOBFSProblem,                         // Problem data type
+                    300,                                // CUDA_ARCH
+                    INSTRUMENT,                         // INSTRUMENT
+                    0,                                  // SATURATION QUIT
+                    true,                               // DEQUEUE_PROBLEM_SIZE
+                    8,                                  // MIN_CTA_OCCUPANCY
+                    6,                                  // LOG_THREADS
+                    2,                                  // LOG_LOAD_VEC_SIZE
+                    1,                                  // LOG_LOADS_PER_TILE
+                    5,                                  // LOG_RAKING_THREADS
+                    5,                                  // END_BITMASK_CULL
+                    8>                                  // LOG_SCHEDULE_GRANULARITY
+                        NormalVertexMapPolicy;
 
-                return EnactDOBFS<EdgeMapPolicy, VertexMapPolicy, DOBFSProblem>(
-                problem, src, max_grid_size);
-        }
+                typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
+                    DOBFSProblem,                         // Problem data type
+                    300,                                // CUDA_ARCH
+                    INSTRUMENT,                         // INSTRUMENT
+                    8,                                  // MIN_CTA_OCCUPANCY
+                    6,                                  // LOG_THREADS
+                    2,                                  // LOG_LOAD_VEC_SIZE
+                    1,                                  // LOG_LOADS_PER_TILE
+                    5,                                  // LOG_RAKING_THREADS
+                    32,                                 // WARP_GATHER_THRESHOLD
+                    128 * 4,                            // CTA_GATHER_THRESHOLD
+                    7>                                  // LOG_SCHEDULE_GRANULARITY
+                        NormalEdgeMapPolicy;
+
+                typedef gunrock::oprtr::vertex_map::KernelPolicy<
+                    DOBFSProblem,                         // Problem data type
+                    300,                                // CUDA_ARCH
+                    INSTRUMENT,                         // INSTRUMENT
+                    0,                                  // SATURATION QUIT
+                    true,                               // DEQUEUE_PROBLEM_SIZE
+                    8,                                  // MIN_CTA_OCCUPANCY
+                    6,                                  // LOG_THREADS
+                    1,                                  // LOG_LOAD_VEC_SIZE
+                    0,                                  // LOG_LOADS_PER_TILE
+                    5,                                  // LOG_RAKING_THREADS
+                    5,                                  // END_BIT_MASK
+                    8>                                  // LOG_SCHEDULE_GRANULARITY
+                        ReverseVertexMapPolicy;
+
+                typedef gunrock::oprtr::edge_map_backward::KernelPolicy<
+                    DOBFSProblem,                         // Problem data type
+                    300,                                // CUDA_ARCH
+                    INSTRUMENT,                         // INSTRUMENT
+                    8,                                  // MIN_CTA_OCCUPANCY
+                    6,                                  // LOG_THREADS
+                    1,                                  // LOG_LOAD_VEC_SIZE
+                    0,                                  // LOG_LOADS_PER_TILE
+                    5,                                  // LOG_RAKING_THREADS
+                    32,                                 // WARP_GATHER_THRESHOLD
+                    128 * 4,                            // CTA_GATHER_THRESHOLD
+                    7>                                  // LOG_SCHEDULE_GRANULARITY
+                        EdgeMapPolicy;
+
+                if (DOBFSProblem::ENABLE_IDEMPOTENCE) {
+                return EnactDOBFS<NormalEdgeMapPolicy, EdgeMapPolicy, NormalVertexMapPolicy, ReverseVertexMapPolicy, DOBFSProblem>(
+                        problem, src, max_grid_size);
+                } else {
+                return EnactDOBFS<EdgeMapPolicy, EdgeMapPolicy, ReverseVertexMapPolicy, ReverseVertexMapPolicy, DOBFSProblem>(
+                        problem, src, max_grid_size);
+                }
+            }
 
         //to reduce compile time, get rid of other architecture for now
         //TODO: add all the kernelpolicy settings for all archs

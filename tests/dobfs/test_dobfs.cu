@@ -95,7 +95,7 @@ float g_beta;
   * @param[in] MARK_PREDECESSORS Whether to show predecessor of each node.
   */
  template<typename VertexId, typename SizeT>
- void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes, bool MARK_PREDECESSORS)
+ void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes, bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE)
  {
     if (nodes > 40)
         nodes = 40;
@@ -104,9 +104,10 @@ float g_beta;
         PrintValue(i);
         printf(":");
         PrintValue(source_path[i]);
-        printf(",");
-        if (MARK_PREDECESSORS)
+        if (MARK_PREDECESSORS && !ENABLE_IDEMPOTENCE) {
+            printf(",");
             PrintValue(preds[i]);
+        }
         printf(" ");
     }
     printf("]\n");
@@ -379,12 +380,14 @@ void RunTests(
 
         // Verify the result
         if (reference_check != NULL) {
-            printf("Validity: ");
-            CompareResults(h_labels, reference_check, graph.nodes, true);
+            if (!MARK_PREDECESSORS) {
+                printf("Validity: ");
+                CompareResults(h_labels, reference_check, graph.nodes, true);
+            }
         }
         printf("\nFirst 40 labels of the GPU result."); 
         // Display Solution
-        DisplaySolution(h_labels, h_preds, graph.nodes, MARK_PREDECESSORS);
+        DisplaySolution(h_labels, h_preds, graph.nodes, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE);
 
         DisplayStats<MARK_PREDECESSORS>(
             *stats,
@@ -456,7 +459,7 @@ void RunTests(
     args.GetCmdLineArgument("beta", g_beta);
 
     if (g_alpha == 0.0f)
-        g_alpha = 12.0f;
+        g_alpha = 6.0f;
     if (g_beta == 0.0f)
         g_beta = 24.0f;
 

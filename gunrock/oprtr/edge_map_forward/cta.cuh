@@ -268,7 +268,7 @@ namespace edge_map_forward {
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                     neighbor_id,
                                                     cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
-                                                if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS) {
+                                                if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
                                                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                             pred_id,
                                                             cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
@@ -301,7 +301,7 @@ namespace edge_map_forward {
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                     neighbor_id,
                                                     cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
-                                                if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS) {
+                                                if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
                                                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                             pred_id,
                                                             cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
@@ -378,7 +378,7 @@ namespace edge_map_forward {
                                                 // set neighbor_id to -1 for invalid 
                                                 if (Functor::CondEdge(pred_id, neighbor_id, cta->problem)) {
                                                     Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
-                                                    if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS) {
+                                                    if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
                                                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                                 pred_id,
                                                                 cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
@@ -409,7 +409,7 @@ namespace edge_map_forward {
                                                 // set neighbor_id to -1 for invalid                                            
                                                 if (Functor::CondEdge(pred_id, neighbor_id, cta->problem)) {
                                                     Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
-                                                    if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS) {
+                                                    if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
                                                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                                 pred_id,
                                                                 cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
@@ -730,7 +730,7 @@ namespace edge_map_forward {
                                 neighbor_id,
                                 d_out + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
 
-                        if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS) {
+                        if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && d_pred_out != NULL) {
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                     predecessor_id,
                                     d_pred_out + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);

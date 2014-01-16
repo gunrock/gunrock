@@ -317,7 +317,8 @@ class BFSEnactor : public EnactorBase
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                     printf(", %lld", (long long) queue_length);
-                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
+                    util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
+                    util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], queue_length);
 
                     /*if (iteration == 2) {
                         cudaMemcpy(h_cur_queue, graph_slice->frontier_queues.d_keys[selector], sizeof(VertexId)*queue_length, cudaMemcpyDeviceToHost);
@@ -435,9 +436,44 @@ class BFSEnactor : public EnactorBase
         typename BFSProblem::VertexId    src,
         int                             max_grid_size = 0)
     {
-        if (this->cuda_props.device_sm_version >= 300) {
-            typedef gunrock::oprtr::vertex_map::KernelPolicy<
-                BFSProblem,                         // Problem data type
+        if (BFSProblem::ENABLE_IDEMPOTENCE) {
+            if (this->cuda_props.device_sm_version >= 300) {
+                typedef gunrock::oprtr::vertex_map::KernelPolicy<
+                    BFSProblem,                         // Problem data type
+                300,                                // CUDA_ARCH
+                INSTRUMENT,                         // INSTRUMENT
+                0,                                  // SATURATION QUIT
+                true,                               // DEQUEUE_PROBLEM_SIZE
+                8,                                  // MIN_CTA_OCCUPANCY
+                8,                                  // LOG_THREADS
+                1,                                  // LOG_LOAD_VEC_SIZE
+                0,                                  // LOG_LOADS_PER_TILE
+                5,                                  // LOG_RAKING_THREADS
+                5,                                  // END_BITMASK_CULL
+                8>                                  // LOG_SCHEDULE_GRANULARITY
+                    VertexMapPolicy;
+
+                typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
+                    BFSProblem,                         // Problem data type
+                    300,                                // CUDA_ARCH
+                    INSTRUMENT,                         // INSTRUMENT
+                    8,                                  // MIN_CTA_OCCUPANCY
+                    8,                                  // LOG_THREADS
+                    0,                                  // LOG_LOAD_VEC_SIZE
+                    0,                                  // LOG_LOADS_PER_TILE
+                    5,                                  // LOG_RAKING_THREADS
+                    32,                            // WARP_GATHER_THRESHOLD
+                    128 * 4,                            // CTA_GATHER_THRESHOLD
+                    7>                                  // LOG_SCHEDULE_GRANULARITY
+                        EdgeMapPolicy;
+
+                return EnactBFS<EdgeMapPolicy, VertexMapPolicy, BFSProblem>(
+                        problem, src, max_grid_size);
+            }
+        } else {
+                if (this->cuda_props.device_sm_version >= 300) {
+                typedef gunrock::oprtr::vertex_map::KernelPolicy<
+                    BFSProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 0,                                  // SATURATION QUIT
@@ -449,24 +485,25 @@ class BFSEnactor : public EnactorBase
                 5,                                  // LOG_RAKING_THREADS
                 5,                                  // END_BITMASK_CULL
                 8>                                  // LOG_SCHEDULE_GRANULARITY
-                VertexMapPolicy;
+                    VertexMapPolicy;
 
                 typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
-                BFSProblem,                         // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                6,                                  // LOG_THREADS
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                            // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7>                                  // LOG_SCHEDULE_GRANULARITY
-                EdgeMapPolicy;
+                    BFSProblem,                         // Problem data type
+                    300,                                // CUDA_ARCH
+                    INSTRUMENT,                         // INSTRUMENT
+                    8,                                  // MIN_CTA_OCCUPANCY
+                    6,                                  // LOG_THREADS
+                    1,                                  // LOG_LOAD_VEC_SIZE
+                    0,                                  // LOG_LOADS_PER_TILE
+                    5,                                  // LOG_RAKING_THREADS
+                    32,                            // WARP_GATHER_THRESHOLD
+                    128 * 4,                            // CTA_GATHER_THRESHOLD
+                    7>                                  // LOG_SCHEDULE_GRANULARITY
+                        EdgeMapPolicy;
 
                 return EnactBFS<EdgeMapPolicy, VertexMapPolicy, BFSProblem>(
-                problem, src, max_grid_size);
+                        problem, src, max_grid_size);
+            }
         }
 
         //to reduce compile time, get rid of other architecture for now
