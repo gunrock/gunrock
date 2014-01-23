@@ -359,6 +359,7 @@ void RunTests(
         }
         printf("\nFirst 40 labels of the GPU result."); 
         // Display Solution
+        DisplaySolution(reference_check_label, graph.nodes);
         DisplaySolution(h_labels, graph.nodes);
 
         DisplayStats(
@@ -497,6 +498,7 @@ int main( int argc, char** argv)
 		}
 
 		csr.PrintHistogram();
+		csr.DisplayGraph();
 
 		// Run tests
 		RunTests(csr, args);

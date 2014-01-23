@@ -34,7 +34,7 @@ template <
 struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
 {
 
-    static const bool MARK_PREDECESSORS     = false;
+    static const bool MARK_PREDECESSORS     = true;
     static const bool ENABLE_IDEMPOTENCE    = false;
 
     //Helper structures

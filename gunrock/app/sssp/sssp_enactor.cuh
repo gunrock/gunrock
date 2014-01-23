@@ -255,6 +255,7 @@ class SSSPEnactor : public EnactorBase
             typename SSSPProblem::GraphSlice *graph_slice = problem->graph_slices[0];
             typename SSSPProblem::DataSlice *data_slice = problem->d_data_slices[0];
 
+
             SizeT queue_length          = 1;
             VertexId queue_index        = 0;        // Work queue index
             int selector                = 0;
@@ -303,20 +304,8 @@ class SSSPEnactor : public EnactorBase
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                     printf(", %lld", (long long) queue_length);
-                    util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
-                    util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], queue_length);
-
-                    /*if (iteration == 2) {
-                        cudaMemcpy(h_cur_queue, graph_slice->frontier_queues.d_keys[selector], sizeof(VertexId)*queue_length, cudaMemcpyDeviceToHost);
-                        int neg_num = 0;
-                        std::sort(h_cur_queue, h_cur_queue + queue_length);
-                        for (int i = 0; i < queue_length; ++i)
-                        {
-                            if (h_cur_queue[i] == -1)
-                                neg_num++;
-                        }
-                        printf("(%d)", neg_num);
-                    }*/
+                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
+                    //util::DisplayDeviceResults(problem->data_slices[0]->d_labels, graph_slice->nodes);
                 }
 
                 if (INSTRUMENT) {
