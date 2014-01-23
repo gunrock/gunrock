@@ -651,6 +651,19 @@ struct GpuTimer
     }
 };
 
+// Quite simple KeyValuePair struct for doing
+// Key-value sorting according to keys
+template<typename A, typename B>
+struct KeyValuePair
+{
+    A Key;
+    B Value;
+    bool operator<(const KeyValuePair<A, B>& rhs)
+    {
+        return this->Key < rhs.Key;
+    }
+};
+
 
 }// namespace util
 }// namespace gunrock

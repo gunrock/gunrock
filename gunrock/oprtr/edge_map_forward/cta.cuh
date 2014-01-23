@@ -263,8 +263,8 @@ namespace edge_map_forward {
                                             // if Cond(neighbor_id) returns true
                                             // if Cond(neighbor_id) returns false or Apply returns false
                                             // set neighbor_id to -1 for invalid
-                                            if (Functor::CondEdge(pred_id, neighbor_id, cta->problem)) {
-                                                Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
+                                            if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x)) {
+                                                Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x);
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                     neighbor_id,
                                                     cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
@@ -296,8 +296,8 @@ namespace edge_map_forward {
                                             // if Cond(neighbor_id) returns true
                                             // if Cond(neighbor_id) returns false or Apply returns false
                                             // set neighbor_id to -1 for invalid                                    
-                                            if (Functor::CondEdge(pred_id, neighbor_id, cta->problem)) {
-                                                Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
+                                            if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x)) {
+                                                Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x);
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                     neighbor_id,
                                                     cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
@@ -376,8 +376,8 @@ namespace edge_map_forward {
                                                 // if Cond(neighbor_id) returns true
                                                 // if Cond(neighbor_id) returns false or Apply returns false
                                                 // set neighbor_id to -1 for invalid 
-                                                if (Functor::CondEdge(pred_id, neighbor_id, cta->problem)) {
-                                                    Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
+                                                if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id)) {
+                                                    Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id);
                                                     if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
                                                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                                 pred_id,
@@ -407,8 +407,8 @@ namespace edge_map_forward {
                                                 // if Cond(neighbor_id) returns true
                                                 // if Cond(neighbor_id) returns false or Apply returns false
                                                 // set neighbor_id to -1 for invalid                                            
-                                                if (Functor::CondEdge(pred_id, neighbor_id, cta->problem)) {
-                                                    Functor::ApplyEdge(pred_id, neighbor_id, cta->problem);
+                                                if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id)) {
+                                                    Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id);
                                                     if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
                                                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                                 pred_id,
@@ -721,8 +721,8 @@ namespace edge_map_forward {
                         // if Cond(neighbor_id) returns false or Apply returns false
                         // set neighbor_id to -1 for invalid
 
-                        if (Functor::CondEdge(predecessor_id, neighbor_id, problem))
-                            Functor::ApplyEdge(predecessor_id, neighbor_id, problem);
+                        if (Functor::CondEdge(predecessor_id, neighbor_id, problem, smem_storage.gather_offsets[scratch_offset]))
+                            Functor::ApplyEdge(predecessor_id, neighbor_id, problem, smem_storage.gather_offsets[scratch_offset]);
                         else
                             neighbor_id = -1;
                         // Scatter into out_queue

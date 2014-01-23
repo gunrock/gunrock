@@ -220,7 +220,7 @@ struct Cta
                         VertexId label;
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                     label,
-                                                    cta->problem->d_labels + row_id);
+                                                    (VertexId*)cta->problem->d_labels + row_id);
                         if (label != -1) {
                             // Seen it
                             tile->vertex_id[LOAD][VEC] = -1;
