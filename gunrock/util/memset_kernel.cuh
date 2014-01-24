@@ -115,6 +115,26 @@ __global__ void MemsetAddVectorKernel(T *d_dst, T *d_src, int length)
     }
 }
 
+/**
+ * @brief Add the source vector to the destination vector with the same length
+ *
+ * @tparam T datatype of the vector.
+ *
+ * @param[in] d_dst Destination device-side vector
+ * @param[in] d_src1 Source device-side vector 1
+ * @param[in] d_src2 Source device-side vector 2
+ * @param[in] scale Scale factor
+ * @param[in] length Vector length
+ */
+template <typename T>
+__global__ void MemsetMadVectorKernel(T *d_dst, T *d_src1, T *d_src2, T scale, int length)
+{
+    const int STRIDE = gridDim.x * blockDim.x;
+    for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x; idx < length; idx += STRIDE) {
+        d_dst[idx] = d_src1[idx] * scale + d_src2[idx];
+    }
+}
+
 /** @} */
 
 } // namespace util

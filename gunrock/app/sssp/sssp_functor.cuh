@@ -22,11 +22,11 @@ namespace app {
 namespace sssp {
 
 /**
- * @brief Structure contains device functions in BFS graph traverse.
+ * @brief Structure contains device functions in SSSP graph traverse.
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam ProblemData         Problem data type which contains data slice for BFS problem
+ * @tparam ProblemData         Problem data type which contains data slice for SSSP problem
  *
  */
 template<typename VertexId, typename SizeT, typename ProblemData>
@@ -85,7 +85,7 @@ struct SSSPFunctor
     }
 
     /**
-     * @brief Vertex mapping apply function. Doing nothing for BFS problem.
+     * @brief Vertex mapping apply function. Doing nothing for SSSP problem.
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
