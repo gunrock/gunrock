@@ -121,7 +121,6 @@ class PREnactor : public EnactorBase
 
             //graph slice
             typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
-            typename ProblemData::DataSlice *data_slice = problem->data_slices[0];
 
             // Bind row-offsets texture
             cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
@@ -182,20 +181,16 @@ class PREnactor : public EnactorBase
      * @brief Obtain statistics about the last PR search enacted.
      *
      * @param[out] total_queued Total queued elements in PR kernel running.
-     * @param[out] search_depth Search depth of PR algorithm.
      * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
      */
-    template <typename VertexId>
     void GetStatistics(
         long long &total_queued,
-        VertexId &search_depth,
         double &avg_duty)
     {
         cudaThreadSynchronize();
 
         total_queued = this->total_queued;
-        search_depth = this->iteration;
-
+        
         avg_duty = (total_lifetimes >0) ?
             double(total_runtimes) / total_lifetimes : 0.0;
     }
@@ -222,8 +217,7 @@ class PREnactor : public EnactorBase
     cudaError_t EnactPR(
     CudaContext                        &context,
     PRProblem                          *problem,
-    typename PRProblem::Value           threshold,
-    int                                 max_iteration,
+    typename PRProblem::SizeT           max_iteration,
     int                                 max_grid_size = 0)
     {
         typedef typename PRProblem::SizeT       SizeT;
@@ -352,14 +346,15 @@ class PREnactor : public EnactorBase
                         "PREnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
                 }
 
+                if (queue_reset)
+                    queue_reset = false;
 
-                if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-                num_elements = queue_length;
+                if (done[0] == 0) break;
 
                 // Vertex Map
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, PRProblem, PrFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
-                    iteration+1,
+                    iteration,
                     queue_reset,
                     queue_index,
                     1,
@@ -380,6 +375,13 @@ class PREnactor : public EnactorBase
 
 
                 iteration++;
+                queue_index++;
+                selector ^= 1;
+
+                //swap rank_curr and rank_next
+                /*Value *temp = data_slice->d_rank_curr;
+                data_slice->d_rank_curr = data_slice->d_rank_next;
+                data_slice->d_rank_next = temp;*/
 
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
@@ -393,11 +395,16 @@ class PREnactor : public EnactorBase
                     }
                 }
 
+                if (done[0] == 0) break;
+
+                if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
+
                 //Sum the error together using reduction
                 //if error > threshold or iteration > iteration_upper_limits
                 //break
-                Value accumulated_error = Reduce(problem->data_slices[0]->d_errors, graph_slice->nodes, context);
-                if (accmulated_error > threshold || iteration > max_iteration)
+                //Value accumulated_error = Reduce(problem->data_slices[0]->d_errors, graph_slice->nodes, context);
+                //printf("error: %f\n", accumulated_error);
+                if (iteration > max_iteration)
                     break;
 
                 if (DEBUG) printf("\n%lld", (long long) iteration);
@@ -440,8 +447,7 @@ class PREnactor : public EnactorBase
     cudaError_t Enact(
         CudaContext                          &context,
         PRProblem                      *problem,
-        typename PRProblem::Value       threshold,
-        int                             max_iteration,
+        typename PRProblem::SizeT       max_iteration,
         int                             max_grid_size = 0)
     {
         if (this->cuda_props.device_sm_version >= 300) {
@@ -475,7 +481,7 @@ class PREnactor : public EnactorBase
                     EdgeMapPolicy;
 
             return EnactPR<EdgeMapPolicy, VertexMapPolicy, PRProblem>(
-                    context, problem, threshold, max_iteration, max_grid_size);
+                    context, problem, max_iteration, max_grid_size);
         }
 
         //to reduce compile time, get rid of other architecture for now

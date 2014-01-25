@@ -29,11 +29,15 @@ namespace pr {
  * @tparam _Value               Type of float or double to use for computing PR value.
  */
 template <
-    typename    VertexId,                       
-    typename    SizeT,                          
-    typename    Value>
-struct PRProblem : ProblemBase<VertexId, SizeT, false> // USE_DOUBLE_BUFFER = false
+    typename    _VertexId,                       
+    typename    _SizeT,                          
+    typename    _Value>
+struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = false
 {
+
+    typedef _VertexId 			VertexId;
+	typedef _SizeT			    SizeT;
+	typedef _Value              Value;
 
     static const bool MARK_PREDECESSORS     = true;
     static const bool ENABLE_IDEMPOTENCE    = false;
@@ -49,9 +53,10 @@ struct PRProblem : ProblemBase<VertexId, SizeT, false> // USE_DOUBLE_BUFFER = fa
         Value   *d_rank_curr;           /**< Used for ping-pong page rank value */
         Value   *d_rank_next;           /**< Used for ping-pong page rank value */       
         SizeT   *d_degrees;             /**< Used for keeping out-degree for each vertex */
-        Value   *d_errors;               /**< Used for recording accumulated error */
+        Value   *d_threshold;               /**< Used for recording accumulated error */
         Value   *d_delta;
         SizeT   *d_nodes;
+        SizeT   *d_labels;
     };
 
     // Members
@@ -117,7 +122,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, false> // USE_DOUBLE_BUFFER = fa
             if (data_slices[i]->d_rank_curr)      util::GRError(cudaFree(data_slices[i]->d_rank_curr), "GpuSlice cudaFree d_rank[0] failed", __FILE__, __LINE__);
             if (data_slices[i]->d_rank_next)      util::GRError(cudaFree(data_slices[i]->d_rank_next), "GpuSlice cudaFree d_rank[1] failed", __FILE__, __LINE__);
             if (data_slices[i]->d_degrees)      util::GRError(cudaFree(data_slices[i]->d_degrees), "GpuSlice cudaFree d_degrees failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_errors)      util::GRError(cudaFree(data_slices[i]->d_errors), "GpuSlice cudaFree d_errors failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_threshold)      util::GRError(cudaFree(data_slices[i]->d_threshold), "GpuSlice cudaFree d_threshold failed", __FILE__, __LINE__);
             if (data_slices[i]->d_delta)      util::GRError(cudaFree(data_slices[i]->d_delta), "GpuSlice cudaFree d_delta failed", __FILE__, __LINE__);
             if (data_slices[i]->d_nodes)      util::GRError(cudaFree(data_slices[i]->d_nodes), "GpuSlice cudaFree d_nodes failed", __FILE__, __LINE__);
             if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
@@ -151,7 +156,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, false> // USE_DOUBLE_BUFFER = fa
 
                 if (retval = util::GRError(cudaMemcpy(
                                 h_rank,
-                                data_slices[0]->d_rank[selector],
+                                data_slices[0]->d_rank_curr,
                                 sizeof(Value) * nodes,
                                 cudaMemcpyDeviceToHost),
                             "PRProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) break;
@@ -182,7 +187,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, false> // USE_DOUBLE_BUFFER = fa
         edges = graph.edges;
         VertexId *h_row_offsets = graph.row_offsets;
         VertexId *h_column_indices = graph.column_indices;
-            ProblemBase<VertexId, SizeT, _USE_DOUBLE_BUFFER>::Init(stream_from_host,
+            ProblemBase<VertexId, SizeT, false>::Init(stream_from_host,
                     nodes,
                     edges,
                     h_row_offsets,
@@ -234,12 +239,12 @@ struct PRProblem : ProblemBase<VertexId, SizeT, false> // USE_DOUBLE_BUFFER = fa
                     "PRProblem cudaMalloc d_degrees failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_degrees = d_degrees;
 
-                Value    *d_errors;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_errors,
-                        nodes * sizeof(Value)),
-                    "PRProblem cudaMalloc d_errors failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_errors = d_errors;
+                Value   *d_threshold;
+                    if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_threshold,
+                        1 * sizeof(Value)),
+                    "PRProblem cudaMalloc d_threshold failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_threshold = d_threshold;
 
                 Value    *d_delta;
                 if (retval = util::GRError(cudaMalloc(
@@ -255,6 +260,8 @@ struct PRProblem : ProblemBase<VertexId, SizeT, false> // USE_DOUBLE_BUFFER = fa
                     "PRProblem cudaMalloc d_nodes failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_nodes = d_nodes;
 
+                data_slices[0]->d_labels = NULL;
+
             }
             //TODO: add multi-GPU allocation code
         } while (0);
@@ -267,18 +274,17 @@ struct PRProblem : ProblemBase<VertexId, SizeT, false> // USE_DOUBLE_BUFFER = fa
      *
      *  @param[in] src Source node for one PR computing pass.
      *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
-     *  @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
      * 
      *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Reset(
             Value    delta,
-            FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
-            double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
+            Value    threshold,
+            FrontierType frontier_type)             // The frontier type (i.e., edge/vertex/mixed)
     {
-        typedef ProblemBase<VertexId, SizeT, _USE_DOUBLE_BUFFER> BaseProblem;
+        typedef ProblemBase<VertexId, SizeT, false> BaseProblem;
         //load ProblemBase Reset
-        BaseProblem::Reset(frontier_type, queue_sizing);
+        BaseProblem::Reset(frontier_type, 1.0f); // Default queue sizing is 1.0
 
         cudaError_t retval = cudaSuccess;
 
@@ -304,16 +310,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, false> // USE_DOUBLE_BUFFER = fa
                                 nodes * sizeof(Value)),
                             "PRProblem cudaMalloc d_rank2 failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_rank_next = d_rank2;
-            }
-
-            if (!data_slices[gpu]->d_errors) {
-                Value    *d_errors;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_errors,
-                                nodes * sizeof(Value)),
-                            "PRProblem cudaMalloc d_errors failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_errors = d_errors;
-            }
+            } 
 
             if (!data_slices[gpu]->d_delta) {
                 Value    *d_delta;
@@ -322,6 +319,15 @@ struct PRProblem : ProblemBase<VertexId, SizeT, false> // USE_DOUBLE_BUFFER = fa
                                 1 * sizeof(Value)),
                             "PRProblem cudaMalloc d_delta failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_delta = d_delta;
+            }
+
+            if (!data_slices[gpu]->d_threshold) {
+                Value    *d_threshold;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_threshold,
+                                1 * sizeof(Value)),
+                            "PRProblem cudaMalloc d_threshold failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_threshold = d_threshold;
             }
 
             if (!data_slices[gpu]->d_nodes) {
@@ -343,28 +349,34 @@ struct PRProblem : ProblemBase<VertexId, SizeT, false> // USE_DOUBLE_BUFFER = fa
                 data_slices[gpu]->d_degrees = d_degrees;
             }
 
+            data_slices[gpu]->d_labels = NULL;
+
             // Initial rank_curr = 1/|V|
             // Initial rank_next = 0
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_rank_curr, (Value)(1.0f/nodes), nodes);
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_rank_next, 0.0f, nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_rank_next, (Value)0.0f, nodes);
 
-
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_errors, 0.0f, nodes);
-            
             // Compute degrees
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_degrees, 0, nodes);
             util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_degrees, BaseProblem::graph_slices[0]->d_row_offsets, &BaseProblem::graph_slices[0]->d_row_offsets[1], -1, nodes);
 
-            if (retval = util::grerror(cudamemcpy(
+            if (retval = util::GRError(cudaMemcpy(
                             data_slices[gpu]->d_delta,
-                            delta,
+                            (Value*)&delta,
                             sizeof(Value),
                             cudaMemcpyHostToDevice),
                         "PRProblem cudaMemcpy d_delta failed", __FILE__, __LINE__)) return retval;
 
-            if (retval = util::grerror(cudamemcpy(
+            if (retval = util::GRError(cudaMemcpy(
+                            data_slices[gpu]->d_threshold,
+                            (Value*)&threshold,
+                            sizeof(Value),
+                            cudaMemcpyHostToDevice),
+                        "PRProblem cudaMemcpy d_threshold failed", __FILE__, __LINE__)) return retval;
+
+            if (retval = util::GRError(cudaMemcpy(
                             data_slices[gpu]->d_nodes,
-                            (SizeT)nodes,
+                            (SizeT*)&nodes,
                             sizeof(SizeT),
                             cudaMemcpyHostToDevice),
                         "PRProblem cudaMemcpy d_nodes failed", __FILE__, __LINE__)) return retval;

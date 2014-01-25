@@ -75,11 +75,15 @@ struct PRFunctor
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-        Value delta = problem->delta;
-        problem->rank_next[node] = (delta * problem->rank_next[node]) + (1.0-delta)/(Value)problem->nodes;
-        problem->errors[node] = fabs(problem->rank_next[node] - problem->rank_curr[node]);
-        problem->rank_curr[i] = 0.0;
-        return true;
+        Value delta = problem->d_delta[0];
+        Value nodes = (Value)problem->d_nodes[0];
+        Value threshold = (Value)problem->d_threshold[0];
+        problem->d_rank_next[node] = (delta * problem->d_rank_next[node]) + (1.0-delta)/nodes;
+
+        // Swap rank_curr and rank_next
+        problem->d_rank_curr[node] = problem->d_rank_next[node];
+        problem->d_rank_next[node] = 0.0;
+        return (fabs(problem->d_rank_next[node] - problem->d_rank_curr[node]) < threshold);
     }
 
     /**
