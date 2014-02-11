@@ -110,7 +110,7 @@ test: bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
 bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_sssp.cu $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_sssp.cu $(NVCCFLAGS) $(ARCH) $(INC) -lcuda -O3  
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_sssp.cu $(NVCCFLAGS) $(ARCH) $(INC) -O3  
 
 #-------------------------------------------------------------------------------
 # Clean
