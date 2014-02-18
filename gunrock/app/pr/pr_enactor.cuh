@@ -273,6 +273,29 @@ class PREnactor : public EnactorBase
 
             bool queue_reset = true;
 
+            gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, PRProblem, RemoveZeroFunctor>
+                <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
+                        queue_reset,
+                        queue_index,
+                        1,
+                        iteration,
+                        num_elements,
+                        d_done,
+                        graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
+                        NULL,
+                        graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
+                        graph_slice->d_column_indices,
+                        data_slice,
+                        this->work_progress,
+                        graph_slice->frontier_elements[selector],                   // max_in_queue
+                        graph_slice->frontier_elements[selector^1],                 // max_out_queue
+                        this->edge_map_kernel_stats);
+
+            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+
+            util::DisplayDeviceResults(problem->data_slices[0]->d_degrees,
+                    graph_slice->nodes);
+
             gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, PRProblem, RemoveZeroFunctor>
             <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                     iteration,
@@ -299,6 +322,9 @@ class PREnactor : public EnactorBase
             num_elements = queue_length;
             int edge_map_queue_len = num_elements;
 
+            util::MemsetKernel<<<128, 128>>>(problem->data_slices[0]->d_rank_curr,
+                (Value)1.0/edge_map_queue_len, graph_slice->nodes);
+
             // Step through PR iterations 
             while (done[0] < 0) {
 
@@ -321,7 +347,6 @@ class PREnactor : public EnactorBase
                     graph_slice->frontier_elements[1],                   // max_in_queue
                     graph_slice->frontier_elements[0],                 // max_out_queue
                     this->edge_map_kernel_stats);
-
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates 
@@ -387,10 +412,10 @@ class PREnactor : public EnactorBase
                 if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                 num_elements = queue_length;
 
-                /*util::DisplayDeviceResults(problem->data_slices[0]->d_rank_next,
+                util::DisplayDeviceResults(problem->data_slices[0]->d_rank_next,
                     graph_slice->nodes);
                 util::DisplayDeviceResults(problem->data_slices[0]->d_rank_curr,
-                    graph_slice->nodes);*/
+                    graph_slice->nodes);
     
                 //swap rank_curr and rank_next
                 util::MemsetCopyVectorKernel<<<128,
