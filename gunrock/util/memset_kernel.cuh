@@ -36,8 +36,7 @@ namespace util {
  * @param[in] value Value we want to set
  * @param[in] length Vector length
  */
-template <typename T>
-__global__ void MemsetKernel(T *d_out, T value, int length)
+template <typename T> __global__ void MemsetKernel(T *d_out, T value, int length)
 {
     const int STRIDE = gridDim.x * blockDim.x;
     for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x; idx < length; idx += STRIDE) {
@@ -112,6 +111,24 @@ __global__ void MemsetAddVectorKernel(T *d_dst, T *d_src, int length)
     const int STRIDE = gridDim.x * blockDim.x;
     for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x; idx < length; idx += STRIDE) {
         d_dst[idx] += d_src[idx];
+    }
+}
+
+/**
+ * @brief Copy the source vector to the destination vector with the same length
+ *
+ * @tparam T datatype of the vector.
+ *
+ * @param[in] d_dst Destination device-side vector
+ * @param[in] d_src Source device-side vector
+ * @param[in] length Vector length
+ */
+template <typename T>
+__global__ void MemsetCopyVectorKernel(T *d_dst, T *d_src, int length)
+{
+    const int STRIDE = gridDim.x * blockDim.x;
+    for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x; idx < length; idx += STRIDE) {
+        d_dst[idx] = d_src[idx];
     }
 }
 

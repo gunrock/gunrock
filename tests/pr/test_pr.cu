@@ -99,10 +99,12 @@ bool PRCompare(
  { 
      //sort the top page ranks
      RankPair<SizeT, Value> *pr_list = (RankPair<SizeT, Value>*)malloc(sizeof(RankPair<SizeT, Value>) * nodes);
+     Value total_pr = 0;
      for (int i = 0; i < nodes; ++i)
      {
          pr_list[i].vertex_id = i;
          pr_list[i].page_rank = rank[i];
+         total_pr += rank[i];
      }
      std::stable_sort(pr_list, pr_list + nodes, PRCompare<RankPair<SizeT, Value> >);
 
@@ -113,6 +115,7 @@ bool PRCompare(
      {
          printf("Vertex ID: %d, Page Rank: %5f\n", pr_list[i].vertex_id, pr_list[i].page_rank);
      }
+     printf("total pr: %5f\n", total_pr);
 
      free(pr_list);
  }
@@ -450,6 +453,7 @@ int main( int argc, char** argv)
 		}
 
 		csr.PrintHistogram();
+		csr.DisplayGraph();
 
 		// Run tests
 		RunTests(csr, args, *context);

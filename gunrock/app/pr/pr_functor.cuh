@@ -3,8 +3,7 @@
 // ----------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ----------------------------------------------------------------
-
+// ---------------------------------------------------------------- 
 /**
  * @file
  * pr_functor.cuh
@@ -45,7 +44,7 @@ struct PRFunctor
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
-    {
+    { 
         atomicAdd(&problem->d_rank_next[d_id], problem->d_rank_curr[s_id]/problem->d_degrees[s_id]);
         return true;
     }
@@ -78,12 +77,10 @@ struct PRFunctor
         Value delta = problem->d_delta[0];
         Value nodes = (Value)problem->d_nodes[0];
         Value threshold = (Value)problem->d_threshold[0];
-        problem->d_rank_next[node] = (delta * problem->d_rank_next[node]) + (1.0-delta)/nodes;
-
-        // Swap rank_curr and rank_next
-        problem->d_rank_curr[node] = problem->d_rank_next[node];
-        problem->d_rank_next[node] = 0.0;
-        return (fabs(problem->d_rank_next[node] - problem->d_rank_curr[node]) < threshold);
+        //problem->d_rank_next[node] = (delta * problem->d_rank_next[node]) + (1.0-delta)/nodes;
+        Value diff = fabs(problem->d_rank_next[node] - problem->d_rank_curr[node]);
+ 
+        return (diff > threshold);
     }
 
     /**

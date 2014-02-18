@@ -62,6 +62,7 @@ class PREnactor : public EnactorBase
     int                 *d_done;
     cudaEvent_t         throttle_event;
 
+
     /**
      * Current iteration, also used to get the final search depth of the PR search
      */
@@ -89,6 +90,7 @@ class PREnactor : public EnactorBase
         typedef typename ProblemData::VertexId      VertexId;
         
         cudaError_t retval = cudaSuccess;
+
 
         do {
             //initialize the host-mapped "done"
@@ -292,14 +294,15 @@ class PREnactor : public EnactorBase
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel RemoveZeroFunctor failed", __FILE__, __LINE__))) break;
 
             queue_index++;
-            selector ^= 1;
 
             if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
             num_elements = queue_length;
+            int edge_map_queue_len = num_elements;
 
             // Step through PR iterations 
             while (done[0] < 0) {
 
+                if (retval = work_progress.SetQueueLength(queue_index, edge_map_queue_len)) break;
                 // Edge Map
                 gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, PRProblem, PrFunctor>
                 <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
@@ -309,25 +312,25 @@ class PREnactor : public EnactorBase
                     iteration,
                     num_elements,
                     d_done,
-                    graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
+                    graph_slice->frontier_queues.d_keys[1],              // d_in_queue
                     NULL,
-                    graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
+                    graph_slice->frontier_queues.d_keys[0],            // d_out_queue
                     graph_slice->d_column_indices,
                     data_slice,
                     this->work_progress,
-                    graph_slice->frontier_elements[selector],                   // max_in_queue
-                    graph_slice->frontier_elements[selector^1],                 // max_out_queue
+                    graph_slice->frontier_elements[1],                   // max_in_queue
+                    graph_slice->frontier_elements[0],                 // max_out_queue
                     this->edge_map_kernel_stats);
 
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates 
-                
+
+                queue_index++;
+
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                     printf(", %lld", (long long) queue_length);
-                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
-                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], queue_length);
                 }
 
                 if (INSTRUMENT) {
@@ -349,7 +352,11 @@ class PREnactor : public EnactorBase
                 if (queue_reset)
                     queue_reset = false;
 
-                if (done[0] == 0) break;
+                if (done[0] == 0) break; 
+                
+
+                
+                if (retval = work_progress.SetQueueLength(queue_index, edge_map_queue_len)) break;
 
                 // Vertex Map
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, PRProblem, PrFunctor>
@@ -360,28 +367,37 @@ class PREnactor : public EnactorBase
                     1,
                     num_elements,
                     d_done,
-                    graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                    graph_slice->frontier_queues.d_keys[1],      // d_in_queue
                     NULL,
-                    graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
+                    graph_slice->frontier_queues.d_keys[0],    // d_out_queue
                     data_slice,
                     NULL,
                     work_progress,
-                    graph_slice->frontier_elements[selector],           // max_in_queue
-                    graph_slice->frontier_elements[selector^1],         // max_out_queue
+                    graph_slice->frontier_elements[1],           // max_in_queue
+                    graph_slice->frontier_elements[0],         // max_out_queue
                     this->vertex_map_kernel_stats);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
-
+                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates     
 
                 iteration++;
                 queue_index++;
-                selector ^= 1;
 
+
+                if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
+                num_elements = queue_length;
+
+                /*util::DisplayDeviceResults(problem->data_slices[0]->d_rank_next,
+                    graph_slice->nodes);
+                util::DisplayDeviceResults(problem->data_slices[0]->d_rank_curr,
+                    graph_slice->nodes);*/
+    
                 //swap rank_curr and rank_next
-                /*Value *temp = data_slice->d_rank_curr;
-                data_slice->d_rank_curr = data_slice->d_rank_next;
-                data_slice->d_rank_next = temp;*/
+                util::MemsetCopyVectorKernel<<<128,
+                  128>>>(problem->data_slices[0]->d_rank_curr,
+                      problem->data_slices[0]->d_rank_next, graph_slice->nodes);
+                util::MemsetKernel<<<128, 128>>>(problem->data_slices[0]->d_rank_next,
+                    (Value)0.0, graph_slice->nodes);
 
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
@@ -395,17 +411,7 @@ class PREnactor : public EnactorBase
                     }
                 }
 
-                if (done[0] == 0) break;
-
-                if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-
-                //Sum the error together using reduction
-                //if error > threshold or iteration > iteration_upper_limits
-                //break
-                //Value accumulated_error = Reduce(problem->data_slices[0]->d_errors, graph_slice->nodes, context);
-                //printf("error: %f\n", accumulated_error);
-                if (iteration > max_iteration)
-                    break;
+                if (done[0] == 0 || queue_length == 0 || iteration > max_iteration) break;
 
                 if (DEBUG) printf("\n%lld", (long long) iteration);
 
@@ -413,14 +419,6 @@ class PREnactor : public EnactorBase
 
             if (retval) break;
 
-            // Check if any of the frontiers overflowed due to redundant expansion
-            /*bool overflowed = false;
-            if (retval = work_progress.CheckOverflow<SizeT>(overflowed)) break;
-            if (overflowed) {
-                retval = util::GRError(cudaErrorInvalidConfiguration, "Frontier queue overflow. Please increase queue-sizing factor.",__FILE__, __LINE__);
-                break;
-            }*/
-            
         } while(0);
 
         if (DEBUG) printf("\nGPU PR Done.\n");
