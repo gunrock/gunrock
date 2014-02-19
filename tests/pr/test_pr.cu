@@ -17,6 +17,7 @@
 #include <deque>
 #include <vector>
 #include <iostream>
+#include <cstdlib>
 
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
@@ -34,6 +35,12 @@
 #include <gunrock/oprtr/vertex_map/kernel.cuh>
 
 #include <moderngpu.cuh>
+
+// boost includes
+#include <boost/config.hpp>
+#include <boost/utility.hpp>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/page_rank.hpp>
 
 
 using namespace gunrock;
@@ -204,21 +211,45 @@ void SimpleReferencePr(
     Value                                   error,
     SizeT                                   max_iter) 
 {
-    //initialization
-    for (VertexId i = 0; i < graph.nodes; ++i) {
-        rank[i] = 1.0/graph.nodes;
-    }
-    
+    using namespace boost;
 
+    //Preparation
+    typedef adjacency_list<vecS, vecS, bidirectionalS, no_property, property<edge_index_t, int> > Graph;
+
+    Graph g;
+
+    for (int i = 0; i < graph.nodes; ++i)
+    {
+        for (int j = graph.row_offsets[i]; j < graph.row_offsets[i+1]; ++j)
+        {
+            Graph::edge_descriptor e =
+            add_edge(i, graph.column_indices[j], g).first;
+            put(edge_index, g, e, i);
+        }
+    }
+
+    
     //
     //compute page rank
     //
 
     CpuTimer cpu_timer;
     cpu_timer.Start();
+
+    remove_dangling_links(g);
+
+    std::vector<Value> ranks(num_vertices(g));
+    page_rank(g,
+              make_iterator_property_map(ranks.begin(),
+              get(boost::vertex_index, g)),
+              boost::graph::n_iterations(max_iter));
     
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
+
+    for (std::size_t i = 0; i < num_vertices(g); ++i) {
+        rank[i] = ranks[i];
+    }
 
     printf("CPU BFS finished in %lf msec.\n", elapsed);
 }
@@ -453,7 +484,6 @@ int main( int argc, char** argv)
 		}
 
 		csr.PrintHistogram();
-		csr.DisplayGraph();
 
 		// Run tests
 		RunTests(csr, args, *context);

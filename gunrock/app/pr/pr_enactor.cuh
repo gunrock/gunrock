@@ -278,8 +278,8 @@ class PREnactor : public EnactorBase
 
               num_valid_node = queue_length; 
 
-              util::DisplayDeviceResults(problem->graph_slices[0]->frontier_queues.d_keys[selector],
-                  num_elements);
+              //util::DisplayDeviceResults(problem->graph_slices[0]->frontier_queues.d_keys[selector],
+              //    num_elements);
 
               if (retval = work_progress.SetQueueLength(queue_index, queue_length)) break;
               gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, PRProblem, RemoveZeroFunctor>
@@ -329,14 +329,13 @@ class PREnactor : public EnactorBase
                   128>>>(problem->data_slices[0]->d_degrees,
                           problem->data_slices[0]->d_degrees_pong, graph_slice->nodes);
 
-              util::DisplayDeviceResults(problem->data_slices[0]->d_degrees,
-                      graph_slice->nodes);
+              //util::DisplayDeviceResults(problem->data_slices[0]->d_degrees,
+              //        graph_slice->nodes);
 
               queue_index++;
               selector^=1;
               if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
               num_elements = queue_length;
-              printf("origin: %d, new: %d\n", num_valid_node, queue_length);
             }
 
             queue_reset = true;
@@ -431,10 +430,10 @@ class PREnactor : public EnactorBase
                 if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                 num_elements = queue_length;
 
-                util::DisplayDeviceResults(problem->data_slices[0]->d_rank_next,
-                    graph_slice->nodes);
-                util::DisplayDeviceResults(problem->data_slices[0]->d_rank_curr,
-                    graph_slice->nodes);
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_next,
+                //    graph_slice->nodes);
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_curr,
+                //    graph_slice->nodes);
     
                 //swap rank_curr and rank_next
                 util::MemsetCopyVectorKernel<<<128,
