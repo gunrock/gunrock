@@ -10,8 +10,8 @@
 #-------------------------------------------------------------------------------
 
 force64 = 1
-#NVCC = "$(shell which nvcc)"
-NVCC = "/usr/local/cuda-5.5/bin/nvcc"
+NVCC = "$(shell which nvcc)"
+#NVCC = "/usr/local/cuda-6.0/bin/nvcc"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
 KERNELS = 
@@ -38,7 +38,10 @@ SM_TARGETS = $(GEN_SM30)
 #-------------------------------------------------------------------------------
 
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
-INC = -I$(CUDA_INC) -I.. -I../..
+BOOST_INC = "../../../boost_1_53_0"
+MGPU_INC = "../../../moderngpu/include"
+INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(BOOST_INC) -I.. -I../..
+
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -105,11 +108,11 @@ DEPS = 			./Makefile \
 # (make test) Test driver for 
 #-------------------------------------------------------------------------------
 
-test: bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX)
+test: bin/test_psssp_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_dobfs.cu $(DEPS)
+bin/test_psssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_psssp.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_dobfs.cu $(NVCCFLAGS) $(ARCH) $(INC) -O3  
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_psssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_psssp.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3  
 
 #-------------------------------------------------------------------------------
 # Clean

@@ -287,8 +287,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 } else*/
                 {
                     if (!ProblemData::MARK_PREDECESSORS) {
-                        if (Functor::CondEdge(label, u, problem)) {
-                            Functor::ApplyEdge(label, u, problem);
+                        if (Functor::CondEdge(label, u, problem, lookup)) {
+                            Functor::ApplyEdge(label, u, problem, lookup);
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                     u,
                                     d_out + out_index);
@@ -299,8 +299,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                     d_out + out_index);
                         }
                     } else {
-                        if (Functor::CondEdge(v, u, problem)) {
-                            Functor::ApplyEdge(v, u, problem);
+                        if (Functor::CondEdge(v, u, problem, lookup)) {
+                            Functor::ApplyEdge(v, u, problem, lookup);
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                     u,
                                     d_out + out_index);
@@ -426,8 +426,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             VertexId u = d_column_indices[lookup];
            
             if (!ProblemData::MARK_PREDECESSORS) {
-                if (Functor::CondEdge(label, u, problem)) {
-                    Functor::ApplyEdge(label, u, problem);
+                if (Functor::CondEdge(label, u, problem, lookup)) {
+                    Functor::ApplyEdge(label, u, problem, lookup);
                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                             u,
                             d_out + offset+i);
@@ -439,8 +439,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 }
             } else {
                 //v:pre, u:neighbor, outoffset:offset+i
-                if (Functor::CondEdge(v, u, problem)) {
-                    Functor::ApplyEdge(v, u, problem);
+                if (Functor::CondEdge(v, u, problem, lookup)) {
+                    Functor::ApplyEdge(v, u, problem, lookup);
                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                             u,
                             d_out + offset+i);

@@ -17,19 +17,22 @@
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
 
-#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
-#include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
+#include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
+#include <gunrock/oprtr/edge_map_partitioned/kernel_policy.cuh>
 #include <gunrock/oprtr/vertex_map/kernel.cuh>
 #include <gunrock/oprtr/vertex_map/kernel_policy.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
-#include <gunrock/app/sssp/sssp_problem.cuh>
-#include <gunrock/app/sssp/sssp_functor.cuh>
+#include <gunrock/app/psssp/psssp_problem.cuh>
+#include <gunrock/app/psssp/psssp_functor.cuh>
 
+#include <moderngpu.cuh>
+
+using namespace mgpu;
 
 namespace gunrock {
 namespace app {
-namespace sssp {
+namespace psssp {
 
 /**
  * @brief SSSP problem enactor class.
@@ -37,7 +40,7 @@ namespace sssp {
  * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA clock-count statistics
  */
 template<bool INSTRUMENT>
-class SSSPEnactor : public EnactorBase
+class PSSSPEnactor : public EnactorBase
 {
     // Members
     protected:
@@ -117,17 +120,17 @@ class SSSPEnactor : public EnactorBase
             done[0]             = -1;
 
             //graph slice
-            typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
+            //typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
 
             // Bind row-offsets and bitmask texture
-            cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
+            /*cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
             if (retval = util::GRError(cudaBindTexture(
                     0,
                     gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
                     graph_slice->d_row_offsets,
                     row_offsets_desc,
                     (graph_slice->nodes + 1) * sizeof(SizeT)),
-                        "SSSPEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
+                        "SSSPEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;*/
 
             /*cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
             if (retval = util::GRError(cudaBindTexture(
@@ -147,7 +150,7 @@ class SSSPEnactor : public EnactorBase
     /**
      * @brief SSSPEnactor constructor
      */
-    SSSPEnactor(bool DEBUG = false) :
+    PSSSPEnactor(bool DEBUG = false) :
         EnactorBase(EDGE_FRONTIERS, DEBUG),
         iteration(0),
         total_queued(0),
@@ -158,7 +161,7 @@ class SSSPEnactor : public EnactorBase
     /**
      * @brief SSSPEnactor destructor
      */
-    virtual ~SSSPEnactor()
+    virtual ~PSSSPEnactor()
     {
         if (done) {
             util::GRError(cudaFreeHost((void*)done),
@@ -214,19 +217,20 @@ class SSSPEnactor : public EnactorBase
     template<
         typename EdgeMapPolicy,
         typename VertexMapPolicy,
-        typename SSSPProblem>
-    cudaError_t EnactSSSP(
-    SSSPProblem                          *problem,
-    typename SSSPProblem::VertexId       src,
+        typename PSSSPProblem>
+    cudaError_t EnactPSSSP(
+    CudaContext				 &context,
+    PSSSPProblem                          *problem,
+    typename PSSSPProblem::VertexId       src,
     int                                 max_grid_size = 0)
     {
-        typedef typename SSSPProblem::SizeT      SizeT;
-        typedef typename SSSPProblem::VertexId   VertexId;
+        typedef typename PSSSPProblem::SizeT      SizeT;
+        typedef typename PSSSPProblem::VertexId   VertexId;
 
-        typedef SSSPFunctor<
+        typedef PSSSPFunctor<
             VertexId,
             SizeT,
-            SSSPProblem> SsspFunctor;
+            PSSSPProblem> SsspFunctor;
 
         cudaError_t retval = cudaSuccess;
 
@@ -252,8 +256,8 @@ class SSSPEnactor : public EnactorBase
             if (retval = Setup(problem, edge_map_grid_size, vertex_map_grid_size)) break;
 
             // Single-gpu graph slice
-            typename SSSPProblem::GraphSlice *graph_slice = problem->graph_slices[0];
-            typename SSSPProblem::DataSlice *data_slice = problem->d_data_slices[0];
+            typename PSSSPProblem::GraphSlice *graph_slice = problem->graph_slices[0];
+            typename PSSSPProblem::DataSlice *data_slice = problem->d_data_slices[0];
 
 
             SizeT queue_length          = 1;
@@ -263,49 +267,101 @@ class SSSPEnactor : public EnactorBase
 
             bool queue_reset = true; 
 
+	    unsigned int *d_node_locks;
+            unsigned int *d_node_locks_out;
 
-            fflush(stdout);
-            // Step through SSSP iterations
-            
-            VertexId *h_cur_queue = new VertexId[graph_slice->edges];
-            while (done[0] < 0) {
+            if (retval = util::GRError(cudaMalloc(
+                            (void**)&d_node_locks,
+                            EdgeMapPolicy::BLOCKS * sizeof(unsigned int)),
+                        "PBFSProblem cudaMalloc d_node_locks failed", __FILE__, __LINE__)) return retval;
 
-                // Edge Map
-                gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, SSSPProblem, SsspFunctor>
-                <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
-                    queue_reset,
-                    queue_index,
-                    1,
-                    iteration,
-                    num_elements,
-                    d_done,
-                    graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
-                    NULL,          // d_pred_out_queue
-                    graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
-                    graph_slice->d_column_indices,
-                    data_slice,
-                    this->work_progress,
-                    graph_slice->frontier_elements[selector],                   // max_in_queue
-                    graph_slice->frontier_elements[selector^1],                 // max_out_queue
-                    this->edge_map_kernel_stats);
+            if (retval = util::GRError(cudaMalloc(
+                            (void**)&d_node_locks_out,
+                            EdgeMapPolicy::BLOCKS * sizeof(unsigned int)),
+                        "PBFSProblem cudaMalloc d_node_locks_out failed", __FILE__, __LINE__)) return retval;
 
+ 	    while (done[0] < 0) {
+                if (queue_length == 0) break;
+                //Partitioned Edge Map
+                //
+                // Get Rowoffsets
+                // Use scan to compute edge_offsets for each vertex in the frontier
+                // Use sorted sort to compute partition bound for each work-chunk
+                // load edge-expand-partitioned kernel
+                int num_block = (queue_length + EdgeMapPolicy::THREADS - 1)/EdgeMapPolicy::THREADS;
+                gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<EdgeMapPolicy, PSSSPProblem, SsspFunctor> <<< num_block, EdgeMapPolicy::THREADS >>>(
+                                        graph_slice->d_row_offsets,
+                                        graph_slice->frontier_queues.d_keys[selector],
+                                       problem->data_slices[0]->d_scanned_edges,
+                                        queue_length,
+                                        graph_slice->frontier_elements[selector],
+                                        graph_slice->frontier_elements[selector^1]);
 
-                // Only need to reset queue for once
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_partitioned kernel failed", __FILE__, __LINE__))) break;
+                //Scan<MgpuScanTypeInc>((unsigned int*)data_slice->d_scanned_edges, queue_length, context);
+                Scan<MgpuScanTypeInc>((int*)problem->data_slices[0]->d_scanned_edges, queue_length, (int)0, mgpu::plus<int>(),
+		(int*)0, (int*)0, (int*)problem->data_slices[0]->d_scanned_edges, context);
+
+		        /*//Test Scan
+		        int *t_scan = new int[10];
+		        for (int i = 0; i < 10; ++i) {
+		            t_scan[i] = 1;
+		        }
+		        int *d_t_scan;
+		        cudaMalloc((void**)&d_t_scan, sizeof(int)*10);
+                if (retval = util::GRError(cudaMemcpy(
+                                d_t_scan,
+                                t_scan,
+                                sizeof(int)*10,
+                                cudaMemcpyHostToDevice),
+                            "test scan failed", __FILE__, __LINE__)) return retval;
+                Scan<MgpuScanTypeInc>(d_t_scan, 10, (int)0, mgpu::plus<int>(),
+		            (int*)0, (int*)0, d_t_scan, context);
+
+                util::DisplayDeviceResults(d_t_scan, 10);
+                cudaFree(d_t_scan);
+                delete[] t_scan;*/
+
+                SizeT *temp = new SizeT[1];
+                cudaMemcpy(temp, problem->data_slices[0]->d_scanned_edges+queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
+                SizeT output_queue_len = temp[0];
+                printf("num block:%d, scanned length:%d\n", num_block, output_queue_len);
+                
+                // Edge Expand Kernel
+		{
+                        gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<EdgeMapPolicy, PSSSPProblem, SsspFunctor> <<< num_block, EdgeMapPolicy::THREADS >>>(
+                                        queue_reset,
+                                        queue_index,
+                                        iteration,
+                                        graph_slice->d_row_offsets,
+                                        graph_slice->d_column_indices,
+                                        problem->data_slices[0]->d_scanned_edges,
+                                        d_done,
+                                        graph_slice->frontier_queues.d_keys[selector],
+                                        graph_slice->frontier_queues.d_keys[selector^1],
+                                        data_slice,
+                                        queue_length,
+                                        output_queue_len,
+                                        graph_slice->frontier_elements[selector],
+                                        graph_slice->frontier_elements[selector^1],
+                                        work_progress,
+                                        this->edge_map_kernel_stats);
+                }
+		//Only need to reset queue for once
                 if (queue_reset)
                     queue_reset = false;
 
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates 
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_partitioned kernel failed", __FILE__, __LINE__))) break;
+                cudaEventQuery(throttle_event); //give host memory mapped visibility to GPU updates
 
 
                 queue_index++;
                 selector ^= 1;
-                
+
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-                    printf(", %lld", (long long) queue_length);
                     //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
-                    //util::DisplayDeviceResults(problem->data_slices[0]->d_labels, graph_slice->nodes);
+                    printf(", %lld", (long long) queue_length);
                 }
 
                 if (INSTRUMENT) {
@@ -317,52 +373,50 @@ class SSSPEnactor : public EnactorBase
 
                 // Throttle
                 if (iteration & 1) {
-                    if (retval = util::GRError(cudaEventRecord(throttle_event),
-                        "SSSPEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
+                    if (retval = util::GRError(cudaEventRecord(throttle_event), "PBFSEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
                 } else {
-                    if (retval = util::GRError(cudaEventSynchronize(throttle_event),
-                        "SSSPEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
+                    if (retval = util::GRError(cudaEventSynchronize(throttle_event), "PBFSEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
                 }
 
                 // Check if done
                 if (done[0] == 0) break;
-
-                // Vertex Map
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, SSSPProblem, SsspFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
-                    iteration+1,
-                    queue_reset,
-                    queue_index,
-                    1,
-                    num_elements,
-                    d_done,
-                    graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
-                    NULL,    // d_pred_in_queue
-                    graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
-                    data_slice,
-                    NULL,
-                    work_progress,
-                    graph_slice->frontier_elements[selector],           // max_in_queue
-                    graph_slice->frontier_elements[selector^1],         // max_out_queue
-                    this->vertex_map_kernel_stats);
+		
+		// Vertex Map
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, PSSSPProblem, SsspFunctor>
+                    <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                            iteration + 1,
+                            queue_reset,
+                            queue_index,
+                            1,
+                            num_elements,
+                            d_done,
+                            graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                            graph_slice->frontier_queues.d_values[selector],    // d_pred_in_queue
+                            graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
+                            data_slice,
+                            problem->data_slices[0]->d_visited_mask,
+                            work_progress,
+                            graph_slice->frontier_elements[selector],           // max_in_queue
+                            graph_slice->frontier_elements[selector^1],         // max_out_queue
+                            this->vertex_map_kernel_stats);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
-
 
                 queue_index++;
                 selector ^= 1;
                 iteration++;
 
+                
+                if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                 if (INSTRUMENT || DEBUG) {
-                    if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                     total_queued += queue_length;
                     if (DEBUG) printf(", %lld", (long long) queue_length);
                     if (INSTRUMENT) {
                         if (retval = vertex_map_kernel_stats.Accumulate(
-                            vertex_map_grid_size,
-                            total_runtimes,
-                            total_lifetimes)) break;
+                                    vertex_map_grid_size,
+                                    total_runtimes,
+                                    total_lifetimes)) break;
                     }
                 }
                 // Check if done
@@ -372,19 +426,12 @@ class SSSPEnactor : public EnactorBase
 
             }
 
-            delete[] h_cur_queue;
+            util::GRError(cudaFree(d_node_locks), "GpuSlice cudaFree d_node_locks failed", __FILE__, __LINE__);
+            util::GRError(cudaFree(d_node_locks_out), "GpuSlice cudaFree d_node_locks_out failed", __FILE__, __LINE__);
+
             if (retval) break;
 
-            // Check if any of the frontiers overflowed due to redundant expansion
-            bool overflowed = false;
-            if (retval = work_progress.CheckOverflow<SizeT>(overflowed)) break;
-            if (overflowed) {
-                retval = util::GRError(cudaErrorInvalidConfiguration, "Frontier queue overflow. Please increase queue-sizing factor.",__FILE__, __LINE__);
-                break;
-            }
-            
-        } while(0);
-
+	} while(0);
         if (DEBUG) printf("\nGPU SSSP Done.\n");
         return retval;
     }
@@ -405,22 +452,23 @@ class SSSPEnactor : public EnactorBase
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
-    template <typename SSSPProblem>
+    template <typename PSSSPProblem>
     cudaError_t Enact(
-        SSSPProblem                      *problem,
-        typename SSSPProblem::VertexId    src,
+        CudaContext			 &context,
+        PSSSPProblem                      *problem,
+        typename PSSSPProblem::VertexId    src,
         int                             max_grid_size = 0)
     {
         
         if (this->cuda_props.device_sm_version >= 300) {
             typedef gunrock::oprtr::vertex_map::KernelPolicy<
-                SSSPProblem,                         // Problem data type
+                PSSSPProblem,                         // Problem data type
             300,                                // CUDA_ARCH
             INSTRUMENT,                         // INSTRUMENT
             0,                                  // SATURATION QUIT
             true,                               // DEQUEUE_PROBLEM_SIZE
             8,                                  // MIN_CTA_OCCUPANCY
-            6,                                  // LOG_THREADS
+            7,                                  // LOG_THREADS
             1,                                  // LOG_LOAD_VEC_SIZE
             0,                                  // LOG_LOADS_PER_TILE
             5,                                  // LOG_RAKING_THREADS
@@ -428,22 +476,18 @@ class SSSPEnactor : public EnactorBase
             8>                                  // LOG_SCHEDULE_GRANULARITY
                 VertexMapPolicy;
 
-            typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
-                SSSPProblem,                         // Problem data type
+            typedef gunrock::oprtr::edge_map_partitioned::KernelPolicy<
+                PSSSPProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                6,                                  // LOG_THREADS
-                0,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                            // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7>                                  // LOG_SCHEDULE_GRANULARITY
+		1,
+		7,
+		15,
+		32 * 1024>
                     EdgeMapPolicy;
 
-            return EnactSSSP<EdgeMapPolicy, VertexMapPolicy, SSSPProblem>(
-                    problem, src, max_grid_size);
+            return EnactPSSSP<EdgeMapPolicy, VertexMapPolicy, PSSSPProblem>(
+                    context, problem, src, max_grid_size);
         }
 
         //to reduce compile time, get rid of other architecture for now

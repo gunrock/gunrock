@@ -123,11 +123,13 @@ int ReadMarketStream(
 
             long long ll_row, ll_col, ll_value;
             if (LOAD_VALUES) {
-                if (sscanf(line, "%lld %lld %lld", &ll_col, &ll_row, &ll_value) != 3) {
+                if (sscanf(line, "%lld %lld %lld", &ll_col, &ll_row, &ll_value) <2) {
                     fprintf(stderr,
                             "Error parsing MARKET graph: badly formed edge\n");
                         if (coo) free(coo);
                     return -1;
+                } else {
+                    ll_value = rand()%64;
                 }
             } else {
                 if (sscanf(line, "%lld %lld", &ll_col, &ll_row) != 2) {

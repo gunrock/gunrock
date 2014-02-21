@@ -394,7 +394,7 @@ void RunTests(
     }
 
     util::MemsetScaleKernel<<<128, 128>>>
-        (csr_problem->data_slices[0]->d_bc_values, 0.5f, graph.nodes);
+        (csr_problem->data_slices[0]->d_bc_values, (Value)0.5f, (int)graph.nodes);
 
     gpu_timer.Stop();
 
@@ -542,6 +542,7 @@ int main( int argc, char** argv)
         }
 
         csr.PrintHistogram();
+        csr.DisplayGraph();
         fflush(stdout);
 
         // Run tests
