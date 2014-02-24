@@ -439,7 +439,7 @@ int main( int argc, char** argv)
 		// Matrix-market coordinate-formatted graph file
 
 		typedef int VertexId;							// Use as the node identifier type
-		typedef int Value;								// Use as the value type
+		typedef float Value;								// Use as the value type
 		typedef int SizeT;								// Use as the graph size type
 		Csr<VertexId, Value, SizeT> csr(false);         // default value for stream_from_host is false
 

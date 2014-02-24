@@ -158,28 +158,34 @@ class HITSEnactor : public EnactorBase
 
         typedef typename ProblemData::Value         Value;
         Value *rank_curr;
+        Value *rank_next;
         if (hub_or_auth == 0) {
             rank_curr = problem->data_slices[0]->d_hrank_curr;
+            rank_next = problem->data_slices[0]->d_hrank_next;
+            //printf("hub\n");
         } else {
             rank_curr = problem->data_slices[0]->d_arank_curr;
+            rank_next = problem->data_slices[0]->d_arank_next;
+            //printf("auth\n");
         }
+
         //swap rank_curr and rank_next
-        util::MemsetCopyVectorKernel<<<128,
-            128>>>(rank_curr,
-                    problem->data_slices[0]->d_rank_next, nodes); 
+        util::MemsetCopyVectorKernel<<<128, 128>>>(rank_curr, rank_next, nodes); 
 
         //Compute square
-        util::MemsetMultiplyVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_rank_next,
-        problem->data_slices[0]->d_rank_next, nodes);
+        util::MemsetMultiplyVectorKernel<<<128, 128>>>(rank_next, rank_next, nodes);
 
         //Compute sum by reduce
-        Value accumulated_rank = Reduce(problem->data_slices[0]->d_rank_next, nodes, context);
+        Value accumulated_rank = Reduce(rank_next, nodes, context);
         //Compute invsqrt
         accumulated_rank = 1.0/sqrt(accumulated_rank);
         util::MemsetScaleKernel<<<128, 128>>>(rank_curr, accumulated_rank, nodes);
 
-        util::MemsetKernel<<<128, 128>>>(problem->data_slices[0]->d_rank_next,
-                (Value)0.0, nodes);
+        util::MemsetKernel<<<128, 128>>>(rank_next, (Value)0.0, nodes);
+
+        //util::DisplayDeviceResults(rank_curr, nodes);
+
+
     }
 
     /**
@@ -286,7 +292,7 @@ class HITSEnactor : public EnactorBase
             int edge_map_queue_len = num_elements;
 
             // Step through HITS iterations 
-            while (done[0] < 0) {
+            while (done[0] < 0) { 
 
                 if (retval = util::GRError(cudaBindTexture(
                     0,
@@ -297,6 +303,7 @@ class HITSEnactor : public EnactorBase
                         "HITSEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
 
                 if (retval = work_progress.SetQueueLength(queue_index, edge_map_queue_len)) break;
+                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], edge_map_queue_len);
                 // Edge Map
                 gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, HITSProblem, HubFunctor>
                 <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
@@ -317,9 +324,10 @@ class HITSEnactor : public EnactorBase
                     this->edge_map_kernel_stats);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates
+                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates  
 
-                NormalizeRank<HITSProblem>(problem, context, 0, graph_slice->nodes);  
+
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_hrank_next,graph_slice->nodes);
 
                 if (retval = util::GRError(cudaBindTexture(
                     0,
@@ -330,6 +338,7 @@ class HITSEnactor : public EnactorBase
                         "HITSEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
 
                 if (retval = work_progress.SetQueueLength(queue_index, edge_map_queue_len)) break;
+                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], edge_map_queue_len);
                 // Edge Map
                 gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, HITSProblem, AuthFunctor>
                 <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
@@ -350,9 +359,10 @@ class HITSEnactor : public EnactorBase
                     this->edge_map_kernel_stats);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event);
+                cudaEventQuery(throttle_event); 
 
-                NormalizeRank<HITSProblem>(problem, context, 1, graph_slice->nodes); 
+
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next,graph_slice->nodes);
 
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
@@ -375,15 +385,14 @@ class HITSEnactor : public EnactorBase
                         "HITSEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
                 }
 
-                if (queue_reset)
-                    queue_reset = false;
-
                 if (done[0] == 0) break; 
+
+                NormalizeRank<HITSProblem>(problem, context, 0, graph_slice->nodes);
+                NormalizeRank<HITSProblem>(problem, context, 1, graph_slice->nodes); 
                 
                 iteration++; 
 
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_next,
-                //    graph_slice->nodes);
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_next,graph_slice->nodes);
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_curr,
                 //    graph_slice->nodes); 
 

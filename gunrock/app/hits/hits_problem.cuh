@@ -52,7 +52,8 @@ struct HITSProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
         // device storage arrays
         Value   *d_hrank_curr;           /**< Used for ping-pong hub rank value */
         Value   *d_arank_curr;           /**< Used for ping-pong authority rank value */
-        Value   *d_rank_next;           /**< Used for ping-pong page rank value */       
+        Value   *d_hrank_next;           /**< Used for ping-pong page rank value */       
+        Value   *d_arank_next;           /**< Used for ping-pong page rank value */       
         SizeT   *d_labels;
     };
 
@@ -120,7 +121,8 @@ struct HITSProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
                 "~HITSProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
             if (data_slices[i]->d_hrank_curr)      util::GRError(cudaFree(data_slices[i]->d_hrank_curr), "GpuSlice cudaFree d_rank[0] failed", __FILE__, __LINE__);
             if (data_slices[i]->d_arank_curr)      util::GRError(cudaFree(data_slices[i]->d_arank_curr), "GpuSlice cudaFree d_rank[0] failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_rank_next)      util::GRError(cudaFree(data_slices[i]->d_rank_next), "GpuSlice cudaFree d_rank[1] failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_hrank_next)      util::GRError(cudaFree(data_slices[i]->d_hrank_next), "GpuSlice cudaFree d_rank[1] failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_arank_next)      util::GRError(cudaFree(data_slices[i]->d_arank_next), "GpuSlice cudaFree d_rank[1] failed", __FILE__, __LINE__);
             if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
         }
         if (d_data_slices)  delete[] d_data_slices;
@@ -243,12 +245,19 @@ struct HITSProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
                     "HITSProblem cudaMalloc d_arank1 failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_arank_curr = d_arank1;
 
-                Value    *d_rank2;
+                Value    *d_hrank2;
                 if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_rank2,
+                        (void**)&d_hrank2,
                         nodes * sizeof(Value)),
-                    "HITSProblem cudaMalloc d_rank2 failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_rank_next = d_rank2;
+                    "HITSProblem cudaMalloc d_hrank2 failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_hrank_next = d_hrank2;
+
+                Value    *d_arank2;
+                if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_arank2,
+                        nodes * sizeof(Value)),
+                    "HITSProblem cudaMalloc d_arank2 failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_arank_next = d_arank2;
  
                 data_slices[0]->d_labels = NULL;
 
@@ -300,23 +309,31 @@ struct HITSProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
                 data_slices[gpu]->d_arank_curr = d_arank1;
             }
 
-            if (!data_slices[gpu]->d_rank_next) {
-                Value    *d_rank2;
+            if (!data_slices[gpu]->d_hrank_next) {
+                Value    *d_hrank2;
                 if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_rank2,
+                                (void**)&d_hrank2,
                                 nodes * sizeof(Value)),
-                            "HITSProblem cudaMalloc d_rank2 failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_rank_next = d_rank2;
+                            "HITSProblem cudaMalloc d_hrank2 failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_hrank_next = d_hrank2;
             } 
+
+            if (!data_slices[gpu]->d_arank_next) {
+                Value    *d_arank2;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_arank2,
+                                nodes * sizeof(Value)),
+                            "HITSProblem cudaMalloc d_arank2 failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_arank_next = d_arank2;
+            }
 
             data_slices[gpu]->d_labels = NULL;
 
-            // Initial rank_next = 0 
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_hrank_curr,
-                (Value)1.0, nodes);
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_arank_curr,
-                (Value)1.0, nodes);
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_rank_next, (Value)0.0, nodes);
+            // Initial rank_curr = 0 
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_hrank_curr, (Value)1.0, nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_arank_curr, (Value)1.0, nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_hrank_next, (Value)0, nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_arank_next, (Value)0, nodes);
             
             if (retval = util::GRError(cudaMemcpy(
                             d_data_slices[gpu],
