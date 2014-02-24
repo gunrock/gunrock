@@ -60,8 +60,9 @@ struct HUBFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
-        atomicAdd(&problem->d_rank_next[s_id], problem->d_arank_curr[d_id]);
+        atomicAdd(&problem->d_hrank_next[s_id], problem->d_arank_curr[d_id]);
     }
+
 };
 
 /**
@@ -104,7 +105,7 @@ struct AUTHFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
-        atomicAdd(&problem->d_rank_next[s_id], problem->d_hrank_curr[d_id]);
+        atomicAdd(&problem->d_arank_next[s_id], problem->d_hrank_curr[d_id]);
     }
 };
 
