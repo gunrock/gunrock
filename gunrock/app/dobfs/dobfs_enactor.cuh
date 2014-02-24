@@ -514,8 +514,8 @@ class DOBFSEnactor : public EnactorBase
                     problem->data_slices[0]->d_index_queue,            // d_in_index_queue
                     problem->data_slices[0]->d_frontier_map_in,
                     problem->data_slices[0]->d_frontier_map_out,
-                    problem->data_slices[0]->d_col_offsets,
-                    problem->data_slices[0]->d_row_indices,
+                    graph_slice->d_column_offsets,
+                    graph_slice->d_row_indices,
                     data_slice,
                     this->work_progress,
                     this->edge_map_kernel_stats);
@@ -532,8 +532,8 @@ class DOBFSEnactor : public EnactorBase
                     problem->data_slices[0]->d_index_queue,            // d_in_index_queue
                     problem->data_slices[0]->d_frontier_map_out,
                     problem->data_slices[0]->d_frontier_map_in,
-                    problem->data_slices[0]->d_col_offsets,
-                    problem->data_slices[0]->d_row_indices,
+                    graph_slice->d_column_offsets,
+                    graph_slice->d_row_indices,
                     data_slice,
                     this->work_progress,
                     this->edge_map_kernel_stats);

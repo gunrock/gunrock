@@ -77,6 +77,8 @@ struct ProblemBase
 
         SizeT           *d_row_offsets;             // CSR format row offset on device memory
         VertexId        *d_column_indices;          // CSR format column indices on device memory
+        SizeT           *d_column_offsets;          // CSR format column offset on device memory
+        VertexId        *d_row_indices;             // CSR format row indices on device memory
 
         //Frontier queues. Used to track working frontier.
         util::DoubleBuffer<VertexId, VertexId>      frontier_queues;
@@ -99,6 +101,8 @@ struct ProblemBase
             index(index),
             d_row_offsets(NULL),
             d_column_indices(NULL),
+            d_column_offsets(NULL),
+            d_row_indices(NULL),
             nodes(0),
             edges(0),
             stream(stream)
@@ -121,6 +125,8 @@ struct ProblemBase
             // Free pointers
             if (d_row_offsets)      util::GRError(cudaFree(d_row_offsets), "GpuSlice cudaFree d_row_offsets failed", __FILE__, __LINE__);
             if (d_column_indices)   util::GRError(cudaFree(d_column_indices), "GpuSlice cudaFree d_column_indices failed", __FILE__, __LINE__);
+            if (d_column_offsets)   util::GRError(cudaFree(d_column_offsets), "GpuSlice cudaFree d_column_offsets failed", __FILE__, __LINE__);
+            if (d_row_indices)      util::GRError(cudaFree(d_row_indices), "GpuSlice cudaFree d_row_indices failed", __FILE__, __LINE__);
             for (int i = 0; i < 2; ++i) {
                 if (frontier_queues.d_keys[i])      util::GRError(cudaFree(frontier_queues.d_keys[i]), "GpuSlice cudaFree frontier_queues.d_keys failed", __FILE__, __LINE__);
                 if (frontier_queues.d_values[i])    util::GRError(cudaFree(frontier_queues.d_values[i]), "GpuSlice cudaFree frontier_queues.d_values failed", __FILE__, __LINE__);
@@ -211,6 +217,8 @@ struct ProblemBase
      * @param[in] edges Number of edges in the CSR graph.
      * @param[in] h_row_offsets Host-side row offsets array.
      * @param[in] h_column_indices Host-side column indices array.
+     * @param[in] h_column_offsets Host-side column offsets array.
+     * @param[in] h_row_indices Host-side row indices array.
      * @param[in] num_gpus Number of the GPUs used.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -221,7 +229,9 @@ struct ProblemBase
         SizeT       edges,
         SizeT       *h_row_offsets,
         VertexId    *h_column_indices,
-        int         num_gpus)
+        SizeT       *h_column_offsets = NULL,
+        VertexId    *h_row_indices = NULL,
+        int         num_gpus = 1)
     {
         cudaError_t retval      = cudaSuccess;
         this->nodes             = nodes;
@@ -251,6 +261,19 @@ struct ProblemBase
                                     (void **)&graph_slices[0]->d_column_indices,
                                     (void *) h_column_indices, 0),
                                 "ProblemBase cudaHostGetDevicePointer d_column_indices failed", __FILE__, __LINE__)) break;
+                    if (h_column_offsets != NULL) {
+                        if (retval = util::GRError(cudaHostGetDevicePointer(
+                                        (void **)&graph_slices[0]->d_column_offsets,
+                                        (void *) h_column_offsets, 0),
+                                    "ProblemBase cudaHostGetDevicePointer d_column_offsets failed", __FILE__, __LINE__)) break;
+                    }
+
+                    if (h_row_indices != NULL) {
+                        if (retval = util::GRError(cudaHostGetDevicePointer(
+                                        (void **)&graph_slices[0]->d_row_indices,
+                                        (void *) h_row_indices, 0),
+                                    "ProblemBase cudaHostGetDevicePointer d_row_indices failed", __FILE__, __LINE__)) break;
+                    }
                 } else {
 
                     // Allocate and initialize d_row_offsets
@@ -279,7 +302,35 @@ struct ProblemBase
                         cudaMemcpyHostToDevice),
                         "ProblemBase cudaMemcpy d_column_indices failed", __FILE__, __LINE__)) break;
 
+                    if (h_column_offsets != NULL) {
+                        // Allocate and initialize d_column_offsets
+                        if (retval = util::GRError(cudaMalloc(
+                                        (void**)&graph_slices[0]->d_column_offsets,
+                                        (graph_slices[0]->nodes+1) * sizeof(SizeT)),
+                                    "ProblemBase cudaMalloc d_column_offsets failed", __FILE__, __LINE__)) break;
 
+                        if (retval = util::GRError(cudaMemcpy(
+                                        graph_slices[0]->d_column_offsets,
+                                        h_column_offsets,
+                                        (graph_slices[0]->nodes+1) * sizeof(SizeT),
+                                        cudaMemcpyHostToDevice),
+                                    "ProblemBase cudaMemcpy d_column_offsets failed", __FILE__, __LINE__)) break;
+                    }
+
+                    if (h_row_indices != NULL) {
+                        // Allocate and initialize d_row_indices
+                        if (retval = util::GRError(cudaMalloc(
+                                        (void**)&graph_slices[0]->d_row_indices,
+                                        graph_slices[0]->edges * sizeof(VertexId)),
+                                    "ProblemBase cudaMalloc d_row_indices failed", __FILE__, __LINE__)) break;
+
+                        if (retval = util::GRError(cudaMemcpy(
+                                        graph_slices[0]->d_row_indices,
+                                        h_row_indices,
+                                        graph_slices[0]->edges * sizeof(VertexId),
+                                        cudaMemcpyHostToDevice),
+                                    "ProblemBase cudaMemcpy d_row_indices failed", __FILE__, __LINE__)) break;
+                    }
 
                 } //end if(stream_from_host)
             } else {
@@ -309,7 +360,6 @@ struct ProblemBase
                 // Set device
                 if (retval = util::GRError(cudaSetDevice(graph_slices[gpu]->index),
                             "ProblemBase cudaSetDevice failed", __FILE__, __LINE__)) return retval;
-
 
                 //
                 // Allocate frontier queues if necessary

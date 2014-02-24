@@ -39,7 +39,8 @@ SM_TARGETS = $(GEN_SM30)
 
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
 MGPU_INC = "../../../moderngpu/include"
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I.. -I../..
+BOOST_INC = "../../../boost_1_53_0"
+INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(BOOST_INC) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -106,11 +107,11 @@ DEPS = 			./Makefile \
 # (make test) Test driver for 
 #-------------------------------------------------------------------------------
 
-test: bin/test_pbfs_$(NVCC_VERSION)_$(ARCH_SUFFIX)
+test: bin/test_hits_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_pbfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_pbfs.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/test_hits_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_hits.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_pbfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_pbfs.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3  
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_hits_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_hits.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3  
 
 #-------------------------------------------------------------------------------
 # Clean

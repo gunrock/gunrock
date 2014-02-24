@@ -194,6 +194,8 @@ struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
                     edges,
                     h_row_offsets,
                     h_column_indices,
+                    NULL,
+                    NULL,
                     num_gpus);
 
         // No data in DataSlice needs to be copied from host

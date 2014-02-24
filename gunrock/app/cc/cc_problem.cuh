@@ -234,6 +234,8 @@ struct CCProblem : ProblemBase<VertexId, SizeT,
                                         edges,
                                         h_row_offsets,
                                         h_column_indices,
+                                        NULL,
+                                        NULL,
                                         num_gpus);
 
         // No data in DataSlice needs to be copied from host

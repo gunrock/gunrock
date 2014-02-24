@@ -23,7 +23,6 @@
 
 // Graph construction utils
 #include <gunrock/graphio/market.cuh>
-#include <gunrock/graphio/rmat.cuh>
 
 // BFS includes
 #include <gunrock/app/bfs/bfs_enactor.cuh>
@@ -64,10 +63,7 @@ bool g_stream_from_host;
         "  market [<file>]\n"
         "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
         "    edges from stdin (or from the optionally-specified file).\n"
-        " rmat <n> <m>\n"
-        "    An R-MAT graph generator that adds <m> edges to <n> nodes in accordance with\n"
-        "    the GTGraph generator defaults (A=.45,B=.15,C=.15,D=.25 skew parameters\n"
-
+        
         "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
         "  --undirected If set then treat the graph as undirected.\n"
         "  --instrumented If set then kernels keep track of queue-search_depth\n"
@@ -602,34 +598,6 @@ int main( int argc, char** argv)
 		// Run tests
 		RunTests(csr, args);
 
-	} else if (graph_type == "rmat") {
-        // Matrix-market coordinate-formatted graph file
-
-		typedef int VertexId;							// Use as the node identifier type
-		typedef int Value;								// Use as the value type
-		typedef int SizeT;								// Use as the graph size type
-		Csr<VertexId, Value, SizeT> csr(false);         // default value for stream_from_host is false
-
-		if (graph_args < 3) { Usage(); return 1; }
-        SizeT nodes = atol(argv[2]);
-        SizeT edges = atol(argv[3]);
-		if (graphio::BuildRmatGraph<false>(
-			nodes,
-            edges,
-			csr, 
-			g_undirected,
-			false,  // no inverse graph
-            0.45,
-            0.15,
-            0.15) != 0)
-		{
-			return 1;
-		}
-
-		csr.PrintHistogram();
-
-		// Run tests
-		RunTests(csr, args);
     } else {
 
 		// Unknown graph type

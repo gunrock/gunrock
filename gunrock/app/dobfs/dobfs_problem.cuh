@@ -56,8 +56,6 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
         // device storage arrays
         VertexId        *d_labels;              /**< Used for source distance */
         VertexId        *d_preds;               /**< Used for predecessor */
-        SizeT           *d_col_offsets;         /**< CSC format column offset on device memory */
-        VertexId        *d_row_indices;         /**< CSC format row indices on device memory */
         bool            *d_frontier_map_in;     /**< Input frontier bitmap */
         bool            *d_frontier_map_out;    /**< Output frontier bitmap */
         VertexId        *d_index_queue;         /**< Index of unvisited queue */
@@ -140,10 +138,6 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
                 "~DOBFSProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
             if (data_slices[i]->d_labels)       util::GRError(cudaFree(data_slices[i]->d_labels), "GpuSlice cudaFree d_labels failed", __FILE__, __LINE__);
             if (data_slices[i]->d_preds)        util::GRError(cudaFree(data_slices[i]->d_preds), "GpuSlice cudaFree d_preds failed", __FILE__, __LINE__);
-            if (!undirected) {
-                if (data_slices[i]->d_col_offsets)  util::GRError(cudaFree(data_slices[i]->d_col_offsets), "GpuSlice cudaFree d_col_offsets failed", __FILE__, __LINE__);
-                if (data_slices[i]->d_row_indices)  util::GRError(cudaFree(data_slices[i]->d_row_indices), "GpuSlice cudaFree d_row_indices failed", __FILE__, __LINE__);
-            }
             if (data_slices[i]->d_frontier_map_in)  util::GRError(cudaFree(data_slices[i]->d_frontier_map_in), "GpuSlice cudaFree d_frontier_map_in failed", __FILE__, __LINE__);
             if (data_slices[i]->d_frontier_map_out)  util::GRError(cudaFree(data_slices[i]->d_frontier_map_out), "GpuSlice cudaFree d_frontier_map_out failed", __FILE__, __LINE__);
             if (data_slices[i]->d_index_queue)  util::GRError(cudaFree(data_slices[i]->d_index_queue), "GpuSlice cudaFree d_index_queue failed", __FILE__, __LINE__);
@@ -230,14 +224,18 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
         beta = _beta;
         VertexId *h_row_offsets = graph.row_offsets;
         VertexId *h_column_indices = graph.column_indices;
-        VertexId *h_col_offsets = inv_graph.row_offsets;
-        VertexId *h_row_indices = inv_graph.column_indices;
+        VertexId *h_col_offsets = NULL;
+        if (!undirected) h_col_offsets = inv_graph.row_offsets;
+        VertexId *h_row_indices = NULL;
+        if (!undirected) h_row_indices = inv_graph.column_indices;
         ProblemBase<VertexId, SizeT,
                                 _USE_DOUBLE_BUFFER>::Init(stream_from_host,
                                         nodes,
                                         edges,
                                         h_row_offsets,
                                         h_column_indices,
+                                        h_col_offsets,
+                                        h_row_indices,
                                         num_gpus);
 
         // No data in DataSlice needs to be copied from host
@@ -276,41 +274,7 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
                         (void**)&d_preds,
                         nodes * sizeof(VertexId)),
                     "DOBFSProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_preds = d_preds;
-
-                if (!undirected) {
-                    SizeT    *d_col_offsets;
-                    if (retval = util::GRError(cudaMalloc(
-                                    (void**)&d_col_offsets,
-                                    (nodes+1) * sizeof(SizeT)),
-                                "DOBFSProblem cudaMalloc d_col_offsets failed", __FILE__, __LINE__)) return retval;
-
-                    if (retval = util::GRError(cudaMemcpy(
-                                    d_col_offsets,
-                                    h_col_offsets,
-                                    (nodes+1) * sizeof(SizeT),
-                                    cudaMemcpyHostToDevice),
-                                "DOBFSProblem cudaMemcpy d_col_offsets failed", __FILE__, __LINE__)) break;
-
-                    data_slices[gpu]->d_col_offsets = d_col_offsets;
-
-                    VertexId    *d_row_indices;
-                    if (retval = util::GRError(cudaMalloc(
-                                    (void**)&d_row_indices,
-                                    edges * sizeof(VertexId)),
-                                "DOBFSProblem cudaMalloc d_row_indices failed", __FILE__, __LINE__)) return retval;
-
-                    if (retval = util::GRError(cudaMemcpy(
-                                    d_row_indices,
-                                    h_row_indices,
-                                    edges * sizeof(VertexId),
-                                    cudaMemcpyHostToDevice),
-                                "ProblemBase cudaMemcpy d_row_indices failed", __FILE__, __LINE__)) break;
-                    data_slices[gpu]->d_row_indices = d_row_indices;
-                } else {
-                    data_slices[gpu]->d_col_offsets = ProblemBase<VertexId, SizeT,_USE_DOUBLE_BUFFER>::graph_slices[gpu]->d_row_offsets;
-                    data_slices[gpu]->d_row_indices = ProblemBase<VertexId, SizeT,_USE_DOUBLE_BUFFER>::graph_slices[gpu]->d_column_indices;
-                }
+                data_slices[0]->d_preds = d_preds; 
 
                 bool    *d_frontier_map_in;
                 if (retval = util::GRError(cudaMalloc(
