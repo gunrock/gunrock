@@ -46,7 +46,7 @@ struct MSTFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
-        
+        return true;
     }
 
     /**
@@ -61,7 +61,7 @@ struct MSTFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
-        
+       return; 
     }
 
     /**
@@ -74,6 +74,7 @@ struct MSTFunctor
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
+        return true;
     }
 
     /**
@@ -85,7 +86,7 @@ struct MSTFunctor
      */
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-        
+        return; 
     }
 };
 
