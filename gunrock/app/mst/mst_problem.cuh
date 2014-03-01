@@ -51,6 +51,7 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
     {
         // device storage arrays
         SizeT   *d_labels;
+        Value   *d_weights;
     };
 
     // Members
@@ -155,7 +156,7 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
             } //end if (data_slices.size() ==1)
         } while(0);*/
 
-        return true;
+        return cudaSuccess;
     }
 
     /**
@@ -235,8 +236,6 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
      *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Reset(
-            Value    delta,
-            Value    threshold,
             FrontierType frontier_type)             // The frontier type (i.e., edge/vertex/mixed)
     {
         typedef ProblemBase<VertexId, SizeT, false> BaseProblem;

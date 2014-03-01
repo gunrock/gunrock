@@ -31,7 +31,7 @@
 #include <gunrock/app/mst/mst_functor.cuh>
 
 // Operator includes
-#include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
+#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/vertex_map/kernel.cuh>
 
 #include <moderngpu.cuh>
@@ -51,7 +51,6 @@ bool g_verbose;
 bool g_undirected;
 bool g_quick;
 bool g_stream_from_host;
-
 
 /******************************************************************************
  * Housekeeping Routines
@@ -142,23 +141,31 @@ void RunTests(
     const Csr<VertexId, Value, SizeT> &graph,
     int max_grid_size,
     int num_gpus,
-    CudaContext& context)
+    mgpu::CudaContext& context)
 {
-    
+
     typedef MSTProblem<
         VertexId,
         SizeT,
         Value> Problem;
 
-        // Perform MST
-        GpuTimer gpu_timer;
+    // Allocate BFS enactor map
+    MSTEnactor<INSTRUMENT> mst_enactor(g_verbose);
+
+    // Allocate problem on GPU
+    Problem *csr_problem = new Problem;
+    util::GRError(csr_problem->Init(
+                g_stream_from_host,
+                graph,
+                num_gpus), "Problem MST Initialization Failed", __FILE__, __LINE__);
+
+    // Perform MST
+    GpuTimer gpu_timer;
 
         util::GRError(csr_problem->Reset(mst_enactor.GetFrontierType()), "MST Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
-        util::GRError(pr_enactor.template Enact<Problem>(context, csr_problem, max_grid_size), "MST Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(mst_enactor.template Enact<Problem>(context, csr_problem, max_grid_size), "MST Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
-
-        mst_enactor.GetStatistics(total_queued, avg_duty);
 
         float elapsed = gpu_timer.ElapsedMillis();
 
@@ -191,7 +198,7 @@ template <
 void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
     CommandLineArgs &args,
-    CudaContext& context)
+    mgpu::CudaContext& context)
 {
     bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
@@ -236,7 +243,7 @@ int main( int argc, char** argv)
 	//cudaSetDeviceFlags(cudaDeviceMapHost);
 	int dev = 0;
     args.GetCmdLineArgument("device", dev);
-    ContextPtr context = mgpu::CreateCudaDevice(dev);
+    mgpu::ContextPtr context = mgpu::CreateCudaDevice(dev);
 
 	//srand(0);									// Presently deterministic
 	//srand(time(NULL));

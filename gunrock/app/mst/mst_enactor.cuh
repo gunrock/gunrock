@@ -26,10 +26,13 @@
 #include <gunrock/app/mst/mst_problem.cuh>
 #include <gunrock/app/mst/mst_functor.cuh>
 
+#include <moderngpu.cuh>
 
 namespace gunrock {
 namespace app {
 namespace mst {
+
+using namespace mgpu;
 
 /**
  * @brief MST problem enactor class.
@@ -215,6 +218,7 @@ class MSTEnactor : public EnactorBase
         typename VertexMapPolicy,
         typename MSTProblem>
     cudaError_t EnactMST(
+    CudaContext                         &context,
     MSTProblem                          *problem,
     int                                 max_grid_size = 0)
     {
@@ -255,8 +259,8 @@ class MSTEnactor : public EnactorBase
      */
     template <typename MSTProblem>
     cudaError_t Enact(
+        CudaContext                     &context,
         MSTProblem                      *problem,
-        typename MSTProblem::VertexId    src,
         int                             max_grid_size = 0)
     {
         if (this->cuda_props.device_sm_version >= 300) {
@@ -290,7 +294,7 @@ class MSTEnactor : public EnactorBase
                     EdgeMapPolicy;
 
             return EnactMST<EdgeMapPolicy, VertexMapPolicy, MSTProblem>(
-                    problem, src, max_grid_size);
+                    context, problem, max_grid_size);
         }
 
         //to reduce compile time, get rid of other architecture for now
