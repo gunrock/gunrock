@@ -22,6 +22,7 @@
 #include <gunrock/util/multiple_buffering.cuh>
 #include <gunrock/util/io/modified_load.cuh>
 #include <gunrock/util/io/modified_store.cuh>
+#include <gunrock/util/markSegment.cuh>
 
 #include <vector>
 
