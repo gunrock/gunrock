@@ -312,13 +312,6 @@ struct EdgeRmFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
-	/*
-	if (problem->d_represent[s_id] == problem->d_represent[d_id]){
-		problem->d_edges[e_id] = -1; 
-		problem->d_weights[e_id] = -1;
-		problem->d_keys[e_id] = -1;
-	}
-	*/
 	problem->d_edges[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_edges[e_id]; 
 	problem->d_weights[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_weights[e_id];
 	problem->d_keys[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_keys[e_id];	
@@ -351,7 +344,9 @@ struct EdgeRmFunctor
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-        return true;
+        problem->d_keys[node] = problem->d_Ckeys[problem->d_keys[node]];
+	problem->d_edges[node] = problem->d_Ckeys[problem->d_edges[node]];
+	return true;
     }
 
     /**
@@ -424,7 +419,7 @@ struct RMFunctor
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-	return (problem->d_edges[node] != problem->d_edges[node-1]);
+   	return (node != -1) ? true : false;
     }
 
     /**

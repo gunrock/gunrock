@@ -351,8 +351,9 @@ class BFSEnactor : public EnactorBase
 
                 // Check if done
                 if (done[0] == 0) break;
-
-                // Vertex Map
+		printf("Before Vertex Mapping:");
+                util::DisplayDeviceResults(problem->data_slices[0]->d_labels, graph_slice->nodes);
+		// Vertex Map
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, BFSProblem, BfsFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
                     iteration+1,
@@ -370,12 +371,12 @@ class BFSEnactor : public EnactorBase
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
                     this->vertex_map_kernel_stats);
-
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
-
-
-                queue_index++;
+		
+		util::DisplayDeviceResults(problem->data_slices[0]->d_labels, graph_slice->nodes);
+                
+		queue_index++;
                 selector ^= 1;
                 iteration++;
 

@@ -25,7 +25,7 @@
 // Graph construction utils
 #include <gunrock/graphio/market.cuh>
 
-// BFS includes
+// MST includes
 #include <gunrock/app/mst/mst_enactor.cuh>
 #include <gunrock/app/mst/mst_problem.cuh>
 #include <gunrock/app/mst/mst_functor.cuh>
@@ -163,7 +163,8 @@ void RunTests(
     	typedef MSTProblem<
         VertexId,
         SizeT,
-        Value> Problem;
+        Value,
+	true> Problem;
 	
 	/* INSTRUMENT specifies whether we want to keep such statistical data */
     	/* Allocate MST enactor map */
@@ -182,16 +183,19 @@ void RunTests(
     	// Perform MST
     	GpuTimer gpu_timer; /* Record the kernel running time */
 	/* Reset values in DataSlice */
-        util::GRError(mst_problem->Reset(mst_enactor.GetFrontierType()), "MST Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(mst_problem->Reset(mst_enactor.GetFrontierType()), 
+		"MST Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
-        util::GRError(mst_enactor.template Enact<Problem>(context, mst_problem, max_grid_size), "MST Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(mst_enactor.template Enact<Problem>(context, mst_problem, max_grid_size), 
+		"MST Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
 
         float elapsed = gpu_timer.ElapsedMillis();
 
         /* Copy out results back to CPU from GPU using Extract */
         // TODO: write the extract function
-        // util::GRError(csr_problem->Extract(h_result), "MST Problem Data Extraction Failed", __FILE__, __LINE__);
+        // util::GRError(csr_problem->Extract(h_result), 
+	//	"MST Problem Data Extraction Failed", __FILE__, __LINE__);
 
         /* Verify the result using CompareResults() */
         
@@ -224,11 +228,8 @@ void RunTests(
     	mgpu::CudaContext& context)
 {
     	bool instrumented = false;
-	/* Whether or not to collect instrumentation from kernels */
     	int max_grid_size = 0;            
-	/* maximum grid size (0: leave it up to the enactor) */
     	int num_gpus = 1;            
-	/* Number of GPUs for multi-gpu enactor to use */
 
     	instrumented = args.CheckCmdLineFlag("instrumented");
 
@@ -295,9 +296,7 @@ int main( int argc, char** argv)
 
 		typedef int VertexId;	// Use as the node identifier type
 		typedef int Value;	// Use as the value type
-		/* Datatype of a value attached to edge or node in graph */
 		typedef int SizeT;	// Use as the graph size type
-		/* Datatype for storing the #nodes and the #edges in the graph */
 		Csr<VertexId, Value, SizeT> csr(false);	
 		/* Default value for stream_from_host is false */
 
@@ -314,7 +313,7 @@ int main( int argc, char** argv)
 			return 1;
 		}
 			
-		// csr.DisplayGraph();
+		csr.DisplayGraph();
 		
 		// Run tests
 		RunTests(csr, args, *context);

@@ -27,12 +27,15 @@ namespace mst {
  * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
  * @tparam _Value               Type of float or double to use for computing MST value.
+ * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer.
+ *
  */
 template <
     	typename    _VertexId,                       
     	typename    _SizeT,                          
-    	typename    _Value>
-struct MSTProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = false
+    	typename    _Value,
+	bool        _USE_DOUBLE_BUFFER>
+struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DOUBLE_BUFFER = false
 {
 
     	typedef _VertexId	VertexId;
@@ -228,7 +231,7 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
 	    edges = graph.edges;
 	    VertexId *h_row_offsets = graph.row_offsets;
 	    VertexId *h_column_indices = graph.column_indices;
-		ProblemBase<VertexId, SizeT, false>::Init(stream_from_host,
+		ProblemBase<VertexId, SizeT, _USE_DOUBLE_BUFFER>::Init(stream_from_host,
 			nodes,
 			edges,
 			h_row_offsets,
@@ -385,6 +388,7 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                                 nodes * sizeof(VertexId)),
                                 "MSTProblem cudaMalloc d_nodes failed", __FILE__, __LINE__)) return retval;
 			data_slices[0]->d_nodes = d_nodes;
+			util::MemsetKernel<<<128, 128>>>(data_slices[0]->d_nodes, 0, nodes);			
 			
 			SizeT           *d_Cflag;        // CFlag array has the same size as #edges
                         if (retval = util::GRError(cudaMalloc(
@@ -421,7 +425,7 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
 	cudaError_t Reset(
 		FrontierType frontier_type)             // The frontier type (i.e., edge/vertex/mixed)
 	{
-	    typedef ProblemBase<VertexId, SizeT, false> BaseProblem;
+	    typedef ProblemBase<VertexId, SizeT, _USE_DOUBLE_BUFFER> BaseProblem;
 	    //load ProblemBase Reset
 	    BaseProblem::Reset(frontier_type, 1.0f); // Default queue sizing is 1.0
 
@@ -439,7 +443,8 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                                     (void**)&d_edges,
                                     edges * sizeof(SizeT)),
                                 "MSTProblem cudaMalloc d_edges failed", __FILE__, __LINE__)) return retval;
-                }
+                	data_slices[gpu]->d_edges = d_edges;
+		}
 
 		if (!data_slices[gpu]->d_weights) {
 		    	Value    *d_weights;
@@ -447,6 +452,7 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
 				    (void**)&d_weights,
 				    edges * sizeof(Value)),
 				"MSTProblem cudaMalloc d_weights failed", __FILE__, __LINE__)) return retval;
+			data_slices[gpu]->d_weights = d_weights;
 		} 
 		
 		 if (!data_slices[gpu]->d_reducedWeights) {
@@ -603,6 +609,7 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
 	    	    
 	    // Put every vertex in frontier queue
 	    util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], nodes);
+	    // util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_values[0], edges);
 	    return retval;
 	}
 
