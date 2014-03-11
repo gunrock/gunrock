@@ -264,6 +264,18 @@ class MSTEnactor : public EnactorBase
             VertexId,
             MSTProblem> RmFunctor;
 
+	typedef VLENFunctor<
+            VertexId,
+            SizeT,
+            VertexId,
+            MSTProblem> VlenFunctor;
+
+	typedef RowOFunctor<
+            VertexId,
+            SizeT,
+            VertexId,
+            MSTProblem> RowOFunctor;
+	
 	cudaError_t retval = cudaSuccess;
 
         do {
@@ -346,8 +358,8 @@ class MSTEnactor : public EnactorBase
 		// give host memory mapped visibility to GPU updates
 
 		/* TODO:check */
-		printf("::Flag Array::");	
-		util::DisplayDeviceResults(problem->data_slices[0]->d_flag, graph_slice->edges);
+		// printf("::Flag Array::");	
+		// util::DisplayDeviceResults(problem->data_slices[0]->d_flag, graph_slice->edges);
 		
 		/* Segmented reduction: generate keys array using mgpu::scan */
 		Scan<MgpuScanTypeInc>((int*)problem->data_slices[0]->d_flag, graph_slice->edges,
@@ -360,10 +372,10 @@ class MSTEnactor : public EnactorBase
                 problem->data_slices[0]->d_reducedWeights, &numSegments, (int*)0, context);	
 		
 		// TODO:	
-		printf("::Reduced keys::");
-		util::DisplayDeviceResults(problem->data_slices[0]->d_reducedKeys, graph_slice->nodes);
-		printf("::Reduced weights::");
-		util::DisplayDeviceResults(problem->data_slices[0]->d_reducedWeights, graph_slice->nodes);
+		// printf("::Reduced keys::");
+		// util::DisplayDeviceResults(problem->data_slices[0]->d_reducedKeys, graph_slice->nodes);
+		// printf("::Reduced weights::");
+		// util::DisplayDeviceResults(problem->data_slices[0]->d_reducedWeights, graph_slice->nodes);
 
 		
 		/* Generate Successor Array using Edge Mapping */
@@ -397,8 +409,8 @@ class MSTEnactor : public EnactorBase
 		
 		// printf("::Edge Weights::");
                 // util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);
-		printf("::Successor Array::");
-		util::DisplayDeviceResults(problem->data_slices[0]->d_successor, graph_slice->nodes);
+		// printf("::Successor Array::");
+		// util::DisplayDeviceResults(problem->data_slices[0]->d_successor, graph_slice->nodes);
 
 		/* Remove Cycles using Vertex Mapping */
                 queue_index  = 0;   
@@ -498,17 +510,49 @@ class MSTEnactor : public EnactorBase
     		MergesortPairs(problem->data_slices[0]->d_superVertex, 
 			problem->data_slices[0]->d_nodes, graph_slice->nodes, mgpu::less<int>(), context);
 		
-		// printf("::SuperVertex Id::");
-                // util::DisplayDeviceResults(problem->data_slices[0]->d_superVertex, graph_slice->nodes);
-		// printf("::Sorted nodes that match C flag::");
+		printf("::SuperVertex Id::");
+                util::DisplayDeviceResults(problem->data_slices[0]->d_superVertex, graph_slice->nodes);
+		// printf(":: Sorted nodes that match C flag ::");
 		// util::DisplayDeviceResults(problem->data_slices[0]->d_nodes, graph_slice->nodes);		
 
 		/* Scan of the flag assigns new supervertex ids */
 		util::markSegment<<<128, 128>>>(problem->data_slices[0]->d_Cflag, 
 			problem->data_slices[0]->d_superVertex, graph_slice->nodes);
 		
-		// printf("::C Flag::");
-                // util::DisplayDeviceResults(problem->data_slices[0]->d_Cflag, graph_slice->nodes);	
+		printf("::C Flag::");
+                util::DisplayDeviceResults(problem->data_slices[0]->d_Cflag, graph_slice->nodes);	
+		
+		/* Calculate New Vertex List length */
+                queue_index  = 0;
+                selector     = 0;
+                num_elements = graph_slice->nodes;
+                queue_reset = true;
+
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, MSTProblem, VlenFunctor>
+                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                        0,              // Current graph traversal iteration
+                        queue_reset,    // reset queue counter
+                        queue_index,    // Current frontier queue counter index
+                        1,              // Number of gpu(s)
+                        num_elements,   // Number of element(s)
+                        NULL,           // d_done
+                        graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                        NULL,           // d_pred_in_queue
+                        graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
+                        data_slice,     // Problem
+                        NULL,           // visited mask
+                        work_progress,  // work progress
+                        graph_slice->frontier_elements[selector],       // max_in_queue
+                        graph_slice->frontier_elements[selector^1],     // max_out_queue
+                        this->vertex_map_kernel_stats);                 // kernel stats
+
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
+                        "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates		
+
+		printf(":: New Row_offsets ::");
+		util::DisplayDeviceResults(problem->data_slices[0]->d_row_offsets, graph_slice->nodes);
+
 		
 		/* Segmented reduction: generate keys array using mgpu::scan */
                 Scan<MgpuScanTypeInc>((int*)problem->data_slices[0]->d_Cflag, graph_slice->nodes,
@@ -548,25 +592,25 @@ class MSTEnactor : public EnactorBase
                         "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
-		// Debug
-		printf("::Edge Removal (edges)::");
-                util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
-		printf("::Edge Removal (keys)::");
-		util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
-		printf("::Edge Removal (weights)::");
-		util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);
+		// Debug Mark -1 means need to be removed
+		// printf("::Edge Removal (edges)::");
+                // util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
+		// printf("::Edge Removal (keys)::");
+		// util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
+		// printf("::Edge Removal (weights)::");
+		// util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);
  		
 		// Mergesort pairs.
        		MergesortPairs(problem->data_slices[0]->d_nodes,
                         problem->data_slices[0]->d_Ckeys, graph_slice->nodes, mgpu::less<int>(), context);
 		
-		printf("::Sorted Ckeys matching nodes::");
-                util::DisplayDeviceResults(problem->data_slices[0]->d_Ckeys, graph_slice->nodes);
+		// printf("::Sorted Ckeys matching nodes::");
+                // util::DisplayDeviceResults(problem->data_slices[0]->d_Ckeys, graph_slice->nodes);
 		
 		// printf("::Ordered Edge List::");
                 // util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
                 
-		/* Generate new edge list, keys array and weights list using vertex mapping */
+		/* Generate new edge list, keys array and weights list using vertex mapping */	
 		// Edge mapping to select edges
 		queue_index = 0;
                 selector = 0;
@@ -606,15 +650,15 @@ class MSTEnactor : public EnactorBase
 		
 		// Edge mapping to select keys
                 queue_index = 0;
-                selector ^= 1;
+                selector = 0;
                 num_elements = graph_slice->edges;
                 queue_reset = true;
 		
 		// Fill in frontier queue
                 util::MemsetCopyVectorKernel<<<128, 128>>>(graph_slice->frontier_queues.d_values[selector],
                         problem->data_slices[0]->d_keys, graph_slice->edges);
-	     	printf("::keys in frontier queue::");	
-		util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], graph_slice->edges);
+	     	// printf("::keys in frontier queue::");	
+		// util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], graph_slice->edges);
 
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, MSTProblem, RmFunctor>
                         <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
@@ -638,22 +682,23 @@ class MSTEnactor : public EnactorBase
                         "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 		
+		// printf("::Before copy back to d_keys array::");		
+		// util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector^1], graph_slice->edges);
 		// Copy back to keys
 		util::MemsetCopyVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_keys,
                         graph_slice->frontier_queues.d_values[selector^1], graph_slice->edges);
-		// util::MemsetKernel<<<128, 128>>>(graph_slice->frontier_queues.d_values[selector^1], 0, graph_slice->edges);
 
 		// Edge mapping to select weights
                 queue_index = 0;
-                selector ^= 1;
+                selector = 0;
                 num_elements = graph_slice->edges;
                 queue_reset = true;
 		
 		// Fill in frontier queue
                 util::MemsetCopyVectorKernel<<<128, 128>>>(graph_slice->frontier_queues.d_values[selector],
                         problem->data_slices[0]->d_weights, graph_slice->edges);
-		printf("::weights in frontier queue::");
-		util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], graph_slice->edges);
+		// printf("::weights in frontier queue::");
+		// util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], graph_slice->edges);
 
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, MSTProblem, RmFunctor>
                         <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
@@ -680,18 +725,63 @@ class MSTEnactor : public EnactorBase
 		// Copy back to d_weights	
 		util::MemsetCopyVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_weights,
                         graph_slice->frontier_queues.d_values[selector^1], graph_slice->edges);
+		
+		// Generate Flag array with new length
+                queue_index = 0;
+                selector = 0;
+                num_elements = graph_slice->edges;
+                queue_reset = true;
+
+                // Fill in frontier queue
+                util::MemsetCopyVectorKernel<<<128, 128>>>(graph_slice->frontier_queues.d_values[selector],
+                        problem->data_slices[0]->d_flag, graph_slice->edges);
+
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, MSTProblem, RmFunctor>
+                        <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                            0,
+                            queue_reset,
+                            queue_index,
+                            1,
+                            num_elements,
+                            NULL,       // d_done,
+                            graph_slice->frontier_queues.d_values[selector],      // d_in_queue
+                            NULL,
+                            graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
+                            data_slice,
+                            NULL,
+                            work_progress,
+                            graph_slice->frontier_elements[selector],           // max_in_queue
+                            graph_slice->frontier_elements[selector^1],         // max_out_queue
+                            this->vertex_map_kernel_stats);
+
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
+                        "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
+		
+		
+                // Copy back to d_flag
+                util::MemsetCopyVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_flag,
+                        graph_slice->frontier_queues.d_values[selector^1], graph_slice->edges);
+
 			
 		/* Update length of graph_slice */
 		queue_index++;	
 		if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
 		graph_slice->edges = queue_length;
+		
+		//if (retval = work_progress.SetQueueLength(queue_length, 4)) break;
+
+		// TODO (Temp Solution): Mergesort pairs.
+                MergesortPairs(problem->data_slices[0]->d_keys,
+                        problem->data_slices[0]->d_weights, graph_slice->edges, mgpu::less<int>(), context);
 
 		// TODO: WRONG SEQUENCE 
-		util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
-	 	util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
-		util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);	
+		// util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
+	 	// util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
+		// printf("::WEIGHTS::");
+		// util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);	
 		
-		/* Remove Edges between Super Vertices using Vertex Mapping */
+		/* Finding representative for keys and edges using Vertex Mapping */
                 queue_index  = 0;
                 selector     = 0;
                 num_elements = graph_slice->edges;
@@ -699,9 +789,6 @@ class MSTEnactor : public EnactorBase
 		
 		// Fill in frontier queue
                 util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_values[selector], graph_slice->edges);
-		
-		//printf("::Edges in frontier queue::");
-                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], graph_slice->edges);	
 		
                 gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, MSTProblem, EdgeRmFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
@@ -720,41 +807,121 @@ class MSTEnactor : public EnactorBase
                         graph_slice->frontier_elements[selector],       // max_in_queue
                         graph_slice->frontier_elements[selector^1],     // max_out_queue
                         this->vertex_map_kernel_stats);                 // kernel stats
-		// printf("::::::::::: Representative Edges :::::::::::");
+		// printf(":: NEW Edges ::");
 		// util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
+		// printf(":: NEW Keys ::");
 		// util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
 		
+		// Used for sorting weights 	
+		util::MemsetCopyVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_flag,
+                        problem->data_slices[0]->d_keys, graph_slice->edges);
+		// util::DisplayDeviceResults(problem->data_slices[0]->d_flag, graph_slice->edges);
 
-		// Mergesort pairs.
+		
+		// Mergesort pairs. Sort edges by keys
                 MergesortPairs(problem->data_slices[0]->d_keys,
                         problem->data_slices[0]->d_edges, graph_slice->edges, mgpu::less<int>(), context);
 		
-		//printf("::::::::::: NEW EDGES AND KEYS :::::::::::");
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
-		/*
-		// TODO DID NOT TEST FROM HERE ON : need another keys
-		MergesortPairs(problem->data_slices[0]->d_keys,
+		printf(":: NEW Edges ::");
+                util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
+                printf(":: NEW Keys ::");
+		util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
+		 
+		// Sort weights by keys	
+		MergesortPairs(problem->data_slices[0]->d_flag,
                         problem->data_slices[0]->d_weights, graph_slice->edges, mgpu::less<int>(), context);
+		printf(":: NEW Weights ::");
+		util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);	
+	
+
+		/* Generate NEW Vertex List */	
+                queue_index = 0;
+                selector = 0;
+                num_elements = graph_slice->nodes;
+                queue_reset = true;
+
+                // Fill in frontier queue
+                util::MemsetCopyVectorKernel<<<128, 128>>>(graph_slice->frontier_queues.d_values[selector],
+                        problem->data_slices[0]->d_row_offsets, graph_slice->nodes);
+                // util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], graph_slice->edges);
+
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, MSTProblem, RmFunctor>
+                        <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                            0,
+                            queue_reset,
+                            queue_index,
+                            1,
+                            num_elements,
+                            NULL,//d_done,
+                            graph_slice->frontier_queues.d_values[selector],      // d_in_queue
+                            NULL,
+                            graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
+                            data_slice,
+                            NULL,
+                            work_progress,
+                            graph_slice->frontier_elements[selector],           // max_in_queue
+                            graph_slice->frontier_elements[selector^1],         // max_out_queue
+                            this->vertex_map_kernel_stats);
+
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
+                        "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
+		// Copy back to d_row_offsets
+                util::MemsetCopyVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_row_offsets,
+                        graph_slice->frontier_queues.d_values[selector^1], graph_slice->nodes);
 		
+		/* Update length of graph_slice */
+                queue_index++;
+                if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
+                graph_slice->nodes = queue_length;
+			
+		// printf(":: NEW Vertex List ::");
+                // util::DisplayDeviceResults(problem->data_slices[0]->d_row_offsets, graph_slice->nodes);
 
-
+		/* Assign row_offsets to vertex list */
 		// Generate new flag array using markSegment kernel 
 		util::markSegment<<<128, 128>>>(problem->data_slices[0]->d_flag,
-                        problem->data_slices[0]->d_keys, graph_slice->keys);
-		printf("::New Flag array::");
-		util::DisplayDeviceResults(problem->data_slices[0]->d_flag, graph_slice->edges);
+                        problem->data_slices[0]->d_keys, graph_slice->edges);
+		// printf(":: NEW Flag array ::");
+		// util::DisplayDeviceResults(problem->data_slices[0]->d_flag, graph_slice->edges);
 
-		// Segmented reduction: generate keys array using mgpu::scan 
-                Scan<MgpuScanTypeInc>((int*)problem->data_slices[0]->d_flag, graph_slice->edges,
-                (int)0, mgpu::plus<int>(), (int*)0, (int*)0, (int*)problem->data_slices[0]->d_flag, context);
+		/* Generate New Row_Offsets */		
+		queue_index = 0;
+                selector = 0;
+                num_elements = graph_slice->edges;
+                queue_reset = true;
+
+                // Fill in frontier queue
+                util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_values[selector], graph_slice->edges);
+		util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], graph_slice->edges);		
+
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, MSTProblem, RowOFunctor>
+                        <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                            0,
+                            queue_reset,
+                            queue_index,
+                            1,
+                            num_elements,
+                            NULL,//d_done,
+                            graph_slice->frontier_queues.d_values[selector],      // d_in_queue
+                            NULL,
+                            graph_slice->frontier_queues.d_values[selector^1],    // d_out_queue
+                            data_slice,
+                            NULL,
+                            work_progress,
+                            graph_slice->frontier_elements[selector],           // max_in_queue
+                            graph_slice->frontier_elements[selector^1],         // max_out_queue
+                            this->vertex_map_kernel_stats);
+
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
+                        "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 		
-		// flag[node] == 1 ? node : NULL; vertex mapping ; length = #1s
-
-		*/
-
+		printf(":: NEW row_offsets ::");
+                util::DisplayDeviceResults(problem->data_slices[0]->d_row_offsets, graph_slice->nodes);
 		
-
+		
+		
 		iteration++;
 
 		if (INSTRUMENT || DEBUG) {
@@ -771,7 +938,8 @@ class MSTEnactor : public EnactorBase
                     if (DEBUG) printf("\n %lld \n", (long long) iteration);
                 }
 
-            	
+            	// } // Recursive Loop
+	
 		if (retval) break;
 
             	/* Check if any of the frontiers overflowed due to redundant expansion */

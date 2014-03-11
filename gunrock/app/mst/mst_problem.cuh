@@ -70,6 +70,7 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
 		VertexId	*d_nodes;		/* Used for nodes vid */
 		VertexId	*d_Cflag;		/* Used for a scan of the flag assigns new supervertex Ids */
 		VertexId	*d_Ckeys;		/* Used for storing new keys array */
+		
 	};
 
     	// Members

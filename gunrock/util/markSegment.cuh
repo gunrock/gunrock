@@ -25,7 +25,7 @@ namespace util {
 __global__ void markSegment(int *flag, int *vid, int length)
 {
 	const int STRIDE = gridDim.x * blockDim.x;
-	for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x + 1; idx < length-1; idx += STRIDE) {
+	for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x + 1; idx < length; idx += STRIDE) {
     		flag[idx] = (vid[idx] != vid[idx-1]) ? 1 : 0;
   	} 
 }
