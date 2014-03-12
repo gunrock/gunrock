@@ -48,8 +48,10 @@ struct FLAGFunctor
     {
         if (problem->d_reducedWeights[s_id] == problem->d_weights[e_id]){
                 problem->d_successor[s_id] = d_id;
-        }
-	// TODO: 
+		problem->d_selector[problem->d_eId[e_id]] = 1;
+	}
+	
+	// TODO Following assign method would cause error outputs 
 	// problem->d_successor[s_id] = (problem->d_reducedWeights[s_id] == problem->d_weights[e_id]) ? d_id : problem->d_flag[e_id];
 	return true;
     }
@@ -124,6 +126,13 @@ struct RCFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id)
     {
+	if (problem->d_successor[problem->d_successor[s_id]] == s_id){
+		if (problem->d_successor[s_id] > s_id) {
+			problem->d_successor[s_id] = s_id;
+			problem->d_selector[problem->d_eId[e_id]] = 0;
+		}
+	}
+	// problem->d_successor[s_id] = (problem->d_successor[problem->d_successor[s_id]] == s_id) ? ((problem->d_successor[s_id] > s_id)? s_id : problem->d_successor[s_id]) : problem->d_successor[s_id];
     	return true;
     }
 
@@ -155,7 +164,6 @@ struct RCFunctor
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-        problem->d_successor[node] = (problem->d_successor[problem->d_successor[node]] == node) ? ((problem->d_successor[node] > node)? node:problem->d_successor[node]) : problem->d_successor[node];
 	return true;
     }
 
@@ -315,8 +323,9 @@ struct EdgeRmFunctor
 	problem->d_edges[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_edges[e_id]; 
 	problem->d_weights[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_weights[e_id];
 	problem->d_keys[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_keys[e_id];	
-	// New flag for reduce length 
+	// New flag for calculating reduced length 
 	problem->d_flag[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_flag[e_id];
+	problem->d_eId[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_eId[e_id];
 	return true;
     }
 
@@ -337,6 +346,7 @@ struct EdgeRmFunctor
 
     /**
      * @brief Vertex mapping condition function. Check if the Vertex Id is valid (not equal to -1).
+     * Finding Representative
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object

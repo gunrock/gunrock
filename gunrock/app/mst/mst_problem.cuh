@@ -60,6 +60,7 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
 		SizeT		*d_flag;		/* Used for flag array to mark segments */
 		SizeT		*d_edgeFlag;		/* Used for storing edges that have min_weights */
 		SizeT		*d_keys;		/* Used for segmented reduction */	
+		SizeT           *d_keysCopy;            /* Used for segmented reduction */
 		VertexId	*d_reducedKeys;		/* Used for segmented reduction */
 		VertexId	*d_successor;		/* Used for storing dest.ID that have min_weights */ 
 		VertexId        *d_represent;           /* Used for storing represetatives for each successor */
@@ -70,9 +71,10 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
 		VertexId	*d_nodes;		/* Used for nodes vid */
 		VertexId	*d_Cflag;		/* Used for a scan of the flag assigns new supervertex Ids */
 		VertexId	*d_Ckeys;		/* Used for storing new keys array */
-		
+		SizeT		*d_eId;			/* Used for keeping original edge Id to label selected edges */
+		bool		*d_selector;		/* Used for recording selected edges for MST */
 	};
-
+	
     	// Members
     
     	// Number of GPUs to be sliced over
@@ -146,6 +148,8 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
                         "GpuSlice cudaFree d_edgeflag failed", __FILE__, __LINE__);
 		if (data_slices[i]->d_keys)		util::GRError(cudaFree(data_slices[i]->d_keys),
                         "GpuSlice cudaFree d_keys failed", __FILE__, __LINE__);
+		if (data_slices[i]->d_keysCopy)             util::GRError(cudaFree(data_slices[i]->d_keysCopy),
+                        "GpuSlice cudaFree d_keys failed", __FILE__, __LINE__);
 		if (data_slices[i]->d_reducedKeys)	util::GRError(cudaFree(data_slices[i]->d_reducedKeys),
                         "GpuSlice cudaFree d_reducedKeys failed", __FILE__, __LINE__);
 		if (data_slices[i]->d_successor)	util::GRError(cudaFree(data_slices[i]->d_successor),
@@ -166,7 +170,10 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
                         "GpuSlice cudaFree d_Cflag failed", __FILE__, __LINE__);
 		if (data_slices[i]->d_Ckeys)             util::GRError(cudaFree(data_slices[i]->d_Ckeys),
                         "GpuSlice cudaFree d_Ckeys failed", __FILE__, __LINE__);	
-
+		if (data_slices[i]->d_eId)             util::GRError(cudaFree(data_slices[i]->d_eId),
+                        "GpuSlice cudaFree d_eId failed", __FILE__, __LINE__);
+		if (data_slices[i]->d_selector)             util::GRError(cudaFree(data_slices[i]->d_selector),
+                        "GpuSlice cudaFree d_selector failed", __FILE__, __LINE__);
 
 		if (d_data_slices[i])			util::GRError(cudaFree(d_data_slices[i]), 
 			"GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
@@ -319,9 +326,17 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
                         if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_keys,
                                 edges * sizeof(SizeT)),
-                                "MSTProblem cudaMalloc d_flag Failed", __FILE__, __LINE__)) return retval;
+                                "MSTProblem cudaMalloc d_keys Failed", __FILE__, __LINE__)) return retval;
                         data_slices[0]->d_keys = d_keys;
 			util::MemsetKernel<<<128, 128>>>(data_slices[0]->d_keys, 0, edges);
+
+			SizeT           *d_keysCopy;        // Keys array has the same size as #edges
+                        if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_keysCopy,
+                                edges * sizeof(SizeT)),
+                                "MSTProblem cudaMalloc d_keysCopy Failed", __FILE__, __LINE__)) return retval;
+                        data_slices[0]->d_keysCopy = d_keysCopy;
+                        // util::MemsetKernel<<<128, 128>>>(data_slices[0]->d_keysCopy, 0, edges);
 
 			VertexId        *d_reducedKeys;   // Reduced Keys array has the same size as #nodes
                         if (retval = util::GRError(cudaMalloc(
@@ -407,6 +422,22 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
                         data_slices[0]->d_Ckeys = d_Ckeys;
                         util::MemsetKernel<<<128, 128>>>(data_slices[0]->d_Ckeys, 0, nodes);
 
+			SizeT           *d_eId;        // has the same size as #edges
+                        if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_eId,
+                                edges * sizeof(SizeT)),
+                                "MSTProblem cudaMalloc d_eId Failed", __FILE__, __LINE__)) return retval;
+                        data_slices[0]->d_eId = d_eId;
+			util::MemsetIdxKernel<<<128, 128>>>(data_slices[0]->d_eId, edges);			
+			
+			bool           *d_selector;        // has the same size as #edges
+                        if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_selector,
+                                edges * sizeof(SizeT)),
+                                "MSTProblem cudaMalloc d_selector Failed", __FILE__, __LINE__)) return retval;
+                        data_slices[0]->d_selector = d_selector;
+                        //util::MemsetKernel<<<128, 128>>>(data_slices[0]->d_selector, 0, edges);
+
 			data_slices[0]->d_labels = NULL;
 		}
 		//TODO: add multi-GPU allocation code
@@ -488,10 +519,19 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
                         if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_keys,
                                 edges * sizeof(SizeT)),
-                                "MSTProblem cudaMalloc d_flag Failed", __FILE__, __LINE__)) return retval;
+                                "MSTProblem cudaMalloc d_keys Failed", __FILE__, __LINE__)) return retval;
                         data_slices[gpu]->d_keys = d_keys;
                 }
 	
+		if (!data_slices[gpu]->d_keysCopy) {
+                        SizeT   *d_keysCopy;
+                        if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_keysCopy,
+                                edges * sizeof(SizeT)),
+                                "MSTProblem cudaMalloc d_keysCopy Failed", __FILE__, __LINE__)) return retval;
+                        data_slices[gpu]->d_keysCopy = d_keysCopy;
+                }
+
 		if (!data_slices[gpu]->d_successor) {
 			VertexId	*d_successor;
 			if (retval = util::GRError(cudaMalloc(
@@ -592,7 +632,24 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
                         data_slices[gpu]->d_Ckeys = d_Ckeys;
                 }
 
-	
+		if (!data_slices[gpu]->d_eId) {
+                        SizeT   *d_eId;
+                        if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_eId,
+                                edges * sizeof(SizeT)),
+                                "MSTProblem cudaMalloc d_eId Failed", __FILE__, __LINE__)) return retval;
+                        data_slices[gpu]->d_eId = d_eId;
+                }		
+		
+		if (!data_slices[gpu]->d_selector) {
+                        bool   *d_selector;
+                        if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_selector,
+                                edges * sizeof(SizeT)),
+                                "MSTProblem cudaMalloc d_selector Failed", __FILE__, __LINE__)) return retval;
+                        data_slices[gpu]->d_selector = d_selector;
+                }		
+
 		data_slices[gpu]->d_labels = NULL;
 
 		if (retval = util::GRError(cudaMemcpy(
@@ -610,7 +667,6 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
 	    	    
 	    // Put every vertex in frontier queue
 	    util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], nodes);
-	    // util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_values[0], edges);
 	    return retval;
 	}
 
