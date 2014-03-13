@@ -35,6 +35,7 @@
 #include <utility>
 #include <gunrock/util/random_bits.cuh>
 #include <gunrock/util/basic_utils.cuh>
+#include <gunrock/util/error_utils.cuh>
 
 namespace gunrock {
 namespace util {
@@ -551,8 +552,6 @@ void DisplayDeviceResults(
     if (h_data) free(h_data);
 }
 
-
-
 /******************************************************************************
  * Timing
  ******************************************************************************/
@@ -650,6 +649,28 @@ struct GpuTimer
         return elapsed;
     }
 };
+
+// Quite simple KeyValuePair struct for doing
+// Key-value sorting according to keys
+template<typename A, typename B>
+struct KeyValuePair
+{
+    A Key;
+    B Value;
+    bool operator<(const KeyValuePair<A, B>& rhs)
+    {
+        return this->Key < rhs.Key;
+    }
+};
+
+// Check available device memory
+bool EnoughDeviceMemory(unsigned int mem_needed)
+{
+    size_t free_mem, total_mem;
+    if (util::GRError(cudaMemGetInfo(&free_mem, &total_mem),
+                "cudaMemGetInfo failed", __FILE__, __LINE__)) return false;
+    return (mem_needed <= free_mem);
+}
 
 
 }// namespace util

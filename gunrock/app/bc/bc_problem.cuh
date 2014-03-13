@@ -43,6 +43,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
     typedef _Value          Value;
 
     static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
+    static const bool ENABLE_IDEMPOTENCE    = false;
     
     //Helper structures
     
@@ -199,6 +200,8 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
                                         edges,
                                         h_row_offsets,
                                         h_column_indices,
+                                        NULL,
+                                        NULL,
                                         num_gpus);
 
         // No data in DataSlice needs to be copied from host

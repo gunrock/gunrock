@@ -95,7 +95,7 @@ float g_beta;
   * @param[in] MARK_PREDECESSORS Whether to show predecessor of each node.
   */
  template<typename VertexId, typename SizeT>
- void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes, bool MARK_PREDECESSORS)
+ void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes, bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE)
  {
     if (nodes > 40)
         nodes = 40;
@@ -104,9 +104,10 @@ float g_beta;
         PrintValue(i);
         printf(":");
         PrintValue(source_path[i]);
-        printf(",");
-        if (MARK_PREDECESSORS)
+        if (MARK_PREDECESSORS && !ENABLE_IDEMPOTENCE) {
+            printf(",");
             PrintValue(preds[i]);
+        }
         printf(" ");
     }
     printf("]\n");
@@ -298,7 +299,8 @@ template <
     typename Value,
     typename SizeT,
     bool INSTRUMENT,
-    bool MARK_PREDECESSORS>
+    bool MARK_PREDECESSORS,
+    bool ENABLE_IDEMPOTENCE>
 void RunTests(
     const Csr<VertexId, Value, SizeT> &graph,
     const Csr<VertexId, Value, SizeT> &inv_graph,
@@ -314,7 +316,8 @@ void RunTests(
         SizeT,
         Value,
         MARK_PREDECESSORS,
-        false> Problem; // does not use double buffer
+        ENABLE_IDEMPOTENCE,
+        (MARK_PREDECESSORS && ENABLE_IDEMPOTENCE)> Problem; // does not use double buffer
 
         // Allocate host-side label array (for both reference and gpu-computed results)
         VertexId    *reference_labels       = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
@@ -377,12 +380,14 @@ void RunTests(
 
         // Verify the result
         if (reference_check != NULL) {
-            printf("Validity: ");
-            CompareResults(h_labels, reference_check, graph.nodes, true);
+            if (!MARK_PREDECESSORS) {
+                printf("Validity: ");
+                CompareResults(h_labels, reference_check, graph.nodes, true);
+            }
         }
         printf("\nFirst 40 labels of the GPU result."); 
         // Display Solution
-        DisplaySolution(h_labels, h_preds, graph.nodes, MARK_PREDECESSORS);
+        DisplaySolution(h_labels, h_preds, graph.nodes, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE);
 
         DisplayStats<MARK_PREDECESSORS>(
             *stats,
@@ -428,6 +433,7 @@ void RunTests(
     std::string         src_str;
     bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
     bool                mark_pred           = false;        // Whether or not to mark src-distance vs. parent vertices
+    bool                idempotence         = false;        // Whether or not to enable idempotence operation
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
     int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
     double              max_queue_sizing    = 1.0;          // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
@@ -446,61 +452,111 @@ void RunTests(
 
     g_quick = args.CheckCmdLineFlag("quick");
     mark_pred = args.CheckCmdLineFlag("mark-pred");
+    idempotence = args.CheckCmdLineFlag("idempotence");
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
     g_verbose = args.CheckCmdLineFlag("v");
     args.GetCmdLineArgument("alpha", g_alpha);
     args.GetCmdLineArgument("beta", g_beta);
 
     if (g_alpha == 0.0f)
-        g_alpha = 12.0f;
+        g_alpha = 6.0f;
     if (g_beta == 0.0f)
         g_beta = 24.0f;
 
     if (instrumented) {
         if (mark_pred) {
-            RunTests<VertexId, Value, SizeT, true, true>(
-                graph,
-                inv_graph,
-                src,
-                max_grid_size,
-                num_gpus,
-                max_queue_sizing,
-                g_alpha,
-                g_beta);
+            if (idempotence) {
+                RunTests<VertexId, Value, SizeT, true, true, true>(
+                        graph,
+                        inv_graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing,
+                        g_alpha,
+                        g_beta);
+            } else {
+                RunTests<VertexId, Value, SizeT, true, true, false>(
+                        graph,
+                        inv_graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing,
+                        g_alpha,
+                        g_beta);
+            }
         } else {
-            RunTests<VertexId, Value, SizeT, true, false>(
-                graph,
-                inv_graph,
-                src,
-                max_grid_size,
-                num_gpus,
-                max_queue_sizing,
-                g_alpha,
-                g_beta);
+            if (idempotence) {
+                RunTests<VertexId, Value, SizeT, true, false, true>(
+                        graph,
+                        inv_graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing,
+                        g_alpha,
+                        g_beta);
+            } else {
+                RunTests<VertexId, Value, SizeT, true, false, false>(
+                        graph,
+                        inv_graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing,
+                        g_alpha,
+                        g_beta);
+            }
         }
     } else {
         if (mark_pred) {
-            RunTests<VertexId, Value, SizeT, false, true>(
-                graph,
-                inv_graph,
-                src,
-                max_grid_size,
-                num_gpus,
-                max_queue_sizing,
-                g_alpha,
-                g_beta);
+            if (idempotence) {
+                RunTests<VertexId, Value, SizeT, false, true, true>(
+                        graph,
+                        inv_graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing,
+                        g_alpha,
+                        g_beta);
+            } else {
+                RunTests<VertexId, Value, SizeT, false, true, false>(
+                        graph,
+                        inv_graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing,
+                        g_alpha,
+                        g_beta);
+            }
         } else {
-            RunTests<VertexId, Value, SizeT, false, false>(
-                graph,
-                inv_graph,
-                src,
-                max_grid_size,
-                num_gpus,
-                max_queue_sizing,
-                g_alpha,
-                g_beta);
+            if (idempotence) {
+                RunTests<VertexId, Value, SizeT, false, false, true>(
+                        graph,
+                        inv_graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing,
+                        g_alpha,
+                        g_beta);
+            } else {
+                RunTests<VertexId, Value, SizeT, false, false, false>(
+                        graph,
+                        inv_graph,
+                        src,
+                        max_grid_size,
+                        num_gpus,
+                        max_queue_sizing,
+                        g_alpha,
+                        g_beta);
+            }
         }
     }
+
 
 }
 

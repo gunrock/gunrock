@@ -603,6 +603,7 @@ void RunTests(
         SizeT,
         Value,
         true,                // Set MARK_PREDECESSORS flag true
+        false,                // Set to enable idempotent operation
         false> BFSProblem_T; // does not use double buffer
 
     // Allocate host-side label array (for both reference and

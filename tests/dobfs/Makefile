@@ -11,7 +11,7 @@
 
 force64 = 1
 #NVCC = "$(shell which nvcc)"
-NVCC = "/usr/local/cuda-6.0/bin/nvcc"
+NVCC = "/usr/local/cuda-5.5/bin/nvcc"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
 KERNELS = 
@@ -109,7 +109,7 @@ test: bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
 bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_dobfs.cu $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_dobfs.cu $(NVCCFLAGS) $(ARCH) $(INC) -lcuda -O3  
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_dobfs.cu $(NVCCFLAGS) $(ARCH) $(INC) -O3  
 
 #-------------------------------------------------------------------------------
 # Clean

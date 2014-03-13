@@ -49,6 +49,7 @@ namespace vertex_map {
  * @tparam _LOG_LOAD_VEC_SIZE           Number of incoming frontier vertex-ids to dequeue in a single load (log).
  * @tparam _LOG_LOADS_PER_TILE          Number of such loads that constitute a tile of incoming frontier vertex-ids (log)
  * @tparam _LOG_RAKING_THREADS          Number of raking threads to use for prefix sum (log), range [5, LOG_THREADS]
+ * @tparam _END_BITMASK_CULL,           Iteration after which to skip bitmask filtering (0 to never perform bitmask filtering, -1 to always perform bitmask filtering)
  * @tparam _LOG_SCHEDULE_GRANULARITY    The scheduling granularity of incoming frontier tiles (for even-share work distribution only) (log)
  */
 template <
@@ -67,6 +68,7 @@ template <
     int _LOG_LOAD_VEC_SIZE,                             
     int _LOG_LOADS_PER_TILE,                            
     int _LOG_RAKING_THREADS,                            
+    int _END_BITMASK_CULL,
     int _LOG_SCHEDULE_GRANULARITY>                      
 
 struct KernelPolicy
@@ -109,6 +111,8 @@ struct KernelPolicy
 
         LOG_SCHEDULE_GRANULARITY        = _LOG_SCHEDULE_GRANULARITY,
         SCHEDULE_GRANULARITY            = 1 << LOG_SCHEDULE_GRANULARITY,
+
+        END_BITMASK_CULL                = _END_BITMASK_CULL,
     };
 
     //Prefix sum raking grid for contraction allocations
@@ -130,6 +134,10 @@ struct KernelPolicy
     struct SmemStorage
     {
 
+        enum {
+            WARP_HASH_ELEMENTS          = 128,          // Collision hash table size (per warp)
+        };
+
         // Persistent shared state for the CTA
         struct State {
 
@@ -140,7 +148,10 @@ struct KernelPolicy
             SizeT                               warpscan[2][GR_WARP_THREADS(CUDA_ARCH)];
 
             // General pool for prefix sum
-            SizeT                               raking_elements[RakingGrid::TOTAL_RAKING_ELEMENTS];
+            union {
+                SizeT                               raking_elements[RakingGrid::TOTAL_RAKING_ELEMENTS];
+                volatile VertexId                   vid_hashtable[WARPS][WARP_HASH_ELEMENTS];
+            };
 
         } state;
 
@@ -150,8 +161,12 @@ struct KernelPolicy
             FULL_OCCUPANCY_BYTES                = (GR_SMEM_BYTES(CUDA_ARCH) / _MIN_CTA_OCCUPANCY)
                                                     - sizeof(State)
                                                     - 128,                                              // Fudge-factor to guarantee occupancy
+            HISTORY_HASH_ELEMENTS               = FULL_OCCUPANCY_BYTES / sizeof(VertexId),
 
         };
+
+        // Fill the remainder of smem with a history-based hash-cache of seen vertex-ids
+        volatile VertexId                      history[HISTORY_HASH_ELEMENTS];
 
     };
 
@@ -160,6 +175,7 @@ struct KernelPolicy
         SMEM_OCCUPANCY      = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
         CTA_OCCUPANCY       = GR_MIN(_MIN_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
         VALID               = (CTA_OCCUPANCY > 0),
+	    VERTEX_ID_MASK	    = ~(1<<(sizeof(VertexId)*8-2)),								// Bitmask for masking off the upper control bits in vertex identifier
     };
 };
 

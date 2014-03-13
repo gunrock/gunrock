@@ -41,7 +41,7 @@ namespace dobfs {
  * @tparam ProblemData         Problem data type which contains data slice for BFS problem
  *
  */
-template<typename VertexId, typename SizeT, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct PrepareInputFrontierMapFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
@@ -54,7 +54,7 @@ struct PrepareInputFrontierMapFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
+    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
        return true; 
     }
@@ -62,7 +62,7 @@ struct PrepareInputFrontierMapFunctor
     /**
      * @brief Vertex mapping apply function. Set frontier_map_in
      */
-    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
+    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
             true, problem->d_frontier_map_in + node);
@@ -77,7 +77,7 @@ struct PrepareInputFrontierMapFunctor
  * @tparam ProblemData         Problem data type which contains data slice for BFS problem
  *
  */
-template<typename VertexId, typename SizeT, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct PrepareUnvisitedQueueFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice; 
@@ -90,7 +90,7 @@ struct PrepareUnvisitedQueueFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
+    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
         VertexId label;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -101,7 +101,7 @@ struct PrepareUnvisitedQueueFunctor
     /**
      * @brief Vertex mapping apply function. Doing nothing.
      */
-    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
+    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
         // Doing nothing here
     }
@@ -120,7 +120,7 @@ struct PrepareUnvisitedQueueFunctor
  * @tparam ProblemData         Problem data type which contains data slice for BFS problem
  *
  */
-template<typename VertexId, typename SizeT, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct ReverseBFSFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
@@ -135,7 +135,7 @@ struct ReverseBFSFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
+    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
         // Check if the destination node has been claimed as someone's child
         //return (atomicCAS(&problem->d_preds[d_id], -2, s_id) == -2) ? true : false;
@@ -155,7 +155,7 @@ struct ReverseBFSFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem)
+    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
         //set d_labels[d_id] to be d_labels[s_id]+1
         VertexId label;
@@ -173,7 +173,7 @@ struct ReverseBFSFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
+    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
         return (node != -1);
     }
@@ -181,7 +181,7 @@ struct ReverseBFSFunctor
     /**
      * @brief Vertex mapping apply function. Doing nothing.
      */
-    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
+    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
         // Doing nothing here
     }
@@ -199,7 +199,7 @@ struct ReverseBFSFunctor
  * @tparam ProblemData         Problem data type which contains data slice for BFS problem
  *
  */
-template<typename VertexId, typename SizeT, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct SwitchToNormalFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice; 
@@ -212,7 +212,7 @@ struct SwitchToNormalFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem)
+    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
         bool flag;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -223,7 +223,7 @@ struct SwitchToNormalFunctor
     /**
      * @brief Vertex mapping apply function. Doing nothing.
      */
-    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem)
+    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
         // Doing nothing here
     }

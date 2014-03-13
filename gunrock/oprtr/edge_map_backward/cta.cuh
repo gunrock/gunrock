@@ -275,8 +275,8 @@ namespace edge_map_backward {
                                         if (bitmap_in)
                                         {
 
-                                            if (Functor::CondEdge(parent_id, child_id, cta->problem))
-                                                Functor::ApplyEdge(parent_id, child_id, cta->problem);
+                                            if (Functor::CondEdge(parent_id, child_id, cta->problem, coop_offset+threadIdx.x))
+                                                Functor::ApplyEdge(parent_id, child_id, cta->problem, coop_offset+threadIdx.x);
                                             child_id = -1;
                                             
                                         }
@@ -313,8 +313,8 @@ namespace edge_map_backward {
                                         if (bitmap_in)
                                         {
 
-                                            if (Functor::CondEdge(parent_id, child_id, cta->problem))
-                                                Functor::ApplyEdge(parent_id, child_id, cta->problem);
+                                            if (Functor::CondEdge(parent_id, child_id, cta->problem, coop_offset+threadIdx.x))
+                                                Functor::ApplyEdge(parent_id, child_id, cta->problem, coop_offset+threadIdx.x);
                                             child_id = -1;
                                         }
 
@@ -394,8 +394,8 @@ namespace edge_map_backward {
                                             if (bitmap_in)
                                             {
 
-                                                if (Functor::CondEdge(parent_id, child_id, cta->problem))
-                                                    Functor::ApplyEdge(parent_id, child_id, cta->problem);
+                                                if (Functor::CondEdge(parent_id, child_id, cta->problem, coop_offset+lane_id))
+                                                    Functor::ApplyEdge(parent_id, child_id, cta->problem, coop_offset+lane_id);
                                                 child_id = -1;
                                             }
 
@@ -431,8 +431,8 @@ namespace edge_map_backward {
                                             if (bitmap_in)
                                             {
 
-                                                if (Functor::CondEdge(parent_id, child_id, cta->problem))
-                                                    Functor::ApplyEdge(parent_id, child_id, cta->problem);
+                                                if (Functor::CondEdge(parent_id, child_id, cta->problem, coop_offset+lane_id))
+                                                    Functor::ApplyEdge(parent_id, child_id, cta->problem, coop_offset+lane_id);
                                                 child_id = -1;
                                             }
 
@@ -743,8 +743,8 @@ namespace edge_map_backward {
                             d_bitmap_in + parent_id);
                         if (bitmap_in)
                         {
-                            if (Functor::CondEdge(parent_id, child_id, problem))
-                                Functor::ApplyEdge(parent_id, child_id, problem);
+                            if (Functor::CondEdge(parent_id, child_id, problem, smem_storage.gather_offsets[scratch_offset]))
+                                Functor::ApplyEdge(parent_id, child_id, problem, smem_storage.gather_offsets[scratch_offset]);
                             child_id = -1;
                         }
 

@@ -121,17 +121,29 @@ int ReadMarketStream(
                 return -1;
             }
 
-            long long ll_row, ll_col;
-            if (sscanf(line, "%lld %lld", &ll_col, &ll_row) != 2) {
-                fprintf(stderr,
-                        "Error parsing MARKET graph: badly formed edge\n"
-                        /*, edges */
-                        /* JDO commented this out; it wasn't used and
-                         * generated a warning */);
-                if (coo) free(coo);
-                return -1;
+            long long ll_row, ll_col, ll_value;
+            int num_input;
+            if (LOAD_VALUES) {
+                if ((num_input = sscanf(line, "%lld %lld %lld", &ll_col, &ll_row, &ll_value)) <2) {
+                    fprintf(stderr,
+                            "Error parsing MARKET graph: badly formed edge\n");
+                        if (coo) free(coo);
+                    return -1;
+                } else if (num_input == 2) {
+                    ll_value = rand()%64;
+                }
+            } else {
+                if (sscanf(line, "%lld %lld", &ll_col, &ll_row) != 2) {
+                    fprintf(stderr,
+                            "Error parsing MARKET graph: badly formed edge\n");
+                        if (coo) free(coo);
+                    return -1;
+                }
             }
 
+            if (LOAD_VALUES) {
+                coo[edges_read].val = ll_value;
+            }
             if (reversed && !undirected) {
                 coo[edges_read].col = ll_row - 1;   // zero-based array
                 coo[edges_read].row = ll_col - 1;   // zero-based array
@@ -139,6 +151,7 @@ int ReadMarketStream(
             } else {
                 coo[edges_read].row = ll_row - 1;   // zero-based array
                 coo[edges_read].col = ll_col - 1;   // zero-based array
+                ordered_rows = false;
             }
 
             edges_read++;
@@ -147,6 +160,10 @@ int ReadMarketStream(
                 // Go ahead and insert reverse edge
                 coo[edges_read].row = ll_col - 1;       // zero-based array
                 coo[edges_read].col = ll_row - 1;       // zero-based array
+                
+                if (LOAD_VALUES) {
+                    coo[edges_read].val = ll_value;
+                }
 
                 ordered_rows = false;
                 edges_read++;

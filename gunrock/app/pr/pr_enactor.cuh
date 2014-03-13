@@ -7,9 +7,9 @@
 
 /**
  * @file
- * bfs_enactor.cuh
+ * pr_enactor.cuh
  *
- * @brief BFS Problem Enactor
+ * @brief PR Problem Enactor
  */
 
 #pragma once
@@ -23,21 +23,24 @@
 #include <gunrock/oprtr/vertex_map/kernel_policy.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
-#include <gunrock/app/bfs/bfs_problem.cuh>
-#include <gunrock/app/bfs/bfs_functor.cuh>
+#include <gunrock/app/pr/pr_problem.cuh>
+#include <gunrock/app/pr/pr_functor.cuh>
 
+#include <moderngpu.cuh>
+
+using namespace mgpu;
 
 namespace gunrock {
 namespace app {
-namespace bfs {
+namespace pr {
 
 /**
- * @brief BFS problem enactor class.
+ * @brief PR problem enactor class.
  *
  * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA clock-count statistics
  */
 template<bool INSTRUMENT>
-class BFSEnactor : public EnactorBase
+class PREnactor : public EnactorBase
 {
     // Members
     protected:
@@ -59,8 +62,9 @@ class BFSEnactor : public EnactorBase
     int                 *d_done;
     cudaEvent_t         throttle_event;
 
+
     /**
-     * Current iteration, also used to get the final search depth of the BFS search
+     * Current iteration, also used to get the final search depth of the PR search
      */
     long long                           iteration;
 
@@ -68,9 +72,9 @@ class BFSEnactor : public EnactorBase
     protected:
 
     /**
-     * @brief Prepare the enactor for BFS kernel call. Must be called prior to each BFS search.
+     * @brief Prepare the enactor for PR kernel call. Must be called prior to each PR search.
      *
-     * @param[in] problem BFS Problem object which holds the graph data and BFS problem data to compute.
+     * @param[in] problem PR Problem object which holds the graph data and PR problem data to compute.
      * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
      * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
      *
@@ -87,6 +91,7 @@ class BFSEnactor : public EnactorBase
         
         cudaError_t retval = cudaSuccess;
 
+
         do {
             //initialize the host-mapped "done"
             if (!done) {
@@ -94,15 +99,15 @@ class BFSEnactor : public EnactorBase
 
                 // Allocate pinned memory for done
                 if (retval = util::GRError(cudaHostAlloc((void**)&done, sizeof(int) * 1, flags),
-                    "BFSEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) break;
+                    "PREnactor cudaHostAlloc done failed", __FILE__, __LINE__)) break;
 
                 // Map done into GPU space
                 if (retval = util::GRError(cudaHostGetDevicePointer((void**)&d_done, (void*) done, 0),
-                    "BFSEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) break;
+                    "PREnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) break;
 
                 // Create throttle event
                 if (retval = util::GRError(cudaEventCreateWithFlags(&throttle_event, cudaEventDisableTiming),
-                    "BFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) break;
+                    "PREnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) break;
             }
 
             //initialize runtime stats
@@ -118,9 +123,8 @@ class BFSEnactor : public EnactorBase
 
             //graph slice
             typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
-            typename ProblemData::DataSlice *data_slice = problem->data_slices[0];
 
-            // Bind row-offsets and bitmask texture
+            // Bind row-offsets texture
             cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
             if (retval = util::GRError(cudaBindTexture(
                     0,
@@ -128,19 +132,7 @@ class BFSEnactor : public EnactorBase
                     graph_slice->d_row_offsets,
                     row_offsets_desc,
                     (graph_slice->nodes + 1) * sizeof(SizeT)),
-                        "BFSEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
-
-            if (ProblemData::ENABLE_IDEMPOTENCE) {
-                int bytes = (graph_slice->nodes + 8 - 1) / 8;
-                cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
-                if (retval = util::GRError(cudaBindTexture(
-                                0,
-                                gunrock::oprtr::vertex_map::BitmaskTex<unsigned char>::ref,
-                                data_slice->d_visited_mask,
-                                bitmask_desc,
-                                bytes),
-                            "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
-            }
+                        "PREnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
 
             /*cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
             if (retval = util::GRError(cudaBindTexture(
@@ -149,7 +141,7 @@ class BFSEnactor : public EnactorBase
                             graph_slice->d_column_indices,
                             column_indices_desc,
                             graph_slice->edges * sizeof(VertexId)),
-                        "BFSEnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;*/
+                        "PREnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;*/
         } while (0);
         
         return retval;
@@ -158,9 +150,9 @@ class BFSEnactor : public EnactorBase
     public:
 
     /**
-     * @brief BFSEnactor constructor
+     * @brief PREnactor constructor
      */
-    BFSEnactor(bool DEBUG = false) :
+    PREnactor(bool DEBUG = false) :
         EnactorBase(EDGE_FRONTIERS, DEBUG),
         iteration(0),
         total_queued(0),
@@ -169,16 +161,16 @@ class BFSEnactor : public EnactorBase
     {}
 
     /**
-     * @brief BFSEnactor destructor
+     * @brief PREnactor destructor
      */
-    virtual ~BFSEnactor()
+    virtual ~PREnactor()
     {
         if (done) {
             util::GRError(cudaFreeHost((void*)done),
-                "BFSEnactor cudaFreeHost done failed", __FILE__, __LINE__);
+                "PREnactor cudaFreeHost done failed", __FILE__, __LINE__);
 
             util::GRError(cudaEventDestroy(throttle_event),
-                "BFSEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
+                "PREnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
         }
     }
 
@@ -188,23 +180,19 @@ class BFSEnactor : public EnactorBase
      */
 
     /**
-     * @brief Obtain statistics about the last BFS search enacted.
+     * @brief Obtain statistics about the last PR search enacted.
      *
-     * @param[out] total_queued Total queued elements in BFS kernel running.
-     * @param[out] search_depth Search depth of BFS algorithm.
+     * @param[out] total_queued Total queued elements in PR kernel running.
      * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
      */
-    template <typename VertexId>
     void GetStatistics(
         long long &total_queued,
-        VertexId &search_depth,
         double &avg_duty)
     {
         cudaThreadSynchronize();
 
         total_queued = this->total_queued;
-        search_depth = this->iteration;
-
+        
         avg_duty = (total_lifetimes >0) ?
             double(total_runtimes) / total_lifetimes : 0.0;
     }
@@ -212,35 +200,43 @@ class BFSEnactor : public EnactorBase
     /** @} */
 
     /**
-     * @brief Enacts a breadth-first search computing on the specified graph.
+     * @brief Enacts a page rank computing on the specified graph.
      *
      * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
      * @tparam VertexMapPolicy Kernel policy for vertex mapping.
-     * @tparam BFSProblem BFS Problem type.
+     * @tparam PRProblem PR Problem type.
      *
-     * @param[in] problem BFSProblem object.
-     * @param[in] src Source node for BFS.
-     * @param[in] max_grid_size Max grid size for BFS kernel calls.
+     * @param[in] problem PRProblem object.
+     * @param[in] src Source node for PR.
+     * @param[in] max_grid_size Max grid size for PR kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template<
         typename EdgeMapPolicy,
         typename VertexMapPolicy,
-        typename BFSProblem>
-    cudaError_t EnactBFS(
-    BFSProblem                          *problem,
-    typename BFSProblem::VertexId       src,
+        typename PRProblem>
+    cudaError_t EnactPR(
+    CudaContext                        &context,
+    PRProblem                          *problem,
+    typename PRProblem::SizeT           max_iteration,
     int                                 max_grid_size = 0)
     {
-        typedef typename BFSProblem::SizeT      SizeT;
-        typedef typename BFSProblem::VertexId   VertexId;
+        typedef typename PRProblem::SizeT       SizeT;
+        typedef typename PRProblem::VertexId    VertexId;
+        typedef typename PRProblem::Value       Value;
 
-        typedef BFSFunctor<
+        typedef PRFunctor<
             VertexId,
             SizeT,
+            Value,
+            PRProblem> PrFunctor;
+
+        typedef RemoveZeroDegreeNodeFunctor<
             VertexId,
-            BFSProblem> BfsFunctor;
+            SizeT,
+            Value,
+            PRProblem> RemoveZeroFunctor;
 
         cudaError_t retval = cudaSuccess;
 
@@ -253,38 +249,40 @@ class BFSEnactor : public EnactorBase
             int vertex_map_grid_size    = MaxGridSize(vertex_map_occupancy, max_grid_size);
 
             if (DEBUG) {
-                printf("BFS edge map occupancy %d, level-grid size %d\n",
+                printf("PR edge map occupancy %d, level-grid size %d\n",
                         edge_map_occupancy, edge_map_grid_size);
-                printf("BFS vertex map occupancy %d, level-grid size %d\n",
+                printf("PR vertex map occupancy %d, level-grid size %d\n",
                         vertex_map_occupancy, vertex_map_grid_size);
                 printf("Iteration, Edge map queue, Vertex map queue\n");
                 printf("0");
             }
 
+            fflush(stdout);
 
             // Lazy initialization
             if (retval = Setup(problem, edge_map_grid_size, vertex_map_grid_size)) break;
 
             // Single-gpu graph slice
-            typename BFSProblem::GraphSlice *graph_slice = problem->graph_slices[0];
-            typename BFSProblem::DataSlice *data_slice = problem->d_data_slices[0];
+            typename PRProblem::GraphSlice *graph_slice = problem->graph_slices[0];
+            typename PRProblem::DataSlice *data_slice = problem->d_data_slices[0];
 
-            SizeT queue_length          = 1;
+            SizeT queue_length          = graph_slice->nodes;
             VertexId queue_index        = 0;        // Work queue index
             int selector                = 0;
-            SizeT num_elements          = 1;
+            SizeT num_elements          = graph_slice->nodes;
 
-            bool queue_reset = true; 
+            bool queue_reset = true;
+            SizeT num_valid_node = 0;
 
+            while (num_valid_node != queue_length) {
 
-            fflush(stdout);
-            // Step through BFS iterations
-            
-            VertexId *h_cur_queue = new VertexId[graph_slice->edges];
-            while (done[0] < 0) {
+              num_valid_node = queue_length; 
 
-                // Edge Map
-                gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, BFSProblem, BfsFunctor>
+              //util::DisplayDeviceResults(problem->graph_slices[0]->frontier_queues.d_keys[selector],
+              //    num_elements);
+
+              if (retval = work_progress.SetQueueLength(queue_index, queue_length)) break;
+              gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, PRProblem, RemoveZeroFunctor>
                 <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
                     queue_reset,
                     queue_index,
@@ -293,7 +291,7 @@ class BFSEnactor : public EnactorBase
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
-                    graph_slice->frontier_queues.d_values[selector^1],          // d_pred_out_queue
+                    NULL,
                     graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
                     graph_slice->d_column_indices,
                     data_slice,
@@ -302,35 +300,82 @@ class BFSEnactor : public EnactorBase
                     graph_slice->frontier_elements[selector^1],                 // max_out_queue
                     this->edge_map_kernel_stats);
 
+              if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
+                      "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break; 
 
-                // Only need to reset queue for once
-                if (queue_reset)
-                    queue_reset = false;
+              gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, PRProblem, RemoveZeroFunctor>
+                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                    iteration,
+                    queue_reset,
+                    queue_index,
+                    1,
+                    num_elements,
+                    d_done,
+                    graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
+                    NULL,
+                    graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
+                    data_slice,
+                    NULL,
+                    work_progress,
+                    graph_slice->frontier_elements[selector],           // max_in_queue
+                    graph_slice->frontier_elements[selector^1],         // max_out_queue
+                    this->vertex_map_kernel_stats);
+
+              if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
+                      "vertex_map::Kernel RemoveZeroFunctor failed", __FILE__, __LINE__)))
+                break;
+
+                util::MemsetCopyVectorKernel<<<128,
+                  128>>>(problem->data_slices[0]->d_degrees,
+                          problem->data_slices[0]->d_degrees_pong, graph_slice->nodes);
+
+              //util::DisplayDeviceResults(problem->data_slices[0]->d_degrees,
+              //        graph_slice->nodes);
+
+              queue_index++;
+              selector^=1;
+              if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
+              num_elements = queue_length;
+            }
+
+            queue_reset = true;
+            num_elements = queue_length;
+            int edge_map_queue_len = num_elements;
+
+            util::MemsetKernel<<<128, 128>>>(problem->data_slices[0]->d_rank_curr,
+                (Value)1.0/edge_map_queue_len, graph_slice->nodes);
+
+            // Step through PR iterations 
+            while (done[0] < 0) {
+
+                if (retval = work_progress.SetQueueLength(queue_index, edge_map_queue_len)) break;
+                // Edge Map
+                gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, PRProblem, PrFunctor>
+                <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
+                    queue_reset,
+                    queue_index,
+                    1,
+                    iteration,
+                    num_elements,
+                    d_done,
+                    graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
+                    NULL,
+                    graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
+                    graph_slice->d_column_indices,
+                    data_slice,
+                    this->work_progress,
+                    graph_slice->frontier_elements[selector],                   // max_in_queue
+                    graph_slice->frontier_elements[selector^1],                 // max_out_queue
+                    this->edge_map_kernel_stats);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates 
 
-
                 queue_index++;
-                selector ^= 1;
-                
+
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                     printf(", %lld", (long long) queue_length);
-                    util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
-                    util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[selector], queue_length);
-
-                    /*if (iteration == 2) {
-                        cudaMemcpy(h_cur_queue, graph_slice->frontier_queues.d_keys[selector], sizeof(VertexId)*queue_length, cudaMemcpyDeviceToHost);
-                        int neg_num = 0;
-                        std::sort(h_cur_queue, h_cur_queue + queue_length);
-                        for (int i = 0; i < queue_length; ++i)
-                        {
-                            if (h_cur_queue[i] == -1)
-                                neg_num++;
-                        }
-                        printf("(%d)", neg_num);
-                    }*/
                 }
 
                 if (INSTRUMENT) {
@@ -343,41 +388,59 @@ class BFSEnactor : public EnactorBase
                 // Throttle
                 if (iteration & 1) {
                     if (retval = util::GRError(cudaEventRecord(throttle_event),
-                        "BFSEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
+                        "PREnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
                 } else {
                     if (retval = util::GRError(cudaEventSynchronize(throttle_event),
-                        "BFSEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
+                        "PREnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
                 }
 
-                // Check if done
-                if (done[0] == 0) break;
+                if (queue_reset)
+                    queue_reset = false;
+
+                if (done[0] == 0) break; 
+                
+                if (retval = work_progress.SetQueueLength(queue_index, edge_map_queue_len)) break;
 
                 // Vertex Map
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, BFSProblem, BfsFunctor>
+                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, PRProblem, PrFunctor>
                 <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
-                    iteration+1,
+                    iteration,
                     queue_reset,
                     queue_index,
                     1,
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
-                    graph_slice->frontier_queues.d_values[selector],    // d_pred_in_queue
+                    NULL,
                     graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
                     data_slice,
-                    problem->data_slices[0]->d_visited_mask,
+                    NULL,
                     work_progress,
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
                     this->vertex_map_kernel_stats);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
+                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates     
 
-
-                queue_index++;
-                selector ^= 1;
                 iteration++;
+                queue_index++;
+
+
+                if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
+                num_elements = queue_length;
+
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_next,
+                //    graph_slice->nodes);
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_curr,
+                //    graph_slice->nodes);
+    
+                //swap rank_curr and rank_next
+                util::MemsetCopyVectorKernel<<<128,
+                  128>>>(problem->data_slices[0]->d_rank_curr,
+                      problem->data_slices[0]->d_rank_next, graph_slice->nodes);
+                util::MemsetKernel<<<128, 128>>>(problem->data_slices[0]->d_rank_next,
+                    (Value)0.0, graph_slice->nodes);
 
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
@@ -390,27 +453,18 @@ class BFSEnactor : public EnactorBase
                             total_lifetimes)) break;
                     }
                 }
-                // Check if done
-                if (done[0] == 0) break;
+
+                if (done[0] == 0 || queue_length == 0 || iteration > max_iteration) break;
 
                 if (DEBUG) printf("\n%lld", (long long) iteration);
 
             }
 
-            delete[] h_cur_queue;
             if (retval) break;
 
-            // Check if any of the frontiers overflowed due to redundant expansion
-            bool overflowed = false;
-            if (retval = work_progress.CheckOverflow<SizeT>(overflowed)) break;
-            if (overflowed) {
-                retval = util::GRError(cudaErrorInvalidConfiguration, "Frontier queue overflow. Please increase queue-sizing factor.",__FILE__, __LINE__);
-                break;
-            }
-            
         } while(0);
 
-        if (DEBUG) printf("\nGPU BFS Done.\n");
+        if (DEBUG) printf("\nGPU PR Done.\n");
         return retval;
     }
 
@@ -420,90 +474,55 @@ class BFSEnactor : public EnactorBase
      */
 
     /**
-     * @brief BFS Enact kernel entry.
+     * @brief PR Enact kernel entry.
      *
-     * @tparam BFSProblem BFS Problem type. @see BFSProblem
+     * @tparam PRProblem PR Problem type. @see PRProblem
      *
-     * @param[in] problem Pointer to BFSProblem object.
-     * @param[in] src Source node for BFS.
-     * @param[in] max_grid_size Max grid size for BFS kernel calls.
+     * @param[in] problem Pointer to PRProblem object.
+     * @param[in] src Source node for PR.
+     * @param[in] max_grid_size Max grid size for PR kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
-    template <typename BFSProblem>
+    template <typename PRProblem>
     cudaError_t Enact(
-        BFSProblem                      *problem,
-        typename BFSProblem::VertexId    src,
+        CudaContext                          &context,
+        PRProblem                      *problem,
+        typename PRProblem::SizeT       max_iteration,
         int                             max_grid_size = 0)
     {
-        if (BFSProblem::ENABLE_IDEMPOTENCE) {
-            if (this->cuda_props.device_sm_version >= 300) {
-                typedef gunrock::oprtr::vertex_map::KernelPolicy<
-                    BFSProblem,                         // Problem data type
+        if (this->cuda_props.device_sm_version >= 300) {
+            typedef gunrock::oprtr::vertex_map::KernelPolicy<
+                PRProblem,                         // Problem data type
+            300,                                // CUDA_ARCH
+            INSTRUMENT,                         // INSTRUMENT
+            0,                                  // SATURATION QUIT
+            true,                               // DEQUEUE_PROBLEM_SIZE
+            8,                                  // MIN_CTA_OCCUPANCY
+            6,                                  // LOG_THREADS
+            1,                                  // LOG_LOAD_VEC_SIZE
+            0,                                  // LOG_LOADS_PER_TILE
+            5,                                  // LOG_RAKING_THREADS
+            5,                                  // END_BITMASK_CULL
+            8>                                  // LOG_SCHEDULE_GRANULARITY
+                VertexMapPolicy;
+
+            typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
+                PRProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
-                0,                                  // SATURATION QUIT
-                true,                               // DEQUEUE_PROBLEM_SIZE
-                8,                                  // MIN_CTA_OCCUPANCY
-                8,                                  // LOG_THREADS
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                5,                                  // END_BITMASK_CULL
-                8>                                  // LOG_SCHEDULE_GRANULARITY
-                    VertexMapPolicy;
-
-                typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
-                    BFSProblem,                         // Problem data type
-                    300,                                // CUDA_ARCH
-                    INSTRUMENT,                         // INSTRUMENT
-                    8,                                  // MIN_CTA_OCCUPANCY
-                    8,                                  // LOG_THREADS
-                    0,                                  // LOG_LOAD_VEC_SIZE
-                    0,                                  // LOG_LOADS_PER_TILE
-                    5,                                  // LOG_RAKING_THREADS
-                    32,                            // WARP_GATHER_THRESHOLD
-                    128 * 4,                            // CTA_GATHER_THRESHOLD
-                    7>                                  // LOG_SCHEDULE_GRANULARITY
-                        EdgeMapPolicy;
-
-                return EnactBFS<EdgeMapPolicy, VertexMapPolicy, BFSProblem>(
-                        problem, src, max_grid_size);
-            }
-        } else {
-                if (this->cuda_props.device_sm_version >= 300) {
-                typedef gunrock::oprtr::vertex_map::KernelPolicy<
-                    BFSProblem,                         // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                0,                                  // SATURATION QUIT
-                true,                               // DEQUEUE_PROBLEM_SIZE
                 8,                                  // MIN_CTA_OCCUPANCY
                 6,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
-                5,                                  // END_BITMASK_CULL
-                8>                                  // LOG_SCHEDULE_GRANULARITY
-                    VertexMapPolicy;
+                32,                            // WARP_GATHER_THRESHOLD
+                128 * 4,                            // CTA_GATHER_THRESHOLD
+                7>                                  // LOG_SCHEDULE_GRANULARITY
+                    EdgeMapPolicy;
 
-                typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
-                    BFSProblem,                         // Problem data type
-                    300,                                // CUDA_ARCH
-                    INSTRUMENT,                         // INSTRUMENT
-                    8,                                  // MIN_CTA_OCCUPANCY
-                    6,                                  // LOG_THREADS
-                    1,                                  // LOG_LOAD_VEC_SIZE
-                    0,                                  // LOG_LOADS_PER_TILE
-                    5,                                  // LOG_RAKING_THREADS
-                    32,                            // WARP_GATHER_THRESHOLD
-                    128 * 4,                            // CTA_GATHER_THRESHOLD
-                    7>                                  // LOG_SCHEDULE_GRANULARITY
-                        EdgeMapPolicy;
-
-                return EnactBFS<EdgeMapPolicy, VertexMapPolicy, BFSProblem>(
-                        problem, src, max_grid_size);
-            }
+            return EnactPR<EdgeMapPolicy, VertexMapPolicy, PRProblem>(
+                    context, problem, max_iteration, max_grid_size);
         }
 
         //to reduce compile time, get rid of other architecture for now
@@ -517,7 +536,7 @@ class BFSEnactor : public EnactorBase
 
 };
 
-} // namespace bfs
+} // namespace pr
 } // namespace app
 } // namespace gunrock
 
