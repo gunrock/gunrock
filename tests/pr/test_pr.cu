@@ -304,22 +304,7 @@ void RunTests(
         util::GRError(csr_problem->Init(
             g_stream_from_host,
             graph,
-            num_gpus), "Problem pr Initialization Failed", __FILE__, __LINE__);
-
-        //
-        // Compute reference CPU BFS solution for source-distance
-        //
-        if (reference_check != NULL)
-        {
-            printf("compute ref value\n");
-            SimpleReferencePr(
-                    graph,
-                    reference_check,
-                    delta,
-                    error,
-                    max_iter);
-            printf("\n");
-        }
+            num_gpus), "Problem pr Initialization Failed", __FILE__, __LINE__); 
 
         Stats *stats = new Stats("GPU PageRank");
 
@@ -341,8 +326,29 @@ void RunTests(
         // Copy out results
         util::GRError(csr_problem->Extract(h_rank), "PageRank Problem Data Extraction Failed", __FILE__, __LINE__);
 
+        float total_pr = 0;
+        for (int i = 0; i < graph.nodes; ++i)
+        {
+            total_pr += h_rank[i];
+        }
+
+        //
+        // Compute reference CPU PR solution for source-distance
+        //
+        if (reference_check != NULL && total_pr > 0)
+        {
+            printf("compute ref value\n");
+            SimpleReferencePr(
+                    graph,
+                    reference_check,
+                    delta,
+                    error,
+                    max_iter);
+            printf("\n");
+        }
+
         // Verify the result
-        if (reference_check != NULL) {
+        if (reference_check != NULL && total_pr > 0) {
             printf("Validity: ");
             CompareResults(h_rank, reference_check, graph.nodes, true);
         }

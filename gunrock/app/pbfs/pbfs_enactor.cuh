@@ -236,9 +236,10 @@ class PBFSEnactor : public EnactorBase
             int vertex_map_occupancy    = VertexMapPolicy::CTA_OCCUPANCY;
             int vertex_map_grid_size    = MaxGridSize(vertex_map_occupancy, max_grid_size);
 
-            printf("scratch size:%d\n", EdgeMapPolicy::SmemStorage::SCRATCH_ELEMENTS);
 
             if (DEBUG) {
+                printf("scratch size:%d\n", EdgeMapPolicy::SmemStorage::SCRATCH_ELEMENTS);
+
                 printf("Partitioned BFS edge map occupancy %d, level-grid size %d\n",
                 edge_map_occupancy, edge_map_grid_size);
                 printf("Partitioned BFS vertex map occupancy %d, level-grid size %d\n",
@@ -293,34 +294,13 @@ class PBFSEnactor : public EnactorBase
                                         graph_slice->frontier_elements[selector^1]);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_partitioned kernel failed", __FILE__, __LINE__))) break;
-                //Scan<MgpuScanTypeInc>((unsigned int*)data_slice->d_scanned_edges, queue_length, context);
                 Scan<MgpuScanTypeInc>((int*)problem->data_slices[0]->d_scanned_edges, queue_length, (int)0, mgpu::plus<int>(),
 		(int*)0, (int*)0, (int*)problem->data_slices[0]->d_scanned_edges, context);
-
-		        /*//Test Scan
-		        int *t_scan = new int[10];
-		        for (int i = 0; i < 10; ++i) {
-		            t_scan[i] = 1;
-		        }
-		        int *d_t_scan;
-		        cudaMalloc((void**)&d_t_scan, sizeof(int)*10);
-                if (retval = util::GRError(cudaMemcpy(
-                                d_t_scan,
-                                t_scan,
-                                sizeof(int)*10,
-                                cudaMemcpyHostToDevice),
-                            "test scan failed", __FILE__, __LINE__)) return retval;
-                Scan<MgpuScanTypeInc>(d_t_scan, 10, (int)0, mgpu::plus<int>(),
-		            (int*)0, (int*)0, d_t_scan, context);
-
-                util::DisplayDeviceResults(d_t_scan, 10);
-                cudaFree(d_t_scan);
-                delete[] t_scan;*/
 
                 SizeT *temp = new SizeT[1];
                 cudaMemcpy(temp, problem->data_slices[0]->d_scanned_edges+queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
                 SizeT output_queue_len = temp[0];
-                printf("num block:%d, scanned length:%d\n", num_block, output_queue_len);
+                if (DEBUG) printf("num block:%d, scanned length:%d\n", num_block, output_queue_len);
                 
                 // Edge Expand Kernel
                 {
@@ -344,6 +324,7 @@ class PBFSEnactor : public EnactorBase
                                         work_progress,
                                         this->edge_map_kernel_stats);
                     }
+                    // Disable one partition edge mapping strategy. Have bugs on large dataset
                     /*else
                     {
 
