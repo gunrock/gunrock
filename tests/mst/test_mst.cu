@@ -16,6 +16,7 @@
 #include <string>
 #include <deque>
 #include <vector>
+#include <utility>
 #include <iostream>
 #include <cstdlib>
 
@@ -35,6 +36,10 @@
 #include <gunrock/oprtr/vertex_map/kernel.cuh>
 
 #include <moderngpu.cuh>
+
+#include <boost/config.hpp>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/prim_minimum_spanning_tree.hpp>
 
 
 using namespace gunrock;
@@ -100,22 +105,66 @@ bool g_stream_from_host;
     typename Value,
     typename SizeT>
 void SimpleReferenceMST(
+    Value                                   *weights,
     const Csr<VertexId, Value, SizeT>       &graph)
 {
     //Preparation
+    using namespace boost;
+    typedef adjacency_list < vecS, vecS, undirectedS,
+            property<vertex_distance_t, int>, property < edge_weight_t, int > > Graph;
+    typedef std::pair < int, int > E;
+    int num_nodes = graph.nodes;
+    int num_edges = graph.edges;
+    E *edge_pairs = new E[num_edges];
+    int idx = 0;
+    printf("node %d edge %d\n", num_nodes, num_edges);
 
-    
+    for (int i = 0; i < num_nodes; ++i)
+    {
+        for (int j = graph.row_offsets[i]; j < graph.row_offsets[i+1]; ++j)
+        {
+            edge_pairs[idx++] = std::make_pair(i, graph.column_indices[j]);
+        }
+    }
+    /*Graph g(num_nodes);
+  property_map<Graph, edge_weight_t>::type weightmap = get(edge_weight, g); 
+  for (std::size_t j = 0; j < sizeof(edge_pairs) / sizeof(E); ++j) {
+  printf("%d, %d\n", edge_pairs[j].first, edge_pairs[j].second);
+    graph_traits<Graph>::edge_descriptor e; bool inserted;
+    tie(e, inserted) = add_edge(edge_pairs[j].first, edge_pairs[j].second, g);
+    weightmap[e] = weights[j];
+  }*/
+    Graph g(edge_pairs, edge_pairs + num_edges, weights, num_nodes);
+    property_map<Graph, edge_weight_t>::type weightmap = get(edge_weight, g);
+    std::vector < graph_traits < Graph >::vertex_descriptor >
+        p(num_vertices(g));
+
+        typedef graph_traits<Graph>::edge_iterator edge_iterator;
+
+std::pair<edge_iterator, edge_iterator> ei = edges(g);
+for(edge_iterator edge_iter = ei.first; edge_iter != ei.second; ++edge_iter) {
+        std::cout << "(" << source(*edge_iter, g) << ", " << target(*edge_iter, g) << ")\n";
+            }
+
     //
     //compute MST
     //
 
     CpuTimer cpu_timer;
     cpu_timer.Start();
+    prim_minimum_spanning_tree(g, &p[0]);
 
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
 
     printf("CPU MST finished in %lf msec.\n", elapsed);
+
+    for (std::size_t i = 0; i != p.size(); ++i)
+        if (p[i] != i)
+            std::cout << "parent[" << i << "] = " << p[i] << std::endl;
+        else
+            std::cout << "parent[" << i << "] = no parent" << std::endl;
+
 }
 
 /**
@@ -174,6 +223,7 @@ void RunTests(
         //util::GRError(csr_problem->Extract(h_result), "MST Problem Data Extraction Failed", __FILE__, __LINE__);
 
         // Verify the result
+        //SimpleReferenceMST(graph.edge_values, graph);
         
         // Cleanup
         if (csr_problem) delete csr_problem;
@@ -285,6 +335,24 @@ int main( int argc, char** argv)
 		}
 
 		csr.DisplayGraph();
+
+        for (int i = 0; i < csr.edges; ++i)
+        {
+            printf("%d ", csr.edge_values[i]);
+        }
+        printf("\n");
+
+        Csr<VertexId, Value, SizeT> csr2(false);
+        graphio::BuildMarketGraph<true>(
+        market_filename,
+        csr2,
+        false,
+        false);
+
+        csr2.DisplayGraph();
+
+        SimpleReferenceMST(csr2.edge_values, csr2);
+
 
 		// Run tests
 		RunTests(csr, args, *context);
