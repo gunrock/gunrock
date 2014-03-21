@@ -481,7 +481,7 @@ class PSSSPEnactor : public EnactorBase
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
 		1,
-		7,
+		10,
 		15,
 		32 * 1024>
                     EdgeMapPolicy;
