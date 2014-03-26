@@ -842,8 +842,7 @@ struct ORFunctor
     typedef typename ProblemData::DataSlice DataSlice;
 
     /**
-     * @brief Forward Edge Mapping condition function. Check if the destination node
-     * has been claimed as someone else's child.
+     * @brief Forward Edge Mapping condition function. 
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
@@ -857,9 +856,7 @@ struct ORFunctor
     }
 
     /**
-     * @brief Forward Edge Mapping apply function. Now we know the source node
-     * has succeeded in claiming child, so it is safe to set label to its child
-     * node (destination node).
+     * @brief Forward Edge Mapping apply function. 
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
@@ -872,7 +869,7 @@ struct ORFunctor
     }
 
     /**
-     * @brief Vertex mapping condition function. Check if the Vertex Id is valid (not equal to -1).
+     * @brief Vertex mapping condition function. 
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
@@ -881,7 +878,7 @@ struct ORFunctor
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-         problem->d_edgeFlag[node] = problem->d_edgeFlag[node] | problem->d_flag[node];
+        problem->d_edgeFlag[node] = problem->d_edgeFlag[node] | problem->d_flag[node];
 	return true;
     }
 
