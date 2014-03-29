@@ -149,7 +149,7 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
 		if (data_slices[i]->d_keys)		util::GRError(cudaFree(data_slices[i]->d_keys),
                         "GpuSlice cudaFree d_keys failed", __FILE__, __LINE__);
 		if (data_slices[i]->d_keysCopy)             util::GRError(cudaFree(data_slices[i]->d_keysCopy),
-                        "GpuSlice cudaFree d_keys failed", __FILE__, __LINE__);
+                        "GpuSlice cudaFree d_keysCopy failed", __FILE__, __LINE__);
 		if (data_slices[i]->d_reducedKeys)	util::GRError(cudaFree(data_slices[i]->d_reducedKeys),
                         "GpuSlice cudaFree d_reducedKeys failed", __FILE__, __LINE__);
 		if (data_slices[i]->d_successor)	util::GRError(cudaFree(data_slices[i]->d_successor),
