@@ -23,7 +23,8 @@ namespace mst {
 
 /**
  * @brief Structure contains device functions in MST graph traverse.
- * Used for finding flag array
+ * Used for generating Flag array.
+ *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
  * @tparam ProblemData         Problem data type which contains data slice for BFS problem
@@ -49,7 +50,7 @@ struct FLAGFunctor
         if (problem->d_reducedWeights[s_id] == problem->d_weights[e_id])
 	{
                 problem->d_successor[s_id] = d_id;
-		problem->d_selector[problem->d_eId[e_id]] = true;
+		problem->d_selector[problem->d_eId[e_id]] = true; // Mark Selected Edge(s)
 	}
 	return true;
     }
@@ -79,7 +80,7 @@ struct FLAGFunctor
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
 	problem->d_flag[problem->d_row_offsets[node]] = 1;
-    	problem->d_flag[0] = 0;
+    	problem->d_flag[0] = 0;	// For Scanning Keys Array. 
 	return true;
     }
 
@@ -98,7 +99,7 @@ struct FLAGFunctor
 
 /**
  * @brief Structure contains device functions in MST graph traverse.
- *  Used for removing cycles in the graph
+ * Used for removing cycles.
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
@@ -112,7 +113,7 @@ struct RCFunctor
 
     /**
      * @brief Forward Edge Mapping condition function. 
-     * Used for finding Vetex Id that have min weight
+     * Used for finding Vetex Id that have minimum weight value.
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
@@ -134,7 +135,7 @@ struct RCFunctor
     }
 
     /**
-     * @brief Forward Edge Mapping apply function. Now we know the source node
+     * @brief Forward Edge Mapping apply function. 
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
@@ -159,7 +160,7 @@ struct RCFunctor
     }
 
     /**
-     * @brief Vertex mapping apply function. Doing nothing for BFS problem.
+     * @brief Vertex mapping apply function. 
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
@@ -170,8 +171,6 @@ struct RCFunctor
 	return;
     }
 };
-
-
 
 
 /**
@@ -225,6 +224,7 @@ struct PtrJumpFunctor
         }
     }
 };
+
 
 /**
  * @brief Structure contains device functions for doing pointer jumping only for masked nodes.
@@ -364,8 +364,6 @@ struct EdgeRmFunctor
         return; 
     }
 };
-
-
 
 
 /**
@@ -775,7 +773,7 @@ struct SuEdgeRmFunctor
 
 
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct VertexLenFunctor
+struct ORFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
@@ -816,72 +814,7 @@ struct VertexLenFunctor
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-        return true;
-    }
-
-    /**
-     * @brief Vertex mapping apply function. Calculate Vertex List Length 
-     *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     *
-     */
-    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
-    {
-        problem->d_row_offsets[node] = (problem->d_flag[node] == 0) ? -1 : 1;
-	problem->d_row_offsets[0] = 1;
-	return; 
-    }
-};
-
-
-
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct ORFunctor
-{
-    typedef typename ProblemData::DataSlice DataSlice;
-
-    /**
-     * @brief Forward Edge Mapping condition function. Check if the destination node
-     * has been claimed as someone else's child.
-     *
-     * @param[in] s_id Vertex Id of the edge source node
-     * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     *
-     * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
-     */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
-    {
-        return true;
-    }
-
-    /**
-     * @brief Forward Edge Mapping apply function. Now we know the source node
-     * has succeeded in claiming child, so it is safe to set label to its child
-     * node (destination node).
-     *
-     * @param[in] s_id Vertex Id of the edge source node
-     * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     *
-     */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
-    {
-       return; 
-    }
-
-    /**
-     * @brief Vertex mapping condition function. Check if the Vertex Id is valid (not equal to -1).
-     *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     *
-     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
-     */
-    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
-    {
-         problem->d_edgeFlag[node] = problem->d_edgeFlag[node] | problem->d_flag[node];
+        problem->d_edgeFlag[node] = problem->d_edgeFlag[node] | problem->d_flag[node];
 	return true;
     }
 
