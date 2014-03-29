@@ -146,11 +146,11 @@ int ReadMarketStream(
             if (reversed && !undirected) {
                 coo[edges_read].col = ll_row - 1;   // zero-based array
                 coo[edges_read].row = ll_col - 1;   // zero-based array
-                ordered_rows = false;
             } else {
                 coo[edges_read].row = ll_row - 1;   // zero-based array
                 coo[edges_read].col = ll_col - 1;   // zero-based array
-            }
+            	ordered_rows = false;
+	    }
 
             edges_read++;
 
