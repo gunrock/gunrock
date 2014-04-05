@@ -343,7 +343,7 @@ void RunTests(
         // Perform SSSP
         GpuTimer gpu_timer;
 
-        util::GRError(csr_problem->Reset(src, sssp_enactor.GetFrontierType(), 1.0), "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(csr_problem->Reset(src, sssp_enactor.GetFrontierType(), 5.0), "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
         util::GRError(sssp_enactor.template Enact<Problem>(context, csr_problem, src, max_grid_size), "SSSP Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
