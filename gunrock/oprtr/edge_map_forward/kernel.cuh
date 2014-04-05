@@ -174,8 +174,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         }
 
         // Determine work decomposition
-        if (threadIdx.x == 0) {
-
+        if (threadIdx.x == 0) { 
+        
             // Obtain problem size
             if (queue_reset)
             {
@@ -208,7 +208,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         }
 
         // Barrier to protect work decomposition
-        __syncthreads();
+        __syncthreads(); 
 
         Sweep<KernelPolicy, ProblemData, Functor>::Invoke(
                 queue_index,
@@ -222,7 +222,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 smem_storage,
                 work_progress,
                 smem_storage.state.work_decomposition,
-                max_out_frontier);
+                max_out_frontier); 
 
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
             kernel_stats.MarkStop();
