@@ -13,12 +13,11 @@
  */
 
 #pragma once
-
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/app/sssp/sssp_problem.cuh>
+#include <stdio.h>
 
-namespace gunrock {
-namespace app {
+namespace gunrock { namespace app {
 namespace sssp {
 
 /**
@@ -47,11 +46,14 @@ struct SSSPFunctor
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id)
     {
         unsigned int label, weight;
+
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                         label, problem->d_labels + s_id);
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                         weight, problem->d_weights + e_id);
         unsigned int new_weight = weight + label;
+       
+        
         // Check if the destination node has been claimed as someone's child
         return (new_weight < atomicMin(&problem->d_labels[d_id], new_weight));
     }
@@ -67,8 +69,10 @@ struct SSSPFunctor
      *
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id)
-    {
-        // do nothing here
+    { 
+        if (ProblemData::MARK_PATHS)
+            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                    s_id, problem->d_preds + d_id);
     }
 
     /**

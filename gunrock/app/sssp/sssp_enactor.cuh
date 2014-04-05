@@ -256,18 +256,20 @@ class SSSPEnactor : public EnactorBase
             typename SSSPProblem::DataSlice *data_slice = problem->d_data_slices[0];
 
 
+
+            fflush(stdout);
+            // Step through SSSP iterations
+
+            //for (int iter = 0; iter < graph_slice->nodes; ++iter) {
+            
             SizeT queue_length          = 1;
             VertexId queue_index        = 0;        // Work queue index
             int selector                = 0;
             SizeT num_elements          = 1;
 
-            bool queue_reset = true; 
+            bool queue_reset = true;
+            done[0] = -1;
 
-
-            fflush(stdout);
-            // Step through SSSP iterations
-            
-            VertexId *h_cur_queue = new VertexId[graph_slice->edges];
             while (done[0] < 0) {
 
                 // Edge Map
@@ -280,7 +282,7 @@ class SSSPEnactor : public EnactorBase
                     num_elements,
                     d_done,
                     graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
-                    NULL,          // d_pred_out_queue
+                    NULL,                                                       // d_pred_out_queue
                     graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
                     graph_slice->d_column_indices,
                     data_slice,
@@ -295,12 +297,11 @@ class SSSPEnactor : public EnactorBase
                     queue_reset = false;
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates 
-
+                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates
 
                 queue_index++;
                 selector ^= 1;
-                
+    
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                     printf(", %lld", (long long) queue_length);
@@ -371,17 +372,17 @@ class SSSPEnactor : public EnactorBase
                 if (DEBUG) printf("\n%lld", (long long) iteration);
 
             }
+            //}
 
-            delete[] h_cur_queue;
             if (retval) break;
 
             // Check if any of the frontiers overflowed due to redundant expansion
-            bool overflowed = false;
+            /*bool overflowed = false;
             if (retval = work_progress.CheckOverflow<SizeT>(overflowed)) break;
             if (overflowed) {
                 retval = util::GRError(cudaErrorInvalidConfiguration, "Frontier queue overflow. Please increase queue-sizing factor.",__FILE__, __LINE__);
                 break;
-            }
+            }*/
             
         } while(0);
 
@@ -433,8 +434,8 @@ class SSSPEnactor : public EnactorBase
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 8,                                  // MIN_CTA_OCCUPANCY
-                6,                                  // LOG_THREADS
-                0,                                  // LOG_LOAD_VEC_SIZE
+                5,                                  // LOG_THREADS
+                1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
                 32,                            // WARP_GATHER_THRESHOLD
