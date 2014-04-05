@@ -30,12 +30,14 @@ namespace sssp {
  */
 template <
     typename    VertexId,                       
-    typename    SizeT>
+    typename    SizeT,
+    bool        _MARK_PREDECESSORS>
 struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
 {
 
     static const bool MARK_PREDECESSORS     = true;
     static const bool ENABLE_IDEMPOTENCE    = false;
+    static const bool MARK_PATHS            = _MARK_PREDECESSORS;
 
     //Helper structures
 
@@ -47,6 +49,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
         // device storage arrays
         unsigned int        *d_labels;              /**< Used for source distance */
         unsigned int        *d_weights;             /**< Used for storing edge weights */
+        VertexId            *d_preds;               /**< Used for storing the actual shortest path */
     };
 
     // Members
@@ -108,6 +111,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
                 "~SSSPProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
             if (data_slices[i]->d_labels)      util::GRError(cudaFree(data_slices[i]->d_labels), "GpuSlice cudaFree d_labels failed", __FILE__, __LINE__);
             if (data_slices[i]->d_weights)      util::GRError(cudaFree(data_slices[i]->d_weights), "GpuSlice cudaFree d_weights failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_preds)      util::GRError(cudaFree(data_slices[i]->d_preds), "GpuSlice cudaFree d_preds failed", __FILE__, __LINE__);
             if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
         }
         if (d_data_slices)  delete[] d_data_slices;
@@ -126,7 +130,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
      *
      *\return cudaError_t object which indicates the success of all CUDA function calls.
      */
-    cudaError_t Extract(unsigned int *h_labels)
+    cudaError_t Extract(unsigned int *h_labels, VertexId *h_preds)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -140,10 +144,17 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
                 if (retval = util::GRError(cudaMemcpy(
                                 h_labels,
                                 data_slices[0]->d_labels,
-                                sizeof(VertexId) * nodes,
+                                sizeof(unsigned int) * nodes,
                                 cudaMemcpyDeviceToHost),
                             "SSSPProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) break;
-
+                if (MARK_PATHS) {
+                    if (retval = util::GRError(cudaMemcpy(
+                                    h_preds,
+                                    data_slices[0]->d_preds,
+                                    sizeof(VertexId) * nodes,
+                                    cudaMemcpyDeviceToHost),
+                                "SSSPProblem cudaMemcpy d_preds failed", __FILE__, __LINE__)) break;
+                }
             } else {
                 // TODO: multi-GPU extract result
             } //end if (data_slices.size() ==1)
@@ -216,6 +227,16 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
                         (void**)&d_weights,
                         edges * sizeof(unsigned int)),
                     "SSSPProblem cudaMalloc d_weights failed", __FILE__, __LINE__)) return retval;
+
+                VertexId    *d_preds = NULL;
+
+                if (MARK_PATHS) {
+                    if (retval = util::GRError(cudaMalloc(
+                                    (void**)&d_preds,
+                                    nodes * sizeof(VertexId)),
+                                "SSSPProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
+                }
+                data_slices[0]->d_preds = d_preds;
     
                 if (retval = util::GRError(cudaMemcpy(
                         d_weights,
@@ -269,12 +290,23 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
 
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_labels, UINT_MAX, nodes);
 
+            if (!data_slices[gpu]->d_preds && MARK_PATHS) {
+                VertexId    *d_preds;
+                if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_preds,
+                        nodes * sizeof(VertexId)),
+                    "SSSPProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_preds = d_preds;
+            }
+
+
             if (retval = util::GRError(cudaMemcpy(
                             d_data_slices[gpu],
                             data_slices[gpu],
                             sizeof(DataSlice),
                             cudaMemcpyHostToDevice),
                         "SSSPProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
+
 
         }
 
@@ -294,6 +326,10 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
                         sizeof(VertexId),
                         cudaMemcpyHostToDevice),
                     "SSSPProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
+
+
+        if (MARK_PATHS) util::MemsetIdxKernel<<<128, 128>>>(data_slices[0]->d_preds, nodes);
+
 
         return retval;
     }

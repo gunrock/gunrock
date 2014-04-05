@@ -156,7 +156,7 @@ struct Csr
         new_coo[0].val = coo[0].val;
         for (int i = 0; i < coo_edges-1; ++i)
         {
-            if ((coo[i+1].col != coo[i].col) || (coo[i+1].row != coo[i].row))
+            if (((coo[i+1].col != coo[i].col) || (coo[i+1].row != coo[i].row)) && (coo[i+1].col != coo[i+1].row))
             {
                 new_coo[real_edge].col = coo[i+1].col;
                 new_coo[real_edge].row = coo[i+1].row;
@@ -242,21 +242,46 @@ struct Csr
     /**
      * @brief Display CSR graph to console
      */
-    void DisplayGraph()
+    void DisplayGraph(bool with_edge_value = false)
     {
         SizeT displayed_node_num = (nodes > 40) ? 40:nodes;
         printf("First %d nodes's neighbor list of the input graph:\n", displayed_node_num);
         for (SizeT node = 0; node < displayed_node_num; node++) {
             util::PrintValue(node);
-            printf(": ");
+            printf(":");
             for (SizeT edge = row_offsets[node];
                  edge < row_offsets[node + 1];
                  edge++) {
                 util::PrintValue(column_indices[edge]);
-                printf(", ");
+                if (with_edge_value)
+                    printf(":%d, ", edge_values[edge]);
+                else
+                    printf(", ");
             }
             printf("\n");
         }
+    }
+
+    bool CheckValue()
+    {
+        for (SizeT node = 0; node < nodes; ++node) {
+            for (SizeT edge = row_offsets[node];
+                 edge < row_offsets[node+1];
+                 ++edge) {
+                 int src_node = node;
+                 int dst_node = column_indices[edge];
+                 int edge_value = edge_values[edge];
+                 for (SizeT r_edge = row_offsets[dst_node];
+                 r_edge < row_offsets[dst_node+1];
+                 ++r_edge) {
+                    if (column_indices[r_edge] == src_node) {
+                        if (edge_values[r_edge] != edge_value)
+                            return false;
+                    }
+                 }
+            }
+        }
+        return true;
     }
 
     /**
