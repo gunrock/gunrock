@@ -174,7 +174,7 @@ struct BackwardFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id)
     {
         //set d_labels[d_id] to be d_labels[s_id]+1
         Value from_sigma;
@@ -192,10 +192,14 @@ struct BackwardFunctor
         Value result = from_sigma / to_sigma * (1.0 + to_delta);
 
         //Accumulate delta value
-        atomicAdd(&problem->d_deltas[s_id], result);
 
         //Accumulate bc value
-        atomicAdd(&problem->d_bc_values[s_id], result);
+        atomicAdd(&problem->d_ebc_values[e_id], result);
+
+        if (s_id != problem->d_src_node[0]) {
+            atomicAdd(&problem->d_deltas[s_id], result); 
+            atomicAdd(&problem->d_bc_values[s_id], result);
+        }
     }
 
     /**

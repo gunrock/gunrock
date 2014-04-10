@@ -165,6 +165,13 @@ void RefCPUBC(
         typedef boost::associative_property_map< StdEdgeIndexMap > EdgeIndexMap;
         EdgeIndexMap e_index(my_e_index);
 
+        int i = 0;
+        BGL_FORALL_EDGES(edge, G, Graph)
+        {
+            my_e_index.insert(std::pair<Edge, int>(edge, i));
+            ++i;
+        }
+
         // Define EdgeCentralityMap
         std::vector< double > e_centrality_vec(boost::num_edges(G), 0.0);
         // Create the external property map
@@ -195,6 +202,11 @@ void RefCPUBC(
         BGL_FORALL_VERTICES(vertex, G, Graph)
         {
             bc_values[vertex] = (Value)v_centrality_map[vertex];
+        }
+
+        BGL_FORALL_EDGES(edge, G, Graph)
+        {
+            std::cout << edge << ": " << (Value)e_centrality_map[edge] << std::endl;
         }
 
         printf("CPU BC finished in %lf msec.", elapsed);
@@ -329,6 +341,7 @@ void RunTests(
     Value *reference_sigmas    = (Value*)malloc(sizeof(Value) * graph.nodes);
     Value *h_sigmas            = (Value*)malloc(sizeof(Value) * graph.nodes);
     Value *h_bc_values         = (Value*)malloc(sizeof(Value) * graph.nodes);
+    Value *h_ebc_values         = (Value*)malloc(sizeof(Value) * graph.nodes);
     Value *reference_check_bc_values = (g_quick) ? NULL : reference_bc_values;
     Value *reference_check_sigmas = (g_quick || (src == -1)) ? NULL : reference_sigmas;
 
@@ -403,7 +416,12 @@ void RunTests(
     bc_enactor.GetStatistics(avg_duty);
 
     // Copy out results
-    util::GRError(csr_problem->Extract(h_sigmas, h_bc_values), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
+    util::GRError(csr_problem->Extract(h_sigmas, h_bc_values, h_ebc_values), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
+    printf("edge bc values:\n");
+    for (int i = 0; i < graph.edges; ++i) {
+        printf("%5f\n", h_ebc_values[i]);
+    }
+    printf("edge bc values end\n");
 
     // Verify the result
     if (reference_check_bc_values != NULL) {

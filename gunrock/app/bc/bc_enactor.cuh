@@ -388,7 +388,7 @@ class BCEnactor : public EnactorBase
             if (DEBUG) printf("\nStart backward phase\n%lld", (long long) iteration);
 
             // Backward BC iteration
-            for (;iteration > 0; --iteration) {
+            for (;iteration >= 0; --iteration) {
                 num_elements        = graph_slice->nodes;
                 // Fill in the frontier_queues
                 util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[selector], num_elements);
