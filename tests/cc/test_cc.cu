@@ -30,7 +30,7 @@
 #include <gunrock/app/cc/cc_functor.cuh>
 
 // Operator includes
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
 
 // Boost includes for CPU CC reference algorithms
 #include <boost/config.hpp>

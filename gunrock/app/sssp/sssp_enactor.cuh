@@ -19,8 +19,8 @@
 
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel_policy.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel_policy.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/sssp/sssp_problem.cuh>
@@ -46,7 +46,7 @@ class SSSPEnactor : public EnactorBase
      * CTA duty kernel stats
      */
     util::KernelRuntimeStatsLifetime edge_map_kernel_stats;
-    util::KernelRuntimeStatsLifetime vertex_map_kernel_stats;
+    util::KernelRuntimeStatsLifetime filter_kernel_stats;
 
     unsigned long long total_runtimes;              // Total working time by each CTA
     unsigned long long total_lifetimes;             // Total life time of each CTA
@@ -72,7 +72,7 @@ class SSSPEnactor : public EnactorBase
      *
      * @param[in] problem SSSP Problem object which holds the graph data and SSSP problem data to compute.
      * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
+     * @param[in] filter_grid_size CTA occupancy for vertex mapping kernel call.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -80,7 +80,7 @@ class SSSPEnactor : public EnactorBase
     cudaError_t Setup(
         ProblemData *problem,
         int edge_map_grid_size,
-        int vertex_map_grid_size)
+        int filter_grid_size)
     {
         typedef typename ProblemData::SizeT         SizeT;
         typedef typename ProblemData::VertexId      VertexId;
@@ -107,7 +107,7 @@ class SSSPEnactor : public EnactorBase
 
             //initialize runtime stats
             if (retval = edge_map_kernel_stats.Setup(edge_map_grid_size)) break;
-            if (retval = vertex_map_kernel_stats.Setup(vertex_map_grid_size)) break;
+            if (retval = filter_kernel_stats.Setup(filter_grid_size)) break;
 
             //Reset statistics
             iteration           = 0;
@@ -202,7 +202,7 @@ class SSSPEnactor : public EnactorBase
      * @brief Enacts a breadth-first search computing on the specified graph.
      *
      * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam VertexMapPolicy Kernel policy for vertex mapping.
+     * @tparam FilterPolicy Kernel policy for vertex mapping.
      * @tparam SSSPProblem SSSP Problem type.
      *
      * @param[in] problem SSSPProblem object.
@@ -213,7 +213,7 @@ class SSSPEnactor : public EnactorBase
      */
     template<
         typename EdgeMapPolicy,
-        typename VertexMapPolicy,
+        typename FilterPolicy,
         typename SSSPProblem>
     cudaError_t EnactSSSP(
     SSSPProblem                          *problem,
@@ -235,21 +235,21 @@ class SSSPEnactor : public EnactorBase
             int edge_map_occupancy      = EdgeMapPolicy::CTA_OCCUPANCY;
             int edge_map_grid_size      = MaxGridSize(edge_map_occupancy, max_grid_size);
 
-            int vertex_map_occupancy    = VertexMapPolicy::CTA_OCCUPANCY;
-            int vertex_map_grid_size    = MaxGridSize(vertex_map_occupancy, max_grid_size);
+            int filter_occupancy    = FilterPolicy::CTA_OCCUPANCY;
+            int filter_grid_size    = MaxGridSize(filter_occupancy, max_grid_size);
 
             if (DEBUG) {
                 printf("SSSP edge map occupancy %d, level-grid size %d\n",
                         edge_map_occupancy, edge_map_grid_size);
                 printf("SSSP vertex map occupancy %d, level-grid size %d\n",
-                        vertex_map_occupancy, vertex_map_grid_size);
+                        filter_occupancy, filter_grid_size);
                 printf("Iteration, Edge map queue, Vertex map queue\n");
                 printf("0");
             }
 
 
             // Lazy initialization
-            if (retval = Setup(problem, edge_map_grid_size, vertex_map_grid_size)) break;
+            if (retval = Setup(problem, edge_map_grid_size, filter_grid_size)) break;
 
             // Single-gpu graph slice
             typename SSSPProblem::GraphSlice *graph_slice = problem->graph_slices[0];
@@ -329,8 +329,8 @@ class SSSPEnactor : public EnactorBase
                 if (done[0] == 0) break;
 
                 // Vertex Map
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, SSSPProblem, SsspFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                gunrock::oprtr::filter::Kernel<FilterPolicy, SSSPProblem, SsspFunctor>
+                <<<filter_grid_size, FilterPolicy::THREADS>>>(
                     iteration+1,
                     queue_reset,
                     queue_index,
@@ -345,9 +345,9 @@ class SSSPEnactor : public EnactorBase
                     work_progress,
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
-                    this->vertex_map_kernel_stats);
+                    this->filter_kernel_stats);
 
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
 
@@ -360,8 +360,8 @@ class SSSPEnactor : public EnactorBase
                     total_queued += queue_length;
                     if (DEBUG) printf(", %lld", (long long) queue_length);
                     if (INSTRUMENT) {
-                        if (retval = vertex_map_kernel_stats.Accumulate(
-                            vertex_map_grid_size,
+                        if (retval = filter_kernel_stats.Accumulate(
+                            filter_grid_size,
                             total_runtimes,
                             total_lifetimes)) break;
                     }
@@ -414,7 +414,7 @@ class SSSPEnactor : public EnactorBase
     {
         
         if (this->cuda_props.device_sm_version >= 300) {
-            typedef gunrock::oprtr::vertex_map::KernelPolicy<
+            typedef gunrock::oprtr::filter::KernelPolicy<
                 SSSPProblem,                         // Problem data type
             300,                                // CUDA_ARCH
             INSTRUMENT,                         // INSTRUMENT
@@ -427,7 +427,7 @@ class SSSPEnactor : public EnactorBase
             5,                                  // LOG_RAKING_THREADS
             5,                                  // END_BITMASK_CULL
             8>                                  // LOG_SCHEDULE_GRANULARITY
-                VertexMapPolicy;
+                FilterPolicy;
 
             typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
                 SSSPProblem,                         // Problem data type
@@ -443,7 +443,7 @@ class SSSPEnactor : public EnactorBase
                 7>                                  // LOG_SCHEDULE_GRANULARITY
                     EdgeMapPolicy;
 
-            return EnactSSSP<EdgeMapPolicy, VertexMapPolicy, SSSPProblem>(
+            return EnactSSSP<EdgeMapPolicy, FilterPolicy, SSSPProblem>(
                     problem, src, max_grid_size);
         }
 

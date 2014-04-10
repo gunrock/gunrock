@@ -19,8 +19,8 @@
 
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel_policy.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel_policy.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/pr/pr_problem.cuh>
@@ -49,7 +49,7 @@ class PREnactor : public EnactorBase
      * CTA duty kernel stats
      */
     util::KernelRuntimeStatsLifetime edge_map_kernel_stats;
-    util::KernelRuntimeStatsLifetime vertex_map_kernel_stats;
+    util::KernelRuntimeStatsLifetime filter_kernel_stats;
 
     unsigned long long total_runtimes;              // Total working time by each CTA
     unsigned long long total_lifetimes;             // Total life time of each CTA
@@ -76,7 +76,7 @@ class PREnactor : public EnactorBase
      *
      * @param[in] problem PR Problem object which holds the graph data and PR problem data to compute.
      * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
+     * @param[in] filter_grid_size CTA occupancy for vertex mapping kernel call.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -84,7 +84,7 @@ class PREnactor : public EnactorBase
     cudaError_t Setup(
         ProblemData *problem,
         int edge_map_grid_size,
-        int vertex_map_grid_size)
+        int filter_grid_size)
     {
         typedef typename ProblemData::SizeT         SizeT;
         typedef typename ProblemData::VertexId      VertexId;
@@ -112,7 +112,7 @@ class PREnactor : public EnactorBase
 
             //initialize runtime stats
             if (retval = edge_map_kernel_stats.Setup(edge_map_grid_size)) break;
-            if (retval = vertex_map_kernel_stats.Setup(vertex_map_grid_size)) break;
+            if (retval = filter_kernel_stats.Setup(filter_grid_size)) break;
 
             //Reset statistics
             iteration           = 0;
@@ -203,7 +203,7 @@ class PREnactor : public EnactorBase
      * @brief Enacts a page rank computing on the specified graph.
      *
      * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam VertexMapPolicy Kernel policy for vertex mapping.
+     * @tparam FilterPolivy Kernel policy for vertex mapping.
      * @tparam PRProblem PR Problem type.
      *
      * @param[in] problem PRProblem object.
@@ -214,7 +214,7 @@ class PREnactor : public EnactorBase
      */
     template<
         typename EdgeMapPolicy,
-        typename VertexMapPolicy,
+        typename FilterPolivy,
         typename PRProblem>
     cudaError_t EnactPR(
     CudaContext                        &context,
@@ -245,14 +245,14 @@ class PREnactor : public EnactorBase
             int edge_map_occupancy      = EdgeMapPolicy::CTA_OCCUPANCY;
             int edge_map_grid_size      = MaxGridSize(edge_map_occupancy, max_grid_size);
 
-            int vertex_map_occupancy    = VertexMapPolicy::CTA_OCCUPANCY;
-            int vertex_map_grid_size    = MaxGridSize(vertex_map_occupancy, max_grid_size);
+            int filter_occupancy    = FilterPolivy::CTA_OCCUPANCY;
+            int filter_grid_size    = MaxGridSize(filter_occupancy, max_grid_size);
 
             if (DEBUG) {
                 printf("PR edge map occupancy %d, level-grid size %d\n",
                         edge_map_occupancy, edge_map_grid_size);
                 printf("PR vertex map occupancy %d, level-grid size %d\n",
-                        vertex_map_occupancy, vertex_map_grid_size);
+                        filter_occupancy, filter_grid_size);
                 printf("Iteration, Edge map queue, Vertex map queue\n");
                 printf("0");
             }
@@ -260,7 +260,7 @@ class PREnactor : public EnactorBase
             fflush(stdout);
 
             // Lazy initialization
-            if (retval = Setup(problem, edge_map_grid_size, vertex_map_grid_size)) break;
+            if (retval = Setup(problem, edge_map_grid_size, filter_grid_size)) break;
 
             // Single-gpu graph slice
             typename PRProblem::GraphSlice *graph_slice = problem->graph_slices[0];
@@ -303,8 +303,8 @@ class PREnactor : public EnactorBase
               if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
                       "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break; 
 
-              gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, PRProblem, RemoveZeroFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+              gunrock::oprtr::filter::Kernel<FilterPolivy, PRProblem, RemoveZeroFunctor>
+                <<<filter_grid_size, FilterPolivy::THREADS>>>(
                     iteration,
                     queue_reset,
                     queue_index,
@@ -319,10 +319,10 @@ class PREnactor : public EnactorBase
                     work_progress,
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
-                    this->vertex_map_kernel_stats);
+                    this->filter_kernel_stats);
 
               if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
-                      "vertex_map::Kernel RemoveZeroFunctor failed", __FILE__, __LINE__)))
+                      "filter::Kernel RemoveZeroFunctor failed", __FILE__, __LINE__)))
                 break;
 
                 util::MemsetCopyVectorKernel<<<128,
@@ -402,8 +402,8 @@ class PREnactor : public EnactorBase
                 if (retval = work_progress.SetQueueLength(queue_index, edge_map_queue_len)) break;
 
                 // Vertex Map
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, PRProblem, PrFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                gunrock::oprtr::filter::Kernel<FilterPolivy, PRProblem, PrFunctor>
+                <<<filter_grid_size, FilterPolivy::THREADS>>>(
                     iteration,
                     queue_reset,
                     queue_index,
@@ -418,9 +418,9 @@ class PREnactor : public EnactorBase
                     work_progress,
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
-                    this->vertex_map_kernel_stats);
+                    this->filter_kernel_stats);
 
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates     
 
                 iteration++;
@@ -447,8 +447,8 @@ class PREnactor : public EnactorBase
                     total_queued += queue_length;
                     if (DEBUG) printf(", %lld", (long long) queue_length);
                     if (INSTRUMENT) {
-                        if (retval = vertex_map_kernel_stats.Accumulate(
-                            vertex_map_grid_size,
+                        if (retval = filter_kernel_stats.Accumulate(
+                            filter_grid_size,
                             total_runtimes,
                             total_lifetimes)) break;
                     }
@@ -492,7 +492,7 @@ class PREnactor : public EnactorBase
         int                             max_grid_size = 0)
     {
         if (this->cuda_props.device_sm_version >= 300) {
-            typedef gunrock::oprtr::vertex_map::KernelPolicy<
+            typedef gunrock::oprtr::filter::KernelPolicy<
                 PRProblem,                         // Problem data type
             300,                                // CUDA_ARCH
             INSTRUMENT,                         // INSTRUMENT
@@ -505,7 +505,7 @@ class PREnactor : public EnactorBase
             5,                                  // LOG_RAKING_THREADS
             5,                                  // END_BITMASK_CULL
             8>                                  // LOG_SCHEDULE_GRANULARITY
-                VertexMapPolicy;
+                FilterPolivy;
 
             typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
                 PRProblem,                         // Problem data type
@@ -521,7 +521,7 @@ class PREnactor : public EnactorBase
                 7>                                  // LOG_SCHEDULE_GRANULARITY
                     EdgeMapPolicy;
 
-            return EnactPR<EdgeMapPolicy, VertexMapPolicy, PRProblem>(
+            return EnactPR<EdgeMapPolicy, FilterPolivy, PRProblem>(
                     context, problem, max_iteration, max_grid_size);
         }
 

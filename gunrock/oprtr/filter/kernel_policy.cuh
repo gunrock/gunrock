@@ -9,7 +9,7 @@
  * @file
  * kernel_policy.cuh
  *
- * @brief Kernel configuration policy for Vertex Map Kernels
+ * @brief Kernel configuration policy for Filter Kernels
  */
 
 #pragma once
@@ -24,12 +24,12 @@
 
 namespace gunrock {
 namespace oprtr {
-namespace vertex_map {
+namespace filter {
 
 
 
 /**
- * @brief Kernel configuration policy for vertex mapping kernels.
+ * @brief Kernel configuration policy for filter kernels.
  *
  * Parameterizations of this type encapsulate our kernel-tuning parameters
  *
@@ -175,11 +175,11 @@ struct KernelPolicy
         SMEM_OCCUPANCY      = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
         CTA_OCCUPANCY       = GR_MIN(_MIN_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
         VALID               = (CTA_OCCUPANCY > 0),
-	    VERTEX_ID_MASK	    = ~(1<<(sizeof(VertexId)*8-2)),								// Bitmask for masking off the upper control bits in vertex identifier
+	    ELEMENT_ID_MASK	    = ~(1<<(sizeof(VertexId)*8-2)),								// Bitmask for masking off the upper control bits in element identifier
     };
 };
 
-} // namespace vertex_map
+} // namespace filter
 } // namespace oprtr
 } // namespace gunrock
 

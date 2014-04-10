@@ -37,7 +37,7 @@
 // Operator includes
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_backward/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
 
 using namespace gunrock;
 using namespace gunrock::util;

@@ -62,7 +62,6 @@ template <
     typename _ProblemData,
     // Machine parameters
     int _CUDA_ARCH,
-
     // Behavioral control parameters
     bool _INSTRUMENT,
     // Tunable parameters

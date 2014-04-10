@@ -33,7 +33,7 @@
 
 // Operator includes
 #include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
 
 #include <moderngpu.cuh>
 

@@ -9,7 +9,7 @@
  * @file
  * cta.cuh
  *
- * @brief CTA tile-processing abstraction for Vertex Map
+ * @brief CTA tile-processing abstraction for Filter
  */
 
 #pragma once
@@ -30,7 +30,7 @@
 
 namespace gunrock {
 namespace oprtr {
-namespace vertex_map {
+namespace filter {
 
 /**
 * Templated texture reference for visited mask
@@ -45,10 +45,10 @@ texture<VisitedMask, cudaTextureType1D, cudaReadModeElementType> BitmaskTex<Visi
 
 
 /**
- * @brief CTA tile-processing abstraction for the vertex mapping operator.
+ * @brief CTA tile-processing abstraction for the filter operator.
  *
- * @tparam KernelPolicy Kernel policy type for the vertex mapping.
- * @tparam ProblemData Problem data type for the vertex mapping.
+ * @tparam KernelPolicy Kernel policy type for filter.
+ * @tparam ProblemData Problem data type for filter.
  * @tparam Functor Functor type for the specific problem type.
  *
  */
@@ -72,9 +72,9 @@ struct Cta
      */
 
     // Input and output device pointers
-    VertexId                *d_in;                      // Incoming edge frontier
-    VertexId                *d_pred_in;                 // Incoming predecessor frontier
-    VertexId                *d_out;                     // Outgoing vertex frontier
+    VertexId                *d_in;                      // Incoming frontier
+    VertexId                *d_pred_in;                 // Incoming predecessor frontier (if any)
+    VertexId                *d_out;                     // Outgoing frontier
     DataSlice               *problem;                   // Problem data
     unsigned char           *d_visited_mask;            // Mask for detecting visited status
 
@@ -82,7 +82,7 @@ struct Cta
     VertexId                iteration;                  // Current graph traversal iteration
     VertexId                queue_index;                // Current frontier queue counter index
     util::CtaWorkProgress   &work_progress;             // Atomic workstealing and queueing counters
-    SizeT                   max_out_frontier;           // Maximum size (in elements) of outgoing vertex frontier
+    SizeT                   max_out_frontier;           // Maximum size (in elements) of outgoing frontier
     int                     num_gpus;                   // Number of GPUs
 
     // Operational details for raking_scan_grid
@@ -123,11 +123,11 @@ struct Cta
         // Members
         //---------------------------------------------------------------------
 
-        // Dequeued vertex ids
-        VertexId    vertex_id[LOADS_PER_TILE][LOAD_VEC_SIZE];
+        // Dequeued element ids
+        VertexId    element_id[LOADS_PER_TILE][LOAD_VEC_SIZE];
         VertexId    pred_id[LOADS_PER_TILE][LOAD_VEC_SIZE];
 
-        // Whether or not the corresponding vertex_id is valid for exploring
+        // Whether or not the corresponding element_id is valid for exploring
         unsigned char   flags[LOADS_PER_TILE][LOAD_VEC_SIZE];
 
         // Global scatter offsets
@@ -138,7 +138,7 @@ struct Cta
         //---------------------------------------------------------------------
 
         /**
-         * @brief Iterate over vertex ids in tile.
+         * @brief Iterate over element ids in tile.
          */
         template <int LOAD, int VEC, int dummy = 0>
         struct Iterate
@@ -146,12 +146,12 @@ struct Cta
             /**
              * @brief Initialize flag values for compact new frontier. If vertex id equals to -1, then discard it in the new frontier.
              *
-             * @param[in] tile Pointer to Tile object holds the vertex ids, ranks and flags.
+             * @param[in] tile Pointer to Tile object holds the element ids, ranks and flags.
              */
             static __device__ __forceinline__ void InitFlags(Tile *tile)
             {
                 // Initially valid if vertex-id is valid
-                tile->flags[LOAD][VEC] = (tile->vertex_id[LOAD][VEC] == -1) ? 0 : 1;
+                tile->flags[LOAD][VEC] = (tile->element_id[LOAD][VEC] == -1) ? 0 : 1;
                 tile->ranks[LOAD][VEC] = tile->flags[LOAD][VEC];
 
                 // Next
@@ -166,12 +166,12 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                if (tile->vertex_id[LOAD][VEC] >= 0) {
+                if (tile->element_id[LOAD][VEC] >= 0) {
                     // Location of mask byte to read
-                    SizeT mask_byte_offset = (tile->vertex_id[LOAD][VEC] & KernelPolicy::VERTEX_ID_MASK) >> 3;
+                    SizeT mask_byte_offset = (tile->element_id[LOAD][VEC] & KernelPolicy::ELEMENT_ID_MASK) >> 3;
 
                     // Bit in mask byte corresponding to current vertex id
-                    unsigned char mask_bit = 1 << (tile->vertex_id[LOAD][VEC] & 7);
+                    unsigned char mask_bit = 1 << (tile->element_id[LOAD][VEC] & 7);
 
                     // Read byte from visited mask in tex
                     unsigned char tex_mask_byte = tex1Dfetch(
@@ -180,7 +180,7 @@ struct Cta
 
                     if (mask_bit & tex_mask_byte) {
                         // Seen it
-                        tile->vertex_id[LOAD][VEC] = -1;
+                        tile->element_id[LOAD][VEC] = -1;
                     } else {
                         unsigned char mask_byte;
                         util::io::ModifiedLoad<util::io::ld::cg>::Ld(
@@ -190,7 +190,7 @@ struct Cta
 
                         if (mask_bit & mask_byte) {
                             // Seen it
-                            tile->vertex_id[LOAD][VEC] = -1;
+                            tile->element_id[LOAD][VEC] = -1;
                         } else {
                             // Update with best effort
                             mask_byte |= mask_bit;
@@ -214,8 +214,8 @@ struct Cta
                 Tile *tile)
             {
                 if (ProblemData::ENABLE_IDEMPOTENCE && cta->iteration != -1) {
-                    if (tile->vertex_id[LOAD][VEC] >= 0) {
-                        VertexId row_id = (tile->vertex_id[LOAD][VEC]&KernelPolicy::VERTEX_ID_MASK)/cta->num_gpus;
+                    if (tile->element_id[LOAD][VEC] >= 0) {
+                        VertexId row_id = (tile->element_id[LOAD][VEC]&KernelPolicy::ELEMENT_ID_MASK)/cta->num_gpus;
 
                         VertexId label;
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -223,27 +223,27 @@ struct Cta
                                                     (VertexId*)cta->problem->d_labels + row_id);
                         if (label != -1) {
                             // Seen it
-                            tile->vertex_id[LOAD][VEC] = -1;
+                            tile->element_id[LOAD][VEC] = -1;
                         } else {
                             if (ProblemData::MARK_PREDECESSORS) {
-                                if (Functor::CondVertex(row_id, cta->problem))
-                                Functor::ApplyVertex(row_id, cta->problem, tile->pred_id[LOAD][VEC]);
+                                if (Functor::CondFilter(row_id, cta->problem))
+                                Functor::ApplyFilter(row_id, cta->problem, tile->pred_id[LOAD][VEC]);
                             } else {
-                                if (Functor::CondVertex(row_id, cta->problem))
-                                Functor::ApplyVertex(row_id, cta->problem, cta->iteration);
+                                if (Functor::CondFilter(row_id, cta->problem))
+                                Functor::ApplyFilter(row_id, cta->problem, cta->iteration);
                             }
                         }
                     }
                 } else {
-                    if (tile->vertex_id[LOAD][VEC] >= 0) {
-                        // Row index on our GPU (for multi-gpu, vertex ids are striped across GPUs)
-                        VertexId row_id = (tile->vertex_id[LOAD][VEC]) / cta->num_gpus;
+                    if (tile->element_id[LOAD][VEC] >= 0) {
+                        // Row index on our GPU (for multi-gpu, element ids are striped across GPUs)
+                        VertexId row_id = (tile->element_id[LOAD][VEC]) / cta->num_gpus;
 
-                        if (Functor::CondVertex(row_id, cta->problem)) {
-                            // ApplyVertex(row_id)
-                            Functor::ApplyVertex(row_id, cta->problem);
+                        if (Functor::CondFilter(row_id, cta->problem)) {
+                            // ApplyFilter(row_id)
+                            Functor::ApplyFilter(row_id, cta->problem);
                         }
-                        else tile->vertex_id[LOAD][VEC] = -1;
+                        else tile->element_id[LOAD][VEC] = -1;
                     }
                 }
 
@@ -259,16 +259,16 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                if (tile->vertex_id[LOAD][VEC] >= 0) {
-                    int hash = ((unsigned int)tile->vertex_id[LOAD][VEC]) % SmemStorage::HISTORY_HASH_ELEMENTS;
+                if (tile->element_id[LOAD][VEC] >= 0) {
+                    int hash = ((unsigned int)tile->element_id[LOAD][VEC]) % SmemStorage::HISTORY_HASH_ELEMENTS;
                     VertexId retrieved = cta->smem_storage.history[hash];
 
-                    if (retrieved == tile->vertex_id[LOAD][VEC]) {
+                    if (retrieved == tile->element_id[LOAD][VEC]) {
                         // Seen it
-                        tile->vertex_id[LOAD][VEC] = -1;
+                        tile->element_id[LOAD][VEC] = -1;
                     } else {
                         // Update it
-                        cta->smem_storage.history[hash] = tile->vertex_id[LOAD][VEC];
+                        cta->smem_storage.history[hash] = tile->element_id[LOAD][VEC];
                     }
                 }
 
@@ -284,18 +284,18 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                if (tile->vertex_id[LOAD][VEC] >= 0) {
+                if (tile->element_id[LOAD][VEC] >= 0) {
                     int warp_id = threadIdx.x >> 5;
-                    int hash    = tile->vertex_id[LOAD][VEC] & (SmemStorage::WARP_HASH_ELEMENTS - 1);
+                    int hash    = tile->element_id[LOAD][VEC] & (SmemStorage::WARP_HASH_ELEMENTS - 1);
 
-                    cta->smem_storage.state.vid_hashtable[warp_id][hash] = tile->vertex_id[LOAD][VEC];
+                    cta->smem_storage.state.vid_hashtable[warp_id][hash] = tile->element_id[LOAD][VEC];
                     VertexId retrieved = cta->smem_storage.state.vid_hashtable[warp_id][hash];
 
-                    if (retrieved == tile->vertex_id[LOAD][VEC]) {
+                    if (retrieved == tile->element_id[LOAD][VEC]) {
                         cta->smem_storage.state.vid_hashtable[warp_id][hash] = threadIdx.x;
                         VertexId tid = cta->smem_storage.state.vid_hashtable[warp_id][hash];
                         if (tid != threadIdx.x) {
-                            tile->vertex_id[LOAD][VEC] = -1;
+                            tile->element_id[LOAD][VEC] = -1;
                         }
                     }
                 }
@@ -476,7 +476,7 @@ struct Cta
             KernelPolicy::THREADS,
             ProblemData::QUEUE_READ_MODIFIER,
             false>::LoadValid(
-                tile.vertex_id,
+                tile.element_id,
                 d_in,
                 cta_offset,
                 guarded_elements,
@@ -536,14 +536,14 @@ struct Cta
             KernelPolicy::THREADS,
             ProblemData::QUEUE_WRITE_MODIFIER>::Scatter(
                 d_out,
-                tile.vertex_id,
+                tile.element_id,
                 tile.flags,
                 tile.ranks);
     }
 };
 
 
-} // namespace vertex_map
+} // namespace filter
 } // namespace oprtr
 } // namespace gunrock
 

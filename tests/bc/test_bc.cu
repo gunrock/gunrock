@@ -33,7 +33,7 @@
 
 // Operator includes
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
 
 // Boost includes
 #include <boost/config.hpp>

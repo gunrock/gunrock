@@ -71,7 +71,7 @@ struct PRFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
         Value delta = problem->d_delta[0];
         Value nodes = (Value)problem->d_nodes[0];
@@ -89,7 +89,7 @@ struct PRFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
         // Doing nothing here
     }
@@ -146,7 +146,7 @@ struct RemoveZeroDegreeNodeFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
         bool valid = (problem->d_degrees[node] == 0);
         problem->d_degrees_pong[node] = valid ? -1 : problem->d_degrees_pong[node];
@@ -160,7 +160,7 @@ struct RemoveZeroDegreeNodeFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
         // Doing nothing here
     }

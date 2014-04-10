@@ -21,8 +21,8 @@
 #include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_backward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_backward/kernel_policy.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel_policy.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel_policy.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/dobfs/dobfs_problem.cuh>
@@ -49,7 +49,7 @@ class DOBFSEnactor : public EnactorBase
      * CTA duty kernel stats
      */
     util::KernelRuntimeStatsLifetime edge_map_kernel_stats;
-    util::KernelRuntimeStatsLifetime vertex_map_kernel_stats;
+    util::KernelRuntimeStatsLifetime filter_kernel_stats;
 
     unsigned long long total_runtimes;              // Total working time by each CTA
     unsigned long long total_lifetimes;             // Total life time of each CTA
@@ -75,7 +75,7 @@ class DOBFSEnactor : public EnactorBase
      *
      * @param[in] problem DOBFS Problem object which holds the graph data and DOBFS problem data to compute.
      * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
+     * @param[in] filter_grid_size CTA occupancy for vertex mapping kernel call.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -83,7 +83,7 @@ class DOBFSEnactor : public EnactorBase
     cudaError_t Setup(
         ProblemData *problem,
         int edge_map_grid_size,
-        int vertex_map_grid_size)
+        int filter_grid_size)
     {
         typedef typename ProblemData::SizeT         SizeT;
         typedef typename ProblemData::VertexId      VertexId;
@@ -110,7 +110,7 @@ class DOBFSEnactor : public EnactorBase
 
             //initialize runtime stats
             if (retval = edge_map_kernel_stats.Setup(edge_map_grid_size)) break;
-            if (retval = vertex_map_kernel_stats.Setup(vertex_map_grid_size)) break;
+            if (retval = filter_kernel_stats.Setup(filter_grid_size)) break;
 
             //Reset statistics
             iteration           = 0;
@@ -138,7 +138,7 @@ class DOBFSEnactor : public EnactorBase
                 cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
                 if (retval = util::GRError(cudaBindTexture(
                                 0,
-                                gunrock::oprtr::vertex_map::BitmaskTex<unsigned char>::ref,
+                                gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref,
                                 data_slice->d_visited_mask,
                                 bitmask_desc,
                                 bytes),
@@ -280,21 +280,21 @@ class DOBFSEnactor : public EnactorBase
             int edge_map_occupancy      = EdgeMapPolicy::CTA_OCCUPANCY;
             int edge_map_grid_size      = MaxGridSize(edge_map_occupancy, max_grid_size);
 
-            int vertex_map_occupancy    = VertexMapPolicy::CTA_OCCUPANCY;
-            int vertex_map_grid_size    = MaxGridSize(vertex_map_occupancy, max_grid_size);
+            int filter_occupancy    = VertexMapPolicy::CTA_OCCUPANCY;
+            int filter_grid_size    = MaxGridSize(filter_occupancy, max_grid_size);
 
             if (DEBUG) {
                 printf("BFS edge map occupancy %d, level-grid size %d\n",
                         edge_map_occupancy, edge_map_grid_size);
                 printf("BFS vertex map occupancy %d, level-grid size %d\n",
-                        vertex_map_occupancy, vertex_map_grid_size);
+                        filter_occupancy, filter_grid_size);
                 printf("Iteration, Edge map queue, Vertex map queue\n");
                 printf("0");
             }
             fflush(stdout);
 
             // Lazy initialization
-            if (retval = Setup(problem, edge_map_grid_size, vertex_map_grid_size)) break;
+            if (retval = Setup(problem, edge_map_grid_size, filter_grid_size)) break;
 
             // Single-gpu graph slice
             typename DOBFSProblem::GraphSlice   *graph_slice = problem->graph_slices[0];
@@ -374,8 +374,8 @@ class DOBFSEnactor : public EnactorBase
                     if (done[0] == 0) break;
 
                     // Vertex Map
-                    gunrock::oprtr::vertex_map::Kernel<NormalVertexMapPolicy, DOBFSProblem, BfsFunctor>
-                        <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                    gunrock::oprtr::filter::Kernel<NormalVertexMapPolicy, DOBFSProblem, BfsFunctor>
+                        <<<filter_grid_size, VertexMapPolicy::THREADS>>>(
                                 iteration + 1,
                                 queue_reset,
                                 queue_index,
@@ -390,9 +390,9 @@ class DOBFSEnactor : public EnactorBase
                                 work_progress,
                                 graph_slice->frontier_elements[selector],           // max_in_queue
                                 graph_slice->frontier_elements[selector^1],         // max_out_queue
-                                this->vertex_map_kernel_stats);
+                                this->filter_kernel_stats);
 
-                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
                     cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
 
@@ -405,8 +405,8 @@ class DOBFSEnactor : public EnactorBase
                         total_queued += queue_length;
                         if (DEBUG) printf(", %lld", (long long) queue_length);
                         if (INSTRUMENT) {
-                            if (retval = vertex_map_kernel_stats.Accumulate(
-                                        vertex_map_grid_size,
+                            if (retval = filter_kernel_stats.Accumulate(
+                                        filter_grid_size,
                                         total_runtimes,
                                         total_lifetimes)) break;
                         }
@@ -441,8 +441,8 @@ class DOBFSEnactor : public EnactorBase
             bool queue_reset = true;
             
             // Prepare unvisited queue
-            gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, InputFrontierFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+            gunrock::oprtr::filter::Kernel<VertexMapPolicy, DOBFSProblem, InputFrontierFunctor>
+                <<<filter_grid_size, VertexMapPolicy::THREADS>>>(
                         -1,
                         queue_reset,
                         queue_index,
@@ -457,16 +457,16 @@ class DOBFSEnactor : public EnactorBase
                         work_progress,
                         graph_slice->frontier_elements[selector],           // max_in_queue
                         graph_slice->frontier_elements[selector^1],         // max_out_queue
-                        this->vertex_map_kernel_stats);
-            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_prepare_input_frontier::Kernel failed", __FILE__, __LINE__))) break;
+                        this->filter_kernel_stats);
+            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_prepare_input_frontier::Kernel failed", __FILE__, __LINE__))) break;
             
             queue_length            = graph_slice->nodes;
             queue_index             = 0;        // Work queue index
             selector                = 0;
             num_elements          = graph_slice->nodes;
 
-            gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, UnvisitedQueueFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+            gunrock::oprtr::filter::Kernel<VertexMapPolicy, DOBFSProblem, UnvisitedQueueFunctor>
+                <<<filter_grid_size, VertexMapPolicy::THREADS>>>(
                         -1,
                         queue_reset,
                         queue_index,
@@ -481,8 +481,8 @@ class DOBFSEnactor : public EnactorBase
                         work_progress,
                         graph_slice->frontier_elements[selector],           // max_in_queue
                         graph_slice->frontier_elements[selector^1],         // max_out_queue
-                        this->vertex_map_kernel_stats);
-            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_prepare_unvisited_queue::Kernel failed", __FILE__, __LINE__))) break;
+                        this->filter_kernel_stats);
+            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_prepare_unvisited_queue::Kernel failed", __FILE__, __LINE__))) break;
 
             queue_index++;
             selector ^= 1;
@@ -573,8 +573,8 @@ class DOBFSEnactor : public EnactorBase
                 if (done[0] == 0) break;
 
                 // Vertex Map
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, RBFSFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                gunrock::oprtr::filter::Kernel<VertexMapPolicy, DOBFSProblem, RBFSFunctor>
+                <<<filter_grid_size, VertexMapPolicy::THREADS>>>(
                     -1,
                     queue_reset,
                     queue_index,
@@ -589,9 +589,9 @@ class DOBFSEnactor : public EnactorBase
                     work_progress,
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
-                    this->vertex_map_kernel_stats);
+                    this->filter_kernel_stats);
 
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
 
@@ -604,8 +604,8 @@ class DOBFSEnactor : public EnactorBase
                     total_queued += queue_length;
                     if (DEBUG) printf(", %lld", (long long) queue_length);
                     if (INSTRUMENT) {
-                        if (retval = vertex_map_kernel_stats.Accumulate(
-                            vertex_map_grid_size,
+                        if (retval = filter_kernel_stats.Accumulate(
+                            filter_grid_size,
                             total_runtimes,
                             total_lifetimes)) break;
                     }
@@ -635,8 +635,8 @@ class DOBFSEnactor : public EnactorBase
 
             bool queue_reset = true;
 
-            gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, DOBFSProblem, SwitchFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+            gunrock::oprtr::filter::Kernel<VertexMapPolicy, DOBFSProblem, SwitchFunctor>
+                <<<filter_grid_size, VertexMapPolicy::THREADS>>>(
                         -1,
                         queue_reset,
                         queue_index,
@@ -651,8 +651,8 @@ class DOBFSEnactor : public EnactorBase
                         work_progress,
                         graph_slice->frontier_elements[selector],           // max_in_queue
                         graph_slice->frontier_elements[selector^1],         // max_out_queue
-                        this->vertex_map_kernel_stats);
-            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_switch_to_normal::Kernel failed", __FILE__, __LINE__))) break;
+                        this->filter_kernel_stats);
+            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_switch_to_normal::Kernel failed", __FILE__, __LINE__))) break;
 
             queue_index++;
             if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
@@ -719,8 +719,8 @@ class DOBFSEnactor : public EnactorBase
                 if (done[0] == 0) break;
 
                 // Vertex Map
-                gunrock::oprtr::vertex_map::Kernel<NormalVertexMapPolicy, DOBFSProblem, BfsFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                gunrock::oprtr::filter::Kernel<NormalVertexMapPolicy, DOBFSProblem, BfsFunctor>
+                <<<filter_grid_size, VertexMapPolicy::THREADS>>>(
                     iteration + 1,
                     queue_reset,
                     queue_index,
@@ -735,9 +735,9 @@ class DOBFSEnactor : public EnactorBase
                     work_progress,
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
-                    this->vertex_map_kernel_stats);
+                    this->filter_kernel_stats);
 
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
 
@@ -750,8 +750,8 @@ class DOBFSEnactor : public EnactorBase
                     total_queued += queue_length;
                     if (DEBUG) printf(", %lld", (long long) queue_length);
                     if (INSTRUMENT) {
-                        if (retval = vertex_map_kernel_stats.Accumulate(
-                            vertex_map_grid_size,
+                        if (retval = filter_kernel_stats.Accumulate(
+                            filter_grid_size,
                             total_runtimes,
                             total_lifetimes)) break;
                     }
@@ -796,7 +796,7 @@ class DOBFSEnactor : public EnactorBase
     {
             
             if (this->cuda_props.device_sm_version >= 300) {
-                typedef gunrock::oprtr::vertex_map::KernelPolicy<
+                typedef gunrock::oprtr::filter::KernelPolicy<
                     DOBFSProblem,                         // Problem data type
                     300,                                // CUDA_ARCH
                     INSTRUMENT,                         // INSTRUMENT
@@ -825,7 +825,7 @@ class DOBFSEnactor : public EnactorBase
                     7>                                  // LOG_SCHEDULE_GRANULARITY
                         NormalEdgeMapPolicy;
 
-                typedef gunrock::oprtr::vertex_map::KernelPolicy<
+                typedef gunrock::oprtr::filter::KernelPolicy<
                     DOBFSProblem,                         // Problem data type
                     300,                                // CUDA_ARCH
                     INSTRUMENT,                         // INSTRUMENT

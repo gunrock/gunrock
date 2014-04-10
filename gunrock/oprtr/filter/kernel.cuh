@@ -9,7 +9,7 @@
  * @file
  * kernel.cuh
  *
- * @brief Vertex Map Kernel
+ * @brief Filter Kernel
  */
 
 #pragma once
@@ -18,11 +18,11 @@
 #include <gunrock/util/cta_work_progress.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
 
-#include <gunrock/oprtr/vertex_map/cta.cuh>
+#include <gunrock/oprtr/filter/cta.cuh>
 
 namespace gunrock {
 namespace oprtr {
-namespace vertex_map {
+namespace filter {
 
 /**
  * @brief Structure for invoking CTA processing tile over all elements.
@@ -231,10 +231,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 };
 
 /**
- * @brief Vertex map kernel entry point.
+ * @brief Filter kernel entry point.
  *
- * @tparam KernelPolicy Kernel policy type for the vertex mapping.
- * @tparam ProblemData Problem data type for the vertex mapping.
+ * @tparam KernelPolicy Kernel policy type for filter.
+ * @tparam ProblemData Problem data type for filter.
  * @tparam Functor Functor type for the specific problem type.
  *
  * @param[in] iteration     Current graph traversal iteration
@@ -292,7 +292,7 @@ void Kernel(
 }
 
 
-} // namespace vertex_map
+} // namespace filter
 } // namespace oprtr
 } // namespace gunrock
 

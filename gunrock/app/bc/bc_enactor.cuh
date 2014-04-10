@@ -19,8 +19,8 @@
 
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel_policy.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel_policy.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/bc/bc_problem.cuh>
@@ -46,7 +46,7 @@ class BCEnactor : public EnactorBase
      * CTA duty kernel stats
      */
     util::KernelRuntimeStatsLifetime edge_map_kernel_stats;
-    util::KernelRuntimeStatsLifetime vertex_map_kernel_stats;
+    util::KernelRuntimeStatsLifetime filter_kernel_stats;
 
     unsigned long long total_runtimes;              // Total working time by each CTA
     unsigned long long total_lifetimes;             // Total life time of each CTA
@@ -71,7 +71,7 @@ class BCEnactor : public EnactorBase
      *
      * @param[in] problem BC Problem object which holds the graph data and BC problem data to compute.
      * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
+     * @param[in] filter_grid_size CTA occupancy for filter kernel call.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -79,7 +79,7 @@ class BCEnactor : public EnactorBase
     cudaError_t Setup(
         ProblemData *problem,
         int edge_map_grid_size,
-        int vertex_map_grid_size)
+        int filter_grid_size)
     {
         typedef typename ProblemData::SizeT         SizeT;
         typedef typename ProblemData::VertexId      VertexId;
@@ -106,7 +106,7 @@ class BCEnactor : public EnactorBase
 
             //initialize runtime stats
             if (retval = edge_map_kernel_stats.Setup(edge_map_grid_size)) break;
-            if (retval = vertex_map_kernel_stats.Setup(vertex_map_grid_size)) break;
+            if (retval = filter_kernel_stats.Setup(filter_grid_size)) break;
 
             //Reset statistics
             iteration           = 0;
@@ -191,7 +191,7 @@ class BCEnactor : public EnactorBase
      * @brief Enacts a brandes betweenness centrality computing on the specified graph.
      *
      * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam VertexMapPolicy Kernel policy for vertex mapping.
+     * @tparam FilterPolicy Kernel policy for filter operator.
      * @tparam BCProblem BC Problem type.
      * @tparam ForwardFunctor Forward Functor type used in the forward sigma computing pass.
      * @tparam BackwardFunctor Backward Functor type used in the backward bc value accumulation pass.
@@ -203,7 +203,7 @@ class BCEnactor : public EnactorBase
      */
     template<
         typename EdgeMapPolicy,
-        typename VertexMapPolicy,
+        typename FilterPolicy,
         typename BCProblem>
     cudaError_t EnactBC(
     BCProblem                          *problem,
@@ -233,20 +233,20 @@ class BCEnactor : public EnactorBase
             int edge_map_occupancy      = EdgeMapPolicy::CTA_OCCUPANCY;
             int edge_map_grid_size      = MaxGridSize(edge_map_occupancy, max_grid_size);
 
-            int vertex_map_occupancy    = VertexMapPolicy::CTA_OCCUPANCY;
-            int vertex_map_grid_size    = MaxGridSize(vertex_map_occupancy, max_grid_size);
+            int filter_occupancy    = FilterPolicy::CTA_OCCUPANCY;
+            int filter_grid_size    = MaxGridSize(filter_occupancy, max_grid_size);
 
             if (DEBUG) {
                 printf("BC edge map occupancy %d, level-grid size %d\n",
                         edge_map_occupancy, edge_map_grid_size);
-                printf("BC vertex map occupancy %d, level-grid size %d\n",
-                        vertex_map_occupancy, vertex_map_grid_size);
-                printf("Iteration, Edge map queue, Vertex map queue\n");
+                printf("BC filter occupancy %d, level-grid size %d\n",
+                        filter_occupancy, filter_grid_size);
+                printf("Iteration, Edge map queue, Filter queue\n");
                 printf("0");
             }
 
             // Lazy initialization
-            if (retval = Setup(problem, edge_map_grid_size, vertex_map_grid_size)) break;
+            if (retval = Setup(problem, edge_map_grid_size, filter_grid_size)) break;
 
             // Single-gpu graph slice
             typename BCProblem::GraphSlice *graph_slice = problem->graph_slices[0];
@@ -323,9 +323,9 @@ class BCEnactor : public EnactorBase
                 // Check if done
                 if (done[0] == 0) break;
 
-                // Vertex Map
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, BCProblem, ForwardFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                // Filter
+                gunrock::oprtr::filter::Kernel<FilterPolicy, BCProblem, ForwardFunctor>
+                <<<filter_grid_size, FilterPolicy::THREADS>>>(
                     0,
                     queue_reset,
                     queue_index,
@@ -340,9 +340,9 @@ class BCEnactor : public EnactorBase
                     work_progress,
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
-                    this->vertex_map_kernel_stats);
+                    this->filter_kernel_stats);
 
-                if (/*DEBUG &&*/ (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                if (/*DEBUG &&*/ (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
 
@@ -354,8 +354,8 @@ class BCEnactor : public EnactorBase
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                     if (DEBUG) printf(", %lld", (long long) queue_length);
                     if (INSTRUMENT) {
-                        if (retval = vertex_map_kernel_stats.Accumulate(
-                            vertex_map_grid_size,
+                        if (retval = filter_kernel_stats.Accumulate(
+                            filter_grid_size,
                             total_runtimes,
                             total_lifetimes)) break;
                     }
@@ -393,9 +393,9 @@ class BCEnactor : public EnactorBase
                 // Fill in the frontier_queues
                 util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[selector], num_elements);
 
-                // Vertex Map
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, BCProblem, BackwardFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                // Filter
+                gunrock::oprtr::filter::Kernel<FilterPolicy, BCProblem, BackwardFunctor>
+                <<<filter_grid_size, FilterPolicy::THREADS>>>(
                     0,
                     queue_reset,
                     queue_index,
@@ -410,7 +410,7 @@ class BCEnactor : public EnactorBase
                     work_progress,
                     graph_slice->frontier_elements[selector],           // max_in_queue
                     graph_slice->frontier_elements[selector^1],         // max_out_queue
-                    this->vertex_map_kernel_stats);
+                    this->filter_kernel_stats);
 
 
                 // Only need to reset queue for once
@@ -467,7 +467,7 @@ class BCEnactor : public EnactorBase
                     graph_slice->frontier_elements[selector^1],                 // max_out_queue
                     this->edge_map_kernel_stats);
 
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
                 queue_index++;
@@ -480,8 +480,8 @@ class BCEnactor : public EnactorBase
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
                     if (DEBUG) printf(", %lld", (long long) queue_length);
                     if (INSTRUMENT) {
-                        if (retval = vertex_map_kernel_stats.Accumulate(
-                            vertex_map_grid_size,
+                        if (retval = filter_kernel_stats.Accumulate(
+                            filter_grid_size,
                             total_runtimes,
                             total_lifetimes)) break;
                     }
@@ -531,7 +531,7 @@ class BCEnactor : public EnactorBase
         int                             max_grid_size = 0)
     {
         if (this->cuda_props.device_sm_version >= 300) {
-            typedef gunrock::oprtr::vertex_map::KernelPolicy<
+            typedef gunrock::oprtr::filter::KernelPolicy<
                 BCProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
@@ -544,7 +544,7 @@ class BCEnactor : public EnactorBase
                 5,                                  // LOG_RAKING_THREADS
                 0,                                  // END BIT_MASK (no bitmask cull in BC)
                 8>                                  // LOG_SCHEDULE_GRANULARITY
-                VertexMapPolicy;
+                FilterPolicy;
 
                 typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
                 BCProblem,                         // Problem data type
@@ -560,7 +560,7 @@ class BCEnactor : public EnactorBase
                 7>                                  // LOG_SCHEDULE_GRANULARITY
                 EdgeMapPolicy;
 
-                return EnactBC<EdgeMapPolicy, VertexMapPolicy, BCProblem>(
+                return EnactBC<EdgeMapPolicy, FilterPolicy, BCProblem>(
                 problem, src, max_grid_size);
         }
 
