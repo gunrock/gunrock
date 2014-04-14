@@ -524,7 +524,8 @@ int main( int argc, char** argv)
     //srand(time(NULL));
 
     // Parse graph-contruction params
-    g_undirected = true;
+    //g_undirected = true;
+    g_undirected = args.CheckCmdLineFlag("undirected");
 
     std::string graph_type = argv[1];
     int flags = args.ParsedArgc();
