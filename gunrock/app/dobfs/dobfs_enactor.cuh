@@ -833,8 +833,8 @@ class DOBFSEnactor : public EnactorBase
                     true,                               // DEQUEUE_PROBLEM_SIZE
                     8,                                  // MIN_CTA_OCCUPANCY
                     6,                                  // LOG_THREADS
-                    1,                                  // LOG_LOAD_VEC_SIZE
-                    0,                                  // LOG_LOADS_PER_TILE
+                    2,                                  // LOG_LOAD_VEC_SIZE
+                    1,                                  // LOG_LOADS_PER_TILE
                     5,                                  // LOG_RAKING_THREADS
                     5,                                  // END_BIT_MASK
                     8>                                  // LOG_SCHEDULE_GRANULARITY
@@ -846,8 +846,8 @@ class DOBFSEnactor : public EnactorBase
                     INSTRUMENT,                         // INSTRUMENT
                     8,                                  // MIN_CTA_OCCUPANCY
                     6,                                  // LOG_THREADS
-                    1,                                  // LOG_LOAD_VEC_SIZE
-                    0,                                  // LOG_LOADS_PER_TILE
+                    2,                                  // LOG_LOAD_VEC_SIZE
+                    1,                                  // LOG_LOADS_PER_TILE
                     5,                                  // LOG_RAKING_THREADS
                     32,                                 // WARP_GATHER_THRESHOLD
                     128 * 4,                            // CTA_GATHER_THRESHOLD
