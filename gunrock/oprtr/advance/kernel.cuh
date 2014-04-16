@@ -50,6 +50,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             // Load Thread Warp CTA Forward Kernel
             gunrock::oprtr::edge_map_forward::Kernel<THREAD_WARP_CTA_FORWARD, ProblemData, Functor>
                 <<<enactor_stats.advance_grid_size, THREAD_WARP_CTA_FORWARD::THREADS>>>(
+                    ADVANCE_TYPE,
                     frontier_attribute.queue_reset,
                     frontier_attribute.queue_index,
                     enactor_stats.num_gpus,
@@ -62,14 +63,53 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     graph_slice->d_column_indices,
                     data_slice,
                     work_progress,
-                    graph_slice->frontier_elements[selector],                   // max_in_queue
-                    graph_slice->frontier_elements[selector^1],                 // max_out_queue
+                    graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
+                    graph_slice->frontier_elements[frontier_attribute.selector^1],                 // max_out_queue
                     enactor_stats.advance_kernel_stats);
             break;
         }
         case THREAD_WARP_CTA_BACKWARD:
         {
             // Load Thread Warp CTA Backward Kernel
+            if (frontier_queues.selector == 1) {
+                // Edge Map
+                gunrock::oprtr::edge_map_backward::Kernel<KernelPolicy::THREAD_WARP_CTA_BACKWARD, ProblemData, Functor>
+                    <<<enactor_stats.advance_grid_size, KernelPolicy::THREAD_WARP_CTA_BACKWARD::THREADS>>>(
+                            ADVANCE_TYPE,
+                            frontier_attribute.queue_reset,
+                            frontier_attribute.queue_index,
+                            enactor_stats.num_gpus,
+                            frontier_attribute.queue_length,
+                            enactor_stats.d_done,
+                            graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
+                            problem->data_slices[enactor_stats.gpu_id]->d_index_queue,            // d_in_index_queue
+                            problem->data_slices[enactor_stats.gpu_id]->d_frontier_map_in,
+                            problem->data_slices[enactor_stats.gpu_id]->d_frontier_map_out,
+                            graph_slice->d_column_offsets,
+                            graph_slice->d_row_indices,
+                            data_slice,
+                            work_progress,
+                            enactor_stats.advance_kernel_stats);
+            } else {
+                // Edge Map
+                gunrock::oprtr::edge_map_backward::Kernel<KernelPolicy::THREAD_WARP_CTA_BACKWARD, ProblemData, Functor>
+                    <<<enactor_stats.advance_grid_size, KernelPolicy::THREAD_WARP_CTA_BACKWARD::THREADS>>>(
+                            ADVANCE_TYPE,
+                            frontier_attribute.queue_reset,
+                            frontier_attribute.queue_index,
+                            enactor_stats.num_gpus,
+                            frontier_attribute.queue_length,
+                            enactor_stats.d_done,
+                            graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
+                            problem->data_slices[enactor_stats.gpu_id]->d_index_queue,            // d_in_index_queue
+                            problem->data_slices[enactor_stats.gpu_id]->d_frontier_map_out,
+                            problem->data_slices[enactor_stats.gpu_id]->d_frontier_map_in,
+                            graph_slice->d_column_offsets,
+                            graph_slice->d_row_indices,
+                            data_slice,
+                            work_progress,
+                            enactor_stats.advance_kernel_stats);
+            }
             break;
         }
         case LOAD_BALANCED:
@@ -100,6 +140,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             {
                 gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
+                        ADVANCE_TYPE,
                         frontier_attribute.queue_reset,
                         frontier_attribute.queue_index,
                         enactor_stats.iteration,
@@ -131,6 +172,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
 
                 gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges<KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
                 <<< KernelPolicy::LOAD_BALANCED::BLOCKS, KernelPolicy::LOAD_BALANCED::THREADS >>>(
+                                        ADVANCE_TYPE,
                                         frontier_attribute.queue_reset,
                                         frontier_attribute.queue_index,
                                         enactor_stats.iteration,
