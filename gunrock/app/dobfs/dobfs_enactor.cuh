@@ -414,8 +414,8 @@ class DOBFSEnactor : public EnactorBase
 
                     num_unvisited_nodes -= queue_length;
                     current_frontier_size = queue_length;
-                    //if (num_unvisited_nodes < current_frontier_size*problem->alpha)
-                    //    break;
+                    if (num_unvisited_nodes < current_frontier_size*problem->alpha)
+                        break;
 
                     // Check if done
                     if (done[0] == 0) break;
@@ -804,8 +804,8 @@ class DOBFSEnactor : public EnactorBase
                     true,                               // DEQUEUE_PROBLEM_SIZE
                     8,                                  // MIN_CTA_OCCUPANCY
                     6,                                  // LOG_THREADS
-                    2,                                  // LOG_LOAD_VEC_SIZE
-                    1,                                  // LOG_LOADS_PER_TILE
+                    1,                                  // LOG_LOAD_VEC_SIZE
+                    0,                                  // LOG_LOADS_PER_TILE
                     5,                                  // LOG_RAKING_THREADS
                     5,                                  // END_BITMASK_CULL
                     8>                                  // LOG_SCHEDULE_GRANULARITY
@@ -817,8 +817,8 @@ class DOBFSEnactor : public EnactorBase
                     INSTRUMENT,                         // INSTRUMENT
                     8,                                  // MIN_CTA_OCCUPANCY
                     6,                                  // LOG_THREADS
-                    2,                                  // LOG_LOAD_VEC_SIZE
-                    1,                                  // LOG_LOADS_PER_TILE
+                    1,                                  // LOG_LOAD_VEC_SIZE
+                    0,                                  // LOG_LOADS_PER_TILE
                     5,                                  // LOG_RAKING_THREADS
                     32,                                 // WARP_GATHER_THRESHOLD
                     128 * 4,                            // CTA_GATHER_THRESHOLD

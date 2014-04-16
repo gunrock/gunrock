@@ -21,8 +21,43 @@
 
 #include <gunrock/app/problem_base.cuh>
 
+#include <gunrock/oprtr/advance/kernel_policy.cuh>
+
 namespace gunrock {
 namespace app {
+
+struct EnactorStats
+{
+    volatile int        done;
+    int                 d_done;
+    cudaEvent_t         throttle_event;
+    long long           iteration;
+    unsigned int        num_gpus;
+    unsigned int        gpu_id;
+
+    unsigned long long  total_lifetimes;
+    unsigned long long  total_runtimes;
+    unsigned long long  total_queued;
+
+    unsigned int        advance_grid_size;
+    unsigned int        filter_grid_size;
+
+    util::KernelRuntimeStatsLifetime advance_kernel_stats;
+    util::KernelRuntimeStatsLifetime filter_kernel_stats;
+
+    unsigned int        *d_node_locks;
+    unsigned int        *d_node_locks_out;
+};
+
+struct FrontierAttribute
+{
+    unsigned int        queue_length;
+    unsigned int        queue_index;
+    int                 selector;
+    bool                queue_reset;
+    int                 current_label;
+    gunrock::oprtr::advance::TYPE   advance_type;
+};
 
 /**
  * @brief Base class for graph problem enactors.
@@ -32,12 +67,16 @@ class EnactorBase
 protected:  
 
     //Device properties
-    util::CudaProperties cuda_props;
+    util::CudaProperties            cuda_props;
     
     // Queue size counters and accompanying functionality
-    util::CtaWorkProgressLifetime work_progress;
+    util::CtaWorkProgressLifetime   work_progress;
 
-    FrontierType frontier_type;
+    FrontierType                    frontier_type;
+
+    EnactorStats                    enactor_stats;
+
+    FrontierAttribute               frontier_attribute;
 
 public:
 

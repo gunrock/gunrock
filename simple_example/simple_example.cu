@@ -755,7 +755,7 @@ void RunTests(
     bc_enactor.GetStatistics(avg_duty);
 
     // Copy out results
-    util::GRError(bc_problem->Extract(NULL, h_bc_values), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
+    util::GRError(bc_problem->Extract(NULL, h_bc_values, NULL), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // Verify the result
     if (reference_check_bc_values != NULL) {
