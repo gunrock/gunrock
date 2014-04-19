@@ -20,6 +20,8 @@
 
 #include <gunrock/oprtr/edge_map_backward/cta.cuh>
 
+#include <gunrock/oprtr/advance/kernel_policy.cuh>
+
 namespace gunrock {
 namespace oprtr {
 namespace edge_map_backward {
@@ -260,7 +262,8 @@ void Kernel(
         typename KernelPolicy::VertexId         *d_column_indices,
         typename ProblemData::DataSlice         *problem,                    // Problem Object
         util::CtaWorkProgress                   work_progress,              // Atomic workstealing and queueing counters
-        util::KernelRuntimeStats                kernel_stats)               // Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT)
+        util::KernelRuntimeStats                kernel_stats,               // Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT)
+        gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
             queue_reset,    

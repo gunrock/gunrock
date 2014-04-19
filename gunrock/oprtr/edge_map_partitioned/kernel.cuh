@@ -20,6 +20,8 @@
 
 #include <gunrock/oprtr/edge_map_partitioned/cta.cuh>
 
+#include <gunrock/oprtr/advance/kernel_policy.cuh>
+
 namespace gunrock {
 namespace oprtr {
 namespace edge_map_partitioned {
@@ -47,7 +49,7 @@ struct Dispatch
     typedef typename ProblemData::DataSlice DataSlice;
 
     static __device__ __forceinline__ SizeT GetNeighborListLength(
-                            VertexId    *&d_row_offsets,
+                            SizeT    *&d_row_offsets,
                             VertexId    &d_vertex_id,
                             SizeT       &max_vertex,
                             SizeT       &max_edge)
@@ -83,7 +85,8 @@ struct Dispatch
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
                                 util::CtaWorkProgress &work_progress,
-                                util::KernelRuntimeStats &kernel_stats)
+                                util::KernelRuntimeStats &kernel_stats,
+                                gunrock::oprtr::advance::TYPE ADVANCE_TYPE)
     {
     }
 
@@ -103,7 +106,8 @@ struct Dispatch
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
                                 util::CtaWorkProgress &work_progress,
-                                util::KernelRuntimeStats &kernel_stats)
+                                util::KernelRuntimeStats &kernel_stats,
+                                gunrock::oprtr::advance::TYPE ADVANCE_TYPE)
     {
     }
 
@@ -116,7 +120,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     typedef typename ProblemData::DataSlice         DataSlice;
 
     static __device__ __forceinline__ SizeT GetNeighborListLength(
-                            VertexId    *&d_row_offsets,
+                            SizeT    *&d_row_offsets,
                             VertexId    &d_vertex_id,
                             SizeT       &max_vertex,
                             SizeT       &max_edge)
@@ -165,7 +169,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
                                 util::CtaWorkProgress &work_progress,
-                                util::KernelRuntimeStats &kernel_stats)
+                                util::KernelRuntimeStats &kernel_stats,
+                                gunrock::oprtr::advance::TYPE ADVANCE_TYPE)
     {
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0 && blockIdx.x == 0)) {
             kernel_stats.MarkStart();
@@ -341,7 +346,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
                                 util::CtaWorkProgress &work_progress,
-                                util::KernelRuntimeStats &kernel_stats)
+                                util::KernelRuntimeStats &kernel_stats,
+                                gunrock::oprtr::advance::TYPE ADVANCE_TYPE)
     {
         if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
             kernel_stats.MarkStart();
@@ -508,7 +514,8 @@ void RelaxPartitionedEdges(
         typename KernelPolicy::SizeT            max_vertices,
         typename KernelPolicy::SizeT            max_edges,
         util::CtaWorkProgress                   work_progress,
-        util::KernelRuntimeStats                kernel_stats)
+        util::KernelRuntimeStats                kernel_stats,
+        gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::RelaxPartitionedEdges(
             queue_reset,
@@ -529,7 +536,8 @@ void RelaxPartitionedEdges(
             max_vertices,
             max_edges,
             work_progress,
-            kernel_stats);
+            kernel_stats,
+            ADVANCE_TYPE);
 }
 
 /**
@@ -574,7 +582,8 @@ void RelaxLightEdges(
         typename KernelPolicy::SizeT    max_vertices,
         typename KernelPolicy::SizeT    max_edges,
         util::CtaWorkProgress           work_progress,
-        util::KernelRuntimeStats        kernel_stats)
+        util::KernelRuntimeStats        kernel_stats,
+        gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::RelaxLightEdges(
                                 queue_reset,
@@ -592,7 +601,8 @@ void RelaxLightEdges(
                                 max_vertices,
                                 max_edges,
                                 work_progress,
-                                kernel_stats);
+                                kernel_stats,
+                                ADVANCE_TYPE);
 }
 
 /**

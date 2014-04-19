@@ -30,9 +30,10 @@
 #include <gunrock/app/bfs/bfs_functor.cuh>
 
 // Operator includes
-#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
+#include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
 
+#include <moderngpu.cuh>
 
 using namespace gunrock;
 using namespace gunrock::util;
@@ -308,7 +309,8 @@ void RunTests(
     VertexId src,
     int max_grid_size,
     int num_gpus,
-    double max_queue_sizing)
+    double max_queue_sizing,
+    CudaContext& context)
 {
         typedef BFSProblem<
             VertexId,
@@ -369,7 +371,7 @@ void RunTests(
 
         util::GRError(csr_problem->Reset(src, bfs_enactor.GetFrontierType(), max_queue_sizing), "BFS Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
-        util::GRError(bfs_enactor.template Enact<Problem>(csr_problem, src, max_grid_size), "BFS Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(bfs_enactor.template Enact<Problem>(context, csr_problem, src, max_grid_size), "BFS Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
 
         bfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
@@ -432,7 +434,8 @@ template <
     typename SizeT>
 void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
-    CommandLineArgs &args)
+    CommandLineArgs &args,
+    CudaContext& context)
 {
     VertexId            src                 = -1;           // Use whatever the specified graph-type's default is
     std::string         src_str;
@@ -472,14 +475,16 @@ void RunTests(
                         src,
                         max_grid_size,
                         num_gpus,
-                        max_queue_sizing);
+                        max_queue_sizing,
+                        context);
             } else {
                 RunTests<VertexId, Value, SizeT, true, true, false>(
                         graph,
                         src,
                         max_grid_size,
                         num_gpus,
-                        max_queue_sizing);
+                        max_queue_sizing,
+                        context);
             }
         } else {
             if (idempotence) {
@@ -488,14 +493,16 @@ void RunTests(
                         src,
                         max_grid_size,
                         num_gpus,
-                        max_queue_sizing);
+                        max_queue_sizing,
+                        context);
             } else {
                 RunTests<VertexId, Value, SizeT, true, false, false>(
                         graph,
                         src,
                         max_grid_size,
                         num_gpus,
-                        max_queue_sizing);
+                        max_queue_sizing,
+                        context);
             }
         }
     } else {
@@ -506,14 +513,16 @@ void RunTests(
                         src,
                         max_grid_size,
                         num_gpus,
-                        max_queue_sizing);
+                        max_queue_sizing,
+                        context);
             } else {
                 RunTests<VertexId, Value, SizeT, false, true, false>(
                         graph,
                         src,
                         max_grid_size,
                         num_gpus,
-                        max_queue_sizing);
+                        max_queue_sizing,
+                        context);
             }
         } else {
             if (idempotence) {
@@ -522,14 +531,16 @@ void RunTests(
                         src,
                         max_grid_size,
                         num_gpus,
-                        max_queue_sizing);
+                        max_queue_sizing,
+                        context);
             } else {
                 RunTests<VertexId, Value, SizeT, false, false, false>(
                         graph,
                         src,
                         max_grid_size,
                         num_gpus,
-                        max_queue_sizing);
+                        max_queue_sizing,
+                        context);
             }
         }
     }
@@ -551,8 +562,12 @@ int main( int argc, char** argv)
 		return 1;
 	}
 
-	DeviceInit(args);
-	cudaSetDeviceFlags(cudaDeviceMapHost);
+	//DeviceInit(args);
+	//cudaSetDeviceFlags(cudaDeviceMapHost);
+
+    int dev = 0;
+    args.GetCmdLineArgument("device", dev);
+    ContextPtr context = mgpu::CreateCudaDevice(dev);
 
 	//srand(0);									// Presently deterministic
 	//srand(time(NULL));
@@ -596,7 +611,7 @@ int main( int argc, char** argv)
 		csr.PrintHistogram();
 
 		// Run tests
-		RunTests(csr, args);
+		RunTests(csr, args, *context);
 
     } else {
 
