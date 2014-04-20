@@ -161,8 +161,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         // Shared storage for the kernel
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
 
-        printf("after smem alloc.\n");
-
         // If instrument flag is set, track kernel stats
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
             kernel_stats.MarkStart();

@@ -53,14 +53,12 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             util::CtaWorkProgress                   work_progress,
             CudaContext                             &context,
             TYPE                      ADVANCE_TYPE)
-
 {
             
     switch (KernelPolicy::ADVANCE_MODE)
     {
         case TWC_FORWARD:
         {
-            printf("before kernel.\n");
             // Load Thread Warp CTA Forward Kernel
             gunrock::oprtr::edge_map_forward::Kernel<typename KernelPolicy::THREAD_WARP_CTA_FORWARD, ProblemData, Functor>
                 <<<enactor_stats.advance_grid_size, KernelPolicy::THREAD_WARP_CTA_FORWARD::THREADS>>>(
@@ -93,7 +91,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                             frontier_attribute.queue_index,
                             enactor_stats.num_gpus,
                             frontier_attribute.queue_length,
-                            enactor_stats.d_done,
+                            d_done,
                             d_in_key_queue,              // d_in_queue
                             backward_index_queue,            // d_in_index_queue
                             backward_frontier_map_in,
@@ -112,7 +110,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                             frontier_attribute.queue_index,
                             enactor_stats.num_gpus,
                             frontier_attribute.queue_length,
-                            enactor_stats.d_done,
+                            d_done,
                             d_in_key_queue,              // d_in_queue
                             backward_index_queue,            // d_in_index_queue
                             backward_frontier_map_out,
@@ -162,7 +160,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         d_row_offsets,
                         d_column_indices,
                         partitioned_scanned_edges,
-                        enactor_stats.d_done,
+                        d_done,
                         d_in_key_queue,
                         d_out_key_queue,
                         data_slice,
@@ -196,7 +194,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         partitioned_scanned_edges,
                                         enactor_stats.d_node_locks_out,
                                         KernelPolicy::LOAD_BALANCED::BLOCKS,
-                                        enactor_stats.d_done,
+                                        d_done,
                                         d_in_key_queue,
                                         d_out_key_queue,
                                         data_slice,

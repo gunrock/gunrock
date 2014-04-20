@@ -102,9 +102,11 @@ class BFSEnactor : public EnactorBase
                         "PBFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
         }
 
+        done[0] = -1;
+
             //graph slice
             typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
-            typename ProblemData::DataSlice *data_slice = problem->data_slices[0];
+            typename ProblemData::DataSlice *data_slice = problem->d_data_slices[0];
 
         do {
 
@@ -270,7 +272,7 @@ class BFSEnactor : public EnactorBase
                     (unsigned int*)NULL,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],            // d_out_queue
-                    graph_slice->frontier_queues.d_values[frontier_attribute.selector],          // d_pred_in_queue
+                    (VertexId*)NULL,          // d_pred_in_queue
                     graph_slice->frontier_queues.d_values[frontier_attribute.selector^1],          // d_pred_out_queue
                     graph_slice->d_row_offsets,
                     graph_slice->d_column_indices,
@@ -282,12 +284,33 @@ class BFSEnactor : public EnactorBase
                     context,
                     gunrock::oprtr::advance::V2V);
 
+
+                /*gunrock::oprtr::edge_map_forward::Kernel<typename AdvanceKernelPolicy::THREAD_WARP_CTA_FORWARD, BFSProblem, BfsFunctor>
+                <<<enactor_stats.advance_grid_size, AdvanceKernelPolicy::THREAD_WARP_CTA_FORWARD::THREADS>>>(
+                    frontier_attribute.queue_reset,
+                    frontier_attribute.queue_index,
+                    enactor_stats.num_gpus,
+                    enactor_stats.iteration,
+                    frontier_attribute.queue_length,
+                    d_done,
+                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
+                    graph_slice->frontier_queues.d_values[frontier_attribute.selector^1],          // d_pred_out_queue
+                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],            // d_out_queue
+                    graph_slice->d_column_indices,
+                    data_slice,
+                    this->work_progress,
+                    graph_slice->frontier_elements[frontier_attribute.selector],
+                    graph_slice->frontier_elements[frontier_attribute.selector^1],
+                    enactor_stats.advance_kernel_stats,
+                    gunrock::oprtr::advance::V2V);*/
+ 
+
                 // Only need to reset queue for once
                 if (frontier_attribute.queue_reset)
                     frontier_attribute.queue_reset = false;
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "advance::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(enactor_stats.throttle_event);                                 // give host memory mapped visibility to GPU updates 
+                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates 
 
 
                 frontier_attribute.queue_index++;
@@ -296,8 +319,8 @@ class BFSEnactor : public EnactorBase
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
                     printf(", %lld", (long long) frontier_attribute.queue_length);
-                    util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
-                    util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[frontier_attribute.selector], frontier_attribute.queue_length);
+                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
+                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[frontier_attribute.selector], frontier_attribute.queue_length);
                 }
 
                 if (INSTRUMENT) {
@@ -309,10 +332,10 @@ class BFSEnactor : public EnactorBase
 
                 // Throttle
                 if (enactor_stats.iteration & 1) {
-                    if (retval = util::GRError(cudaEventRecord(enactor_stats.throttle_event),
+                    if (retval = util::GRError(cudaEventRecord(throttle_event),
                         "BFSEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
                 } else {
-                    if (retval = util::GRError(cudaEventSynchronize(enactor_stats.throttle_event),
+                    if (retval = util::GRError(cudaEventSynchronize(throttle_event),
                         "BFSEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
                 }
 
@@ -339,7 +362,7 @@ class BFSEnactor : public EnactorBase
                     enactor_stats.filter_kernel_stats);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(enactor_stats.throttle_event); // give host memory mapped visibility to GPU updates
+                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
 
                 frontier_attribute.queue_index++;

@@ -32,9 +32,6 @@ namespace app {
 
 struct EnactorStats
 {
-    volatile int        *done;
-    int                 *d_done;
-    cudaEvent_t         throttle_event;
     long long           iteration;
     unsigned int        num_gpus;
     unsigned int        gpu_id;
@@ -116,23 +113,6 @@ protected:
     {
         cudaError_t retval = cudaSuccess;
 
-        //initialize the host-mapped "done"
-        if (!enactor_stats.done) {
-            int flags = cudaHostAllocMapped;
-
-            // Allocate pinned memory for done
-            if (retval = util::GRError(cudaHostAlloc((void**)&enactor_stats.done, sizeof(int) * 1, flags),
-                        "PBFSEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
-
-            // Map done into GPU space
-            if (retval = util::GRError(cudaHostGetDevicePointer((void**)&enactor_stats.d_done, (void*) enactor_stats.done, 0),
-                        "PBFSEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
-
-            // Create throttle event
-            if (retval = util::GRError(cudaEventCreateWithFlags(&enactor_stats.throttle_event, cudaEventDisableTiming),
-                        "PBFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
-        }
-
         //initialize runtime stats
         enactor_stats.advance_grid_size = MaxGridSize(advance_occupancy, max_grid_size);
         enactor_stats.filter_grid_size  = MaxGridSize(filter_occupancy, max_grid_size);
@@ -144,7 +124,6 @@ protected:
         enactor_stats.total_runtimes        = 0;
         enactor_stats.total_lifetimes       = 0;
         enactor_stats.total_queued          = 0;
-        enactor_stats.done[0]               = -1;
 
         enactor_stats.num_gpus              = 1;
         enactor_stats.gpu_id                = 0;
