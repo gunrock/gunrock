@@ -46,7 +46,8 @@ struct Sweep
         typename KernelPolicy::SmemStorage      &smem_storage,
         util::CtaWorkProgress                   &work_progress,
         util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition,
-        typename KernelPolicy::SizeT            &max_out_frontier)
+        typename KernelPolicy::SizeT            &max_out_frontier,
+        gunrock::oprtr::advance::TYPE           &ADVANCE_TYPE)
         {
             typedef Cta<KernelPolicy, ProblemData, Functor>     Cta;
             typedef typename KernelPolicy::SizeT                SizeT;
@@ -74,7 +75,8 @@ struct Sweep
                 d_column_indices,
                 problem,
                 work_progress,
-                max_out_frontier);
+                max_out_frontier,
+                ADVANCE_TYPE);
 
             // Process full tiles
             while (work_limits.offset < work_limits.guarded_offset) {
@@ -124,7 +126,8 @@ struct Dispatch
         util::CtaWorkProgress       &work_progress,
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
-        util::KernelRuntimeStats    &kernel_stats)
+        util::KernelRuntimeStats    &kernel_stats,
+        gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
         {
             // empty
         }
@@ -156,7 +159,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         util::CtaWorkProgress       &work_progress,
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
-        util::KernelRuntimeStats    &kernel_stats)
+        util::KernelRuntimeStats    &kernel_stats,
+        gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
     {
         // Shared storage for the kernel
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
@@ -224,7 +228,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 smem_storage,
                 work_progress,
                 smem_storage.state.work_decomposition,
-                max_out_frontier); 
+                max_out_frontier,
+                ADVANCE_TYPE); 
 
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
             kernel_stats.MarkStop();
@@ -276,7 +281,7 @@ void Kernel(
         typename KernelPolicy::SizeT            max_in_frontier,
         typename KernelPolicy::SizeT            max_out_frontier,
         util::KernelRuntimeStats                kernel_stats,
-        gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V)
+        gunrock::oprtr::advance::TYPE           ADVANCE_TYPE = gunrock::oprtr::advance::V2V)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
             queue_reset,    
@@ -293,7 +298,8 @@ void Kernel(
             work_progress,
             max_in_frontier,
             max_out_frontier,
-            kernel_stats);
+            kernel_stats,
+            ADVANCE_TYPE);
 }
 
 } //edge_map_forward

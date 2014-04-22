@@ -24,6 +24,8 @@
 
 #include <gunrock/util/scan/soa/cooperative_soa_scan.cuh>
 
+#include <gunrock/oprtr/advance/kernel_policy.cuh>
+
 
 //TODO: use CUB for SOA scan
 
@@ -97,6 +99,7 @@ namespace edge_map_forward {
             SizeT                   max_out_frontier;           // Maximum size (in elements) of outgoing frontier
             int                     num_gpus;                   // Number of GPUs
             int                     label;                      // Current label of the frontier
+            gunrock::oprtr::advance::TYPE           ADVANCE_TYPE;
 
             // Operational details for raking grid
             RakingSoaDetails        raking_soa_details;
@@ -585,7 +588,8 @@ namespace edge_map_forward {
                     VertexId                    *d_column_indices,
                     DataSlice                   *problem,
                     util::CtaWorkProgress       &work_progress,
-                    SizeT                       max_out_frontier) :
+                    SizeT                       max_out_frontier,
+                    gunrock::oprtr::advance::TYPE ADVANCE_TYPE) :
 
                 queue_index(queue_index),
                 num_gpus(num_gpus),
@@ -605,7 +609,8 @@ namespace edge_map_forward {
                 d_column_indices(d_column_indices),
                 problem(problem),
                 work_progress(work_progress),
-                max_out_frontier(max_out_frontier)
+                max_out_frontier(max_out_frontier),
+                ADVANCE_TYPE(ADVANCE_TYPE)
                 {
                     if (threadIdx.x == 0) {
                         smem_storage.state.cta_comm = KernelPolicy::THREADS;

@@ -44,7 +44,8 @@ struct Sweep
         typename ProblemData::DataSlice         *&problem,
         typename KernelPolicy::SmemStorage      &smem_storage,
         util::CtaWorkProgress                   &work_progress,
-        util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition)
+        util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition,
+        gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
         {
             typedef Cta<KernelPolicy, ProblemData, Functor>     Cta;
             typedef typename KernelPolicy::SizeT                SizeT;
@@ -72,7 +73,8 @@ struct Sweep
                 d_row_offsets,
                 d_column_indices,
                 problem,
-                work_progress);
+                work_progress,
+                ADVANCE_TYPE);
 
             // Process full tiles
             while (work_limits.offset < work_limits.guarded_offset) {
@@ -121,7 +123,8 @@ struct Dispatch
         VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
         util::CtaWorkProgress       &work_progress,
-        util::KernelRuntimeStats    &kernel_stats)
+        util::KernelRuntimeStats    &kernel_stats,
+        gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
         {
             // empty
         }
@@ -152,7 +155,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
         util::CtaWorkProgress       &work_progress,
-        util::KernelRuntimeStats    &kernel_stats)
+        util::KernelRuntimeStats    &kernel_stats,
+        gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
     {
         // Shared storage for the kernel
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
@@ -213,7 +217,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 problem,
                 smem_storage,
                 work_progress,
-                smem_storage.state.work_decomposition);
+                smem_storage.state.work_decomposition,
+                ADVANCE_TYPE);
 
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
             kernel_stats.MarkStop();
@@ -279,7 +284,8 @@ void Kernel(
             d_column_indices,
             problem,
             work_progress,
-            kernel_stats);
+            kernel_stats,
+            ADVANCE_TYPE);
 }
 
 } //edge_map_backward

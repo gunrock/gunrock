@@ -105,6 +105,8 @@ namespace edge_map_backward {
             // Shared memory for the CTA
             SmemStorage             &smem_storage;
 
+            gunrock::oprtr::advance::TYPE ADVANCE_TYPE;
+
 
             /**
              * @brief Tile of incoming frontier to process
@@ -611,7 +613,8 @@ namespace edge_map_backward {
                 SizeT                       *d_row_offsets,
                 VertexId                    *d_column_indices,
                 DataSlice                   *problem,
-                util::CtaWorkProgress       &work_progress) :
+                util::CtaWorkProgress       &work_progress,
+                gunrock::oprtr::advance::TYPE ADVANCE_TYPE) :
 
                 queue_index(queue_index),
                 num_gpus(num_gpus),
@@ -631,7 +634,8 @@ namespace edge_map_backward {
                 d_row_offsets(d_row_offsets),
                 d_column_indices(d_column_indices),
                 problem(problem),
-                work_progress(work_progress)
+                work_progress(work_progress),
+                ADVANCE_TYPE(ADVANCE_TYPE)
             {
                 if (threadIdx.x == 0) {
                     smem_storage.state.cta_comm = KernelPolicy::THREADS;
