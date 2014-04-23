@@ -122,7 +122,7 @@ class BFSEnactor : public EnactorBase
 
             if (ProblemData::ENABLE_IDEMPOTENCE) {
                 int bytes = (graph_slice->nodes + 8 - 1) / 8;
-                cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
+                cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<unsigned char>();
                 if (retval = util::GRError(cudaBindTexture(
                                 0,
                                 gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref,
@@ -259,8 +259,6 @@ class BFSEnactor : public EnactorBase
             // Step through BFS iterations
             
             while (done[0] < 0) {
-
-                printf("before advance kernel.\n");
 
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BFSProblem, BfsFunctor>(
