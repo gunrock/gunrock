@@ -99,7 +99,7 @@ namespace edge_map_forward {
             SizeT                   max_out_frontier;           // Maximum size (in elements) of outgoing frontier
             int                     num_gpus;                   // Number of GPUs
             int                     label;                      // Current label of the frontier
-            gunrock::oprtr::advance::TYPE           ADVANCE_TYPE;
+            gunrock::oprtr::advance::TYPE           advance_type;
 
             // Operational details for raking grid
             RakingSoaDetails        raking_soa_details;
@@ -270,14 +270,20 @@ namespace edge_map_forward {
                                             // set neighbor_id to -1 for invalid
                                             if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x)) {
                                                 Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x);
-                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                    neighbor_id,
-                                                    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
-                                                if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
+                                                if (cta->advance_type == gunrock::oprtr::advance::V2V) {
                                                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                            pred_id,
-                                                            cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                            neighbor_id,
+                                                            cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank); 
+                                                } else if (cta->advance_type == gunrock::oprtr::advance::V2E) {
+                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                            (VertexId)(coop_offset+threadIdx.x),
+                                                            cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
                                                 }
+                                                if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
+                                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                pred_id,
+                                                                cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                    }
                                             }
                                             else {
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -303,9 +309,15 @@ namespace edge_map_forward {
                                             // set neighbor_id to -1 for invalid                                    
                                             if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x)) {
                                                 Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x);
-                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                    neighbor_id,
-                                                    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                if (cta->advance_type == gunrock::oprtr::advance::V2V) {
+                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                            neighbor_id,
+                                                            cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank); 
+                                                } else if (cta->advance_type == gunrock::oprtr::advance::V2E) {
+                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                            (VertexId)(coop_offset+threadIdx.x),
+                                                            cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                }
                                                 if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
                                                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                             pred_id,
@@ -383,14 +395,18 @@ namespace edge_map_forward {
                                                 // set neighbor_id to -1 for invalid 
                                                 if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id)) {
                                                     Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id);
-                                                    if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
-                                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                                pred_id,
-                                                                cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                    if (cta->advance_type == gunrock::oprtr::advance::V2E) {
+                                                        neighbor_id = coop_offset+lane_id;
                                                     }
                                                 }
                                                 else
                                                     neighbor_id = -1;
+
+                                                if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
+                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                            pred_id,
+                                                            cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                }
 
                                                 // Scatter neighbor
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -414,14 +430,18 @@ namespace edge_map_forward {
                                                 // set neighbor_id to -1 for invalid                                            
                                                 if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id)) {
                                                     Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id);
-                                                    if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
-                                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                                pred_id,
-                                                                cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                    if (cta->advance_type == gunrock::oprtr::advance::V2E) {
+                                                        neighbor_id = coop_offset+lane_id;
                                                     }
                                                 }
                                                 else
                                                     neighbor_id = -1;
+
+                                                if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
+                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                            pred_id,
+                                                            cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                }
 
                                                 // Scatter neighbor
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -610,7 +630,7 @@ namespace edge_map_forward {
                 problem(problem),
                 work_progress(work_progress),
                 max_out_frontier(max_out_frontier),
-                ADVANCE_TYPE(ADVANCE_TYPE)
+                advance_type(ADVANCE_TYPE)
                 {
                     if (threadIdx.x == 0) {
                         smem_storage.state.cta_comm = KernelPolicy::THREADS;
@@ -728,8 +748,11 @@ namespace edge_map_forward {
                         // if Cond(neighbor_id) returns false or Apply returns false
                         // set neighbor_id to -1 for invalid
 
-                        if (Functor::CondEdge(predecessor_id, neighbor_id, problem, smem_storage.gather_offsets[scratch_offset]))
+                        if (Functor::CondEdge(predecessor_id, neighbor_id, problem, smem_storage.gather_offsets[scratch_offset])) {
                             Functor::ApplyEdge(predecessor_id, neighbor_id, problem, smem_storage.gather_offsets[scratch_offset]);
+                            if (advance_type == gunrock::oprtr::advance::V2E)
+                                neighbor_id = smem_storage.gather_offsets[scratch_offset];
+                        }
                         else
                             neighbor_id = -1;
                         // Scatter into out_queue
