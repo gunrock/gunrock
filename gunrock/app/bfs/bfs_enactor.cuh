@@ -106,7 +106,7 @@ class BFSEnactor : public EnactorBase
 
             //graph slice
             typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
-            typename ProblemData::DataSlice *data_slice = problem->d_data_slices[0];
+            typename ProblemData::DataSlice *data_slice = problem->data_slices[0];
 
         do {
 
@@ -259,6 +259,8 @@ class BFSEnactor : public EnactorBase
             // Step through BFS iterations
             
             while (done[0] < 0) {
+
+                printf("before advance kernel.\n");
 
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BFSProblem, BfsFunctor>(
