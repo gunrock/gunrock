@@ -304,16 +304,31 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                     d_out + out_index);
                         }
                     } else {
-                        if (Functor::CondEdge(v, u, problem, lookup)) {
-                            Functor::ApplyEdge(v, u, problem, lookup);
-                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                    u,
-                                    d_out + out_index);
-                        }
-                        else {
-                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                    -1,
-                                    d_out + out_index);
+                        
+                        if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
+                            if (Functor::CondEdge(v, u, problem, lookup)) {
+                                Functor::ApplyEdge(v, u, problem, lookup);
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        u,
+                                        d_out + out_index);
+                            }
+                            else {
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        -1,
+                                        d_out + out_index);
+                            }
+                        } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
+                            if (Functor::CondEdge(v, u, problem, lookup)) {
+                                Functor::ApplyEdge(v, u, problem, lookup);
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        lookup,
+                                        d_out + out_index);
+                            }
+                            else {
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        -1,
+                                        d_out + out_index);
+                            }
                         }
                     }
                 }
@@ -444,19 +459,33 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             d_out + offset+i);
                 }
             } else {
-                //v:pre, u:neighbor, outoffset:offset+i
-                if (Functor::CondEdge(v, u, problem, lookup)) {
-                    Functor::ApplyEdge(v, u, problem, lookup);
-                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                            u,
-                            d_out + offset+i);
-                }
-                else {
-                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                            -1,
-                            d_out + offset+i);
-                }
-            }
+                        
+                        if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
+                            if (Functor::CondEdge(v, u, problem, lookup)) {
+                                Functor::ApplyEdge(v, u, problem, lookup);
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        u,
+                                        d_out + offset+i);
+                            }
+                            else {
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        -1,
+                                        d_out + offset+i);
+                            }
+                        } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
+                            if (Functor::CondEdge(v, u, problem, lookup)) {
+                                Functor::ApplyEdge(v, u, problem, lookup);
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        lookup,
+                                        d_out + offset+i);
+                            }
+                            else {
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        -1,
+                                        d_out + offset+i);
+                            }
+                        }
+                    }
         }
 
         if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
