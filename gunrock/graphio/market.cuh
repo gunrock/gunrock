@@ -129,7 +129,7 @@ int ReadMarketStream(
                         if (coo) free(coo);
                     return -1;
                 } else {
-                    ll_value = rand()%64;
+                    ll_value = (ll_col+ll_row) % 64;
                 }
             } else {
                 if (sscanf(line, "%lld %lld", &ll_col, &ll_row) != 2) {

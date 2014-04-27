@@ -48,11 +48,11 @@ struct FLAGFunctor
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
         if (problem->d_reducedWeights[s_id] == problem->d_weights[e_id])
-	{
-                problem->d_successor[s_id] = d_id;
-		problem->d_selector[problem->d_eId[e_id]] = true; // Mark Selected Edge(s)
-	}
-	return true;
+	    {
+            problem->d_successor[s_id] = d_id;
+		    problem->d_selector[problem->d_eId[e_id]] = 1; // Mark Selected Edge(s)
+	    }
+	    return true;
     }
 
     /**
@@ -64,9 +64,7 @@ struct FLAGFunctor
      *
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
-    {
-	return;
-    }
+    { return; }
 
     /**
      * @ set the flags[row_offset[vid]] = 1
@@ -79,9 +77,9 @@ struct FLAGFunctor
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-	problem->d_flag[problem->d_row_offsets[node]] = 1;
+	    problem->d_flag[problem->d_row_offsets[node]] = 1;
     	problem->d_flag[0] = 0;	// For Scanning Keys Array. 
-	return true;
+	    return true;
     }
 
     /**
@@ -93,7 +91,7 @@ struct FLAGFunctor
      */
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-	return;
+	    return;
     }
 };
 
@@ -123,14 +121,14 @@ struct RCFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id)
     {
-	if (problem->d_successor[problem->d_successor[s_id]] == s_id)
-	{
-		if (problem->d_successor[s_id] > s_id) 
-		{
-			problem->d_successor[s_id] = s_id;
-			problem->d_selector[problem->d_eId[e_id]] = false;
-		}
-	}
+	    if (problem->d_successor[problem->d_successor[s_id]] == s_id)
+	    {
+		    if (problem->d_successor[s_id] > s_id) 
+		    {
+			    problem->d_successor[s_id] = s_id;
+			    problem->d_selector[problem->d_eId[e_id]] = 0;
+            }
+	    }
     	return true;
     }
 
@@ -143,7 +141,7 @@ struct RCFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
-	return;
+	    return;
     }
 
     /**
@@ -156,7 +154,7 @@ struct RCFunctor
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-	return true;
+	    return true;
     }
 
     /**
@@ -168,7 +166,7 @@ struct RCFunctor
      */
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-	return;
+	    return;
     }
 };
 
@@ -211,16 +209,16 @@ struct PtrJumpFunctor
     {
         VertexId parent;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                parent, problem->d_represent + node);
+            parent, problem->d_represent + node);
         VertexId grand_parent;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                grand_parent, problem->d_represent + parent);
+            grand_parent, problem->d_represent + parent);
         if (parent != grand_parent) 
-	{
+	    {
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        0, problem->d_vertex_flag); 
+                0, problem->d_vertex_flag); 
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        grand_parent, problem->d_represent + node);
+                grand_parent, problem->d_represent + node);
         }
     }
 };
@@ -264,25 +262,25 @@ struct PtrJumpMaskFunctor
     {
         VertexId mask;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                mask, problem->d_masks + node);
+            mask, problem->d_masks + node);
         if (mask == 0) 
-	{
+	    {
             VertexId parent;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    parent, problem->d_represent + node);
+                parent, problem->d_represent + node);
             VertexId grand_parent;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    grand_parent, problem->d_represent + parent);
+                grand_parent, problem->d_represent + parent);
             if (parent != grand_parent) 
-	    {
+	        {
                 problem->d_vertex_flag[0] = 0;
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        grand_parent, problem->d_represent + node);
+                    grand_parent, problem->d_represent + node);
             } 
-  	    else 
-	    {
+  	        else 
+	        {
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        -1, problem->d_masks + node);
+                    -1, problem->d_masks + node);
             }
         }
     }
@@ -314,14 +312,14 @@ struct EdgeRmFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
-	problem->d_edges[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_edges[e_id]; 
-	problem->d_weights[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_weights[e_id];
-	problem->d_keys[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_keys[e_id];	
-	// New flag for calculating reduced length 
-	problem->d_flag[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_flag[e_id];
-	problem->d_eId[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_eId[e_id];
-	problem->d_edgeFlag[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_edgeFlag[e_id];
-	return true;
+	    problem->d_edges[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_edges[e_id]; 
+	    problem->d_weights[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_weights[e_id];
+	    problem->d_keys[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_keys[e_id];	
+	    // New flag for calculating reduced length 
+	    problem->d_flag[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_flag[e_id];
+	    problem->d_eId[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_eId[e_id];
+	    problem->d_edgeFlag[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_edgeFlag[e_id];
+	    return true;
     }
 
     /**
@@ -348,8 +346,8 @@ struct EdgeRmFunctor
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
         problem->d_keys[node] = problem->d_Ckeys[problem->d_keys[node]];
-	problem->d_edges[node] = problem->d_Ckeys[problem->d_edges[node]];
-	return true;
+	    problem->d_edges[node] = problem->d_Ckeys[problem->d_edges[node]];
+	    return true;
     }
 
     /**
@@ -416,7 +414,7 @@ struct RMFunctor
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-   	return (node != -1) ? true : false;
+   	    return node != -1;
     }
 
     /**
@@ -487,8 +485,8 @@ struct VLENFunctor
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
         problem->d_row_offsets[node] = (problem->d_Cflag[node] == 0) ? -1 : 1;
-	problem->d_row_offsets[0] = 1;
-	return; 
+	    problem->d_row_offsets[0] = 1;
+	    return; 
     }
 };
 
@@ -546,7 +544,7 @@ struct ELENFunctor
     {
     	problem->d_edge_offsets[node] = (problem->d_flag[node] == 0) ? -1 : 1;
         problem->d_edge_offsets[0] = 1;
-	return true;
+	    return true;
     }
 
     /**
@@ -612,12 +610,12 @@ struct RowOFunctor
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-	problem->d_row_offsets[0] = 0;
+	    problem->d_row_offsets[0] = 0;
         if (problem->d_flag[node] == 1)
-	{
-		problem->d_row_offsets[problem->d_keys[node]] = node;
-	}
-	return true;
+	    {
+		    problem->d_row_offsets[problem->d_keys[node]] = node;
+	    }
+	    return true;
     }
 
     /**
@@ -679,8 +677,8 @@ struct EdgeOFunctor
     {
         problem->d_edge_offsets[0] = 0;
         if (problem->d_flag[node] == 1)
-	{
-                problem->d_edge_offsets[problem->d_edgeKeys[node]] = node;
+	    {
+            problem->d_edge_offsets[problem->d_edgeKeys[node]] = node;
         }
         //problem->d_row_offsets[problem->d_keys[node]] = (problem->d_flag[node] == 1) ? node : problem->d_row_offsets[problem->d_keys[node]];
         return true;
@@ -724,7 +722,7 @@ struct SuEdgeRmFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
-	return true;
+	    return true;
     }
 
     /**
@@ -751,11 +749,11 @@ struct SuEdgeRmFunctor
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
      	problem->d_flag[0] = 1;
-	problem->d_edges[node] = (problem->d_flag[node] == 0) ? -1 : problem->d_edges[node];
+	    problem->d_edges[node] = (problem->d_flag[node] == 0) ? -1 : problem->d_edges[node];
         problem->d_weights[node] = (problem->d_flag[node] == 0) ? -1 : problem->d_weights[node];
         problem->d_keys[node] = (problem->d_flag[node] == 0) ? -1 : problem->d_keys[node];
         problem->d_eId[node] = (problem->d_flag[node] == 0) ? -1 : problem->d_eId[node];
-	return true;
+	    return true;
     }
 
     /**
@@ -814,8 +812,9 @@ struct ORFunctor
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-        problem->d_edgeFlag[node] = problem->d_edgeFlag[node] | problem->d_flag[node];
-	return true;
+        // problem->d_edgeFlag[node] = problem->d_edgeFlag[node] | problem->d_flag[node];
+	    problem->d_edgeFlag[node] = atomicOr(&problem->d_edgeFlag[node], problem->d_flag[node]);
+	    return true;
     }
 
     /**
@@ -827,11 +826,34 @@ struct ORFunctor
      */
     static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-	return; 
+	    return; 
     }
 };
 
 
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+struct FilterFunctor
+{
+    typedef typename ProblemData::DataSlice DataSlice;
+    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    {
+        return true;
+    }
+    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    {
+        return;
+    }
+    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
+    {
+        //problem->d_oriWeights[node] = problem->d_oriWeights[node] * problem->d_selector[node];
+        return true;
+    }
+    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
+    {
+        return;
+    }
+
+};
 
 } // mst
 } // app
