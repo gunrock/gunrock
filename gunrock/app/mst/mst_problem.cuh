@@ -39,11 +39,11 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
 {
 
     typedef _VertexId	VertexId;
-    typedef _SizeT		SizeT;
-    typedef _Value		Value;
+    typedef _SizeT	SizeT;
+    typedef _Value	Value;
 
-    static const bool MARK_PREDECESSORS     = true;
-    static const bool ENABLE_IDEMPOTENCE    = false;
+    static const bool MARK_PREDECESSORS		= true;
+    static const bool ENABLE_IDEMPOTENCE	= false;
 
     //Helper structures
 
@@ -53,29 +53,29 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
     struct DataSlice
     {
         // device storage arrays
-        SizeT		*d_labels;
-        SizeT   	*d_edges;		/* Edge list */
-        Value   	*d_weights;	   	/* Store weights for each edge */
-        Value       *d_oriWeights;  /* Original weight list used for total weight calculate */
-        Value       *d_reducedWeights;	/* Store minimum weights for each vertex */
-        SizeT		*d_flag;		/* Flag array to mark segments */
-        SizeT		*d_keys;		/* Used for segmented reduction */	
-        SizeT       *d_keysCopy;            /* Used for pair soring (temp) */
+        SizeT	*d_labels;
+        SizeT	*d_eId;         /* Used for keeping current iteration edge Ids to select edges */
+		SizeT	*d_edges;		/* Edge list */
+        SizeT	*d_flag;        /* Flag array to mark segments */
+        SizeT	*d_keys;        /* Used for segmented reduction */
+        SizeT	*d_keysCopy;            /* Used for pair soring (temp) */
+		SizeT	*d_edgeFlag;        /* Used for removing edges between supervertices */
+        SizeT	*d_edgeKeys;        /* Used for removing edges between supervertices */
+		Value	*d_weights;	   	/* Store weights for each edge */
+        Value	*d_oriWeights;  /* Original weight list used for total weight calculate */
+        Value	*d_reducedWeights;	/* Store minimum weights for each vertex */
         VertexId	*d_reducedKeys;		/* Used for segmented reduction */
         VertexId	*d_successor;		/* Used for storing dest.ID that have min_weights */ 
-        VertexId    *d_represent;           /* Used for storing represetatives for each successor */
-        VertexId    *d_superVertex;         /* Used for storing supervertex in order */
+        VertexId	*d_represent;           /* Used for storing represetatives for each successor */
+        VertexId	*d_superVertex;         /* Used for storing supervertex in order */
         VertexId	*d_row_offsets;		/* Used for accessing row_offsets */
         VertexId	*d_edgeId;		/* Used for storing vid of edges have min_weights */
-        int         *d_vertex_flag;         /* Finish flag for per-vertex kernels in MST algorithm */
         VertexId	*d_nodes;		/* Used for nodes vid */
         VertexId	*d_Cflag;		/* Used for a scan of the flag assigns new supervertex Ids */
         VertexId	*d_Ckeys;		/* Used for storing new keys array */
-        SizeT		*d_eId;			/* Used for keeping current iteration edge Ids to select edges */
-		int		    *d_selector;		/* Used for recording selected edges for MST */
-        VertexId	*d_edge_offsets;	/* Used for removing edges between supervertices */		
-        SizeT 		*d_edgeFlag;		/* Used for removing edges between supervertices */
-        SizeT		*d_edgeKeys;		/* Used for removing edges between supervertices */	
+		VertexId	*d_edge_offsets;    /* Used for removing edges between supervertices */
+		int			*d_vertex_flag;         /* Finish flag for per-vertex kernels in MST algorithm */
+		int			*d_selector;		/* Used for recording selected edges for MST */
 	};
 	
     // Members
