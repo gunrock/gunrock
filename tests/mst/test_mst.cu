@@ -82,24 +82,7 @@ void Usage()
 template<typename Value, typename SizeT>
 void DisplaySolution()
 {	
-	/* 
-	printf("\nVertex List (row_offsets):\n");
-        for (SizeT node = 0;
-      	node < csr.nodes;
-        node++){
-          	util::PrintValue(csr.row_offsets[node]);
-            printf(" ");
-        }
-	printf("\n");
-    printf("\nEdge List (col_indices):\n");
-    for (SizeT edge = 0;
-     	edge < csr.edges;
-        edge++){
-                    util::PrintValue(csr.column_indices[edge]);
-                    printf(" ");
-                }
-	printf("\n");		
-	*/
+
 }
 
 /**
@@ -160,17 +143,6 @@ void SimpleReferenceMST(
     }
     printf(" Original Total Weights: %d\n", weight_sum);
        
-    /*
-	Graph g(num_nodes);
- 	property_map<Graph, edge_weight_t>::type weightmap = get(edge_weight, g); 
- 	for (std::size_t j = 0; j < sizeof(edge_pairs) / sizeof(E); ++j) 
-	{
- 		printf("%d, %d\n", edge_pairs[j].first, edge_pairs[j].second);
- 		graph_traits<Graph>::edge_descriptor e; bool inserted;
- 		tie(e, inserted) = add_edge(edge_pairs[j].first, edge_pairs[j].second, g);
- 		weightmap[e] = weights[j];
- 	}*/
- 	
 	Graph g(edge_pairs, edge_pairs + num_edges, weights, num_nodes);
  		property_map<Graph, edge_weight_t>::type weightmap = get(edge_weight, g);
  	std::vector < graph_traits < Graph >::vertex_descriptor >
