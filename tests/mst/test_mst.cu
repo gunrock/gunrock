@@ -198,21 +198,20 @@ void SimpleReferenceMST(
 	float elapsed_cpu = cpu_timer.ElapsedMillis();
 	
     printf(" CPU MST finished in %lf msec.\n", elapsed_cpu);
-	
+
+	/*	
     // display graph results 	
-    int final_edge_len = 0;
     for (std::size_t i = 0; i != p.size(); ++i)
 	{
 		if (p[i] != i)
         {
             std::cout << "parent[" << i << "] = " << p[i] << std::endl;
-            final_edge_len += 1;
         }
         else
 			std::cout << "parent[" << i << "] = no parent" << std::endl;
 	}
-	
-	printf(" Number of edges selected - %d\n", p.size());
+	*/
+	printf(" Number of edges selected - %d\n", p.size() - 1);
     // int total_weights_cpu = 0;
     // std::cout << "final edge len = " << final_edge_len << std::endl;
     // std::cout << "total weights cpu = " << total_weights_cpu << std::endl; 

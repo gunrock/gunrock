@@ -71,8 +71,8 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
         VertexId	*d_nodes;		/* Used for nodes vid */
         VertexId	*d_Cflag;		/* Used for a scan of the flag assigns new supervertex Ids */
         VertexId	*d_Ckeys;		/* Used for storing new keys array */
-        SizeT		*d_eId;			/* Used for keeping original edge Id to label selected edges */
-        int		    *d_selector;		/* Used for recording selected edges for MST */
+        SizeT		*d_eId;			/* Used for keeping current iteration edge Ids to select edges */
+		int		    *d_selector;		/* Used for recording selected edges for MST */
         VertexId	*d_edge_offsets;	/* Used for removing edges between supervertices */		
         SizeT 		*d_edgeFlag;		/* Used for removing edges between supervertices */
         SizeT		*d_edgeKeys;		/* Used for removing edges between supervertices */	
@@ -468,8 +468,8 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
                     edges * sizeof(SizeT)),
                     "MSTProblem cudaMalloc d_eId Failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_eId = d_eId;
-			    util::MemsetIdxKernel<<<128, 128>>>(data_slices[0]->d_eId, edges);			
-			
+			    util::MemsetIdxKernel<<<128, 128>>>(data_slices[0]->d_eId, edges);
+
 			    int   *d_selector;        // has the same size as #edges
                 if (retval = util::GRError(cudaMalloc(
                     (void**)&d_selector,
@@ -774,10 +774,9 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER> // USE_DO
 
 	    }
 
-	    
 	    // Fillin the initial input_queue for MST problem, this needs to be modified
 	    // in multi-GPU scene
-	    	    
+
 	    // Put every vertex in frontier queue
 	    util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], nodes);
 	    return retval;

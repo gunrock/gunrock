@@ -47,10 +47,12 @@ struct FLAGFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
-        if (problem->d_reducedWeights[s_id] == problem->d_weights[e_id])
+        if (problem->d_reducedWeights[s_id] == problem->d_weights[e_id] && (atomicCAS(&problem->d_keysCopy[s_id], 0, s_id) == 0))
 	    {
-            problem->d_successor[s_id] = d_id;
-		    problem->d_selector[problem->d_eId[e_id]] = 1; // Mark Selected Edge(s)
+            // printf("s_id: %4d \t d_id: %4d \t e_id: %4d \n", s_id, d_id, e_id);
+			problem->d_successor[s_id] = d_id;
+			// mark edges that have mimimum weight values as output
+		    problem->d_selector[problem->d_eId[e_id]] = 1; 
 	    }
 	    return true;
     }
@@ -64,7 +66,9 @@ struct FLAGFunctor
      *
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
-    { return; }
+    { 
+		return; 
+	}
 
     /**
      * @ set the flags[row_offset[vid]] = 1
@@ -121,14 +125,6 @@ struct RCFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id)
     {
-	    if (problem->d_successor[problem->d_successor[s_id]] == s_id)
-	    {
-		    if (problem->d_successor[s_id] > s_id) 
-		    {
-			    problem->d_successor[s_id] = s_id;
-			    problem->d_selector[problem->d_eId[e_id]] = 0;
-            }
-	    }
     	return true;
     }
 
@@ -141,12 +137,17 @@ struct RCFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
-	    return;
+	    if (problem->d_successor[problem->d_successor[s_id]] == s_id && problem->d_successor[s_id] > s_id)
+		{
+			problem->d_successor[s_id] = s_id;
+			problem->d_selector[problem->d_eId[e_id]] = 0; // remove edges form a cycle from output 	
+		}
+		return;
     }
 
     /**
      * @ set the Successor[node] = node if Successor[Successor[node]] = node 
-     *
+     * @ remove cycles in successor array
      * @ param[in] node Vertex Id
      * @ param[in] problem Data slice object
      *
@@ -154,7 +155,11 @@ struct RCFunctor
      */
     static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
     {
-	    return true;
+	    if (problem->d_successor[problem->d_successor[node]] == node && problem->d_successor[node] > node)
+		{
+			problem->d_successor[node] = node;
+		}
+		return true;
     }
 
     /**
@@ -830,30 +835,6 @@ struct ORFunctor
     }
 };
 
-
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct FilterFunctor
-{
-    typedef typename ProblemData::DataSlice DataSlice;
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
-    {
-        return true;
-    }
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
-    {
-        return;
-    }
-    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
-    {
-        //problem->d_oriWeights[node] = problem->d_oriWeights[node] * problem->d_selector[node];
-        return true;
-    }
-    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
-    {
-        return;
-    }
-
-};
 
 } // mst
 } // app

@@ -185,6 +185,7 @@ struct Csr
         for (VertexId row = prev_row + 1; row <= nodes; row++) {
             row_offsets[row] = real_edge;
         }
+		edges = real_edge; 
 
         if (new_coo) free(new_coo);
 
@@ -246,14 +247,18 @@ struct Csr
     {
         SizeT displayed_node_num = (nodes > 40) ? 40:nodes;
         printf("First %d nodes's neighbor list of the input graph:\n", displayed_node_num);
-        for (SizeT node = 0; node < displayed_node_num; node++) {
+        for (SizeT node = 0; node < displayed_node_num; node++) 
+	{
             util::PrintValue(node);
             printf(": ");
             for (SizeT edge = row_offsets[node];
                  edge < row_offsets[node + 1];
-                 edge++) {
+                 edge++) 
+	    {
                 util::PrintValue(column_indices[edge]);
-                printf(", ");
+                printf("(");
+		util::PrintValue(edge_values[edge]);
+		printf("),  ");
             }
             printf("\n");
         }

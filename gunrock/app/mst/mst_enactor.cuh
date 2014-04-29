@@ -303,7 +303,7 @@ class MSTEnactor : public EnactorBase
             SizeT,
             VertexId,
             MSTProblem> OrFunctor;	
-
+	
 	    cudaError_t retval = cudaSuccess;
 
         do 
@@ -334,7 +334,7 @@ class MSTEnactor : public EnactorBase
         typename MSTProblem::DataSlice  *data_slice  = problem->d_data_slices[0];
 
 		fflush(stdout);
-                
+
 		// keep original edge list length
         int original_edge_length = graph_slice->edges;
 
@@ -345,10 +345,11 @@ class MSTEnactor : public EnactorBase
         SizeT           num_elements;
         bool            queue_reset;
 
+		int dbg_info_on = 0;
+
 		// Recursive Loop MST implementations
 		while (graph_slice->nodes > 1) 
 		{
-			
 			printf(" ===============> Start Iteration.%d, #nodes:%d, #edges:%d  \n",
                 iteration, graph_slice->nodes, graph_slice->edges);
 
@@ -361,9 +362,14 @@ class MSTEnactor : public EnactorBase
 				row_offsets_desc,
 				(graph_slice->nodes + 1) * sizeof(SizeT)),
 				"MSTEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
-
-			printf("\n:: Read In Row offsets ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_row_offsets, graph_slice->nodes);
+			
+			if (dbg_info_on)
+			{
+				printf("\n:: Read in row_offsets ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_row_offsets, graph_slice->nodes);
+				printf(" :: from the graph_slice ::");
+				util::DisplayDeviceResults(graph_slice->d_row_offsets, graph_slice->nodes);
+			}
 
 			// Generate Flag Array using FlagFunctor vertex mapping
 			queue_index  = 0;
@@ -403,21 +409,29 @@ class MSTEnactor : public EnactorBase
 				mgpu::equal_to<int>(), problem->data_slices[0]->d_reducedKeys,
 				problem->data_slices[0]->d_reducedWeights, &numSegments, (int*)0, context);	
 
-			printf(" 0.got Keys, reduced Keys, Weights and reduced Weights \n");
+			printf("----> 0.got Keys, reduced Keys, Weights and reduced Weights \n");
 			
-			printf(":: Initial Flag Array ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_flag, graph_slice->edges); 
-			printf(":: Initial Keys array ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
-			printf(":: Initial Edge List ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
-			printf(":: Initial Edge Weights ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);		
-			printf(":: Reduced keys ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_reducedKeys, graph_slice->nodes);
-			printf(":: Reduced weights ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_reducedWeights, graph_slice->nodes);
-
+			if (dbg_info_on)
+			{
+				printf(":: Initial Flag Array ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_flag, graph_slice->edges); 
+				printf(":: Initial Keys array ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
+				printf(":: Initial Edge List ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
+				printf(":: Initial Edge Weights ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);		
+				printf(":: Reduced keys ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_reducedKeys, graph_slice->nodes);
+				printf(":: Reduced weights ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_reducedWeights, graph_slice->nodes);
+				printf(" d_eId before first mark 1 to edges with minimum weight values \n");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_eId, graph_slice->edges);
+			}
+			
+			// reset keysCopy in order to avoid same weight issue
+			util::MemsetKernel<<<128, 128>>>(problem->data_slices[0]->d_keysCopy, 0, graph_slice->nodes);			
+		
 			// Generate Successor Array using FlagFunctor - Edge Mapping
 			// Successor Array holds the outgoing v for each u
 			queue_index = 0;
@@ -446,8 +460,8 @@ class MSTEnactor : public EnactorBase
 			if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), 
 				"edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
 			
-			printf(":: Successor Array ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_successor, graph_slice->nodes);
+			// printf(":: Successor Array ::\n");
+			// util::DisplayDeviceResults(problem->data_slices[0]->d_successor, graph_slice->nodes);
 	
 			// Remove cycles using RcFuntor - Vertex Mapping, S(S(u)) = u
 			queue_index  = 0;
@@ -466,7 +480,7 @@ class MSTEnactor : public EnactorBase
 				graph_slice->frontier_queues.d_keys[selector],          // d_in_queue
 				NULL,
 				graph_slice->frontier_queues.d_keys[selector^1],        // d_out_queue
-				graph_slice->d_column_indices,
+				graph_slice->d_column_indices,	
 				data_slice,
 				this->work_progress,
 				graph_slice->frontier_elements[selector],               // max_in_queue
@@ -474,12 +488,15 @@ class MSTEnactor : public EnactorBase
 				this->edge_map_kernel_stats);
 
 			if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
-				"vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+				"edge_map::Kernel failed", __FILE__, __LINE__))) break;
 
-			printf(":: Removed Cycles Successor Array ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_successor, graph_slice->nodes);
-			
-			printf(" 1.generated Successor Array and removed cycles \n");
+			if (dbg_info_on)
+			{
+				printf(":: Removed Cycles Successor Array ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_successor, graph_slice->nodes);
+			}
+
+			printf("----> 1.generated Successor Array and removed cycles \n");
 
 			// Pointer Jumpping to get Representative Array
 			util::MemsetCopyVectorKernel<<<128,128>>>(problem->data_slices[0]->d_represent,
@@ -537,11 +554,13 @@ class MSTEnactor : public EnactorBase
 	
 				if (vertex_flag[0]) break; // check if done
 			}
-			
-			printf(":: Pointer Jumping (Representative Array) ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_represent, graph_slice->nodes);
-
-			printf(" 2.got Representative Array using Pointer Jumping \n");
+		
+			if (dbg_info_on)
+			{	
+				printf(":: Pointer Jumping (Representative Array) ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_represent, graph_slice->nodes);
+			}
+			printf("----> 2.got Representative Array using Pointer Jumping \n");
 
 			// Assigning Ids to supervertices stored in d_superVertex
 			// copy representatives to d_superVertex
@@ -555,18 +574,20 @@ class MSTEnactor : public EnactorBase
 			MergesortPairs(problem->data_slices[0]->d_superVertex, 
 				problem->data_slices[0]->d_nodes, graph_slice->nodes, mgpu::less<int>(), context);
 			
-			printf(":: Super-Vertices Ids (d_superVertex) ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_superVertex, graph_slice->nodes);
-			printf(":: Sorted nodes according to supervertices (d_nodes) ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_nodes, graph_slice->nodes);		
-
 			// Scan of the flag assigns new supervertex ids stored in d_Cflag
 			util::markSegment<<<128, 128>>>(problem->data_slices[0]->d_Cflag, 
 				problem->data_slices[0]->d_superVertex, graph_slice->nodes);
 			
-			printf(":: New Super-vertex Ids (C Flag) ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_Cflag, graph_slice->nodes);	
-			
+			if (dbg_info_on)
+            {
+                printf(":: Super-Vertices Ids (d_superVertex) ::");
+                util::DisplayDeviceResults(problem->data_slices[0]->d_superVertex, graph_slice->nodes);
+                printf(":: Sorted nodes according to supervertices (d_nodes) ::");
+                util::DisplayDeviceResults(problem->data_slices[0]->d_nodes, graph_slice->nodes);
+				printf(":: New Super-vertex Ids (C Flag) ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_Cflag, graph_slice->nodes);	
+			}
+
 			// Calculate the length of New Vertex List - VLENFunctor vertex mapping
 			// d_row_offsets[node] = (d_Cflag[node] == 0) ? -1 : 1
 			queue_index  = 0;
@@ -599,9 +620,12 @@ class MSTEnactor : public EnactorBase
 			Scan<MgpuScanTypeInc>((int*)problem->data_slices[0]->d_Cflag, graph_slice->nodes, (int)0, 
 				mgpu::plus<int>(), (int*)0, (int*)0, (int*)problem->data_slices[0]->d_Ckeys, context);
 			
-			printf(":: Generated Ckeys Array using Cflag (d_Ckeys) ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_Ckeys, graph_slice->nodes);
-			
+			if (dbg_info_on)
+			{
+				printf(":: Generated Ckeys Array using Cflag (d_Ckeys) ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_Ckeys, graph_slice->nodes);
+			}
+
 			// Remove edges using edge mapping to mark -1 in Edges List - EdgeRmFunctor edge mapping
 			// d_edges, d_weights, d_keys, d_flag, d_eId, d_edgeFlag = d_represent[s_id == d_id] ? -1 : old value 
 			queue_index = 0;
@@ -629,28 +653,28 @@ class MSTEnactor : public EnactorBase
 
 			if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
 				"edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-
-			printf(":: Edge Removal (edges) ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
-			printf(":: Edge Removal (keys) ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
-			printf(":: Edge Removal (weights) ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);
-			printf(":: Edge Removal (d_eId) ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_eId, graph_slice->edges);
-			printf(":: Edge Removal (d_edgeFlag) ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_edgeFlag, graph_slice->edges);
-	
-			// Mergesort pairs - 
-			MergesortPairs(problem->data_slices[0]->d_nodes,
-				problem->data_slices[0]->d_Ckeys, graph_slice->nodes, mgpu::less<int>(), context);
 			
-
-			printf(":: Sorted Ckeys matching nodes ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_Ckeys, graph_slice->nodes);			
-			printf(":: Ordered Edge List ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
-			
+			// Mergesort pairs -
+            MergesortPairs(problem->data_slices[0]->d_nodes,
+                problem->data_slices[0]->d_Ckeys, graph_slice->nodes, mgpu::less<int>(), context);
+		
+			if (dbg_info_on)
+			{
+				printf(":: Edge Removal (edges) ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
+				printf(":: Edge Removal (keys) ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
+				printf(":: Edge Removal (weights) ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);
+				printf(":: Edge Removal (d_eId) ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_eId, graph_slice->edges);
+				printf(":: Edge Removal (d_edgeFlag) ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_edgeFlag, graph_slice->edges);
+				printf(":: Sorted Ckeys matching nodes ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_Ckeys, graph_slice->nodes);			
+				printf(":: Ordered Edge List ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
+			}
 
 			// Generate new edge list, keys array and weights list	
 			// Remove "-1" items in edge list using RmFunctor - vertex mapping
@@ -864,13 +888,13 @@ class MSTEnactor : public EnactorBase
 			util::MemsetCopyVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_flag,
 				graph_slice->frontier_queues.d_values[selector^1], graph_slice->edges);
 			
-			printf(" 3.first time reduce edge length, before: Q: %d \n", queue_index);
+			printf("----> 3.first time reduce edge length, before: Q: %d \n", queue_index);
 
 			// Update Length of edges in graph_slice 
 			queue_index++;	
 			if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
 			graph_slice->edges = queue_length;
-			printf(" 3.5 after update length: Q: %d, L: %d\n", queue_index, queue_length);
+			printf("----> 3.5 after update length: Q: %d, L: %d\n", queue_index, queue_length);
 
 			// TODO: Disordered on Midas. Sort to make sure correctness 
 			util::MemsetCopyVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_keysCopy,
@@ -879,15 +903,18 @@ class MSTEnactor : public EnactorBase
 				problem->data_slices[0]->d_eId, graph_slice->edges, mgpu::less<int>(), context);
 			MergesortPairs(problem->data_slices[0]->d_keys,
 				problem->data_slices[0]->d_weights, graph_slice->edges, mgpu::less<int>(), context);
-
-			printf(":: d_edges after first reduction ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
-			printf(":: d_keys after first reduction ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
-			printf(":: d_weights after first reduction ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);	
-			printf(":: d_eId after first reduction ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_eId, graph_slice->edges);
+			
+			if (dbg_info_on)
+			{
+				printf(":: d_edges after first reduction ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
+				printf(":: d_keys after first reduction ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
+				printf(":: d_weights after first reduction ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);	
+				printf(":: d_eId after first reduction ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_eId, graph_slice->edges);
+			}
 
 			// Finding representatives for keys and edges using EdgeRmFunctor - Vertex Mapping 
 			// problem->d_keys[node] = problem->d_Ckeys[problem->d_keys[node]];
@@ -938,15 +965,18 @@ class MSTEnactor : public EnactorBase
 			// Sort eId by keys
 			MergesortPairs(problem->data_slices[0]->d_keysCopy,
 				problem->data_slices[0]->d_eId, graph_slice->edges, mgpu::less<int>(), context);
-			
-			printf(":: Finding representatives (Sorted by keys Edges) ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
-			printf(":: Finding representatives (Sorted by keys Weights) ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);	
-			printf(":: Finding representatives (Sorted by keys eId) ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_eId, graph_slice->edges);
-			
-			printf(" 4.got new keys, edges, weights \n");
+		
+			if (dbg_info_on)
+			{	
+				printf(":: Finding representatives (Sorted by keys Edges) ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
+				printf(":: Finding representatives (Sorted by keys Weights) ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);	
+				printf(":: Finding representatives (Sorted by keys eId) ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_eId, graph_slice->edges);
+			}
+
+			printf("----> 4.got new keys, edges, weights \n");
 			
 			// Calculate the length of New RmFunctor - Vertex List	
 			// d_row_offset already marked "-1" using VlenFunctor 
@@ -984,7 +1014,7 @@ class MSTEnactor : public EnactorBase
 			util::MemsetCopyVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_row_offsets,
 				graph_slice->frontier_queues.d_values[selector^1], graph_slice->nodes);
 			
-			printf(" 5.update vertex list length, before:");
+			printf("----> 5.update vertex list length, before:");
 			printf(" Q: %d, L: %d\n", queue_index, queue_length);
 			
 			// Update vertex length of graph_slice
@@ -992,10 +1022,10 @@ class MSTEnactor : public EnactorBase
 			if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
 			graph_slice->nodes = queue_length;
 			
-			printf(" 6.update #nodes (If only ONE node left, break), Q: %d, L: %d\n", 
+			printf("----> 6.update #nodes (If only ONE node left, break), Q: %d, L: %d\n", 
 				queue_index, graph_slice->nodes);
 			
-			// Break the Loop if only 1 super_vertex left.
+			// Break the Loop if only 1 super_vertex left. -- moved to the end
 			if (graph_slice->nodes == 1) break;
 
 			// Assign row_offsets to vertex list 
@@ -1003,8 +1033,8 @@ class MSTEnactor : public EnactorBase
 			util::markSegment<<<128, 128>>>(problem->data_slices[0]->d_flag,
 				problem->data_slices[0]->d_keys, graph_slice->edges);
 			
-			printf(":: Mark segment to generate Flag Array for next iteration ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_flag, graph_slice->edges);
+			//printf(":: Mark segment to generate Flag Array for next iteration ::");
+			//util::DisplayDeviceResults(problem->data_slices[0]->d_flag, graph_slice->edges);
 			
 			// Generate row_offsets for next iteration using RowOFunctor - vertex mapping
 			// if d_flag[node] == 1: 
@@ -1038,8 +1068,8 @@ class MSTEnactor : public EnactorBase
 			if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
 				"edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
 			
-			printf(":: row_offsets for next iteration ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_row_offsets, graph_slice->nodes);
+			//printf(":: row_offsets ::");
+			//util::DisplayDeviceResults(problem->data_slices[0]->d_row_offsets, graph_slice->nodes);
 			
 			// Removing Duplicated Edges Between Supervertices	
 			// Segmented Sort Edges, Weights and eId
@@ -1053,14 +1083,16 @@ class MSTEnactor : public EnactorBase
 			SegSortPairsFromIndices(problem->data_slices[0]->d_keysCopy, problem->data_slices[0]->d_eId,
                 graph_slice->edges, problem->data_slices[0]->d_row_offsets, graph_slice->nodes, context);
 			
-			
-			printf(":: Removing Duplicated Edges Between Supervertices After SegmentedSort (d_edges) ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
-			printf(":: Removing Duplicated Edges Between Supervertices After SegmentedSort (d_weights) ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);
-			printf(":: Removing Duplicated Edges Between Supervertices After SegmentedSort (d_eId) ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_eId, graph_slice->edges);
-	
+			if (dbg_info_on)
+			{
+				printf(":: Removing Duplicated Edges Between Supervertices After SegmentedSort (d_edges) ::");
+            	util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
+				printf(":: Removing Duplicated Edges Between Supervertices After SegmentedSort (d_weights) ::");
+            	util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);
+				printf(":: Removing Duplicated Edges Between Supervertices After SegmentedSort (d_eId) ::");
+            	util::DisplayDeviceResults(problem->data_slices[0]->d_eId, graph_slice->edges);
+			}
+
 			// Generate new edge flag array using markSegment kernel
             util::MemsetCopyVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_edgeFlag,
                 problem->data_slices[0]->d_flag, graph_slice->edges);
@@ -1100,13 +1132,17 @@ class MSTEnactor : public EnactorBase
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
                 "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;		
 			
-			printf(":: Edge Flag ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_edgeFlag, graph_slice->edges);
-			printf(":: Edge Keys ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_edgeKeys, graph_slice->edges);
-			// printf(":: Old Keys ::");
-            // util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
-			printf(" 7.got edge flag, edge keys\n");
+			if (dbg_info_on)
+			{
+				printf(":: Edge Flag ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_edgeFlag, graph_slice->edges);
+				printf(":: Edge Keys ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_edgeKeys, graph_slice->edges);
+				printf(":: Old Keys ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
+			}
+
+			printf("----> 7.got edge flag, edge keys\n");
 			
 			// Calculate the length of New Edge offset array
 			queue_index  = 0;
@@ -1166,7 +1202,7 @@ class MSTEnactor : public EnactorBase
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
                 "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
 
-			printf(" 8.reduce length of edge offsets \n");
+			printf("----> 8.reduce length of edge offsets \n");
 			// Get edge offset length
 			// int edge_offsets_length;
 			// queue_index++;
@@ -1208,19 +1244,22 @@ class MSTEnactor : public EnactorBase
             // printf(":: Edge_offsets ::");
             // util::DisplayDeviceResults(problem->data_slices[0]->d_edge_offsets, edge_offsets_length);
 		 	
-			printf(" 9.got edge offsets\n");	
+			printf("----> 9.got edge offsets\n");	
 			
 			// Segment Sort weights and eId using edge_offsets
 			SegSortPairsFromIndices(problem->data_slices[0]->d_weights, problem->data_slices[0]->d_eId,
                 graph_slice->edges, problem->data_slices[0]->d_edge_offsets, graph_slice->nodes, context);
 			
-			printf(":: SegmentedSort using edge_offsets (d_edges) ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);	
-			printf(":: SegmentedSort using edge_offsets (d_weights) ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);
-            printf(":: SegmentedSort using edge_offsets (d_eId) ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_eId, graph_slice->edges);	
-			
+			if (dbg_info_on)
+			{
+				printf(":: SegmentedSort using edge_offsets (d_edges) ::");
+            	util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);	
+				printf(":: SegmentedSort using edge_offsets (d_weights) ::");
+            	util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);
+            	printf(":: SegmentedSort using edge_offsets (d_eId) ::");
+            	util::DisplayDeviceResults(problem->data_slices[0]->d_eId, graph_slice->edges);	
+			}			
+
 			// Mark -1 to Edges needed to be removed using edge mapping
             // d_edges, d_weights, d_keys, d_eId = -1 if (d_flag[node] == 0)
 			queue_index = 0;
@@ -1395,13 +1434,13 @@ class MSTEnactor : public EnactorBase
             util::MemsetCopyVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_eId,
                 graph_slice->frontier_queues.d_values[selector^1], graph_slice->edges);
 		   
-		    printf(" 10.second time update edge list length, before: Q: %d, L: %d \n", queue_index, queue_length);
+		    printf("----> 10.second time update edge list length, before: Q: %d, L: %d \n", queue_index, queue_length);
 		    
 			// Update edge length of graph_slice, final edge length for next iteration 
             queue_index++;
             if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
             graph_slice->edges = queue_length;
-		    printf(" 11.updated edges length, Q: %d, L: %d \n", queue_index, graph_slice->edges);
+		    printf("----> 11.updated edges length, Q: %d, L: %d \n", queue_index, graph_slice->edges);
 		   
 		    // TODO: Disordered on Midas
             util::MemsetCopyVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_keysCopy,
@@ -1417,24 +1456,35 @@ class MSTEnactor : public EnactorBase
 		    MergesortPairs(problem->data_slices[0]->d_flag,
                 problem->data_slices[0]->d_edges, graph_slice->edges, mgpu::less<int>(), context);
 
-			printf(":: Final edges for current iteration ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
-            printf(":: Final keys for current iteration ::");
-			util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
-            printf(":: Final weights for current iteration ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);
-            printf(":: Final d_eId for current iteration ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_eId, graph_slice->edges);
+
+			// copy back d_edges back to original column indices in graph_slice
+			util::MemsetCopyVectorKernel<<<128, 128>>>(graph_slice->d_column_indices,
+													   problem->data_slices[0]->d_edges,
+													   graph_slice->edges);
+			
+			if (dbg_info_on)
+			{
+				printf(":: Final edges for current iteration ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_edges, graph_slice->edges);
+				printf(":: check graph_slice d_column_indices ::");
+				util::DisplayDeviceResults(graph_slice->d_column_indices, graph_slice->edges);
+				printf(":: Final keys for current iteration ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_keys, graph_slice->edges);
+				printf(":: Final weights for current iteration ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_weights, graph_slice->edges);
+				printf(":: Final d_eId for current iteration ::");
+				util::DisplayDeviceResults(problem->data_slices[0]->d_eId, graph_slice->edges);
+			}
 
 			// Finding final flag array for next iteration
 			// Generate edge flag array for next iteration using markSegment kernel
             util::markSegment<<<128, 128>>>(problem->data_slices[0]->d_flag,
                 problem->data_slices[0]->d_keys, graph_slice->edges);
 
-			printf(":: Final d_flag for current iteration ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_flag, graph_slice->edges);
+			//printf(":: Final d_flag for current iteration ::");
+            //util::DisplayDeviceResults(problem->data_slices[0]->d_flag, graph_slice->edges);
 			
-			printf(" 12.finish final edges, keys, weights and eId \n");
+			printf("----> 12.finish final edges, keys, weights and eId \n");
 
 			/* Generate row_offsets for next iteration */
             queue_index = 0;
@@ -1465,13 +1515,25 @@ class MSTEnactor : public EnactorBase
 
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
                 "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-
-            printf(":: Final row_offsets for current iteration ::");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_row_offsets, graph_slice->nodes);
 			
+			// copy back to graph_slice d_row_offsets
+			util::MemsetCopyVectorKernel<<<128, 128>>>(graph_slice->d_row_offsets, 
+				problem->data_slices[0]->d_row_offsets, graph_slice->nodes);
+			
+			// Break the Loop if only 1 super_vertex left.
+            // if (graph_slice->nodes == 1) break;
+
 			printf(" <========== End of Iteration.%d, #Nodes Left: %d, #Edges Left: %d\n\n",
 				iteration, graph_slice->nodes, graph_slice->edges);
-			
+
+			// final selected edges for current iteration
+            // printf("\n Selected Edges for current iteration \n");
+            // util::DisplayDeviceResults(problem->data_slices[0]->d_selector, original_edge_length);
+
+            // final number of selected edges
+            int tmp_length = Reduce(problem->data_slices[0]->d_selector, original_edge_length, context);
+            printf(" Number of selected edges so far - %d\n", tmp_length);
+				
 			iteration++;
 			
 			if (INSTRUMENT || DEBUG) 
@@ -1494,14 +1556,14 @@ class MSTEnactor : public EnactorBase
 			// tempIter++;
 			// if (tempIter == 100) break;
         } // Recursive Loop
-
+		
         // final selected edges
-        printf("\n Final Selected Edges \n");
-        util::DisplayDeviceResults(problem->data_slices[0]->d_selector, original_edge_length);
+        // printf("\n----> Minimum Spanning Tree: \n");
+        // util::DisplayDeviceResults(problem->data_slices[0]->d_selector, original_edge_length);
 
         // final number of selected edges
         int final_edge_length = Reduce(problem->data_slices[0]->d_selector, original_edge_length, context);
-        printf(" Number of selected edges - %d\n", final_edge_length);
+        printf("----> Number of edges selected - %d\n", final_edge_length);
 
         // mgpu reduce to calculate total weights
         // int total_weights_gpu = Reduce(problem->data_slices[0]->d_oriWeights, original_edge_length, context);
@@ -1509,7 +1571,7 @@ class MSTEnactor : public EnactorBase
  
         if (retval) break;
 
-        /* Check if any of the frontiers overflowed due to redundant expansion */
+        // Check if any of the frontiers overflowed due to redundant expansion
         bool overflowed = false;
         if (retval = work_progress.CheckOverflow<SizeT>(overflowed)) break;
         if (overflowed) 
@@ -1520,8 +1582,8 @@ class MSTEnactor : public EnactorBase
         }
 	
 	}while(0);
-
-        if (DEBUG) printf(" --- GPU MST Complete --- \n");
+		
+        printf(" --- GPU MST Complete --- \n");
         return retval;
     }
 
