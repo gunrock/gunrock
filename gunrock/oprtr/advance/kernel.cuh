@@ -137,11 +137,13 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
             <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
                                         d_row_offsets,
+                                        d_column_indices,
                                         d_in_key_queue,
                                         partitioned_scanned_edges,
                                         frontier_attribute.queue_length,
                                         max_in,
-                                        max_out);
+                                        max_out,
+                                        ADVANCE_TYPE);
 
             Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
