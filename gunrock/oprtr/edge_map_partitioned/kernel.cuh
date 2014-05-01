@@ -294,9 +294,15 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                     if (!ProblemData::MARK_PREDECESSORS) {
                         if (Functor::CondEdge(label, u, problem, lookup)) {
                             Functor::ApplyEdge(label, u, problem, lookup);
-                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                    u,
-                                    d_out + out_index);
+                            if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        u,
+                                        d_out + out_index); 
+                            } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (VertexId)lookup,
+                                        d_out + out_index);
+                            }
                         }
                         else {
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -306,9 +312,15 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                     } else {
                         if (Functor::CondEdge(v, u, problem, lookup)) {
                             Functor::ApplyEdge(v, u, problem, lookup);
-                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                    u,
-                                    d_out + out_index);
+                            if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        u,
+                                        d_out + out_index); 
+                            } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (VertexId)lookup,
+                                        d_out + out_index);
+                            }
                         }
                         else {
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -434,9 +446,15 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             if (!ProblemData::MARK_PREDECESSORS) {
                 if (Functor::CondEdge(label, u, problem, lookup)) {
                     Functor::ApplyEdge(label, u, problem, lookup);
-                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                            u,
-                            d_out + offset+i);
+                    if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
+                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                u,
+                                d_out + offset+i); 
+                    } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
+                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                (VertexId)lookup,
+                                d_out + offset+i);
+                    }
                 }
                 else {
                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -447,9 +465,15 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 //v:pre, u:neighbor, outoffset:offset+i
                 if (Functor::CondEdge(v, u, problem, lookup)) {
                     Functor::ApplyEdge(v, u, problem, lookup);
-                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                            u,
-                            d_out + offset+i);
+                    if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
+                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                u,
+                                d_out + offset+i); 
+                    } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
+                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                (VertexId)lookup,
+                                d_out + offset+i);
+                    }
                 }
                 else {
                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
