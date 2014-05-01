@@ -673,7 +673,7 @@ __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
     __global__
 void GetEdgeCounts(
                                 typename KernelPolicy::SizeT *d_row_offsets,
-                                VertexId KernelPolicy::VertexId *d_column_indices,
+                                typename KernelPolicy::VertexId *d_column_indices,
                                 typename KernelPolicy::VertexId *d_queue,
                                 unsigned int *d_scanned_edges,
                                 typename KernelPolicy::SizeT num_elements,
