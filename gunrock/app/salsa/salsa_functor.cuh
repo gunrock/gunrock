@@ -106,7 +106,11 @@ struct BackwardFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        atomicAdd(&problem->d_arank_next[s_id], problem->d_hrank_curr[d_id]);
+        Value hrank_dst = problem->d_hrank_curr[d_id] / (problem->d_in_degrees[s_id] * problem->d_out_degrees[d_id]);
+        Value arank_dst = problem->d_arank_curr[d_id] / (problem->d_out_degrees[s_id] * problem->d_in_degrees[d_id]);
+        VertexId v_id = problem->d_column_indices[e_id_in];
+        atomicAdd(&problem->d_hrank_next[v_id], hrank_dst);
+        atomicAdd(&problem->d_arank_next[v_id], arank_dst);
     }
 };
 
