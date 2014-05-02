@@ -49,7 +49,7 @@ class SALSAEnactor : public EnactorBase
      * CTA duty kernel stats
      */
     util::KernelRuntimeStatsLifetime edge_map_kernel_stats;
-    util::KernelRuntimeStatsLifetime vertex_map_kernel_stats;
+    util::KernelRuntimeStatsLifetime filter_kernel_stats;
 
     unsigned long long total_runtimes;              // Total working time by each CTA
     unsigned long long total_lifetimes;             // Total life time of each CTA
@@ -82,47 +82,32 @@ class SALSAEnactor : public EnactorBase
      */
     template <typename ProblemData>
     cudaError_t Setup(
-        ProblemData *problem,
-        int edge_map_grid_size,
-        int vertex_map_grid_size)
+        ProblemData *problem)
     {
         typedef typename ProblemData::SizeT         SizeT;
         typedef typename ProblemData::VertexId      VertexId;
         
         cudaError_t retval = cudaSuccess;
 
+        //initialize the host-mapped "done"
+        if (!done) {
+            int flags = cudaHostAllocMapped;
 
-        do {
-            //initialize the host-mapped "done"
-            if (!done) {
-                int flags = cudaHostAllocMapped;
+            // Allocate pinned memory for done
+            if (retval = util::GRError(cudaHostAlloc((void**)&done, sizeof(int) * 1, flags),
+                        "SALSAEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
 
-                // Allocate pinned memory for done
-                if (retval = util::GRError(cudaHostAlloc((void**)&done, sizeof(int) * 1, flags),
-                    "SALSAEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) break;
+            // Map done into GPU space
+            if (retval = util::GRError(cudaHostGetDevicePointer((void**)&d_done, (void*) done, 0),
+                        "SALSAEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
 
-                // Map done into GPU space
-                if (retval = util::GRError(cudaHostGetDevicePointer((void**)&d_done, (void*) done, 0),
-                    "SALSAEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) break;
+            // Create throttle event
+            if (retval = util::GRError(cudaEventCreateWithFlags(&throttle_event, cudaEventDisableTiming),
+                        "SALSAEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
+        }
 
-                // Create throttle event
-                if (retval = util::GRError(cudaEventCreateWithFlags(&throttle_event, cudaEventDisableTiming),
-                    "SALSAEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) break;
-            }
+        done[0]             = -1; 
 
-            //initialize runtime stats
-            if (retval = edge_map_kernel_stats.Setup(edge_map_grid_size)) break;
-            if (retval = vertex_map_kernel_stats.Setup(vertex_map_grid_size)) break;
-
-            //Reset statistics
-            iteration           = 0;
-            total_runtimes      = 0;
-            total_lifetimes     = 0;
-            total_queued        = 0;
-            done[0]             = -1; 
-
-        } while (0);
-        
         return retval;
     }
 
@@ -152,6 +137,7 @@ class SALSAEnactor : public EnactorBase
                 "SALSAEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
         }
     }
+
     template <typename ProblemData>
     void NormalizeRank(ProblemData *problem, CudaContext &context, int hub_or_auth, int nodes)
     {
@@ -184,8 +170,6 @@ class SALSAEnactor : public EnactorBase
         util::MemsetKernel<<<128, 128>>>(rank_next, (Value)0.0, nodes);
 
         //util::DisplayDeviceResults(rank_curr, nodes);
-
-
     }
 
     /**
@@ -216,8 +200,8 @@ class SALSAEnactor : public EnactorBase
     /**
      * @brief Enacts a SALSA computing on the specified graph.
      *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam VertexMapPolicy Kernel policy for vertex mapping.
+     * @tparam AdvanceKernelPolicy Kernel policy for advance
+     * @tparam FilterKernelPolicy Kernel policy for filter
      * @tparam SALSAProblem SALSA Problem type.
      *
      * @param[in] problem SALSAProblem object.
@@ -227,46 +211,35 @@ class SALSAEnactor : public EnactorBase
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template<
-        typename EdgeMapPolicy,
-        typename VertexMapPolicy,
+        typename AdvanceKernelPolicy,
+        typename FilterKernelPolicy,
         typename SALSAProblem>
     cudaError_t EnactSALSA(
-    CudaContext                        &context,
-    SALSAProblem                          *problem,
-    typename SALSAProblem::SizeT           max_iteration,
+    CudaContext                         &context,
+    SALSAProblem                        *problem,
+    typename SALSAProblem::SizeT        max_iteration,
     int                                 max_grid_size = 0)
     {
         typedef typename SALSAProblem::SizeT       SizeT;
         typedef typename SALSAProblem::VertexId    VertexId;
         typedef typename SALSAProblem::Value       Value;
 
-        typedef HUBFunctor<
+        typedef FORWARDFunctor<
             VertexId,
             SizeT,
             Value,
-            SALSAProblem> HubFunctor;
+            SALSAProblem> ForwardFunctor;
 
-        typedef AUTHFunctor<
+        typedef BACKWARDFunctor<
             VertexId,
             SizeT,
             Value,
-            SALSAProblem> AuthFunctor;
+            SALSAProblem> BackwardFunctor;
 
         cudaError_t retval = cudaSuccess;
 
         do {
-            // Determine grid size(s)
-            int edge_map_occupancy      = EdgeMapPolicy::CTA_OCCUPANCY;
-            int edge_map_grid_size      = MaxGridSize(edge_map_occupancy, max_grid_size);
-
-            int vertex_map_occupancy    = VertexMapPolicy::CTA_OCCUPANCY;
-            int vertex_map_grid_size    = MaxGridSize(vertex_map_occupancy, max_grid_size);
-
             if (DEBUG) {
-                printf("SALSA edge map occupancy %d, level-grid size %d\n",
-                        edge_map_occupancy, edge_map_grid_size);
-                printf("SALSA vertex map occupancy %d, level-grid size %d\n",
-                        vertex_map_occupancy, vertex_map_grid_size);
                 printf("Iteration, Edge map queue, Vertex map queue\n");
                 printf("0");
             }
@@ -274,27 +247,31 @@ class SALSAEnactor : public EnactorBase
             fflush(stdout);
 
             // Lazy initialization
-            if (retval = Setup(problem, edge_map_grid_size, vertex_map_grid_size)) break;
+            if (retval = Setup(problem)) break;
 
-            // Single-gpu graph slice
+            if (retval = EnactorBase::Setup(problem,
+                                            max_grid_size,
+                                            AdvanceKernelPolicy::CTA_OCCUPANCY,
+                                            FilterKernelPolicy::CTA_OCCUPANCY))
+                                            break;
+
+            //graph slice
             typename SALSAProblem::GraphSlice *graph_slice = problem->graph_slices[0];
             typename SALSAProblem::DataSlice *data_slice = problem->d_data_slices[0];
-
-            // Bind row-offsets texture
             cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>(); 
 
-            SizeT queue_length          = graph_slice->nodes;
-            VertexId queue_index        = 0;        // Work queue index
-            int selector                = 0;
-            SizeT num_elements          = graph_slice->nodes;
+            frontier_attribute.queue_length     = graph_slice->nodes;
+            frontier_attribute.queue_index      = 0;
+            frontier_attribute.selector         = 0;
 
-            bool queue_reset = true;
-            int edge_map_queue_len = num_elements;
+            frontier_attribute.queue_reset      = true;
+
+            int edge_map_queue_len = frontier_attribute.queue_length;
 
             // Step through SALSA iterations 
-            while (done[0] < 0) { 
+            while (done[0] < 0) {
 
-                if (retval = util::GRError(cudaBindTexture(
+            if (retval = util::GRError(cudaBindTexture(
                     0,
                     gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
                     graph_slice->d_row_offsets,
@@ -305,23 +282,29 @@ class SALSAEnactor : public EnactorBase
                 if (retval = work_progress.SetQueueLength(queue_index, edge_map_queue_len)) break;
                 //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], edge_map_queue_len);
                 // Edge Map
-                gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, SALSAProblem, HubFunctor>
-                <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
-                    queue_reset,
-                    queue_index,
-                    1,
-                    iteration,
-                    num_elements,
+                gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SALSAProblem, ForwardFunctor>(
                     d_done,
-                    graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
-                    NULL,
-                    graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
-                    graph_slice->d_column_indices,
+                    enactor_stats,
+                    frontier_attribute,
                     data_slice,
+                    (VertexId*)NULL,
+                    (bool*)NULL,
+                    (bool*)NULL,
+                    (unsigned int*)NULL,
+                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector],               //d_in_queue
+                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],             //d_out_queue
+                    (VertexId*)NULL,    //d_pred_in_queue
+                    (VertexId*)NULL,
+                    graph_slice->d_row_offsets,
+                    graph_slice->d_column_indices,
+                    (SizeT*)NULL,
+                    (VertexId*)NULL,
+                    graph_slice->frontier_elements[frontier_attribute.selector],
+                    graph_slice->frontier_elements[frontier_attribute.selector^1],
                     this->work_progress,
-                    graph_slice->frontier_elements[selector],                   // max_in_queue
-                    graph_slice->frontier_elements[selector^1],                 // max_out_queue
-                    this->edge_map_kernel_stats);
+                    context,
+                    gunrock::oprtr::advance::V2E);
+                    
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates  
@@ -340,23 +323,28 @@ class SALSAEnactor : public EnactorBase
                 if (retval = work_progress.SetQueueLength(queue_index, edge_map_queue_len)) break;
                 //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], edge_map_queue_len);
                 // Edge Map
-                gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, SALSAProblem, AuthFunctor>
-                <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
-                    queue_reset,
-                    queue_index,
-                    1,
-                    iteration,
-                    num_elements,
+                gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SALSAProblem, BackwardFunctor>(
                     d_done,
-                    graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
-                    NULL,
-                    graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
-                    graph_slice->d_row_indices,
+                    enactor_stats,
+                    frontier_attribute,
                     data_slice,
+                    (VertexId*)NULL,
+                    (bool*)NULL,
+                    (bool*)NULL,
+                    (unsigned int*)NULL,
+                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
+                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],            // d_out_queue
+                    (VertexId*)NULL,
+                    (VertexId*)NULL,
+                    graph_slice->d_column_offsets,
+                    graph_slice->d_row_indices,
+                    (SizeT*)NULL,
+                    (VertexId*)NULL,
+                    graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
+                    graph_slice->frontier_elements[frontier_attribute.selector^1],                 // max_out_queue
                     this->work_progress,
-                    graph_slice->frontier_elements[selector],                   // max_in_queue
-                    graph_slice->frontier_elements[selector^1],                 // max_out_queue
-                    this->edge_map_kernel_stats);
+                    context,
+                    gunrock::oprtr::advance::E2V);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); 
@@ -365,19 +353,19 @@ class SALSAEnactor : public EnactorBase
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next,graph_slice->nodes);
 
                 if (DEBUG) {
-                    if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-                    printf(", %lld", (long long) queue_length);
+                    if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                    printf(", %lld", (long long)frontier_attribute.queue_length);
                 }
 
                 if (INSTRUMENT) {
-                    if (retval = edge_map_kernel_stats.Accumulate(
-                        edge_map_grid_size,
-                        total_runtimes,
-                        total_lifetimes)) break;
+                    if (retval = enactor_stats.advance_kernel_stats.Accumulate(
+                        enactor_stats.advance_grid_size,
+                        enactor_stats.total_runtimes,
+                        enactor_stats.total_lifetimes)) break;
                 }
 
                 // Throttle
-                if (iteration & 1) {
+                if (enactor_stats.iteration & 1) {
                     if (retval = util::GRError(cudaEventRecord(throttle_event),
                         "SALSAEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
                 } else {
@@ -396,25 +384,15 @@ class SALSAEnactor : public EnactorBase
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_curr,
                 //    graph_slice->nodes); 
 
-                if (INSTRUMENT || DEBUG) {
-                    if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-                    total_queued += queue_length;
-                    if (DEBUG) printf(", %lld", (long long) queue_length);
-                    if (INSTRUMENT) {
-                        if (retval = vertex_map_kernel_stats.Accumulate(
-                            vertex_map_grid_size,
-                            total_runtimes,
-                            total_lifetimes)) break;
-                    }
-                }
+                if (done[0] == 0 || enactor_stats.iteration > max_iteration) break;
 
-                if (done[0] == 0 || iteration > max_iteration) break;
-
-                if (DEBUG) printf("\n%lld", (long long) iteration);
+                if (DEBUG) printf("\n%lld", (long long) enactor_stats.iteration);
 
             }
 
             if (retval) break;
+
+            //Check overflow ignored here
 
         } while(0);
 
@@ -441,12 +419,12 @@ class SALSAEnactor : public EnactorBase
     template <typename SALSAProblem>
     cudaError_t Enact(
         CudaContext                          &context,
-        SALSAProblem                      *problem,
+        SALSAProblem                        *problem,
         typename SALSAProblem::SizeT       max_iteration,
         int                             max_grid_size = 0)
     {
         if (this->cuda_props.device_sm_version >= 300) {
-            typedef gunrock::oprtr::vertex_map::KernelPolicy<
+            typedef gunrock::oprtr::filter::KernelPolicy<
                 SALSAProblem,                         // Problem data type
             300,                                // CUDA_ARCH
             INSTRUMENT,                         // INSTRUMENT
@@ -459,23 +437,26 @@ class SALSAEnactor : public EnactorBase
             5,                                  // LOG_RAKING_THREADS
             5,                                  // END_BITMASK_CULL
             8>                                  // LOG_SCHEDULE_GRANULARITY
-                VertexMapPolicy;
+                FilterKernelPolicy;
 
-            typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
+            typedef gunrock::oprtr::advance::KernelPolicy<
                 SALSAProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 8,                                  // MIN_CTA_OCCUPANCY
                 6,                                  // LOG_THREADS
+                0,                                  // LOG_BLOCKS
+                0,                                  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
                 32,                            // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD
-                7>                                  // LOG_SCHEDULE_GRANULARITY
-                    EdgeMapPolicy;
+                7,                                  // LOG_SCHEDULE_GRANULARITY
+                gunrock::oprtr::advance::TWC_FORWARD>
+                    AdvanceKernelPolicy;
 
-            return EnactSALSA<EdgeMapPolicy, VertexMapPolicy, SALSAProblem>(
+            return EnactSALSA<AdvanceKernelPolicy, FilterKernelPolicy, SALSAProblem>(
                     context, problem, max_iteration, max_grid_size);
         }
 
