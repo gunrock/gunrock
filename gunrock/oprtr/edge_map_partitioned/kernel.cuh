@@ -243,6 +243,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         // smem_storage.s_vertices[NT]
         unsigned int* s_edges = (unsigned int*) &smem_storage.s_edges[0];
         unsigned int* s_vertices = (unsigned int*) &smem_storage.s_vertices[0];
+        unsigned int* s_edge_ids = (unsigned int*) &smem_storage.s_edge_ids[0];
 
         int my_work_size = my_thread_end - my_thread_start;
         int out_offset = bid * partition_size;
@@ -257,10 +258,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             __syncthreads();
 
             s_edges[tid] = (my_start_partition + tid < my_end_partition ? d_scanned_edges[my_start_partition + tid] - pre_offset : max_edges);
-            if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E)
+            if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
                 s_vertices[tid] = my_start_partition + tid < my_end_partition ? d_queue[my_start_partition+tid] : -1;
-            if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E)
+                s_edge_ids[tid] = 0;
+            }
+            if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
                 s_vertices[tid] = my_start_partition + tid < my_end_partition ? d_column_indices[d_queue[my_start_partition+tid]] : -1;
+                s_edge_ids[tid] = my_start_partition + tid < my_end_partition ? d_queue[my_start_partition+tid] : -1;
+            }
 
             int last = my_start_partition + KernelPolicy::THREADS >= my_end_partition ? my_end_partition - my_start_partition - 1 : KernelPolicy::THREADS - 1;
 
@@ -269,6 +274,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             SizeT e_last = min(s_edges[last] - e_offset, my_work_size - edges_processed);
             SizeT v_index = BinarySearch<KernelPolicy::THREADS>(tid+e_offset, s_edges);
             VertexId v = s_vertices[v_index];
+            VertexId e_id = s_edge_ids[v_index];
             SizeT end_last = (v_index < my_end_partition ? s_edges[v_index] : max_edges);
             SizeT internal_offset = v_index > 0 ? s_edges[v_index-1] : 0;
             SizeT lookup_offset = d_row_offsets[v];
@@ -278,10 +284,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 if (i >= end_last)
                 {
                     v_index = BinarySearch<KernelPolicy::THREADS>(i, s_edges);
-                    if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E)
+                    if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
                         v = d_queue[v_index];
-                    if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E)
+                        e_id = 0;
+                    }
+                    if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
                         v = d_column_indices[d_queue[v_index]];
+                        e_id = d_queue[v_index];
+                    }
                     end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_edges);
                     internal_offset = v_index > 0 ? s_edges[v_index-1] : 0;
                     lookup_offset = d_row_offsets[v];
@@ -309,8 +319,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 } else*/
                 {
                     if (!ProblemData::MARK_PREDECESSORS) {
-                        if (Functor::CondEdge(label, u, problem, lookup)) {
-                            Functor::ApplyEdge(label, u, problem, lookup);
+                        if (Functor::CondEdge(label, u, problem, lookup, e_id)) {
+                            Functor::ApplyEdge(label, u, problem, lookup, e_id);
                             if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                         u,
@@ -328,8 +338,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                     d_out + out_index);
                         }
                     } else {
-                        if (Functor::CondEdge(v, u, problem, lookup)) {
-                            Functor::ApplyEdge(v, u, problem, lookup);
+                        if (Functor::CondEdge(v, u, problem, lookup, e_id)) {
+                            Functor::ApplyEdge(v, u, problem, lookup, e_id);
                             if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                         u,
@@ -430,6 +440,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
         unsigned int* s_edges = (unsigned int*) &smem_storage.s_edges[0];
         unsigned int* s_vertices = (unsigned int*) &smem_storage.s_vertices[0];
+        unsigned int* s_edge_ids = (unsigned int*) &smem_storage.s_edge_ids[0];
 
         int offset = (KernelPolicy::THREADS*bid - 1) > 0 ? d_scanned_edges[KernelPolicy::THREADS*bid-1] : 0;
         int end_id = (KernelPolicy::THREADS*(bid+1)) >= range ? range - 1 : KernelPolicy::THREADS*(bid+1) - 1;
@@ -437,18 +448,23 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         end_id = end_id % KernelPolicy::THREADS;
         s_edges[tid] = (my_id < range ? d_scanned_edges[my_id] - offset : max_edges);
 
-        if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E)
+        if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
             s_vertices[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
-        if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E)
+            s_edge_ids[tid] = 0;
+        }
+        if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
             s_vertices[tid] = (my_id < range ? d_column_indices[d_queue[my_id]] : max_vertices);
+            s_edge_ids[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
+        }
 
         __syncthreads();
         unsigned int size = s_edges[end_id];
 
-        VertexId v, e;
+        VertexId v, e, e_id;
 
         int v_index = BinarySearch<KernelPolicy::THREADS>(tid, s_edges);
         v = s_vertices[v_index];
+        e_id = s_edge_ids[v_index];
         int end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
 
         for (int i = tid; i < size; i += KernelPolicy::THREADS)
@@ -457,6 +473,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             {
                 v_index = BinarySearch<KernelPolicy::THREADS>(i, s_edges);
                 v = s_vertices[v_index];
+                e_id = s_edge_ids[v_index];
                 end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
             }
 
@@ -467,8 +484,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             VertexId u = d_column_indices[lookup];
            
             if (!ProblemData::MARK_PREDECESSORS) {
-                if (Functor::CondEdge(label, u, problem, lookup)) {
-                    Functor::ApplyEdge(label, u, problem, lookup);
+                if (Functor::CondEdge(label, u, problem, lookup, e_id)) {
+                    Functor::ApplyEdge(label, u, problem, lookup, e_id);
                     if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                 u,
@@ -487,8 +504,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 }
             } else {
                 //v:pre, u:neighbor, outoffset:offset+i
-                if (Functor::CondEdge(v, u, problem, lookup)) {
-                    Functor::ApplyEdge(v, u, problem, lookup);
+                if (Functor::CondEdge(v, u, problem, lookup, e_id)) {
+                    Functor::ApplyEdge(v, u, problem, lookup, e_id);
                     if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                 u,

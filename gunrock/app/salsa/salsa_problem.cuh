@@ -50,14 +50,14 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER
     struct DataSlice
     {
         // device storage arrays
-        Value   *d_hrank_curr;          /**< Used for ping-pong hub rank value */
-        Value   *d_arank_curr;          /**< Used for ping-pong authority rank value */
-        Value   *d_hrank_next;          /**< Used for ping-pong page rank value */       
-        Value   *d_arank_next;          /**< Used for ping-pong page rank value */
-        VertexId   *d_in_degrees;          /**< Used for keeping in-degree for each vertex */
-        VertexId   *d_out_degrees;         /**< Used for keeping out-degree for each vertex */
-        VertexId    *d_predecessors;     /**< Used for keeping the predecessor for each vertex */
-        SizeT   *d_labels;
+        Value       *d_hrank_curr;          /**< Used for ping-pong hub rank value */
+        Value       *d_arank_curr;          /**< Used for ping-pong authority rank value */
+        Value       *d_hrank_next;          /**< Used for ping-pong page rank value */       
+        Value       *d_arank_next;          /**< Used for ping-pong page rank value */
+        VertexId    *d_in_degrees;          /**< Used for keeping in-degree for each vertex */
+        VertexId    *d_out_degrees;         /**< Used for keeping out-degree for each vertex */
+        VertexId    *d_predecessors;        /**< Used for keeping the predecessor for each vertex */
+        SizeT       *d_labels;
     };
 
     // Members

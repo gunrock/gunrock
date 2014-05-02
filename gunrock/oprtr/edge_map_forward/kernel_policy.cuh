@@ -185,7 +185,7 @@ struct KernelPolicy
         struct State {
 
             // Type describing four shared memory channels per warp for intra-warp communication
-            typedef SizeT                       WarpComm[WARPS][4];
+            typedef SizeT                       WarpComm[WARPS][5];
 
             // Whether or not we overflowed our outgoing frontier
             bool                                overflowed;
@@ -213,8 +213,7 @@ struct KernelPolicy
                                                 - sizeof(State)
                                                 - 128,                                          // Fudge-factor to guarantee occupancy
 
-            SCRATCH_ELEMENT_SIZE            = (ProblemData::MARK_PREDECESSORS) ? sizeof(SizeT) + sizeof(VertexId) : sizeof(SizeT),                 // Both gather offset and predecessor
-
+            SCRATCH_ELEMENT_SIZE            = (ProblemData::MARK_PREDECESSORS) ? sizeof(SizeT) + sizeof(VertexId)*2 : sizeof(SizeT)+sizeof(VertexId),                 // Both gather offset and predecessor
             GATHER_ELEMENTS                 = MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE,
             PARENT_ELEMENTS                 = (ProblemData::MARK_PREDECESSORS) ? GATHER_ELEMENTS : 0,
         };
@@ -229,6 +228,7 @@ struct KernelPolicy
             // Scratch elements
             struct {
                 SizeT                       gather_offsets[GATHER_ELEMENTS];
+                VertexId                    gather_edges[GATHER_ELEMENTS];
                 VertexId                    gather_predecessors[PARENT_ELEMENTS];
             };
         };

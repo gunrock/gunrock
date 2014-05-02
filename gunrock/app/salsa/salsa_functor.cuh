@@ -29,7 +29,7 @@ namespace salsa {
  *
  */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct HUBFunctor
+struct ForwardFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
@@ -43,7 +43,7 @@ struct HUBFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         return true;
     }
@@ -58,9 +58,10 @@ struct HUBFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        atomicAdd(&problem->d_hrank_next[s_id], problem->d_arank_curr[d_id]);
+        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+            s_id, problem->d_predecessors+e_id);
     }
 
 };
@@ -74,7 +75,7 @@ struct HUBFunctor
  *
  */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct AUTHFunctor
+struct BackwardFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
@@ -88,7 +89,7 @@ struct AUTHFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         return true;
     }
@@ -103,7 +104,7 @@ struct AUTHFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         atomicAdd(&problem->d_arank_next[s_id], problem->d_hrank_curr[d_id]);
     }
