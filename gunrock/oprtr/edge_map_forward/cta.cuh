@@ -192,7 +192,7 @@ namespace edge_map_forward {
                                         }
 
                                         if (cta->advance_type == gunrock::oprtr::advance::E2V || cta->advance_type == gunrock::oprtr::advance::E2E) {
-                                            SizeT row_id1 = cta->d_column_indices[row_id];
+                                            SizeT row_id1 = (cta->inverse_graph) ? cta->d_inverse_column_indices[row_id] : cta->d_column_indices[row_id];
                                             row_range.x = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id1);
                                             row_range.y = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id1+1);
                                         }

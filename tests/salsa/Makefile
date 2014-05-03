@@ -67,13 +67,6 @@ ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
 endif
 
-ifeq (,$(findstring 3.0, $(NVCC_VERSION)))
-ifneq ($(abi), 1)
-	# Disable the ABI by default for 3.1+
-	NVCCFLAGS += -Xptxas -abi=no
-endif
-endif
-
 ifeq ($(verbose), 1)
     NVCCFLAGS += -v
 endif

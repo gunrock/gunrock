@@ -91,6 +91,9 @@ struct BACKWARDFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
+
+        VertexId v_id = problem->d_predecessors[e_id_in];
+        printf("s_id: %d, d_id: %d, prev_id: %d\n", s_id, d_id, v_id);
         return true;
     }
 

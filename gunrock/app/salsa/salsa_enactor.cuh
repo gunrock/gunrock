@@ -257,8 +257,6 @@ class SALSAEnactor : public EnactorBase
 
             frontier_attribute.queue_reset      = true;
 
-            int edge_map_queue_len = frontier_attribute.queue_length;
-
             // Step through SALSA iterations 
             while (done[0] < 0) {
 
@@ -270,7 +268,10 @@ class SALSAEnactor : public EnactorBase
                     (graph_slice->nodes + 1) * sizeof(SizeT)),
                         "SALSAEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
 
-                if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, edge_map_queue_len)) break;
+
+                util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], graph_slice->nodes);
+
+                if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
                 //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], edge_map_queue_len);
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SALSAProblem, ForwardFunctor>(
@@ -301,11 +302,7 @@ class SALSAEnactor : public EnactorBase
                 cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates
 
                 frontier_attribute.queue_index++;
-                frontier_attribute.selector^=1;
-
-
-                if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
-                util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
+                frontier_attribute.selector^=1; 
 
                 if (retval = util::GRError(cudaBindTexture(
                     0,
@@ -314,6 +311,11 @@ class SALSAEnactor : public EnactorBase
                     row_offsets_desc,
                     (graph_slice->nodes + 1) * sizeof(SizeT)),
                         "SALSAEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
+
+                
+                frontier_attribute.queue_length     = graph_slice->edges;
+                if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                util::DisplayDeviceResults(problem->data_slices[0]->d_predecessors, graph_slice->edges);
 
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SALSAProblem, BackwardFunctor>(
@@ -332,18 +334,22 @@ class SALSAEnactor : public EnactorBase
                     graph_slice->d_column_offsets,
                     graph_slice->d_row_indices,
                     (SizeT*)NULL,
-                    (VertexId*)NULL,
+                    (VertexId*)graph_slice->d_column_indices,
                     graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
                     graph_slice->frontier_elements[frontier_attribute.selector^1],                 // max_out_queue
                     this->work_progress,
                     context,
-                    gunrock::oprtr::advance::E2V);
+                    gunrock::oprtr::advance::E2V,
+                    true);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event); 
+                cudaEventQuery(throttle_event);
 
+                frontier_attribute.queue_index++;
+                frontier_attribute.selector^=1;
 
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next,graph_slice->nodes);
+                if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
 
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;

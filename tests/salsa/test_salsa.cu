@@ -462,6 +462,8 @@ int main( int argc, char** argv)
         }
 
 		csr.PrintHistogram();
+        csr.DisplayGraph();
+        inv_csr.DisplayGraph();
 
 		    // Run tests
 		    RunTests(csr, inv_csr, args, *context);
