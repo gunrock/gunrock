@@ -158,15 +158,6 @@ class SALSAEnactor : public EnactorBase
         //swap rank_curr and rank_next
         util::MemsetCopyVectorKernel<<<128, 128>>>(rank_curr, rank_next, nodes); 
 
-        //Compute square
-        util::MemsetMultiplyVectorKernel<<<128, 128>>>(rank_next, rank_next, nodes);
-
-        //Compute sum by reduce
-        Value accumulated_rank = Reduce(rank_next, nodes, context);
-        //Compute invsqrt
-        accumulated_rank = 1.0/sqrt(accumulated_rank);
-        util::MemsetScaleKernel<<<128, 128>>>(rank_curr, accumulated_rank, nodes);
-
         util::MemsetKernel<<<128, 128>>>(rank_next, (Value)0.0, nodes);
 
         //util::DisplayDeviceResults(rank_curr, nodes);
@@ -279,8 +270,8 @@ class SALSAEnactor : public EnactorBase
                     (graph_slice->nodes + 1) * sizeof(SizeT)),
                         "SALSAEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
 
-                if (retval = work_progress.SetQueueLength(queue_index, edge_map_queue_len)) break;
-                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], edge_map_queue_len);
+                if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, edge_map_queue_len)) break;
+                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], edge_map_queue_len);
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SALSAProblem, ForwardFunctor>(
                     d_done,
@@ -307,10 +298,14 @@ class SALSAEnactor : public EnactorBase
                     
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates  
+                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates
+
+                frontier_attribute.queue_index++;
+                frontier_attribute.selector^=1;
 
 
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_hrank_next,graph_slice->nodes);
+                if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
 
                 if (retval = util::GRError(cudaBindTexture(
                     0,
@@ -320,8 +315,6 @@ class SALSAEnactor : public EnactorBase
                     (graph_slice->nodes + 1) * sizeof(SizeT)),
                         "SALSAEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
 
-                if (retval = work_progress.SetQueueLength(queue_index, edge_map_queue_len)) break;
-                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], edge_map_queue_len);
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SALSAProblem, BackwardFunctor>(
                     d_done,
@@ -378,13 +371,13 @@ class SALSAEnactor : public EnactorBase
                 NormalizeRank<SALSAProblem>(problem, context, 0, graph_slice->nodes);
                 NormalizeRank<SALSAProblem>(problem, context, 1, graph_slice->nodes); 
                 
-                iteration++; 
+                enactor_stats.iteration++; 
 
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_next,graph_slice->nodes);
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_curr,
                 //    graph_slice->nodes); 
 
-                if (done[0] == 0 || enactor_stats.iteration > max_iteration) break;
+                if (done[0] == 0 || enactor_stats.iteration >= max_iteration) break;
 
                 if (DEBUG) printf("\n%lld", (long long) enactor_stats.iteration);
 

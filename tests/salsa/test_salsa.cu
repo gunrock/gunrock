@@ -31,17 +31,10 @@
 #include <gunrock/app/salsa/salsa_functor.cuh>
 
 // Operator includes
-#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
+#include <gunrock/oprtr/advance/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
 
 #include <moderngpu.cuh>
-
-// boost includes
-#include <boost/config.hpp>
-#include <boost/utility.hpp>
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/page_rank.hpp>
-
 
 using namespace gunrock;
 using namespace gunrock::util;
@@ -182,11 +175,11 @@ void DisplayStats(
 
 
 /******************************************************************************
- * BFS Testing Routines
+ * SALSA Testing Routines
  *****************************************************************************/
 
  /**
-  * @brief A simple CPU-based reference Page Rank implementation.
+  * @brief A simple CPU-based reference SALSA implementation.
   *
   * @tparam VertexId
   * @tparam Value
@@ -209,8 +202,6 @@ void SimpleReferenceSALSA(
     Value                                   *arank,
     SizeT                                   max_iter) 
 {
-    using namespace boost;
-
     //Preparation
     
     //
@@ -254,6 +245,7 @@ void RunTests(
     SizeT max_iter,
     int max_grid_size,
     int num_gpus,
+    double max_queue_sizing,
     CudaContext& context)
 {
     
@@ -368,12 +360,14 @@ void RunTests(
     bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
     int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
+    double              max_queue_sizing    = 1.0;
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("max-iter", max_iter);
 
     g_quick = args.CheckCmdLineFlag("quick");
     g_verbose = args.CheckCmdLineFlag("v");
+    args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
 
     if (instrumented) {
         RunTests<VertexId, Value, SizeT, true>(
@@ -382,6 +376,7 @@ void RunTests(
                         max_iter,
                         max_grid_size,
                         num_gpus,
+                        max_queue_sizing,
                         context);
     } else {
         RunTests<VertexId, Value, SizeT, false>(
@@ -390,6 +385,7 @@ void RunTests(
                         max_iter,
                         max_grid_size,
                         num_gpus,
+                        max_queue_sizing,
                         context);
     }
 }

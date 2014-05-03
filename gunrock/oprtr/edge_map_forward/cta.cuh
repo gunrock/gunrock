@@ -93,6 +93,7 @@ namespace edge_map_forward {
             VertexId                *d_pred_out;                 // Incoming predecessor frontier
             VertexId                *d_out;                     // Outgoing frontier
             VertexId                *d_column_indices;
+            VertexId                *d_inverse_column_indices;
             DataSlice               *problem;                   // Problem Data
 
             // Work progress
@@ -102,6 +103,7 @@ namespace edge_map_forward {
             int                     num_gpus;                   // Number of GPUs
             int                     label;                      // Current label of the frontier
             gunrock::oprtr::advance::TYPE           advance_type;
+            bool                    inverse_graph;
 
             // Operational details for raking grid
             RakingSoaDetails        raking_soa_details;
@@ -249,7 +251,8 @@ namespace edge_map_forward {
                                                 cta->smem_storage.state.warp_comm[0][4] = 0;
                                             }
                                             if (cta->advance_type == gunrock::oprtr::advance::E2V || cta->advance_type == gunrock::oprtr::advance::E2E) {
-                                                cta->smem_storage.state.warp_comm[0][3] = cta->d_column_indices[tile->vertex_id[LOAD][VEC]];
+                                                cta->smem_storage.state.warp_comm[0][3] = cta->inverse_graph ? cta->d_inverse_column_indices[tile->vertex_id[LOAD][VEC]]
+                                                                                                        : cta->d_column_indices[tile->vertex_id[LOAD][VEC]];
                                                 cta->smem_storage.state.warp_comm[0][4] = tile->vertex_id[LOAD][VEC];
                                             }
 
@@ -389,7 +392,8 @@ namespace edge_map_forward {
                                                 cta->smem_storage.state.warp_comm[warp_id][4] = 0;
                                             }
                                             if (cta->advance_type == gunrock::oprtr::advance::E2V || cta->advance_type == gunrock::oprtr::advance::E2E) {
-                                                cta->smem_storage.state.warp_comm[warp_id][3] = cta->d_column_indices[tile->vertex_id[LOAD][VEC]];
+                                                cta->smem_storage.state.warp_comm[warp_id][3] = cta->inverse_graph ? cta->d_inverse_column_indices[tile->vertex_id[LOAD][VEC]]:
+                                                cta->d_column_indices[tile->vertex_id[LOAD][VEC]];
                                                 cta->smem_storage.state.warp_comm[warp_id][4] = tile->vertex_id[LOAD][VEC];
                                             }
                                                 // Unset row length
@@ -506,7 +510,8 @@ namespace edge_map_forward {
                                         cta->smem_storage.gather_offsets[scratch_offset] = tile->row_offset[LOAD][VEC] + tile->row_progress[LOAD][VEC];
                                         if (ProblemData::MARK_PREDECESSORS) {
                                             if (cta->advance_type == gunrock::oprtr::advance::E2V || cta->advance_type == gunrock::oprtr::advance::E2E) {
-                                                cta->smem_storage.gather_predecessors[scratch_offset] = cta->d_column_indices[tile->vertex_id[LOAD][VEC]];
+                                                cta->smem_storage.gather_predecessors[scratch_offset] = cta->inverse_graph ? cta->d_inverse_column_indices[tile->vertex_id[LOAD][VEC]]:
+                                                cta->d_column_indices[tile->vertex_id[LOAD][VEC]];
                                                 cta->smem_storage.gather_edges[scratch_offset] = tile->vertex_id[LOAD][VEC];
                                             }
                                             if (cta->advance_type == gunrock::oprtr::advance::V2V || cta->advance_type == gunrock::oprtr::advance::V2E)
@@ -643,10 +648,12 @@ namespace edge_map_forward {
                     VertexId                    *d_pred_out,
                     VertexId                    *d_out_queue,
                     VertexId                    *d_column_indices,
+                    VertexId                    *d_inverse_column_indices,
                     DataSlice                   *problem,
                     util::CtaWorkProgress       &work_progress,
                     SizeT                       max_out_frontier,
-                    gunrock::oprtr::advance::TYPE ADVANCE_TYPE) :
+                    gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
+                    bool                        inverse_graph) :
 
                 queue_index(queue_index),
                 num_gpus(num_gpus),
@@ -664,10 +671,12 @@ namespace edge_map_forward {
                 d_pred_out(d_pred_out),
                 d_out(d_out_queue),
                 d_column_indices(d_column_indices),
+                d_inverse_column_indices(d_inverse_column_indices),
                 problem(problem),
                 work_progress(work_progress),
                 max_out_frontier(max_out_frontier),
-                advance_type(ADVANCE_TYPE)
+                advance_type(ADVANCE_TYPE),
+                inverse_graph(inverse_graph)
                 {
                     if (threadIdx.x == 0) {
                         smem_storage.state.cta_comm = KernelPolicy::THREADS;

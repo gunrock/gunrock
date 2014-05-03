@@ -29,7 +29,7 @@ namespace salsa {
  *
  */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct ForwardFunctor
+struct FORWARDFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
@@ -75,7 +75,7 @@ struct ForwardFunctor
  *
  */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct BackwardFunctor
+struct BACKWARDFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
