@@ -33,6 +33,7 @@ struct Csr
 {
     SizeT nodes;    /**< Number of nodes in the graph. */
     SizeT edges;    /**< Number of edges in the graph. */
+    SizeT out_nodes; /**< Number of nodes which have outgoing edges. */
 
     VertexId    *column_indices;/**< Column indices corresponding to all the non-zero values in the sparse matrix. */
     SizeT       *row_offsets;   /**< List of indices where each row of the sparse matrix starts. */
@@ -51,6 +52,7 @@ struct Csr
     {
         nodes = 0;
         edges = 0;
+        out_nodes = -1;
         row_offsets = NULL;
         column_indices = NULL;
         edge_values = NULL;
@@ -191,6 +193,16 @@ struct Csr
         time_t mark2 = time(NULL);
         printf("Done converting (%ds).\n", (int) (mark2 - mark1));
         fflush(stdout);
+
+        // Compute out_nodes
+        SizeT out_node = 0;
+        for (SizeT node = 0; node < nodes; node++) {
+            if (row_offsets[node+1] - row_offsets[node] > 0)
+            {
+                ++out_node;
+            }
+        }
+        out_nodes = out_node;
     }
 
     /**

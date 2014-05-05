@@ -183,7 +183,6 @@ namespace edge_map_forward {
 
                                         // Translate vertex-id into local gpu row-id (currently stride of num_gpu)
                                         VertexId row_id = tile->vertex_id[LOAD][VEC] / cta->num_gpus;
-
                                         // Load neighbor row range from d_row_offsets
                                         Vec2SizeT   row_range;
                                         if (cta->advance_type == gunrock::oprtr::advance::V2V || cta->advance_type == gunrock::oprtr::advance::V2E) {

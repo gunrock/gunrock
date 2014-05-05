@@ -465,6 +465,8 @@ int main( int argc, char** argv)
         csr.DisplayGraph();
         inv_csr.DisplayGraph();
 
+        printf("out node:%d, in node:%d\n", csr.out_nodes, inv_csr.out_nodes);
+
 		    // Run tests
 		    RunTests(csr, inv_csr, args, *context);
 

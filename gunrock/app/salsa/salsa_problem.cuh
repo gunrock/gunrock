@@ -68,6 +68,8 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER
     // Size of the graph
     SizeT               nodes;
     SizeT               edges;
+    SizeT               out_nodes;
+    SizeT               in_nodes;
 
     // Selector, which d_rank array stores the final page rank?
     SizeT               selector;
@@ -91,6 +93,8 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER
     SALSAProblem():
     nodes(0),
     edges(0),
+    out_nodes(0),
+    in_nodes(0),
     num_gpus(0) {}
 
     /**
@@ -200,6 +204,8 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER
         num_gpus = _num_gpus;
         nodes = hub_graph.nodes;
         edges = hub_graph.edges;
+        out_nodes = hub_graph.out_nodes;
+        in_nodes = auth_graph.out_nodes;
         SizeT *h_row_offsets = hub_graph.row_offsets;
         VertexId *h_column_indices = hub_graph.column_indices;
         SizeT *h_col_offsets = auth_graph.row_offsets;
@@ -386,8 +392,8 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER
             data_slices[gpu]->d_labels = NULL;
 
             // Initial rank_curr = 0 
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_hrank_curr, (Value)1.0/nodes, nodes);
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_arank_curr, (Value)1.0/nodes, nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_hrank_curr, (Value)1.0/out_nodes, nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_arank_curr, (Value)1.0/in_nodes, nodes);
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_hrank_next, (Value)0, nodes);
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_arank_next, (Value)0, nodes);
 
@@ -409,9 +415,6 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER
         
         // Fillin the initial input_queue for SALSA problem, this needs to be modified
         // in multi-GPU scene
-
-        // Put every vertex in there
-        util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], nodes);
 
         return retval;
     }
