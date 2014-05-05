@@ -44,7 +44,7 @@ struct BFSFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         if (ProblemData::ENABLE_IDEMPOTENCE) {
             return true;
@@ -68,7 +68,7 @@ struct BFSFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         if (ProblemData::ENABLE_IDEMPOTENCE) {
             // do nothing here

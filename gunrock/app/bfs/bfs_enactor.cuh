@@ -42,12 +42,6 @@ class BFSEnactor : public EnactorBase
     // Members
     protected:
 
-    /**
-     * CTA duty kernel stats
-     */
-    util::KernelRuntimeStatsLifetime edge_map_kernel_stats;
-    util::KernelRuntimeStatsLifetime filter_kernel_stats;
-
     unsigned long long total_runtimes;              // Total working time by each CTA
     unsigned long long total_lifetimes;             // Total life time of each CTA
     unsigned long long total_queued;

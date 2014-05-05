@@ -6,30 +6,30 @@
 // ---------------------------------------------------------------- 
 /**
  * @file
- * pr_functor.cuh
+ * salsa_functor.cuh
  *
- * @brief Device functions for PR problem.
+ * @brief Device functions for SALSA problem.
  */
 
 #pragma once
 
 #include <gunrock/app/problem_base.cuh>
-#include <gunrock/app/pr/pr_problem.cuh>
+#include <gunrock/app/salsa/salsa_problem.cuh>
 
 namespace gunrock {
 namespace app {
-namespace pr {
+namespace salsa {
 
 /**
- * @brief Structure contains device functions in PR graph traverse.
+ * @brief Structure contains device functions in SALSA graph traverse.
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam ProblemData         Problem data type which contains data slice for PR problem
+ * @tparam ProblemData         Problem data type which contains data slice for SALSA problem
  *
  */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct PRFunctor
+struct FORWARDFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
@@ -45,7 +45,7 @@ struct PRFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        return (problem->d_degrees[d_id] > 0 && problem->d_degrees[s_id] > 0);
+        return true;
     }
 
     /**
@@ -60,51 +60,22 @@ struct PRFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        atomicAdd(&problem->d_rank_next[d_id], problem->d_rank_curr[s_id]/problem->d_degrees[s_id]);
+        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+            s_id, problem->d_predecessors+e_id);
     }
 
-    /**
-     * @brief Vertex mapping condition function. Check if the Vertex Id is valid (not equal to -1).
-     *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     *
-     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
-     */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
-    {
-        Value delta = problem->d_delta[0];
-        Value nodes = (Value)problem->d_nodes[0];
-        Value threshold = (Value)problem->d_threshold[0];
-        problem->d_rank_next[node] = (delta * problem->d_rank_next[node]) + (1.0-delta);
-        Value diff = fabs(problem->d_rank_next[node] - problem->d_rank_curr[node]);
- 
-        return (diff > threshold);
-    }
-
-    /**
-     * @brief Vertex mapping apply function. Doing nothing for PR problem.
-     *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     *
-     */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
-    {
-        // Doing nothing here
-    }
 };
 
 /**
- * @brief Structure contains device functions to remove zero degree node
+ * @brief Structure contains device functions in SALSA graph traverse.
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam ProblemData         Problem data type which contains data slice for PR problem
+ * @tparam ProblemData         Problem data type which contains data slice for SALSA problem
  *
  */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct RemoveZeroDegreeNodeFunctor
+struct BACKWARDFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
@@ -120,7 +91,10 @@ struct RemoveZeroDegreeNodeFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        return (problem->d_degrees[d_id] == 0);
+
+        VertexId v_id = problem->d_predecessors[e_id_in];
+        printf("s_id: %d, d_id: %d, prev_id: %d\n", s_id, d_id, v_id);
+        return true;
     }
 
     /**
@@ -135,38 +109,15 @@ struct RemoveZeroDegreeNodeFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        atomicAdd(&problem->d_degrees_pong[s_id], -1);
-    }
-
-    /**
-     * @brief Vertex mapping condition function. Check if the Vertex Id is valid (not equal to -1).
-     *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     *
-     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
-     */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
-    {
-        bool valid = (problem->d_degrees[node] == 0);
-        problem->d_degrees_pong[node] = valid ? -1 : problem->d_degrees_pong[node];
-        return (problem->d_degrees[node] > 0);
-    }
-
-    /**
-     * @brief Vertex mapping apply function. Doing nothing for PR problem.
-     *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     *
-     */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
-    {
-        // Doing nothing here
+        Value hrank_dst = problem->d_hrank_curr[d_id] / (problem->d_in_degrees[s_id] * problem->d_out_degrees[d_id]);
+        Value arank_dst = problem->d_arank_curr[d_id] / (problem->d_out_degrees[s_id] * problem->d_in_degrees[d_id]);
+        VertexId v_id = problem->d_predecessors[e_id_in];
+        atomicAdd(&problem->d_hrank_next[v_id], hrank_dst);
+        atomicAdd(&problem->d_arank_next[v_id], arank_dst);
     }
 };
 
-} // pr
+} // salsa
 } // app
 } // gunrock
 

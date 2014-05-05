@@ -42,12 +42,14 @@ struct Sweep
         typename KernelPolicy::VertexId         *&d_pred_out,
         typename KernelPolicy::VertexId         *&d_out_queue,
         typename KernelPolicy::VertexId         *&d_column_indices,
+        typename KernelPolicy::VertexId         *&d_inverse_column_indices,
         typename ProblemData::DataSlice         *&problem,
         typename KernelPolicy::SmemStorage      &smem_storage,
         util::CtaWorkProgress                   &work_progress,
         util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition,
         typename KernelPolicy::SizeT            &max_out_frontier,
-        gunrock::oprtr::advance::TYPE           &ADVANCE_TYPE)
+        gunrock::oprtr::advance::TYPE           &ADVANCE_TYPE,
+        bool                                    &inverse_graph)
         {
             typedef Cta<KernelPolicy, ProblemData, Functor>     Cta;
             typedef typename KernelPolicy::SizeT                SizeT;
@@ -73,10 +75,12 @@ struct Sweep
                 d_pred_out,
                 d_out_queue,
                 d_column_indices,
+                d_inverse_column_indices,
                 problem,
                 work_progress,
                 max_out_frontier,
-                ADVANCE_TYPE);
+                ADVANCE_TYPE,
+                inverse_graph);
 
             // Process full tiles
             while (work_limits.offset < work_limits.guarded_offset) {
@@ -122,12 +126,14 @@ struct Dispatch
         VertexId                    *&d_pred_out,
         VertexId                    *&d_out_queue,
         VertexId                    *&d_column_indices,
+        VertexId                    *&d_inverse_column_indices,
         DataSlice                   *&problem,
         util::CtaWorkProgress       &work_progress,
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
         util::KernelRuntimeStats    &kernel_stats,
-        gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
+        gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
+        bool                        &inverse_graph)
         {
             // empty
         }
@@ -155,12 +161,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         VertexId                    *&d_pred_out,
         VertexId                    *&d_out_queue,
         VertexId                    *&d_column_indices,
+        VertexId                    *&d_inverse_column_indices,
         DataSlice                   *&problem,
         util::CtaWorkProgress       &work_progress,
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
         util::KernelRuntimeStats    &kernel_stats,
-        gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
+        gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
+        bool                        &inverse_graph)
     {
         // Shared storage for the kernel
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
@@ -224,12 +232,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 d_pred_out,
                 d_out_queue, 
                 d_column_indices,
+                d_inverse_column_indices,
                 problem,
                 smem_storage,
                 work_progress,
                 smem_storage.state.work_decomposition,
                 max_out_frontier,
-                ADVANCE_TYPE); 
+                ADVANCE_TYPE,
+                inverse_graph); 
 
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
             kernel_stats.MarkStop();
@@ -276,12 +286,14 @@ void Kernel(
         typename KernelPolicy::VertexId         *d_pred_out,
         typename KernelPolicy::VertexId         *d_out_queue,
         typename KernelPolicy::VertexId         *d_column_indices,
+        typename KernelPolicy::VertexId         *d_inverse_column_indices,
         typename ProblemData::DataSlice         *problem,
         util::CtaWorkProgress                   work_progress,
         typename KernelPolicy::SizeT            max_in_frontier,
         typename KernelPolicy::SizeT            max_out_frontier,
         util::KernelRuntimeStats                kernel_stats,
-        gunrock::oprtr::advance::TYPE           ADVANCE_TYPE = gunrock::oprtr::advance::V2V)
+        gunrock::oprtr::advance::TYPE           ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
+        bool                                    inverse_graph = false)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
             queue_reset,    
@@ -294,12 +306,14 @@ void Kernel(
             d_pred_out,
             d_out_queue,
             d_column_indices,
+            d_inverse_column_indices,
             problem,
             work_progress,
             max_in_frontier,
             max_out_frontier,
             kernel_stats,
-            ADVANCE_TYPE);
+            ADVANCE_TYPE,
+            inverse_graph);
 }
 
 } //edge_map_forward

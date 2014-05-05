@@ -52,7 +52,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             typename KernelPolicy::SizeT            max_out,
             util::CtaWorkProgress                   work_progress,
             CudaContext                             &context,
-            TYPE                      ADVANCE_TYPE)
+            TYPE                                    ADVANCE_TYPE,
+            bool                                    inverse_graph = false)
 {
             
     switch (KernelPolicy::ADVANCE_MODE)
@@ -72,12 +73,14 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     d_out_value_queue,          // d_pred_out_queue
                     d_out_key_queue,            // d_out_queue
                     d_column_indices,
+                    d_row_indices,
                     data_slice,
                     work_progress,
                     max_in,                   // max_in_queue
                     max_out,                 // max_out_queue
                     enactor_stats.advance_kernel_stats,
-                    ADVANCE_TYPE);
+                    ADVANCE_TYPE,
+                    inverse_graph);
             break;
         }
         case TWC_BACKWARD:
@@ -137,11 +140,13 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
             <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
                                         d_row_offsets,
+                                        d_column_indices,
                                         d_in_key_queue,
                                         partitioned_scanned_edges,
                                         frontier_attribute.queue_length,
                                         max_in,
-                                        max_out);
+                                        max_out,
+                                        ADVANCE_TYPE);
 
             Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
@@ -159,6 +164,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         enactor_stats.iteration,
                         d_row_offsets,
                         d_column_indices,
+                        d_row_indices,
                         partitioned_scanned_edges,
                         d_done,
                         d_in_key_queue,
@@ -170,7 +176,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         max_out,
                         work_progress,
                         enactor_stats.advance_kernel_stats,
-                        ADVANCE_TYPE);
+                        ADVANCE_TYPE,
+                        inverse_graph);
             }
             //else
             /*{
@@ -191,6 +198,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         enactor_stats.iteration,
                                         d_row_offsets,
                                         d_column_indices,
+                                        d_row_indices,
                                         partitioned_scanned_edges,
                                         enactor_stats.d_node_locks_out,
                                         KernelPolicy::LOAD_BALANCED::BLOCKS,
@@ -205,7 +213,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         max_out,
                                         work_progress,
                                         enactor_stats.advance_kernel_stats,
-                                        ADVANCE_TYPE);
+                                        ADVANCE_TYPE,
+                                        inverse_graph);
             }*/
             break;
         }
