@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------- 
 /**
  * @file
- * pr_functor.cuh
+ * hits_functor.cuh
  *
  * @brief Device functions for HITS problem.
  */
@@ -60,7 +60,9 @@ struct HUBFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
-        atomicAdd(&problem->d_hrank_next[s_id], problem->d_arank_curr[d_id]);
+        Value val = (s_id == problem->d_src_node ? problem->d_delta/problem->d_out_degrees[s_id] : 0)
+                  + (1-problem->d_delta)*problem->d_arank_curr[d_id]/problem->d_in_degrees[d_id];
+        atomicAdd(&problem->d_hrank_next[s_id], val);
     }
 
 };
@@ -105,7 +107,7 @@ struct AUTHFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
     {
-        atomicAdd(&problem->d_arank_next[s_id], problem->d_hrank_curr[d_id]);
+        atomicAdd(&problem->d_arank_next[d_id], problem->d_hrank_curr[s_id]/problem->d_out_degrees[s_id]);
     }
 };
 
