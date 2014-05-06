@@ -104,11 +104,7 @@ test: bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
 bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_bfs.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-<<<<<<< HEAD
 	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_bfs.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3  
-=======
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_bfs.cu $(NVCCFLAGS) $(ARCH) $(INC) -O3  
->>>>>>> 3cac64d... Added HITS algorithm graph primitive. Will test it tmr.
 
 #-------------------------------------------------------------------------------
 # Clean

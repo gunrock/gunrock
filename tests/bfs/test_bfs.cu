@@ -611,11 +611,7 @@ int main( int argc, char** argv)
 		csr.PrintHistogram();
 
 		// Run tests
-<<<<<<< HEAD
 		RunTests(csr, args, *context);
-=======
-		RunTests(csr, args);
->>>>>>> 3cac64d... Added HITS algorithm graph primitive. Will test it tmr.
 
     } else {
 
