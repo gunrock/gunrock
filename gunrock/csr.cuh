@@ -188,6 +188,8 @@ struct Csr
             row_offsets[row] = real_edge;
         }
 
+        edges = real_edge;
+
         if (new_coo) free(new_coo);
 
         time_t mark2 = time(NULL);
@@ -266,7 +268,7 @@ struct Csr
                  edge++) {
                 util::PrintValue(column_indices[edge]);
                 if (with_edge_value)
-                    printf(":%d, ", edge_values[edge]);
+                    util::PrintValue(edge_values[edge]);
                 else
                     printf(", ");
             }

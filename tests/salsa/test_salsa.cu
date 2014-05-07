@@ -296,7 +296,7 @@ void RunTests(
         // Perform BFS
         GpuTimer gpu_timer;
 
-        util::GRError(csr_problem->Reset(salsa_enactor.GetFrontierType()), "SALSA Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(csr_problem->Reset(salsa_enactor.GetFrontierType(), 200.0), "SALSA Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
         util::GRError(salsa_enactor.template Enact<Problem>(context, csr_problem, max_iter, max_grid_size), "SALSA Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();

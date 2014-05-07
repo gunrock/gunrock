@@ -351,7 +351,7 @@ struct ProblemBase
      */
     cudaError_t Reset(
         FrontierType frontier_type,     // The frontier type (i.e., edge/vertex/mixed)
-        double queue_sizing)            // Size scaling factor for work queue allocation
+        double queue_sizing = 2.0)            // Size scaling factor for work queue allocation
         {
             cudaError_t retval = cudaSuccess;
 
@@ -377,7 +377,7 @@ struct ProblemBase
 
                     case EDGE_FRONTIERS :
                         // O(m) ping-pong global edge frontiers
-                        new_frontier_elements[0] = double(graph_slices[gpu]->edges) * queue_sizing;
+                        new_frontier_elements[0] = double(graph_slices[gpu]->edges > graph_slices[gpu]->nodes ? graph_slices[gpu]->edges : graph_slices[gpu]->nodes) * queue_sizing;
                         new_frontier_elements[1] = new_frontier_elements[0];
                         break;
 

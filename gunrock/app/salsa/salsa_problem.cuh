@@ -56,7 +56,8 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER
         Value       *d_arank_next;          /**< Used for ping-pong page rank value */
         VertexId    *d_in_degrees;          /**< Used for keeping in-degree for each vertex */
         VertexId    *d_out_degrees;         /**< Used for keeping out-degree for each vertex */
-        VertexId    *d_predecessors;        /**< Used for keeping the predecessor for each vertex */
+        VertexId    *d_hub_predecessors;        /**< Used for keeping the predecessor for each vertex */
+        VertexId    *d_auth_predecessors;        /**< Used for keeping the predecessor for each vertex */
         SizeT       *d_labels;
     };
 
@@ -132,7 +133,8 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER
             if (data_slices[i]->d_arank_next)      util::GRError(cudaFree(data_slices[i]->d_arank_next), "GpuSlice cudaFree d_rank[1] failed", __FILE__, __LINE__);
             if (data_slices[i]->d_in_degrees)      util::GRError(cudaFree(data_slices[i]->d_in_degrees), "GpuSlice cudaFree d_in_degrees failed", __FILE__, __LINE__);
             if (data_slices[i]->d_out_degrees)      util::GRError(cudaFree(data_slices[i]->d_out_degrees), "GpuSlice cudaFree d_out_degrees failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_predecessors)      util::GRError(cudaFree(data_slices[i]->d_predecessors), "GpuSlice cudaFree d_predecessors failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_hub_predecessors)      util::GRError(cudaFree(data_slices[i]->d_hub_predecessors), "GpuSlice cudaFree d_hub_predecessors failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_auth_predecessors)      util::GRError(cudaFree(data_slices[i]->d_auth_predecessors), "GpuSlice cudaFree d_auth_predecessors failed", __FILE__, __LINE__);
             if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
         }
         if (d_data_slices)  delete[] d_data_slices;
@@ -278,12 +280,19 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER
                     "PRProblem cudaMalloc d_degrees failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_in_degrees = d_in_degrees;
 
-                VertexId   *d_predecessors;
+                VertexId   *d_hub_predecessors;
                     if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_predecessors,
+                        (void**)&d_hub_predecessors,
                         edges * sizeof(VertexId)),
-                    "PRProblem cudaMalloc d_predecessors failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_predecessors = d_predecessors;
+                    "PRProblem cudaMalloc d_hub_predecessors failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_hub_predecessors = d_hub_predecessors;
+
+                VertexId   *d_auth_predecessors;
+                    if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_auth_predecessors,
+                        edges * sizeof(VertexId)),
+                    "PRProblem cudaMalloc d_auth_predecessors failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_auth_predecessors = d_auth_predecessors;
 
                 VertexId   *d_out_degrees;
                     if (retval = util::GRError(cudaMalloc(
@@ -310,11 +319,12 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER
      *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Reset(
-            FrontierType frontier_type)             // The frontier type (i.e., edge/vertex/mixed)
+            FrontierType frontier_type,
+            double queue_sizing = 1.0)             // The frontier type (i.e., edge/vertex/mixed)
     {
         typedef ProblemBase<VertexId, SizeT, false> BaseProblem;
         //load ProblemBase Reset
-        BaseProblem::Reset(frontier_type, 1.0f); // Default queue sizing is 1.0
+        BaseProblem::Reset(frontier_type, queue_sizing); // Default queue sizing is 1.0
 
         cudaError_t retval = cudaSuccess;
 
@@ -370,13 +380,22 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER
                 data_slices[gpu]->d_in_degrees = d_in_degrees;
             }
 
-            if (!data_slices[gpu]->d_predecessors) {
-                VertexId   *d_predecessors;
+            if (!data_slices[gpu]->d_hub_predecessors) {
+                VertexId   *d_hub_predecessors;
                 if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_predecessors,
+                                (void**)&d_hub_predecessors,
                                 edges * sizeof(VertexId)),
-                            "PRProblem cudaMalloc d_predecessors failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_predecessors = d_predecessors;
+                            "PRProblem cudaMalloc d_hub_predecessors failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_hub_predecessors = d_hub_predecessors;
+            }
+
+            if (!data_slices[gpu]->d_auth_predecessors) {
+                VertexId   *d_auth_predecessors;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_auth_predecessors,
+                                edges * sizeof(VertexId)),
+                            "PRProblem cudaMalloc d_auth_predecessors failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_auth_predecessors = d_auth_predecessors;
             }
 
             // Allocate d_degrees if necessary
@@ -402,7 +421,8 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER
             util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_out_degrees, BaseProblem::graph_slices[gpu]->d_row_offsets, &BaseProblem::graph_slices[gpu]->d_row_offsets[1], -1, nodes);
             util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_in_degrees, BaseProblem::graph_slices[gpu]->d_column_offsets, &BaseProblem::graph_slices[gpu]->d_column_offsets[1], -1, nodes);
 
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_predecessors, -1, edges);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_hub_predecessors, -1, edges);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_auth_predecessors, -1, edges);
             
             if (retval = util::GRError(cudaMemcpy(
                             d_data_slices[gpu],

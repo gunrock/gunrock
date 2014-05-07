@@ -185,13 +185,14 @@ namespace edge_map_forward {
                                         VertexId row_id = tile->vertex_id[LOAD][VEC] / cta->num_gpus;
                                         // Load neighbor row range from d_row_offsets
                                         Vec2SizeT   row_range;
+                                        SizeT       row_id1;
                                         if (cta->advance_type == gunrock::oprtr::advance::V2V || cta->advance_type == gunrock::oprtr::advance::V2E) {
                                             row_range.x = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id);
                                             row_range.y = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id + 1);
                                         }
 
                                         if (cta->advance_type == gunrock::oprtr::advance::E2V || cta->advance_type == gunrock::oprtr::advance::E2E) {
-                                            SizeT row_id1 = (cta->inverse_graph) ? cta->d_inverse_column_indices[row_id] : cta->d_column_indices[row_id];
+                                            row_id1 = (cta->inverse_graph) ? cta->d_inverse_column_indices[row_id] : cta->d_column_indices[row_id];
                                             row_range.x = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id1);
                                             row_range.y = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id1+1);
                                         }
@@ -199,6 +200,7 @@ namespace edge_map_forward {
                                         // compute row offset and length
                                         tile->row_offset[LOAD][VEC] = row_range.x;
                                         tile->row_length[LOAD][VEC] = row_range.y - row_range.x;
+
                                     }
 
                                     tile->fine_row_rank[LOAD][VEC] = (tile->row_length[LOAD][VEC] < KernelPolicy::WARP_GATHER_THRESHOLD) ?
@@ -393,6 +395,7 @@ namespace edge_map_forward {
                                             if (cta->advance_type == gunrock::oprtr::advance::E2V || cta->advance_type == gunrock::oprtr::advance::E2E) {
                                                 cta->smem_storage.state.warp_comm[warp_id][3] = cta->inverse_graph ? cta->d_inverse_column_indices[tile->vertex_id[LOAD][VEC]]:
                                                 cta->d_column_indices[tile->vertex_id[LOAD][VEC]];
+
                                                 cta->smem_storage.state.warp_comm[warp_id][4] = tile->vertex_id[LOAD][VEC];
                                             }
                                                 // Unset row length
@@ -509,8 +512,8 @@ namespace edge_map_forward {
                                         cta->smem_storage.gather_offsets[scratch_offset] = tile->row_offset[LOAD][VEC] + tile->row_progress[LOAD][VEC];
                                         if (ProblemData::MARK_PREDECESSORS) {
                                             if (cta->advance_type == gunrock::oprtr::advance::E2V || cta->advance_type == gunrock::oprtr::advance::E2E) {
-                                                cta->smem_storage.gather_predecessors[scratch_offset] = cta->inverse_graph ? cta->d_inverse_column_indices[tile->vertex_id[LOAD][VEC]]:
-                                                cta->d_column_indices[tile->vertex_id[LOAD][VEC]];
+                                                cta->smem_storage.gather_predecessors[scratch_offset] = cta->inverse_graph ? cta->d_inverse_column_indices[tile->vertex_id[LOAD][VEC]]: cta->d_column_indices[tile->vertex_id[LOAD][VEC]];
+
                                                 cta->smem_storage.gather_edges[scratch_offset] = tile->vertex_id[LOAD][VEC];
                                             }
                                             if (cta->advance_type == gunrock::oprtr::advance::V2V || cta->advance_type == gunrock::oprtr::advance::V2E)
@@ -795,8 +798,9 @@ namespace edge_map_forward {
                         VertexId edge_id;
                         if (advance_type == gunrock::oprtr::advance::V2E || advance_type == gunrock::oprtr::advance::V2V)
                             edge_id = 0;
-                        if (advance_type == gunrock::oprtr::advance::E2E || advance_type == gunrock::oprtr::advance::E2V)
+                        if (advance_type == gunrock::oprtr::advance::E2E || advance_type == gunrock::oprtr::advance::E2V) {
                             edge_id = smem_storage.gather_offsets[scratch_offset];
+                        }
                         if (Functor::CondEdge(predecessor_id, neighbor_id, problem, smem_storage.gather_offsets[scratch_offset], edge_id)) {
                             Functor::ApplyEdge(predecessor_id, neighbor_id, problem, smem_storage.gather_offsets[scratch_offset], edge_id);
                             if (advance_type == gunrock::oprtr::advance::V2E || advance_type == gunrock::oprtr::advance::E2E)
