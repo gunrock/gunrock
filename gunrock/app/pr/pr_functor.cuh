@@ -74,9 +74,9 @@ struct PRFunctor
     static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
         Value delta = problem->d_delta[0];
-        Value nodes = (Value)problem->d_nodes[0];
+        VertexId src_node = problem->d_src_node[0];
         Value threshold = (Value)problem->d_threshold[0];
-        problem->d_rank_next[node] = (delta * problem->d_rank_next[node]) + (1.0-delta);
+        problem->d_rank_next[node] = (delta * problem->d_rank_next[node]) + (1.0-delta) * ((src_node == node || src_node == -1) ? 1 : 0);
         Value diff = fabs(problem->d_rank_next[node] - problem->d_rank_curr[node]);
  
         return (diff > threshold);

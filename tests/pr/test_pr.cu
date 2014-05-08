@@ -31,7 +31,7 @@
 #include <gunrock/app/pr/pr_functor.cuh>
 
 // Operator includes
-#include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
+#include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
 
 #include <moderngpu.cuh>
@@ -278,6 +278,7 @@ template <
     bool INSTRUMENT>
 void RunTests(
     const Csr<VertexId, Value, SizeT> &graph,
+    VertexId src,
     Value delta,
     Value error,
     SizeT max_iter,
@@ -314,7 +315,7 @@ void RunTests(
         // Perform BFS
         GpuTimer gpu_timer;
 
-        util::GRError(csr_problem->Reset(delta, error, pr_enactor.GetFrontierType()), "pr Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(csr_problem->Reset(src, delta, error, pr_enactor.GetFrontierType()), "pr Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
         util::GRError(pr_enactor.template Enact<Problem>(context, csr_problem, max_iter, max_grid_size), "pr Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
@@ -399,11 +400,13 @@ void RunTests(
     bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
     int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
+    VertexId            src                 = -1;
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("delta", delta);
     args.GetCmdLineArgument("error", error);
     args.GetCmdLineArgument("max-iter", max_iter);
+    args.GetCmdLineArgument("src", src);
 
     g_quick = args.CheckCmdLineFlag("quick");
     g_verbose = args.CheckCmdLineFlag("v");
@@ -411,6 +414,7 @@ void RunTests(
     if (instrumented) {
         RunTests<VertexId, Value, SizeT, true>(
                         graph,
+                        src,
                         delta,
                         error,
                         max_iter,
@@ -420,6 +424,7 @@ void RunTests(
     } else {
         RunTests<VertexId, Value, SizeT, false>(
                         graph,
+                        src,
                         delta,
                         error,
                         max_iter,
