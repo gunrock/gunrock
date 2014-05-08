@@ -315,11 +315,12 @@ struct HITSProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
     cudaError_t Reset(
             VertexId        src,
             Value           delta,
-            FrontierType    frontier_type)             // The frontier type (i.e., edge/vertex/mixed)
+            FrontierType    frontier_type,
+            double queue_sizing = 1.0)             // The frontier type (i.e., edge/vertex/mixed)
     {
         typedef ProblemBase<VertexId, SizeT, false> BaseProblem;
         //load ProblemBase Reset
-        BaseProblem::Reset(frontier_type, 1.0f); // Default queue sizing is 1.0
+        BaseProblem::Reset(frontier_type, queue_sizing); // Default queue sizing is 1.0
 
         cudaError_t retval = cudaSuccess;
 
@@ -395,7 +396,7 @@ struct HITSProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
             }
 
             if (!data_slices[gpu]->d_src_node) {
-                Value    *d_src_node;
+                VertexId    *d_src_node;
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_src_node,
                                 1 * sizeof(VertexId)),
@@ -415,6 +416,7 @@ struct HITSProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_in_degrees, 0, nodes);
             util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_out_degrees, BaseProblem::graph_slices[gpu]->d_row_offsets, &BaseProblem::graph_slices[gpu]->d_row_offsets[1], -1, nodes);
             util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_in_degrees, BaseProblem::graph_slices[gpu]->d_column_offsets, &BaseProblem::graph_slices[gpu]->d_column_offsets[1], -1, nodes);
+            util::DisplayDeviceResults(data_slices[gpu]->d_out_degrees, nodes);
             
             if (retval = util::GRError(cudaMemcpy(
                             d_data_slices[gpu],
@@ -434,6 +436,13 @@ struct HITSProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
                         sizeof(Value),
                         cudaMemcpyHostToDevice),
                     "BFSProblem cudaMemcpy d_hrank_curr[src] failed", __FILE__, __LINE__)) return retval;
+
+        if (retval = util::GRError(cudaMemcpy(
+                        data_slices[0]->d_delta,
+                        &delta,
+                        sizeof(Value),
+                        cudaMemcpyHostToDevice),
+                    "BFSProblem cudaMemcpy d_delta failed", __FILE__, __LINE__)) return retval;
 
         if (retval = util::GRError(cudaMemcpy(
                             data_slices[0]->d_src_node,

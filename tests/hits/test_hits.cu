@@ -31,17 +31,10 @@
 #include <gunrock/app/hits/hits_functor.cuh>
 
 // Operator includes
-#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
+#include <gunrock/oprtr/advance/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
 
 #include <moderngpu.cuh>
-
-// boost includes
-#include <boost/config.hpp>
-#include <boost/utility.hpp>
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/page_rank.hpp>
-
 
 using namespace gunrock;
 using namespace gunrock::util;
@@ -209,7 +202,7 @@ void SimpleReferenceHITS(
     Value                                   *arank,
     SizeT                                   max_iter) 
 {
-    using namespace boost;
+    //using namespace boost;
 
     //Preparation
     
@@ -251,6 +244,8 @@ template <
 void RunTests(
     const Csr<VertexId, Value, SizeT> &graph,
     const Csr<VertexId, Value, SizeT> &inv_graph,
+    VertexId src,
+    Value delta,
     SizeT max_iter,
     int max_grid_size,
     int num_gpus,
@@ -304,7 +299,7 @@ void RunTests(
         // Perform BFS
         GpuTimer gpu_timer;
 
-        util::GRError(csr_problem->Reset(hits_enactor.GetFrontierType()), "HITS Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(csr_problem->Reset(src, delta, hits_enactor.GetFrontierType()), "HITS Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
         util::GRError(hits_enactor.template Enact<Problem>(context, csr_problem, max_iter, max_grid_size), "HITS Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
@@ -364,13 +359,17 @@ void RunTests(
     CommandLineArgs &args,
     CudaContext& context)
 {
-    SizeT               max_iter            = 20;
+    Value               delta               = 0.2f;
+    VertexId            src                 = 0;
+    SizeT               max_iter            = 1;
     bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
     int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
 
     instrumented = args.CheckCmdLineFlag("instrumented");
+    args.GetCmdLineArgument("delta", delta);
     args.GetCmdLineArgument("max-iter", max_iter);
+    args.GetCmdLineArgument("src", src);
 
     g_quick = args.CheckCmdLineFlag("quick");
     g_verbose = args.CheckCmdLineFlag("v");
@@ -379,6 +378,8 @@ void RunTests(
         RunTests<VertexId, Value, SizeT, true>(
                         graph,
                         inv_graph,
+                        src,
+                        delta,
                         max_iter,
                         max_grid_size,
                         num_gpus,
@@ -387,6 +388,8 @@ void RunTests(
         RunTests<VertexId, Value, SizeT, false>(
                         graph,
                         inv_graph,
+                        src,
+                        delta,
                         max_iter,
                         max_grid_size,
                         num_gpus,
@@ -466,6 +469,8 @@ int main( int argc, char** argv)
         }
 
 		csr.PrintHistogram();
+        csr.DisplayGraph();
+        inv_csr.DisplayGraph();
 
 		    // Run tests
 		    RunTests(csr, inv_csr, args, *context);
