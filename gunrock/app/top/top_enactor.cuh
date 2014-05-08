@@ -51,8 +51,8 @@ class topEnactor : public EnactorBase
     util::KernelRuntimeStatsLifetime edge_map_kernel_stats;
     util::KernelRuntimeStatsLifetime vertex_map_kernel_stats;
 
-    unsigned long long total_runtimes;              // Total working time by each CTA
-    unsigned long long total_lifetimes;             // Total life time of each CTA
+    unsigned long long total_runtimes;  // Total working time by each CTA
+    unsigned long long total_lifetimes; // Total life time of each CTA
     unsigned long long total_queued;
 
     /**
@@ -226,6 +226,7 @@ class topEnactor : public EnactorBase
     {
         typedef typename TOPProblem::SizeT      SizeT;
         typedef typename TOPProblem::VertexId   VertexId;
+        
         /*
         typedef TOPFunctor<
             VertexId,
@@ -233,11 +234,26 @@ class topEnactor : public EnactorBase
             VertexId,
             TOPProblem> TopFunctor;
         */
+        
         cudaError_t retval = cudaSuccess;
 
         do {
             // Add Enactor Code here
-            // 
+            //
+            printf("data_slices[0] d_node_id");
+            util::DisplayDeviceResults(problem->data_slices[0]->d_node_id, graph_slice->nodes);
+            printf("data_slices[0] d_degrees");
+            util::DisplayDeviceResults(problem->data_slices[0]->d_degrees, graph_slice->nodes);
+        
+            // sort by key using mgpu
+            MergesortPairs(problem->data_slices[0]->d_degrees,
+                problem->data_slices[0]->d_node_id, mgpu::less<int>(), context);
+
+            printf("sorted data_slices[0] d_node_id");
+            util::DisplayDeviceResults(problem->data_slices[0]->d_node_id, graph_slice->nodes);
+            printf("sorted data_slices[0] d_degrees");
+            util::DisplayDeviceResults(problem->data_slices[0]->d_degrees, graph_slice->nodes);
+
         }while(0);
 
         if (DEBUG) printf("\n ----- GPU TOP Done ----- \n");

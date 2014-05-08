@@ -159,8 +159,7 @@ void RunTests(
     typedef TOPProblem<
         VertexId,
         SizeT,
-        Value,
-		true> Problem;
+        Value> Problem;
 	
 	/* INSTRUMENT specifies whether we want to keep such statistical data */
     // Allocate TOP enactor map 

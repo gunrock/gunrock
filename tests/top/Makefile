@@ -107,11 +107,11 @@ DEPS = 			./Makefile \
 # (make test) Test driver for 
 #-------------------------------------------------------------------------------
 
-test: bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX)
+test: bin/test_top_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_mst.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/test_top_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_top.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_mst.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3  
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_top_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_top.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3  
 
 #-------------------------------------------------------------------------------
 # Clean

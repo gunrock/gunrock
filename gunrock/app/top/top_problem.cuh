@@ -49,8 +49,10 @@ struct TOPProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
     struct DataSlice
     {
         // device storage arrays
-        SizeT   *d_labels;
-        Value   *d_weights;
+        SizeT       *d_labels;
+        VertexId    *d_node_id;
+        Value       *d_degrees;
+
     };
 
     // Members
@@ -114,8 +116,9 @@ struct TOPProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
             if (util::GRError(cudaSetDevice(gpu_idx[i]),
                 "~TOPProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
 
-            if (data_slices[i]->d_weights)  util::GRError(cudaFree(data_slices[i]->d_weights), 
-                "GpuSlice cudaFree d_labels failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_degrees)  util::GRError(cudaFree(data_slices[i]->d_degrees), 
+                "GpuSlice cudaFree d_degrees failed", __FILE__, __LINE__);
+
             if (d_data_slices[i])   util::GRError(cudaFree(d_data_slices[i]), 
                 "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
         }
@@ -215,13 +218,19 @@ struct TOPProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                     "TOPProblem cudaMalloc d_data_slices failed", __FILE__, __LINE__)) return retval;
 
                 // Create SoA on device
-                Value    *d_weights;
+                VertexId    *d_node_id;
                 if (retval = util::GRError(cudaMalloc(
-                    (void**)&d_weights,
-                    edges * sizeof(Value)),
-                    "TOPProblem cudaMalloc d_weights failed", __FILE__, __LINE__)) return retval;
+                    (void**)&d_degrees,
+                    nodes * sizeof(Value)),
+                    "TOPProblem cudaMalloc d_degrees failed", __FILE__, __LINE__)) return retval;
 
-                data_slices[0]->d_weights = NULL;
+                Value    *d_degrees;
+                if (retval = util::GRError(cudaMalloc(
+                    (void**)&d_degrees,
+                    nodes * sizeof(Value)),
+                    "TOPProblem cudaMalloc d_degrees failed", __FILE__, __LINE__)) return retval;
+
+                data_slices[0]->d_degrees = NULL;
                 data_slices[0]->d_labels  = NULL;
 
             }
@@ -254,15 +263,24 @@ struct TOPProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
             if (retval = util::GRError(cudaSetDevice(gpu_idx[gpu]),
                 "TOPProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
 
-            // Allocate output page ranks if necessary
-            if (!data_slices[gpu]->d_weights) {
-                Value    *d_weights;
+            // Allocate output if necessary
+            if (!data_slices[gpu]->d_node_id) {
+                VertexId    *d_node_id;
                 if (retval = util::GRError(cudaMalloc(
-                    (void**)&d_weights,
-                    edges * sizeof(Value)),
-                    "TOPProblem cudaMalloc d_weights failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_weights = d_weights;
-            } 
+                    (void**)&d_node_id,
+                    nodes * sizeof(Value)),
+                    "TOPProblem cudaMalloc d_node_id failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_node_id = d_node_id;
+            }
+
+            if (!data_slices[gpu]->d_degrees) {
+                Value    *d_degrees;
+                if (retval = util::GRError(cudaMalloc(
+                    (void**)&d_degrees,
+                    nodes * sizeof(Value)),
+                    "TOPProblem cudaMalloc d_degrees failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_degrees = d_degrees;
+            }
 
             data_slices[gpu]->d_labels = NULL;
 
@@ -281,6 +299,13 @@ struct TOPProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
         // Put every vertex in there
         util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], nodes);
 
+        // set track node ids
+        util::MemsetIdxKernel<<<128, 128>>>(data_slices[0]->d_node_id, nodes);
+
+        // count number of degrees for each node
+        util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[0]->d_degrees, 
+            BaseProblem::graph_slices[0]->d_row_offsets, 
+            &BaseProblem::graph_slices[0]->d_row_offsets[1], -1, nodes);
         return retval;
     }
 
