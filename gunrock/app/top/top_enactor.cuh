@@ -264,7 +264,7 @@ class TOPEnactor : public EnactorBase
 
             // sort by key using mgpu
        	   	MergesortPairs(problem->data_slices[0]->d_degrees,
-                problem->data_slices[0]->d_node_id, graph_slice->nodes, mgpu::less<int>(), context);
+                problem->data_slices[0]->d_node_id, graph_slice->nodes, mgpu::greater<int>(), context);
 			
 			if (DEBUG)
 			{
