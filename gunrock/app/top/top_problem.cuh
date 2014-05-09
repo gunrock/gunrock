@@ -95,9 +95,9 @@ struct TOPProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
      * @param[in] graph Reference to the CSR graph object we process on.
      * @param[in] num_gpus Number of the GPUs used.
      */
-    TOPProblem(bool        stream_from_host,       // Only meaningful for single-GPU
-               const Csr<VertexId, Value, SizeT> &graph,
-               int         num_gpus) :
+    TOPProblem(bool        							stream_from_host,       // Only meaningful for single-GPU
+               const Csr<VertexId, Value, SizeT> 	&graph,
+               int         							num_gpus) :
         num_gpus(num_gpus)
     {
         Init(
@@ -116,6 +116,8 @@ struct TOPProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
             if (util::GRError(cudaSetDevice(gpu_idx[i]),
                 "~TOPProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
 
+			if (data_slices[i]->d_node_id)  util::GRError(cudaFree(data_slices[i]->d_node_id),
+                "GpuSlice cudaFree d_node_id failed", __FILE__, __LINE__);
             if (data_slices[i]->d_degrees)  util::GRError(cudaFree(data_slices[i]->d_degrees), 
                 "GpuSlice cudaFree d_degrees failed", __FILE__, __LINE__);
 
@@ -138,28 +140,35 @@ struct TOPProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
      *
      *\return cudaError_t object which indicates the success of all CUDA function calls.
      */
-    //TODO: write extract function
-    cudaError_t Extract(Value *h_rank)
+	cudaError_t Extract(VertexId *h_node_id, Value *h_degrees)
     {
-        /*cudaError_t retval = cudaSuccess;
-
-        do {
-            if (num_gpus == 1) {
-
+        cudaError_t retval = cudaSuccess;
+        do 
+		{
+            if (num_gpus == 1)
+			{
                 // Set device
                 if (util::GRError(cudaSetDevice(gpu_idx[0]),
-                            "TOPProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
+                	"TOPProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
 
                 if (retval = util::GRError(cudaMemcpy(
-                                h_rank,
-                                data_slices[0]->d_rank_curr,
-                                sizeof(Value) * nodes,
-                                cudaMemcpyDeviceToHost),
-                            "TOPProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) break;
+                    h_node_id,
+                    data_slices[0]->d_node_id,
+                    sizeof(VertexId) * nodes,
+                    cudaMemcpyDeviceToHost),
+                   	"TOPProblem cudaMemcpy d_node_id failed", __FILE__, __LINE__)) break;
+				
+				if (retval = util::GRError(cudaMemcpy(
+                    h_degrees,
+                    data_slices[0]->d_degrees,
+                    sizeof(Value) * nodes,
+                    cudaMemcpyDeviceToHost),
+                   	"TOPProblem cudaMemcpy d_degrees failed", __FILE__, __LINE__)) break;
+
             } else {
                 // TODO: multi-GPU extract result
             } //end if (data_slices.size() ==1)
-        } while(0);*/
+        } while(0);
 
         return cudaSuccess;
     }
@@ -220,17 +229,18 @@ struct TOPProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                 // Create SoA on device
                 VertexId    *d_node_id;
                 if (retval = util::GRError(cudaMalloc(
-                    (void**)&d_degrees,
+                    (void**)&d_node_id,
                     nodes * sizeof(Value)),
-                    "TOPProblem cudaMalloc d_degrees failed", __FILE__, __LINE__)) return retval;
-
+                    "TOPProblem cudaMalloc d_node_id failed", __FILE__, __LINE__)) return retval;
+				data_slices[0]->d_node_id = d_node_id;
+				
                 Value    *d_degrees;
                 if (retval = util::GRError(cudaMalloc(
                     (void**)&d_degrees,
                     nodes * sizeof(Value)),
                     "TOPProblem cudaMalloc d_degrees failed", __FILE__, __LINE__)) return retval;
+				data_slices[0]->d_degrees = d_degrees;				
 
-                data_slices[0]->d_degrees = NULL;
                 data_slices[0]->d_labels  = NULL;
 
             }
@@ -264,7 +274,8 @@ struct TOPProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                 "TOPProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
 
             // Allocate output if necessary
-            if (!data_slices[gpu]->d_node_id) {
+            if (!data_slices[gpu]->d_node_id)
+			{
                 VertexId    *d_node_id;
                 if (retval = util::GRError(cudaMalloc(
                     (void**)&d_node_id,
@@ -273,7 +284,8 @@ struct TOPProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                 data_slices[gpu]->d_node_id = d_node_id;
             }
 
-            if (!data_slices[gpu]->d_degrees) {
+            if (!data_slices[gpu]->d_degrees) 
+			{
                 Value    *d_degrees;
                 if (retval = util::GRError(cudaMalloc(
                     (void**)&d_degrees,
@@ -297,7 +309,7 @@ struct TOPProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
         // in multi-GPU scene
 
         // Put every vertex in there
-        util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], nodes);
+        // util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], nodes);
 
         // set track node ids
         util::MemsetIdxKernel<<<128, 128>>>(data_slices[0]->d_node_id, nodes);

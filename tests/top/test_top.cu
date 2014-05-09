@@ -30,17 +30,12 @@
 // top includes
 #include <gunrock/app/top/top_enactor.cuh>
 #include <gunrock/app/top/top_problem.cuh>
-#include <gunrock/app/top/top_functor.cuh>
+//#include <gunrock/app/top/top_functor.cuh>
 
 // Operator includes
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/vertex_map/kernel.cuh>
 #include <moderngpu.cuh>
-
-// CPU Prim's top reference
-#include <boost/config.hpp>
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/prim_minimum_spanning_tree.hpp>
 
 using namespace gunrock;
 using namespace gunrock::util;
@@ -79,10 +74,19 @@ void Usage()
  * @brief Displays the top result
  *
  */
-template<typename Value, typename SizeT>
-void DisplaySolution()
-{	
-
+template<typename VertexId, typename Value, typename SizeT>
+void DisplaySolution(VertexId *h_node_id, Value *h_degrees, SizeT num_nodes)
+{
+	// only display top K degrees
+	if (num_nodes > 10)
+	{
+		num_nodes = 10;
+	}
+	printf("\n-----> Top %s degree nodes: \n", num_nodes);
+	for (VertexId i = 0; i < num_nodes; ++i)
+	{
+		printf("node_id: %4d \t degrees: %4d\n", h_node_id[i], h_degrees[i]);
+	}
 }
 
 /**
@@ -185,19 +189,30 @@ void RunTests(
     
     gpu_timer.Start();
     util::GRError(top_enactor.template Enact<Problem>(context, top_problem, max_grid_size), 
-	    "top Problem Enact Failed", __FILE__, __LINE__);
-    gpu_timer.Stop();
+			"top Problem Enact Failed", __FILE__, __LINE__);
+	gpu_timer.Stop();
 
-    float elapsed_gpu = gpu_timer.ElapsedMillis();
+	float elapsed_gpu = gpu_timer.ElapsedMillis();
 	printf(" GPU top finished in %lf msec.\n", elapsed_gpu);
+		
+	// Copy out results back to CPU from GPU using Extract 
+    VertexId	*h_node_id = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+	Value 		*h_degrees = (Value*)malloc(sizeof(Value) * graph.nodes);
 	
-    // Copy out results back to CPU from GPU using Extract 
-    // TODO: write the extract function
-    // util::GRError(csr_problem->Extract(h_result), 
-	//	"top Problem Data Extraction Failed", __FILE__, __LINE__);
-
+	util::GRError(top_problem->Extract(h_node_id, h_degrees), 
+		"top Problem Data Extraction Failed", __FILE__, __LINE__);
+	
+	// display results
+	int num_node = graph.nodes;
+	if (num_node > 10) num_node = 10;
+	printf("-----> Top %d degree nodes:\n", num_node);
+	for (int i = 0; i < num_node; ++i)
+	{
+		printf("node_id: %4d \t degrees: %4d\n", h_node_id[i], h_degrees[i]);
+	}
+	
 	// Display solution
-	// DisplaySolution()
+	// DisplaySolution(h_node_id, h_degrees, graph.nodes);
 		
     // Cleanup
     if (top_problem) delete top_problem;
@@ -298,8 +313,8 @@ int main(int argc, char** argv)
 		/* Matrix-market coordinate-formatted graph file */
 
 		typedef int VertexId;	// Use as the node identifier type
-		typedef int Value;	// Use as the value type
-		typedef int SizeT;	// Use as the graph size type
+		typedef int Value;		// Use as the value type
+		typedef int SizeT;		// Use as the graph size type
 		Csr<VertexId, Value, SizeT> csr(false);	
 		
 		/* Default value for stream_from_host is false */
@@ -327,10 +342,7 @@ int main(int argc, char** argv)
 		
 		// run gpu tests
 		RunTests(csr, args, *context);
-		
-		// verify results using compareResults() function 
-		// int result = compareResults();
-		// printf(" Verifying results ... %s\n", (result == 1) ? "Success!" : "Failed!");
+	
 	}
 	else 
 	{

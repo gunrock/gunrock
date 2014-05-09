@@ -40,7 +40,7 @@ using namespace mgpu;
  * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA clock-count statistics
  */
 template<bool INSTRUMENT>
-class topEnactor : public EnactorBase
+class TOPEnactor : public EnactorBase
 {
     // Members
     protected:
@@ -239,24 +239,44 @@ class topEnactor : public EnactorBase
 
         do {
             // Add Enactor Code here
-            //
-            printf("data_slices[0] d_node_id");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_node_id, graph_slice->nodes);
-            printf("data_slices[0] d_degrees");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_degrees, graph_slice->nodes);
-        
-            // sort by key using mgpu
-            MergesortPairs(problem->data_slices[0]->d_degrees,
-                problem->data_slices[0]->d_node_id, mgpu::less<int>(), context);
+			// determine grid size for edge and vertex mapping
+			int edge_map_occupancy = EdgeMapPolicy::CTA_OCCUPANCY;
+		 	int edge_map_grid_size = MaxGridSize(edge_map_occupancy, max_grid_size);
+		 	int vertex_map_occupancy = VertexMapPolicy::CTA_OCCUPANCY;
+			int vertex_map_grid_size = MaxGridSize(vertex_map_occupancy, max_grid_size);
 
-            printf("sorted data_slices[0] d_node_id");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_node_id, graph_slice->nodes);
-            printf("sorted data_slices[0] d_degrees");
-            util::DisplayDeviceResults(problem->data_slices[0]->d_degrees, graph_slice->nodes);
+			// initialization
+			if (retval = Setup(problem, edge_map_grid_size, vertex_map_grid_size)) break;
+			
+			// single gpu graph slice
+			typename TOPProblem::GraphSlice *graph_slice = problem->graph_slices[0];
+			typename TOPProblem::DataSlice	*data_slice	= problem->d_data_slices[0];
+
+			fflush(stdout);
+
+			if (DEBUG)
+			{
+				printf("data_slices[0] d_node_id");
+            	util::DisplayDeviceResults(problem->data_slices[0]->d_node_id, graph_slice->nodes);
+            	printf("data_slices[0] d_degrees");
+            	util::DisplayDeviceResults(problem->data_slices[0]->d_degrees, graph_slice->nodes);
+        	}
+
+            // sort by key using mgpu
+       	   	MergesortPairs(problem->data_slices[0]->d_degrees,
+                problem->data_slices[0]->d_node_id, graph_slice->nodes, mgpu::less<int>(), context);
+			
+			if (DEBUG)
+			{
+            	printf("sorted data_slices[0] d_node_id");
+            	util::DisplayDeviceResults(problem->data_slices[0]->d_node_id, graph_slice->nodes);
+            	printf("sorted data_slices[0] d_degrees");
+            	util::DisplayDeviceResults(problem->data_slices[0]->d_degrees, graph_slice->nodes);
+			}
 
         }while(0);
 
-        if (DEBUG) printf("\n ----- GPU TOP Done ----- \n");
+        printf("\n ----- GPU TOP Done ----- \n");
         return retval;
     }
 
