@@ -40,7 +40,8 @@ SM_TARGETS = $(GEN_SM30)
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
 MGPU_INC = "../../../moderngpu/include"
 BOOST_INC = "../../../boost_1_53_0"
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(BOOST_INC) -I.. -I../..
+CUB_INC = "../../../cub"
+INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(BOOST_INC) -I$(CUB_INC) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
