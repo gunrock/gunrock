@@ -35,6 +35,13 @@ using namespace mgpu;
 namespace gunrock {
 namespace app {
 namespace wtf {
+/*
+1 according to the first 1000 Circle of Trust nodes. Get all their neighbors.
+2 write these circle of trust nodes and their neighbors in a bitmap (1 is hub, 2 is auth, 0 is not in map)
+3 compute atomicAdd their neighbors' incoming node number.
+4 set hub nodes in the frontier_keys and auth nodes in the frontier_values
+5 change the salsa functor to be aware of the bitmap test
+*/
 
 /**
  * @brief WTF problem enactor class.
