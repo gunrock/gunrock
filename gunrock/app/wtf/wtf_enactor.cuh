@@ -35,13 +35,6 @@ using namespace mgpu;
 namespace gunrock {
 namespace app {
 namespace wtf {
-/*
-1 according to the first 1000 Circle of Trust nodes. Get all their neighbors.
-2 write these circle of trust nodes and their neighbors in a bitmap (1 is hub, 2 is auth, 0 is not in map)
-3 compute atomicAdd their neighbors' incoming node number.
-4 set hub nodes in the frontier_keys and auth nodes in the frontier_values
-5 change the salsa functor to be aware of the bitmap test
-*/
 
 /**
  * @brief WTF problem enactor class.
@@ -201,12 +194,6 @@ class WTFEnactor : public EnactorBase
             Value,
             WTFProblem> PrFunctor;
 
-        typedef RemoveZeroDegreeNodeFunctor<
-            VertexId,
-            SizeT,
-            Value,
-            WTFProblem> RemoveZeroFunctor;
-
         cudaError_t retval = cudaSuccess;
 
         do {
@@ -236,81 +223,8 @@ class WTFEnactor : public EnactorBase
 
             frontier_attribute.queue_reset          = true;
 
-            SizeT num_valid_node = 0;
-
-            while (num_valid_node != frontier_attribute.queue_length) {
-
-              num_valid_node = frontier_attribute.queue_length; 
-
-              //util::DisplayDeviceResults(problem->graph_slices[0]->frontier_queues.d_keys[selector],
-              //    num_elements);
-
-              if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
-              gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, WTFProblem, RemoveZeroFunctor>(
-                    d_done,
-                    enactor_stats,
-                    frontier_attribute,
-                    data_slice,
-                    (VertexId*)NULL,
-                    (bool*)NULL,
-                    (bool*)NULL,
-                    (unsigned int*)NULL,
-                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
-                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],            // d_out_queue
-                    (VertexId*)NULL,
-                    (VertexId*)NULL,
-                    graph_slice->d_row_offsets,
-                    graph_slice->d_column_indices,
-                    (SizeT*)NULL,
-                    (VertexId*)NULL,
-                    graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
-                    graph_slice->frontier_elements[frontier_attribute.selector^1],                 // max_out_queue
-                    this->work_progress,
-                    context,
-                    gunrock::oprtr::advance::V2V);
-
-              if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
-                      "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break; 
-
-              gunrock::oprtr::filter::Kernel<FilterKernelPolicy, WTFProblem, RemoveZeroFunctor>
-                <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
-                    enactor_stats.iteration,
-                    frontier_attribute.queue_reset,
-                    frontier_attribute.queue_index,
-                    enactor_stats.num_gpus,
-                    frontier_attribute.queue_length,
-                    d_done,
-                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector],      // d_in_queue
-                    NULL,
-                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],    // d_out_queue
-                    data_slice,
-                    NULL,
-                    work_progress,
-                    graph_slice->frontier_elements[frontier_attribute.selector],           // max_in_queue
-                    graph_slice->frontier_elements[frontier_attribute.selector^1],         // max_out_queue
-                    enactor_stats.filter_kernel_stats);
-
-              if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
-                      "filter::Kernel RemoveZeroFunctor failed", __FILE__, __LINE__)))
-                break;
-
-                util::MemsetCopyVectorKernel<<<128,
-                  128>>>(problem->data_slices[0]->d_degrees,
-                          problem->data_slices[0]->d_degrees_pong, graph_slice->nodes);
-
-              //util::DisplayDeviceResults(problem->data_slices[0]->d_degrees,
-              //        graph_slice->nodes);
-
-              frontier_attribute.queue_index++;
-              frontier_attribute.selector^=1;
-              if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
-            }
-
             frontier_attribute.queue_reset = true;
             int edge_map_queue_len = frontier_attribute.queue_length;
-
-            util::MemsetKernel<<<128, 128>>>(problem->data_slices[0]->d_rank_curr,
-                (Value)1.0/edge_map_queue_len, graph_slice->nodes);
 
             // Step through WTF iterations 
             while (done[0] < 0) {
@@ -434,7 +348,7 @@ class WTFEnactor : public EnactorBase
 
             if (retval) break;
         
-        // sort the WTF value TODO: make this a utility function
+        // sort the PR value TODO: make this a utility function
         Value *rank_curr;
         VertexId *node_id;
         if (util::GRError((retval = cudaMalloc(&rank_curr, sizeof(Value)*graph_slice->nodes)), "sort WTF malloc rank_curr failed", __FILE__, __LINE__)) return retval;
@@ -455,6 +369,15 @@ class WTFEnactor : public EnactorBase
         if (util::GRError((retval = cudaFree(d_temp_storage)), "sort WTF free d_temp_storage failed", __FILE__, __LINE__)) return retval;
         if (util::GRError((retval = cudaFree(node_id)), "sort WTF free node_id failed", __FILE__, __LINE__)) return retval;
         if (util::GRError((retval = cudaFree(rank_curr)), "sort WTF free rank_curr failed", __FILE__, __LINE__)) return retval;
+
+        /*
+           1 according to the first 1000 Circle of Trust nodes. Get all their neighbors.
+           2 write these circle of trust nodes in a bitmap
+           3 compute atomicAdd their neighbors' incoming node number.
+           4 set hub nodes in the frontier_keys and auth nodes in the frontier_values
+           5 change the salsa functor to be aware of the bitmap test
+         */
+
 
         } while(0); 
 

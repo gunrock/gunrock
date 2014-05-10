@@ -53,13 +53,17 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
         // device storage arrays
         Value   *d_rank_curr;           /**< Used for ping-pong page rank value */
         Value   *d_rank_next;           /**< Used for ping-pong page rank value */       
-        SizeT   *d_degrees;             /**< Used for keeping out-degree for each vertex */
-        SizeT    *d_degrees_pong;
+        Value   *d_refscore_curr;
+        Value   *d_refscore_next;
+        SizeT   *d_out_degrees;             /**< Used for keeping out-degree for each vertex */
+        SizeT    *d_in_degrees;
         Value   *d_threshold;               /**< Used for recording accumulated error */
         Value   *d_delta;
+        Value   *d_alpha;
         VertexId   *d_src_node;
         SizeT   *d_labels;
         VertexId *d_node_ids;
+        bool        *d_cot_map;     /**< Input frontier bitmap */
     };
 
     // Members
@@ -124,10 +128,14 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                 "~WTFProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
             if (data_slices[i]->d_rank_curr)      util::GRError(cudaFree(data_slices[i]->d_rank_curr), "GpuSlice cudaFree d_rank[0] failed", __FILE__, __LINE__);
             if (data_slices[i]->d_rank_next)      util::GRError(cudaFree(data_slices[i]->d_rank_next), "GpuSlice cudaFree d_rank[1] failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_degrees)      util::GRError(cudaFree(data_slices[i]->d_degrees), "GpuSlice cudaFree d_degrees failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_degrees_pong)      util::GRError(cudaFree(data_slices[i]->d_degrees_pong), "GpuSlice cudaFree d_degrees_pong failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_refscore_curr)      util::GRError(cudaFree(data_slices[i]->d_refscore_curr), "GpuSlice cudaFree d_refscore[0] failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_refscore_next)      util::GRError(cudaFree(data_slices[i]->d_refscore_next), "GpuSlice cudaFree d_refscore[1] failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_out_degrees)      util::GRError(cudaFree(data_slices[i]->d_out_degrees), "GpuSlice cudaFree d_out_degrees failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_in_degrees)      util::GRError(cudaFree(data_slices[i]->d_in_degrees), "GpuSlice cudaFree d_in_degrees failed", __FILE__, __LINE__);
             if (data_slices[i]->d_threshold)      util::GRError(cudaFree(data_slices[i]->d_threshold), "GpuSlice cudaFree d_threshold failed", __FILE__, __LINE__);
             if (data_slices[i]->d_delta)      util::GRError(cudaFree(data_slices[i]->d_delta), "GpuSlice cudaFree d_delta failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_alpha)      util::GRError(cudaFree(data_slices[i]->d_alpha), "GpuSlice cudaFree d_alpha failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_cot_map)      util::GRError(cudaFree(data_slices[i]->d_cot_map), "GpuSlice cudaFree d_cot_map failed", __FILE__, __LINE__);
             if (data_slices[i]->d_node_ids)      util::GRError(cudaFree(data_slices[i]->d_node_ids), "GpuSlice cudaFree d_node_ids failed", __FILE__, __LINE__);
             if (data_slices[i]->d_src_node)      util::GRError(cudaFree(data_slices[i]->d_src_node), "GpuSlice cudaFree d_src_node failed", __FILE__, __LINE__);
             if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
@@ -245,20 +253,34 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                         nodes * sizeof(Value)),
                     "WTFProblem cudaMalloc d_rank2 failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_rank_next = d_rank2;
- 
-                SizeT   *d_degrees;
-                    if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_degrees,
-                        nodes * sizeof(SizeT)),
-                    "WTFProblem cudaMalloc d_degrees failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_degrees = d_degrees;
 
-                SizeT   *d_degrees_pong;
+                Value    *d_rank3;
+                if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_rank1,
+                        nodes * sizeof(Value)),
+                    "WTFProblem cudaMalloc d_rank3 failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_refscore_curr = d_rank3;
+
+                Value    *d_rank4;
+                if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_rank4,
+                        nodes * sizeof(Value)),
+                    "WTFProblem cudaMalloc d_rank4 failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_refscore_next = d_rank4;
+ 
+                SizeT   *d_out_degrees;
                     if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_degrees_pong,
+                        (void**)&d_out_degrees,
                         nodes * sizeof(SizeT)),
-                    "WTFProblem cudaMalloc d_degrees_pong failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_degrees_pong = d_degrees_pong;
+                    "WTFProblem cudaMalloc d_out_degrees failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_out_degrees = d_out_degrees;
+
+                SizeT   *d_in_degrees;
+                    if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_in_degrees,
+                        nodes * sizeof(SizeT)),
+                    "WTFProblem cudaMalloc d_in_degrees failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_in_degrees = d_in_degrees;
 
                 Value   *d_threshold;
                     if (retval = util::GRError(cudaMalloc(
@@ -274,6 +296,13 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                     "WTFProblem cudaMalloc d_delta failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_delta = d_delta;
 
+                Value    *d_alpha;
+                if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_alpha,
+                        1 * sizeof(Value)),
+                    "WTFProblem cudaMalloc d_alpha failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_alpha = d_alpha;
+
                 VertexId    *d_node_ids;
                 if (retval = util::GRError(cudaMalloc(
                         (void**)&d_node_ids,
@@ -287,6 +316,13 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                         1 * sizeof(SizeT)),
                     "WTFProblem cudaMalloc d_src_node failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_src_node = d_src_node;
+
+                bool    *d_cot_map;
+                if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_cot_map,
+                        nodes * sizeof(bool)),
+                    "DOBFSProblem cudaMalloc d_cot_map failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_cot_map = d_cot_map;
 
                 data_slices[0]->d_labels = NULL;
 
@@ -308,6 +344,7 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
     cudaError_t Reset(
             VertexId src,
             Value    delta,
+            Value    alpha,
             Value    threshold,
             FrontierType frontier_type)             // The frontier type (i.e., edge/vertex/mixed)
     {
@@ -341,6 +378,24 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                 data_slices[gpu]->d_rank_next = d_rank2;
             } 
 
+            if (!data_slices[gpu]->d_refscore_curr) {
+                Value    *d_rank3;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_rank3,
+                                nodes * sizeof(Value)),
+                            "WTFProblem cudaMalloc d_rank3 failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_refscore_curr = d_rank3;
+            }
+
+            if (!data_slices[gpu]->d_refscore_next) {
+                Value    *d_rank4;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_rank4,
+                                nodes * sizeof(Value)),
+                            "WTFProblem cudaMalloc d_rank4 failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_refscore_next = d_rank4;
+            }
+
             if (!data_slices[gpu]->d_delta) {
                 Value    *d_delta;
                 if (retval = util::GRError(cudaMalloc(
@@ -348,6 +403,15 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                                 1 * sizeof(Value)),
                             "WTFProblem cudaMalloc d_delta failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_delta = d_delta;
+            }
+
+            if (!data_slices[gpu]->d_alpha) {
+                Value    *d_alpha;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_alpha,
+                                1 * sizeof(Value)),
+                            "WTFProblem cudaMalloc d_alpha failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_alpha = d_alpha;
             }
 
             if (!data_slices[gpu]->d_node_ids) {
@@ -377,38 +441,52 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                 data_slices[gpu]->d_src_node = d_src_node;
             }
 
-            // Allocate d_degrees if necessary
-            if (!data_slices[gpu]->d_degrees) {
-                VertexId    *d_degrees;
+            // Allocate d_out_degrees if necessary
+            if (!data_slices[gpu]->d_out_degrees) {
+                VertexId    *d_out_degrees;
                 if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_degrees,
+                                (void**)&d_out_degrees,
                                 nodes * sizeof(VertexId)),
-                            "WTFProblem cudaMalloc d_degrees failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_degrees = d_degrees;
+                            "WTFProblem cudaMalloc d_out_degrees failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_out_degrees = d_out_degrees;
             }
 
-            // Allocate d_degrees_pong if necessary
-            if (!data_slices[gpu]->d_degrees_pong) {
-                SizeT    *d_degrees_pong;
+            // Allocate d_in_degrees if necessary
+            if (!data_slices[gpu]->d_in_degrees) {
+                SizeT    *d_in_degrees;
                 if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_degrees_pong,
+                                (void**)&d_in_degrees,
                                 nodes * sizeof(SizeT)),
-                            "WTFProblem cudaMalloc d_degrees_pong failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_degrees_pong = d_degrees_pong;
+                            "WTFProblem cudaMalloc d_in_degrees failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_in_degrees = d_in_degrees;
+            }
+
+            if (!data_slices[gpu]->d_cot_map) {
+                bool    *d_cot_map;
+                if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_cot_map,
+                        nodes * sizeof(bool)),
+                    "DOBFSProblem cudaMalloc d_cot_map failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_cot_map = d_cot_map;
             }
 
             data_slices[gpu]->d_labels = NULL;
 
-            // Initial rank_next = 0 
-            //util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_rank_curr,
-            //    (Value)1.0/nodes, nodes);
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_rank_next, (Value)0.0, nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_rank_curr, (Value)1.0/nodes, nodes);
+
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_refscore_curr, (Value)0.0, nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_refscore_next, (Value)0.0, nodes);
             
             // Compute degrees
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_degrees, 0, nodes);
-            util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_degrees, BaseProblem::graph_slices[0]->d_row_offsets, &BaseProblem::graph_slices[0]->d_row_offsets[1], -1, nodes);
-            util::MemsetCopyVectorKernel<<<128, 128>>>(data_slices[gpu]->d_degrees_pong, data_slices[gpu]->d_degrees, nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_out_degrees, 0, nodes);
+            util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_out_degrees, BaseProblem::graph_slices[0]->d_row_offsets, &BaseProblem::graph_slices[0]->d_row_offsets[1], -1, nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_in_degrees, 0, nodes);
+            util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_in_degrees, BaseProblem::graph_slices[0]->d_column_offsets, &BaseProblem::graph_slices[0]->d_column_offsets[1], -1, nodes);
+ 
             util::MemsetIdxKernel<<<128, 128>>>(data_slices[gpu]->d_node_ids, nodes);
+
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_cot_map, false, nodes);
 
             if (retval = util::GRError(cudaMemcpy(
                             data_slices[gpu]->d_delta,
@@ -416,6 +494,13 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                             sizeof(Value),
                             cudaMemcpyHostToDevice),
                         "WTFProblem cudaMemcpy d_delta failed", __FILE__, __LINE__)) return retval;
+
+            if (retval = util::GRError(cudaMemcpy(
+                            data_slices[gpu]->d_alpha,
+                            (Value*)&alpha,
+                            sizeof(Value),
+                            cudaMemcpyHostToDevice),
+                        "WTFProblem cudaMemcpy d_alpha failed", __FILE__, __LINE__)) return retval;
 
             if (retval = util::GRError(cudaMemcpy(
                             data_slices[gpu]->d_threshold,
@@ -439,7 +524,6 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                         "WTFProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
 
         }
-
         
         // Fillin the initial input_queue for WTF problem, this needs to be modified
         // in multi-GPU scene

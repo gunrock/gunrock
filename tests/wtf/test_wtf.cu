@@ -284,6 +284,7 @@ void RunTests(
     const Csr<VertexId, Value, SizeT> &graph,
     VertexId src,
     Value delta,
+    Value alpha,
     Value error,
     SizeT max_iter,
     int max_grid_size,
@@ -321,7 +322,7 @@ void RunTests(
         // Perform BFS
         GpuTimer gpu_timer;
 
-        util::GRError(csr_problem->Reset(src, delta, error, wtf_enactor.GetFrontierType()), "pr Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(csr_problem->Reset(src, delta, alpha, error, wtf_enactor.GetFrontierType()), "pr Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
         util::GRError(wtf_enactor.template Enact<Problem>(context, csr_problem, max_iter, max_grid_size), "pr Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
@@ -402,6 +403,7 @@ void RunTests(
     CudaContext& context)
 {
     Value               delta               = 0.85f;           // Use whatever the specified graph-type's default is
+    Value               alpha               = 0.2f;
     Value               error               = 0.01f;        // Error threshold
     SizeT               max_iter            = 20;
     bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
@@ -411,6 +413,7 @@ void RunTests(
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("delta", delta);
+    args.GetCmdLineArgument("alpha", alpha);
     args.GetCmdLineArgument("error", error);
     args.GetCmdLineArgument("max-iter", max_iter);
     args.GetCmdLineArgument("src", src);
@@ -423,6 +426,7 @@ void RunTests(
                         graph,
                         src,
                         delta,
+                        alpha,
                         error,
                         max_iter,
                         max_grid_size,
@@ -433,6 +437,7 @@ void RunTests(
                         graph,
                         src,
                         delta,
+                        alpha,
                         error,
                         max_iter,
                         max_grid_size,
