@@ -136,6 +136,31 @@ class WTFEnactor : public EnactorBase
         }
     }
 
+    template <typename ProblemData>
+    void NormalizeRank(ProblemData *problem, CudaContext &context, int hub_or_auth, int nodes)
+    {
+
+        typedef typename ProblemData::Value         Value;
+        Value *rank_curr;
+        Value *rank_next;
+        if (hub_or_auth == 0) {
+            rank_curr = problem->data_slices[0]->d_rank_curr;
+            rank_next = problem->data_slices[0]->d_rank_next;
+            //printf("hub\n");
+        } else {
+            rank_curr = problem->data_slices[0]->d_refscore_curr;
+            rank_next = problem->data_slices[0]->d_refscore_next;
+            //printf("auth\n");
+        }
+
+        //swap rank_curr and rank_next
+        util::MemsetCopyVectorKernel<<<128, 128>>>(rank_curr, rank_next, nodes); 
+
+        util::MemsetKernel<<<128, 128>>>(rank_next, (Value)0.0, nodes);
+
+        //util::DisplayDeviceResults(rank_curr, nodes);
+    }
+
     /**
      * \addtogroup PublicInterface
      * @{
@@ -180,6 +205,8 @@ class WTFEnactor : public EnactorBase
         typename WTFProblem>
     cudaError_t EnactWTF(
     CudaContext                        &context,
+    typename WTFProblem::VertexId       src,
+    typename WTFProblem::Value          alpha,
     WTFProblem                          *problem,
     typename WTFProblem::SizeT           max_iteration,
     int                                 max_grid_size = 0)
@@ -193,6 +220,24 @@ class WTFEnactor : public EnactorBase
             SizeT,
             Value,
             WTFProblem> PrFunctor;
+
+        typedef HUBFunctor<
+            VertexId,
+            SizeT,
+            Value,
+            WTFProblem> HubFunctor;
+
+        typedef AUTHFunctor<
+            VertexId,
+            SizeT,
+            Value,
+            WTFProblem> AuthFunctor;
+
+        typedef COTFunctor<
+            VertexId,
+            SizeT,
+            Value,
+            WTFProblem> CotFunctor;
 
         cudaError_t retval = cudaSuccess;
 
@@ -223,7 +268,6 @@ class WTFEnactor : public EnactorBase
 
             frontier_attribute.queue_reset          = true;
 
-            frontier_attribute.queue_reset = true;
             int edge_map_queue_len = frontier_attribute.queue_length;
 
             // Step through WTF iterations 
@@ -347,6 +391,7 @@ class WTFEnactor : public EnactorBase
             }
 
             if (retval) break;
+            enactor_stats.iteration = 0;
         
         // sort the PR value TODO: make this a utility function
         Value *rank_curr;
@@ -363,7 +408,7 @@ class WTFEnactor : public EnactorBase
         if (util::GRError((retval = cudaMalloc(&d_temp_storage, temp_storage_bytes)), "sort WTF malloc d_temp_storage failed", __FILE__, __LINE__)) return retval;
         if (util::GRError((retval = cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_rank_curr, d_node_id, graph_slice->nodes)), "cub::DeviceRadixSort::SortPairsDescending failed", __FILE__, __LINE__)) return retval;
 
-        if (util::GRError((retval = cudaMemcpy(problem->data_slices[0]->d_rank_curr, d_rank_curr.Current(), sizeof(Value)*graph_slice->nodes, cudaMemcpyDeviceToDevice)), "sort WTF copy back rank_currs failed", __FILE__, __LINE__)) return retval;
+        //if (util::GRError((retval = cudaMemcpy(problem->data_slices[0]->d_rank_curr, d_rank_curr.Current(), sizeof(Value)*graph_slice->nodes, cudaMemcpyDeviceToDevice)), "sort WTF copy back rank_currs failed", __FILE__, __LINE__)) return retval;
         if (util::GRError((retval = cudaMemcpy(problem->data_slices[0]->d_node_ids, d_node_id.Current(), sizeof(VertexId)*graph_slice->nodes, cudaMemcpyDeviceToDevice)), "sort WTF copy back node ids failed", __FILE__, __LINE__)) return retval;
 
         if (util::GRError((retval = cudaFree(d_temp_storage)), "sort WTF free d_temp_storage failed", __FILE__, __LINE__)) return retval;
@@ -371,13 +416,126 @@ class WTFEnactor : public EnactorBase
         if (util::GRError((retval = cudaFree(rank_curr)), "sort WTF free rank_curr failed", __FILE__, __LINE__)) return retval;
 
         /*
-           1 according to the first 1000 Circle of Trust nodes. Get all their neighbors.
-           2 write these circle of trust nodes in a bitmap
            3 compute atomicAdd their neighbors' incoming node number.
            4 set hub nodes in the frontier_keys and auth nodes in the frontier_values
            5 change the salsa functor to be aware of the bitmap test
          */
+        //1 according to the first 1000 Circle of Trust nodes. Get all their neighbors.
+        //2 write these circle of trust nodes in a bitmap
+        frontier_attribute.queue_index          = 0;        // Work queue index
+        frontier_attribute.selector             = 0;
+        frontier_attribute.queue_reset          = true;
+        long long cot_size                      = (1000 > graph_slice->nodes) ? graph_slice->nodes : 1000; 
+        frontier_attribute.queue_length         = cot_size;
 
+        if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, cot_size)) break;
+
+        // Edge Map
+        gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, WTFProblem, CotFunctor>(
+                d_done,
+                enactor_stats,
+                frontier_attribute,
+                data_slice,
+                (VertexId*)NULL,
+                (bool*)NULL,
+                (bool*)NULL,
+                (unsigned int*)NULL,
+                problem->data_slices[0]->d_node_ids,              // d_in_queue
+                graph_slice->frontier_queues.d_keys[frontier_attribute.selector],            // d_out_queue
+                (VertexId*)NULL,          // d_pred_in_queue
+                (VertexId*)NULL,
+                graph_slice->d_row_offsets,
+                graph_slice->d_column_indices,
+                (SizeT*)NULL,
+                (VertexId*)NULL,
+                graph_slice->frontier_elements[frontier_attribute.selector],
+                graph_slice->frontier_elements[frontier_attribute.selector^1],
+                this->work_progress,
+                context,
+                gunrock::oprtr::advance::V2V);
+
+        util::MemsetKernel<<<128, 128>>>(problem->data_slices[0]->d_rank_next, (Value)0.0, graph_slice->nodes);
+        util::MemsetKernel<<<128, 128>>>(problem->data_slices[0]->d_rank_curr, (Value)0.0, graph_slice->nodes);
+
+        util::MemsetKernel<<<128, 128>>>(problem->data_slices[0]->d_refscore_curr, (Value)0.0, graph_slice->nodes);
+        util::MemsetKernel<<<128, 128>>>(problem->data_slices[0]->d_refscore_next, (Value)0.0, graph_slice->nodes);
+
+        Value init_score = 1.0;
+        if (retval = util::GRError(cudaMemcpy(
+                        problem->data_slices[0]->d_rank_curr+src,
+                        &init_score,
+                        sizeof(Value),
+                        cudaMemcpyHostToDevice),
+                    "WTFProblem cudaMemcpy d_rank_curr[src] failed", __FILE__, __LINE__)) return retval;
+
+        long long max_salsa_iteration = 1/alpha;
+        
+        while (true) {
+
+            if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+
+            // Edge Map
+            gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, WTFProblem, AuthFunctor>(
+                    d_done,
+                    enactor_stats,
+                    frontier_attribute,
+                    data_slice,
+                    (VertexId*)NULL,
+                    (bool*)NULL,
+                    (bool*)NULL,
+                    (unsigned int*)NULL,
+                    problem->data_slices[0]->d_node_ids,              // d_in_queue
+                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector],            // d_out_queue
+                    (VertexId*)NULL,
+                    (VertexId*)NULL,
+                    graph_slice->d_row_offsets,
+                    graph_slice->d_column_indices,
+                    (SizeT*)NULL,
+                    (VertexId*)NULL,
+                    graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
+                    graph_slice->frontier_elements[frontier_attribute.selector^1],                 // max_out_queue
+                    this->work_progress,
+                    context,
+                    gunrock::oprtr::advance::V2V);
+
+            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+
+            NormalizeRank<WTFProblem>(problem, context, 1, graph_slice->nodes);
+
+            if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+
+            gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, WTFProblem, HubFunctor>(
+                    d_done,
+                    enactor_stats,
+                    frontier_attribute,
+                    data_slice,
+                    (VertexId*)NULL,
+                    (bool*)NULL,
+                    (bool*)NULL,
+                    (unsigned int*)NULL,
+                    problem->data_slices[0]->d_node_ids,              // d_in_queue
+                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector],            // d_out_queue
+                    (VertexId*)NULL,
+                    (VertexId*)NULL,
+                    graph_slice->d_row_offsets,
+                    graph_slice->d_column_indices,
+                    (SizeT*)NULL,
+                    (VertexId*)NULL,
+                    graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
+                    graph_slice->frontier_elements[frontier_attribute.selector^1],                 // max_out_queue
+                    this->work_progress,
+                    context,
+                    gunrock::oprtr::advance::V2V);
+
+            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+
+            NormalizeRank<WTFProblem>(problem, context, 0, graph_slice->nodes);
+
+            enactor_stats.iteration++;
+            printf("\n");
+
+            if (enactor_stats.iteration >= max_salsa_iteration) break;
+        }
 
         } while(0); 
 
@@ -404,6 +562,8 @@ class WTFEnactor : public EnactorBase
     template <typename WTFProblem>
     cudaError_t Enact(
         CudaContext                     &context,
+        typename WTFProblem::VertexId   src,
+        typename WTFProblem::Value      alpha,
         WTFProblem                      *problem,
         typename WTFProblem::SizeT       max_iteration,
         int                             max_grid_size = 0)
@@ -442,7 +602,7 @@ class WTFEnactor : public EnactorBase
                     AdvanceKernelPolicy;
 
             return EnactWTF<AdvanceKernelPolicy, FilterKernelPolicy, WTFProblem>(
-                    context, problem, max_iteration, max_grid_size);
+                    context, src, alpha, problem, max_iteration, max_grid_size);
         }
 
         //to reduce compile time, get rid of other architecture for now

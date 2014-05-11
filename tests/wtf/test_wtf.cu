@@ -324,7 +324,7 @@ void RunTests(
 
         util::GRError(csr_problem->Reset(src, delta, alpha, error, wtf_enactor.GetFrontierType()), "pr Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
-        util::GRError(wtf_enactor.template Enact<Problem>(context, csr_problem, max_iter, max_grid_size), "pr Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(wtf_enactor.template Enact<Problem>(context, src, alpha, csr_problem, max_iter, max_grid_size), "pr Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
 
         wtf_enactor.GetStatistics(total_queued, avg_duty);
@@ -507,6 +507,7 @@ int main( int argc, char** argv)
 		}
 
 		csr.PrintHistogram();
+        csr.DisplayGraph();
 
 		// Run tests
 		RunTests(csr, args, *context);

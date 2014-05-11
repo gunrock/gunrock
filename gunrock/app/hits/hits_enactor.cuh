@@ -309,7 +309,6 @@ class HITSEnactor : public EnactorBase
 
                 NormalizeRank<HITSProblem>(problem, context, 0, graph_slice->nodes);
                 
-                enactor_stats.iteration++; 
 
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_next,graph_slice->nodes);
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_curr,
@@ -326,6 +325,8 @@ class HITSEnactor : public EnactorBase
                             total_lifetimes)) break;
                     }
                 }*/
+
+                enactor_stats.iteration++; 
 
                 if (enactor_stats.iteration >= max_iteration) break;
 

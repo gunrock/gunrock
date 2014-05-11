@@ -256,7 +256,7 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
 
                 Value    *d_rank3;
                 if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_rank1,
+                        (void**)&d_rank3,
                         nodes * sizeof(Value)),
                     "WTFProblem cudaMalloc d_rank3 failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_refscore_curr = d_rank3;
@@ -346,11 +346,12 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
             Value    delta,
             Value    alpha,
             Value    threshold,
-            FrontierType frontier_type)             // The frontier type (i.e., edge/vertex/mixed)
+            FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
+            double  queue_sizing=1.0)
     {
         typedef ProblemBase<VertexId, SizeT, false> BaseProblem;
         //load ProblemBase Reset
-        BaseProblem::Reset(frontier_type, 1.0f); // Default queue sizing is 1.0
+        BaseProblem::Reset(frontier_type, queue_sizing); // Default queue sizing is 1.0
 
         cudaError_t retval = cudaSuccess;
 
@@ -482,7 +483,7 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_out_degrees, 0, nodes);
             util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_out_degrees, BaseProblem::graph_slices[0]->d_row_offsets, &BaseProblem::graph_slices[0]->d_row_offsets[1], -1, nodes);
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_in_degrees, 0, nodes);
-            util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_in_degrees, BaseProblem::graph_slices[0]->d_column_offsets, &BaseProblem::graph_slices[0]->d_column_offsets[1], -1, nodes);
+            //util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_in_degrees, BaseProblem::graph_slices[0]->d_column_offsets, &BaseProblem::graph_slices[0]->d_column_offsets[1], -1, nodes);
  
             util::MemsetIdxKernel<<<128, 128>>>(data_slices[gpu]->d_node_ids, nodes);
 
