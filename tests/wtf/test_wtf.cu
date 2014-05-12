@@ -361,7 +361,7 @@ void RunTests(
             printf("Validity: ");
             CompareResults(h_rank, reference_check, graph.nodes, true);
         }
-        printf("\nFirst 40 labels of the GPU result."); 
+        printf("\nGPU result."); 
         // Display Solution
         DisplaySolution(h_node_id, h_rank, graph.nodes);
 

@@ -16,6 +16,7 @@
 
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
+#include <gunrock/util/sort_utils.cuh>
 
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
@@ -392,36 +393,13 @@ class WTFEnactor : public EnactorBase
 
             if (retval) break;
             enactor_stats.iteration = 0;
+
+        util::CUBRadixSort<Value, VertexId>(false, graph_slice->nodes, problem->data_slices[0]->d_rank_curr, problem->data_slices[0]->d_node_ids);
         
-        // sort the PR value TODO: make this a utility function
-        Value *rank_curr;
-        VertexId *node_id;
-        if (util::GRError((retval = cudaMalloc(&rank_curr, sizeof(Value)*graph_slice->nodes)), "sort WTF malloc rank_curr failed", __FILE__, __LINE__)) return retval;
-        if (util::GRError((retval = cudaMalloc(&node_id, sizeof(VertexId)*graph_slice->nodes)), "sort WTF malloc node_id failed", __FILE__, __LINE__)) return retval;
-
-        cub::DoubleBuffer<Value> d_rank_curr(problem->data_slices[0]->d_rank_curr, rank_curr);
-        cub::DoubleBuffer<VertexId> d_node_id(problem->data_slices[0]->d_node_ids, node_id);
-
-        void *d_temp_storage = NULL;
-        size_t temp_storage_bytes = 0;
-        if (util::GRError((retval = cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_rank_curr, d_node_id, graph_slice->nodes)), "cub::DeviceRadixSort::SortPairsDescending failed", __FILE__, __LINE__)) return retval; 
-        if (util::GRError((retval = cudaMalloc(&d_temp_storage, temp_storage_bytes)), "sort WTF malloc d_temp_storage failed", __FILE__, __LINE__)) return retval;
-        if (util::GRError((retval = cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_rank_curr, d_node_id, graph_slice->nodes)), "cub::DeviceRadixSort::SortPairsDescending failed", __FILE__, __LINE__)) return retval;
-
-        //if (util::GRError((retval = cudaMemcpy(problem->data_slices[0]->d_rank_curr, d_rank_curr.Current(), sizeof(Value)*graph_slice->nodes, cudaMemcpyDeviceToDevice)), "sort WTF copy back rank_currs failed", __FILE__, __LINE__)) return retval;
-        if (util::GRError((retval = cudaMemcpy(problem->data_slices[0]->d_node_ids, d_node_id.Current(), sizeof(VertexId)*graph_slice->nodes, cudaMemcpyDeviceToDevice)), "sort WTF copy back node ids failed", __FILE__, __LINE__)) return retval;
-
-        if (util::GRError((retval = cudaFree(d_temp_storage)), "sort WTF free d_temp_storage failed", __FILE__, __LINE__)) return retval;
-        if (util::GRError((retval = cudaFree(node_id)), "sort WTF free node_id failed", __FILE__, __LINE__)) return retval;
-        if (util::GRError((retval = cudaFree(rank_curr)), "sort WTF free rank_curr failed", __FILE__, __LINE__)) return retval;
-
         /*
-           3 compute atomicAdd their neighbors' incoming node number.
-           4 set hub nodes in the frontier_keys and auth nodes in the frontier_values
-           5 change the salsa functor to be aware of the bitmap test
+         * 1 according to the first 1000 circle of trust nodes. Get all their neighbors.
+           2 compute atomicAdd their neighbors' incoming node number.
          */
-        //1 according to the first 1000 Circle of Trust nodes. Get all their neighbors.
-        //2 write these circle of trust nodes in a bitmap
         frontier_attribute.queue_index          = 0;        // Work queue index
         frontier_attribute.selector             = 0;
         frontier_attribute.queue_reset          = true;
@@ -532,10 +510,11 @@ class WTFEnactor : public EnactorBase
             NormalizeRank<WTFProblem>(problem, context, 0, graph_slice->nodes);
 
             enactor_stats.iteration++;
-            printf("\n");
 
             if (enactor_stats.iteration >= max_salsa_iteration) break;
         }
+
+        util::CUBRadixSort<Value, VertexId>(false, graph_slice->nodes, problem->data_slices[0]->d_refscore_curr, problem->data_slices[0]->d_node_ids); 
 
         } while(0); 
 

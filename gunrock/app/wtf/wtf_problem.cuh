@@ -169,7 +169,7 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
 
                 if (retval = util::GRError(cudaMemcpy(
                                 h_rank,
-                                data_slices[0]->d_rank_curr,
+                                data_slices[0]->d_refscore_curr,
                                 sizeof(Value) * nodes,
                                 cudaMemcpyDeviceToHost),
                             "WTFProblem cudaMemcpy d_rank_curr failed", __FILE__, __LINE__)) break;
