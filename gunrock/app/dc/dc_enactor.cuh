@@ -16,6 +16,7 @@
 
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
+#include <gunrock/util/sort_utils.cuh>
 
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
@@ -225,6 +226,7 @@ class DCEnactor : public EnactorBase
     int             max_grid_size = 0)
     {
         typedef typename DCProblem::SizeT      SizeT;
+        typedef typename DCProblem::Value      Value;
         typedef typename DCProblem::VertexId   VertexId;
         
         /*
@@ -262,10 +264,10 @@ class DCEnactor : public EnactorBase
             	util::DisplayDeviceResults(problem->data_slices[0]->d_degrees, graph_slice->nodes);
         	}
 
-            // sort by key using mgpu
-       	   	MergesortPairs(problem->data_slices[0]->d_degrees,
-                problem->data_slices[0]->d_node_id, graph_slice->nodes, mgpu::greater<int>(), context);
-			
+            // sort by key
+            util::CUBRadixSort<Value, VertexId>(false, graph_slice->nodes, 
+                problem->data_slices[0]->d_degrees, problem->data_slices[0]->d_node_id);
+
 			if (DEBUG)
 			{
             	printf("sorted data_slices[0] d_node_id");

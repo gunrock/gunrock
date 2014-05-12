@@ -304,8 +304,7 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
                 cudaMemcpyHostToDevice),
                 "DCProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
         }
-
-        
+ 
         // Fillin the initial input_queue for DC problem, this needs to be modified
         // in multi-GPU scene
 
