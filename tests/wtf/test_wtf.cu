@@ -79,7 +79,7 @@ bool PRCompare(
  ******************************************************************************/
  void Usage()
  {
- printf("\ntest_pr <graph type> <graph type args> [--device=<device_index>] "
+ printf("\ntest_wtf <graph type> <graph type args> [--device=<device_index>] "
         "[--undirected] [--instrumented] [--quick] "
         "[--v]\n"
         "\n"
@@ -192,10 +192,11 @@ void DisplayStats(
     typename SizeT>
 void SimpleReferencePr(
     const Csr<VertexId, Value, SizeT>       &graph,
+    VertexId                                src,
     VertexId                                *node_id,
     Value                                   *rank,
     Value                                   delta,
-    Value                                   error,
+    Value                                   alpha,
     SizeT                                   max_iter) 
 {
     using namespace boost;
@@ -223,7 +224,7 @@ void SimpleReferencePr(
     CpuTimer cpu_timer;
     cpu_timer.Start();
 
-    remove_dangling_links(g);
+    //remove_dangling_links(g);
 
     std::vector<Value> ranks(num_vertices(g));
     page_rank(g,
@@ -238,7 +239,7 @@ void SimpleReferencePr(
         rank[i] = ranks[i];
     }
 
-    //sort the top page ranks
+     //sort the top page ranks
      RankPair<SizeT, Value> *pr_list = (RankPair<SizeT, Value>*)malloc(sizeof(RankPair<SizeT, Value>) * num_vertices(g));
      for (int i = 0; i < num_vertices(g); ++i)
      {
@@ -247,15 +248,77 @@ void SimpleReferencePr(
      }
      std::stable_sort(pr_list, pr_list + num_vertices(g), PRCompare<RankPair<SizeT, Value> >);
 
+     std::vector<int> in_degree(num_vertices(g));
+     std::vector<Value> refscore(num_vertices(g));
+
      for (int i = 0; i < num_vertices(g); ++i)
      {
          node_id[i] = pr_list[i].vertex_id;
-         rank[i] = pr_list[i].page_rank;
+         rank[i] = (i == src) ? 1.0 : 0;
+         in_degree[i] = 0;
+         refscore[i] = 0;
      }
 
      free(pr_list);
 
-    printf("CPU BFS finished in %lf msec.\n", elapsed);
+     int cot_size = (graph.nodes > 1000) ? 1000 : graph.nodes;
+
+     for (int i = 0; i < cot_size; ++i) {
+        int node = node_id[i];
+        for (int j = graph.row_offsets[node]; j < graph.row_offsets[node+1]; ++j) {
+            VertexId edge = graph.column_indices[j];
+            ++in_degree[edge];
+        }
+     }
+
+     int salsa_iter = 1.0/alpha+1; 
+     for (int iter = 0; iter < salsa_iter; ++iter) {
+         for (int i = 0; i < cot_size; ++i) {
+             int node = node_id[i];
+             int out_degree = graph.row_offsets[node+1]-graph.row_offsets[node];
+             for (int j = graph.row_offsets[node]; j < graph.row_offsets[node+1]; ++j) {
+                 VertexId edge = graph.column_indices[j];
+                 Value val = rank[node]/ (out_degree > 0 ? out_degree : 1.0);
+                 refscore[edge] += val;
+             }
+         }
+         for (int i = 0; i < cot_size; ++i) {
+            rank[node_id[i]] = 0;
+         }
+
+         for (int i = 0; i < cot_size; ++i) {
+             int node = node_id[i];
+             rank[node] += (node == src) ? alpha : 0;
+             for (int j = graph.row_offsets[node]; j < graph.row_offsets[node+1]; ++j) {
+                 VertexId edge = graph.column_indices[j];
+                 Value val = (1-alpha)*refscore[edge]/in_degree[edge];
+                 rank[node] += val;
+             }
+         }
+        
+        for (int i = 0; i < cot_size; ++i) {
+            if (iter+1<salsa_iter) refscore[node_id[i]] = 0;
+         }
+     }
+
+    //sort the top page ranks
+     RankPair<SizeT, Value> *final_list = (RankPair<SizeT, Value>*)malloc(sizeof(RankPair<SizeT, Value>) * num_vertices(g));
+     for (int i = 0; i < num_vertices(g); ++i)
+     {
+         final_list[i].vertex_id = node_id[i];
+         final_list[i].page_rank = refscore[i];
+     }
+     std::stable_sort(final_list, final_list + num_vertices(g), PRCompare<RankPair<SizeT, Value> >);
+
+     for (int i = 0; i < num_vertices(g); ++i)
+     {
+         node_id[i] = final_list[i].vertex_id;
+         rank[i] = final_list[i].page_rank;
+     }
+
+     free(final_list);
+
+    printf("CPU Who-To-Follow finished in %lf msec.\n", elapsed);
 }
 
 /**
@@ -348,10 +411,11 @@ void RunTests(
             printf("compute ref value\n");
             SimpleReferencePr(
                     graph,
+                    src,
                     reference_node_id,
                     reference_check,
                     delta,
-                    error,
+                    alpha,
                     max_iter);
             printf("\n");
         }

@@ -77,6 +77,8 @@ namespace util {
             if (util::GRError((retval = cudaFree(d_temp_storage)), "CUB Radixsort free d_temp_storage failed", __FILE__, __LINE__)) return retval;
             if (util::GRError((retval = cudaFree(key)), "CUB Radixsort free key failed", __FILE__, __LINE__)) return retval;
             if (util::GRError((retval = cudaFree(value)), "CUB Radixsort free value failed", __FILE__, __LINE__)) return retval;
+
+            return retval;
         }
 
     /** @} */
