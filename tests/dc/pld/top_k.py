@@ -1,20 +1,22 @@
 #!/usr/bin/env python
 
-# Find Top K degree centrality node_ids and URLs
-# Input: gpu_result_file mapping_info_file index_file
-# Output format: | node_id | #degrees | URL |
+# find top K degree centrality node_ids and URLs
+# file: top_k.py
+# input:       | gpu_result_file  | mapping_info_file | index_file |
+# output text: | original_node_id | number of degrees |     URL    |
+# output file: results.txt and results.json
 
 import sys
 import fileinput
+import csv
 
-# check input format
+# check input
 if len(sys.argv) != 4:
-    print 'Usage: python top_k.py out_file map_info index_file'
+    print 'Usage: python top_k.py gpu_output map_info index'
     sys.exit()
 
 # put mapping information into a dictionary
 map_dict = {}
-# for item in map_dict
 for line in fileinput.input(sys.argv[2]):
     (key, val) = line.split()
     map_dict[int(key)] = val
@@ -26,18 +28,65 @@ for line in fileinput.input(sys.argv[3]):
     index_dict[int(key)] = val
 
 # find original vertex ids and URLs
-out_file = open(sys.argv[1])
+out_file = open(sys.argv[1]) # open gpu_output text file
 results = open('results.txt', 'w')
-for line0 in out_file.readlines():
-    (vertex_id, num_degrees) = line0.split()
-    #print "Results  Vertex ID:" + str(vertex_id) + '\t\t',
-    #print "Original Vertex ID:" + str(map_dict[int(vertex_id)])
-    for line1 in fileinput.input(sys.argv[3]):
-        (URL, original_id) = line1.split()
-        if original_id == vertex_id:
-            print str(original_id) + '\t' + str(num_degrees) + '\t' + str(index_dict[int(original_id)])
-            # write line back to the output file
-            new_line = str(original_id) + '\t' + str(num_degrees) + '\t' + str(index_dict[int(original_id)]) + '\n'
-            results.write(new_line)
+head = 'node_id degree_centrality website_link\n'
+results.write(head)
+
+for line in out_file.readlines():
+    (node, dc) = line.split()
+    #print "gpu results ndoe id:" + str(node) + '\t\t',
+    #print "original node id:" + str(map_dict[int(node)])
+    for key in index_dict:
+        if key == int(node):
+            #print str(key) + ' ' + str(dc) + ' ' + str(index_dict[int(key)])
+            # write new line back into the output file: results.txt
+            nl = str(key) + ' ' + str(dc) + ' ' + str(index_dict[int(key)]) + '\n'
+            results.write(nl)
+
 results.close()
+
+# Covert to JSON format output
+jsfile = file('results.json', 'w')
+jsfile.write('[\r\n')
+
+with open('results.txt', 'r') as f:
+    next(f) # skip headings
+    reader = csv.reader(f, delimiter = ' ')
+    
+    # get the total number of rows excluded the heading
+    row_count = len(list(reader))
+    ite = 0
+    
+    # back to the first position
+    f.seek(0)
+    next(f)
+    
+    # write results
+    for node,dc,url in reader:
+        ite += 1
+        jsfile.write('\t{\r\n')
+        
+        n = '\t\t\"node_id\": ' + node + ',\r\n'
+        d = '\t\t\"degree_centrality\": ' + dc + ',\r\n'
+        u = '\t\t\"website_link\": \"' + url + '\"\r\n'
+                                                      
+        jsfile.write(n)
+        jsfile.write(d)
+        jsfile.write(u)
+
+        jsfile.write('\t}')
+
+        # omit comma for last row item
+        if ite < row_count:
+            jsfile.write(',\r\n')
+
+        jsfile.write('\r\n')
+
+jsfile.write(']')
+jsfile.close()
+
+print '==> Complete.'
+print 'See results in text file: results.txt'
+print 'Or results in JSON format: results.json'
 # end
