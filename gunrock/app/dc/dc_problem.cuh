@@ -140,7 +140,7 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
      *
      *\return cudaError_t object which indicates the success of all CUDA function calls.
      */
-	cudaError_t Extract(VertexId *h_node_id, Value *h_degrees)
+	cudaError_t Extract(VertexId *h_node_id, Value *h_degrees, SizeT nodes)
     {
         cudaError_t retval = cudaSuccess;
         do 

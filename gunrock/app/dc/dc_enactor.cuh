@@ -25,15 +25,10 @@
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/dc/dc_problem.cuh>
-//#include <gunrock/app/dc/dc_functor.cuh>
-
-#include <moderngpu.cuh>
 
 namespace gunrock {
 namespace app {
 namespace dc {
-
-using namespace mgpu;
 
 /**
  * @brief DC problem enactor class.
@@ -86,14 +81,15 @@ class DCEnactor : public EnactorBase
         int edge_map_grid_size,
         int vertex_map_grid_size)
     {
-        typedef typename ProblemData::SizeT         SizeT;
-        typedef typename ProblemData::VertexId      VertexId;
+        typedef typename ProblemData::SizeT     SizeT;
+        typedef typename ProblemData::VertexId  VertexId;
         
         cudaError_t retval = cudaSuccess;
 
         do {
+            
             //initialize the host-mapped "done"
-            if (!done) 
+            if (!done)
             {
                 int flags = cudaHostAllocMapped;
 
@@ -205,7 +201,7 @@ class DCEnactor : public EnactorBase
     /** @} */
 
     /**
-     * @brief Enacts a breadth-first search computing on the specified graph.
+     * @brief Enacts a degree centrality on the specified graph.
      *
      * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
      * @tparam VertexMapPolicy Kernel policy for vertex mapping.
@@ -221,7 +217,6 @@ class DCEnactor : public EnactorBase
         typename VertexMapPolicy,
         typename DCProblem>
     cudaError_t EnactDC(
-    CudaContext     &context,
     DCProblem      	*problem,
     int             max_grid_size = 0)
     {
@@ -229,56 +224,26 @@ class DCEnactor : public EnactorBase
         typedef typename DCProblem::Value      Value;
         typedef typename DCProblem::VertexId   VertexId;
         
-        /*
-        typedef DCFunctor<
-            VertexId,
-            SizeT,
-            VertexId,
-            DCProblem> DcFunctor;
-        */
-        
         cudaError_t retval = cudaSuccess;
 
         do {
-            // Add Enactor Code here
-			// determine grid size for edge and vertex mapping
-			int edge_map_occupancy = EdgeMapPolicy::CTA_OCCUPANCY;
-		 	int edge_map_grid_size = MaxGridSize(edge_map_occupancy, max_grid_size);
-		 	int vertex_map_occupancy = VertexMapPolicy::CTA_OCCUPANCY;
-			int vertex_map_grid_size = MaxGridSize(vertex_map_occupancy, max_grid_size);
+            
+            // initialization
+            if (retval = Setup(problem, 0, 0)) break;
 
-			// initialization
-			if (retval = Setup(problem, edge_map_grid_size, vertex_map_grid_size)) break;
-			
 			// single gpu graph slice
 			typename DCProblem::GraphSlice *graph_slice = problem->graph_slices[0];
 			typename DCProblem::DataSlice	*data_slice	= problem->d_data_slices[0];
 
 			fflush(stdout);
 
-			if (DEBUG)
-			{
-				printf("data_slices[0] d_node_id");
-            	util::DisplayDeviceResults(problem->data_slices[0]->d_node_id, graph_slice->nodes);
-            	printf("data_slices[0] d_degrees");
-            	util::DisplayDeviceResults(problem->data_slices[0]->d_degrees, graph_slice->nodes);
-        	}
-
-            // sort by key
+            // sort node_ids by number of degrees 
             util::CUBRadixSort<Value, VertexId>(false, graph_slice->nodes, 
                 problem->data_slices[0]->d_degrees, problem->data_slices[0]->d_node_id);
 
-			if (DEBUG)
-			{
-            	printf("sorted data_slices[0] d_node_id");
-            	util::DisplayDeviceResults(problem->data_slices[0]->d_node_id, graph_slice->nodes);
-            	printf("sorted data_slices[0] d_degrees");
-            	util::DisplayDeviceResults(problem->data_slices[0]->d_degrees, graph_slice->nodes);
-			}
-
         }while(0);
 
-        printf("\n ----- GPU Degree Centrality Complete ----- \n");
+        if (DEBUG)   printf("====> GPU Degree Centrality Complete\n");
         return retval;
     }
 
@@ -300,7 +265,6 @@ class DCEnactor : public EnactorBase
      */
     template <typename DCProblem>
     cudaError_t Enact(
-        CudaContext	&context,
         DCProblem	*problem,
         int			max_grid_size = 0)
     {
@@ -335,8 +299,7 @@ class DCEnactor : public EnactorBase
                 7>                                  // LOG_SCHEDULE_GRANULARITY
                 EdgeMapPolicy;
 
-            return  EnactDC<EdgeMapPolicy, VertexMapPolicy, DCProblem>(
-                        context, problem, max_grid_size);
+            return  EnactDC<EdgeMapPolicy, VertexMapPolicy, DCProblem>(problem, max_grid_size);
         }
 
         //to reduce compile time, get rid of other architecture for now
