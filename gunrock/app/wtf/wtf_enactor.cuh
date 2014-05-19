@@ -50,7 +50,6 @@ class WTFEnactor : public EnactorBase
 
     volatile int        *done;
     int                 *d_done;
-    cudaEvent_t         throttle_event;
 
     // Methods
     protected:
@@ -87,9 +86,6 @@ class WTFEnactor : public EnactorBase
                 if (retval = util::GRError(cudaHostGetDevicePointer((void**)&d_done, (void*) done, 0),
                     "WTFEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) break;
 
-                // Create throttle event
-                if (retval = util::GRError(cudaEventCreateWithFlags(&throttle_event, cudaEventDisableTiming),
-                    "WTFEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) break;
             }
 
             done[0]             = -1;
@@ -132,8 +128,6 @@ class WTFEnactor : public EnactorBase
             util::GRError(cudaFreeHost((void*)done),
                 "WTFEnactor cudaFreeHost done failed", __FILE__, __LINE__);
 
-            util::GRError(cudaEventDestroy(throttle_event),
-                "WTFEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
         }
     }
 
@@ -242,6 +236,8 @@ class WTFEnactor : public EnactorBase
 
         cudaError_t retval = cudaSuccess;
 
+        unsigned int    *d_scanned_edges = NULL; 
+        
         do {
             if (DEBUG) {
                 printf("Iteration, Edge map queue, Vertex map queue\n");
@@ -271,10 +267,17 @@ class WTFEnactor : public EnactorBase
 
             int edge_map_queue_len = frontier_attribute.queue_length;
 
+            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_scanned_edges,
+                                graph_slice->edges * sizeof(unsigned int)),
+                            "PBFSProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
+            }
+
             // Step through WTF iterations 
             while (done[0] < 0) {
 
-                if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, edge_map_queue_len)) break;
+                //if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, edge_map_queue_len)) break;
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, WTFProblem, PrFunctor>(
                     d_done,
@@ -284,7 +287,7 @@ class WTFEnactor : public EnactorBase
                     (VertexId*)NULL,
                     (bool*)NULL,
                     (bool*)NULL,
-                    (unsigned int*)NULL,
+                    d_scanned_edges,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],            // d_out_queue
                     (VertexId*)NULL,
@@ -300,7 +303,6 @@ class WTFEnactor : public EnactorBase
                     gunrock::oprtr::advance::V2V);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates 
 
                 frontier_attribute.queue_index++;
 
@@ -316,21 +318,13 @@ class WTFEnactor : public EnactorBase
                         enactor_stats.total_lifetimes)) break;
                 }
 
-                // Throttle
-                if (enactor_stats.iteration & 1) {
-                    if (retval = util::GRError(cudaEventRecord(throttle_event),
-                        "WTFEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
-                } else {
-                    if (retval = util::GRError(cudaEventSynchronize(throttle_event),
-                        "WTFEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
-                }
 
                 if (frontier_attribute.queue_reset)
                     frontier_attribute.queue_reset = false;
 
                 if (done[0] == 0) break; 
                 
-                if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, edge_map_queue_len)) break;
+                //if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, edge_map_queue_len)) break;
 
                 // Vertex Map
                 gunrock::oprtr::filter::Kernel<FilterKernelPolicy, WTFProblem, PrFunctor>
@@ -352,13 +346,13 @@ class WTFEnactor : public EnactorBase
                     enactor_stats.filter_kernel_stats);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates     
 
                 enactor_stats.iteration++;
                 frontier_attribute.queue_index++;
 
 
                 if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                
                 //num_elements = queue_length;
 
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_next,
@@ -385,7 +379,7 @@ class WTFEnactor : public EnactorBase
                     }
                 }
 
-                if (done[0] == 0 || frontier_attribute.queue_length == 0 || enactor_stats.iteration > max_iteration) break;
+                if (frontier_attribute.queue_length == 0 || enactor_stats.iteration > max_iteration) break;
 
                 if (DEBUG) printf("\n%lld", (long long) enactor_stats.iteration);
 
@@ -406,7 +400,7 @@ class WTFEnactor : public EnactorBase
         long long cot_size                      = (1000 > graph_slice->nodes) ? graph_slice->nodes : 1000; 
         frontier_attribute.queue_length         = cot_size;
 
-        if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, cot_size)) break;
+        //if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, cot_size)) break;
 
         // Edge Map
         gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, WTFProblem, CotFunctor>(
@@ -417,7 +411,7 @@ class WTFEnactor : public EnactorBase
                 (VertexId*)NULL,
                 (bool*)NULL,
                 (bool*)NULL,
-                (unsigned int*)NULL,
+                d_scanned_edges,
                 problem->data_slices[0]->d_node_ids,              // d_in_queue
                 graph_slice->frontier_queues.d_keys[frontier_attribute.selector],            // d_out_queue
                 (VertexId*)NULL,          // d_pred_in_queue
@@ -461,7 +455,7 @@ class WTFEnactor : public EnactorBase
                     (VertexId*)NULL,
                     (bool*)NULL,
                     (bool*)NULL,
-                    (unsigned int*)NULL,
+                    d_scanned_edges,
                     problem->data_slices[0]->d_node_ids,              // d_in_queue
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],            // d_out_queue
                     (VertexId*)NULL,
@@ -490,7 +484,7 @@ class WTFEnactor : public EnactorBase
                     (VertexId*)NULL,
                     (bool*)NULL,
                     (bool*)NULL,
-                    (unsigned int*)NULL,
+                    d_scanned_edges,
                     problem->data_slices[0]->d_node_ids,              // d_in_queue
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],            // d_out_queue
                     (VertexId*)NULL,
@@ -514,9 +508,13 @@ class WTFEnactor : public EnactorBase
             if (enactor_stats.iteration >= max_salsa_iteration) break;
         }
 
+        util::MemsetIdxKernel<<<128, 128>>>(problem->data_slices[0]->d_node_ids, graph_slice->nodes);
+
         util::CUBRadixSort<Value, VertexId>(false, graph_slice->nodes, problem->data_slices[0]->d_refscore_curr, problem->data_slices[0]->d_node_ids); 
 
         } while(0); 
+
+        if (d_scanned_edges) cudaFree(d_scanned_edges);
 
         if (DEBUG) printf("\nGPU WTF Done.\n");
         return retval;
@@ -568,11 +566,11 @@ class WTFEnactor : public EnactorBase
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 8,                                  // MIN_CTA_OCCUPANCY
-                6,                                  // LOG_THREADS
+                10,                                  // LOG_THREADS
+                8,
+                32*1024,
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
-                0,
-                0,
                 5,                                  // LOG_RAKING_THREADS
                 32,                            // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD

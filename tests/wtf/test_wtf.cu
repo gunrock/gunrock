@@ -469,7 +469,7 @@ void RunTests(
     Value               delta               = 0.85f;           // Use whatever the specified graph-type's default is
     Value               alpha               = 0.2f;
     Value               error               = 0.01f;        // Error threshold
-    SizeT               max_iter            = 20;
+    SizeT               max_iter            = 5;
     bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
     int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use

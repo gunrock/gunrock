@@ -148,7 +148,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         max_out,
                                         ADVANCE_TYPE);
 
-            Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length, (int)0, mgpu::plus<int>(),
+            /*Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
 
             SizeT *temp = new SizeT[1];
@@ -178,7 +178,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         enactor_stats.advance_kernel_stats,
                         ADVANCE_TYPE,
                         inverse_graph);
-            }
+            }*/
             //else
             /*{
                 unsigned int split_val = (output_queue_len + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
