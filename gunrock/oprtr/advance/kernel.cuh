@@ -137,6 +137,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             // Use sorted sort to compute partition bound for each work-chunk
             // load edge-expand-partitioned kernel
             int num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
+            printf("num_block: %d\n");
             gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
             <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
                                         d_row_offsets,

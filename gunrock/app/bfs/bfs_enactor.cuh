@@ -221,6 +221,7 @@ class BFSEnactor : public EnactorBase
 
         cudaError_t retval = cudaSuccess;
 
+        unsigned int    *d_scanned_edges = NULL; 
         do {
             // Determine grid size(s)
             if (DEBUG) {
@@ -248,6 +249,13 @@ class BFSEnactor : public EnactorBase
 
             frontier_attribute.queue_reset = true; 
 
+            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_scanned_edges,
+                                graph_slice->edges * sizeof(unsigned int)),
+                            "PBFSProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
+            }
+
 
             fflush(stdout);
             // Step through BFS iterations
@@ -263,7 +271,7 @@ class BFSEnactor : public EnactorBase
                     (VertexId*)NULL,
                     (bool*)NULL,
                     (bool*)NULL,
-                    (unsigned int*)NULL,
+                    d_scanned_edges,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],            // d_out_queue
                     (VertexId*)NULL,          // d_pred_in_queue
@@ -393,6 +401,8 @@ class BFSEnactor : public EnactorBase
             
         } while(0);
 
+        if (d_scanned_edges) cudaFree(d_scanned_edges);
+
         if (DEBUG) printf("\nGPU BFS Done.\n");
         return retval;
     }
@@ -480,7 +490,7 @@ class BFSEnactor : public EnactorBase
                     INSTRUMENT,                         // INSTRUMENT
                     8,                                  // MIN_CTA_OCCUPANCY
                     10,                                  // LOG_THREADS
-                    256,                                  // LOG_BLOCKS
+                    8,                                  // LOG_BLOCKS
                     32*128,                                  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
                     1,                                  // LOG_LOAD_VEC_SIZE
                     0,                                  // LOG_LOADS_PER_TILE
