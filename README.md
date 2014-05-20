@@ -96,6 +96,8 @@ Gunrock Developers
 - Yuechao Pan, University of
   California, Davis
 
+- [Yuduo Wu](http://www.ece.ucdavis.edu/~wyd855/), University of California, Davis
+
 - [John Owens](http://www.ece.ucdavis.edu/~jowens/), University of California,
   Davis [general help]
 
