@@ -20,8 +20,8 @@
 
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel_policy.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel_policy.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/dc/dc_problem.cuh>
@@ -45,7 +45,7 @@ protected:
    * CTA duty kernel stats
    */
   util::KernelRuntimeStatsLifetime edge_map_kernel_stats;
-  util::KernelRuntimeStatsLifetime vertex_map_kernel_stats;
+  util::KernelRuntimeStatsLifetime filter_kernel_stats;
   
   unsigned long long total_runtimes;  // Total working time by each CTA
   unsigned long long total_lifetimes; // Total life time of each CTA
@@ -71,7 +71,7 @@ protected:
    *
    * @param[in] problem DC Problem object which holds the graph data and DC problem data to compute.
    * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-   * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
+   * @param[in] filter_grid_size CTA occupancy for filter kernel call.
    *
    * \return cudaError_t object which indicates the success of all CUDA function calls.
    */
@@ -79,7 +79,7 @@ template <typename ProblemData>
 cudaError_t Setup(
 		  ProblemData *problem,
 		  int edge_map_grid_size,
-		  int vertex_map_grid_size)
+		  int filter_grid_size)
   {
     typedef typename ProblemData::SizeT     SizeT;
     typedef typename ProblemData::VertexId  VertexId;
@@ -108,7 +108,7 @@ cudaError_t Setup(
       
       //initialize runtime stats
       if (retval = edge_map_kernel_stats.Setup(edge_map_grid_size)) break;
-      if (retval = vertex_map_kernel_stats.Setup(vertex_map_grid_size)) break;
+      if (retval = filter_kernel_stats.Setup(filter_grid_size)) break;
       
       //Reset statistics
       iteration           =  0;
@@ -204,7 +204,7 @@ void GetStatistics(
    * @brief Enacts a degree centrality on the specified graph.
    *
    * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-   * @tparam VertexMapPolicy Kernel policy for vertex mapping.
+   * @tparam FilterKernelPolicy Kernel policy for filtering.
    * @tparam DCProblem DC Problem type.
    *
    * @param[in] problem DCProblem object.
@@ -214,7 +214,7 @@ void GetStatistics(
    */
 template<
   typename EdgeMapPolicy,
-  typename VertexMapPolicy,
+  typename FilterKernelPolicy,
   typename DCProblem>
 cudaError_t EnactDC(
 		    DCProblem      	*problem,
@@ -270,7 +270,7 @@ cudaError_t Enact(
   {
     if (this->cuda_props.device_sm_version >= 300) 
       {
-	typedef gunrock::oprtr::vertex_map::KernelPolicy<
+	typedef gunrock::oprtr::filter::KernelPolicy<
 	  DCProblem,                         	// Problem data type
 	  300,                                // CUDA_ARCH
 	  INSTRUMENT,                         // INSTRUMENT
@@ -283,7 +283,7 @@ cudaError_t Enact(
 	  5,                                  // LOG_RAKING_THREADS
 	  5,                                  // END_BITMASK_CULL
 	  8>                                  // LOG_SCHEDULE_GRANULARITY
-	  VertexMapPolicy;
+	  FilterKernelPolicy;
 	
 	typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
 	  DCProblem,                         	// Problem data type
@@ -299,7 +299,7 @@ cudaError_t Enact(
 	  7>                                  // LOG_SCHEDULE_GRANULARITY
 	  EdgeMapPolicy;
 	
-	return  EnactDC<EdgeMapPolicy, VertexMapPolicy, DCProblem>(problem, max_grid_size);
+	return  EnactDC<EdgeMapPolicy, FilterKernelPolicy, DCProblem>(problem, max_grid_size);
       }
     
     //to reduce compile time, get rid of other architecture for now
