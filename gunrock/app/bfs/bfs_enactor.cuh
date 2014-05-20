@@ -257,6 +257,7 @@ class BFSEnactor : public EnactorBase
             }
 
 
+            
             fflush(stdout);
             // Step through BFS iterations
             
@@ -314,9 +315,12 @@ class BFSEnactor : public EnactorBase
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "advance::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates 
 
-
                 frontier_attribute.queue_index++;
                 frontier_attribute.selector ^= 1;
+
+                if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
+                    if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                }
                 
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
@@ -370,6 +374,10 @@ class BFSEnactor : public EnactorBase
                 frontier_attribute.queue_index++;
                 frontier_attribute.selector ^= 1;
                 enactor_stats.iteration++;
+
+                if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
+                    if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                }
 
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;

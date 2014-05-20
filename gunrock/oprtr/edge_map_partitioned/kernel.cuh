@@ -158,7 +158,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         int bid = blockIdx.x;
 
         int my_id = bid*blockDim.x + tid;
-            printf("my_id: %d\n");
 
         if (my_id >= num_elements || my_id >= max_edge)
             return;

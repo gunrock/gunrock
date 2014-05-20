@@ -9,6 +9,8 @@
 #include <gunrock/util/io/modified_store.cuh>
 #include <gunrock/util/operators.cuh>
 
+#include <gunrock/util/test_utils.cuh>
+
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/app/enactor_base.cuh>
 
@@ -137,7 +139,6 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             // Use sorted sort to compute partition bound for each work-chunk
             // load edge-expand-partitioned kernel
             int num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
-            printf("num_block: %d\n");
             gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
             <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
                                         d_row_offsets,
@@ -149,7 +150,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         max_out,
                                         ADVANCE_TYPE);
 
-            /*Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length, (int)0, mgpu::plus<int>(),
+            Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
 
             SizeT *temp = new SizeT[1];
@@ -179,7 +180,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         enactor_stats.advance_kernel_stats,
                         ADVANCE_TYPE,
                         inverse_graph);
-            }*/
+            }
             //else
             /*{
                 unsigned int split_val = (output_queue_len + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
