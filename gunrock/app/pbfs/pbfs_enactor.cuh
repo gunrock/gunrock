@@ -126,11 +126,11 @@ class PBFSEnactor : public EnactorBase
             if (ProblemData::ENABLE_IDEMPOTENCE) {
                 int bytes = (graph_slice->nodes + 8 - 1) / 8;
                 cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
+                gunrock::oprtr::vertex_map::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
                 if (retval = util::GRError(cudaBindTexture(
                                 0,
                                 gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref,
                                 data_slice->d_visited_mask,
-                                bitmask_desc,
                                 bytes),
                             "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
             }
