@@ -122,32 +122,32 @@ class BFSEnactor : public EnactorBase
 
             // Bind row-offsets and bitmask texture
             cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
+            gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref.channelDesc = row_offsets_desc;
             if (retval = util::GRError(cudaBindTexture(
                     0,
                     gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
                     graph_slice->d_row_offsets,
-                    row_offsets_desc,
                     (graph_slice->nodes + 1) * sizeof(SizeT)),
                         "BFSEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
 
             if (ProblemData::ENABLE_IDEMPOTENCE) {
                 int bytes = (graph_slice->nodes + 8 - 1) / 8;
                 cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
+                gunrock::oprtr::vertex_map::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
                 if (retval = util::GRError(cudaBindTexture(
                                 0,
                                 gunrock::oprtr::vertex_map::BitmaskTex<unsigned char>::ref,
                                 data_slice->d_visited_mask,
-                                bitmask_desc,
                                 bytes),
                             "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
             }
 
             /*cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
+            gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref.channelDesc = column_indices_desc;
             if (retval = util::GRError(cudaBindTexture(
                             0,
                             gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref,
                             graph_slice->d_column_indices,
-                            column_indices_desc,
                             graph_slice->edges * sizeof(VertexId)),
                         "BFSEnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;*/
         } while (0);

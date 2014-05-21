@@ -126,20 +126,20 @@ class PREnactor : public EnactorBase
 
             // Bind row-offsets texture
             cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
+            gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref.channelDesc = row_offsets_desc;
             if (retval = util::GRError(cudaBindTexture(
                     0,
                     gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
                     graph_slice->d_row_offsets,
-                    row_offsets_desc,
                     (graph_slice->nodes + 1) * sizeof(SizeT)),
                         "PREnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
 
             /*cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
+            gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref.channelDesc = column_indicies_desc;
             if (retval = util::GRError(cudaBindTexture(
                             0,
                             gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref,
                             graph_slice->d_column_indices,
-                            column_indices_desc,
                             graph_slice->edges * sizeof(VertexId)),
                         "PREnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;*/
         } while (0);
