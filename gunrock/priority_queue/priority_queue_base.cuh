@@ -41,6 +41,7 @@ struct PriorityQueueBase
     util::DoubleBuffer<VertexId, VertexId>      queue;
     
     SizeT                                       priority_level;
+    SizeT                                       queue_length;
     SizeT                                       max_queue_length;
 
     PriorityQueueBase() {}
