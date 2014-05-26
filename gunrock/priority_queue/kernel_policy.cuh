@@ -30,7 +30,7 @@
 namespace gunrock {
 namespace priority_queue {
 
-typename <
+template <
     typename _ProblemData,
     int _CUDA_ARCH,
     bool _INSTRUMENT,

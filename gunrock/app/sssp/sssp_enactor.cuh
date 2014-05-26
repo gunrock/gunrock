@@ -21,6 +21,8 @@
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel_policy.cuh>
+#include <gunrock/priority_queue/kernel.cuh>
+#include <gunrock/priority_queue/kernel_policy.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/sssp/sssp_problem.cuh>
