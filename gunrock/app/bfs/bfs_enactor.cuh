@@ -117,7 +117,7 @@ class BFSEnactor : public EnactorBase
             if (ProblemData::ENABLE_IDEMPOTENCE) {
                 int bytes = (graph_slice->nodes + 8 - 1) / 8;
                 cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
-                gunrock::oprtr::vertex_map::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
+                gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
                 if (retval = util::GRError(cudaBindTexture(
                                 0,
                                 gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref,
