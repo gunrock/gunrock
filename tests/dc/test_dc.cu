@@ -53,7 +53,7 @@ bool g_stream_from_host;
  ******************************************************************************/
 void Usage()
 {
-  printf("\ntest_dc <graph type> <graph type args> <k value args> [--device=<device_index>] "
+  printf("\ntest_dc <graph type> <graph type args> [--top=<K_value>] [--device=<device_index>] "
 	 "[--instrumented] [--quick] "
 	 "[--v]\n"
 	 "\n"
@@ -77,16 +77,32 @@ template<
   typename VertexId, 
   typename Value, 
   typename SizeT>
-void DisplaySolution(VertexId *h_node_id, Value *h_degrees, SizeT num_nodes)
+void DisplaySolution(VertexId *h_node_id, 
+		     Value    *h_degrees, 
+		     VertexId *h_sub_row_offsets,
+		     VertexId *h_sub_col_indices,
+		     SizeT    num_nodes)
 {
-  // only display top k nodes and their degrees
-  printf("====> Top %d degree nodes: \n", num_nodes);
-  printf("|vertex_id|#degrees|\n");
+  printf("====> top %d nodes: \n", num_nodes);
+  printf("NodeId DegreeCentrality\n");
   for (SizeT i = 0; i < num_nodes; ++i)
+  {
+    printf("%d %d\n", h_node_id[i], h_degrees[i]);
+  }
+  /*
+  printf("====> Sub-graph of top %d nodes\n", num_nodes);
+  for (SizeT i = 0; i < num_nodes; ++i)
+  {
+    printf("%d: [", h_node_id[i]);
+    for (SizeT j = h_sub_row_offsets[i]; 
+	 j < h_sub_row_offsets[i]+h_degrees[i]; ++j)
     {
-      printf("%d %d\n", h_node_id[i], h_degrees[i]);
+      printf(" %d", h_sub_col_indices[j]);
     }
-  printf("\n");
+    printf("]\n");
+  }
+  */
+  fflush(stdout);
 }
 
 /**
@@ -115,11 +131,10 @@ template<
   typename VertexId,
   typename Value,
   typename SizeT>
-void SimpleReferenceDC(
-		       const Csr<VertexId, Value, SizeT> 	&graph,
-		       VertexId 				node_id,
-		       Value 					degrees,
-		       SizeT                                    top_nodes)
+void SimpleReferenceDC(const Csr<VertexId, Value, SizeT> &graph,
+		       VertexId 			 node_id,
+		       Value 				 degrees,
+		       SizeT                             top_nodes)
 {
   // preparation
   
@@ -164,11 +179,11 @@ template <
   typename Value,
   typename SizeT,
   bool INSTRUMENT>
-void RunTests(
-	      const Csr<VertexId, Value, SizeT> &graph,
-	      int max_grid_size,
-	      int num_gpus,
-	      int top_nodes)
+void RunTests(const Csr<VertexId, Value, SizeT> &graph,
+	      int                               max_grid_size,
+	      int                               num_gpus,
+	      int                               top_nodes,
+	      CudaContext                       &context)
 {
   // define the problem data structure for graph primitive
   typedef DCProblem<
@@ -184,21 +199,22 @@ void RunTests(
   // create a pointer of the DCProblem type 
   Problem *dc_problem = new Problem;
   
-  // malloc host memory
-  // SizeT 		top_nodes = 100; // only copy and display top K values
+  // reset top value if K is larger than total #vertices
   if (top_nodes > graph.nodes)
-    {
-      top_nodes = graph.nodes;
-    }
-  VertexId 	*h_node_id = (VertexId*)malloc(sizeof(VertexId) * top_nodes);
-  Value		*h_degrees = (Value*)malloc(sizeof(VertexId) * top_nodes);
+    top_nodes = graph.nodes;
+  
+  // malloc host memory
+  VertexId *h_node_id = (VertexId*)malloc(sizeof(VertexId) * top_nodes);
+  Value	   *h_degrees = (Value*)malloc(sizeof(VertexId) * top_nodes);
+  VertexId *h_sub_row_offsets = (VertexId*)malloc(sizeof(VertexId) * top_nodes);
+  VertexId *h_sub_col_indices = (VertexId*)malloc(sizeof(VertexId) * graph.edges);
   
   // copy data from CPU to GPU
   // initialize data members in DataSlice 
-  util::GRError(dc_problem->Init(
-				 g_stream_from_host,
+  util::GRError(dc_problem->Init(g_stream_from_host,
 				 graph,
-				 num_gpus), "Problem DC Initialization Failed", __FILE__, __LINE__);
+				 num_gpus), 
+		"Problem DC Initialization Failed", __FILE__, __LINE__);
   
   // perform degree centrality
   GpuTimer gpu_timer; // Record the kernel running time
@@ -209,7 +225,7 @@ void RunTests(
   
   gpu_timer.Start();
   
-  util::GRError(dc_enactor.template Enact<Problem>(dc_problem, max_grid_size), 
+  util::GRError(dc_enactor.template Enact<Problem>(context, dc_problem, top_nodes, max_grid_size), 
 		"DC Problem Enact Failed", __FILE__, __LINE__);
   
   gpu_timer.Stop();
@@ -218,11 +234,19 @@ void RunTests(
   printf("====> GPU Degree Centrality finished in %lf msec.\n", elapsed_gpu);
   
   // copy out results back to CPU from GPU using Extract
-  util::GRError(dc_problem->Extract(h_node_id, h_degrees, top_nodes), 
+  util::GRError(dc_problem->Extract(h_node_id, 
+				    h_degrees, 
+				    h_sub_row_offsets, 
+				    h_sub_col_indices, 
+				    top_nodes), 
 		"DC Problem Data Extraction Failed", __FILE__, __LINE__);
   
   // display solution
-  DisplaySolution(h_node_id, h_degrees, top_nodes);
+  DisplaySolution(h_node_id, 
+		  h_degrees, 
+		  h_sub_row_offsets,
+		  h_sub_col_indices,
+		  top_nodes);
   
   // validation
   // CompareResults();
@@ -231,7 +255,9 @@ void RunTests(
   if (dc_problem) delete dc_problem;
   if (h_node_id) free(h_node_id);
   if (h_degrees) free(h_degrees);
-  
+  if (h_sub_row_offsets) free(h_sub_row_offsets);
+  if (h_sub_col_indices) free(h_sub_col_indices);
+
   cudaDeviceSynchronize();
 }
 
@@ -249,37 +275,34 @@ template <
   typename VertexId,
   typename Value,
   typename SizeT>
-void RunTests(
-	      Csr<VertexId, Value, SizeT> &graph,
-	      CommandLineArgs 			&args)
+void RunTests(Csr<VertexId, Value, SizeT> &graph,
+	      CommandLineArgs		  &args,
+	      SizeT                       top_nodes,
+	      CudaContext                 &context)
 {
   bool 	instrumented 	= false;
   int 	max_grid_size 	= 0;            
   int 	num_gpus	= 1;            
-  int   top_nodes       = 100; // default K value
-  
+    
   instrumented = args.CheckCmdLineFlag("instrumented");
-  //top_nodes = args.CheckCmdLineFlag("top_nodes"); // pass K value
-  
+    
   g_quick = args.CheckCmdLineFlag("quick");
   g_verbose = args.CheckCmdLineFlag("v");
   
-  if (instrumented) 
-    {
-      RunTests<VertexId, Value, SizeT, true>(
-					     graph,
-					     max_grid_size,
-					     num_gpus,
-					     top_nodes);
-    } 
-  else 
-    {
-      RunTests<VertexId, Value, SizeT, false>(
-					      graph,
-					      max_grid_size,
-					      num_gpus,
-					      top_nodes);
-    }
+  if (instrumented) {
+    RunTests<VertexId, Value, SizeT, true>(graph,
+					   max_grid_size,
+					   num_gpus,
+					   top_nodes,
+					   context);
+  }
+  else {
+    RunTests<VertexId, Value, SizeT, false>(graph,
+					    max_grid_size,
+					    num_gpus,
+					    top_nodes,
+					    context);
+  }
 }
 
 /******************************************************************************
@@ -290,17 +313,20 @@ int main(int argc, char** argv)
   CommandLineArgs args(argc, argv);
   
   if ((argc < 2) || (args.CheckCmdLineFlag("help"))) 
-    {
-      Usage();
-      return 1;
-    }
+  {
+    Usage();
+    return 1;
+  }
   
   //DeviceInit(args);
   //cudaSetDeviceFlags(cudaDeviceMapHost);
   int dev = 0;
+  int top_nodes;
+
   args.GetCmdLineArgument("device", dev);
+  args.GetCmdLineArgument("top", top_nodes);
   
-  //mgpu::ContextPtr context = mgpu::CreateCudaDevice(dev);
+  mgpu::ContextPtr context = mgpu::CreateCudaDevice(dev);
   //srand(0);			// Presently deterministic
   //srand(time(NULL));
   
@@ -312,58 +338,55 @@ int main(int argc, char** argv)
   int graph_args = argc - flags - 1;
   
   if (graph_args < 1) 
-    {
-      Usage();
-      return 1;
-    }
+  {
+    Usage();
+    return 1;
+  }
   
   //
   // Construct graph and perform
   //
-
   if (graph_type == "market") 
+  {
+    // Matrix-market coordinate-formatted graph file
+    
+    typedef int VertexId;	// Use as the node identifier type
+    typedef int Value;	        // Use as the value type
+    typedef int SizeT;	        // Use as the graph size type
+    Csr<VertexId, Value, SizeT> csr(false);
+      
+    // Default value for stream_from_host is false
+    if (graph_args < 1)
     {
-      
-      // Matrix-market coordinate-formatted graph file
-      
-      typedef int VertexId;	// Use as the node identifier type
-      typedef int Value;		// Use as the value type
-      typedef int SizeT;		// Use as the graph size type
-      Csr<VertexId, Value, SizeT> csr(false);
-      
-      // Default value for stream_from_host is false
-      if (graph_args < 1)
-	{
-	  Usage();
-	  return 1;
-	}
-      
-      char *market_filename = (graph_args == 2) ? argv[2] : NULL;
-      
-      // BuildMarketGraph() reads a mtx file into CSR data structure
-      // Template argumet = true because the graph has edge weights
-      if (graphio::BuildMarketGraph<true>(
-					  market_filename,
-					  csr,
-					  g_undirected,
-					  false) != 0) // no inverse graph
-	{
-	  return 1;
-	}
-      
-      // display graph
-      // csr.DisplayGraph();
-      
-      // run gpu tests
-      RunTests(csr, args);
-      
-    }
-  else 
-    {
-      // unknown graph type
-      fprintf(stderr, "Unspecified graph type\n");
+      Usage();
       return 1;
     }
+      
+    char *market_filename = (graph_args == 2) ? argv[2] : NULL;
+    
+    // BuildMarketGraph() reads a mtx file into CSR data structure
+    // Template argumet = true because the graph has edge weights
+    if (graphio::BuildMarketGraph<true>(market_filename,
+					csr,
+					g_undirected,
+					false) != 0) // no inverse graph
+    {
+      return 1;
+    }
+    
+    // display graph
+    //csr.DisplayGraph();
+    
+    // run gpu tests
+    RunTests(csr, args, top_nodes, *context);
+    
+  }
+  else 
+  {
+    // unknown graph type
+    fprintf(stderr, "Unspecified graph type\n");
+    return 1;
+  }
   
   return 0;
 }
