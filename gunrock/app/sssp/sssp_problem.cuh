@@ -334,6 +334,12 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
         return retval;
     }
 
+    float EstimatedDelta(const Csr<VertexId, unsigned int, SizeT> &graph) {
+        double  avgV = graph.average_edge_value;
+        int     avgD = graph.average_degree;
+        return avgV * 32 / avgD;
+    }
+
     /** @} */
 
 };

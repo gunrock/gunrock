@@ -133,6 +133,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         {
             typedef typename ProblemData::SizeT         SizeT;
             typedef typename ProblemData::VertexId      VertexId;
+            typedef typename KernelPolicy::LOAD_BALANCED LBPOLICY;
             // Load Load Balanced Kernel
             // Get Rowoffsets
             // Use scan to compute edge_offsets for each vertex in the frontier
@@ -156,10 +157,9 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             SizeT *temp = new SizeT[1];
             cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
             SizeT output_queue_len = temp[0];
-
-            //if (output_queue_len < EdgeMapPolicy::LIGHT_EDGE_THRESHOLD)
+            //if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
             {
-                gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
+                gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
                         frontier_attribute.queue_reset,
                         frontier_attribute.queue_index,
@@ -181,8 +181,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         ADVANCE_TYPE,
                         inverse_graph);
             }
-            //else
-            /*{
+            /*else
+            {
                 unsigned int split_val = (output_queue_len + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
                 util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.d_node_locks, KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
                 SortedSearch<MgpuBoundsLower>(
@@ -191,9 +191,9 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                 partitioned_scanned_edges,
                 frontier_attribute.queue_length,
                 enactor_stats.d_node_locks_out,
-                enactor_stats.context);
+                context);
 
-                gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges<KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
+                gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
                 <<< KernelPolicy::LOAD_BALANCED::BLOCKS, KernelPolicy::LOAD_BALANCED::THREADS >>>(
                                         frontier_attribute.queue_reset,
                                         frontier_attribute.queue_index,
