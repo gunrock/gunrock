@@ -101,6 +101,34 @@ struct SSSPFunctor
     }
 };
 
+template<typename VertexId, typename SizeT, typename ProblemData>
+struct PQFunctor
+{
+    typedef typename ProblemData::DataSlice DataSlice;
+
+    /**
+     * @brief Forward Edge Mapping condition function. Check if the destination node
+     * has been claimed as someone else's child.
+     *
+     * @param[in] s_id Vertex Id of the edge source node
+     * @param[in] d_id Vertex Id of the edge destination node
+     * @param[in] problem Data slice object
+     *
+     * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
+     */
+    static __device__ __forceinline__ unsigned int ComputePriorityScore(VertexId node_id, DataSlice *problem)
+    {
+        unsigned int weight;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                        weight, problem->d_labels + node_id);
+        float delta;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                        delta, problem->d_delta);
+        return (delta == 0) ? weight : weight/delta;
+    }
+};
+ 
+
 } // sssp
 } // app
 } // gunrock

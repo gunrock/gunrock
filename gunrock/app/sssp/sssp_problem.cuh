@@ -26,7 +26,6 @@ namespace sssp {
  *
  * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam _Value               Type of float or double to use for computing BC value.
  */
 template <
     typename    VertexId,                       
@@ -50,6 +49,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
         unsigned int        *d_labels;              /**< Used for source distance */
         unsigned int        *d_weights;             /**< Used for storing edge weights */
         VertexId            *d_preds;               /**< Used for storing the actual shortest path */
+        float               *d_delta;
     };
 
     // Members
@@ -111,6 +111,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
                 "~SSSPProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
             if (data_slices[i]->d_labels)      util::GRError(cudaFree(data_slices[i]->d_labels), "GpuSlice cudaFree d_labels failed", __FILE__, __LINE__);
             if (data_slices[i]->d_weights)      util::GRError(cudaFree(data_slices[i]->d_weights), "GpuSlice cudaFree d_weights failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_delta)      util::GRError(cudaFree(data_slices[i]->d_delta), "GpuSlice cudaFree d_delta failed", __FILE__, __LINE__);
             if (data_slices[i]->d_preds)      util::GRError(cudaFree(data_slices[i]->d_preds), "GpuSlice cudaFree d_preds failed", __FILE__, __LINE__);
             if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
         }
@@ -228,6 +229,12 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
                         edges * sizeof(unsigned int)),
                     "SSSPProblem cudaMalloc d_weights failed", __FILE__, __LINE__)) return retval;
 
+                float    *d_delta;
+                if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_delta,
+                        1 * sizeof(float)),
+                    "SSSPProblem cudaMalloc d_delta failed", __FILE__, __LINE__)) return retval;
+
                 VertexId    *d_preds = NULL;
 
                 if (MARK_PATHS) {
@@ -246,6 +253,16 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
                         "ProblemBase cudaMemcpy d_weights failed", __FILE__, __LINE__)) return retval;
 
                 data_slices[0]->d_weights = d_weights;
+
+                float delta = EstimatedDelta(graph);
+
+                if (retval = util::GRError(cudaMemcpy(
+                            d_delta,
+                            (float*)&delta,
+                            sizeof(float),
+                            cudaMemcpyHostToDevice),
+                        "SSSPProblem cudaMemcpy d_delta failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_delta = d_delta;
             }
             //TODO: add multi-GPU allocation code
         } while (0);
@@ -337,6 +354,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
     float EstimatedDelta(const Csr<VertexId, unsigned int, SizeT> &graph) {
         double  avgV = graph.average_edge_value;
         int     avgD = graph.average_degree;
+        printf("estimated delta:%5f\n", avgV * 32/avgD);
         return avgV * 32 / avgD;
     }
 

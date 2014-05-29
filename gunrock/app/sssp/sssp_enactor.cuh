@@ -204,7 +204,6 @@ class SSSPEnactor : public EnactorBase
     CudaContext                         &context,
     SSSPProblem                          *problem,
     typename SSSPProblem::VertexId       src,
-    float                               delta,
     double                              queue_sizing,
     int                                 max_grid_size = 0)
     {
@@ -216,13 +215,25 @@ class SSSPEnactor : public EnactorBase
             SizeT,
             SSSPProblem> SsspFunctor;
 
+        typedef PQFunctor<
+            VertexId,
+            SizeT,
+            SSSPProblem> PqFunctor;
+
         typedef gunrock::priority_queue::PriorityQueue<
             VertexId,
             SizeT> NearFarPriorityQueue;
 
+        typedef gunrock::priority_queue::KernelPolicy<
+                SSSPProblem,                         // Problem data type
+                300,                                // CUDA_ARCH
+                INSTRUMENT,                         // INSTRUMENT
+                8,                                  // MIN_CTA_OCCUPANCY
+                10>                                  // LOG_THREADS
+            PriorityQueueKernelPolicy;
+
         NearFarPriorityQueue *pq = new NearFarPriorityQueue;
-        util::GRError(pq->Init(problem->graph_slices[0]->edges,
-                               queue_sizing), "Priority Queue SSSP Initialization Failed", __FILE__, __LINE__);
+        util::GRError(pq->Init(problem->graph_slices[0]->edges, queue_sizing), "Priority Queue SSSP Initialization Failed", __FILE__, __LINE__);
 
         cudaError_t retval = cudaSuccess;
 
@@ -244,6 +255,7 @@ class SSSPEnactor : public EnactorBase
             // Single-gpu graph slice
             typename SSSPProblem::GraphSlice *graph_slice = problem->graph_slices[0];
             typename SSSPProblem::DataSlice *data_slice = problem->d_data_slices[0];
+            typename NearFarPriorityQueue::NearFarPile *nf_pile = pq->d_nf_pile[0];
 
             fflush(stdout);
             // Step through SSSP iterations
@@ -263,6 +275,8 @@ class SSSPEnactor : public EnactorBase
                                 graph_slice->edges * sizeof(unsigned int)),
                             "SSSPProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
             }
+
+            unsigned int pq_level = 0; 
 
             while (done[0] < 0) {
 
@@ -356,11 +370,27 @@ class SSSPEnactor : public EnactorBase
 
                 frontier_attribute.queue_index++;
                 frontier_attribute.selector ^= 1;
-                enactor_stats.iteration++;
 
-                if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
-                    if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
-                }
+                if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+
+                //TODO: split the output queue into near/far pile, put far pile in far queue, put near pile as the input queue
+                //for next round.
+                unsigned int out_length = gunrock::priority_queue::Bisect<PriorityQueueKernelPolicy, SSSPProblem, NearFarPriorityQueue, PqFunctor>(
+                (int*)graph_slice->frontier_queues.d_keys[frontier_attribute.selector],
+                pq,
+                (unsigned int)frontier_attribute.queue_length,
+                data_slice,
+                graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],
+                pq->queue_length,
+                pq_level,
+                (pq_level+1),
+                context);
+                printf("out_length:%d\n", out_length);
+                //
+                //If the output queue is empty and far queue is not, then add priority level and split the far pile.
+
+
+                enactor_stats.iteration++;
 
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
@@ -420,7 +450,6 @@ class SSSPEnactor : public EnactorBase
         CudaContext                      &context,
         SSSPProblem                      *problem,
         typename SSSPProblem::VertexId    src,
-        float                           delta,
         double                          queue_sizing,
         int                             max_grid_size = 0)
     {
@@ -459,7 +488,7 @@ class SSSPEnactor : public EnactorBase
                     AdvanceKernelPolicy;
 
             return EnactSSSP<AdvanceKernelPolicy, FilterKernelPolicy, SSSPProblem>(
-                    context, problem, src, delta, queue_sizing, max_grid_size);
+                    context, problem, src, queue_sizing, max_grid_size);
         }
 
         //to reduce compile time, get rid of other architecture for now
