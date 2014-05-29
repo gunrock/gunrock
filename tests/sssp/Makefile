@@ -92,6 +92,7 @@ DEPS = 			./Makefile \
 				$(wildcard ../../gunrock/graphio/*.cuh) \
 				$(wildcard ../../gunrock/oprtr/*.cuh) \
 				$(wildcard ../../gunrock/oprtr/**/*.cuh) \
+				$(wildcard ../../gunrock/priority_queue/*.cuh) \
 				$(wildcard ../../gunrock/app/*.cuh) \
 				$(wildcard ../../gunrock/app/**/*.cuh)
 				 

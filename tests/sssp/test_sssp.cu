@@ -32,6 +32,7 @@
 // Operator includes
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
+#include <gunrock/priority_queue/kernel.cuh>
 
 #include <moderngpu.cuh>
 
@@ -389,9 +390,10 @@ void RunTests(
         // Perform SSSP
         GpuTimer gpu_timer;
 
-        util::GRError(csr_problem->Reset(src, sssp_enactor.GetFrontierType(), queue_sizing), "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(csr_problem->Reset(src, sssp_enactor.GetFrontierType(), queue_sizing), "SSSP Problem Data Reset Failed", __FILE__, __LINE__); 
+        float delta = csr_problem->EstimatedDelta(graph);
         gpu_timer.Start();
-        util::GRError(sssp_enactor.template Enact<Problem>(context, csr_problem, src, max_grid_size), "SSSP Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(sssp_enactor.template Enact<Problem>(context, csr_problem, src, delta, queue_sizing, max_grid_size), "SSSP Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
 
         sssp_enactor.GetStatistics(total_queued, search_depth, avg_duty);
@@ -591,6 +593,9 @@ int main( int argc, char** argv)
 
 		csr.PrintHistogram();
 		csr.DisplayGraph(true); //print graph with edge_value
+        
+        csr.GetAverageEdgeValue();
+        csr.GetAverageDegree();
 		
         // Run tests
 		RunTests(csr, args, *context);

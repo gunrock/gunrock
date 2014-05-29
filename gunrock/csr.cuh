@@ -34,11 +34,15 @@ struct Csr
     SizeT nodes;    /**< Number of nodes in the graph. */
     SizeT edges;    /**< Number of edges in the graph. */
     SizeT out_nodes; /**< Number of nodes which have outgoing edges. */
+    SizeT average_degree;
 
     VertexId    *column_indices;/**< Column indices corresponding to all the non-zero values in the sparse matrix. */
     SizeT       *row_offsets;   /**< List of indices where each row of the sparse matrix starts. */
     Value       *edge_values;   /**< List of values attached to edges in the graph. */
     Value       *node_values;   /**< List of values attached to nodes in the graph. */
+
+    Value       average_edge_value;
+    Value       average_node_value;
 
     bool         pinned;        /**< Whether to use pinned memory */
 
@@ -52,6 +56,9 @@ struct Csr
     {
         nodes = 0;
         edges = 0;
+        average_degree = 0;
+        average_edge_value = 0;
+        average_node_value = 0;
         out_nodes = -1;
         row_offsets = NULL;
         column_indices = NULL;
@@ -267,6 +274,7 @@ struct Csr
                  edge < row_offsets[node + 1];
                  edge++) {
                 util::PrintValue(column_indices[edge]);
+                printf("edge value: ");
                 if (with_edge_value)
                     util::PrintValue(edge_values[edge]);
                 else
@@ -315,6 +323,9 @@ struct Csr
         return src;
     }
 
+    /**
+     * @brief Display the neighbor list of a node
+     */
     void DisplayNeighborList(VertexId node)
     {
         for (SizeT edge = row_offsets[node];
@@ -324,6 +335,42 @@ struct Csr
                 printf(", ");
             }
             printf("\n");
+    }
+
+    SizeT GetAverageDegree() {
+        if (average_degree == 0) {
+            double mean = 0, count = 0;
+            for (SizeT node = 0; node < nodes; ++node) {
+                count += 1;
+                mean += (row_offsets[node+1]- row_offsets[node] - mean) / count;
+            }
+            average_degree = static_cast<SizeT>(mean);
+        }
+        return average_degree;
+    }
+
+    Value GetAverageNodeValue() {
+        if (abs(average_node_value - 0) < 0.001 && node_values != NULL) {
+            double mean = 0, count = 0;
+            for (SizeT node = 0; node < nodes; ++node) {
+                count += 1;
+                mean += (node_values[node] - mean) / count;
+            }
+            average_node_value = static_cast<Value>(mean);
+        }
+        return average_node_value;
+    }
+
+    Value GetAverageEdgeValue() {
+        if (abs(average_edge_value - 0) < 0.001 && edge_values != NULL) {
+            double mean = 0, count = 0;
+            for (SizeT edge = 0; edge < edges; ++edge) {
+                count += 1;
+                mean += (edge_values[edge] - mean) / count;
+            }
+            average_edge_value = static_cast<Value>(mean);
+        }
+        return average_edge_value;
     }
 
     /**@}*/

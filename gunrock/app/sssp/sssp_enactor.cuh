@@ -21,6 +21,8 @@
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel_policy.cuh>
+#include <gunrock/priority_queue/kernel.cuh>
+#include <gunrock/priority_queue/kernel_policy.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/sssp/sssp_problem.cuh>
@@ -202,6 +204,8 @@ class SSSPEnactor : public EnactorBase
     CudaContext                         &context,
     SSSPProblem                          *problem,
     typename SSSPProblem::VertexId       src,
+    float                               delta,
+    double                              queue_sizing,
     int                                 max_grid_size = 0)
     {
         typedef typename SSSPProblem::SizeT      SizeT;
@@ -211,6 +215,14 @@ class SSSPEnactor : public EnactorBase
             VertexId,
             SizeT,
             SSSPProblem> SsspFunctor;
+
+        typedef gunrock::priority_queue::PriorityQueue<
+            VertexId,
+            SizeT> NearFarPriorityQueue;
+
+        NearFarPriorityQueue *pq = new NearFarPriorityQueue;
+        util::GRError(pq->Init(problem->graph_slices[0]->edges,
+                               queue_sizing), "Priority Queue SSSP Initialization Failed", __FILE__, __LINE__);
 
         cudaError_t retval = cudaSuccess;
 
@@ -408,6 +420,8 @@ class SSSPEnactor : public EnactorBase
         CudaContext                      &context,
         SSSPProblem                      *problem,
         typename SSSPProblem::VertexId    src,
+        float                           delta,
+        double                          queue_sizing,
         int                             max_grid_size = 0)
     {
         
@@ -445,7 +459,7 @@ class SSSPEnactor : public EnactorBase
                     AdvanceKernelPolicy;
 
             return EnactSSSP<AdvanceKernelPolicy, FilterKernelPolicy, SSSPProblem>(
-                    context, problem, src, max_grid_size);
+                    context, problem, src, delta, queue_sizing, max_grid_size);
         }
 
         //to reduce compile time, get rid of other architecture for now
