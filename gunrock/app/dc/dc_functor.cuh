@@ -47,8 +47,7 @@ struct DCFunctor
   static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, 
 						  VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    //printf("%4d: %4d\n", s_id, d_id);
-    return d_id;
+    return true;
   }
   
   /**

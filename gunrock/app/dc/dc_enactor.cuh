@@ -93,15 +93,15 @@ protected:
       
       // Allocate pinned memory for done
       if (retval = util::GRError(cudaHostAlloc((void**)&done, sizeof(int) * 1, flags),
-				 "DCEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
+	 "DCEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
       
       // Map done into GPU space
       if (retval = util::GRError(cudaHostGetDevicePointer((void**)&d_done, (void*) done, 0),
-				 "DCEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
+	 "DCEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
       
       // Create throttle event
       if (retval = util::GRError(cudaEventCreateWithFlags(&throttle_event, cudaEventDisableTiming),
-				 "DCEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
+	 "DCEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
     }
     
     //graph slice
@@ -112,11 +112,11 @@ protected:
       // Bind row-offsets and bitmask texture
       cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
       if (retval = util::GRError(cudaBindTexture(0,
-						 gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
-						 graph_slice->d_row_offsets,
-						 row_offsets_desc,
-						 (graph_slice->nodes + 1) * sizeof(SizeT)),
-				 "DCEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
+	 gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
+	 graph_slice->d_row_offsets,
+	 row_offsets_desc,
+	 (graph_slice->nodes + 1) * sizeof(SizeT)),
+	 "DCEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
       
       
       /*cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
@@ -153,10 +153,10 @@ public:
     if (done) 
     {
       util::GRError(cudaFreeHost((void*)done),
-		    "DCEnactor cudaFreeHost done failed", __FILE__, __LINE__);
+	    "DCEnactor cudaFreeHost done failed", __FILE__, __LINE__);
       
       util::GRError(cudaEventDestroy(throttle_event),
-		    "DCEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
+	    "DCEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
     }
   }
   
@@ -217,13 +217,11 @@ void GetStatistics(long long   &total_queued,
 
     cudaError_t retval = cudaSuccess;
     
-    unsigned int *d_scanned_edges = NULL;
     do {
       
       // initialization
       if (retval = Setup(problem)) break;
-      if (retval = EnactorBase::Setup(problem, 
-				      max_grid_size,
+      if (retval = EnactorBase::Setup(problem, max_grid_size,
 				      AdvanceKernelPolicy::CTA_OCCUPANCY, 
 				      FilterKernelPolicy::CTA_OCCUPANCY)) break;
       
@@ -236,7 +234,7 @@ void GetStatistics(long long   &total_queued,
 					  problem->data_slices[0]->d_degrees, 
 					  problem->data_slices[0]->d_node_id);
       
-      // scan to get row_offsets for top k subgraph
+      // scan to get top k sub-graph row offsets
       void   *d_temp_storage = NULL;
       size_t temp_storage_bytes = 0;
       cub::DeviceScan::ExclusiveSum(d_temp_storage, 
@@ -244,35 +242,20 @@ void GetStatistics(long long   &total_queued,
 				    problem->data_slices[0]->d_degrees,
 				    problem->data_slices[0]->d_sub_row_offsets,
 				    top_nodes);
-      
       cudaMalloc(&d_temp_storage, temp_storage_bytes);
-      
       cub::DeviceScan::ExclusiveSum(d_temp_storage, 
 				    temp_storage_bytes, 
 				    problem->data_slices[0]->d_degrees,
 				    problem->data_slices[0]->d_sub_row_offsets,
 				    top_nodes);
-      
-      // advanced edge mapping to find neighbors for top k nodes
+
+      // advanced edge mapping to find top k sub-graph column indices
       frontier_attribute.queue_length = top_nodes;
       frontier_attribute.queue_index  = 0;
       frontier_attribute.selector     = 0;
       frontier_attribute.queue_reset  = true;
 
-      if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) 
-      {
-	if (retval = util::GRError(cudaMalloc((void**)&d_scanned_edges,
-					      graph_slice->edges * sizeof(unsigned int)),
-				   "DCProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) 
-	  return retval;
-      }
-      
-      // put top nodes into frontier queue used for mapping
-      util::MemsetCopyVectorKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[frontier_attribute.selector],
-						 problem->data_slices[0]->d_node_id,
-						 top_nodes);
-      
-      // edge mapping
+      // forward edge mapping
       gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, DCProblem, DcFunctor>(
 	d_done,
 	enactor_stats,
@@ -281,9 +264,9 @@ void GetStatistics(long long   &total_queued,
 	(VertexId*)NULL,
 	(bool*)NULL,
 	(bool*)NULL,
-	d_scanned_edges,
-	graph_slice->frontier_queues.d_keys[frontier_attribute.selector],
-	graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],
+	(unsigned int*)NULL,
+	problem->data_slices[0]->d_node_id,
+	problem->data_slices[0]->d_sub_col_indices,
 	(VertexId*)NULL,
 	(VertexId*)NULL,
 	graph_slice->d_row_offsets,
@@ -297,20 +280,15 @@ void GetStatistics(long long   &total_queued,
 	gunrock::oprtr::advance::V2V);
 
       if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), 
-					   "advance::Kernel failed", __FILE__, __LINE__))) break;
+	   "advance::Kernel failed", __FILE__, __LINE__))) break;
       cudaEventQuery(throttle_event);
       
       // get the length of sub graph column indices
-      if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index+1, 
-						frontier_attribute.queue_length)) break;
-      SizeT top_edges = frontier_attribute.queue_length;
+      //if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index+1, 
+      //					  frontier_attribute.queue_length)) break;
+      //SizeT top_edges = frontier_attribute.queue_length;
 
-      // copy sub graph column indices results back to d_sub_col_indices 
-      util::MemsetCopyVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_sub_col_indices,
-						 graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],
-						 top_edges);
-      
-      // print out results
+      // check new generated sub-graph
       //util::DisplayDeviceResults(problem->data_slices[0]->d_sub_row_offsets, top_nodes);
       //util::DisplayDeviceResults(problem->data_slices[0]->d_sub_col_indices, top_edges);
       
@@ -320,13 +298,12 @@ void GetStatistics(long long   &total_queued,
       if (overflowed) 
       {
 	retval = util::GRError(cudaErrorInvalidConfiguration, 
-			       "Frontier queue overflow. Please increase queus size factor.",
-			       __FILE__, __LINE__); break;
+	       "Frontier queue overflow. Please increase queus size factor.",
+	       __FILE__, __LINE__); break;
       }
       
     } while(0);
     
-    if (d_scanned_edges) cudaFree(d_scanned_edges);
     if (DEBUG) printf("====> GPU Degree Centrality Complete.\n");
     
     return retval;
@@ -376,7 +353,7 @@ void GetStatistics(long long   &total_queued,
 	300,                                // CUDA_ARCH
 	INSTRUMENT,                         // INSTRUMENT
 	8,                                  // MIN_CTA_OCCUPANCY
-	10,                                 // LOG_THREADS
+	7,                                  // LOG_THREADS
 	8,                                  // LOG_BLOCKS
 	32 * 128,                           // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
 	1,                                  // LOG_LOAD_VEC_SIZE
@@ -385,7 +362,7 @@ void GetStatistics(long long   &total_queued,
 	32,                                 // WARP_GATHER_THRESHOLD
 	128 * 4,                            // CTA_GATHER_THRESHOLD
 	7,                                  // LOG_SCHEDULE_GRANULARITY
-	gunrock::oprtr::advance::LB>        
+	gunrock::oprtr::advance::TWC_FORWARD>        
 	AdvanceKernelPolicy;
       
       return  EnactDC<AdvanceKernelPolicy, FilterKernelPolicy, DCProblem>(context,

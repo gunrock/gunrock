@@ -54,7 +54,8 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
     Value       *d_degrees;         // degree centrality
     VertexId    *d_sub_row_offsets; // sub-graph row_offsets
     VertexId    *d_sub_col_indices; // sub-graph column_indices
- };
+    Value       *d_top_edges;
+  };
   
   // Members
   
@@ -125,6 +126,8 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 							     "GpuSlice cudaFree d_sub_row_offsets failed", __FILE__, __LINE__);
 	if (data_slices[i]->d_sub_col_indices) util::GRError(cudaFree(data_slices[i]->d_sub_col_indices),
 							     "GpuSlice cudaFree d_sub_col_indices failed", __FILE__, __LINE__);
+	if (data_slices[i]->d_top_edges) util::GRError(cudaFree(data_slices[i]->d_top_edges),
+						       "GpuSlices cudaFree d_top_edges failed", __FILE__, __LINE__);
 	
 	if (d_data_slices[i])   util::GRError(cudaFree(d_data_slices[i]), 
 					      "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
@@ -185,7 +188,7 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 						  sizeof(VertexId) * edges,
 						  cudaMemcpyDeviceToHost),
 				       "DCProblem cudaMemcpy d_sub_col_indices failed", __FILE__, __LINE__)) break;
-	    
+
 	  } else {
 	  // TODO: multi-GPU extract result
 	} //end if (data_slices.size() ==1)
@@ -270,7 +273,13 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 						edges * sizeof(VertexId)),
 				     "DCProblem cudaMalloc d_sub_col_ind failed", __FILE__, __LINE__)) return retval;
 	  data_slices[0]->d_sub_col_indices = d_sub_col_indices;
-	  
+
+	  Value   *d_top_edges;
+	  if (retval = util::GRError(cudaMalloc((void**)&d_top_edges,
+						sizeof(Value)),
+				     "DCProblem cudaMalloc d_top_edges failed", __FILE__, __LINE__)) return retval;
+	  data_slices[0]->d_top_edges = d_top_edges;
+
 	  data_slices[0]->d_labels  = NULL;
 	  
 	}
@@ -339,6 +348,15 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 						edges * sizeof(VertexId)),
 				     "DCProblem cudaMalloc d_sub_col_indices failed", __FILE__, __LINE__)) return retval;
 	  data_slices[gpu]->d_sub_col_indices = d_sub_col_indices;
+	}
+
+	if (!data_slices[gpu]->d_top_edges)
+	{
+	  Value *d_top_edges;
+	  if (retval = util::GRError(cudaMalloc((void**)&d_top_edges,
+						sizeof(Value)),
+				     "DCProblem cudaMalloc d_top_edges failed", __FILE__, __LINE__)) return retval;
+	  data_slices[gpu]->d_top_edges = d_top_edges;
 	}
 
 	data_slices[gpu]->d_labels = NULL;

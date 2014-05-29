@@ -83,25 +83,27 @@ void DisplaySolution(VertexId *h_node_id,
 		     VertexId *h_sub_col_indices,
 		     SizeT    num_nodes)
 {
+
   printf("====> top %d nodes: \n", num_nodes);
   printf("NodeId DegreeCentrality\n");
   for (SizeT i = 0; i < num_nodes; ++i)
   {
     printf("%d %d\n", h_node_id[i], h_degrees[i]);
   }
-  /*
+
   printf("====> Sub-graph of top %d nodes\n", num_nodes);
+
   for (SizeT i = 0; i < num_nodes; ++i)
   {
-    printf("%d: [", h_node_id[i]);
+    printf("%d", h_node_id[i]);
     for (SizeT j = h_sub_row_offsets[i]; 
 	 j < h_sub_row_offsets[i]+h_degrees[i]; ++j)
     {
       printf(" %d", h_sub_col_indices[j]);
     }
-    printf("]\n");
+    printf("\n");
   }
-  */
+
   fflush(stdout);
 }
 
@@ -205,7 +207,7 @@ void RunTests(const Csr<VertexId, Value, SizeT> &graph,
   
   // malloc host memory
   VertexId *h_node_id = (VertexId*)malloc(sizeof(VertexId) * top_nodes);
-  Value	   *h_degrees = (Value*)malloc(sizeof(VertexId) * top_nodes);
+  Value    *h_degrees = (Value*)malloc(sizeof(VertexId) * top_nodes);
   VertexId *h_sub_row_offsets = (VertexId*)malloc(sizeof(VertexId) * top_nodes);
   VertexId *h_sub_col_indices = (VertexId*)malloc(sizeof(VertexId) * graph.edges);
   
@@ -234,11 +236,11 @@ void RunTests(const Csr<VertexId, Value, SizeT> &graph,
   printf("====> GPU Degree Centrality finished in %lf msec.\n", elapsed_gpu);
   
   // copy out results back to CPU from GPU using Extract
-  util::GRError(dc_problem->Extract(h_node_id, 
-				    h_degrees, 
-				    h_sub_row_offsets, 
-				    h_sub_col_indices, 
-				    top_nodes), 
+  util::GRError(dc_problem->Extract(h_node_id,
+				    h_degrees,
+				    h_sub_row_offsets,
+				    h_sub_col_indices,
+				    top_nodes),
 		"DC Problem Data Extraction Failed", __FILE__, __LINE__);
   
   // display solution
@@ -247,7 +249,7 @@ void RunTests(const Csr<VertexId, Value, SizeT> &graph,
 		  h_sub_row_offsets,
 		  h_sub_col_indices,
 		  top_nodes);
-  
+    
   // validation
   // CompareResults();
   
@@ -370,12 +372,10 @@ int main(int argc, char** argv)
 					csr,
 					g_undirected,
 					false) != 0) // no inverse graph
-    {
-      return 1;
-    }
+    { return 1; }
     
     // display graph
-    //csr.DisplayGraph();
+    // csr.DisplayGraph();
     
     // run gpu tests
     RunTests(csr, args, top_nodes, *context);
