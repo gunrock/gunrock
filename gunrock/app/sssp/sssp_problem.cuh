@@ -262,7 +262,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
 
                 data_slices[0]->d_weights = d_weights;
 
-                float delta = EstimatedDelta(graph);
+                float delta = UINT_MAX; //EstimatedDelta(graph);
 
                 if (retval = util::GRError(cudaMemcpy(
                             d_delta,

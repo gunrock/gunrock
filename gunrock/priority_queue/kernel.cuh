@@ -67,6 +67,7 @@ struct Dispatch
     static __device__ __forceinline__ void Compact(
             VertexId        *&vertex_in,
             NearFarPile     *&pq,
+            int             &selector,
             SizeT           &input_queue_length,
             VertexId        *&vertex_out,
             SizeT           &v_out_offset,
@@ -122,15 +123,16 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
         unsigned int my_vert = vertex_in[my_id];
         unsigned int bucket_id = Functor::ComputePriorityScore(my_vert, problem);
         bool valid = (my_id == problem->d_visit_lookup[my_vert]);
-        printf(" valid:%d, my_id: %d, my_vert: %d\n", valid, my_id, my_vert, bucket_id);
+        //printf(" valid:%d, my_id: %d, my_vert: %d\n", valid, my_id, my_vert, bucket_id);
         pq->d_valid_near[my_id] = (bucket_id < upper_priority_score_limit && bucket_id >= lower_priority_score_limit && valid) ? 1 : 0;
         pq->d_valid_far[my_id] = (bucket_id >= upper_priority_score_limit && bucket_id < bucket_max && valid) ? 1 : 0;
-        printf("valid near, far: %d, %d\n", pq->d_valid_near[my_id], pq->d_valid_far[my_id]);
+        //printf("valid near, far: %d, %d\n", pq->d_valid_near[my_id], pq->d_valid_far[my_id]);
     }
 
     static __device__ __forceinline__ void Compact(
                                             VertexId        *&vertex_in,
                                             NearFarPile     *&pq,
+                                            int             &selector,
                                             SizeT           &input_queue_length,
                                             VertexId        *&vertex_out,
                                             SizeT           &v_out_offset,
@@ -150,7 +152,7 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
 
         my_valid = pq->d_valid_far[my_id];
         if (my_valid == pq->d_valid_far[my_id+1]-1)
-            pq->d_queue[0][my_valid+far_pile_offset] = my_vert;
+            pq->d_queue[selector][my_valid+far_pile_offset] = my_vert;
         
     }
 };
@@ -195,6 +197,7 @@ __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::BLOCKS)
 void Compact(
         typename KernelPolicy::VertexId     *vertex_in,
         typename PriorityQueue::NearFarPile *pq,
+        int                                 selector,
         typename KernelPolicy::SizeT        input_queue_length,
         typename KernelPolicy::VertexId     *vertex_out,
         typename KernelPolicy::SizeT        v_out_offset,
@@ -203,6 +206,7 @@ void Compact(
     Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor>::Compact(
         vertex_in,
         pq,
+        selector,
         input_queue_length,
         vertex_out,
         v_out_offset,
@@ -231,7 +235,7 @@ template <typename KernelPolicy, typename ProblemData, typename PriorityQueue, t
     unsigned int far_size[1] = {0};
     if(input_queue_length > 0)
     {
-        printf("input queue length:%d\n", input_queue_length);
+        //printf("input queue length:%d\n", input_queue_length);
         MarkVisit<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, problem, input_queue_length);
         // MarkNF
         MarkNF<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, nf_pile, problem, input_queue_length, lower_limit, upper_limit);
@@ -241,7 +245,7 @@ template <typename KernelPolicy, typename ProblemData, typename PriorityQueue, t
         Scan<mgpu::MgpuScanTypeExc>(pq->nf_pile[0]->d_valid_near, input_queue_length+1, 0, mgpu::plus<VertexId>(), (VertexId*)0, (VertexId*)0, pq->nf_pile[0]->d_valid_near, context);
         Scan<mgpu::MgpuScanTypeExc>(pq->nf_pile[0]->d_valid_far, input_queue_length+1, 0, mgpu::plus<VertexId>(), (VertexId*)0, (VertexId*)0, pq->nf_pile[0]->d_valid_far, context);
         // Compact
-        Compact<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, nf_pile, input_queue_length, vertex_out, 0, far_pile_offset);
+        Compact<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, nf_pile, pq->selector, input_queue_length, vertex_out, 0, far_pile_offset);
         // get output_near_length
         // get output_far_length
         cudaMemcpy(&close_size[0], pq->nf_pile[0]->d_valid_near+input_queue_length, sizeof(VertexId),

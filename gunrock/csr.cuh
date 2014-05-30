@@ -353,8 +353,10 @@ struct Csr
         if (abs(average_node_value - 0) < 0.001 && node_values != NULL) {
             double mean = 0, count = 0;
             for (SizeT node = 0; node < nodes; ++node) {
-                count += 1;
-                mean += (node_values[node] - mean) / count;
+                if (node_values[node] < UINT_MAX) {
+                    count += 1;
+                    mean += (node_values[node] - mean) / count;
+                }
             }
             average_node_value = static_cast<Value>(mean);
         }
@@ -365,8 +367,10 @@ struct Csr
         if (abs(average_edge_value - 0) < 0.001 && edge_values != NULL) {
             double mean = 0, count = 0;
             for (SizeT edge = 0; edge < edges; ++edge) {
-                count += 1;
-                mean += (edge_values[edge] - mean) / count;
+                if (edge_values[edge] < UINT_MAX) {
+                    count += 1;
+                    mean += (edge_values[edge] - mean) / count;
+                }
             }
             average_edge_value = static_cast<Value>(mean);
         }

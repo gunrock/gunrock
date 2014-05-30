@@ -345,7 +345,6 @@ public:
 
         do {
             int queue_length_idx = iteration & 0x3;
-            printf("%d \n", queue_length_idx);
 
             if (retval = util::GRError(cudaMemcpy(
                     ((SizeT*) d_counters) + queue_length_idx,

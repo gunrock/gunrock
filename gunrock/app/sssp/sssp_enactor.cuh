@@ -255,7 +255,6 @@ class SSSPEnactor : public EnactorBase
             // Single-gpu graph slice
             typename SSSPProblem::GraphSlice *graph_slice = problem->graph_slices[0];
             typename SSSPProblem::DataSlice *data_slice = problem->d_data_slices[0];
-            typename NearFarPriorityQueue::NearFarPile *nf_pile = pq->d_nf_pile[0];
 
             fflush(stdout);
             // Step through SSSP iterations
@@ -388,13 +387,31 @@ class SSSPEnactor : public EnactorBase
                             pq_level,
                             (pq_level+1),
                             context);
-                    printf("out_length:%d\n", out_length);
+                    //printf("out_length:%d\n", out_length);
                     frontier_attribute.selector ^= 1;
                     if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, out_length)) break;
                 }
                 //
                 //If the output queue is empty and far queue is not, then add priority level and split the far pile.
-
+                else if (pq->queue_length > 0) {
+                    pq->selector ^= 1;
+                    pq_level++;
+                    unsigned int out_length = gunrock::priority_queue::Bisect<PriorityQueueKernelPolicy, SSSPProblem, NearFarPriorityQueue, PqFunctor>(
+                            (int*)pq->nf_pile[pq->selector^1],
+                            pq,
+                            (unsigned int)pq->queue_length,
+                            data_slice,
+                            graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],
+                            0,
+                            pq_level,
+                            (pq_level+1),
+                            context);
+                    if (out_length == 0) break;
+                    frontier_attribute.selector ^= 1;
+                    if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, out_length)) break;
+                } else {
+                    break;
+                }
 
                 enactor_stats.iteration++;
 
