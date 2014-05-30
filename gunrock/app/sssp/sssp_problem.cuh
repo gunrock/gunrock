@@ -49,6 +49,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
         unsigned int        *d_labels;              /**< Used for source distance */
         unsigned int        *d_weights;             /**< Used for storing edge weights */
         VertexId            *d_preds;               /**< Used for storing the actual shortest path */
+        VertexId            *d_visit_lookup;        /**< Used for check duplicate */
         float               *d_delta;
     };
 
@@ -113,6 +114,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
             if (data_slices[i]->d_weights)      util::GRError(cudaFree(data_slices[i]->d_weights), "GpuSlice cudaFree d_weights failed", __FILE__, __LINE__);
             if (data_slices[i]->d_delta)      util::GRError(cudaFree(data_slices[i]->d_delta), "GpuSlice cudaFree d_delta failed", __FILE__, __LINE__);
             if (data_slices[i]->d_preds)      util::GRError(cudaFree(data_slices[i]->d_preds), "GpuSlice cudaFree d_preds failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_visit_lookup)      util::GRError(cudaFree(data_slices[i]->d_visit_lookup), "GpuSlice cudaFree d_visit_lookup failed", __FILE__, __LINE__);
             if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
         }
         if (d_data_slices)  delete[] d_data_slices;
@@ -236,7 +238,6 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
                     "SSSPProblem cudaMalloc d_delta failed", __FILE__, __LINE__)) return retval;
 
                 VertexId    *d_preds = NULL;
-
                 if (MARK_PATHS) {
                     if (retval = util::GRError(cudaMalloc(
                                     (void**)&d_preds,
@@ -244,6 +245,13 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
                                 "SSSPProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
                 }
                 data_slices[0]->d_preds = d_preds;
+
+                VertexId    *d_visit_lookup;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_visit_lookup,
+                                nodes * sizeof(VertexId)),
+                            "SSSPProblem cudaMalloc d_visit_lookup failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_visit_lookup = d_visit_lookup;
     
                 if (retval = util::GRError(cudaMemcpy(
                         d_weights,
@@ -316,6 +324,14 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
                 data_slices[gpu]->d_preds = d_preds;
             }
 
+            if (!data_slices[gpu]->d_visit_lookup) {
+                VertexId    *d_visit_lookup;
+                if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_visit_lookup,
+                        nodes * sizeof(VertexId)),
+                    "SSSPProblem cudaMalloc d_visit_lookup failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_visit_lookup = d_visit_lookup;
+            }
 
             if (retval = util::GRError(cudaMemcpy(
                             d_data_slices[gpu],
@@ -346,6 +362,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
 
 
         if (MARK_PATHS) util::MemsetIdxKernel<<<128, 128>>>(data_slices[0]->d_preds, nodes);
+        util::MemsetKernel<<<128, 128>>>(data_slices[0]->d_visit_lookup, -1, nodes);
 
 
         return retval;

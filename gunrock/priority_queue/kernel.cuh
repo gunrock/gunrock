@@ -48,6 +48,12 @@ struct Dispatch
     typedef typename ProblemData::DataSlice     DataSlice;
     typedef typename PriorityQueue::NearFarPile NearFarPile;
 
+    static __device__ __forceinline__ void MarkVisit(
+            VertexId     *&vertex_in,
+            DataSlice       *&problem,
+            SizeT &input_queue_length)
+            {}
+
     static __device__ __forceinline__ void MarkNF(
             VertexId     *&vertex_in,
             NearFarPile     *&pq,
@@ -81,6 +87,22 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
     typedef typename ProblemData::DataSlice     DataSlice;
     typedef typename PriorityQueue::NearFarPile NearFarPile;
 
+    static __device__ __forceinline__ void MarkVisit(
+                                            VertexId     *&vertex_in,
+                                            DataSlice       *&problem,
+                                            SizeT &input_queue_length)
+    {
+        int tid = threadIdx.x;
+        int bid = blockIdx.x;
+        int my_id = tid + bid*blockDim.x;
+
+        if (my_id >= input_queue_length)
+            return;
+
+        unsigned int my_vert = vertex_in[my_id];
+        problem->d_visit_lookup[my_vert] = my_id;
+    }
+
     static __device__ __forceinline__ void MarkNF(
                                             VertexId     *&vertex_in,
                                             NearFarPile     *&pq,
@@ -99,9 +121,10 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
         unsigned int bucket_max = UINT_MAX/problem->d_delta[0];
         unsigned int my_vert = vertex_in[my_id];
         unsigned int bucket_id = Functor::ComputePriorityScore(my_vert, problem);
-        printf("my_id: %d, my_vert: %d\n", my_id, my_vert, bucket_id);
-        pq->d_valid_near[my_id] = (bucket_id < upper_priority_score_limit && bucket_id >= lower_priority_score_limit) ? 1 : 0;
-        pq->d_valid_far[my_id] = (bucket_id >= upper_priority_score_limit && bucket_id < bucket_max) ? 1 : 0;
+        bool valid = (my_id == problem->d_visit_lookup[my_vert]);
+        printf(" valid:%d, my_id: %d, my_vert: %d\n", valid, my_id, my_vert, bucket_id);
+        pq->d_valid_near[my_id] = (bucket_id < upper_priority_score_limit && bucket_id >= lower_priority_score_limit && valid) ? 1 : 0;
+        pq->d_valid_far[my_id] = (bucket_id >= upper_priority_score_limit && bucket_id < bucket_max && valid) ? 1 : 0;
         printf("valid near, far: %d, %d\n", pq->d_valid_near[my_id], pq->d_valid_far[my_id]);
     }
 
@@ -127,10 +150,24 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
 
         my_valid = pq->d_valid_far[my_id];
         if (my_valid == pq->d_valid_far[my_id+1]-1)
-            pq->d_queue[my_valid+far_pile_offset] = my_vert;
+            pq->d_queue[0][my_valid+far_pile_offset] = my_vert;
         
     }
 };
+
+template<typename KernelPolicy, typename ProblemData, typename PriorityQueue, typename Functor>
+__launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::BLOCKS)
+    __global__
+void MarkVisit(
+        typename KernelPolicy::VertexId     *vertex_in,
+        typename ProblemData::DataSlice     *problem,
+        typename KernelPolicy::SizeT        input_queue_length)
+{
+    Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor>::MarkVisit(
+            vertex_in,
+            problem,
+            input_queue_length);
+}
 
 template<typename KernelPolicy, typename ProblemData, typename PriorityQueue, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::BLOCKS)
@@ -195,7 +232,7 @@ template <typename KernelPolicy, typename ProblemData, typename PriorityQueue, t
     if(input_queue_length > 0)
     {
         printf("input queue length:%d\n", input_queue_length);
-        //util::DisplayDeviceResults(problem->d_labels, 38);
+        MarkVisit<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, problem, input_queue_length);
         // MarkNF
         MarkNF<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, nf_pile, problem, input_queue_length, lower_limit, upper_limit);
 

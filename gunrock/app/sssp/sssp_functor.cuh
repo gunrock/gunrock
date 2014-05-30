@@ -72,7 +72,7 @@ struct SSSPFunctor
     { 
         if (ProblemData::MARK_PATHS)
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    s_id, problem->d_preds + d_id);
+                    s_id, problem->d_preds + d_id); 
     }
 
     /**
@@ -85,7 +85,7 @@ struct SSSPFunctor
      */
     static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, unsigned int v = 0)
     {
-        return node != -1;
+        return (node != -1);
     }
 
     /**

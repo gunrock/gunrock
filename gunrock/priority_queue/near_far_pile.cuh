@@ -38,7 +38,7 @@ struct PriorityQueue
     typedef _SizeT              SizeT;
 
     struct NearFarPile {
-        VertexId                                    *d_queue;
+        VertexId                                    *d_queue[2];    //ping-pong buffer for nf_pile
         VertexId                                    *d_valid_near;
         VertexId                                    *d_valid_far;
     };
@@ -48,15 +48,18 @@ struct PriorityQueue
 
     SizeT                   queue_length;
     SizeT                   max_queue_length;
+    int                     selector;
 
     PriorityQueue() :
         queue_length(0),
-        max_queue_length(UINT_MAX)
+        max_queue_length(UINT_MAX),
+        selector(0)
     {}
 
     virtual ~PriorityQueue()
     {
-        if (nf_pile[0]->d_queue)    util::GRError(cudaFree(nf_pile[0]->d_queue), "NearFarPile cudaFree d_queue failed", __FILE__, __LINE__);
+        if (nf_pile[0]->d_queue[0])    util::GRError(cudaFree(nf_pile[0]->d_queue[0]), "NearFarPile cudaFree d_queue failed", __FILE__, __LINE__);
+        if (nf_pile[0]->d_queue[1])    util::GRError(cudaFree(nf_pile[0]->d_queue[1]), "NearFarPile cudaFree d_queue failed", __FILE__, __LINE__);
         if (nf_pile[0]->d_valid_near)    util::GRError(cudaFree(nf_pile[0]->d_valid_near), "NearFarPile cudaFree d_valid_near failed", __FILE__, __LINE__);
         if (nf_pile[0]->d_valid_far)    util::GRError(cudaFree(nf_pile[0]->d_valid_far), "NearFarPile cudaFree d_valid_far failed", __FILE__, __LINE__);
         if (d_nf_pile[0]) util::GRError(cudaFree(d_nf_pile[0]), "NearFarPile cudaFree d_nf_pile failed", __FILE__, __LINE__);
@@ -69,24 +72,32 @@ struct PriorityQueue
     {
         cudaError_t retval = cudaSuccess;
         queue_length = 0;
-        max_queue_length = edges*queue_sizing + 1;
+        //TODO: do not use queue_sizing for now, see if this works.
+        max_queue_length = edges + 1;
 
         nf_pile = new NearFarPile*[1];
         d_nf_pile = new NearFarPile*[1];
 
         do {
-            nf_pile[0] = new NearFarPile;
+            nf_pile[0] = new NearFarPile; 
             if (retval = util::GRError(cudaMalloc(
                             (void**)&d_nf_pile[0],
                             sizeof(NearFarPile)),
                         "PriorityQueue cudaMalloc d_nf_pile failed", __FILE__, __LINE__)) return retval;
 
-            VertexId *d_queue;
+            VertexId *d_queue_ping;
             if (retval = util::GRError(cudaMalloc(
-                (void**)&d_queue,
+                (void**)&d_queue_ping,
                 (max_queue_length)*sizeof(VertexId)),
-                "NearFarPile cudaMalloc d_queue failed", __FILE__, __LINE__)) break;
-                nf_pile[0]->d_queue = d_queue;
+                "NearFarPile cudaMalloc d_queue_ping failed", __FILE__, __LINE__)) break;
+                nf_pile[0]->d_queue[0] = d_queue_ping;
+
+            VertexId *d_queue_pong;
+            if (retval = util::GRError(cudaMalloc(
+                (void**)&d_queue_pong,
+                (max_queue_length)*sizeof(VertexId)),
+                "NearFarPile cudaMalloc d_queue_pong failed", __FILE__, __LINE__)) break;
+                nf_pile[0]->d_queue[1] = d_queue_pong;
 
             VertexId *d_valid_near;
             if (retval = util::GRError(cudaMalloc(

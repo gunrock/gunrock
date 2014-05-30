@@ -276,6 +276,7 @@ class SSSPEnactor : public EnactorBase
                             "SSSPProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
             }
 
+
             unsigned int pq_level = 0; 
 
             while (done[0] < 0) {
@@ -344,7 +345,8 @@ class SSSPEnactor : public EnactorBase
                 }
 
                 // Check if done
-                if (done[0] == 0) break;
+                // Disable here because of Priority Queue
+                //if (done[0] == 0) break;
 
                 // Vertex Map
                 gunrock::oprtr::filter::Kernel<FilterKernelPolicy, SSSPProblem, SsspFunctor>
@@ -356,7 +358,7 @@ class SSSPEnactor : public EnactorBase
                     frontier_attribute.queue_length,
                     d_done,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],      // d_in_queue
-                    NULL,    // d_pred_in_queue
+                    NULL,                                                                       // d_pred_in_queue
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],    // d_out_queue
                     data_slice,
                     NULL,
@@ -375,17 +377,21 @@ class SSSPEnactor : public EnactorBase
 
                 //TODO: split the output queue into near/far pile, put far pile in far queue, put near pile as the input queue
                 //for next round.
-                unsigned int out_length = gunrock::priority_queue::Bisect<PriorityQueueKernelPolicy, SSSPProblem, NearFarPriorityQueue, PqFunctor>(
-                (int*)graph_slice->frontier_queues.d_keys[frontier_attribute.selector],
-                pq,
-                (unsigned int)frontier_attribute.queue_length,
-                data_slice,
-                graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],
-                pq->queue_length,
-                pq_level,
-                (pq_level+1),
-                context);
-                printf("out_length:%d\n", out_length);
+                if (frontier_attribute.queue_length > 0) {
+                    unsigned int out_length = gunrock::priority_queue::Bisect<PriorityQueueKernelPolicy, SSSPProblem, NearFarPriorityQueue, PqFunctor>(
+                            (int*)graph_slice->frontier_queues.d_keys[frontier_attribute.selector],
+                            pq,
+                            (unsigned int)frontier_attribute.queue_length,
+                            data_slice,
+                            graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],
+                            pq->queue_length,
+                            pq_level,
+                            (pq_level+1),
+                            context);
+                    printf("out_length:%d\n", out_length);
+                    frontier_attribute.selector ^= 1;
+                    if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, out_length)) break;
+                }
                 //
                 //If the output queue is empty and far queue is not, then add priority level and split the far pile.
 
@@ -422,7 +428,6 @@ class SSSPEnactor : public EnactorBase
             }*/
             
         } while(0);
-
         if (d_scanned_edges) cudaFree(d_scanned_edges);
 
         if (DEBUG) printf("\nGPU SSSP Done.\n");
