@@ -273,12 +273,13 @@ struct Csr
             for (SizeT edge = row_offsets[node];
                  edge < row_offsets[node + 1];
                  edge++) {
+                 printf("[");
                 util::PrintValue(column_indices[edge]);
-                printf("edge value: ");
-                if (with_edge_value)
+                if (with_edge_value) {
+                    printf(",");
                     util::PrintValue(edge_values[edge]);
-                else
-                    printf(", ");
+                }
+                printf("], ");
             }
             printf("\n");
         }

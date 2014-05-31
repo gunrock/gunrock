@@ -214,7 +214,7 @@ void Compact(
 }
 
 template <typename KernelPolicy, typename ProblemData, typename PriorityQueue, typename Functor>
-    typename KernelPolicy::SizeT Bisect(
+    unsigned int Bisect(
         typename KernelPolicy::VertexId     *vertex_in,
         PriorityQueue                       *pq,
         typename KernelPolicy::SizeT        input_queue_length,
@@ -231,11 +231,12 @@ template <typename KernelPolicy, typename ProblemData, typename PriorityQueue, t
     typename PriorityQueue::NearFarPile         *nf_pile = pq->d_nf_pile[0];
 
     int block_num = (input_queue_length + KernelPolicy::THREADS - 1) / KernelPolicy::THREADS;
-    unsigned int close_size[1] = {0};
-    unsigned int far_size[1] = {0};
+    unsigned int close_size[1];
+    unsigned int far_size[1];
+    close_size[0] = 0;
+    far_size[0] = 0;
     if(input_queue_length > 0)
     {
-        //printf("input queue length:%d\n", input_queue_length);
         MarkVisit<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, problem, input_queue_length);
         // MarkNF
         MarkNF<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, nf_pile, problem, input_queue_length, lower_limit, upper_limit);
@@ -255,8 +256,8 @@ template <typename KernelPolicy, typename ProblemData, typename PriorityQueue, t
 
     }
     // Update near/far length
-    pq->queue_length = far_size[0];
-    return (SizeT)close_size[0];
+    pq->queue_length = far_pile_offset + far_size[0];
+    return close_size[0];
 }
 
 } //priority_queue

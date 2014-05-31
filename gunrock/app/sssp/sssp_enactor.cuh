@@ -277,8 +277,9 @@ class SSSPEnactor : public EnactorBase
 
 
             unsigned int pq_level = 0; 
+            unsigned int out_length = 0;
 
-            while (done[0] < 0) {
+            while (out_length > 0 || pq->queue_length > 0 || frontier_attribute.queue_length > 0) {
 
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SSSPProblem, SsspFunctor>
@@ -376,8 +377,9 @@ class SSSPEnactor : public EnactorBase
 
                 //TODO: split the output queue into near/far pile, put far pile in far queue, put near pile as the input queue
                 //for next round.
+                out_length = 0;
                 if (frontier_attribute.queue_length > 0) {
-                    unsigned int out_length = gunrock::priority_queue::Bisect<PriorityQueueKernelPolicy, SSSPProblem, NearFarPriorityQueue, PqFunctor>(
+                    out_length = gunrock::priority_queue::Bisect<PriorityQueueKernelPolicy, SSSPProblem, NearFarPriorityQueue, PqFunctor>(
                             (int*)graph_slice->frontier_queues.d_keys[frontier_attribute.selector],
                             pq,
                             (unsigned int)frontier_attribute.queue_length,
@@ -387,32 +389,33 @@ class SSSPEnactor : public EnactorBase
                             pq_level,
                             (pq_level+1),
                             context);
-                    //printf("out_length:%d\n", out_length);
-                    frontier_attribute.selector ^= 1;
+                            printf("out:%d, pq_length:%d\n", out_length, pq->queue_length);
                     if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, out_length)) break;
                 }
                 //
                 //If the output queue is empty and far queue is not, then add priority level and split the far pile.
-                else if (pq->queue_length > 0) {
-                    pq->selector ^= 1;
-                    pq_level++;
-                    unsigned int out_length = gunrock::priority_queue::Bisect<PriorityQueueKernelPolicy, SSSPProblem, NearFarPriorityQueue, PqFunctor>(
-                            (int*)pq->nf_pile[pq->selector^1],
-                            pq,
-                            (unsigned int)pq->queue_length,
-                            data_slice,
-                            graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],
-                            0,
-                            pq_level,
-                            (pq_level+1),
-                            context);
-                    if (out_length == 0) break;
-                    frontier_attribute.selector ^= 1;
-                    if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, out_length)) break;
-                } else {
-                    break;
+                if ( out_length == 0 && pq->queue_length > 0) {
+                    while (pq->queue_length > 0 && out_length == 0) {
+                        pq->selector ^= 1;
+                        pq_level++;
+                        out_length = gunrock::priority_queue::Bisect<PriorityQueueKernelPolicy, SSSPProblem, NearFarPriorityQueue, PqFunctor>(
+                                (int*)pq->nf_pile[0]->d_queue[pq->selector^1],
+                                pq,
+                                (unsigned int)pq->queue_length,
+                                data_slice,
+                                graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],
+                                0,
+                                pq_level,
+                                (pq_level+1),
+                                context);
+                                printf("out after p:%d, pq_length:%d\n", out_length, pq->queue_length);
+                        if (out_length > 0) {
+                            if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, out_length)) break;
+                        }
+                    }
                 }
 
+                frontier_attribute.selector ^= 1;
                 enactor_stats.iteration++;
 
                 if (INSTRUMENT || DEBUG) {
@@ -427,7 +430,7 @@ class SSSPEnactor : public EnactorBase
                     }
                 }
                 // Check if done
-                if (done[0] == 0) break;
+                //if (done[0] == 0) break;
 
                 if (DEBUG) printf("\n%lld", (long long) enactor_stats.iteration);
 
