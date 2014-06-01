@@ -389,7 +389,7 @@ class SSSPEnactor : public EnactorBase
                             pq_level,
                             (pq_level+1),
                             context);
-                            printf("out:%d, pq_length:%d\n", out_length, pq->queue_length);
+                            //printf("out:%d, pq_length:%d\n", out_length, pq->queue_length);
                     if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, out_length)) break;
                 }
                 //
@@ -408,7 +408,7 @@ class SSSPEnactor : public EnactorBase
                                 pq_level,
                                 (pq_level+1),
                                 context);
-                                printf("out after p:%d, pq_length:%d\n", out_length, pq->queue_length);
+                                //printf("out after p:%d, pq_length:%d\n", out_length, pq->queue_length);
                         if (out_length > 0) {
                             if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, out_length)) break;
                         }
