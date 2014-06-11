@@ -42,21 +42,12 @@ class BFSEnactor : public EnactorBase
     // Members
     protected:
 
-    unsigned long long total_runtimes;              // Total working time by each CTA
-    unsigned long long total_lifetimes;             // Total life time of each CTA
-    unsigned long long total_queued;
-
     /**
      * A pinned, mapped word that the traversal kernels will signal when done
      */
     volatile int        *done;
     int                 *d_done;
     cudaEvent_t         throttle_event;
-
-    /**
-     * Current iteration, also used to get the final search depth of the BFS search
-     */
-    long long                           iteration;
 
     // Methods
     protected:
@@ -146,8 +137,6 @@ class BFSEnactor : public EnactorBase
      */
     BFSEnactor(bool DEBUG = false) :
         EnactorBase(EDGE_FRONTIERS, DEBUG),
-        iteration(0),
-        total_queued(0),
         done(NULL),
         d_done(NULL)
     {}
@@ -186,11 +175,11 @@ class BFSEnactor : public EnactorBase
     {
         cudaThreadSynchronize();
 
-        total_queued = this->total_queued;
-        search_depth = this->iteration;
+        total_queued = enactor_stats.total_queued;
+        search_depth = enactor_stats.iteration;
 
-        avg_duty = (total_lifetimes >0) ?
-            double(total_runtimes) / total_lifetimes : 0.0;
+        avg_duty = (enactor_stats.total_lifetimes >0) ?
+            double(enactor_stats.total_runtimes) / enactor_stats.total_lifetimes : 0.0;
     }
 
     /** @} */
@@ -381,7 +370,6 @@ class BFSEnactor : public EnactorBase
 
                 frontier_attribute.queue_index++;
                 frontier_attribute.selector ^= 1;
-                enactor_stats.iteration++;
 
                 if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
@@ -400,6 +388,8 @@ class BFSEnactor : public EnactorBase
                 }
                 // Check if done
                 if (done[0] == 0) break;
+
+                enactor_stats.iteration++;
 
                 if (DEBUG) printf("\n%lld", (long long) enactor_stats.iteration);
 
@@ -505,7 +495,7 @@ class BFSEnactor : public EnactorBase
                     300,                                // CUDA_ARCH
                     INSTRUMENT,                         // INSTRUMENT
                     8,                                  // MIN_CTA_OCCUPANCY
-                    10,                                  // LOG_THREADS
+                    6,                                  // LOG_THREADS
                     8,                                  // LOG_BLOCKS
                     32*128,                                  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
                     1,                                  // LOG_LOAD_VEC_SIZE
@@ -514,7 +504,7 @@ class BFSEnactor : public EnactorBase
                     32,                            // WARP_GATHER_THRESHOLD
                     128 * 4,                            // CTA_GATHER_THRESHOLD
                     7,                                  // LOG_SCHEDULE_GRANULARITY
-                    gunrock::oprtr::advance::LB>
+                    gunrock::oprtr::advance::TWC_FORWARD>
                         AdvanceKernelPolicy;
 
                 return EnactBFS<AdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(

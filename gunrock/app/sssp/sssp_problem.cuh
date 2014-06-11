@@ -262,7 +262,8 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
 
                 data_slices[0]->d_weights = d_weights;
 
-                float delta = EstimatedDelta(graph);
+                float delta = EstimatedDelta(graph)*2;
+                printf("estimated delta:%5f\n", delta);
 
                 if (retval = util::GRError(cudaMemcpy(
                             d_delta,
@@ -371,7 +372,6 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
     float EstimatedDelta(const Csr<VertexId, unsigned int, SizeT> &graph) {
         double  avgV = graph.average_edge_value;
         int     avgD = graph.average_degree;
-        printf("estimated delta:%5f\n", avgV * 32/avgD);
         return avgV * 32 / avgD;
     }
 

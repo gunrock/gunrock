@@ -238,12 +238,15 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         my_thread_start = bid * partition_size;
         my_thread_end = (bid+1)*partition_size < output_queue_len ? (bid+1)*partition_size : output_queue_len;
+        //printf("tid:%d, bid:%d, m_thread_start:%d, m_thread_end:%d\n",tid, bid, my_thread_start, my_thread_end); 
 
         if (my_thread_start >= output_queue_len)
             return;
 
         int my_start_partition = partition_starts[bid];
-        int my_end_partition = bid < num_partitions - 1 ? partition_starts[bid+1]+1 : input_queue_len;
+        int my_end_partition = partition_starts[bid+1] > input_queue_len ? partition_starts[bid+1] : input_queue_len;
+        //if (tid == 0 && bid == 252)
+        //    printf("bid(%d) < num_partitions-1(%d)?, partition_starts[bid+1]+1:%d\n", bid, num_partitions-1, partition_starts[bid+1]+1);
 
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
         // smem_storage.s_edges[NT]
@@ -265,6 +268,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             __syncthreads();
 
             s_edges[tid] = (my_start_partition + tid < my_end_partition ? d_scanned_edges[my_start_partition + tid] - pre_offset : max_edges);
+            //if (bid == 252 && tid == 2)
+            //    printf("start_partition+tid:%d < my_end_partition:%d ?, d_queue[%d]:%d\n", my_start_partition+tid, my_end_partition, my_start_partition+tid, d_queue[my_start_partition+tid]);
             if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
                 s_vertices[tid] = my_start_partition + tid < my_end_partition ? d_queue[my_start_partition+tid] : -1;
                 s_edge_ids[tid] = 0;
@@ -341,11 +346,15 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                         (VertexId)lookup,
                                         d_out + out_index);
                             }
+                            if (output_queue_len == 6413)
+                                printf("tid:%d, bid:%d, %d\n", tid, bid, u);
                         }
                         else {
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                     -1,
                                     d_out + out_index);
+                            if (output_queue_len == 6413)
+                                printf("tid:%d, bid:%d, -1\n", tid, bid);
                         }
                     } else {
                         if (Functor::CondEdge(v, u, problem, lookup, e_id)) {
@@ -511,11 +520,15 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 (VertexId)lookup,
                                 d_out + offset+i);
                     }
+                    if (output_queue_len == 6413)
+                        printf("tid:%d, bid:%d, %d\n", tid, bid, u);
                 }
                 else {
                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                             -1,
                             d_out + offset+i);
+                    if (output_queue_len == 6413)
+                                printf("tid:%d, bid:%d, -1\n", tid, bid);
                 }
             } else {
                 //v:pre, u:neighbor, outoffset:offset+i

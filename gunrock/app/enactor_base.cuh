@@ -102,6 +102,15 @@ protected:
         // Setup work progress (only needs doing once since we maintain
         // it in our kernel code)
         work_progress.Setup();
+        enactor_stats.d_node_locks = NULL;
+        enactor_stats.d_node_locks_out = NULL;
+    }
+
+
+    virtual ~EnactorBase()
+    {
+        if (enactor_stats.d_node_locks) util::GRError(cudaFree(enactor_stats.d_node_locks), "EnactorBase cudaFree d_node_locks failed", __FILE__, __LINE__);
+        if (enactor_stats.d_node_locks_out) util::GRError(cudaFree(enactor_stats.d_node_locks_out), "EnactorBase cudaFree d_node_locks_out failed", __FILE__, __LINE__);
     }
 
     template <typename ProblemData>
@@ -109,7 +118,8 @@ protected:
         ProblemData *problem,
         int max_grid_size,
         int advance_occupancy,
-        int filter_occupancy)
+        int filter_occupancy,
+        int node_lock_size = 256)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -127,6 +137,16 @@ protected:
 
         enactor_stats.num_gpus              = 1;
         enactor_stats.gpu_id                = 0;
+
+        if (retval = util::GRError(cudaMalloc(
+                            (void**)&enactor_stats.d_node_locks,
+                            node_lock_size * sizeof(unsigned int)),
+                        "EnactorBase cudaMalloc d_node_locks failed", __FILE__, __LINE__)) return retval;
+
+            if (retval = util::GRError(cudaMalloc(
+                            (void**)&enactor_stats.d_node_locks_out,
+                            node_lock_size * sizeof(unsigned int)),
+                        "EnactorBase cudaMalloc d_node_locks_out failed", __FILE__, __LINE__)) return retval;
 
         return retval;
     }

@@ -35,9 +35,10 @@
 #include <gunrock/app/dobfs/dobfs_functor.cuh>
 
 // Operator includes
-#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
-#include <gunrock/oprtr/edge_map_backward/kernel.cuh>
+#include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
+
+#include <moderngpu.cuh>
 
 using namespace gunrock;
 using namespace gunrock::util;
@@ -309,7 +310,8 @@ void RunTests(
     int num_gpus,
     double max_queue_sizing,
     float alpha,        // Tuning parameter for switching to reverse bfs
-    float beta)         // Tuning parameter for switching back to normal bfs
+    float beta,         // Tuning parameter for switching back to normal bfs
+    CudaContext& context)
 {
     typedef DOBFSProblem<
         VertexId,
@@ -368,7 +370,7 @@ void RunTests(
 
         util::GRError(csr_problem->Reset(src, dobfs_enactor.GetFrontierType(), max_queue_sizing), "DOBFS Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
-        util::GRError(dobfs_enactor.template Enact<Problem>(csr_problem, src, max_grid_size), "DOBFS Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(dobfs_enactor.template Enact<Problem>(context, csr_problem, src, max_grid_size), "DOBFS Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
 
         dobfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
@@ -427,7 +429,8 @@ template <
 void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
     Csr<VertexId, Value, SizeT> &inv_graph,
-    CommandLineArgs &args)
+    CommandLineArgs &args,
+    CudaContext& context)
 {
     VertexId            src                 = -1;           // Use whatever the specified graph-type's default is
     std::string         src_str;
@@ -474,7 +477,8 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         g_alpha,
-                        g_beta);
+                        g_beta,
+                        context);
             } else {
                 RunTests<VertexId, Value, SizeT, true, true, false>(
                         graph,
@@ -484,7 +488,8 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         g_alpha,
-                        g_beta);
+                        g_beta,
+                        context);
             }
         } else {
             if (idempotence) {
@@ -496,7 +501,8 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         g_alpha,
-                        g_beta);
+                        g_beta,
+                        context);
             } else {
                 RunTests<VertexId, Value, SizeT, true, false, false>(
                         graph,
@@ -506,7 +512,8 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         g_alpha,
-                        g_beta);
+                        g_beta,
+                        context);
             }
         }
     } else {
@@ -520,7 +527,8 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         g_alpha,
-                        g_beta);
+                        g_beta,
+                        context);
             } else {
                 RunTests<VertexId, Value, SizeT, false, true, false>(
                         graph,
@@ -530,7 +538,8 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         g_alpha,
-                        g_beta);
+                        g_beta,
+                        context);
             }
         } else {
             if (idempotence) {
@@ -542,7 +551,8 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         g_alpha,
-                        g_beta);
+                        g_beta,
+                        context);
             } else {
                 RunTests<VertexId, Value, SizeT, false, false, false>(
                         graph,
@@ -552,7 +562,8 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         g_alpha,
-                        g_beta);
+                        g_beta,
+                        context);
             }
         }
     }
@@ -575,8 +586,12 @@ int main( int argc, char** argv)
 		return 1;
 	}
 
-	DeviceInit(args);
-	cudaSetDeviceFlags(cudaDeviceMapHost);
+	//DeviceInit(args);
+	//cudaSetDeviceFlags(cudaDeviceMapHost);
+
+    int dev = 0;
+    args.GetCmdLineArgument("device", dev);
+    ContextPtr context = mgpu::CreateCudaDevice(dev);
 
 	//srand(0);									// Presently deterministic
 	//srand(time(NULL));
@@ -634,9 +649,9 @@ int main( int argc, char** argv)
 
         if (!g_undirected) {
 		    // Run tests
-		    RunTests(csr, inv_csr, args);
+		    RunTests(csr, inv_csr, args, *context);
 		} else {
-		    RunTests(csr, csr, args);
+		    RunTests(csr, csr, args, *context);
 		}
 
 	} else {

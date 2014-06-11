@@ -32,8 +32,10 @@
 #include <gunrock/app/bc/bc_functor.cuh>
 
 // Operator includes
-#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
+#include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
+
+#include <moderngpu.cuh>
 
 // Boost includes
 #include <boost/config.hpp>
@@ -327,7 +329,8 @@ void RunTests(
     std::string &ref_filename,
     int max_grid_size,
     int num_gpus,
-    double max_queue_sizing)
+    double max_queue_sizing,
+    CudaContext& context)
 {
     typedef BCProblem<
         VertexId,
@@ -341,7 +344,7 @@ void RunTests(
     Value *reference_sigmas    = (Value*)malloc(sizeof(Value) * graph.nodes);
     Value *h_sigmas            = (Value*)malloc(sizeof(Value) * graph.nodes);
     Value *h_bc_values         = (Value*)malloc(sizeof(Value) * graph.nodes);
-    Value *h_ebc_values         = (Value*)malloc(sizeof(Value) * graph.nodes);
+    Value *h_ebc_values         = (Value*)malloc(sizeof(Value) * graph.edges);
     Value *reference_check_bc_values = (g_quick) ? NULL : reference_bc_values;
     Value *reference_check_sigmas = (g_quick || (src == -1)) ? NULL : reference_sigmas;
 
@@ -403,7 +406,7 @@ void RunTests(
     for (VertexId i = start_src; i < end_src; ++i)
     {
         util::GRError(csr_problem->Reset(i, bc_enactor.GetFrontierType(), max_queue_sizing), "BC Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(bc_enactor.template Enact<Problem>(csr_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(bc_enactor.template Enact<Problem>(context, csr_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
     }
 
     util::MemsetScaleKernel<<<128, 128>>>
@@ -417,7 +420,7 @@ void RunTests(
 
     // Copy out results
     util::GRError(csr_problem->Extract(h_sigmas, h_bc_values, h_ebc_values), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
-    printf("edge bc values:\n");
+    printf("edge bc values: %d\n", graph.edges);
     for (int i = 0; i < graph.edges; ++i) {
         printf("%5f\n", h_ebc_values[i]);
     }
@@ -459,7 +462,8 @@ template <
     typename SizeT>
 void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
-    CommandLineArgs &args)
+    CommandLineArgs &args,
+    CudaContext& context)
 {
     VertexId    src              = -1;    // Use whatever the specified graph-type's default is
     std::string src_str;
@@ -489,7 +493,8 @@ void RunTests(
             ref_filename,
             max_grid_size,
             num_gpus,
-            max_queue_sizing);
+            max_queue_sizing,
+            context);
     } else {
         RunTests<VertexId, Value, SizeT, false>(
             graph,
@@ -497,7 +502,8 @@ void RunTests(
             ref_filename,
             max_grid_size,
             num_gpus,
-            max_queue_sizing);
+            max_queue_sizing,
+            context);
     }
 
 }
@@ -517,15 +523,18 @@ int main( int argc, char** argv)
         return 1;
     }
 
-    DeviceInit(args);
-    cudaSetDeviceFlags(cudaDeviceMapHost);
+    //DeviceInit(args);
+    //cudaSetDeviceFlags(cudaDeviceMapHost);
+
+    int dev = 0;
+    args.GetCmdLineArgument("device", dev);
+    ContextPtr context = mgpu::CreateCudaDevice(dev);
 
     //srand(0);                                                                     // Presently deterministic
     //srand(time(NULL));
 
     // Parse graph-contruction params
-    //g_undirected = true;
-    g_undirected = args.CheckCmdLineFlag("undirected");
+    g_undirected = true;
 
     std::string graph_type = argv[1];
     int flags = args.ParsedArgc();
@@ -565,7 +574,7 @@ int main( int argc, char** argv)
         fflush(stdout);
 
         // Run tests
-        RunTests(csr, args);
+        RunTests(csr, args, *context);
 
     } else {
 
