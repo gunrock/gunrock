@@ -25,7 +25,7 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\" 
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" 
-SM_TARGETS = $(GEN_SM30)
+SM_TARGETS = $(GEN_SM35)
 #$(GEN_SM35)
 
 #-------------------------------------------------------------------------------
@@ -104,7 +104,7 @@ test: bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
 bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_bfs.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_bfs.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3 -lcuda
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_bfs.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean

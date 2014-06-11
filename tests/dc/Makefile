@@ -11,7 +11,6 @@
 
 force64 = 1
 NVCC = "$(shell which nvcc)"
-#NVCC = "/usr/local/cuda-6.0/bin/nvcc"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
 KERNELS = 

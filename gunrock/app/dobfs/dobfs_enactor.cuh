@@ -269,7 +269,7 @@ class DOBFSEnactor : public EnactorBase
             SizeT current_frontier_size = 1;
 
             // Normal BFS
-            {
+            /*{
 
                 frontier_attribute.queue_length         = 1;
                 frontier_attribute.queue_index          = 0;        // Work queue index
@@ -396,7 +396,7 @@ class DOBFSEnactor : public EnactorBase
                 }
 
                 if (retval) break;
-            }
+            }*/
             if (DEBUG) printf("iter: %lld\n, alpha %f\n", enactor_stats.iteration, problem->alpha);
               
             // Reverse BFS
@@ -469,9 +469,9 @@ class DOBFSEnactor : public EnactorBase
                 if (last_queue_length == frontier_attribute.queue_length) break;
                 last_queue_length = frontier_attribute.queue_length;
 
-                //util::DisplayDeviceResults(problem->graph_slices[0]->frontier_queues.d_keys[selector], queue_length);
+                //util::DisplayDeviceResults(problem->graph_slices[0]->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
 
-                if (frontier_attribute.selector == 1) {
+
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<BackwardAdvanceKernelPolicy, DOBFSProblem, RBFSFunctor>(
                     d_done,
@@ -495,31 +495,6 @@ class DOBFSEnactor : public EnactorBase
                     this->work_progress,
                     context,
                     gunrock::oprtr::advance::V2V);
-                } else {
-                // Edge Map
-                gunrock::oprtr::advance::LaunchKernel<BackwardAdvanceKernelPolicy, DOBFSProblem, RBFSFunctor>(
-                    d_done,
-                    enactor_stats,
-                    frontier_attribute,
-                    data_slice,
-                    problem->data_slices[enactor_stats.gpu_id]->d_index_queue,
-                    problem->data_slices[enactor_stats.gpu_id]->d_frontier_map_out,
-                    problem->data_slices[enactor_stats.gpu_id]->d_frontier_map_in,
-                    (unsigned int*)NULL,
-                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
-                    (VertexId*)NULL,
-                    (VertexId*)NULL,
-                    (VertexId*)NULL,
-                    (SizeT*)NULL,
-                    (VertexId*)NULL,
-                    graph_slice->d_column_offsets,
-                    graph_slice->d_row_indices,
-                    0,
-                    0,
-                    this->work_progress,
-                    context,
-                    gunrock::oprtr::advance::V2V);
-                }
 
                 // Only need to reset queue for once
                 if (frontier_attribute.queue_reset)
@@ -580,6 +555,7 @@ class DOBFSEnactor : public EnactorBase
                 frontier_attribute.selector ^= 1;
 
                 if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
                 if (INSTRUMENT || DEBUG) {
                     enactor_stats.total_queued += frontier_attribute.queue_length;
                     if (DEBUG) printf(", %lld", (long long) frontier_attribute.queue_length);
@@ -837,8 +813,8 @@ class DOBFSEnactor : public EnactorBase
                     6,                                  // LOG_THREADS
                     8,                                  // LOG_BLOCKS
                     32*128,                             // LIGHT_EDGE_THRESHOLD
-                    2,                                  // LOG_LOAD_VEC_SIZE
-                    1,                                  // LOG_LOADS_PER_TILE
+                    1,                                  // LOG_LOAD_VEC_SIZE
+                    0,                                  // LOG_LOADS_PER_TILE
                     5,                                  // LOG_RAKING_THREADS
                     32,                                 // WARP_GATHER_THRESHOLD
                     128 * 4,                            // CTA_GATHER_THRESHOLD
