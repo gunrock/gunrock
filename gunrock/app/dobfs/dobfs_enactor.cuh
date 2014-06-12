@@ -269,7 +269,7 @@ class DOBFSEnactor : public EnactorBase
             SizeT current_frontier_size = 1;
 
             // Normal BFS
-            /*{
+            {
 
                 frontier_attribute.queue_length         = 1;
                 frontier_attribute.queue_index          = 0;        // Work queue index
@@ -383,20 +383,19 @@ class DOBFSEnactor : public EnactorBase
 
                     num_unvisited_nodes -= frontier_attribute.queue_length;
                     current_frontier_size = frontier_attribute.queue_length;
+                    enactor_stats.iteration++;
                     if (num_unvisited_nodes < current_frontier_size*problem->alpha)
                         break;
 
                     // Check if done
                     if (done[0] == 0) break;
 
-                    enactor_stats.iteration++;
-
                     if (DEBUG) printf("\n%lld", (long long) enactor_stats.iteration);
 
                 }
 
                 if (retval) break;
-            }*/
+            }
             if (DEBUG) printf("iter: %lld\n, alpha %f\n", enactor_stats.iteration, problem->alpha);
               
             // Reverse BFS
@@ -566,7 +565,7 @@ class DOBFSEnactor : public EnactorBase
                             enactor_stats.total_lifetimes)) break;
                     }
                 }
-                if (frontier_attribute.queue_length < graph_slice->nodes/problem->beta) break;
+                //if (frontier_attribute.queue_length < graph_slice->nodes/problem->beta) break;
 
                 // Check if done
                 if (done[0] == 0) break;
@@ -587,6 +586,7 @@ class DOBFSEnactor : public EnactorBase
             if (done[0] < 0) {
                 if (DEBUG) printf("back to normal BFS.\n");
             frontier_attribute.queue_length         = graph_slice->nodes;
+            //frontier_attribute.queue_length         = 1;
             frontier_attribute.queue_index          = 0;        // Work queue index
             frontier_attribute.selector             = 0;
 
@@ -703,6 +703,7 @@ class DOBFSEnactor : public EnactorBase
 
                 frontier_attribute.queue_index++;
                 frontier_attribute.selector ^= 1;
+                enactor_stats.iteration++;
                 if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
 
                 if (INSTRUMENT || DEBUG) {
@@ -719,7 +720,6 @@ class DOBFSEnactor : public EnactorBase
                 // Check if done
                 if (done[0] == 0) break;
 
-                enactor_stats.iteration++;
 
                 if (DEBUG) printf("\n%lld", (long long) enactor_stats.iteration);
 
