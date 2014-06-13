@@ -367,6 +367,8 @@ int main( int argc, char** argv)
 		typedef int SizeT;								// Use as the graph size type
 		Csr<VertexId, Value, SizeT> csr(false);         // default value for stream_from_host is false
 
+        printf("size of int:%d\n", sizeof(int));
+
 		if (graph_args < 1) { Usage(); return 1; }
 		char *market_filename = (graph_args == 2) ? argv[2] : NULL;
 		if (graphio::BuildMarketGraph<false>(

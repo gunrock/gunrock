@@ -246,6 +246,8 @@ class DOBFSEnactor : public EnactorBase
 
         cudaError_t retval = cudaSuccess;
 
+        unsigned int *d_scanned_edges = NULL; 
+
         do {
             // Determine grid size(s)
             if (DEBUG) {
@@ -268,8 +270,13 @@ class DOBFSEnactor : public EnactorBase
             SizeT num_unvisited_nodes = graph_slice->nodes - 1;
             SizeT current_frontier_size = 1;
 
+            if (retval = util::GRError(cudaMalloc(
+                            (void**)&d_scanned_edges,
+                            graph_slice->edges * sizeof(unsigned int)),
+                        "PBFSProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
+
             // Normal BFS
-            {
+            /*{
 
                 frontier_attribute.queue_length         = 1;
                 frontier_attribute.queue_index          = 0;        // Work queue index
@@ -292,7 +299,7 @@ class DOBFSEnactor : public EnactorBase
                                 (VertexId*)NULL,
                                 (bool*)NULL,
                                 (bool*)NULL,
-                                (unsigned int*)NULL,
+                                d_scanned_edges,
                                 graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
                                 graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],          // d_out_queue
                                 (VertexId*)NULL,
@@ -318,6 +325,8 @@ class DOBFSEnactor : public EnactorBase
 
                     frontier_attribute.queue_index++;
                     frontier_attribute.selector ^= 1;
+
+                    if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
 
                     if (DEBUG) {
                         if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
@@ -384,8 +393,7 @@ class DOBFSEnactor : public EnactorBase
                     num_unvisited_nodes -= frontier_attribute.queue_length;
                     current_frontier_size = frontier_attribute.queue_length;
                     enactor_stats.iteration++;
-                    if (num_unvisited_nodes < current_frontier_size*problem->alpha)
-                        break;
+                    //if (num_unvisited_nodes < current_frontier_size*problem->alpha) break;
 
                     // Check if done
                     if (done[0] == 0) break;
@@ -396,7 +404,7 @@ class DOBFSEnactor : public EnactorBase
 
                 if (retval) break;
             }
-            if (DEBUG) printf("iter: %lld\n, alpha %f\n", enactor_stats.iteration, problem->alpha);
+            if (DEBUG) printf("iter: %lld\n, alpha %f\n", enactor_stats.iteration, problem->alpha);*/
               
             // Reverse BFS
             if (done[0] < 0) {
@@ -429,7 +437,7 @@ class DOBFSEnactor : public EnactorBase
                         enactor_stats.filter_kernel_stats);
 
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_prepare_input_frontier::Kernel failed", __FILE__, __LINE__))) break;
-            
+ 
             frontier_attribute.queue_length            = graph_slice->nodes;
             frontier_attribute.queue_index             = 0;        // Work queue index
             frontier_attribute.selector                = 0;
@@ -461,15 +469,10 @@ class DOBFSEnactor : public EnactorBase
             // Now the unvisited queue is frontier_queues.d_keys[0], frontier_map_in and frontier_map_out are both ready too
             // Start Reverse BFS
 
-            //util::DisplayDeviceResults(problem->data_slices[0]->d_frontier_map_in, graph_slice->nodes);
-
             SizeT last_queue_length = 0;
             while (done[0] < 0) {
-                if (last_queue_length == frontier_attribute.queue_length) break;
+                if (last_queue_length == frontier_attribute.queue_length) { done[0] = 0; break; }
                 last_queue_length = frontier_attribute.queue_length;
-
-                //util::DisplayDeviceResults(problem->graph_slices[0]->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
-
 
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<BackwardAdvanceKernelPolicy, DOBFSProblem, RBFSFunctor>(
@@ -480,7 +483,7 @@ class DOBFSEnactor : public EnactorBase
                     problem->data_slices[enactor_stats.gpu_id]->d_index_queue,
                     problem->data_slices[enactor_stats.gpu_id]->d_frontier_map_in,
                     problem->data_slices[enactor_stats.gpu_id]->d_frontier_map_out,
-                    (unsigned int*)NULL,
+                    d_scanned_edges,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
                     (VertexId*)NULL,
                     (VertexId*)NULL,
@@ -489,20 +492,17 @@ class DOBFSEnactor : public EnactorBase
                     (VertexId*)NULL,
                     graph_slice->d_column_offsets,
                     graph_slice->d_row_indices,
-                    0,
-                    0,
+                    graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
+                    graph_slice->frontier_elements[frontier_attribute.selector^1],                   // max_out_queue
                     this->work_progress,
                     context,
                     gunrock::oprtr::advance::V2V);
 
-                // Only need to reset queue for once
-                if (frontier_attribute.queue_reset)
-                    frontier_attribute.queue_reset = false;
-
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_backward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates  
-                
 
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_frontier_map_out, graph_slice->nodes);
+                
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
                     printf(", %lld", (long long) frontier_attribute.queue_length);
@@ -537,7 +537,7 @@ class DOBFSEnactor : public EnactorBase
                     frontier_attribute.queue_length,
                     d_done,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],      // d_in_queue
-                    graph_slice->frontier_queues.d_values[frontier_attribute.selector],    // d_pred_in_queue
+                    (VertexId*)NULL,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],    // d_out_queue
                     data_slice,
                     NULL,
@@ -548,7 +548,6 @@ class DOBFSEnactor : public EnactorBase
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
-
 
                 frontier_attribute.queue_index++;
                 frontier_attribute.selector ^= 1;
@@ -628,7 +627,7 @@ class DOBFSEnactor : public EnactorBase
                                 (VertexId*)NULL,
                                 (bool*)NULL,
                                 (bool*)NULL,
-                                (unsigned int*)NULL,
+                                d_scanned_edges,
                                 graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
                                 graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],          // d_out_queue
                                 (VertexId*)NULL,
@@ -653,6 +652,8 @@ class DOBFSEnactor : public EnactorBase
 
                 frontier_attribute.queue_index++;
                 frontier_attribute.selector ^= 1;
+
+                if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
                 
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
@@ -728,6 +729,7 @@ class DOBFSEnactor : public EnactorBase
             }
             
         } while(0);
+        if (d_scanned_edges) cudaFree(d_scanned_edges);
 
         if (DEBUG) printf("\nGPU BFS Done.\n");
         return retval;
@@ -778,7 +780,7 @@ class DOBFSEnactor : public EnactorBase
                     300,                                // CUDA_ARCH
                     INSTRUMENT,                         // INSTRUMENT
                     8,                                  // MIN_CTA_OCCUPANCY
-                    6,                                  // LOG_THREADS
+                    10,                                  // LOG_THREADS
                     8,
                     32*128,
                     1,                                  // LOG_LOAD_VEC_SIZE
@@ -787,7 +789,7 @@ class DOBFSEnactor : public EnactorBase
                     32,                                 // WARP_GATHER_THRESHOLD
                     128 * 4,                            // CTA_GATHER_THRESHOLD
                     7,                                  // LOG_SCHEDULE_GRANULARITY
-                    gunrock::oprtr::advance::TWC_FORWARD>
+                    gunrock::oprtr::advance::TWC_BACKWARD>
                         AdvanceKernelPolicy;
 
                 typedef gunrock::oprtr::filter::KernelPolicy<
@@ -810,7 +812,7 @@ class DOBFSEnactor : public EnactorBase
                     300,                                // CUDA_ARCH
                     INSTRUMENT,                         // INSTRUMENT
                     8,                                  // MIN_CTA_OCCUPANCY
-                    6,                                  // LOG_THREADS
+                    10,                                  // LOG_THREADS
                     8,                                  // LOG_BLOCKS
                     32*128,                             // LIGHT_EDGE_THRESHOLD
                     1,                                  // LOG_LOAD_VEC_SIZE

@@ -385,11 +385,15 @@ void RunTests(
         if (reference_check_label != NULL) {
             if (!ENABLE_IDEMPOTENCE) {
                 printf("Label Validity: ");
-                CompareResults(h_labels, reference_check_label, graph.nodes, true);
+                int error_num = CompareResults(h_labels, reference_check_label, graph.nodes, true);
+                if (error_num > 0)
+                printf("%d errors occurred.\n", error_num);
             } else {
                 if (!MARK_PREDECESSORS) {
                     printf("Label Validity: ");
-                    CompareResults(h_labels, reference_check_label, graph.nodes, true);
+                    int error_num = CompareResults(h_labels, reference_check_label, graph.nodes, true);
+                    if (error_num > 0)
+                        printf("%d errors occurred.\n", error_num);
                 }
             }
         }
