@@ -445,7 +445,7 @@ class BFSEnactor : public EnactorBase
                 0,                                  // SATURATION QUIT
                 true,                               // DEQUEUE_PROBLEM_SIZE
                 8,                                  // MIN_CTA_OCCUPANCY
-                8,                                  // LOG_THREADS
+                7,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
@@ -458,16 +458,16 @@ class BFSEnactor : public EnactorBase
                     300,                                // CUDA_ARCH
                     INSTRUMENT,                         // INSTRUMENT
                     8,                                  // MIN_CTA_OCCUPANCY
-                    8,                                  // LOG_THREADS
-                    0,                                  // LOG_BLOCKS
-                    0,                                  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
-                    0,                                  // LOG_LOAD_VEC_SIZE
+                    10,                                  // LOG_THREADS
+                    8,                                  // LOG_BLOCKS
+                    32*128,                                  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+                    1,                                  // LOG_LOAD_VEC_SIZE
                     0,                                  // LOG_LOADS_PER_TILE
                     5,                                  // LOG_RAKING_THREADS
                     32,                            // WARP_GATHER_THRESHOLD
                     128 * 4,                            // CTA_GATHER_THRESHOLD
                     7,                                  // LOG_SCHEDULE_GRANULARITY
-                    gunrock::oprtr::advance::TWC_FORWARD>
+                    gunrock::oprtr::advance::LB>
                         AdvanceKernelPolicy;
 
                 return EnactBFS<AdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(
@@ -482,7 +482,7 @@ class BFSEnactor : public EnactorBase
                 0,                                  // SATURATION QUIT
                 true,                               // DEQUEUE_PROBLEM_SIZE
                 8,                                  // MIN_CTA_OCCUPANCY
-                6,                                  // LOG_THREADS
+                7,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
@@ -495,7 +495,7 @@ class BFSEnactor : public EnactorBase
                     300,                                // CUDA_ARCH
                     INSTRUMENT,                         // INSTRUMENT
                     8,                                  // MIN_CTA_OCCUPANCY
-                    6,                                  // LOG_THREADS
+                    10,                                  // LOG_THREADS
                     8,                                  // LOG_BLOCKS
                     32*128,                                  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
                     1,                                  // LOG_LOAD_VEC_SIZE
@@ -504,7 +504,7 @@ class BFSEnactor : public EnactorBase
                     32,                            // WARP_GATHER_THRESHOLD
                     128 * 4,                            // CTA_GATHER_THRESHOLD
                     7,                                  // LOG_SCHEDULE_GRANULARITY
-                    gunrock::oprtr::advance::TWC_FORWARD>
+                    gunrock::oprtr::advance::LB>
                         AdvanceKernelPolicy;
 
                 return EnactBFS<AdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(

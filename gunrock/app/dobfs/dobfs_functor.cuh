@@ -158,11 +158,14 @@ struct ReverseBFSFunctor
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         //set d_labels[d_id] to be d_labels[s_id]+1
-        VertexId label;
+        VertexId label = s_id;
+        if (ProblemData::MARK_PREDECESSORS)
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
             label, problem->d_labels + s_id);
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
             label+1, problem->d_labels + d_id);
+        
+        //printf("src:%d, dst:%d, label:%d\n", s_id, d_id, problem->d_labels[d_id]);
     }
 
     /**

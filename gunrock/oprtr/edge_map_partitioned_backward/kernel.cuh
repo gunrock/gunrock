@@ -24,7 +24,7 @@
 
 namespace gunrock {
 namespace oprtr {
-namespace edge_map_partitioned {
+namespace edge_map_partitioned_backward {
 
 // GetRowOffsets
 //
@@ -82,7 +82,8 @@ struct Dispatch
                                 unsigned int &num_partitions,
                                 volatile int *&d_done,
                                 VertexId *&d_queue,
-                                VertexId *&d_out,
+                                bool     *&d_bitmap_in,
+                                bool     *&d_bitmap_out,
                                 DataSlice *&problem,
                                 SizeT &input_queue_len,
                                 SizeT &output_queue_len,
@@ -106,7 +107,8 @@ struct Dispatch
                                 unsigned int *&d_scanned_edges,
                                 volatile int *&d_done,
                                 VertexId *&d_queue,
-                                VertexId *&d_out,
+                                bool     *&d_bitmap_in,
+                                bool     *&d_bitmap_out,
                                 DataSlice *&problem,
                                 SizeT &input_queue_len,
                                 SizeT &output_queue_len,
@@ -135,6 +137,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             SizeT       &max_edge,
                             gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
     {
+        if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
+            d_vertex_id = d_column_indices[d_vertex_id];
+        }
         SizeT first = d_vertex_id >= max_vertex ? max_edge : d_row_offsets[d_vertex_id];
         SizeT second = (d_vertex_id + 1) >= max_vertex ? max_edge : d_row_offsets[d_vertex_id+1];
 
@@ -155,6 +160,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         int bid = blockIdx.x;
 
         int my_id = bid*blockDim.x + tid;
+
         if (my_id >= num_elements || my_id >= max_edge)
             return;
         VertexId v_id = d_queue[my_id];
@@ -174,7 +180,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 unsigned int &num_partitions,
                                 volatile int *&d_done,
                                 VertexId *&d_queue,
-                                VertexId *&d_out,
+                                bool     *&d_bitmap_in,
+                                bool     *&d_bitmap_out,
                                 DataSlice *&problem,
                                 SizeT &input_queue_len,
                                 SizeT &output_queue_len,
@@ -283,7 +290,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             __syncthreads();
 
             SizeT e_last = min(s_edges[last] - e_offset, my_work_size - edges_processed);
-            SizeT v_index = BinarySearch<KernelPolicy::THREADS>(tid+e_offset, s_edges);
+            SizeT v_index = gunrock::oprtr::edge_map_partitioned::BinarySearch<KernelPolicy::THREADS>(tid+e_offset, s_edges);
             VertexId v = s_vertices[v_index];
             VertexId e_id = s_edge_ids[v_index];
             SizeT end_last = (v_index < my_end_partition ? s_edges[v_index] : max_edges);
@@ -294,7 +301,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             {
                 if (i >= end_last)
                 {
-                    v_index = BinarySearch<KernelPolicy::THREADS>(i, s_edges);
+                    v_index = gunrock::oprtr::edge_map_partitioned::BinarySearch<KernelPolicy::THREADS>(i, s_edges);
                     if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
                         v = d_queue[v_index];
                         e_id = 0;
@@ -313,7 +320,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 VertexId u = d_column_indices[lookup];
                 SizeT out_index = out_offset+edges_processed+(i-e_offset);
 
-                {
+                /*{
                     if (!ProblemData::MARK_PREDECESSORS) {
                         if (Functor::CondEdge(label, u, problem, lookup, e_id)) {
                             Functor::ApplyEdge(label, u, problem, lookup, e_id);
@@ -353,7 +360,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                     d_out + out_index);
                         }
                     }
-                }
+                }*/
 
             }
             edges_processed += e_last;
@@ -377,7 +384,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 unsigned int *&d_scanned_edges,
                                 volatile int *&d_done,
                                 VertexId *&d_queue,
-                                VertexId *&d_out,
+                                bool     *&d_bitmap_in,
+                                bool     *&d_bitmap_out,
                                 DataSlice *&problem,
                                 SizeT &input_queue_len,
                                 SizeT &output_queue_len,
@@ -446,83 +454,69 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         end_id = end_id % KernelPolicy::THREADS;
         s_edges[tid] = (my_id < range ? d_scanned_edges[my_id] - offset : max_edges);
 
-        if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
+        if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
             s_vertices[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
-            s_edge_ids[tid] = 0;
+            s_edge_ids[tid] = my_id;    //used as input index
         }
-        if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
+        // do not support E2V and E2E for backward BFS now
+        /*if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
             if (inverse_graph) 
                 s_vertices[tid] = (my_id < range ? d_inverse_column_indices[d_queue[my_id]] : max_vertices);
             else
                 s_vertices[tid] = (my_id < range ? d_column_indices[d_queue[my_id]] : max_vertices);
             s_edge_ids[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
-        }
+        }*/
 
         __syncthreads();
         unsigned int size = s_edges[end_id];
 
-        VertexId v, e, e_id;
+        VertexId v, e, v_id;
 
-        int v_index = BinarySearch<KernelPolicy::THREADS>(tid, s_edges);
+        int v_index = gunrock::oprtr::edge_map_partitioned::BinarySearch<KernelPolicy::THREADS>(tid, s_edges);
         v = s_vertices[v_index];
-        e_id = s_edge_ids[v_index];
+        v_id = s_edge_ids[v_index];
         int end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
+        bool found_parent = false;
 
         for (int i = tid; i < size; i += KernelPolicy::THREADS)
         {
             if (i >= end_last)
             {
-                v_index = BinarySearch<KernelPolicy::THREADS>(i, s_edges);
+                v_index = gunrock::oprtr::edge_map_partitioned::BinarySearch<KernelPolicy::THREADS>(i, s_edges);
                 v = s_vertices[v_index];
-                e_id = s_edge_ids[v_index];
+                v_id = s_edge_ids[v_index];
                 end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
+                found_parent = false;
             }
+
+            if (found_parent) continue;
 
             int internal_offset = v_index > 0 ? s_edges[v_index-1] : 0;
             e = i - internal_offset;
 
             int lookup = d_row_offsets[v] + e;
             VertexId u = d_column_indices[lookup];
-           
-            if (!ProblemData::MARK_PREDECESSORS) {
-                if (Functor::CondEdge(label, u, problem, lookup, e_id)) {
-                    Functor::ApplyEdge(label, u, problem, lookup, e_id);
-                    if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
-                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                u,
-                                d_out + offset+i); 
-                    } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
-                             ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
-                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                (VertexId)lookup,
-                                d_out + offset+i);
-                    }
+
+            bool parent_in_bitmap = d_bitmap_in[u];
+
+            if (parent_in_bitmap && !found_parent) {
+                if (!ProblemData::MARK_PREDECESSORS) {
+                    if (Functor::CondEdge(label, v, problem))
+                        Functor::ApplyEdge(label, v, problem);
+                } else {
+                    if (Functor::CondEdge(u, v, problem)) 
+                        Functor::ApplyEdge(u, v, problem);
                 }
-                else {
-                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                            -1,
-                            d_out + offset+i);
-                }
-            } else {
-                //v:pre, u:neighbor, outoffset:offset+i
-                if (Functor::CondEdge(v, u, problem, lookup, e_id)) {
-                    Functor::ApplyEdge(v, u, problem, lookup, e_id);
-                    if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
-                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                u,
-                                d_out + offset+i); 
-                    } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
-                             ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
-                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                (VertexId)lookup,
-                                d_out + offset+i);
-                    }
-                }
-                else {
-                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                            -1,
-                            d_out + offset+i);
-                }
+
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                    true,
+                    d_bitmap_out + v);
+
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                    -1,
+                    d_queue + v_id);
+
+                found_parent = true;
             }
         }
 
@@ -574,7 +568,8 @@ void RelaxPartitionedEdges(
         unsigned int                            num_partitions,
         volatile int                            *d_done,
         typename KernelPolicy::VertexId         *d_queue,
-        typename KernelPolicy::VertexId         *d_out,
+        bool                                    *d_bitmap_in,
+        bool                                    *d_bitmap_out,
         typename ProblemData::DataSlice         *problem,
         typename KernelPolicy::SizeT            input_queue_len,
         typename KernelPolicy::SizeT            output_queue_len,
@@ -598,7 +593,8 @@ void RelaxPartitionedEdges(
             num_partitions,
             d_done,
             d_queue,
-            d_out,
+            d_bitmap_in,
+            d_bitmap_out,
             problem,
             input_queue_len,
             output_queue_len,
@@ -647,7 +643,8 @@ void RelaxLightEdges(
         unsigned int    *d_scanned_edges,
         volatile int                    *d_done,
         typename KernelPolicy::VertexId *d_queue,
-        typename KernelPolicy::VertexId *d_out,
+        bool                            *d_bitmap_in,
+        bool                            *d_bitmap_out,
         typename ProblemData::DataSlice *problem,
         typename KernelPolicy::SizeT    input_queue_len,
         typename KernelPolicy::SizeT    output_queue_len,
@@ -668,7 +665,8 @@ void RelaxLightEdges(
                                 d_scanned_edges,
                                 d_done,
                                 d_queue,
-                                d_out,
+                                d_bitmap_in,
+                                d_bitmap_out,
                                 problem,
                                 input_queue_len,
                                 output_queue_len,

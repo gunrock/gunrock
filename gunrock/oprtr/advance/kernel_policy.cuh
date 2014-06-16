@@ -30,6 +30,7 @@
 
 #include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_backward/kernel_policy.cuh>
+#include <gunrock/oprtr/edge_map_partitioned_backward/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_partitioned/kernel_policy.cuh>
 
 namespace gunrock {

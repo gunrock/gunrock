@@ -646,6 +646,7 @@ int main( int argc, char** argv)
 		}
 
 		csr.PrintHistogram();
+        csr.DisplayGraph();
 
         if (!g_undirected) {
 		    // Run tests
