@@ -48,13 +48,13 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
    */
   struct DataSlice
   {
+
     // device storage arrays
     SizeT       *d_labels;
-    VertexId    *d_node_id;         // top k nodes
-    Value       *d_degrees;         // degree centrality
-    VertexId    *d_sub_row_offsets; // sub-graph row_offsets
-    VertexId    *d_sub_col_indices; // sub-graph column_indices
-    Value       *d_top_edges;
+    VertexId    *d_node_id;         
+    Value       *d_degrees_tot;     
+    Value       *d_degrees_inv;     
+
   };
   
   // Members
@@ -99,13 +99,11 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
    */
   DCProblem(bool        		        stream_from_host,       // Only meaningful for single-GPU
 	    const Csr<VertexId, Value, SizeT> 	&graph,
+	    const Csr<VertexId, Value, SizeT>   &graph_inv,
 	    int         			num_gpus) :
     num_gpus(num_gpus)
   {
-    Init(
-	 stream_from_host,
-	 graph,
-	 num_gpus);
+    Init(stream_from_host, graph, graph_inv, num_gpus);
   }
   
   /**
@@ -116,24 +114,20 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
     for (int i = 0; i < num_gpus; ++i)
       {
 	if (util::GRError(cudaSetDevice(gpu_idx[i]),
-			  "~DCProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
+	  "~DCProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
 	
 	if (data_slices[i]->d_node_id) util::GRError(cudaFree(data_slices[i]->d_node_id),
-						     "GpuSlice cudaFree d_node_id failed", __FILE__, __LINE__);
-	if (data_slices[i]->d_degrees) util::GRError(cudaFree(data_slices[i]->d_degrees), 
-						     "GpuSlice cudaFree d_degrees failed", __FILE__, __LINE__);
-	if (data_slices[i]->d_sub_row_offsets) util::GRError(cudaFree(data_slices[i]->d_sub_row_offsets),
-							     "GpuSlice cudaFree d_sub_row_offsets failed", __FILE__, __LINE__);
-	if (data_slices[i]->d_sub_col_indices) util::GRError(cudaFree(data_slices[i]->d_sub_col_indices),
-							     "GpuSlice cudaFree d_sub_col_indices failed", __FILE__, __LINE__);
-	if (data_slices[i]->d_top_edges) util::GRError(cudaFree(data_slices[i]->d_top_edges),
-						       "GpuSlices cudaFree d_top_edges failed", __FILE__, __LINE__);
-	
+          "GpuSlice cudaFree d_node_id failed", __FILE__, __LINE__);
+	if (data_slices[i]->d_degrees_tot) util::GRError(cudaFree(data_slices[i]->d_degrees_tot), 
+          "GpuSlice cudaFree d_degrees_tot failed", __FILE__, __LINE__);
+	if (data_slices[i]->d_degrees_inv) util::GRError(cudaFree(data_slices[i]->d_degrees_inv),
+	  "GpuSlice cudaFree d_degrees_inv failed", __FILE__, __LINE__);
+
 	if (d_data_slices[i])   util::GRError(cudaFree(d_data_slices[i]), 
-					      "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
+	  "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
       }
     if (d_data_slices) delete[] d_data_slices;
-    if (data_slices) delete[] data_slices;
+    if (data_slices)   delete[] data_slices;
   }
   
   /**
@@ -150,8 +144,6 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
    */
   cudaError_t Extract(VertexId *h_node_id, 
 		      Value    *h_degrees, 
-		      VertexId *h_sub_row_offsets,
-		      VertexId *h_sub_col_indices,
 		      SizeT    nodes)
   {
     
@@ -172,23 +164,10 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 				       "DCProblem cudaMemcpy d_node_id failed", __FILE__, __LINE__)) break;
 	    
 	    if (retval = util::GRError(cudaMemcpy(h_degrees,
-						  data_slices[0]->d_degrees,
+						  data_slices[0]->d_degrees_tot,
 						  sizeof(Value) * nodes,
 						  cudaMemcpyDeviceToHost),
-				       "DCProblem cudaMemcpy d_degrees failed", __FILE__, __LINE__)) break;
-	    
-	    if (retval = util::GRError(cudaMemcpy(h_sub_row_offsets,
-						  data_slices[0]->d_sub_row_offsets,
-						  sizeof(VertexId) * nodes,
-						  cudaMemcpyDeviceToHost),
-				       "DCProblem cudaMemcpy d_sub_row_offsets failed", __FILE__, __LINE__)) break;
-
-	    if (retval = util::GRError(cudaMemcpy(h_sub_col_indices,
-						  data_slices[0]->d_sub_col_indices,
-						  sizeof(VertexId) * edges,
-						  cudaMemcpyDeviceToHost),
-				       "DCProblem cudaMemcpy d_sub_col_indices failed", __FILE__, __LINE__)) break;
-
+				       "DCProblem cudaMemcpy d_degrees_tot failed", __FILE__, __LINE__)) break;
 	  } else {
 	  // TODO: multi-GPU extract result
 	} //end if (data_slices.size() ==1)
@@ -206,32 +185,36 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
    *
    * \return cudaError_t object which indicates the success of all CUDA function calls.
    */
-  cudaError_t Init(
-		   bool        stream_from_host,       // Only meaningful for single-GPU
-		   const Csr<VertexId, Value, SizeT> &graph,
-		   int         _num_gpus)
+  cudaError_t Init(bool                              stream_from_host, // Only meaningful for single-GPU
+		   const Csr<VertexId, Value, SizeT> &graph_i,
+		   const Csr<VertexId, Value, SizeT> &graph_o,
+		   int                               _num_gpus)
   {
+    // non-inversed graph
     num_gpus = _num_gpus;
-    nodes = graph.nodes;
-    edges = graph.edges;
-    VertexId *h_row_offsets = graph.row_offsets;
-    VertexId *h_column_indices = graph.column_indices;
+    nodes    = graph_i.nodes;
+    edges    = graph_i.edges;
+    VertexId *h_row_offsets_i = graph_i.row_offsets;
+    VertexId *h_col_indices_i = graph_i.column_indices;
+    VertexId *h_row_offsets_o = graph_o.row_offsets;
+    VertexId *h_col_indices_o = graph_o.column_indices;
     ProblemBase<VertexId, SizeT, false>::Init(stream_from_host,
 					      nodes,
 					      edges,                
-					      h_row_offsets,
-					      h_column_indices,
-					      NULL,
-					      NULL,
+					      h_row_offsets_i,
+					      h_col_indices_i,
+					      h_row_offsets_o, // d_column_offsets
+					      h_col_indices_o, // d_row_indices
 					      num_gpus);
-    
+
     // No data in DataSlice needs to be copied from host
     
     /**
      * Allocate output labels/preds
      */
     cudaError_t retval = cudaSuccess;
-    data_slices = new DataSlice*[num_gpus];
+
+    data_slices   = new DataSlice*[num_gpus];
     d_data_slices = new DataSlice*[num_gpus];
     
     do {
@@ -241,7 +224,7 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 	  // Create a single data slice for the currently-set gpu
 	  int gpu;
 	  if (retval = util::GRError(cudaGetDevice(&gpu), 
-				     "DCProblem cudaGetDevice failed", __FILE__, __LINE__)) break;
+	    "DCProblem cudaGetDevice failed", __FILE__, __LINE__)) break;
 	  gpu_idx[0] = gpu;
 	  
 	  data_slices[0] = new DataSlice;
@@ -256,30 +239,18 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 				     "DCProblem cudaMalloc d_node_id failed", __FILE__, __LINE__)) return retval;
 	  data_slices[0]->d_node_id = d_node_id;
 	  
-	  Value    *d_degrees;
-	  if (retval = util::GRError(cudaMalloc((void**)&d_degrees,
+	  Value *d_degrees_tot;
+	  if (retval = util::GRError(cudaMalloc((void**)&d_degrees_tot,
 						nodes * sizeof(Value)),
-				     "DCProblem cudaMalloc d_degrees failed", __FILE__, __LINE__)) return retval;
-	  data_slices[0]->d_degrees = d_degrees;				
+				     "DCProblem cudaMalloc d_degrees_tot failed", __FILE__, __LINE__)) return retval;
+	  data_slices[0]->d_degrees_tot = d_degrees_tot;				
 	  
-	  VertexId *d_sub_row_offsets;
-	  if (retval = util::GRError(cudaMalloc((void**)&d_sub_row_offsets,
-						nodes * sizeof(VertexId)),
-				     "DCProblem cudaMalloc d_sub_row_offsets failed", __FILE__, __LINE__)) return retval;
-	  data_slices[0]->d_sub_row_offsets = d_sub_row_offsets;
-
-	  VertexId *d_sub_col_indices;
-	  if (retval = util::GRError(cudaMalloc((void**)&d_sub_col_indices,
-						edges * sizeof(VertexId)),
-				     "DCProblem cudaMalloc d_sub_col_ind failed", __FILE__, __LINE__)) return retval;
-	  data_slices[0]->d_sub_col_indices = d_sub_col_indices;
-
-	  Value   *d_top_edges;
-	  if (retval = util::GRError(cudaMalloc((void**)&d_top_edges,
-						sizeof(Value)),
-				     "DCProblem cudaMalloc d_top_edges failed", __FILE__, __LINE__)) return retval;
-	  data_slices[0]->d_top_edges = d_top_edges;
-
+	  Value *d_degrees_inv;
+	  if (retval = util::GRError(cudaMalloc((void**)&d_degrees_inv,
+						nodes * sizeof(Value)),
+				      "DCProblem cudaMalloc d_degrees_inv failed", __FILE__, __LINE__)) return retval;
+	  data_slices[0]->d_degrees_inv = d_degrees_inv;
+	  
 	  data_slices[0]->d_labels  = NULL;
 	  
 	}
@@ -298,8 +269,7 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
    * 
    *  \return cudaError_t object which indicates the success of all CUDA function calls.
    */
-  cudaError_t Reset(
-		    FrontierType frontier_type)             // The frontier type (i.e., edge/vertex/mixed)
+  cudaError_t Reset(FrontierType frontier_type)             // The frontier type (i.e., edge/vertex/mixed)
   {
     typedef ProblemBase<VertexId, SizeT, false> BaseProblem;
     //load ProblemBase Reset
@@ -323,40 +293,22 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 	  data_slices[gpu]->d_node_id = d_node_id;
 	}
 	
-	if (!data_slices[gpu]->d_degrees) 
+	if (!data_slices[gpu]->d_degrees_tot)
 	{
-	  Value    *d_degrees;
-	  if (retval = util::GRError(cudaMalloc((void**)&d_degrees,
+	  Value *d_degrees_tot;
+	  if (retval = util::GRError(cudaMalloc((void**)&d_degrees_tot,
 						nodes * sizeof(Value)),
-				     "DCProblem cudaMalloc d_degrees failed", __FILE__, __LINE__)) return retval;
-	  data_slices[gpu]->d_degrees = d_degrees;
-	}
-
-	if (!data_slices[gpu]->d_sub_row_offsets)
-	{
-	  VertexId *d_sub_row_offsets;
-	  if (retval = util::GRError(cudaMalloc((void**)&d_sub_row_offsets,
-						nodes * sizeof(VertexId)),
-				     "DCProblem cudaMalloc d_sub_row_offsets failed", __FILE__, __LINE__)) return retval;
-	  data_slices[gpu]->d_sub_row_offsets = d_sub_row_offsets;
+				     "DCProblem cudaMalloc d_degrees_tot failed", __FILE__, __LINE__)) return retval;
+	  data_slices[gpu]->d_degrees_tot = d_degrees_tot;
 	}
 	
-	if (!data_slices[gpu]->d_sub_col_indices)
+	if (!data_slices[gpu]->d_degrees_inv)
 	{
-	  VertexId *d_sub_col_indices;
-	  if (retval = util::GRError(cudaMalloc((void**)&d_sub_col_indices,
-						edges * sizeof(VertexId)),
-				     "DCProblem cudaMalloc d_sub_col_indices failed", __FILE__, __LINE__)) return retval;
-	  data_slices[gpu]->d_sub_col_indices = d_sub_col_indices;
-	}
-
-	if (!data_slices[gpu]->d_top_edges)
-	{
-	  Value *d_top_edges;
-	  if (retval = util::GRError(cudaMalloc((void**)&d_top_edges,
-						sizeof(Value)),
-				     "DCProblem cudaMalloc d_top_edges failed", __FILE__, __LINE__)) return retval;
-	  data_slices[gpu]->d_top_edges = d_top_edges;
+	  Value *d_degrees_inv;
+	  if (retval = util::GRError(cudaMalloc((void**)&d_degrees_inv,
+						nodes * sizeof(Value)),
+				     "DCProblem cudaMalloc d_degrees_inv failed", __FILE__, __LINE__)) return retval;
+	  data_slices[gpu]->d_degrees_inv = d_degrees_inv;
 	}
 
 	data_slices[gpu]->d_labels = NULL;
@@ -367,20 +319,22 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 					      cudaMemcpyHostToDevice),
 				   "DCProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
       }
-    
+ 
     // Fillin the initial input_queue for DC problem, this needs to be modified
     // in multi-GPU scene
-    
-    // Put every vertex in there
-    // util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], nodes);
-    
+        
     // set node ids
     util::MemsetIdxKernel<<<128, 128>>>(data_slices[0]->d_node_id, nodes);
     
-    // count number of degrees for each node
-    util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[0]->d_degrees, 
+    // count number of out-going degrees for each node
+    util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[0]->d_degrees_tot,
 					      BaseProblem::graph_slices[0]->d_row_offsets, 
 					      &BaseProblem::graph_slices[0]->d_row_offsets[1], -1, nodes);
+
+    // count number of in-going degrees for each node
+    util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[0]->d_degrees_inv,
+					      BaseProblem::graph_slices[0]->d_column_offsets,
+					      &BaseProblem::graph_slices[0]->d_column_offsets[1], -1, nodes);
     
     return retval;
   }
