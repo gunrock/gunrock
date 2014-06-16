@@ -420,6 +420,10 @@ class BCEnactor : public EnactorBase
                 frontier_attribute.queue_index++;
                 frontier_attribute.selector ^= 1;
                 
+                if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
+                    if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                }
+
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
                     printf(", %lld", (long long) frontier_attribute.queue_length);
@@ -476,6 +480,10 @@ class BCEnactor : public EnactorBase
                 frontier_attribute.queue_reset = true;
 
                 util::MemsetAddKernel<<<128, 128>>>(problem->data_slices[0]->d_labels, 1, graph_slice->nodes);
+
+                if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
+                    if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                    }
 
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
@@ -555,7 +563,7 @@ class BCEnactor : public EnactorBase
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 8,                                  // MIN_CTA_OCCUPANCY
-                6,                                  // LOG_THREADS
+                10,                                  // LOG_THREADS
                 8,                                  // LOG_BLOCKS
                 32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
                 1,                                  // LOG_LOAD_VEC_SIZE
@@ -564,7 +572,7 @@ class BCEnactor : public EnactorBase
                 32,                                 // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7,                                  // LOG_SCHEDULE_GRANULARITY
-                gunrock::oprtr::advance::TWC_FORWARD>
+                gunrock::oprtr::advance::LB>
                 AdvanceKernelPolicy;
 
                 return EnactBC<AdvanceKernelPolicy, FilterKernelPolicy, BCProblem>(

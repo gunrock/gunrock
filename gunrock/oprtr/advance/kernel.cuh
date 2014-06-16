@@ -95,7 +95,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             // Use scan to compute edge_offsets for each vertex in the frontier
             // Use sorted sort to compute partition bound for each work-chunk
             // load edge-expand-partitioned kernel
-            util::DisplayDeviceResults(d_in_key_queue, frontier_attribute.queue_length);
+            //util::DisplayDeviceResults(d_in_key_queue, frontier_attribute.queue_length);
             int num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
             gunrock::oprtr::edge_map_partitioned_backward::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
             <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
@@ -114,7 +114,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             SizeT *temp = new SizeT[1];
             cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
             SizeT output_queue_len = temp[0];
-            printf("input queue:%d, output_queue:%d\n", frontier_attribute.queue_length, output_queue_len);
+            //printf("input queue:%d, output_queue:%d\n", frontier_attribute.queue_length, output_queue_len);
 
             if (frontier_attribute.selector == 1) {
                 // Edge Map

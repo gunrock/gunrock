@@ -464,7 +464,9 @@ void RunTests(
     if (g_alpha == 0.0f)
         g_alpha = 6.0f;
     if (g_beta == 0.0f)
-        g_beta = 24.0f;
+        g_beta = 6.0f;
+
+    printf("alpha:%5f, beta:%5f\n", g_alpha, g_beta);
 
     if (instrumented) {
         if (mark_pred) {
@@ -646,7 +648,6 @@ int main( int argc, char** argv)
 		}
 
 		csr.PrintHistogram();
-        csr.DisplayGraph();
 
         if (!g_undirected) {
 		    // Run tests

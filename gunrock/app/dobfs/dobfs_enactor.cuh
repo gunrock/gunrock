@@ -276,7 +276,7 @@ class DOBFSEnactor : public EnactorBase
                         "PBFSProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
 
             // Normal BFS
-            /*{
+            {
 
                 frontier_attribute.queue_length         = 1;
                 frontier_attribute.queue_index          = 0;        // Work queue index
@@ -393,7 +393,7 @@ class DOBFSEnactor : public EnactorBase
                     num_unvisited_nodes -= frontier_attribute.queue_length;
                     current_frontier_size = frontier_attribute.queue_length;
                     enactor_stats.iteration++;
-                    //if (num_unvisited_nodes < current_frontier_size*problem->alpha) break;
+                    if (num_unvisited_nodes < current_frontier_size*problem->alpha) break;
 
                     // Check if done
                     if (done[0] == 0) break;
@@ -404,7 +404,7 @@ class DOBFSEnactor : public EnactorBase
 
                 if (retval) break;
             }
-            if (DEBUG) printf("iter: %lld\n, alpha %f\n", enactor_stats.iteration, problem->alpha);*/
+            if (DEBUG) printf("iter: %lld\n, alpha %f\n", enactor_stats.iteration, problem->alpha);
               
             // Reverse BFS
             if (done[0] < 0) {
@@ -551,6 +551,7 @@ class DOBFSEnactor : public EnactorBase
 
                 frontier_attribute.queue_index++;
                 frontier_attribute.selector ^= 1;
+                enactor_stats.iteration++;
 
                 if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
                 //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
@@ -564,12 +565,10 @@ class DOBFSEnactor : public EnactorBase
                             enactor_stats.total_lifetimes)) break;
                     }
                 }
-                //if (frontier_attribute.queue_length < graph_slice->nodes/problem->beta) break;
+                if (frontier_attribute.queue_length < graph_slice->nodes/problem->beta) break;
 
                 // Check if done
                 if (done[0] == 0) break;
-
-                enactor_stats.iteration++;
 
                 if (DEBUG) printf("\n%lld", (long long) enactor_stats.iteration);
 
@@ -584,6 +583,17 @@ class DOBFSEnactor : public EnactorBase
             // Normal BFS
             if (done[0] < 0) {
                 if (DEBUG) printf("back to normal BFS.\n");
+
+            //If selector == 1, copy map_in to map_out
+            if (frontier_attribute.selector == 1) {
+                if (retval = util::GRError(cudaMemcpy(
+                    problem->data_slices[0]->d_frontier_map_out,
+                    problem->data_slices[0]->d_frontier_map_in,
+                    graph_slice->nodes*sizeof(bool),
+                    cudaMemcpyDeviceToDevice),
+                    "DOBFS cudaMemcpy frontier_map_in to frontier_map_out failed", __FILE__, __LINE__)) break;
+            }
+
             frontier_attribute.queue_length         = graph_slice->nodes;
             //frontier_attribute.queue_length         = 1;
             frontier_attribute.queue_index          = 0;        // Work queue index
@@ -789,7 +799,7 @@ class DOBFSEnactor : public EnactorBase
                     32,                                 // WARP_GATHER_THRESHOLD
                     128 * 4,                            // CTA_GATHER_THRESHOLD
                     7,                                  // LOG_SCHEDULE_GRANULARITY
-                    gunrock::oprtr::advance::TWC_BACKWARD>
+                    gunrock::oprtr::advance::LB>
                         AdvanceKernelPolicy;
 
                 typedef gunrock::oprtr::filter::KernelPolicy<
