@@ -12,14 +12,16 @@
  * @brief MARKET Graph Construction Routines
  */
 
-
 #pragma once
 
 #include <math.h>
 #include <time.h>
 #include <stdio.h>
+#include <iostream>
 
 #include <gunrock/graphio/utils.cuh>
+
+using namespace std;
 
 namespace gunrock {
 namespace graphio {
@@ -53,6 +55,7 @@ namespace graphio {
 template<bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
 int ReadMarketStream(
     FILE *f_in,
+    char *output_file,
     Csr<VertexId, Value, SizeT> &csr_graph,
     bool undirected,
     bool reversed)
@@ -187,13 +190,31 @@ int ReadMarketStream(
     fflush(stdout);
 
     // Convert COO to CSR
-    csr_graph.template FromCoo<LOAD_VALUES>(coo, nodes, edges, ordered_rows, reversed);
+    csr_graph.template FromCoo<LOAD_VALUES>(output_file, coo,  
+                                            nodes, edges, ordered_rows, 
+                                            undirected, reversed);
+    
     free(coo);
 
     fflush(stdout);
 
     return 0;
 }
+
+/**
+ * @read csr arrays directly instead of transfer from coo format
+ *
+ */
+template <bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
+int ReadCsrArrays(char *f_in,
+                  Csr<VertexId, Value, SizeT> &csr_graph, 
+                  bool undirected, 
+                  bool reversed)
+{
+    csr_graph.template FromCsr<LOAD_VALUES>(f_in, undirected, reversed);
+    return 0;
+}
+
 
 /**
  * \defgroup PublicInterface Gunrock Public Interface
@@ -212,33 +233,81 @@ int ReadMarketStream(
 template<bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
 int BuildMarketGraph(
     char *mm_filename,
+    char *output_file,
     Csr<VertexId, Value, SizeT> &csr_graph,
     bool undirected,
     bool reversed)
 {
-    if (mm_filename == NULL) {
+    FILE *_file = fopen(output_file, "r");
+    if (_file) {
+        printf("Awesome, already loaded this graph before!\n");
+        if (ReadCsrArrays<LOAD_VALUES>(output_file, csr_graph, undirected, reversed) != 0) return -1;
+        fclose(_file);
+    }
+    else 
+    {
+        if (mm_filename == NULL) 
+        {
 
-        // Read from stdin
-        printf("Reading from stdin:\n");
-        if (ReadMarketStream<LOAD_VALUES>(stdin, csr_graph, undirected, reversed) != 0) {
-            return -1;
-        }
-
-    } else {
-
-        // Read from file
-        FILE *f_in = fopen(mm_filename, "r");
-        if (f_in) {
-            printf("Reading from %s:\n", mm_filename);
-            if (ReadMarketStream<LOAD_VALUES>(f_in, csr_graph, undirected, reversed) != 0) {
-                fclose(f_in);
+            // Read from stdin
+            printf("Reading from stdin:\n");
+            if (ReadMarketStream<LOAD_VALUES>(stdin, output_file, csr_graph, undirected, reversed) != 0) {
                 return -1;
             }
-            fclose(f_in);
-        } else {
-            perror("Unable to open file");
-            return -1;
+
+        } 
+        else 
+        {
+
+            // Read from file
+            FILE *f_in = fopen(mm_filename, "r");
+            if (f_in) {
+                printf("Reading from %s:\n", mm_filename);
+                if (ReadMarketStream<LOAD_VALUES>(f_in, output_file, csr_graph, undirected, reversed) != 0) {
+                    fclose(f_in);
+                    return -1;
+                }
+                fclose(f_in);
+            } else  {
+                perror("Unable to open file");
+                return -1;
+            }
         }
+    }
+    return 0;
+}
+
+/**
+ * @read in graph function read in graph according to it's type
+ *
+ */
+template <bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
+int BuildMarketGraph(char *file_name, 
+                      Csr<VertexId, Value, SizeT> &graph, 
+                      bool undirected, bool reversed)
+{
+    
+    if (undirected)
+    {
+        char undirected_file[200];
+        sprintf(undirected_file, "%s.undirected", file_name);
+        BuildMarketGraph<true>(file_name, undirected_file, graph, true, false);
+    }
+    else if (!undirected && reversed)
+    {
+        char reversed_file[200];
+        sprintf(reversed_file, "%s.reversed", file_name);
+        BuildMarketGraph<true>(file_name, reversed_file, graph, false, true);
+    }
+    else if (!undirected && !reversed)
+    {
+        char nonreversed_file[200];
+        sprintf(nonreversed_file, "%s.nonreversed", file_name);
+        BuildMarketGraph<true>(file_name, nonreversed_file, graph, false, false);
+    }
+    else
+    {
+        fprintf(stderr, "Unspecified Graph Type.\n");
     }
 
     return 0;
