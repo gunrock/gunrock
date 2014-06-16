@@ -135,82 +135,93 @@ struct Csr
      * @store graph information into files
      * 
      */
-    void WriteToFile(char * file_name,
-            bool undirected, 
-            bool reversed,
-            SizeT num_nodes, 
-            SizeT num_edges, 
-            Value *row_offsets,
-            Value *col_indices,
-            Value *edge_values = NULL)
+  void WriteToFile(char * file_name,
+		   bool undirected, 
+		   bool reversed,
+		   SizeT num_nodes, 
+		   SizeT num_edges, 
+		   Value *row_offsets,
+		   Value *col_indices,
+		   Value *edge_values = NULL)
+  {
+    printf("==> Writing into file:  %s\n", file_name);
+    
+    time_t mark1 = time(NULL);
+    
+    std::ofstream output(file_name);
+    
+    if (output.is_open())
     {
-        printf("==> WRITING INTO FILE:  %s\n", file_name);
-       
-        time_t mark1 = time(NULL);
-
-        std::ofstream output(file_name);
-        
-        if (output.is_open())
-        {
-            output << num_nodes << " " << num_edges << " ";
-            std::copy(row_offsets, row_offsets + num_nodes, ostream_iterator<int>(output, " "));
-            std::copy(column_indices, column_indices + num_edges, ostream_iterator<int>(output, " "));
-            if (edge_values != NULL)
-            {
-                std::copy(edge_values, edge_values + num_edges, ostream_iterator<int>(output, " "));
-            }
-            output.close();
-        }
-        else
-        {
-            std::cout << "Cannot Open The File." << std::endl;
-        }
-
-        time_t mark2 = time(NULL);
-        printf("Finished writing in %ds.\n", (int)(mark2 - mark1));
+      output << num_nodes << " " << num_edges << " ";
+      std::copy(row_offsets, row_offsets + num_nodes, ostream_iterator<int>(output, " "));
+      std::copy(column_indices, column_indices + num_edges, ostream_iterator<int>(output, " "));
+      if (edge_values != NULL)
+      {
+	std::copy(edge_values, edge_values + num_edges, ostream_iterator<int>(output, " "));
+      }
+      output.close();
+    }
+    else
+    {
+      std::cout << "Cannot Open The File." << std::endl;
     }
 
-    // read from stored row_offsets, column_indices arrays
-    template <bool LOAD_EDGE_VALUES>
-    void FromCsr(char *f_in, 
-                 bool undirected, 
-                 bool reversed)
+    time_t mark2 = time(NULL);
+    printf("Finished writing in %ds.\n", (int)(mark2 - mark1));
+  }
+
+  // read from stored row_offsets, column_indices arrays
+  template <bool LOAD_EDGE_VALUES>
+  void FromCsr(char *f_in, 
+	       bool undirected, 
+	       bool reversed)
+  {
+    printf("  Reading directly from previously stored CSR arrays ...\n");
+    
+    ifstream _file(f_in);
+    
+    if (_file.is_open())
     {
-        printf("  Reading directly from previously stored CSR arrays ...\n");
-        
-        ifstream _file(f_in);
-        
-        if (_file.is_open())
-        {
-            time_t mark1 = time(NULL);
-            
-            std::istream_iterator<int> start(_file), end;
-            std::vector<int> v(start, end);
-        
-            SizeT csr_nodes = v.at(0);
-            SizeT csr_edges = v.at(1);
-
-            FromScratch<LOAD_EDGE_VALUES, false>(csr_nodes, csr_edges); 
-
-            copy(v.begin()+2, v.begin()+2+csr_nodes, row_offsets);
-            copy(v.begin()+2+csr_nodes, v.begin()+2+csr_nodes+csr_edges, column_indices);
-            if(LOAD_EDGE_VALUES) 
-            { 
-                copy(v.begin()+2+csr_nodes+csr_edges, v.end(), edge_values); 
-            }
-
-            time_t mark2 = time(NULL);
-            printf("Done reading (%ds).\n", (int) (mark2 - mark1));
-
-            v.clear();
-        }
-        else 
-        {
-            perror("Unable to open the file."); 
-        }
-       
-        fflush(stdout);
+      time_t mark1 = time(NULL);
+      
+      std::istream_iterator<int> start(_file), end;
+      std::vector<int> v(start, end);
+      
+      SizeT csr_nodes = v.at(0);
+      SizeT csr_edges = v.at(1);
+      
+      FromScratch<LOAD_EDGE_VALUES, false>(csr_nodes, csr_edges); 
+      
+      copy(v.begin()+2, v.begin()+2+csr_nodes, row_offsets);
+      copy(v.begin()+2+csr_nodes, v.begin()+2+csr_nodes+csr_edges, column_indices);
+      if(LOAD_EDGE_VALUES) 
+      { 
+	copy(v.begin()+2+csr_nodes+csr_edges, v.end(), edge_values); 
+      }
+      
+      time_t mark2 = time(NULL);
+      printf("Done reading (%ds).\n", (int) (mark2 - mark1));
+      
+      v.clear();
     }
+    else 
+    {
+      perror("Unable to open the file."); 
+    }
+
+    // compute out_nodes
+    SizeT out_node = 0;
+    for (SizeT node = 0; node < nodes; node++) 
+    {
+      if (row_offsets[node+1] - row_offsets[node] > 0)
+      {
+	++out_node;
+      }
+    }
+    out_nodes = out_node;
+
+    fflush(stdout);
+  }
 
 
     /**
@@ -289,25 +300,25 @@ struct Csr
         
         // Write offsets, indices, node, edges etc. into file
         if (LOAD_EDGE_VALUES)
-        {
-            WriteToFile(output_file, 
-                        undirected, 
-                        reversed, 
-                        nodes, 
-                        edges, 
-                        row_offsets, 
-                        column_indices, 
-                        edge_values);
+	{
+	  WriteToFile(output_file, 
+		      undirected, 
+		      reversed, 
+		      nodes, 
+		      edges, 
+		      row_offsets, 
+		      column_indices, 
+		      edge_values);
         }
         else
         {
-            WriteToFile(output_file, 
-                        undirected, 
-                        reversed,
-                        nodes, 
-                        edges, 
-                        row_offsets, 
-                        column_indices);
+	  WriteToFile(output_file, 
+		      undirected, 
+		      reversed,
+		      nodes, 
+		      edges, 
+		      row_offsets, 
+		      column_indices);
         }
 
         if (new_coo) free(new_coo);
