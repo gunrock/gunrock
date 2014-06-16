@@ -153,7 +153,7 @@ struct Csr
     if (output.is_open())
     {
       output << num_nodes << " " << num_edges << " ";
-      std::copy(row_offsets, row_offsets + num_nodes, ostream_iterator<int>(output, " "));
+      std::copy(row_offsets,   row_offsets + num_nodes + 1, ostream_iterator<int>(output, " "));
       std::copy(column_indices, column_indices + num_edges, ostream_iterator<int>(output, " "));
       if (edge_values != NULL)
       {
@@ -192,11 +192,11 @@ struct Csr
       
       FromScratch<LOAD_EDGE_VALUES, false>(csr_nodes, csr_edges); 
       
-      copy(v.begin()+2, v.begin()+2+csr_nodes, row_offsets);
-      copy(v.begin()+2+csr_nodes, v.begin()+2+csr_nodes+csr_edges, column_indices);
+      copy(v.begin()+2, v.begin()+3+csr_nodes, row_offsets);
+      copy(v.begin()+3+csr_nodes, v.begin()+3+csr_nodes+csr_edges, column_indices);
       if(LOAD_EDGE_VALUES) 
       { 
-	copy(v.begin()+2+csr_nodes+csr_edges, v.end(), edge_values); 
+	copy(v.begin()+3+csr_nodes+csr_edges, v.end(), edge_values); 
       }
       
       time_t mark2 = time(NULL);
