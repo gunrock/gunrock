@@ -165,7 +165,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             return;
         VertexId v_id = d_queue[my_id];
         SizeT num_edges = GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
-        printf("num edges:%d\n", num_edges);
         d_scanned_edges[my_id] = num_edges;
     }
 
