@@ -27,7 +27,7 @@
 #include <gunrock/app/dc/dc_problem.cuh>
 #include <gunrock/app/dc/dc_functor.cuh>
 
-#include <cub/cub.cuh> // cub scan
+#include <cub/cub.cuh>
 #include <moderngpu.cuh>
 
 using namespace mgpu;
@@ -227,70 +227,16 @@ void GetStatistics(long long   &total_queued,
       
       // single gpu graph slice
       typename DCProblem::GraphSlice *graph_slice = problem->graph_slices[0];
-      typename DCProblem::DataSlice  *data_slice  = problem->d_data_slices[0];
+
+      // add out-going and in-going degrees -> sum stored in d_degrees_tot
+      util::MemsetAddVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_degrees_tot,
+						problem->data_slices[0]->d_degrees_inv,
+						graph_slice->nodes);
       
       // sort node_ids by degree centralities
-      util::CUBRadixSort<Value, VertexId>(false, graph_slice->nodes, 
-					  problem->data_slices[0]->d_degrees, 
+      util::CUBRadixSort<Value, VertexId>(false, graph_slice->nodes,
+					  problem->data_slices[0]->d_degrees_tot,
 					  problem->data_slices[0]->d_node_id);
-      
-      // scan to get top k sub-graph row offsets
-      void   *d_temp_storage = NULL;
-      size_t temp_storage_bytes = 0;
-      cub::DeviceScan::ExclusiveSum(d_temp_storage, 
-				    temp_storage_bytes,
-				    problem->data_slices[0]->d_degrees,
-				    problem->data_slices[0]->d_sub_row_offsets,
-				    top_nodes);
-      cudaMalloc(&d_temp_storage, temp_storage_bytes);
-      cub::DeviceScan::ExclusiveSum(d_temp_storage, 
-				    temp_storage_bytes, 
-				    problem->data_slices[0]->d_degrees,
-				    problem->data_slices[0]->d_sub_row_offsets,
-				    top_nodes);
-
-      // advanced edge mapping to find top k sub-graph column indices
-      frontier_attribute.queue_length = top_nodes;
-      frontier_attribute.queue_index  = 0;
-      frontier_attribute.selector     = 0;
-      frontier_attribute.queue_reset  = true;
-
-      // forward edge mapping
-      gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, DCProblem, DcFunctor>(
-	d_done,
-	enactor_stats,
-	frontier_attribute,
-	data_slice,
-	(VertexId*)NULL,
-	(bool*)NULL,
-	(bool*)NULL,
-	(unsigned int*)NULL,
-	problem->data_slices[0]->d_node_id,
-	problem->data_slices[0]->d_sub_col_indices,
-	(VertexId*)NULL,
-	(VertexId*)NULL,
-	graph_slice->d_row_offsets,
-	graph_slice->d_column_indices,
-	(SizeT*)NULL,
-	(VertexId*)NULL,
-	graph_slice->frontier_elements[frontier_attribute.selector],
-	graph_slice->frontier_elements[frontier_attribute.selector^1],
-	this->work_progress,
-	context,
-	gunrock::oprtr::advance::V2V);
-
-      if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), 
-	   "advance::Kernel failed", __FILE__, __LINE__))) break;
-      cudaEventQuery(throttle_event);
-      
-      // get the length of sub graph column indices
-      //if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index+1, 
-      //					  frontier_attribute.queue_length)) break;
-      //SizeT top_edges = frontier_attribute.queue_length;
-
-      // check new generated sub-graph
-      //util::DisplayDeviceResults(problem->data_slices[0]->d_sub_row_offsets, top_nodes);
-      //util::DisplayDeviceResults(problem->data_slices[0]->d_sub_col_indices, top_edges);
       
       // check if any of the frontiers overflowed due to redundant expansion
       bool overflowed = false;
@@ -304,7 +250,7 @@ void GetStatistics(long long   &total_queued,
       
     } while(0);
     
-    if (DEBUG) printf("====> GPU Degree Centrality Complete.\n");
+    if (DEBUG) printf("==> GPU Degree Centrality Complete.\n");
     
     return retval;
   }
