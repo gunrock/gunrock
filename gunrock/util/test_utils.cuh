@@ -395,7 +395,15 @@ int CompareResults(float* computed, float* reference, SizeT len, bool verbose = 
     for (SizeT i = 0; i < len; i++) {
 
         // Use relative error rate here.
-        if (fabs((computed[i] - reference[i])/reference[i]) > THRESHOLD) {
+        bool is_right = true;
+        if (fabs(computed[i] - 0.0) < 0.01f) {
+            if ((computed[i] - reference[i]) > THRESHOLD)
+                is_right = false;
+        } else {
+            if (fabs((computed[i] - reference[i])/reference[i]) > THRESHOLD)
+                is_right = false;
+        }
+        if (!is_right) {
             printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
             PrintValue<float>(computed[i]);
             printf(" != ");
