@@ -140,8 +140,8 @@ struct Csr
 		   bool reversed,
 		   SizeT num_nodes, 
 		   SizeT num_edges, 
-		   Value *row_offsets,
-		   Value *col_indices,
+		   SizeT *row_offsets,
+		   VertexId *col_indices,
 		   Value *edge_values = NULL)
   {
     printf("==> Writing into file:  %s\n", file_name);
