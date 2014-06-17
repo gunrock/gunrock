@@ -141,9 +141,12 @@ template<
 void RefCPUBC(
     const Csr<VertexId, Value, SizeT>       &graph,
     Value                                   *bc_values,
+    Value                                   *ebc_values,
     Value                                   *sigmas,
     VertexId                                src)
 {
+    typedef Coo<VertexId, Value> EdgeTupleType;
+    EdgeTupleType *coo = (EdgeTupleType*) malloc(sizeof(EdgeTupleType) * graph.edges);
     if (src == -1) {
         // Perform full exact BC using BGL
 
@@ -206,9 +209,22 @@ void RefCPUBC(
             bc_values[vertex] = (Value)v_centrality_map[vertex];
         }
 
+        int idx = 0;
         BGL_FORALL_EDGES(edge, G, Graph)
         {
-            std::cout << edge << ": " << (Value)e_centrality_map[edge] << std::endl;
+            coo[idx].row = source(edge, G);
+            coo[idx].col = target(edge, G);
+            coo[idx++].val = (Value)e_centrality_map[edge];
+            coo[idx].col = source(edge, G);
+            coo[idx].row = target(edge, G);
+            coo[idx++].val = (Value)e_centrality_map[edge];
+        }
+
+        std::stable_sort(coo, coo+graph.edges, RowFirstTupleCompare<EdgeTupleType>);
+
+        for (idx = 0; idx < graph.edges; ++idx) {
+            //std::cout << coo[idx].row << "," << coo[idx].col << ":" << coo[idx].val << std::endl;
+            ebc_values[idx] = coo[idx].val;
         }
 
         printf("CPU BC finished in %lf msec.", elapsed);
@@ -301,6 +317,7 @@ void RefCPUBC(
 
         delete[] source_path;
     }
+    free(coo);
 }
 
 /**
@@ -341,11 +358,13 @@ void RunTests(
 
     // Allocate host-side array (for both reference and gpu-computed results)
     Value *reference_bc_values = (Value*)malloc(sizeof(Value) * graph.nodes);
+    Value *reference_ebc_values = (Value*)malloc(sizeof(Value) * graph.edges);
     Value *reference_sigmas    = (Value*)malloc(sizeof(Value) * graph.nodes);
     Value *h_sigmas            = (Value*)malloc(sizeof(Value) * graph.nodes);
     Value *h_bc_values         = (Value*)malloc(sizeof(Value) * graph.nodes);
     Value *h_ebc_values         = (Value*)malloc(sizeof(Value) * graph.edges);
     Value *reference_check_bc_values = (g_quick) ? NULL : reference_bc_values;
+    Value *reference_check_ebc_values = (g_quick || (src != -1)) ? NULL : reference_ebc_values;
     Value *reference_check_sigmas = (g_quick || (src == -1)) ? NULL : reference_sigmas;
 
     // Allocate BC enactor map
@@ -369,7 +388,8 @@ void RunTests(
             RefCPUBC(
                     graph,
                     reference_check_bc_values,
-                    reference_sigmas,
+                    reference_check_ebc_values,
+                    reference_check_sigmas,
                     src);
             printf("\n");
         } else {
@@ -420,16 +440,22 @@ void RunTests(
 
     // Copy out results
     util::GRError(csr_problem->Extract(h_sigmas, h_bc_values, h_ebc_values), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
-    printf("edge bc values: %d\n", graph.edges);
+    /*printf("edge bc values: %d\n", graph.edges);
     for (int i = 0; i < graph.edges; ++i) {
-        printf("%5f\n", h_ebc_values[i]);
+        printf("%5f, %5f\n", h_ebc_values[i], reference_check_ebc_values[i]);
     }
-    printf("edge bc values end\n");
+    printf("edge bc values end\n");*/
 
     // Verify the result
     if (reference_check_bc_values != NULL) {
         printf("Validity BC Value: ");
         CompareResults(h_bc_values, reference_check_bc_values, graph.nodes,
+                       true);
+        printf("\n");
+    }
+    if (reference_check_ebc_values != NULL) {
+        printf("Validity Edge BC Value: ");
+        CompareResults(h_ebc_values, reference_check_ebc_values, graph.edges,
                        true);
         printf("\n");
     }
@@ -444,12 +470,13 @@ void RunTests(
 
     printf("GPU BC finished in %lf msec.\n", elapsed);
     if (avg_duty != 0)
-        printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
+        printf("\n avg CTA duty: %.2f%% \n", avg_duty * 100);
     
     // Cleanup
     if (csr_problem) delete csr_problem;
     if (reference_sigmas) free(reference_sigmas);
     if (reference_bc_values) free(reference_bc_values);
+    if (reference_ebc_values) free(reference_ebc_values);
     if (h_sigmas) free(h_sigmas);
     if (h_bc_values) free(h_bc_values);
 
@@ -477,7 +504,7 @@ void RunTests(
     args.GetCmdLineArgument("src", src_str);
     args.GetCmdLineArgument("ref-file", ref_filename);
     if (src_str.empty()) {
-        src = 0;
+        src = -1;
     } else {
         args.GetCmdLineArgument("src", src);
     }
