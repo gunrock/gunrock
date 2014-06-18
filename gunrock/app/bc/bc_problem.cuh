@@ -164,13 +164,14 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
                                 sizeof(Value) * nodes,
                                 cudaMemcpyDeviceToHost),
                             "BCProblem cudaMemcpy d_bc_values failed", __FILE__, __LINE__)) break;
-
+                if (h_ebc_values) {
                 if (retval = util::GRError(cudaMemcpy(
                                 h_ebc_values,
                                 data_slices[0]->d_ebc_values,
                                 sizeof(Value) * edges,
                                 cudaMemcpyDeviceToHost),
                             "BCProblem cudaMemcpy d_ebc_values failed", __FILE__, __LINE__)) break;
+                            }
 
                 if (h_sigmas) {
                     if (retval = util::GRError(cudaMemcpy(

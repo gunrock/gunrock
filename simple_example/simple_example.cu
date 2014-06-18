@@ -41,7 +41,7 @@
 
 // Operator includes
 #include <gunrock/oprtr/filter/kernel.cuh>
-#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
+#include <gunrock/oprtr/advance/kernel.cuh>
 
 // Boost includes for CPU CC reference algorithm
 // and BC algorithm
@@ -93,7 +93,7 @@ bool CCCompare(
 void Usage()
 {
     printf("\nsimple_example <graph type> <graph type args> [--device=<device_index>] "
-           "[--instrumented] [--quick] [--num_gpus=<gpu number>]\n"
+           "[--instrumented] [--quick]\n"
            "\n"
            "Graph types and args:\n"
            "  market [<file>]\n"
@@ -487,7 +487,8 @@ void RunTests(
     const Csr<VertexId, Value, SizeT> &graph,
     int max_grid_size,
     int num_gpus,
-    double max_queue_sizing)
+    double max_queue_sizing,
+    CudaContext& context)
 {
     typedef CCProblem<
         VertexId,
@@ -652,7 +653,7 @@ void RunTests(
     util::GRError(bfs_problem->Reset(src, bfs_enactor.GetFrontierType(),
                                     max_queue_sizing), "BFS Problem Data Reset Failed", __FILE__, __LINE__);
     gpu_timer.Start();
-    util::GRError(bfs_enactor.template Enact<BFSProblem_T>(bfs_problem, src, max_grid_size), "BFS Problem Enact Failed", __FILE__, __LINE__);
+    util::GRError(bfs_enactor.template Enact<BFSProblem_T>(context, bfs_problem, src, max_grid_size), "BFS Problem Enact Failed", __FILE__, __LINE__);
     gpu_timer.Stop();
 
     bfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
@@ -741,7 +742,7 @@ void RunTests(
     {
         util::GRError(bc_problem->Reset(i, bc_enactor.GetFrontierType(),
                                        max_queue_sizing), "BC Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(bc_enactor.template Enact<BCProblem_T>(bc_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(bc_enactor.template Enact<BCProblem_T>(context, bc_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
     }
 
     // Normalize BC value
@@ -789,7 +790,8 @@ template <
     typename SizeT>
 void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
-    CommandLineArgs &args)
+    CommandLineArgs &args,
+    CudaContext& context)
 {
     bool   instrumented     = false; // Whether or not to collect
                                      // instrumentation from kernels
@@ -814,13 +816,15 @@ void RunTests(
             graph,
             max_grid_size,
             num_gpus,
-            max_queue_sizing);
+            max_queue_sizing,
+            context);
     } else {
         RunTests<VertexId, Value, SizeT, false>(
             graph,
             max_grid_size,
             num_gpus,
-            max_queue_sizing);
+            max_queue_sizing,
+            context);
     }
 }
 
@@ -837,8 +841,11 @@ int main( int argc, char** argv)
         return 1;
     }
 
-    DeviceInit(args);
-    cudaSetDeviceFlags(cudaDeviceMapHost);
+    //DeviceInit(args);
+    //cudaSetDeviceFlags(cudaDeviceMapHost);
+    int dev = 0;
+    args.GetCmdLineArgument("device", dev);
+    ContextPtr context = mgpu::CreateCudaDevice(dev);
 
     // Parse graph-contruction params
     g_undirected = true;
@@ -882,7 +889,7 @@ int main( int argc, char** argv)
         fflush(stdout);
 
         // Run tests
-        RunTests(csr, args);
+        RunTests(csr, args, *context);
 
 
     } else {

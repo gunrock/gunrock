@@ -27,7 +27,7 @@ GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
 GEN_SM20 = -gencode=arch=compute_20,code=\"sm_20,compute_20\" 
 GEN_SM13 = -gencode=arch=compute_13,code=\"sm_13,compute_13\" 
 GEN_SM10 = -gencode=arch=compute_10,code=\"sm_10,compute_10\" 
-SM_TARGETS = $(GEN_SM30) 
+SM_TARGETS = $(GEN_SM35) 
 #$(GEN_SM30) $(GEN_SM20) $(GEN_SM13) $(GEN_SM10) 
 
 #-------------------------------------------------------------------------------
@@ -71,8 +71,9 @@ endif
 #-------------------------------------------------------------------------------
 
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
+MGPU_INC = "../../moderngpu/include"
 BOOST_INC = "../../boost_1_53_0"
-INC = -I$(CUDA_INC) -I$(BOOST_INC) -I.. -I../..
+INC = -I$(CUDA_INC) -I$(BOOST_INC) -I$(MGPU_INC) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -141,9 +142,9 @@ DEPS = 			./Makefile \
 
 simple: bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX) : simple_example.cu $(DEPS)
+bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX) : simple_example.cu ../../moderngpu/src/mgpucontext.cu ../../moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX) simple_example.cu $(NVCCFLAGS) $(ARCH) $(INC) -lcuda -O3  
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX) simple_example.cu ../../moderngpu/src/mgpucontext.cu ../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -lcuda -O3  
 
 #-------------------------------------------------------------------------------
 # Clean

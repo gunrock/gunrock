@@ -211,6 +211,12 @@ class BCEnactor : public EnactorBase
             Value,
             BCProblem> BackwardFunctor;
 
+        typedef BackwardFunctor2<
+            VertexId,
+            SizeT,
+            Value,
+            BCProblem> BackwardFunctor2;
+
         cudaError_t retval = cudaSuccess;
 
         unsigned int    *d_scanned_edges = NULL;
@@ -444,6 +450,7 @@ class BCEnactor : public EnactorBase
                 // Check if done
                 if (done[0] == 0) break;
                 // Edge Map
+                if (enactor_stats.iteration > 0) {
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BCProblem, BackwardFunctor>(
                     d_done,
                     enactor_stats,
@@ -466,6 +473,30 @@ class BCEnactor : public EnactorBase
                     this->work_progress,
                     context,
                     gunrock::oprtr::advance::V2V);
+                    } else {
+                    gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BCProblem, BackwardFunctor2>(
+                    d_done,
+                    enactor_stats,
+                    frontier_attribute,
+                    data_slice,
+                    (VertexId*)NULL,
+                    (bool*)NULL,
+                    (bool*)NULL,
+                    d_scanned_edges,
+                    graph_slice->frontier_queues.d_keys[1],              // d_in_queue
+                    graph_slice->frontier_queues.d_keys[0],            // d_out_queue
+                    (VertexId*)NULL,
+                    (VertexId*)NULL,
+                    graph_slice->d_row_offsets,
+                    graph_slice->d_column_indices,
+                    (SizeT*)NULL,
+                    (VertexId*)NULL,
+                    graph_slice->nodes,                 // max_in_queue
+                    graph_slice->edges,                 // max_out_queue
+                    this->work_progress,
+                    context,
+                    gunrock::oprtr::advance::V2V);
+                    }
 
                 if (/*DEBUG &&*/ (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates

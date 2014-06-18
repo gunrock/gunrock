@@ -369,9 +369,7 @@ void RunTests(
 
     // Allocate BC enactor map
     BCEnactor<INSTRUMENT> bc_enactor(g_verbose);
-
-    printf("edge: %d\n", graph.edges);
-
+    
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
     util::GRError(csr_problem->Init(
