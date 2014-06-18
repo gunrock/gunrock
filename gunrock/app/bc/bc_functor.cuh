@@ -296,8 +296,6 @@ struct BackwardFunctor2
         //Accumulate bc value
         atomicAdd(&problem->d_ebc_values[e_id], result);
         
-        atomicAdd(&problem->d_deltas[s_id], result); 
-
         /*if (s_id != problem->d_src_node[0]) {
             atomicAdd(&problem->d_deltas[s_id], result); 
             atomicAdd(&problem->d_bc_values[s_id], result);
