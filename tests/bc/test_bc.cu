@@ -449,8 +449,10 @@ void RunTests(
     // Verify the result
     if (reference_check_bc_values != NULL) {
         printf("Validity BC Value: ");
-        CompareResults(h_bc_values, reference_check_bc_values, graph.nodes,
+        int num_error = CompareResults(h_bc_values, reference_check_bc_values, graph.nodes,
                        true);
+        if (num_error > 0)
+            printf("Number of errors occurred: %d\n", num_error);
         printf("\n");
     }
     if (reference_check_ebc_values != NULL) {
@@ -597,7 +599,7 @@ int main( int argc, char** argv)
         }
 
         csr.PrintHistogram();
-        csr.DisplayGraph();
+        //csr.DisplayGraph();
         fflush(stdout);
 
         // Run tests

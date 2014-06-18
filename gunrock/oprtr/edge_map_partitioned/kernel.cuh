@@ -434,7 +434,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         int bid = blockIdx.x;
         int my_id = bid * KernelPolicy::THREADS + tid;
 
-
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
         unsigned int* s_edges = (unsigned int*) &smem_storage.s_edges[0];
         unsigned int* s_vertices = (unsigned int*) &smem_storage.s_vertices[0];
@@ -462,7 +461,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         unsigned int size = s_edges[end_id];
 
         VertexId v, e, e_id;
-
         int v_index = BinarySearch<KernelPolicy::THREADS>(tid, s_edges);
         v = s_vertices[v_index];
         e_id = s_edge_ids[v_index];

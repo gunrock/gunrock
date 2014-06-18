@@ -403,7 +403,7 @@ int CompareResults(float* computed, float* reference, SizeT len, bool verbose = 
             if (fabs((computed[i] - reference[i])/reference[i]) > THRESHOLD)
                 is_right = false;
         }
-        if (!is_right) {
+        if (!is_right && flag == 0) {
             printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
             PrintValue<float>(computed[i]);
             printf(" != ");
@@ -423,9 +423,10 @@ int CompareResults(float* computed, float* reference, SizeT len, bool verbose = 
                 }
                 printf("...]");
             }
-            flag = 1;
-            return flag;
+            flag += 1;
+            //return flag;
         }
+        if (!is_right && flag > 0) flag += 1;
     }
     printf("\n");
     if (!flag)
