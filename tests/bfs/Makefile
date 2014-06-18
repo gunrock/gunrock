@@ -39,7 +39,7 @@ SM_TARGETS = $(GEN_SM35)
 
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
 MGPU_INC = "../../../moderngpu/include"
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I.. -I../..
+INC = -Xlinker "/usr/local/lib/libmetis.so" -I$(CUDA_INC) -I$(MGPU_INC) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
