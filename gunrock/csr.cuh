@@ -406,6 +406,58 @@ struct Csr
         }
     }
 
+    void DisplayGraph(const char name[], SizeT limit = 40) 
+    {   
+        SizeT displayed_node_num = (nodes > limit) ? limit: nodes;
+        printf("%s : #nodes = ",name); util::PrintValue(nodes);
+        printf(", #edges = "); util::PrintValue(edges);
+        printf("\n  row_offsets = ");
+        for (SizeT i=0;i<=displayed_node_num;i++) 
+        {   
+            if (i!=0) printf(", ");
+            util::PrintValue(row_offsets[i]);
+        }   
+
+        if (node_values != NULL)
+        {   
+            printf("\n  node_values = ");
+            for (SizeT i=0;i<displayed_node_num;i++)
+            {   
+                if (i!=0) printf(", ");
+                util::PrintValue(node_values[i]); 
+            }   
+        }   
+ 
+        printf("\n  edges = ");
+        for (SizeT i=0;i<displayed_node_num;i++)
+        {   
+            printf("(");
+            for (SizeT j=row_offsets[i];j<row_offsets[i+1];j++)
+            {   
+                if (j!=row_offsets[i]) printf(", ");
+                util::PrintValue(column_indices[j]);
+            }   
+            printf(") ");
+        }   
+    
+        if (edge_values != NULL)
+        {   
+            printf("\n edge_values = ");
+            for (SizeT i=0;i<displayed_node_num;i++)
+            {   
+                printf("(");
+                for (SizeT j=row_offsets[i];j<row_offsets[i+1];j++)
+                {   
+                    if (j!=row_offsets[i]) printf(", ");
+                    util::PrintValue(edge_values[j]);
+                }   
+                printf(") ");
+            }   
+        }   
+
+        printf("\n");
+    }   
+
     bool CheckValue()
     {
         for (SizeT node = 0; node < nodes; ++node) {

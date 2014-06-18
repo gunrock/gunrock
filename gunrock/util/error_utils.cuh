@@ -15,6 +15,7 @@
 #pragma once
 
 #include <stdio.h>
+#include <string>
 
 namespace gunrock {
 namespace util {
@@ -37,6 +38,20 @@ cudaError_t GRError(
     return error;
 }
 
+cudaError_t GRError(
+    cudaError_t error,
+    std::string message,
+    const char *filename,
+    int line,
+    bool print = true)
+{
+    if (error && print) {
+        fprintf(stderr, "[%s, %d] %s (CUDA error %d: %s)\n", filename, line, message.c_str(), error, cudaGetErrorString(error));
+        fflush(stderr);
+    }
+    return error;
+}
+
 /**
  * Checks and resets last CUDA error.  If set, displays last error message in accordance with debug mode.
  */
@@ -54,6 +69,22 @@ cudaError_t GRError(
     }
     return error;
 }
+
+cudaError_t GRError(
+    std::string message,
+    const char *filename,
+    int line,
+    bool print = true)
+{
+    cudaError_t error = cudaGetLastError();
+    if (error && print) {
+
+        fprintf(stderr, "[%s, %d] %s (CUDA error %d: %s)\n", filename, line, message.c_str(), error, cudaGetErrorString(error));
+        fflush(stderr);
+    }
+    return error;
+}
+
 
 /**
  * Displays error message in accordance with debug mode

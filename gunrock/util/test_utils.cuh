@@ -195,7 +195,6 @@ public:
 /******************************************************************************
  * Device initialization
  ******************************************************************************/
-
 void DeviceInit(CommandLineArgs &args)
 {
     int deviceCount;
@@ -203,29 +202,32 @@ void DeviceInit(CommandLineArgs &args)
     if (deviceCount == 0) {
         fprintf(stderr, "No devices supporting CUDA.\n");
         exit(1);
-    }
-    int dev = 0;
-    args.GetCmdLineArgument("device", dev);
-    if (dev < 0) {
-        dev = 0;
-    }
-    if (dev > deviceCount - 1) {
-        dev = deviceCount - 1;
-    }
-    cudaDeviceProp deviceProp;
-    cudaGetDeviceProperties(&deviceProp, dev);
-    if (deviceProp.major < 1) {
-        fprintf(stderr, "Device does not support CUDA.\n");
-        exit(1);
-    }
-    if (!args.CheckCmdLineFlag("quiet")) {
-        printf("Using device %d: %s\n", dev, deviceProp.name);
-    }
-
-    cudaSetDevice(dev);
+    }   
+    std::vector<int> devs;
+    args.GetCmdLineArguments("device", devs);
+    if (devs.size()==0) for (int i=0;i<deviceCount;i++) devs.push_back(i);
+    else if (devs.size()==1) {
+        if (devs[0] < 0) {
+            devs[0] = 0;
+        }   
+        if (devs[0] > deviceCount - 1) {
+            devs[0] = deviceCount - 1;
+        }   
+    }   
+    for (int i=0;i<devs.size();i++)
+    {   
+        cudaDeviceProp deviceProp;
+        cudaGetDeviceProperties(&deviceProp, devs[i]);
+        if (deviceProp.major < 1) {
+            fprintf(stderr, "Device does not support CUDA.\n");
+            exit(1);
+        }   
+        if (!args.CheckCmdLineFlag("quiet")) {
+            printf("Using device %d: %s\n", devs[i], deviceProp.name);
+        }   
+    }   
+    cudaSetDevice(devs[0]);
 }
-
-
 
 
 /******************************************************************************
