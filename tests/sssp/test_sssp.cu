@@ -30,8 +30,11 @@
 #include <gunrock/app/sssp/sssp_functor.cuh>
 
 // Operator includes
-#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
+#include <gunrock/oprtr/advance/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
+#include <gunrock/priority_queue/kernel.cuh>
+
+#include <moderngpu.cuh>
 
 // Boost includes for CPU dijkstra SSSP reference algorithms
 #include <boost/config.hpp>
@@ -332,7 +335,8 @@ void RunTests(
     VertexId src,
     int max_grid_size,
     float queue_sizing,
-    int num_gpus)
+    int num_gpus,
+    CudaContext& context)
 {
         typedef SSSPProblem<
             VertexId,
@@ -386,9 +390,9 @@ void RunTests(
         // Perform SSSP
         GpuTimer gpu_timer;
 
-        util::GRError(csr_problem->Reset(src, sssp_enactor.GetFrontierType(), queue_sizing), "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(csr_problem->Reset(src, sssp_enactor.GetFrontierType(), queue_sizing), "SSSP Problem Data Reset Failed", __FILE__, __LINE__); 
         gpu_timer.Start();
-        util::GRError(sssp_enactor.template Enact<Problem>(csr_problem, src, max_grid_size), "SSSP Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(sssp_enactor.template Enact<Problem>(context, csr_problem, src, queue_sizing, max_grid_size), "SSSP Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
 
         sssp_enactor.GetStatistics(total_queued, search_depth, avg_duty);
@@ -455,7 +459,8 @@ template <
     typename SizeT>
 void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
-    CommandLineArgs &args)
+    CommandLineArgs &args,
+    CudaContext& context)
 {
     VertexId            src                 = -1;           // Use whatever the specified graph-type's default is
     std::string         src_str;
@@ -493,14 +498,16 @@ void RunTests(
                     src,
                     max_grid_size,
                     max_queue_sizing,
-                    num_gpus);
+                    num_gpus,
+                    context);
         } else {
             RunTests<VertexId, Value, SizeT, true, true>(
                     graph,
                     src,
                     max_grid_size,
                     max_queue_sizing,
-                    num_gpus);
+                    num_gpus,
+                    context);
         }
     } else {
         if (instrumented) {
@@ -509,14 +516,16 @@ void RunTests(
                     src,
                     max_grid_size,
                     max_queue_sizing,
-                    num_gpus);
+                    num_gpus,
+                    context);
         } else {
             RunTests<VertexId, Value, SizeT, true, false>(
                     graph,
                     src,
                     max_grid_size,
                     max_queue_sizing,
-                    num_gpus);
+                    num_gpus,
+                    context);
         }
     }
 
@@ -537,8 +546,11 @@ int main( int argc, char** argv)
 		return 1;
 	}
 
-	DeviceInit(args);
-	cudaSetDeviceFlags(cudaDeviceMapHost);
+	//DeviceInit(args);
+	//cudaSetDeviceFlags(cudaDeviceMapHost);
+    int dev = 0;
+    args.GetCmdLineArgument("device", dev);
+    ContextPtr context = mgpu::CreateCudaDevice(dev);
 
 	//srand(0);									// Presently deterministic
 	//srand(time(NULL));
@@ -580,9 +592,12 @@ int main( int argc, char** argv)
 
 		csr.PrintHistogram();
 		csr.DisplayGraph(true); //print graph with edge_value
+        
+        csr.GetAverageEdgeValue();
+        csr.GetAverageDegree();
 		
         // Run tests
-		RunTests(csr, args);
+		RunTests(csr, args, *context);
 
 	} else {
 

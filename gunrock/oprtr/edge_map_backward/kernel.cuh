@@ -20,6 +20,8 @@
 
 #include <gunrock/oprtr/edge_map_backward/cta.cuh>
 
+#include <gunrock/oprtr/advance/kernel_policy.cuh>
+
 namespace gunrock {
 namespace oprtr {
 namespace edge_map_backward {
@@ -42,7 +44,8 @@ struct Sweep
         typename ProblemData::DataSlice         *&problem,
         typename KernelPolicy::SmemStorage      &smem_storage,
         util::CtaWorkProgress                   &work_progress,
-        util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition)
+        util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition,
+        gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
         {
             typedef Cta<KernelPolicy, ProblemData, Functor>     Cta;
             typedef typename KernelPolicy::SizeT                SizeT;
@@ -70,7 +73,8 @@ struct Sweep
                 d_row_offsets,
                 d_column_indices,
                 problem,
-                work_progress);
+                work_progress,
+                ADVANCE_TYPE);
 
             // Process full tiles
             while (work_limits.offset < work_limits.guarded_offset) {
@@ -119,7 +123,8 @@ struct Dispatch
         VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
         util::CtaWorkProgress       &work_progress,
-        util::KernelRuntimeStats    &kernel_stats)
+        util::KernelRuntimeStats    &kernel_stats,
+        gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
         {
             // empty
         }
@@ -150,7 +155,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
         util::CtaWorkProgress       &work_progress,
-        util::KernelRuntimeStats    &kernel_stats)
+        util::KernelRuntimeStats    &kernel_stats,
+        gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
     {
         // Shared storage for the kernel
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
@@ -211,7 +217,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 problem,
                 smem_storage,
                 work_progress,
-                smem_storage.state.work_decomposition);
+                smem_storage.state.work_decomposition,
+                ADVANCE_TYPE);
 
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
             kernel_stats.MarkStop();
@@ -260,7 +267,8 @@ void Kernel(
         typename KernelPolicy::VertexId         *d_column_indices,
         typename ProblemData::DataSlice         *problem,                    // Problem Object
         util::CtaWorkProgress                   work_progress,              // Atomic workstealing and queueing counters
-        util::KernelRuntimeStats                kernel_stats)               // Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT)
+        util::KernelRuntimeStats                kernel_stats,               // Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT)
+        gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
             queue_reset,    
@@ -276,7 +284,8 @@ void Kernel(
             d_column_indices,
             problem,
             work_progress,
-            kernel_stats);
+            kernel_stats,
+            ADVANCE_TYPE);
 }
 
 } //edge_map_backward

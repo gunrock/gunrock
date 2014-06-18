@@ -32,8 +32,10 @@
 #include <gunrock/app/bc/bc_functor.cuh>
 
 // Operator includes
-#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
+#include <gunrock/oprtr/advance/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
+
+#include <moderngpu.cuh>
 
 // Boost includes
 #include <boost/config.hpp>
@@ -139,9 +141,12 @@ template<
 void RefCPUBC(
     const Csr<VertexId, Value, SizeT>       &graph,
     Value                                   *bc_values,
+    Value                                   *ebc_values,
     Value                                   *sigmas,
     VertexId                                src)
 {
+    typedef Coo<VertexId, Value> EdgeTupleType;
+    EdgeTupleType *coo = (EdgeTupleType*) malloc(sizeof(EdgeTupleType) * graph.edges);
     if (src == -1) {
         // Perform full exact BC using BGL
 
@@ -164,6 +169,13 @@ void RefCPUBC(
         StdEdgeIndexMap my_e_index;
         typedef boost::associative_property_map< StdEdgeIndexMap > EdgeIndexMap;
         EdgeIndexMap e_index(my_e_index);
+
+        int i = 0;
+        BGL_FORALL_EDGES(edge, G, Graph)
+        {
+            my_e_index.insert(std::pair<Edge, int>(edge, i));
+            ++i;
+        }
 
         // Define EdgeCentralityMap
         std::vector< double > e_centrality_vec(boost::num_edges(G), 0.0);
@@ -195,6 +207,24 @@ void RefCPUBC(
         BGL_FORALL_VERTICES(vertex, G, Graph)
         {
             bc_values[vertex] = (Value)v_centrality_map[vertex];
+        }
+
+        int idx = 0;
+        BGL_FORALL_EDGES(edge, G, Graph)
+        {
+            coo[idx].row = source(edge, G);
+            coo[idx].col = target(edge, G);
+            coo[idx++].val = (Value)e_centrality_map[edge];
+            coo[idx].col = source(edge, G);
+            coo[idx].row = target(edge, G);
+            coo[idx++].val = (Value)e_centrality_map[edge];
+        }
+
+        std::stable_sort(coo, coo+graph.edges, RowFirstTupleCompare<EdgeTupleType>);
+
+        for (idx = 0; idx < graph.edges; ++idx) {
+            //std::cout << coo[idx].row << "," << coo[idx].col << ":" << coo[idx].val << std::endl;
+            ebc_values[idx] = coo[idx].val;
         }
 
         printf("CPU BC finished in %lf msec.", elapsed);
@@ -287,6 +317,7 @@ void RefCPUBC(
 
         delete[] source_path;
     }
+    free(coo);
 }
 
 /**
@@ -315,7 +346,8 @@ void RunTests(
     std::string &ref_filename,
     int max_grid_size,
     int num_gpus,
-    double max_queue_sizing)
+    double max_queue_sizing,
+    CudaContext& context)
 {
     typedef BCProblem<
         VertexId,
@@ -326,17 +358,18 @@ void RunTests(
 
     // Allocate host-side array (for both reference and gpu-computed results)
     Value *reference_bc_values = (Value*)malloc(sizeof(Value) * graph.nodes);
+    Value *reference_ebc_values = (Value*)malloc(sizeof(Value) * graph.edges);
     Value *reference_sigmas    = (Value*)malloc(sizeof(Value) * graph.nodes);
     Value *h_sigmas            = (Value*)malloc(sizeof(Value) * graph.nodes);
     Value *h_bc_values         = (Value*)malloc(sizeof(Value) * graph.nodes);
+    Value *h_ebc_values         = (Value*)malloc(sizeof(Value) * graph.edges);
     Value *reference_check_bc_values = (g_quick) ? NULL : reference_bc_values;
+    Value *reference_check_ebc_values = (g_quick || (src != -1)) ? NULL : reference_ebc_values;
     Value *reference_check_sigmas = (g_quick || (src == -1)) ? NULL : reference_sigmas;
 
     // Allocate BC enactor map
     BCEnactor<INSTRUMENT> bc_enactor(g_verbose);
-
-    printf("edge: %d\n", graph.edges);
-
+    
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
     util::GRError(csr_problem->Init(
@@ -353,7 +386,8 @@ void RunTests(
             RefCPUBC(
                     graph,
                     reference_check_bc_values,
-                    reference_sigmas,
+                    reference_check_ebc_values,
+                    reference_check_sigmas,
                     src);
             printf("\n");
         } else {
@@ -390,7 +424,7 @@ void RunTests(
     for (VertexId i = start_src; i < end_src; ++i)
     {
         util::GRError(csr_problem->Reset(i, bc_enactor.GetFrontierType(), max_queue_sizing), "BC Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(bc_enactor.template Enact<Problem>(csr_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(bc_enactor.template Enact<Problem>(context, csr_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
     }
 
     util::MemsetScaleKernel<<<128, 128>>>
@@ -403,12 +437,25 @@ void RunTests(
     bc_enactor.GetStatistics(avg_duty);
 
     // Copy out results
-    util::GRError(csr_problem->Extract(h_sigmas, h_bc_values), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
+    util::GRError(csr_problem->Extract(h_sigmas, h_bc_values, h_ebc_values), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
+    /*printf("edge bc values: %d\n", graph.edges);
+    for (int i = 0; i < graph.edges; ++i) {
+        printf("%5f, %5f\n", h_ebc_values[i], reference_check_ebc_values[i]);
+    }
+    printf("edge bc values end\n");*/
 
     // Verify the result
     if (reference_check_bc_values != NULL) {
         printf("Validity BC Value: ");
-        CompareResults(h_bc_values, reference_check_bc_values, graph.nodes,
+        int num_error = CompareResults(h_bc_values, reference_check_bc_values, graph.nodes,
+                       true);
+        if (num_error > 0)
+            printf("Number of errors occurred: %d\n", num_error);
+        printf("\n");
+    }
+    if (reference_check_ebc_values != NULL) {
+        printf("Validity Edge BC Value: ");
+        CompareResults(h_ebc_values, reference_check_ebc_values, graph.edges,
                        true);
         printf("\n");
     }
@@ -423,12 +470,13 @@ void RunTests(
 
     printf("GPU BC finished in %lf msec.\n", elapsed);
     if (avg_duty != 0)
-        printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
+        printf("\n avg CTA duty: %.2f%% \n", avg_duty * 100);
     
     // Cleanup
     if (csr_problem) delete csr_problem;
     if (reference_sigmas) free(reference_sigmas);
     if (reference_bc_values) free(reference_bc_values);
+    if (reference_ebc_values) free(reference_ebc_values);
     if (h_sigmas) free(h_sigmas);
     if (h_bc_values) free(h_bc_values);
 
@@ -441,7 +489,8 @@ template <
     typename SizeT>
 void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
-    CommandLineArgs &args)
+    CommandLineArgs &args,
+    CudaContext& context)
 {
     VertexId    src              = -1;    // Use whatever the specified graph-type's default is
     std::string src_str;
@@ -455,7 +504,7 @@ void RunTests(
     args.GetCmdLineArgument("src", src_str);
     args.GetCmdLineArgument("ref-file", ref_filename);
     if (src_str.empty()) {
-        src = 0;
+        src = -1;
     } else {
         args.GetCmdLineArgument("src", src);
     }
@@ -471,7 +520,8 @@ void RunTests(
             ref_filename,
             max_grid_size,
             num_gpus,
-            max_queue_sizing);
+            max_queue_sizing,
+            context);
     } else {
         RunTests<VertexId, Value, SizeT, false>(
             graph,
@@ -479,7 +529,8 @@ void RunTests(
             ref_filename,
             max_grid_size,
             num_gpus,
-            max_queue_sizing);
+            max_queue_sizing,
+            context);
     }
 
 }
@@ -499,8 +550,12 @@ int main( int argc, char** argv)
         return 1;
     }
 
-    DeviceInit(args);
-    cudaSetDeviceFlags(cudaDeviceMapHost);
+    //DeviceInit(args);
+    //cudaSetDeviceFlags(cudaDeviceMapHost);
+
+    int dev = 0;
+    args.GetCmdLineArgument("device", dev);
+    ContextPtr context = mgpu::CreateCudaDevice(dev);
 
     //srand(0);                                                                     // Presently deterministic
     //srand(time(NULL));
@@ -542,11 +597,11 @@ int main( int argc, char** argv)
         }
 
         csr.PrintHistogram();
-        csr.DisplayGraph();
+        //csr.DisplayGraph();
         fflush(stdout);
 
         // Run tests
-        RunTests(csr, args);
+        RunTests(csr, args, *context);
 
     } else {
 

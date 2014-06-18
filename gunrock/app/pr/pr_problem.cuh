@@ -56,8 +56,9 @@ struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
         SizeT    *d_degrees_pong;
         Value   *d_threshold;               /**< Used for recording accumulated error */
         Value   *d_delta;
-        SizeT   *d_nodes;
+        VertexId   *d_src_node;
         SizeT   *d_labels;
+        VertexId *d_node_ids;
     };
 
     // Members
@@ -126,7 +127,8 @@ struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
             if (data_slices[i]->d_degrees_pong)      util::GRError(cudaFree(data_slices[i]->d_degrees_pong), "GpuSlice cudaFree d_degrees_pong failed", __FILE__, __LINE__);
             if (data_slices[i]->d_threshold)      util::GRError(cudaFree(data_slices[i]->d_threshold), "GpuSlice cudaFree d_threshold failed", __FILE__, __LINE__);
             if (data_slices[i]->d_delta)      util::GRError(cudaFree(data_slices[i]->d_delta), "GpuSlice cudaFree d_delta failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_nodes)      util::GRError(cudaFree(data_slices[i]->d_nodes), "GpuSlice cudaFree d_nodes failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_node_ids)      util::GRError(cudaFree(data_slices[i]->d_node_ids), "GpuSlice cudaFree d_node_ids failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_src_node)      util::GRError(cudaFree(data_slices[i]->d_src_node), "GpuSlice cudaFree d_src_node failed", __FILE__, __LINE__);
             if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
         }
         if (d_data_slices)  delete[] d_data_slices;
@@ -145,7 +147,7 @@ struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
      *
      *\return cudaError_t object which indicates the success of all CUDA function calls.
      */
-    cudaError_t Extract(Value *h_rank)
+    cudaError_t Extract(Value *h_rank, VertexId *h_node_id)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -161,7 +163,14 @@ struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
                                 data_slices[0]->d_rank_curr,
                                 sizeof(Value) * nodes,
                                 cudaMemcpyDeviceToHost),
-                            "PRProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) break;
+                            "PRProblem cudaMemcpy d_rank_curr failed", __FILE__, __LINE__)) break;
+        
+                if (retval = util::GRError(cudaMemcpy(
+                                h_node_id,
+                                data_slices[0]->d_node_ids,
+                                sizeof(VertexId) * nodes,
+                                cudaMemcpyDeviceToHost),
+                            "PRProblem cudaMemcpy d_node_id failed", __FILE__, __LINE__)) break;
             } else {
                 // TODO: multi-GPU extract result
             } //end if (data_slices.size() ==1)
@@ -264,12 +273,19 @@ struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
                     "PRProblem cudaMalloc d_delta failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_delta = d_delta;
 
-                SizeT    *d_nodes;
+                VertexId    *d_node_ids;
                 if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_nodes,
+                        (void**)&d_node_ids,
+                        nodes * sizeof(VertexId)),
+                    "PRProblem cudaMalloc d_node_ids failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_node_ids = d_node_ids;
+
+                SizeT    *d_src_node;
+                if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_src_node,
                         1 * sizeof(SizeT)),
-                    "PRProblem cudaMalloc d_nodes failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_nodes = d_nodes;
+                    "PRProblem cudaMalloc d_src_node failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_src_node = d_src_node;
 
                 data_slices[0]->d_labels = NULL;
 
@@ -289,6 +305,7 @@ struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
      *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Reset(
+            VertexId src,
             Value    delta,
             Value    threshold,
             FrontierType frontier_type)             // The frontier type (i.e., edge/vertex/mixed)
@@ -332,6 +349,15 @@ struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
                 data_slices[gpu]->d_delta = d_delta;
             }
 
+            if (!data_slices[gpu]->d_node_ids) {
+                VertexId    *d_node_ids;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_node_ids,
+                                nodes * sizeof(VertexId)),
+                            "PRProblem cudaMalloc d_node_ids failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_node_ids = d_node_ids;
+            }
+
             if (!data_slices[gpu]->d_threshold) {
                 Value    *d_threshold;
                 if (retval = util::GRError(cudaMalloc(
@@ -341,13 +367,13 @@ struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
                 data_slices[gpu]->d_threshold = d_threshold;
             }
 
-            if (!data_slices[gpu]->d_nodes) {
-                SizeT    *d_nodes;
+            if (!data_slices[gpu]->d_src_node) {
+                SizeT    *d_src_node;
                 if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_nodes,
+                                (void**)&d_src_node,
                                 1 * sizeof(SizeT)),
-                            "PRProblem cudaMalloc d_nodes failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_nodes = d_nodes;
+                            "PRProblem cudaMalloc d_src_node failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_src_node = d_src_node;
             }
 
             // Allocate d_degrees if necessary
@@ -381,6 +407,7 @@ struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_degrees, 0, nodes);
             util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_degrees, BaseProblem::graph_slices[0]->d_row_offsets, &BaseProblem::graph_slices[0]->d_row_offsets[1], -1, nodes);
             util::MemsetCopyVectorKernel<<<128, 128>>>(data_slices[gpu]->d_degrees_pong, data_slices[gpu]->d_degrees, nodes);
+            util::MemsetIdxKernel<<<128, 128>>>(data_slices[gpu]->d_node_ids, nodes);
 
             if (retval = util::GRError(cudaMemcpy(
                             data_slices[gpu]->d_delta,
@@ -397,11 +424,11 @@ struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
                         "PRProblem cudaMemcpy d_threshold failed", __FILE__, __LINE__)) return retval;
 
             if (retval = util::GRError(cudaMemcpy(
-                            data_slices[gpu]->d_nodes,
-                            (SizeT*)&nodes,
-                            sizeof(SizeT),
+                            data_slices[gpu]->d_src_node,
+                            (VertexId*)&src,
+                            sizeof(VertexId),
                             cudaMemcpyHostToDevice),
-                        "PRProblem cudaMemcpy d_nodes failed", __FILE__, __LINE__)) return retval;
+                        "PRProblem cudaMemcpy d_src_node failed", __FILE__, __LINE__)) return retval;
 
             if (retval = util::GRError(cudaMemcpy(
                             d_data_slices[gpu],

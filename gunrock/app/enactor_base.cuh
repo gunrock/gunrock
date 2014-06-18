@@ -21,8 +21,45 @@
 
 #include <gunrock/app/problem_base.cuh>
 
+#include <gunrock/oprtr/advance/kernel_policy.cuh>
+
+#include <moderngpu.cuh>
+
+using namespace mgpu;
+
 namespace gunrock {
 namespace app {
+
+struct EnactorStats
+{
+    long long           iteration;
+    unsigned int        num_gpus;
+    unsigned int        gpu_id;
+
+    unsigned long long  total_lifetimes;
+    unsigned long long  total_runtimes;
+    unsigned long long  total_queued;
+
+    unsigned int        advance_grid_size;
+    unsigned int        filter_grid_size;
+
+    util::KernelRuntimeStatsLifetime advance_kernel_stats;
+    util::KernelRuntimeStatsLifetime filter_kernel_stats;
+
+    unsigned int        *d_node_locks;
+    unsigned int        *d_node_locks_out;
+
+};
+
+struct FrontierAttribute
+{
+    unsigned int        queue_length;
+    unsigned int        queue_index;
+    int                 selector;
+    bool                queue_reset;
+    int                 current_label;
+    gunrock::oprtr::advance::TYPE   advance_type;
+};
 
 /**
  * @brief Base class for graph problem enactors.
@@ -32,12 +69,16 @@ class EnactorBase
 protected:  
 
     //Device properties
-    util::CudaProperties cuda_props;
+    util::CudaProperties            cuda_props;
     
     // Queue size counters and accompanying functionality
-    util::CtaWorkProgressLifetime work_progress;
+    util::CtaWorkProgressLifetime   work_progress;
 
-    FrontierType frontier_type;
+    FrontierType                    frontier_type;
+
+    EnactorStats                    enactor_stats;
+
+    FrontierAttribute               frontier_attribute;
 
 public:
 
@@ -61,6 +102,53 @@ protected:
         // Setup work progress (only needs doing once since we maintain
         // it in our kernel code)
         work_progress.Setup();
+        enactor_stats.d_node_locks = NULL;
+        enactor_stats.d_node_locks_out = NULL;
+    }
+
+
+    virtual ~EnactorBase()
+    {
+        if (enactor_stats.d_node_locks) util::GRError(cudaFree(enactor_stats.d_node_locks), "EnactorBase cudaFree d_node_locks failed", __FILE__, __LINE__);
+        if (enactor_stats.d_node_locks_out) util::GRError(cudaFree(enactor_stats.d_node_locks_out), "EnactorBase cudaFree d_node_locks_out failed", __FILE__, __LINE__);
+    }
+
+    template <typename ProblemData>
+    cudaError_t Setup(
+        ProblemData *problem,
+        int max_grid_size,
+        int advance_occupancy,
+        int filter_occupancy,
+        int node_lock_size = 256)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        //initialize runtime stats
+        enactor_stats.advance_grid_size = MaxGridSize(advance_occupancy, max_grid_size);
+        enactor_stats.filter_grid_size  = MaxGridSize(filter_occupancy, max_grid_size);
+
+        if (retval = enactor_stats.advance_kernel_stats.Setup(enactor_stats.advance_grid_size)) return retval;
+        if (retval = enactor_stats.filter_kernel_stats.Setup(enactor_stats.filter_grid_size)) return retval;
+
+        enactor_stats.iteration             = 0;
+        enactor_stats.total_runtimes        = 0;
+        enactor_stats.total_lifetimes       = 0;
+        enactor_stats.total_queued          = 0;
+
+        enactor_stats.num_gpus              = 1;
+        enactor_stats.gpu_id                = 0;
+
+        if (retval = util::GRError(cudaMalloc(
+                            (void**)&enactor_stats.d_node_locks,
+                            node_lock_size * sizeof(unsigned int)),
+                        "EnactorBase cudaMalloc d_node_locks failed", __FILE__, __LINE__)) return retval;
+
+            if (retval = util::GRError(cudaMalloc(
+                            (void**)&enactor_stats.d_node_locks_out,
+                            node_lock_size * sizeof(unsigned int)),
+                        "EnactorBase cudaMalloc d_node_locks_out failed", __FILE__, __LINE__)) return retval;
+
+        return retval;
     }
 
     /**

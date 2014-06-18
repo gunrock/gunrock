@@ -44,7 +44,7 @@ struct BFSFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         if (ProblemData::ENABLE_IDEMPOTENCE) {
             return true;
@@ -68,7 +68,7 @@ struct BFSFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         if (ProblemData::ENABLE_IDEMPOTENCE) {
             // do nothing here
@@ -85,26 +85,26 @@ struct BFSFunctor
     }
 
     /**
-     * @brief Vertex mapping condition function. Check if the Vertex Id is valid (not equal to -1).
+     * @brief filter condition function. Check if the Vertex Id is valid (not equal to -1).
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
         return node != -1;
     }
 
     /**
-     * @brief Vertex mapping apply function. Doing nothing for BFS problem.
+     * @brief filter apply function. Doing nothing for BFS problem.
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
         if (ProblemData::ENABLE_IDEMPOTENCE) {
             util::io::ModifiedStore<util::io::st::cg>::St(

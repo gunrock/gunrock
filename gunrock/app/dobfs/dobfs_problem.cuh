@@ -224,10 +224,8 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
         beta = _beta;
         VertexId *h_row_offsets = graph.row_offsets;
         VertexId *h_column_indices = graph.column_indices;
-        VertexId *h_col_offsets = NULL;
-        if (!undirected) h_col_offsets = inv_graph.row_offsets;
-        VertexId *h_row_indices = NULL;
-        if (!undirected) h_row_indices = inv_graph.column_indices;
+        VertexId *h_col_offsets = inv_graph.row_offsets;
+        VertexId *h_row_indices = inv_graph.column_indices;
         ProblemBase<VertexId, SizeT,
                                 _USE_DOUBLE_BUFFER>::Init(stream_from_host,
                                         nodes,

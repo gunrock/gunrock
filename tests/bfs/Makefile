@@ -25,7 +25,7 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\" 
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" 
-SM_TARGETS = $(GEN_SM30)
+SM_TARGETS = $(GEN_SM35)
 #$(GEN_SM35)
 
 #-------------------------------------------------------------------------------
@@ -60,18 +60,12 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -Xptxas -v -Xcudafe -\#
+NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
 endif
 
-ifeq (,$(findstring 3.0, $(NVCC_VERSION)))
-ifneq ($(abi), 1)
-	# Disable the ABI by default for 3.1+
-	NVCCFLAGS += -Xptxas -abi=no
-endif
-endif
 
 ifeq ($(verbose), 1)
     NVCCFLAGS += -v
@@ -108,9 +102,9 @@ DEPS = 			./Makefile \
 
 test: bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_bfs.cu $(DEPS)
+bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_bfs.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_bfs.cu $(NVCCFLAGS) $(ARCH) $(INC) -O3  
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_bfs.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean

@@ -43,7 +43,7 @@ struct PRFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         return (problem->d_degrees[d_id] > 0 && problem->d_degrees[s_id] > 0);
     }
@@ -58,7 +58,7 @@ struct PRFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         atomicAdd(&problem->d_rank_next[d_id], problem->d_rank_curr[s_id]/problem->d_degrees[s_id]);
     }
@@ -71,12 +71,12 @@ struct PRFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
         Value delta = problem->d_delta[0];
-        Value nodes = (Value)problem->d_nodes[0];
+        VertexId src_node = problem->d_src_node[0];
         Value threshold = (Value)problem->d_threshold[0];
-        problem->d_rank_next[node] = (delta * problem->d_rank_next[node]) + (1.0-delta);
+        problem->d_rank_next[node] = (delta * problem->d_rank_next[node]) + (1.0-delta) * ((src_node == node || src_node == -1) ? 1 : 0);
         Value diff = fabs(problem->d_rank_next[node] - problem->d_rank_curr[node]);
  
         return (diff > threshold);
@@ -89,7 +89,7 @@ struct PRFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
         // Doing nothing here
     }
@@ -118,7 +118,7 @@ struct RemoveZeroDegreeNodeFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         return (problem->d_degrees[d_id] == 0);
     }
@@ -133,7 +133,7 @@ struct RemoveZeroDegreeNodeFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         atomicAdd(&problem->d_degrees_pong[s_id], -1);
     }
@@ -146,7 +146,7 @@ struct RemoveZeroDegreeNodeFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
         bool valid = (problem->d_degrees[node] == 0);
         problem->d_degrees_pong[node] = valid ? -1 : problem->d_degrees_pong[node];
@@ -160,7 +160,7 @@ struct RemoveZeroDegreeNodeFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
         // Doing nothing here
     }

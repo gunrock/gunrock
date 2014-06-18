@@ -43,7 +43,7 @@ struct SSSPFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id)
+    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         unsigned int label, weight;
 
@@ -68,11 +68,11 @@ struct SSSPFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id)
+    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     { 
         if (ProblemData::MARK_PATHS)
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    s_id, problem->d_preds + d_id);
+                    s_id, problem->d_preds + d_id); 
     }
 
     /**
@@ -83,9 +83,9 @@ struct SSSPFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondVertex(VertexId node, DataSlice *problem, unsigned int v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, unsigned int v = 0)
     {
-        return node != -1;
+        return (node != -1);
     }
 
     /**
@@ -95,11 +95,39 @@ struct SSSPFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyVertex(VertexId node, DataSlice *problem, unsigned int v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, unsigned int v = 0)
     {
         // Doing nothing here
     }
 };
+
+template<typename VertexId, typename SizeT, typename ProblemData>
+struct PQFunctor
+{
+    typedef typename ProblemData::DataSlice DataSlice;
+
+    /**
+     * @brief Forward Edge Mapping condition function. Check if the destination node
+     * has been claimed as someone else's child.
+     *
+     * @param[in] s_id Vertex Id of the edge source node
+     * @param[in] d_id Vertex Id of the edge destination node
+     * @param[in] problem Data slice object
+     *
+     * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
+     */
+    static __device__ __forceinline__ unsigned int ComputePriorityScore(VertexId node_id, DataSlice *problem)
+    {
+        unsigned int weight;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                        weight, problem->d_labels + node_id);
+        float delta;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                        delta, problem->d_delta);
+        return (delta == 0) ? weight : weight/delta;
+    }
+};
+ 
 
 } // sssp
 } // app

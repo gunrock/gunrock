@@ -40,7 +40,8 @@ SM_TARGETS = $(GEN_SM30)
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
 MGPU_INC = "../../../moderngpu/include"
 BOOST_INC = "../../../boost_1_53_0"
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(BOOST_INC) -I.. -I../..
+CUB_INC = "../../../cub"
+INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(BOOST_INC) -I$(CUB_INC) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -65,13 +66,6 @@ NVCCFLAGS = -Xptxas -v -Xcudafe -\#
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
-endif
-
-ifeq (,$(findstring 3.0, $(NVCC_VERSION)))
-ifneq ($(abi), 1)
-	# Disable the ABI by default for 3.1+
-	NVCCFLAGS += -Xptxas -abi=no
-endif
 endif
 
 ifeq ($(verbose), 1)

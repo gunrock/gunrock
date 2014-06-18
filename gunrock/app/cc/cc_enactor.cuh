@@ -17,10 +17,8 @@
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
 
-#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
-#include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel_policy.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel_policy.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/cc/cc_problem.cuh>
@@ -45,7 +43,7 @@ class CCEnactor : public EnactorBase
     /**
      * CTA duty kernel stats
      */
-    util::KernelRuntimeStatsLifetime vertex_map_kernel_stats;
+    util::KernelRuntimeStatsLifetime filter_kernel_stats;
 
     unsigned long long total_runtimes;              // Total working time by each CTA
     unsigned long long total_lifetimes;             // Total life time of each CTA
@@ -69,14 +67,14 @@ class CCEnactor : public EnactorBase
      * @brief Prepare the enactor for CC kernel call. Must be called prior to each CC search.
      *
      * @param[in] problem CC Problem object which holds the graph data and CC problem data to compute.
-     * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
+     * @param[in] filter_grid_size CTA occupancy for vertex mapping kernel call.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template <typename ProblemData>
     cudaError_t Setup(
         ProblemData *problem,
-        int vertex_map_grid_size)
+        int filter_grid_size)
     {
         typedef typename ProblemData::SizeT         SizeT;
         typedef typename ProblemData::VertexId      VertexId;
@@ -86,7 +84,7 @@ class CCEnactor : public EnactorBase
         do {
 
             //initialize runtime stats
-            if (retval = vertex_map_kernel_stats.Setup(vertex_map_grid_size)) break;
+            if (retval = filter_kernel_stats.Setup(filter_grid_size)) break;
 
             //Reset statistics
             iteration           = 0;
@@ -156,7 +154,7 @@ class CCEnactor : public EnactorBase
     /**
      * @brief Enacts a connected component computing on the specified graph.
      *
-     * @tparam VertexMapPolicy Kernel policy for vertex mapping.
+     * @tparam FilterPolicy Kernel policy for vertex mapping.
      * @tparam CCProblem CC Problem type.
      * @param[in] problem CCProblem object.
      * @param[in] max_grid_size Max grid size for CC kernel calls.
@@ -164,7 +162,7 @@ class CCEnactor : public EnactorBase
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template<
-        typename VertexMapPolicy,
+        typename FilterPolicy,
         typename CCProblem>
     cudaError_t EnactCC(
     CCProblem                          *problem,
@@ -219,16 +217,16 @@ class CCEnactor : public EnactorBase
 
         do {
             // Determine grid size(s)
-            int vertex_map_occupancy    = VertexMapPolicy::CTA_OCCUPANCY;
-            int vertex_map_grid_size    = MaxGridSize(vertex_map_occupancy, max_grid_size);
+            int filter_occupancy    = FilterPolicy::CTA_OCCUPANCY;
+            int filter_grid_size    = MaxGridSize(filter_occupancy, max_grid_size);
 
             if (DEBUG) {
                 printf("CC vertex map occupancy %d, level-grid size %d\n",
-                        vertex_map_occupancy, vertex_map_grid_size);
+                        filter_occupancy, filter_grid_size);
             }
 
             // Lazy initialization
-            if (retval = Setup(problem, vertex_map_grid_size)) break;
+            if (retval = Setup(problem, filter_grid_size)) break;
 
             // Single-gpu graph slice
             typename CCProblem::GraphSlice *graph_slice = problem->graph_slices[0];
@@ -240,8 +238,8 @@ class CCEnactor : public EnactorBase
             bool queue_reset            = true;
 
 
-            gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookInitFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+            gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, HookInitFunctor>
+                <<<filter_grid_size, FilterPolicy::THREADS>>>(
                         0,  //iteration, not used in CC
                         queue_reset,
                         queue_index,
@@ -256,9 +254,9 @@ class CCEnactor : public EnactorBase
                         work_progress,
                         graph_slice->frontier_elements[selector],           // max_in_queue
                         graph_slice->frontier_elements[selector^1],         // max_out_queue
-                        this->vertex_map_kernel_stats);
+                        this->filter_kernel_stats);
 
-            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) break;
+            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) break;
 
             // Pointer Jumping 
             queue_index = 0;
@@ -277,8 +275,8 @@ class CCEnactor : public EnactorBase
                                 cudaMemcpyHostToDevice),
                             "CCProblem cudaMemcpy vertex_flag to d_vertex_flag failed", __FILE__, __LINE__)) return retval;
 
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpFunctor>
-                    <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, PtrJumpFunctor>
+                    <<<filter_grid_size, FilterPolicy::THREADS>>>(
                             0,
                             queue_reset,
                             queue_index,
@@ -293,9 +291,9 @@ class CCEnactor : public EnactorBase
                             work_progress,
                             graph_slice->frontier_elements[selector],           // max_in_queue
                             graph_slice->frontier_elements[selector^1],         // max_out_queue
-                            this->vertex_map_kernel_stats);
+                            this->filter_kernel_stats);
 
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel First Pointer Jumping Round failed", __FILE__, __LINE__))) break;
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel First Pointer Jumping Round failed", __FILE__, __LINE__))) break;
 
                 if (queue_reset) queue_reset = false;
 
@@ -320,8 +318,8 @@ class CCEnactor : public EnactorBase
             num_elements          = graph_slice->nodes;
             queue_reset            = true;
 
-            gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, UpdateMaskFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+            gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, UpdateMaskFunctor>
+                <<<filter_grid_size, FilterPolicy::THREADS>>>(
                         0,
                         queue_reset,
                         queue_index,
@@ -336,9 +334,9 @@ class CCEnactor : public EnactorBase
                         work_progress,
                         graph_slice->frontier_elements[selector],           // max_in_queue
                         graph_slice->frontier_elements[selector^1],         // max_out_queue
-                        this->vertex_map_kernel_stats);
+                        this->filter_kernel_stats);
 
-            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Update Mask Operation failed", __FILE__, __LINE__))) break;
+            if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel Update Mask Operation failed", __FILE__, __LINE__))) break;
 
                 iteration           = 1;
 
@@ -359,8 +357,8 @@ class CCEnactor : public EnactorBase
                                 "CCProblem cudaMemcpy edge_flag to d_edge_flag failed", __FILE__, __LINE__)) return retval;
 
                     if (iteration & 3) {
-                        gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMinFunctor>
-                            <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                        gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, HookMinFunctor>
+                            <<<filter_grid_size, FilterPolicy::THREADS>>>(
                                     0,
                                     queue_reset,
                                     queue_index,
@@ -375,10 +373,10 @@ class CCEnactor : public EnactorBase
                                     work_progress,
                                     graph_slice->frontier_elements[selector],           // max_in_queue
                                     graph_slice->frontier_elements[selector^1],         // max_out_queue
-                                    this->vertex_map_kernel_stats);
+                                    this->filter_kernel_stats);
                     } else {
-                        gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, HookMaxFunctor>
-                            <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                        gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, HookMaxFunctor>
+                            <<<filter_grid_size, FilterPolicy::THREADS>>>(
                                     0,
                                     queue_reset,
                                     queue_index,
@@ -393,10 +391,10 @@ class CCEnactor : public EnactorBase
                                     work_progress,
                                     graph_slice->frontier_elements[selector],           // max_in_queue
                                     graph_slice->frontier_elements[selector^1],         // max_out_queue
-                                    this->vertex_map_kernel_stats);
+                                    this->filter_kernel_stats);
                     }
 
-                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Hook Min/Max Operation failed", __FILE__, __LINE__))) break;
+                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel Hook Min/Max Operation failed", __FILE__, __LINE__))) break;
                     if (queue_reset) queue_reset = false;
                     queue_index++;
                     selector ^= 1;
@@ -429,8 +427,8 @@ class CCEnactor : public EnactorBase
                                         cudaMemcpyHostToDevice),
                                     "CCProblem cudaMemcpy vertex_flag to d_vertex_flag failed", __FILE__, __LINE__)) return retval;
 
-                        gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpMaskFunctor>
-                            <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                        gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, PtrJumpMaskFunctor>
+                            <<<filter_grid_size, FilterPolicy::THREADS>>>(
                                     0,
                                     queue_reset,
                                     queue_index,
@@ -445,9 +443,9 @@ class CCEnactor : public EnactorBase
                                     work_progress,
                                     graph_slice->frontier_elements[selector],           // max_in_queue
                                     graph_slice->frontier_elements[selector^1],         // max_out_queue
-                                    this->vertex_map_kernel_stats);
+                                    this->filter_kernel_stats);
 
-                        if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Pointer Jumping Mask failed", __FILE__, __LINE__))) break;
+                        if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel Pointer Jumping Mask failed", __FILE__, __LINE__))) break;
                         if (queue_reset) queue_reset = false;
 
                         queue_index++;
@@ -468,8 +466,8 @@ class CCEnactor : public EnactorBase
                     num_elements          = graph_slice->nodes;
                     queue_reset            = true;
 
-                    gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, PtrJumpUnmaskFunctor>
-                        <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                    gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, PtrJumpUnmaskFunctor>
+                        <<<filter_grid_size, FilterPolicy::THREADS>>>(
                                 0,
                                 queue_reset,
                                 queue_index,
@@ -484,12 +482,12 @@ class CCEnactor : public EnactorBase
                                 work_progress,
                                 graph_slice->frontier_elements[selector],           // max_in_queue
                                 graph_slice->frontier_elements[selector^1],         // max_out_queue
-                                this->vertex_map_kernel_stats);
+                                this->filter_kernel_stats);
 
-                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Pointer Jumping Unmask Operation failed", __FILE__, __LINE__))) break;
+                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel Pointer Jumping Unmask Operation failed", __FILE__, __LINE__))) break;
 
-                    gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, CCProblem, UpdateMaskFunctor>
-                        <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
+                    gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, UpdateMaskFunctor>
+                        <<<filter_grid_size, FilterPolicy::THREADS>>>(
                                 0,
                                 queue_reset,
                                 queue_index,
@@ -504,9 +502,9 @@ class CCEnactor : public EnactorBase
                                 work_progress,
                                 graph_slice->frontier_elements[selector],           // max_in_queue
                                 graph_slice->frontier_elements[selector^1],         // max_out_queue
-                                this->vertex_map_kernel_stats);
+                                this->filter_kernel_stats);
 
-                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map::Kernel Update Mask Operation failed", __FILE__, __LINE__))) break;
+                    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel Update Mask Operation failed", __FILE__, __LINE__))) break;
 
                     ///////////////////////////////////////////
                 } 
@@ -540,7 +538,7 @@ class CCEnactor : public EnactorBase
         int                             max_grid_size = 0)
     {
         if (this->cuda_props.device_sm_version >= 300) {
-            typedef gunrock::oprtr::vertex_map::KernelPolicy<
+            typedef gunrock::oprtr::filter::KernelPolicy<
                 CCProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
@@ -553,9 +551,9 @@ class CCEnactor : public EnactorBase
                 5,                                  // LOG_RAKING_THREADS
                 0,                                  // END_BITMASK (no bitmask for cc)
                 8>                                  // LOG_SCHEDULE_GRANULARITY
-                VertexMapPolicy;
+                FilterPolicy;
                 
-                return EnactCC<VertexMapPolicy, CCProblem>(
+                return EnactCC<FilterPolicy, CCProblem>(
                 problem, max_grid_size);
         }
 

@@ -16,10 +16,16 @@
 
 #include <time.h>
 #include <stdio.h>
-
+#include <string>
+#include <vector>
+#include <fstream>
+#include <iostream>
 #include <algorithm>
+#include <iterator>
 
 #include <gunrock/util/error_utils.cuh>
+
+using namespace std;
 
 namespace gunrock {
 
@@ -33,13 +39,18 @@ struct Csr
 {
     SizeT nodes;    /**< Number of nodes in the graph. */
     SizeT edges;    /**< Number of edges in the graph. */
+    SizeT out_nodes; /**< Number of nodes which have outgoing edges. */
+    SizeT average_degree;
 
     VertexId    *column_indices;/**< Column indices corresponding to all the non-zero values in the sparse matrix. */
     SizeT       *row_offsets;   /**< List of indices where each row of the sparse matrix starts. */
     Value       *edge_values;   /**< List of values attached to edges in the graph. */
     Value       *node_values;   /**< List of values attached to nodes in the graph. */
 
-    bool         pinned;        /**< Whether to use pinned memory */
+    Value       average_edge_value;
+    Value       average_node_value;
+
+    bool        pinned;        /**< Whether to use pinned memory */
 
     /**
      * @brief CSR Constructor
@@ -51,6 +62,10 @@ struct Csr
     {
         nodes = 0;
         edges = 0;
+        average_degree = 0;
+        average_edge_value = 0;
+        average_node_value = 0;
+        out_nodes = -1;
         row_offsets = NULL;
         column_indices = NULL;
         edge_values = NULL;
@@ -116,6 +131,98 @@ struct Csr
         }
     }
 
+    /**
+     * @store graph information into files
+     * 
+     */
+  void WriteToFile(char * file_name,
+		   bool undirected, 
+		   bool reversed,
+		   SizeT num_nodes, 
+		   SizeT num_edges, 
+		   SizeT *row_offsets,
+		   VertexId *col_indices,
+		   Value *edge_values = NULL)
+  {
+    printf("==> Writing into file:  %s\n", file_name);
+    
+    time_t mark1 = time(NULL);
+    
+    std::ofstream output(file_name);
+    
+    if (output.is_open())
+    {
+      output << num_nodes << " " << num_edges << " ";
+      std::copy(row_offsets,   row_offsets + num_nodes + 1, ostream_iterator<int>(output, " "));
+      std::copy(column_indices, column_indices + num_edges, ostream_iterator<int>(output, " "));
+      if (edge_values != NULL)
+      {
+	std::copy(edge_values, edge_values + num_edges, ostream_iterator<int>(output, " "));
+      }
+      output.close();
+    }
+    else
+    {
+      std::cout << "Cannot Open The File." << std::endl;
+    }
+
+    time_t mark2 = time(NULL);
+    printf("Finished writing in %ds.\n", (int)(mark2 - mark1));
+  }
+
+  // read from stored row_offsets, column_indices arrays
+  template <bool LOAD_EDGE_VALUES>
+  void FromCsr(char *f_in, 
+	       bool undirected, 
+	       bool reversed)
+  {
+    printf("  Reading directly from previously stored CSR arrays ...\n");
+    
+    ifstream _file(f_in);
+    
+    if (_file.is_open())
+    {
+      time_t mark1 = time(NULL);
+      
+      std::istream_iterator<int> start(_file), end;
+      std::vector<int> v(start, end);
+      
+      SizeT csr_nodes = v.at(0);
+      SizeT csr_edges = v.at(1);
+      
+      FromScratch<LOAD_EDGE_VALUES, false>(csr_nodes, csr_edges); 
+      
+      copy(v.begin()+2, v.begin()+3+csr_nodes, row_offsets);
+      copy(v.begin()+3+csr_nodes, v.begin()+3+csr_nodes+csr_edges, column_indices);
+      if(LOAD_EDGE_VALUES) 
+      { 
+	copy(v.begin()+3+csr_nodes+csr_edges, v.end(), edge_values); 
+      }
+      
+      time_t mark2 = time(NULL);
+      printf("Done reading (%ds).\n", (int) (mark2 - mark1));
+      
+      v.clear();
+    }
+    else 
+    {
+      perror("Unable to open the file."); 
+    }
+
+    // compute out_nodes
+    SizeT out_node = 0;
+    for (SizeT node = 0; node < nodes; node++) 
+    {
+      if (row_offsets[node+1] - row_offsets[node] > 0)
+      {
+	++out_node;
+      }
+    }
+    out_nodes = out_node;
+
+    fflush(stdout);
+  }
+
 
     /**
      * @brief Build CSR graph from COO graph, sorted or unsorted
@@ -128,10 +235,12 @@ struct Csr
      */
     template <bool LOAD_EDGE_VALUES, typename Tuple>
     void FromCoo(
+        char *output_file,
         Tuple *coo,
         SizeT coo_nodes,
         SizeT coo_edges,
         bool ordered_rows = false,
+        bool undirected = false,
         bool reversed = false)
     {
         printf("  Converting %d vertices, %d directed edges (%s tuples) "
@@ -141,8 +250,6 @@ struct Csr
         fflush(stdout);
 
         FromScratch<LOAD_EDGE_VALUES, false>(coo_nodes, coo_edges);
-
-        
 
         // Sort COO by row
         if (!ordered_rows) {
@@ -187,11 +294,46 @@ struct Csr
         }
         edges = real_edge;
 
-        if (new_coo) free(new_coo);
+        edges = real_edge;
 
         time_t mark2 = time(NULL);
-        printf("Done converting (%ds).\n", (int) (mark2 - mark1));
+        printf("Done converting (%ds).\n", (int)(mark2 - mark1));
+        
+        // Write offsets, indices, node, edges etc. into file
+        if (LOAD_EDGE_VALUES)
+	{
+	  WriteToFile(output_file, 
+		      undirected, 
+		      reversed, 
+		      nodes, 
+		      edges, 
+		      row_offsets, 
+		      column_indices, 
+		      edge_values);
+        }
+        else
+        {
+	  WriteToFile(output_file, 
+		      undirected, 
+		      reversed,
+		      nodes, 
+		      edges, 
+		      row_offsets, 
+		      column_indices);
+        }
+
+        if (new_coo) free(new_coo);
         fflush(stdout);
+
+        // Compute out_nodes
+        SizeT out_node = 0;
+        for (SizeT node = 0; node < nodes; node++) {
+            if (row_offsets[node+1] - row_offsets[node] > 0)
+            {
+                ++out_node;
+            }
+        }
+        out_nodes = out_node;
     }
 
     /**
@@ -253,11 +395,13 @@ struct Csr
             for (SizeT edge = row_offsets[node];
                  edge < row_offsets[node + 1];
                  edge++) {
+                 printf("[");
                 util::PrintValue(column_indices[edge]);
-                if (with_edge_value)
-                    printf(":%d, ", edge_values[edge]);
-                else
-                    printf(", ");
+                if (with_edge_value) {
+                    printf(",");
+                    util::PrintValue(edge_values[edge]);
+                }
+                printf("], ");
             }
             printf("\n");
         }
@@ -302,6 +446,9 @@ struct Csr
         return src;
     }
 
+    /**
+     * @brief Display the neighbor list of a node
+     */
     void DisplayNeighborList(VertexId node)
     {
         for (SizeT edge = row_offsets[node];
@@ -311,6 +458,46 @@ struct Csr
                 printf(", ");
             }
             printf("\n");
+    }
+
+    SizeT GetAverageDegree() {
+        if (average_degree == 0) {
+            double mean = 0, count = 0;
+            for (SizeT node = 0; node < nodes; ++node) {
+                count += 1;
+                mean += (row_offsets[node+1]- row_offsets[node] - mean) / count;
+            }
+            average_degree = static_cast<SizeT>(mean);
+        }
+        return average_degree;
+    }
+
+    Value GetAverageNodeValue() {
+        if (abs(average_node_value - 0) < 0.001 && node_values != NULL) {
+            double mean = 0, count = 0;
+            for (SizeT node = 0; node < nodes; ++node) {
+                if (node_values[node] < UINT_MAX) {
+                    count += 1;
+                    mean += (node_values[node] - mean) / count;
+                }
+            }
+            average_node_value = static_cast<Value>(mean);
+        }
+        return average_node_value;
+    }
+
+    Value GetAverageEdgeValue() {
+        if (abs(average_edge_value - 0) < 0.001 && edge_values != NULL) {
+            double mean = 0, count = 0;
+            for (SizeT edge = 0; edge < edges; ++edge) {
+                if (edge_values[edge] < UINT_MAX) {
+                    count += 1;
+                    mean += (edge_values[edge] - mean) / count;
+                }
+            }
+            average_edge_value = static_cast<Value>(mean);
+        }
+        return average_edge_value;
     }
 
     /**@}*/

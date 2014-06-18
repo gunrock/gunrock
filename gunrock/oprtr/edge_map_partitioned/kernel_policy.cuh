@@ -92,7 +92,7 @@ struct KernelPolicy
             MAX_SCRATCH_BYTES_PER_CTA       = (GR_SMEM_BYTES(CUDA_ARCH) / _MIN_CTA_OCCUPANCY)
                                                 - 128,                                          // Fudge-factor to guarantee occupancy
 
-            SCRATCH_ELEMENT_SIZE            = sizeof(VertexId) + sizeof(VertexId),
+            SCRATCH_ELEMENT_SIZE            = sizeof(SizeT) + sizeof(VertexId) * 2,
 
             SCRATCH_ELEMENTS                 = (THREADS > MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE) ? MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE : THREADS,
         };
@@ -101,6 +101,7 @@ struct KernelPolicy
         struct {
             SizeT                       s_edges[SCRATCH_ELEMENTS];
             VertexId                    s_vertices[SCRATCH_ELEMENTS];
+            VertexId                    s_edge_ids[SCRATCH_ELEMENTS];
         };
     };
 

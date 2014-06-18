@@ -31,8 +31,8 @@
 #include <gunrock/app/pr/pr_functor.cuh>
 
 // Operator includes
-#include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
+#include <gunrock/oprtr/advance/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
 
 #include <moderngpu.cuh>
 
@@ -101,30 +101,16 @@ bool PRCompare(
   * @param[in] source_path Search depth from the source for each node.
   * @param[in] nodes Number of nodes in the graph.
   */
- template<typename Value, typename SizeT>
- void DisplaySolution(Value *rank, SizeT nodes)
+ template<typename VertexId, typename Value, typename SizeT>
+ void DisplaySolution(VertexId *node_id, Value *rank, SizeT nodes)
  { 
-     //sort the top page ranks
-     RankPair<SizeT, Value> *pr_list = (RankPair<SizeT, Value>*)malloc(sizeof(RankPair<SizeT, Value>) * nodes);
-     Value total_pr = 0;
-     for (int i = 0; i < nodes; ++i)
-     {
-         pr_list[i].vertex_id = i;
-         pr_list[i].page_rank = rank[i];
-         total_pr += rank[i];
-     }
-     std::stable_sort(pr_list, pr_list + nodes, PRCompare<RankPair<SizeT, Value> >);
-
      // Print out at most top 10 largest components
      int top = (nodes < 10) ? nodes : 10;
      printf("Top %d Page Ranks:\n", top);
      for (int i = 0; i < top; ++i)
      {
-         printf("Vertex ID: %d, Page Rank: %5f\n", pr_list[i].vertex_id, pr_list[i].page_rank);
-     }
-     printf("total pr: %5f\n", total_pr);
-
-     free(pr_list);
+         printf("Vertex ID: %d, Page Rank: %5f\n", node_id[i], rank[i]);
+     } 
  }
 
  /**
@@ -206,6 +192,7 @@ void DisplayStats(
     typename SizeT>
 void SimpleReferencePr(
     const Csr<VertexId, Value, SizeT>       &graph,
+    VertexId                                *node_id,
     Value                                   *rank,
     Value                                   delta,
     Value                                   error,
@@ -251,6 +238,23 @@ void SimpleReferencePr(
         rank[i] = ranks[i];
     }
 
+    //sort the top page ranks
+     RankPair<SizeT, Value> *pr_list = (RankPair<SizeT, Value>*)malloc(sizeof(RankPair<SizeT, Value>) * num_vertices(g));
+     for (int i = 0; i < num_vertices(g); ++i)
+     {
+         pr_list[i].vertex_id = i;
+         pr_list[i].page_rank = rank[i];
+     }
+     std::stable_sort(pr_list, pr_list + num_vertices(g), PRCompare<RankPair<SizeT, Value> >);
+
+     for (int i = 0; i < num_vertices(g); ++i)
+     {
+         node_id[i] = pr_list[i].vertex_id;
+         rank[i] = pr_list[i].page_rank;
+     }
+
+     free(pr_list);
+
     printf("CPU BFS finished in %lf msec.\n", elapsed);
 }
 
@@ -278,6 +282,7 @@ template <
     bool INSTRUMENT>
 void RunTests(
     const Csr<VertexId, Value, SizeT> &graph,
+    VertexId src,
     Value delta,
     Value error,
     SizeT max_iter,
@@ -294,6 +299,8 @@ void RunTests(
         // Allocate host-side label array (for both reference and gpu-computed results)
         Value    *reference_rank       = (Value*)malloc(sizeof(Value) * graph.nodes);
         Value    *h_rank               = (Value*)malloc(sizeof(Value) * graph.nodes);
+        VertexId *h_node_id             = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+        VertexId *reference_node_id     = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
         Value    *reference_check        = (g_quick) ? NULL : reference_rank;
 
         // Allocate BFS enactor map
@@ -314,7 +321,7 @@ void RunTests(
         // Perform BFS
         GpuTimer gpu_timer;
 
-        util::GRError(csr_problem->Reset(delta, error, pr_enactor.GetFrontierType()), "pr Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(csr_problem->Reset(src, delta, error, pr_enactor.GetFrontierType()), "pr Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
         util::GRError(pr_enactor.template Enact<Problem>(context, csr_problem, max_iter, max_grid_size), "pr Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
@@ -324,7 +331,7 @@ void RunTests(
         float elapsed = gpu_timer.ElapsedMillis();
 
         // Copy out results
-        util::GRError(csr_problem->Extract(h_rank), "PageRank Problem Data Extraction Failed", __FILE__, __LINE__);
+        util::GRError(csr_problem->Extract(h_rank, h_node_id), "PageRank Problem Data Extraction Failed", __FILE__, __LINE__);
 
         float total_pr = 0;
         for (int i = 0; i < graph.nodes; ++i)
@@ -340,6 +347,7 @@ void RunTests(
             printf("compute ref value\n");
             SimpleReferencePr(
                     graph,
+                    reference_node_id,
                     reference_check,
                     delta,
                     error,
@@ -354,7 +362,7 @@ void RunTests(
         }
         printf("\nFirst 40 labels of the GPU result."); 
         // Display Solution
-        DisplaySolution(h_rank, graph.nodes);
+        DisplaySolution(h_node_id, h_rank, graph.nodes);
 
         DisplayStats(
             *stats,
@@ -399,11 +407,13 @@ void RunTests(
     bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
     int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
+    VertexId            src                 = -1;
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("delta", delta);
     args.GetCmdLineArgument("error", error);
     args.GetCmdLineArgument("max-iter", max_iter);
+    args.GetCmdLineArgument("src", src);
 
     g_quick = args.CheckCmdLineFlag("quick");
     g_verbose = args.CheckCmdLineFlag("v");
@@ -411,6 +421,7 @@ void RunTests(
     if (instrumented) {
         RunTests<VertexId, Value, SizeT, true>(
                         graph,
+                        src,
                         delta,
                         error,
                         max_iter,
@@ -420,6 +431,7 @@ void RunTests(
     } else {
         RunTests<VertexId, Value, SizeT, false>(
                         graph,
+                        src,
                         delta,
                         error,
                         max_iter,
