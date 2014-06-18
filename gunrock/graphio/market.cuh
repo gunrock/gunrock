@@ -238,9 +238,12 @@ int BuildMarketGraph(char *mm_filename,
 		     bool reversed)
 {
   FILE *_file = fopen(output_file, "r");
-  if (_file) {
+  if (_file) 
+  {
     fclose(_file);
-    if (ReadCsrArrays<LOAD_VALUES>(output_file, csr_graph, undirected, reversed) != 0) return -1;
+    if (ReadCsrArrays<LOAD_VALUES>(output_file, csr_graph, undirected, reversed) != 0) { 
+      return -1; 
+    }
   }
   else {
     if (mm_filename == NULL) {
@@ -274,29 +277,31 @@ int BuildMarketGraph(char *mm_filename,
  *
  */
 template <bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
-int BuildMarketGraph(char *file_in, 
+int BuildMarketGraph(char *file_in,
 		     Csr<VertexId, Value, SizeT> &graph, 
 		     bool undirected, 
 		     bool reversed)
 {
-  
+  // length of file name plus suffix
+  unsigned int size = strlen(file_in) + 4; 
+
   if (undirected)
   {
-    char ud[200];
+    char ud[size];
     sprintf(ud, "%s_ud", file_in);
-    if (BuildMarketGraph<true>(file_in, ud, graph, true, false) != 0) { return -1; }
+    if (BuildMarketGraph<true>(file_in, ud, graph, true, false) != 0) { return 1; }
   }
   else if (!undirected && reversed)
   {
-    char rv[200];
+    char rv[size];
     sprintf(rv, "%s_rv", file_in);
-    if (BuildMarketGraph<true>(file_in, rv, graph, false, true) != 0) { return -1; }
+    if (BuildMarketGraph<true>(file_in, rv, graph, false, true) != 0) { return 1; }
   }
   else if (!undirected && !reversed)
   {
-    char nr[200];
+    char nr[size];
     sprintf(nr, "%s_nr", file_in);
-    if (BuildMarketGraph<true>(file_in, nr, graph, false, false) != 0) { return -1; }
+    if (BuildMarketGraph<true>(file_in, nr, graph, false, false) != 0) { return 1; }
   }
   else
   {
