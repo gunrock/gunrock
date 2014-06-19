@@ -34,7 +34,6 @@
 #include <gunrock/app/topk/topk_problem.cuh>
 
 // Operator includes
-#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
 
 using namespace gunrock;
@@ -75,29 +74,28 @@ void Usage()
  * @brief displays the top K results
  *
  */
-template<typename VertexId, typename Value, typename SizeT>
+template<typename VertexId, 
+	 typename Value, 
+	 typename SizeT>
 void DisplaySolution(VertexId *h_node_id, 
 		     Value    *h_degrees, 
 		     SizeT    num_nodes)
 {
+ 
+  // at most display first 100 results
+  if (num_nodes > 100) 
+  { 
+    num_nodes = 100; 
+  }
   printf("==> top %d centrality nodes:\n", num_nodes);
   for (SizeT i = 0; i < num_nodes; ++i)
   { 
     printf("%d %d\n", h_node_id[i], h_degrees[i]); 
   }
   printf("\n");
-  fflush(stdout);
-}
 
-/**
- * @brief Comparison for the Degree Centrality result
- *
- */
-int CompareResults()
-{
-  printf("====> Verifying results ...\n");
-  
-  return 0;
+  fflush(stdout);
+
 }
 
 /******************************************************************************
@@ -121,17 +119,19 @@ struct compare_second_only
   }
 };
 
-template<typename VertexId, typename Value, typename SizeT>
+template<typename VertexId, 
+	 typename Value, 
+	 typename SizeT>
 void SimpleReferenceTopK(const Csr<VertexId, Value, SizeT> &graph_n,
 			 const Csr<VertexId, Value, SizeT> &graph_r,
 			 VertexId *ref_node_id,
 			 Value    *ref_degrees,
 			 SizeT    top_nodes)
 {
+  
   printf("CPU reference test.\n");
   CpuTimer cpu_timer;
-  cpu_timer.Start();
-
+  
   // preparation
   Value    *ref_degrees_n = (Value*)malloc(sizeof(Value) * graph_n.nodes);
   Value    *ref_degrees_r = (Value*)malloc(sizeof(Value) * graph_r.nodes);
@@ -143,14 +143,17 @@ void SimpleReferenceTopK(const Csr<VertexId, Value, SizeT> &graph_n,
     ref_degrees_r[node] = graph_r.row_offsets[node+1] - graph_r.row_offsets[node];
   }
   
+  cpu_timer.Start();
+
   for (SizeT node = 0; node < graph_n.nodes; ++node)
   {
     ref_degrees_n[node] = ref_degrees_n[node] + ref_degrees_r[node];
     results.push_back( std::make_pair (node, ref_degrees_n[node]) );
   }
   
+  // pair sort according to second elements - degree centrality
   std::stable_sort(results.begin(), results.end(), compare_second_only());
-
+  
   for (SizeT itr = 0; itr < top_nodes; ++itr)
   {
     ref_node_id[itr] = results[itr].first;
@@ -160,7 +163,10 @@ void SimpleReferenceTopK(const Csr<VertexId, Value, SizeT> &graph_n,
   cpu_timer.Stop();
   float elapsed_cpu = cpu_timer.ElapsedMillis();
   printf("==> CPU Degree Centrality finished in %lf msec.\n", elapsed_cpu);
-
+  
+  // clean up if neccessary
+  if (ref_degrees_n) { free(ref_degrees_n); } 
+  if (ref_degrees_r) { free(ref_degrees_r); }
   results.clear();
   
 }
@@ -204,7 +210,10 @@ void RunTests(const Csr<VertexId, Value, SizeT> &graph,
   Problem *topk_problem = new Problem;
   
   // reset top_nodes if input k > total number of nodes
-  if (top_nodes > graph.nodes) { top_nodes = graph.nodes; }
+  if (top_nodes > graph.nodes) 
+  { 
+    top_nodes = graph.nodes; 
+  }
   
   // malloc host memory
   VertexId *h_node_id   = (VertexId*)malloc(sizeof(VertexId) * top_nodes);
@@ -228,11 +237,13 @@ void RunTests(const Csr<VertexId, Value, SizeT> &graph,
 		"TOPK Problem Data Reset Failed", __FILE__, __LINE__);
   
   gpu_timer.Start();
+  // launch topk enactor
   util::GRError(topk_enactor.template Enact<Problem>(context, 
 						     topk_problem, 
 						     top_nodes, 
 						     max_grid_size), 
 		"TOPK Problem Enact Failed", __FILE__, __LINE__);
+  
   gpu_timer.Stop();
   
   float elapsed_gpu = gpu_timer.ElapsedMillis();
@@ -245,18 +256,18 @@ void RunTests(const Csr<VertexId, Value, SizeT> &graph,
 		"TOPK Problem Data Extraction Failed", __FILE__, __LINE__);
   
   // display solution
-  //DisplaySolution(h_node_id, h_degrees, top_nodes);
+  DisplaySolution(h_node_id, h_degrees, top_nodes);
   
   // validation
   SimpleReferenceTopK(graph, graph_inv, ref_node_id, ref_degrees, top_nodes);
-
+  
   int error_num = CompareResults(h_node_id, ref_node_id, top_nodes, true);
   if (error_num > 0)
   {
     printf("INCOREECT! %d error(s) occured. \n", error_num);
   }
   printf("\n");
-
+  
   // cleanup if neccessary
   if (topk_problem) { delete topk_problem; }
   if (h_node_id)    {   free(h_node_id);   }
@@ -275,10 +286,9 @@ void RunTests(const Csr<VertexId, Value, SizeT> &graph,
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] args Reference to the command line arguments
  */
-template <
-  typename VertexId,
-  typename Value,
-  typename SizeT>
+template <typename VertexId,
+	  typename Value,
+	  typename SizeT>
 void RunTests(Csr<VertexId, Value, SizeT> &graph,
 	      Csr<VertexId, Value, SizeT> &graph_inv,
 	      CommandLineArgs		  &args,
@@ -294,7 +304,8 @@ void RunTests(Csr<VertexId, Value, SizeT> &graph,
   g_quick = args.CheckCmdLineFlag("quick");
   g_verbose = args.CheckCmdLineFlag("v");
   
-  if (instrumented) {
+  if (instrumented) 
+  {
     RunTests<VertexId, Value, SizeT, true>(graph,
 					   graph_inv,
 					   args,
@@ -303,7 +314,8 @@ void RunTests(Csr<VertexId, Value, SizeT> &graph,
 					   top_nodes,
 					   context);
   }
-  else {
+  else 
+  {
     RunTests<VertexId, Value, SizeT, false>(graph,
 					    graph_inv,
 					    args,
@@ -357,6 +369,7 @@ int main(int argc, char** argv)
   //
   if (graph_type == "market") 
   {
+
     // Matrix-market coordinate-formatted graph file
     
     typedef int VertexId;	// Use as the node identifier type
