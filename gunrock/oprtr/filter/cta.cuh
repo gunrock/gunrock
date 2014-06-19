@@ -35,14 +35,14 @@ namespace filter {
 /**
 * Templated texture reference for visited mask
 */
-template <typename VisitedMask>
+/*template <typename VisitedMask>
 struct BitmaskTex
 {
    static texture<VisitedMask, cudaTextureType1D, cudaReadModeElementType> ref;
 };
 template <typename VisitedMask>
 texture<VisitedMask, cudaTextureType1D, cudaReadModeElementType> BitmaskTex<VisitedMask>::ref;
-
+*/
 
 /**
  * @brief CTA tile-processing abstraction for the filter operator.

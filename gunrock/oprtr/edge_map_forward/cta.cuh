@@ -37,14 +37,14 @@ namespace edge_map_forward {
     /**
      * 1D texture setting for efficiently fetch data from graph_row_offsets and graph_column_indices
      */
-    template <typename SizeT>
+/*    template <typename SizeT>
         struct RowOffsetTex
         {
             static texture<SizeT, cudaTextureType1D, cudaReadModeElementType> ref;
         };
     template <typename SizeT>
         texture<SizeT, cudaTextureType1D, cudaReadModeElementType> RowOffsetTex<SizeT>::ref;
-
+*/
     /*template <typename VertexId>
       struct ColumnIndicesTex
       {

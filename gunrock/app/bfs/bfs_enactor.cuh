@@ -14,8 +14,11 @@
 
 #pragma once
 
+#include <gunrock/util/multithreading.cuh>
+#include <gunrock/util/multithread_utils.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
+#include <gunrock/util/scan/multi_scan.cuh>
 
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
@@ -31,211 +34,106 @@ namespace gunrock {
 namespace app {
 namespace bfs {
 
-/**
- * @brief BFS problem enactor class.
- *
- * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA clock-count statistics
- */
-template<bool INSTRUMENT>
-class BFSEnactor : public EnactorBase
-{
-    // Members
-    protected:
+    template <typename BFSProblem, bool INSTRUMENT> class BFSEnactor;
 
-    /**
-     * A pinned, mapped word that the traversal kernels will signal when done
-     */
-    volatile int        *done;
-    int                 *d_done;
-    cudaEvent_t         throttle_event;
-
-    // Methods
-    protected:
-
-    /**
-     * @brief Prepare the enactor for BFS kernel call. Must be called prior to each BFS search.
-     *
-     * @param[in] problem BFS Problem object which holds the graph data and BFS problem data to compute.
-     * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] filter_grid_size CTA occupancy for filter kernel call.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    template <typename ProblemData>
-    cudaError_t Setup(
-        ProblemData *problem)
+    class ThreadSlice
     {
-        typedef typename ProblemData::SizeT         SizeT;
-        typedef typename ProblemData::VertexId      VertexId;
-        
-        cudaError_t retval = cudaSuccess;
-
-        //initialize the host-mapped "done"
-        if (!done) {
-            int flags = cudaHostAllocMapped;
-
-            // Allocate pinned memory for done
-            if (retval = util::GRError(cudaHostAlloc((void**)&done, sizeof(int) * 1, flags),
-                        "PBFSEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
-
-            // Map done into GPU space
-            if (retval = util::GRError(cudaHostGetDevicePointer((void**)&d_done, (void*) done, 0),
-                        "PBFSEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
-
-            // Create throttle event
-            if (retval = util::GRError(cudaEventCreateWithFlags(&throttle_event, cudaEventDisableTiming),
-                        "PBFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
-        }
-
-        done[0] = -1;
-
-            //graph slice
-            typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
-            typename ProblemData::DataSlice *data_slice = problem->data_slices[0];
-
-        do {
-
-            // Bind row-offsets and bitmask texture
-            cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
-            gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref.channelDesc = row_offsets_desc;
-            if (retval = util::GRError(cudaBindTexture(
-                    0,
-                    gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
-                    graph_slice->d_row_offsets,
-                    (graph_slice->nodes + 1) * sizeof(SizeT)),
-                        "BFSEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
-
-            if (ProblemData::ENABLE_IDEMPOTENCE) {
-                int bytes = (graph_slice->nodes + 8 - 1) / 8;
-                cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
-                gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
-                if (retval = util::GRError(cudaBindTexture(
-                                0,
-                                gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref,
-                                data_slice->d_visited_mask,
-                                bytes),
-                            "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
-            }
-
-            /*cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
-            gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref.channelDesc = column_indices_desc;
-            if (retval = util::GRError(cudaBindTexture(
-                            0,
-                            gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref,
-                            graph_slice->d_column_indices,
-                            graph_slice->edges * sizeof(VertexId)),
-                        "BFSEnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;*/
-        } while (0);
-        
-        return retval;
-    }
-
     public:
+        int           thread_num;
+        int           init_size;
+        int           max_grid_size;
+        int           edge_map_grid_size;
+        int           vertex_map_grid_size;
+        CUTThread     thread_Id;
+        util::cpu_mt::CPUBarrier* cpu_barrier;
+        void*         problem;
+        void*         enactor;
 
-    /**
-     * @brief BFSEnactor constructor
-     */
-    BFSEnactor(bool DEBUG = false) :
-        EnactorBase(EDGE_FRONTIERS, DEBUG),
-        done(NULL),
-        d_done(NULL)
-    {}
+        ThreadSlice()
+        {
+            cpu_barrier = NULL;
+            problem     = NULL;
+            enactor     = NULL;
+        }
 
-    /**
-     * @brief BFSEnactor destructor
-     */
-    virtual ~BFSEnactor()
+        virtual ~ThreadSlice()
+        {
+            cpu_barrier = NULL;
+            problem     = NULL;
+            enactor     = NULL;
+        }
+    };
+
+    template <typename VertexId, typename SizeT, bool MARK_PREDECESSORS>
+    __global__ void Expand_Incoming (
+        const SizeT            num_elements,
+        const SizeT            num_associates,
+        const SizeT            incoming_offset,
+        const VertexId*  const keys_in,
+              VertexId*        keys_out,
+              VertexId**       associate_in,
+              VertexId**       associate_org)
     {
-        if (done) {
-            util::GRError(cudaFreeHost((void*)done),
-                "BFSEnactor cudaFreeHost done failed", __FILE__, __LINE__);
+        SizeT x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
+        if (x>=num_elements) return;
+        SizeT x2=incoming_offset+x;
+        VertexId key=keys_in[x2];
+        VertexId t=associate_in[0][x2];
 
-            util::GRError(cudaEventDestroy(throttle_event),
-                "BFSEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
+        if (atomicCAS(associate_org[0]+key, -1, t)== -1)
+        {
+        } else {
+           if (atomicMin(associate_org[0]+key, t)<t)
+           {
+               keys_out[x]=-1;
+               return;
+           }
+        }
+        keys_out[x]=key;
+        for (SizeT i=1;i<num_associates;i++)
+        {
+            associate_org[i][key]=associate_in[i][x2];
         }
     }
 
-    /**
-     * \addtogroup PublicInterface
-     * @{
-     */
-
-    /**
-     * @brief Obtain statistics about the last BFS search enacted.
-     *
-     * @param[out] total_queued Total queued elements in BFS kernel running.
-     * @param[out] search_depth Search depth of BFS algorithm.
-     * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
-     */
-    template <typename VertexId>
-    void GetStatistics(
-        long long &total_queued,
-        VertexId &search_depth,
-        double &avg_duty)
+    template <typename VertexId, typename SizeT>
+    __global__ void Update_Preds (
+        const SizeT     num_elements,
+        const VertexId* keys,
+        const VertexId* org_vertexs,
+              VertexId* preds)
     {
-        cudaThreadSynchronize();
-
-        total_queued = enactor_stats.total_queued;
-        search_depth = enactor_stats.iteration;
-
-        avg_duty = (enactor_stats.total_lifetimes >0) ?
-            double(enactor_stats.total_runtimes) / enactor_stats.total_lifetimes : 0.0;
+        SizeT x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
+        if (x>=num_elements) return;
+        SizeT t = keys[x];
+        preds[t]=org_vertexs[preds[t]];
     }
 
-    /** @} */
-
-    /**
-     * @brief Enacts a breadth-first search computing on the specified graph.
-     *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam FilterPolicy Kernel policy for filter.
-     * @tparam BFSProblem BFS Problem type.
-     *
-     * @param[in] problem BFSProblem object.
-     * @param[in] src Source node for BFS.
-     * @param[in] max_grid_size Max grid size for BFS kernel calls.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    template<
-        typename AdvanceKernelPolicy,
-        typename FilterKernelPolicy,
-        typename BFSProblem>
-    cudaError_t EnactBFS(
-    CudaContext                          &context,
-    BFSProblem                          *problem,
-    typename BFSProblem::VertexId       src,
-    int                                 max_grid_size = 0)
+    bool All_Done(volatile int **dones, cudaError_t *retvals,int num_gpus)
     {
-        typedef typename BFSProblem::SizeT      SizeT;
-        typedef typename BFSProblem::VertexId   VertexId;
+        for (int gpu=0;gpu<num_gpus;gpu++)
+        if (retvals[gpu]!=cudaSuccess)
+        {
+            printf("(CUDA error %d @ GPU %d: %s\n", retvals[gpu], gpu, cudaGetErrorString(retvals[gpu])); fflush(stdout);
+            return true;
+        }
 
-        typedef BFSFunctor<
-            VertexId,
-            SizeT,
-            VertexId,
-            BFSProblem> BfsFunctor;
+        for (int gpu=0;gpu<num_gpus;gpu++)
+        if (dones[gpu][0]!=0)
+        {
+            return false;
+        }
+        return true;
+    }
 
-        cudaError_t retval = cudaSuccess;
-
-        unsigned int    *d_scanned_edges = NULL; 
-        do {
-            // Determine grid size(s)
-            if (DEBUG) {
-                printf("Iteration, Edge map queue, Filter queue\n");
-                printf("0");
-            }
-
-
-            // Lazy initialization
-            if (retval = Setup(problem)) break;
-
-            if (retval = EnactorBase::Setup(problem,
-                                            max_grid_size,
-                                            AdvanceKernelPolicy::CTA_OCCUPANCY, 
-                                            FilterKernelPolicy::CTA_OCCUPANCY)) break;
-
-
+    template<
+        bool     INSTRUMENT,
+        typename EdgeMapPolicy,
+        typename VertexMapPolicy,
+        typename BFSProblem>
+    static CUT_THREADPROC BFSThread(
+        void * thread_data_)
+    {
             // Single-gpu graph slice
             typename BFSProblem::GraphSlice *graph_slice = problem->graph_slices[0];
             typename BFSProblem::DataSlice *data_slice = problem->d_data_slices[0];
@@ -404,6 +302,243 @@ class BFSEnactor : public EnactorBase
                 retval = util::GRError(cudaErrorInvalidConfiguration, "Frontier queue overflow. Please increase queue-sizing factor.",__FILE__, __LINE__);
                 break;
             }
+}
+
+/**
+ * @brief BFS problem enactor class.
+ *
+ * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA clock-count statistics
+ */
+template <typename BFSProblem, bool INSTRUMENT>
+class BFSEnactor : public EnactorBase
+{
+    typedef typename BFSProblem::SizeT    SizeT   ;
+    typedef typename BFSProblem::VertexId VertexId;
+    typedef typename BFSProblem::Value    Value   ;
+    // Members
+    protected:
+
+    /**
+     * A pinned, mapped word that the traversal kernels will signal when done
+     */
+    volatile int                      **dones;
+    int                               **d_dones;
+    util::Array1D<SizeT, cudaEvent_t> throttle_event;
+    util::Array1D<SizeT, cudaError_t> retvals;
+
+    // Methods
+    protected:
+
+    /**
+     * @brief Prepare the enactor for BFS kernel call. Must be called prior to each BFS search.
+     *
+     * @param[in] problem BFS Problem object which holds the graph data and BFS problem data to compute.
+     * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
+     * @param[in] filter_grid_size CTA occupancy for filter kernel call.
+     *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     */
+    cudaError_t Setup(
+        BFSProblem *problem)
+    {
+        cudaError_t retval = cudaSuccess;
+        this->num_gpus     = problem->num_gpus;
+        this->gpu_idx.SetPointer(problem->gpu_idx, num_gpus);
+
+        do {
+            dones   = new volatile int* [num_gpus];
+            d_dojes = new          int* [num_gpus];
+
+            for (int gpu=0;gpu<num_gpus;gpu++)
+            {
+                if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
+                //initialize the host-mapped "done"
+                int flags = cudaHostAllocMapped;
+
+                // Allocate pinned memory for done
+                if (retval = util::GRError(cudaHostAlloc((void**)&(dones[gpu]), sizeof(int) * 1, flags),
+                    "BFSEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
+
+                // Map done into GPU space
+                if (retval = util::GRError(cudaHostGetDevicePointer((void**)&(d_dones[gpu]), (void*) dones[gpu], 0),
+                    "BFSEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
+
+                // Create throttle event
+                if (retval = util::GRError(cudaEventCreateWithFlags(&throttle_events[gpu], cudaEventDisableTiming),
+                    "BFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
+                
+                dones  [gpu][0] = -1;
+                retvals[gpu]    = cudaSuccess;
+            }
+
+            /*//graph slice
+            typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
+            typename ProblemData::DataSlice *data_slice = problem->data_slices[0];
+
+        do {
+
+            // Bind row-offsets and bitmask texture
+            cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
+            gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref.channelDesc = row_offsets_desc;
+            if (retval = util::GRError(cudaBindTexture(
+                    0,
+                    gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
+                    graph_slice->d_row_offsets,
+                    (graph_slice->nodes + 1) * sizeof(SizeT)),
+                        "BFSEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
+
+            if (ProblemData::ENABLE_IDEMPOTENCE) {
+                int bytes = (graph_slice->nodes + 8 - 1) / 8;
+                cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
+                gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
+                if (retval = util::GRError(cudaBindTexture(
+                                0,
+                                gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref,
+                                data_slice->d_visited_mask,
+                                bytes),
+                            "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
+            }*/
+
+            /*cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
+            gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref.channelDesc = column_indices_desc;
+            if (retval = util::GRError(cudaBindTexture(
+                            0,
+                            gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref,
+                            graph_slice->d_column_indices,
+                            graph_slice->edges * sizeof(VertexId)),
+                        "BFSEnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;*/
+        } while (0);
+        
+        return retval;
+    }
+
+    public:
+
+    /**
+     * @brief BFSEnactor constructor
+     */
+    BFSEnactor(bool DEBUG = false) :
+        EnactorBase(EDGE_FRONTIERS, DEBUG),
+        dones(NULL),
+        d_dones(NULL)
+    {}
+
+    /**
+     * @brief BFSEnactor destructor
+     */
+    virtual ~BFSEnactor()
+    {
+        if (All_Done(dones,retvals.GetPointer(),num_gpus)) {
+            for (int gpu=0;gpu<num_gpus;gpu++)
+            {   
+                if (num_gpus !=1)
+                    util::GRError(cudaSetDevice(gpu_idx[gpu]),
+                        "BFSEnactor cudaSetDevice gpu failed", __FILE__, __LINE__);
+
+                util::GRError(cudaFreeHost((void*)(dones[gpu])),
+                    "BFSEnactor cudaFreeHost done failed", __FILE__, __LINE__);
+
+                util::GRError(cudaEventDestroy(throttle_events[gpu]),
+                    "BFSEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
+            }   
+            delete[] dones;          dones           = NULL;
+            delete[] throttle_events;throttle_events = NULL; 
+        }
+    }
+
+    /**
+     * \addtogroup PublicInterface
+     * @{
+     */
+
+    /**
+     * @brief Obtain statistics about the last BFS search enacted.
+     *
+     * @param[out] total_queued Total queued elements in BFS kernel running.
+     * @param[out] search_depth Search depth of BFS algorithm.
+     * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
+     */
+    template <typename VertexId>
+    void GetStatistics(
+        long long &total_queued,
+        VertexId &search_depth,
+        double &avg_duty)
+    {
+        unsigned long long total_lifetimes=0;
+        unsigned long long total_runtimes =0;
+        total_queued = 0;
+        search_depth = 0;
+        for (int gpu=0;gpu<num_gpus;gpu++)
+        {
+            if (num_gpus!=1)
+                util::GRError(cudaSetDevice(gpu_idx[gpu]),
+                    "BFSEnactor cudaSetDevice gpu failed", __FILE__, __LINE__);
+            cudaThreadSynchronize();
+
+            total_queued += this->total_queued[gpu];
+            if (this->iterations[gpu] > search_depth) search_depth = this->iterations[gpu];
+            total_lifetimes += this->total_lifetimes[gpu];
+            total_runtimes += this->total_runtimes[gpu];
+        }
+        avg_duty = (total_lifetimes >0) ?
+            double(total_runtimes) / total_lifetimes : 0.0;
+    }
+
+    /** @} */
+
+    /**
+     * @brief Enacts a breadth-first search computing on the specified graph.
+     *
+     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
+     * @tparam FilterPolicy Kernel policy for filter.
+     * @tparam BFSProblem BFS Problem type.
+     *
+     * @param[in] problem BFSProblem object.
+     * @param[in] src Source node for BFS.
+     * @param[in] max_grid_size Max grid size for BFS kernel calls.
+     *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     */
+    template<
+        typename AdvanceKernelPolicy,
+        typename FilterKernelPolicy,
+        typename BFSProblem>
+    cudaError_t EnactBFS(
+    CudaContext                          &context,
+    BFSProblem                          *problem,
+    typename BFSProblem::VertexId       src,
+    int                                 max_grid_size = 0)
+    {
+        typedef typename BFSProblem::SizeT      SizeT;
+        typedef typename BFSProblem::VertexId   VertexId;
+
+        typedef BFSFunctor<
+            VertexId,
+            SizeT,
+            VertexId,
+            BFSProblem> BfsFunctor;
+
+        cudaError_t retval = cudaSuccess;
+
+        unsigned int    *d_scanned_edges = NULL; 
+        do {
+            // Determine grid size(s)
+            if (DEBUG) {
+                printf("Iteration, Edge map queue, Filter queue\n");
+                printf("0");
+            }
+
+
+            // Lazy initialization
+            if (retval = Setup(problem)) break;
+
+            if (retval = EnactorBase::Setup(problem,
+                                            max_grid_size,
+                                            AdvanceKernelPolicy::CTA_OCCUPANCY, 
+                                            FilterKernelPolicy::CTA_OCCUPANCY)) break;
+
+
+            
             
         } while(0);
 

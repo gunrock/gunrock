@@ -229,6 +229,10 @@ void DeviceInit(CommandLineArgs &args)
     cudaSetDevice(devs[0]);
 }
 
+cudaError_t SetDevice(int dev)
+{
+    return util::GRError(cudaSetDevice(dev), "cudaSetDevice failed.", __FILE__, __LINE__);
+}
 
 /******************************************************************************
  * Templated routines for printing keys/values to the console 

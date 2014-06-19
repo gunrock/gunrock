@@ -18,7 +18,7 @@
 #include <gunrock/util/cta_work_progress.cuh>
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/test_utils.cuh>
-
+#include <gunrock/util/array_utils.cuh>
 #include <gunrock/app/problem_base.cuh>
 
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
@@ -33,8 +33,8 @@ namespace app {
 struct EnactorStats
 {
     long long           iteration;
-    unsigned int        num_gpus;
-    unsigned int        gpu_id;
+    int                 num_gpus;
+    int                 gpu_idx;
 
     unsigned long long  total_lifetimes;
     unsigned long long  total_runtimes;
@@ -46,9 +46,10 @@ struct EnactorStats
     util::KernelRuntimeStatsLifetime advance_kernel_stats;
     util::KernelRuntimeStatsLifetime filter_kernel_stats;
 
-    unsigned int        *d_node_locks;
-    unsigned int        *d_node_locks_out;
-
+    //unsigned int        *d_node_locks;
+    //unsigned int        *d_node_locks_out;
+    util::Array1D<int, unsigned int> node_locks;
+    util::Array1D<int, unsigned int> node_locks_out;
 };
 
 struct FrontierAttribute
@@ -68,17 +69,23 @@ class EnactorBase
 {
 protected:  
 
+    int                             num_gpus;
+    int                             *gpu_idx;
     //Device properties
-    util::CudaProperties            cuda_props;
-    
+    //util::CudaProperties            cuda_props;
+    util::CudaProperties            *cuda_props;
+
     // Queue size counters and accompanying functionality
-    util::CtaWorkProgressLifetime   work_progress;
+    //util::CtaWorkProgressLifetime   work_progress;
+    util::CtaWorkProgressLifetime   *work_progress;
 
     FrontierType                    frontier_type;
 
-    EnactorStats                    enactor_stats;
+    //EnactorStats                    enactor_stats;
+    EnactorStats                    *enactor_stats;
 
-    FrontierAttribute               frontier_attribute;
+    //FrontierAttribute               frontier_attribute;
+    FrontierAttribute               *frontier_attribute;
 
 public:
 
@@ -95,22 +102,51 @@ protected:
      * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
      * @param[in] DEBUG If set, will collect kernel running stats and display the running info.
      */
-    EnactorBase(FrontierType frontier_type, bool DEBUG) :
+    EnactorBase(FrontierType frontier_type, bool DEBUG,
+                int num_gpus, int* gpu_idx) :
         frontier_type(frontier_type),
         DEBUG(DEBUG)
     {
-        // Setup work progress (only needs doing once since we maintain
-        // it in our kernel code)
-        work_progress.Setup();
-        enactor_stats.d_node_locks = NULL;
-        enactor_stats.d_node_locks_out = NULL;
+        this->num_gpus    = num_gpus;
+        this->gpu_idx     = gpu_idx;
+        cuda_props        = new util::CudaProperties          [num_gpus];
+        work_progress     = new util::CtaWorkProgressLifetime [num_gpus];
+        enactor_stats     = new EnactorStats                  [num_gpus];
+        frontir_attribute = new FrontierAttribute             [num_gpus];
+
+        for (int gpu=0;gpu<num_gpus;gpu++)
+        {
+            if (util::SetDevice(gpu_idx[gpu])) return;
+            // Setup work progress (only needs doing once since we maintain
+            // it in our kernel code)
+            work_progress[gpu].Setup();
+            if (util::GRError(cudaGetDeviceProperties(&cuda_props[gpu],gpu_idx[gpu]), 
+                             "cudaGetDeviceProperties failed.", __FILE__, __LINE__)) return;
+            enactor_stats[gpu].num_gpus = num_gpus;
+            enactor_stats[gpu].gpu_idx  = gpu_idx[gpu];
+            enactor_stats[gpu].node_locks    .SetName("node_locks"    );
+            enactor_stats[gpu].node_locks_out.SetName("node_locks_out");
+            //enactor_stats.d_node_locks = NULL;
+            //enactor_stats.d_node_locks_out = NULL;
+        }
     }
 
 
     virtual ~EnactorBase()
     {
-        if (enactor_stats.d_node_locks) util::GRError(cudaFree(enactor_stats.d_node_locks), "EnactorBase cudaFree d_node_locks failed", __FILE__, __LINE__);
-        if (enactor_stats.d_node_locks_out) util::GRError(cudaFree(enactor_stats.d_node_locks_out), "EnactorBase cudaFree d_node_locks_out failed", __FILE__, __LINE__);
+        for (int gpu=0;gpu<num_gpus;gpu++)
+        {
+            if (util::SetDevice(gpu_idx[gpu])) return;
+            enactor_stats[gpu].node_locks    .Release();
+            enactor_stats[gpu].node_locks_out.Release();
+            if (work_progress[gpu].HostReset()) return;
+            //if (enactor_stats.d_node_locks) util::GRError(cudaFree(enactor_stats.d_node_locks), "EnactorBase cudaFree d_node_locks failed", __FILE__, __LINE__);
+            //if (enactor_stats.d_node_locks_out) util::GRError(cudaFree(enactor_stats.d_node_locks_out), "EnactorBase cudaFree d_node_locks_out failed", __FILE__, __LINE__);
+        }
+        delete[] work_progress     ; work_progress      = NULL;
+        delete[] cuda_props        ; cuda_props         = NULL;
+        delete[] enactor_stats     ; enactor_stats      = NULL;
+        delete[] frontier_attribute; frontier_attribute = NULL;
     }
 
     template <typename ProblemData>
@@ -123,31 +159,36 @@ protected:
     {
         cudaError_t retval = cudaSuccess;
 
-        //initialize runtime stats
-        enactor_stats.advance_grid_size = MaxGridSize(advance_occupancy, max_grid_size);
-        enactor_stats.filter_grid_size  = MaxGridSize(filter_occupancy, max_grid_size);
+        for (int gpu=0;gpu<num_gpus;gpu++)
+        {
+            if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
+            //initialize runtime stats
+            enactor_stats[gpu].advance_grid_size = MaxGridSize(gpu, advance_occupancy, max_grid_size);
+            enactor_stats[gpu].filter_grid_size  = MaxGridSize(gpu, filter_occupancy, max_grid_size);
 
-        if (retval = enactor_stats.advance_kernel_stats.Setup(enactor_stats.advance_grid_size)) return retval;
-        if (retval = enactor_stats.filter_kernel_stats.Setup(enactor_stats.filter_grid_size)) return retval;
+            if (retval = enactor_stats[gpu].advance_kernel_stats.Setup(enactor_stats.advance_grid_size)) return retval;
+            if (retval = enactor_stats[gpu]. filter_kernel_stats.Setup(enactor_stats. filter_grid_size)) return retval;
 
-        enactor_stats.iteration             = 0;
-        enactor_stats.total_runtimes        = 0;
-        enactor_stats.total_lifetimes       = 0;
-        enactor_stats.total_queued          = 0;
+            enactor_stats[gpu].iteration             = 0;
+            enactor_stats[gpu].total_runtimes        = 0;
+            enactor_stats[gpu].total_lifetimes       = 0;
+            enactor_stats[gpu].total_queued          = 0;
 
-        enactor_stats.num_gpus              = 1;
-        enactor_stats.gpu_id                = 0;
+            //enactor_stats.num_gpus              = 1;
+            //enactor_stats.gpu_id                = 0;
 
-        if (retval = util::GRError(cudaMalloc(
-                            (void**)&enactor_stats.d_node_locks,
-                            node_lock_size * sizeof(unsigned int)),
-                        "EnactorBase cudaMalloc d_node_locks failed", __FILE__, __LINE__)) return retval;
+            //if (retval = util::GRError(cudaMalloc(
+            //                (void**)&enactor_stats.d_node_locks,
+            //                node_lock_size * sizeof(unsigned int)),
+            //            "EnactorBase cudaMalloc d_node_locks failed", __FILE__, __LINE__)) return retval;
+            if (retval = enactor_stats[gpu].node_locks.Allocate(node_lock_size,util::DEVICE)) return retval;
 
-            if (retval = util::GRError(cudaMalloc(
-                            (void**)&enactor_stats.d_node_locks_out,
-                            node_lock_size * sizeof(unsigned int)),
-                        "EnactorBase cudaMalloc d_node_locks_out failed", __FILE__, __LINE__)) return retval;
-
+            //if (retval = util::GRError(cudaMalloc(
+            //                (void**)&enactor_stats.d_node_locks_out,
+            //                node_lock_size * sizeof(unsigned int)),
+            //            "EnactorBase cudaMalloc d_node_locks_out failed", __FILE__, __LINE__)) return retval;
+            if (retval = enactor_stats[gpu].node_noces_out.Allocate(node_lock_size, util::DEVICE) return retval;
+        }
         return retval;
     }
 
@@ -159,10 +200,10 @@ protected:
      *
      * \return The maximum number of threadblocks this enactor class can launch.
      */
-    int MaxGridSize(int cta_occupancy, int max_grid_size = 0)
+    int MaxGridSize(int gpu, int cta_occupancy, int max_grid_size = 0)
     {
         if (max_grid_size <= 0) {
-            max_grid_size = this->cuda_props.device_props.multiProcessorCount * cta_occupancy;
+            max_grid_size = this->cuda_props[gpu].device_props.multiProcessorCount * cta_occupancy;
         }
 
         return max_grid_size;
