@@ -132,24 +132,18 @@ public:
     int                 kernel_ptx_version;
     
 public:
-    
-    // Default constructor
-    CudaProperties() 
+
+    CudaProperties()        {           }
+    CudaProperties(int gpu) {Setup(gpu);}
+    void Setup()
     {
-        // Get current device properties 
         int current_device;
         cudaGetDevice(&current_device);
-        cudaGetDeviceProperties(&device_props, current_device);
-        device_sm_version = device_props.major * 100 + device_props.minor * 10;
-    
-        // Get SM version of compiled kernel assemblies
-        cudaFuncAttributes flush_kernel_attrs;
-        cudaFuncGetAttributes(&flush_kernel_attrs, FlushKernel<void>);
-        kernel_ptx_version = flush_kernel_attrs.ptxVersion * 10;
+        Setup(current_device);
     }
 
     // Constructor
-    CudaProperties(int gpu)
+    void Setup(int gpu)
     {
         // Get current device properties
         cudaGetDeviceProperties(&device_props, gpu);

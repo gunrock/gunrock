@@ -146,7 +146,7 @@ struct DoubleBuffer : MultipleBuffer<2, SizeType, KeyType, ValueType, TARGET>
 template <
     typename SizeType,
     typename KeyType,
-    typename ValueType = util::NullType
+    typename ValueType = util::NullType,
     unsigned int TARGET = util::DEVICE>
 struct TripleBuffer : MultipleBuffer<3, SizeType, KeyType, ValueType, TARGET>
 {

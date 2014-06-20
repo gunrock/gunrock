@@ -220,7 +220,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[in] graph Reference to the CSR graph object we process on.
      * @param[in] num_gpus Number of the GPUs used.
      */
-    BFSProblem(bool        stream_from_host,       // Only meaningful for single-GPU
+    /*BFSProblem(bool        stream_from_host,       // Only meaningful for single-GPU
                const Csr<VertexId, Value, SizeT> &graph,
                int         num_gpus,
                int         *gpu_idx,
@@ -232,7 +232,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             num_gpus,
             gpu_idx,
             partition_method);
-    }
+    }*/
 
     /**
      * @brief BFSProblem default destructor
@@ -240,7 +240,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
     ~BFSProblem()
     {
         if (data_slices==NULL) return;
-        for (int i = 0; i < num_gpus; ++i)
+        for (int i = 0; i < this->num_gpus; ++i)
         {
             data_slices[i].Release();
         }
@@ -322,11 +322,14 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
     cudaError_t Init(
             bool        stream_from_host,       // Only meaningful for single-GPU
             const Csr<VertexId, Value, SizeT> &graph,
-            int         _num_gpus)
+            Csr<VertexId, Value, SizeT> *inversgraph = NULL,
+            int         num_gpus = 1,
+            int*        gpu_idx  = NULL,
+            std::string partition_method ="random")
     {
         ProblemBase<VertexId, SizeT,Value,_USE_DOUBLE_BUFFER>::Init(
             stream_from_host,
-            graph,
+            &graph,
             num_gpus,
             gpu_idx,
             partition_method);

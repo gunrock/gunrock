@@ -311,7 +311,7 @@ void RunTests(
     int         max_grid_size,
     int         num_gpus,
     double      max_queue_sizing,
-    CudaContext *context,
+    ContextPtr *context,
     std::string partition_method,
     int         *gpu_idx)
 {
@@ -339,7 +339,7 @@ void RunTests(
 
     // Allocate BFS enactor map
     BFSEnactor<Problem, INSTRUMENT>* bfs_enactor
-         = new BFSEnactor<Problem, INSTRUMENT>(g_verbose);
+         = new BFSEnactor<Problem, INSTRUMENT>(g_verbose, num_gpus, gpu_idx);
 
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
@@ -443,8 +443,8 @@ void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
     CommandLineArgs             &args,
     int                         num_gpus,
-    int                         *gpu_idx;
-    CudaContext                 *context)
+    ContextPtr                  *context,
+    int                         *gpu_idx)
 {
     VertexId            src                 = -1;           // Use whatever the specified graph-type's default is
     std::string         src_str;
@@ -455,7 +455,7 @@ void RunTests(
     //int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
     double              max_queue_sizing    = 1.0;          // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
     std::string         partition_method    = "random";
-    int*                gpu_idx             = NULL;
+    //int*                gpu_idx             = NULL;
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("src", src_str);
@@ -586,7 +586,7 @@ int main( int argc, char** argv)
     CommandLineArgs args(argc, argv);
     int       num_gpus = 0;
     int       *gpu_idx = NULL;
-    ContexPtr *context = NULL;
+    ContextPtr *context = NULL;
 
     if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
         Usage();

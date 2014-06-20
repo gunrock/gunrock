@@ -107,12 +107,12 @@ protected:
         frontier_type(frontier_type),
         DEBUG(DEBUG)
     {
-        this->num_gpus    = num_gpus;
-        this->gpu_idx     = gpu_idx;
-        cuda_props        = new util::CudaProperties          [num_gpus];
-        work_progress     = new util::CtaWorkProgressLifetime [num_gpus];
-        enactor_stats     = new EnactorStats                  [num_gpus];
-        frontir_attribute = new FrontierAttribute             [num_gpus];
+        this->num_gpus     = num_gpus;
+        this->gpu_idx      = gpu_idx;
+        cuda_props         = new util::CudaProperties          [num_gpus];
+        work_progress      = new util::CtaWorkProgressLifetime [num_gpus];
+        enactor_stats      = new EnactorStats                  [num_gpus];
+        frontier_attribute = new FrontierAttribute             [num_gpus];
 
         for (int gpu=0;gpu<num_gpus;gpu++)
         {
@@ -120,8 +120,7 @@ protected:
             // Setup work progress (only needs doing once since we maintain
             // it in our kernel code)
             work_progress[gpu].Setup();
-            if (util::GRError(cudaGetDeviceProperties(&cuda_props[gpu],gpu_idx[gpu]), 
-                             "cudaGetDeviceProperties failed.", __FILE__, __LINE__)) return;
+            cuda_props   [gpu].Setup(gpu_idx[gpu]);
             enactor_stats[gpu].num_gpus = num_gpus;
             enactor_stats[gpu].gpu_idx  = gpu_idx[gpu];
             enactor_stats[gpu].node_locks    .SetName("node_locks"    );

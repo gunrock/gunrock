@@ -152,8 +152,8 @@ struct ProblemBase
             out_offset      .Release();
 
             for (int i = 0; i < 2; ++i) {
-                frontier_queue.keys  [i].Release();
-                frontier_queue.values[i].Release();
+                frontier_queues.keys  [i].Release();
+                frontier_queues.values[i].Release();
             }
 
             // Destroy stream
@@ -177,6 +177,7 @@ struct ProblemBase
             bool                       stream_from_host,
             int                        num_gpus,
             Csr<VertexId,Value,SizeT>* graph,
+            Csr<VertexId,Value,SizeT>* inverstgraph,
             int*                       partition_table,
             VertexId*                  convertion_table,
             VertexId*                  original_vertex,
@@ -205,7 +206,7 @@ struct ProblemBase
                 if (retval = this->column_indices.Allocate(edges     ,util::DEVICE)) break;
                 if (retval = this->column_indices.Move    (util::HOST,util::DEVICE)) break;
               
-                if (column_offsets !=NULL)
+                /*if (graph->column_offsets !=NULL)
                 {
                     // Allocate and initalize column_offsets
                     this->column_offsets.SetPointer(column_offsets, nodes+1);
@@ -213,13 +214,13 @@ struct ProblemBase
                     if (retval = this->column_offsets.Move    (util::HOST, util::DEVICE)) break; 
                 }
 
-                if (row_indices !=NULL)
+                if (graph->row_indices !=NULL)
                 {
                     // Allocate and initalize row_indices
                     this->row_indices.SetPointer(row_indices, edges);
                     if (retval = this->row_indices.Allocate(edges     , util::DEVICE)) break;
                     if (retval = this->row_indices.Move    (util::HOST, util::DEVICE)) break;
-                }
+                }*/
 
                 // For multi-GPU cases
                 if (num_gpus > 1)
@@ -346,7 +347,7 @@ struct ProblemBase
         sub_graphs       (NULL),
         partitioner      (NULL),
         partition_tables (NULL),
-        Convertion_tables(NULL),
+        convertion_tables(NULL),
         original_vertexes(NULL),
         in_offsets       (NULL),
         out_offsets      (NULL)
@@ -444,7 +445,8 @@ struct ProblemBase
         //SizeT       edges,
         //SizeT       *h_row_offsets,
         //VertexId    *h_column_indices,
-        Csr<VertexId, Value, SizeT> &graph,
+        Csr<VertexId, Value, SizeT> *graph,
+        Csr<VertexId, Value, SizeT> *inverse_graph = NULL,
         //SizeT       *column_offsets = NULL,
         //VertexId    *row_indices    = NULL,
         int         num_gpus          = 1,
@@ -471,9 +473,9 @@ struct ProblemBase
             if (num_gpus >1)
             {
                 if (partition_method=="random")
-                    partitioner=new rp::RandomPartitioner<VertexId, SizeT, Value>(graph,num_gpus);
+                    partitioner=new rp::RandomPartitioner<VertexId, SizeT, Value>(*graph,num_gpus);
                 else if (partition_method=="metis")
-                    partitioner=new metisp::MetisPartitioner<VertexId, SizeT, Value>(graph,num_gpus);
+                    partitioner=new metisp::MetisPartitioner<VertexId, SizeT, Value>(*graph,num_gpus);
                 else util::GRError("partition_method invalid", __FILE__,__LINE__);
                 printf("partition begin.\n");fflush(stdout);
                 retval = partitioner->Partition(
@@ -486,7 +488,7 @@ struct ProblemBase
                 printf("partition end.\n");fflush(stdout);
                 if (retval) break;
             } else {
-                sub_graphs=&graph;
+                sub_graphs=graph;
             }
 
             for (int gpu=0;gpu<num_gpus;gpu++)
@@ -498,6 +500,7 @@ struct ProblemBase
                         stream_from_host,
                         num_gpus,
                         &(sub_graphs[gpu]),
+                        NULL,
                         partition_tables [gpu+1],
                         convertion_tables[gpu+1],
                         original_vertexes[gpu],
@@ -507,6 +510,7 @@ struct ProblemBase
                         stream_from_host,
                         num_gpus,
                         &(sub_graphs[gpu]),
+                        NULL,
                         NULL,
                         NULL,
                         NULL,

@@ -41,9 +41,9 @@ namespace bfs {
     public:
         int           thread_num;
         int           init_size;
-        int           max_grid_size;
-        int           edge_map_grid_size;
-        int           vertex_map_grid_size;
+        //int           max_grid_size;
+        //int           edge_map_grid_size;
+        //int           vertex_map_grid_size;
         CUTThread     thread_Id;
         util::cpu_mt::CPUBarrier* cpu_barrier;
         void*         problem;
@@ -134,6 +134,8 @@ namespace bfs {
     static CUT_THREADPROC BFSThread(
         void * thread_data_)
     {
+            
+        /*unsigned int    *d_scanned_edges = NULL; 
             // Single-gpu graph slice
             typename BFSProblem::GraphSlice *graph_slice = problem->graph_slices[0];
             typename BFSProblem::DataSlice *data_slice = problem->d_data_slices[0];
@@ -180,7 +182,7 @@ namespace bfs {
                     graph_slice->frontier_elements[frontier_attribute.selector^1],
                     this->work_progress,
                     context,
-                    gunrock::oprtr::advance::V2V);
+                    gunrock::oprtr::advance::V2V);*/
 
 
                 /*gunrock::oprtr::edge_map_forward::Kernel<typename AdvanceKernelPolicy::THREAD_WARP_CTA_FORWARD, BFSProblem, BfsFunctor>
@@ -203,6 +205,7 @@ namespace bfs {
                     gunrock::oprtr::advance::V2V);*/
  
 
+                /*
                 // Only need to reset queue for once
                 if (frontier_attribute.queue_reset)
                     frontier_attribute.queue_reset = false;
@@ -302,6 +305,7 @@ namespace bfs {
                 retval = util::GRError(cudaErrorInvalidConfiguration, "Frontier queue overflow. Please increase queue-sizing factor.",__FILE__, __LINE__);
                 break;
             }
+        if (d_scanned_edges) cudaFree(d_scanned_edges);*/
 }
 
 /**
@@ -417,8 +421,8 @@ class BFSEnactor : public EnactorBase
     /**
      * @brief BFSEnactor constructor
      */
-    BFSEnactor(bool DEBUG = false) :
-        EnactorBase(EDGE_FRONTIERS, DEBUG),
+    BFSEnactor(bool DEBUG = false, int num_gpus = 1, int* gpu_idx = NULL) :
+        EnactorBase(EDGE_FRONTIERS, DEBUG, num_gpus, gpu_idx),
         dones(NULL),
         d_dones(NULL)
     {}
@@ -438,11 +442,13 @@ class BFSEnactor : public EnactorBase
                 util::GRError(cudaFreeHost((void*)(dones[gpu])),
                     "BFSEnactor cudaFreeHost done failed", __FILE__, __LINE__);
 
-                util::GRError(cudaEventDestroy(throttle_events[gpu]),
+                util::GRError(cudaEventDestroy(throttle_event[gpu]),
                     "BFSEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
             }   
             delete[] dones;          dones           = NULL;
-            delete[] throttle_events;throttle_events = NULL; 
+            throttle_event.Release();
+            retvals       .Release();
+            //delete[] throttle_event ;throttle_event  = NULL; 
         }
     }
 
@@ -501,33 +507,33 @@ class BFSEnactor : public EnactorBase
      */
     template<
         typename AdvanceKernelPolicy,
-        typename FilterKernelPolicy,
-        typename BFSProblem>
+        typename FilterKernelPolicy>
     cudaError_t EnactBFS(
-    CudaContext                          &context,
-    BFSProblem                          *problem,
-    typename BFSProblem::VertexId       src,
-    int                                 max_grid_size = 0)
+    CudaContext *context,
+    BFSProblem  *problem,
+    VertexId    src,
+    int         max_grid_size = 0)
     {
-        typedef typename BFSProblem::SizeT      SizeT;
+        /*typedef typename BFSProblem::SizeT      SizeT;
         typedef typename BFSProblem::VertexId   VertexId;
 
         typedef BFSFunctor<
             VertexId,
             SizeT,
             VertexId,
-            BFSProblem> BfsFunctor;
+            BFSProblem> BfsFunctor;*/
 
-        cudaError_t retval = cudaSuccess;
+        cudaError_t              retval         = cudaSuccess;
+        util::cpu_mt::CPUBarrier cpu_barrier    = util::cpu_mt::CreateBarrier(num_gpus);
+        ThreadSlice              *thread_slices = new ThreadSlice [num_gpus];
+        CUTThread                *thread_Ids    = new CUTThread   [num_gpus];
 
-        unsigned int    *d_scanned_edges = NULL; 
         do {
             // Determine grid size(s)
             if (DEBUG) {
                 printf("Iteration, Edge map queue, Filter queue\n");
                 printf("0");
             }
-
 
             // Lazy initialization
             if (retval = Setup(problem)) break;
@@ -537,14 +543,31 @@ class BFSEnactor : public EnactorBase
                                             AdvanceKernelPolicy::CTA_OCCUPANCY, 
                                             FilterKernelPolicy::CTA_OCCUPANCY)) break;
 
+            for (int gpu=0;gpu<num_gpus;gpu++)
+            {
+                thread_slices[gpu].thread_num    = gpu;
+                thread_slices[gpu].problem       = (void*)problem;
+                thread_slices[gpu].enactor       = (void*)this;
+                thread_slices[gpu].cpu_barrier   = &cpu_barrier;
+                if ((num_gpus ==1) || (gpu==problem->partition_tables[0][src]))
+                     thread_slices[gpu].init_size=1;
+                else thread_slices[gpu].init_size=0;
+                thread_slices[gpu].thread_Id = cutStartThread(
+                    (CUT_THREADROUTINE)&(BFSThread<INSTRUMENT,AdvanceKernelPolicy,FilterKernelPolicy,BFSProblem>),
+                    (void*)&(thread_slices[gpu]));
+                thread_Ids[gpu] = thread_slices[gpu].thread_Id;
+            }
 
+            cutWaitForThreads(thread_Ids, num_gpus);
+            util::cpu_mt::DestoryBarrier(&cpu_barrier);
             
-            
+            for (int gpu=0;gpu<num_gpus;gpu++)
+            if (this->retvals[gpu]!=cudaSuccess) {retval=this->retvals[gpu];break;}
         } while(0);
 
-        if (d_scanned_edges) cudaFree(d_scanned_edges);
-
         if (DEBUG) printf("\nGPU BFS Done.\n");
+        delete[] thread_Ids   ; thread_Ids    = NULL;
+        delete[] thread_slices; thread_slices = NULL;
         return retval;
     }
 
@@ -564,12 +587,11 @@ class BFSEnactor : public EnactorBase
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
-    template <typename BFSProblem>
     cudaError_t Enact(
-        CudaContext                     &context,
-        BFSProblem                      *problem,
-        typename BFSProblem::VertexId    src,
-        int                             max_grid_size = 0)
+        CudaContext *context,
+        BFSProblem  *problem,
+        VertexId    src,
+        int         max_grid_size = 0)
     {
         if (BFSProblem::ENABLE_IDEMPOTENCE) {
             if (this->cuda_props.device_sm_version >= 300) {
@@ -605,7 +627,7 @@ class BFSEnactor : public EnactorBase
                     gunrock::oprtr::advance::LB>
                         AdvanceKernelPolicy;
 
-                return EnactBFS<AdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(
+                return EnactBFS<AdvanceKernelPolicy, FilterKernelPolicy>(
                         context, problem, src, max_grid_size);
             }
         } else {
@@ -642,7 +664,7 @@ class BFSEnactor : public EnactorBase
                     gunrock::oprtr::advance::LB>
                         AdvanceKernelPolicy;
 
-                return EnactBFS<AdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(
+                return EnactBFS<AdvanceKernelPolicy, FilterKernelPolicy>(
                         context, problem, src, max_grid_size);
             }
         }
