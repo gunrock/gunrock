@@ -7,9 +7,9 @@
 
 /**
  * @file
- * dc_enactor.cuh
+ * topk_enactor.cuh
  *
- * @brief DC Problem Enactor
+ * @brief TOPK Problem Enactor
  */
 
 #pragma once
@@ -24,8 +24,8 @@
 #include <gunrock/oprtr/filter/kernel_policy.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
-#include <gunrock/app/dc/dc_problem.cuh>
-#include <gunrock/app/dc/dc_functor.cuh>
+#include <gunrock/app/topk/topk_problem.cuh>
+#include <gunrock/app/topk/topk_functor.cuh>
 
 #include <cub/cub.cuh>
 #include <moderngpu.cuh>
@@ -34,7 +34,7 @@ using namespace mgpu;
 
 namespace gunrock {
 namespace app {
-namespace dc {
+namespace topk {
 
 /**
  * @brief DC problem enactor class.
@@ -42,7 +42,7 @@ namespace dc {
  * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA clock-count statistics
  */
 template<bool INSTRUMENT>
-class DCEnactor : public EnactorBase
+class TOPKEnactor : public EnactorBase
 {
   // Members
 protected:
@@ -63,7 +63,7 @@ protected:
   cudaEvent_t         throttle_event;
   
   /**
-   * Current iteration, also used to get the final search depth of the DC search
+   * Current iteration
    */
   long long           iteration;
   
@@ -71,9 +71,9 @@ protected:
 protected:
   
   /**
-   * @brief Prepare the enactor for DC kernel call. Must be called prior to each DC iteration.
+   * @brief Prepare the enactor for TOPK kernel call.
    *
-   * @param[in] problem DC Problem object which holds the graph data and DC problem data to compute.
+   * @param[in] problem TOPK Problem object which holds the graph data and TOPK data to compute.
    * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
    * @param[in] filter_grid_size CTA occupancy for filter kernel call.
    *
@@ -93,15 +93,15 @@ protected:
       
       // Allocate pinned memory for done
       if (retval = util::GRError(cudaHostAlloc((void**)&done, sizeof(int) * 1, flags),
-	 "DCEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
+	 "TOPKEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
       
       // Map done into GPU space
       if (retval = util::GRError(cudaHostGetDevicePointer((void**)&d_done, (void*) done, 0),
-	 "DCEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
+	 "TOPKEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
       
       // Create throttle event
       if (retval = util::GRError(cudaEventCreateWithFlags(&throttle_event, cudaEventDisableTiming),
-	 "DCEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
+	 "TOPKEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
     }
     
     //graph slice
@@ -116,7 +116,7 @@ protected:
 	 graph_slice->d_row_offsets,
 	 row_offsets_desc,
 	 (graph_slice->nodes + 1) * sizeof(SizeT)),
-	 "DCEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
+	 "TOPKEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
       
       
       /*cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
@@ -126,7 +126,7 @@ protected:
 	graph_slice->d_column_indices,
 	column_indices_desc,
 	graph_slice->edges * sizeof(VertexId)),
-	"DCEnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;*/
+	"TOPKEnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;*/
     } while (0);
     
     return retval;
@@ -135,9 +135,9 @@ protected:
 public:
   
   /**
-   * @brief DCEnactor constructor
+   * @brief TOPKEnactor constructor
    */
-  DCEnactor(bool DEBUG = false) :
+  TOPKEnactor(bool DEBUG = false) :
     EnactorBase(EDGE_FRONTIERS, DEBUG),
     iteration(0),
     total_queued(0),
@@ -146,17 +146,17 @@ public:
   {}
   
   /**
-   * @brief DCEnactor destructor
+   * @brief TOPKEnactor destructor
    */
-  virtual ~DCEnactor()
+  virtual ~TOPKEnactor()
   {
     if (done) 
     {
       util::GRError(cudaFreeHost((void*)done),
-	    "DCEnactor cudaFreeHost done failed", __FILE__, __LINE__);
+	    "TOPKEnactor cudaFreeHost done failed", __FILE__, __LINE__);
       
       util::GRError(cudaEventDestroy(throttle_event),
-	    "DCEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
+	    "TOPKEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
     }
   }
   
@@ -166,10 +166,10 @@ public:
    */
   
   /**
-   * @brief Obtain statistics about the last DC search enacted.
+   * @brief Obtain statistics about the last TOPK search enacted.
    *
-   * @param[out] total_queued Total queued elements in DC kernel running.
-   * @param[out] search_depth Search depth of DC algorithm.
+   * @param[out] total_queued Total queued elements in TOPK kernel running.
+   * @param[out] search_depth Search depth of TOPK algorithm.
    * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
    */
 template <typename VertexId>
@@ -193,27 +193,27 @@ void GetStatistics(long long   &total_queued,
    *
    * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
    * @tparam FilterKernelPolicy Kernel policy for filtering.
-   * @tparam DCProblem DC Problem type.
+   * @tparam TOPKProblem TOPK Problem type.
    *
-   * @param[in] problem DCProblem object.
-   * @param[in] max_grid_size Max grid size for DC kernel calls.
+   * @param[in] problem TOPKProblem object.
+   * @param[in] max_grid_size Max grid size for TOPK kernel calls.
    *
    * \return cudaError_t object which indicates the success of all CUDA function calls.
    */
   template<
     typename AdvanceKernelPolicy,
     typename FilterKernelPolicy,
-    typename DCProblem>
-  cudaError_t EnactDC(CudaContext &context,
-		      DCProblem   *problem,
-		      int         top_nodes,
-		      int         max_grid_size = 0)
+    typename TOPKProblem>
+  cudaError_t EnactTOPK(CudaContext &context,
+			TOPKProblem *problem,
+			int         top_nodes,
+			int         max_grid_size = 0)
   {
-    typedef typename DCProblem::SizeT      SizeT;
-    typedef typename DCProblem::Value      Value;
-    typedef typename DCProblem::VertexId   VertexId;
+    typedef typename TOPKProblem::SizeT      SizeT;
+    typedef typename TOPKProblem::Value      Value;
+    typedef typename TOPKProblem::VertexId   VertexId;
 
-    typedef DCFunctor<VertexId, SizeT, Value, DCProblem> DcFunctor;
+    typedef TOPKFunctor<VertexId, SizeT, Value, TOPKProblem> TopkFunctor;
 
     cudaError_t retval = cudaSuccess;
     
@@ -226,7 +226,7 @@ void GetStatistics(long long   &total_queued,
 				      FilterKernelPolicy::CTA_OCCUPANCY)) break;
       
       // single gpu graph slice
-      typename DCProblem::GraphSlice *graph_slice = problem->graph_slices[0];
+      typename TOPKProblem::GraphSlice *graph_slice = problem->graph_slices[0];
 
       // add out-going and in-going degrees -> sum stored in d_degrees_tot
       util::MemsetAddVectorKernel<<<128, 128>>>(problem->data_slices[0]->d_degrees_tot,
@@ -261,26 +261,26 @@ void GetStatistics(long long   &total_queued,
    */
   
   /**
-   * @brief DC Enact kernel entry.
+   * @brief TOPK Enact kernel entry.
    *
-   * @tparam DCProblem DC Problem type. @see DCProblem
+   * @tparam TOPKProblem TOPK Problem type. @see TOPKProblem
    *
-   * @param[in] problem Pointer to DCProblem object.
-   * @param[in] src Source node for DC.
-   * @param[in] max_grid_size Max grid size for DC kernel calls.
+   * @param[in] problem Pointer to TOPKProblem object.
+   * @param[in] src Source node for TOPK.
+   * @param[in] max_grid_size Max grid size for TOPK kernel calls.
    *
    * \return cudaError_t object which indicates the success of all CUDA function calls.
    */
-  template <typename DCProblem>
+  template <typename TOPKProblem>
   cudaError_t Enact(CudaContext &context,
-		    DCProblem   *problem,
+		    TOPKProblem *problem,
 		    int         top_nodes,
 		    int	        max_grid_size = 0)
   {
     if (this->cuda_props.device_sm_version >= 300) 
-    {
-      typedef gunrock::oprtr::filter::KernelPolicy<
-	DCProblem,                          // Problem data type
+      {
+	typedef gunrock::oprtr::filter::KernelPolicy<
+	TOPKProblem,                          // Problem data type
 	300,                                // CUDA_ARCH
 	INSTRUMENT,                         // INSTRUMENT
 	0,                                  // SATURATION QUIT
@@ -295,7 +295,7 @@ void GetStatistics(long long   &total_queued,
 	FilterKernelPolicy;
       
       typedef gunrock::oprtr::advance::KernelPolicy<
-	DCProblem,                          // Problem data type
+	TOPKProblem,                          // Problem data type
 	300,                                // CUDA_ARCH
 	INSTRUMENT,                         // INSTRUMENT
 	8,                                  // MIN_CTA_OCCUPANCY
@@ -311,10 +311,10 @@ void GetStatistics(long long   &total_queued,
 	gunrock::oprtr::advance::TWC_FORWARD>        
 	AdvanceKernelPolicy;
       
-      return  EnactDC<AdvanceKernelPolicy, FilterKernelPolicy, DCProblem>(context,
-									  problem,
-									  top_nodes,
-									  max_grid_size);
+      return  EnactTOPK<AdvanceKernelPolicy, FilterKernelPolicy, TOPKProblem>(context,
+									      problem,
+									      top_nodes,
+									      max_grid_size);
     }
     
     //to reduce compile time, get rid of other architecture for now
@@ -329,7 +329,7 @@ void GetStatistics(long long   &total_queued,
   
 };
   
-} // namespace dc
+} // namespace topk
 } // namespace app
 } // namespace gunrock
 

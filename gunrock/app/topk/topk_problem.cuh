@@ -7,7 +7,7 @@
 
 /**
  * @file
- * dc_problem.cuh
+ * topk_problem.cuh
  *
  * @brief GPU Storage management Structure for Degree Centrality Problem Data
  */
@@ -19,10 +19,10 @@
 
 namespace gunrock {
 namespace app {
-namespace dc {
+namespace topk {
 
 /**
- * @brief DC Problem structure stores device-side vectors for doing DC on the GPU.
+ * @brief TOPK Problem structure stores device-side vectors for doing TOPK on the GPU.
  *
  * @tparam _VertexId    Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam _SizeT       Type of unsigned integer to use for array indexing. (e.g., uint32)
@@ -32,7 +32,7 @@ template <
   typename    _VertexId,
   typename    _SizeT,
   typename    _Value>
-struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = false
+struct TOPKProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = false
 {
   typedef _VertexId   VertexId;
   typedef _SizeT      SizeT;
@@ -44,7 +44,7 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
   //Helper structures
   
   /**
-   * @brief Data slice structure which contains DC problem specific data.
+   * @brief Data slice structure which contains TOPK problem specific data.
    */
   struct DataSlice
   {
@@ -82,39 +82,39 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
   // Methods
   
   /**
-   * @brief DCProblem default constructor
+   * @brief TOPKProblem default constructor
    */
   
-  DCProblem():
+  TOPKProblem():
     nodes(0),
     edges(0),
     num_gpus(0) {}
   
   /**
-   * @brief DCProblem constructor
+   * @brief TOPKProblem constructor
    *
    * @param[in] stream_from_host Whether to stream data from host.
    * @param[in] graph Reference to the CSR graph object we process on.
    * @param[in] num_gpus Number of the GPUs used.
    */
-  DCProblem(bool        		        stream_from_host,       // Only meaningful for single-GPU
-	    const Csr<VertexId, Value, SizeT> 	&graph,
-	    const Csr<VertexId, Value, SizeT>   &graph_inv,
-	    int         			num_gpus) :
+  TOPKProblem(bool        		        stream_from_host,       // Only meaningful for single-GPU
+	      const Csr<VertexId, Value, SizeT> &graph,
+	      const Csr<VertexId, Value, SizeT> &graph_inv,
+	      int         			num_gpus) :
     num_gpus(num_gpus)
   {
     Init(stream_from_host, graph, graph_inv, num_gpus);
   }
   
   /**
-   * @brief DCProblem default destructor
+   * @brief TOPKProblem default destructor
    */
-  ~DCProblem()
+  ~TOPKProblem()
   {
     for (int i = 0; i < num_gpus; ++i)
       {
 	if (util::GRError(cudaSetDevice(gpu_idx[i]),
-	  "~DCProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
+	  "~TOPKProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
 	
 	if (data_slices[i]->d_node_id) util::GRError(cudaFree(data_slices[i]->d_node_id),
           "GpuSlice cudaFree d_node_id failed", __FILE__, __LINE__);
@@ -155,19 +155,19 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 	  {
 	    // Set device
 	    if (util::GRError(cudaSetDevice(gpu_idx[0]),
-			      "DCProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
+			      "TOPKProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
 	    
 	    if (retval = util::GRError(cudaMemcpy(h_node_id,
 						  data_slices[0]->d_node_id,
 						  sizeof(VertexId) * nodes,
 						  cudaMemcpyDeviceToHost),
-				       "DCProblem cudaMemcpy d_node_id failed", __FILE__, __LINE__)) break;
+				       "TOPK cudaMemcpy d_node_id failed", __FILE__, __LINE__)) break;
 	    
 	    if (retval = util::GRError(cudaMemcpy(h_degrees,
 						  data_slices[0]->d_degrees_tot,
 						  sizeof(Value) * nodes,
 						  cudaMemcpyDeviceToHost),
-				       "DCProblem cudaMemcpy d_degrees_tot failed", __FILE__, __LINE__)) break;
+				       "TOPK cudaMemcpy d_degrees_tot failed", __FILE__, __LINE__)) break;
 	  } else {
 	  // TODO: multi-GPU extract result
 	} //end if (data_slices.size() ==1)
@@ -177,7 +177,7 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
   }
   
   /**
-   * @brief DCProblem initialization
+   * @brief TOPKProblem initialization
    *
    * @param[in] stream_from_host Whether to stream data from host.
    * @param[in] graph Reference to the CSR graph object we process on. @see Csr
@@ -224,31 +224,31 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 	  // Create a single data slice for the currently-set gpu
 	  int gpu;
 	  if (retval = util::GRError(cudaGetDevice(&gpu), 
-	    "DCProblem cudaGetDevice failed", __FILE__, __LINE__)) break;
+	    "TOPKProblem cudaGetDevice failed", __FILE__, __LINE__)) break;
 	  gpu_idx[0] = gpu;
 	  
 	  data_slices[0] = new DataSlice;
 	  if (retval = util::GRError(cudaMalloc((void**)&d_data_slices[0],
 						sizeof(DataSlice)),
-				     "DCProblem cudaMalloc d_data_slices failed", __FILE__, __LINE__)) return retval;
+				     "TOPK cudaMalloc d_data_slices failed", __FILE__, __LINE__)) return retval;
 	  
 	  // Create SoA on device
 	  VertexId    *d_node_id;
 	  if (retval = util::GRError(cudaMalloc((void**)&d_node_id,
 						nodes * sizeof(VertexId)),
-				     "DCProblem cudaMalloc d_node_id failed", __FILE__, __LINE__)) return retval;
+				     "TOPK cudaMalloc d_node_id failed", __FILE__, __LINE__)) return retval;
 	  data_slices[0]->d_node_id = d_node_id;
 	  
 	  Value *d_degrees_tot;
 	  if (retval = util::GRError(cudaMalloc((void**)&d_degrees_tot,
 						nodes * sizeof(Value)),
-				     "DCProblem cudaMalloc d_degrees_tot failed", __FILE__, __LINE__)) return retval;
+				     "TOPK cudaMalloc d_degrees_tot failed", __FILE__, __LINE__)) return retval;
 	  data_slices[0]->d_degrees_tot = d_degrees_tot;				
 	  
 	  Value *d_degrees_inv;
 	  if (retval = util::GRError(cudaMalloc((void**)&d_degrees_inv,
 						nodes * sizeof(Value)),
-				      "DCProblem cudaMalloc d_degrees_inv failed", __FILE__, __LINE__)) return retval;
+				      "TOPK cudaMalloc d_degrees_inv failed", __FILE__, __LINE__)) return retval;
 	  data_slices[0]->d_degrees_inv = d_degrees_inv;
 	  
 	  data_slices[0]->d_labels  = NULL;
@@ -261,10 +261,10 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
   }
   
   /**
-   *  @brief Performs any initialization work needed for DC problem type. 
-   *	Must be called prior to each DC iteration.
+   *  @brief Performs any initialization work needed for TOPK problem type. 
+   *	Must be called prior to each TOPK iteration.
    *
-   *  @param[in] src Source node for one DC computing pass.
+   *  @param[in] src Source node for one TOPK computing pass.
    *  @param[in] frontier_type The f rontier type (i.e., edge/vertex/mixed)
    * 
    *  \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -281,7 +281,7 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
       {
 	// Set device
 	if (retval = util::GRError(cudaSetDevice(gpu_idx[gpu]),
-				   "DCProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
+				   "TOPK cudaSetDevice failed", __FILE__, __LINE__)) return retval;
 	
 	// Allocate output if necessary
 	if (!data_slices[gpu]->d_node_id)
@@ -289,7 +289,7 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 	  VertexId    *d_node_id;
 	  if (retval = util::GRError(cudaMalloc((void**)&d_node_id,
 						nodes * sizeof(VertexId)),
-				     "DCProblem cudaMalloc d_node_id failed", __FILE__, __LINE__)) return retval;
+				     "TOPK cudaMalloc d_node_id failed", __FILE__, __LINE__)) return retval;
 	  data_slices[gpu]->d_node_id = d_node_id;
 	}
 	
@@ -298,7 +298,7 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 	  Value *d_degrees_tot;
 	  if (retval = util::GRError(cudaMalloc((void**)&d_degrees_tot,
 						nodes * sizeof(Value)),
-				     "DCProblem cudaMalloc d_degrees_tot failed", __FILE__, __LINE__)) return retval;
+				     "TOPK cudaMalloc d_degrees_tot failed", __FILE__, __LINE__)) return retval;
 	  data_slices[gpu]->d_degrees_tot = d_degrees_tot;
 	}
 	
@@ -307,7 +307,7 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 	  Value *d_degrees_inv;
 	  if (retval = util::GRError(cudaMalloc((void**)&d_degrees_inv,
 						nodes * sizeof(Value)),
-				     "DCProblem cudaMalloc d_degrees_inv failed", __FILE__, __LINE__)) return retval;
+				     "TOPK cudaMalloc d_degrees_inv failed", __FILE__, __LINE__)) return retval;
 	  data_slices[gpu]->d_degrees_inv = d_degrees_inv;
 	}
 
@@ -317,10 +317,10 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 					      data_slices[gpu],
 					      sizeof(DataSlice),
 					      cudaMemcpyHostToDevice),
-				   "DCProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
+				   "TOPK cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
       }
  
-    // Fillin the initial input_queue for DC problem, this needs to be modified
+    // Fillin the initial input_queue for TOPK problem, this needs to be modified
     // in multi-GPU scene
         
     // set node ids
@@ -344,7 +344,7 @@ struct DCProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
 };
   
   
-} //namespace dc
+} //namespace topk
 } //namespace app
 } //namespace gunrock
 

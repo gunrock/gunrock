@@ -69,8 +69,8 @@ endif
 
 #ifeq (,$(findstring 3.0, $(NVCC_VERSION)))
 #ifneq ($(abi), 1)
-	# Disable the ABI by default for 3.1+
-	#NVCCFLAGS += -Xptxas -abi=no
+# Disable the ABI by default for 3.1+
+#NVCCFLAGS += -Xptxas -abi=no
 #endif
 #endif
 
@@ -99,19 +99,17 @@ DEPS = 			./Makefile \
 				$(wildcard ../../gunrock/oprtr/**/*.cuh) \
 				$(wildcard ../../gunrock/app/*.cuh) \
 				$(wildcard ../../gunrock/app/**/*.cuh)
-				 
-
 
 
 #-------------------------------------------------------------------------------
 # (make test) Test driver for 
 #-------------------------------------------------------------------------------
 
-test: bin/test_dc_$(NVCC_VERSION)_$(ARCH_SUFFIX)
+test: bin/test_topk_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_dc_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_dc.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/test_topk_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_topk.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_dc_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_dc.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3  
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_topk_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_topk.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3  
 
 #-------------------------------------------------------------------------------
 # Clean
