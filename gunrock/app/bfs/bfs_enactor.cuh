@@ -289,7 +289,8 @@ namespace bfs {
                     work_progress,
                     graph_slice->frontier_elements[frontier_attribute.selector],           // max_in_queue
                     graph_slice->frontier_elements[frontier_attribute.selector^1],         // max_out_queue
-                    enactor_stats.filter_kernel_stats);
+                    enactor_stats.filter_kernel_stats,
+                    ts_bitmask);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates

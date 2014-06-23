@@ -48,7 +48,9 @@ struct Sweep
         util::CtaWorkProgress                   &work_progress,
         util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition,
         typename KernelPolicy::SizeT            &max_out_frontier,
-        gunrock::oprtr::advance::TYPE           &ADVANCE_TYPE,
+        texture<KernelPolicy::SizeT, cudaTextureType1D, cudaReadModeElementType> *&ts_rowoffset,
+        texture<KernelPolicy::VertexId, cudaTextureType1D, cudaReadModeElementType> *&ts_columnindices, 
+        gunrock::oprtr::advance::TYPE           &ADVANCE_TYPE, 
         bool                                    &inverse_graph)
         {
             typedef Cta<KernelPolicy, ProblemData, Functor>     Cta;
@@ -79,6 +81,8 @@ struct Sweep
                 problem,
                 work_progress,
                 max_out_frontier,
+                ts_rowoffset,
+                ts_columnindices,
                 ADVANCE_TYPE,
                 inverse_graph);
 
@@ -132,6 +136,8 @@ struct Dispatch
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
         util::KernelRuntimeStats    &kernel_stats,
+        texture<SizeT, cudaTextureType1D, cudaReadModeElementType> *&ts_rowoffset,
+        texture<VertexId, cudaTextureType1D, cudaReadModeElementType> *&ts_columnindices,  
         gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
         bool                        &inverse_graph)
         {
@@ -167,6 +173,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
         util::KernelRuntimeStats    &kernel_stats,
+        texture<SizeT, cudaTextureType1D, cudaReadModeElementType> *&ts_rowoffset,
+        texture<VertexId, cudaTextureType1D, cudaReadModeElementType> *&ts_columnindices,  
         gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
         bool                        &inverse_graph)
     {
@@ -292,6 +300,8 @@ void Kernel(
         typename KernelPolicy::SizeT            max_in_frontier,
         typename KernelPolicy::SizeT            max_out_frontier,
         util::KernelRuntimeStats                kernel_stats,
+        texture<KernelPolicy::SizeT, cudaTextureType1D, cudaReadModeElementType> *ts_rowoffset,
+        texture<KernelPolicy::SizeT, cudaTextureType1D, cudaReadModeElementType> *ts_columnindices,
         gunrock::oprtr::advance::TYPE           ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
         bool                                    inverse_graph = false)
 {

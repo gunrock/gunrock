@@ -110,6 +110,10 @@ namespace edge_map_forward {
 
             // Shared memory for the CTA
             SmemStorage             &smem_storage;
+            
+            texture<SizeT, cudaTextureType1D, cudaReadModeElementType> *ts_rowoffset,
+            texture<VertexId, cudaTextureType1D, cudaReadModeElementType> *ts_columnindices, 
+ 
 
             /**
              * @brief Tile of incoming frontier to process
@@ -187,14 +191,14 @@ namespace edge_map_forward {
                                         Vec2SizeT   row_range;
                                         SizeT       row_id1;
                                         if (cta->advance_type == gunrock::oprtr::advance::V2V || cta->advance_type == gunrock::oprtr::advance::V2E) {
-                                            row_range.x = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id);
-                                            row_range.y = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id + 1);
+                                            row_range.x = tex1Dfetch(ts_rowoffset[0], row_id);
+                                            row_range.y = tex1Dfetch(ts_rowoffset[0], row_id + 1);
                                         }
 
                                         if (cta->advance_type == gunrock::oprtr::advance::E2V || cta->advance_type == gunrock::oprtr::advance::E2E) {
                                             row_id1 = (cta->inverse_graph) ? cta->d_inverse_column_indices[row_id] : cta->d_column_indices[row_id];
-                                            row_range.x = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id1);
-                                            row_range.y = tex1Dfetch(RowOffsetTex<SizeT>::ref, row_id1+1);
+                                            row_range.x = tex1Dfetch(ts_rowoffset[0], row_id1);
+                                            row_range.y = tex1Dfetch(ts_rowoffset[0], row_id1+1);
                                         }
 
                                         // compute row offset and length
@@ -282,7 +286,7 @@ namespace edge_map_forward {
                                         while (coop_offset + KernelPolicy::THREADS < coop_oob) {
 
                                             // Gather
-                                            //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+threadIdx.x);
+                                            //neighbor_id = tex1Dfetch(ts_columnindices[0], coop_offset+threadIdx.x);
                                             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                     neighbor_id,
                                                     cta->d_column_indices + coop_offset+threadIdx.x);
@@ -322,7 +326,7 @@ namespace edge_map_forward {
                                         if (coop_offset + threadIdx.x < coop_oob) {
 
                                             // Gather
-                                            //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+threadIdx.x);
+                                            //neighbor_id = tex1Dfetch(ts_columnindices[0], coop_offset+threadIdx.x);
                                             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                     neighbor_id,
                                                     cta->d_column_indices + coop_offset+threadIdx.x);
@@ -419,7 +423,7 @@ namespace edge_map_forward {
                                             while (coop_offset + GR_WARP_THREADS(KernelPolicy::CUDA_ARCH) < coop_oob) {
 
                                                 // Gather
-                                                //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+lane_id);
+                                                //neighbor_id = tex1Dfetch(ts_columnindices[0], coop_offset+lane_id);
                                                 util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                         neighbor_id,
                                                         cta->d_column_indices + coop_offset+lane_id);
@@ -455,7 +459,7 @@ namespace edge_map_forward {
 
                                             if (coop_offset + lane_id < coop_oob) {
                                                 // Gather
-                                                //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset+lane_id);
+                                                //neighbor_id = tex1Dfetch(ts_columnindices[0], coop_offset+lane_id);
                                                 util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                         neighbor_id,
                                                         cta->d_column_indices + coop_offset+lane_id);
@@ -654,6 +658,8 @@ namespace edge_map_forward {
                     DataSlice                   *problem,
                     util::CtaWorkProgress       &work_progress,
                     SizeT                       max_out_frontier,
+                    texture<SizeT, cudaTextureType1D, cudaReadModeElementType> *ts_rowoffset,
+                    texture<VertexId, cudaTextureType1D, cudaReadModeElementType> *ts_columnindices, 
                     gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
                     bool                        inverse_graph) :
 
@@ -677,6 +683,8 @@ namespace edge_map_forward {
                 problem(problem),
                 work_progress(work_progress),
                 max_out_frontier(max_out_frontier),
+                ts_rowoffset(ts_rowoffset),
+                ts_columnindices(ts_columnindices),
                 advance_type(ADVANCE_TYPE),
                 inverse_graph(inverse_graph)
                 {
@@ -782,7 +790,7 @@ namespace edge_map_forward {
                     {
                         // Gather a neighbor
                         VertexId neighbor_id;
-                        //neighbor_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, smem_storage.gather_offsets[scratch_offset]);
+                        //neighbor_id = tex1Dfetch(ts_columnindices[0], smem_storage.gather_offsets[scratch_offset]);
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                 neighbor_id,
                                 d_column_indices + smem_storage.gather_offsets[scratch_offset]);
