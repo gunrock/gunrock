@@ -132,10 +132,10 @@ struct DoubleBuffer : MultipleBuffer<2, SizeType, KeyType, ValueType, TARGET>
         ValueType* values0,
         ValueType* values1) : ParentType()
     {
-        this->keys  [0].SetPointer(keys0  , size, TARGET);
-        this->keys  [1].SetPointer(keys1  , size, TARGET);
-        this->values[0].SetPointer(values0, size, TARGET);
-        this->values[1].SetPointer(values1, size, TARGET);
+        this->keys  [0].SetPointer(keys0  , size0, TARGET);
+        this->keys  [1].SetPointer(keys1  , size1, TARGET);
+        this->values[0].SetPointer(values0, size0, TARGET);
+        this->values[1].SetPointer(values1, size1, TARGET);
     }
 };
 

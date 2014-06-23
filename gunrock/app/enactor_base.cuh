@@ -33,8 +33,8 @@ namespace app {
 struct EnactorStats
 {
     long long           iteration;
-    int                 num_gpus;
-    int                 gpu_idx;
+//    int                 num_gpus;
+//    int                 gpu_idx;
 
     unsigned long long  total_lifetimes;
     unsigned long long  total_runtimes;
@@ -50,6 +50,11 @@ struct EnactorStats
     //unsigned int        *d_node_locks_out;
     util::Array1D<int, unsigned int> node_locks;
     util::Array1D<int, unsigned int> node_locks_out;
+
+    volatile int       *done;
+    int                *d_done;
+    cudaEvent_t        throttle_event;
+    cudaError_t        retval;
 };
 
 struct FrontierAttribute
@@ -121,8 +126,8 @@ protected:
             // it in our kernel code)
             work_progress[gpu].Setup();
             cuda_props   [gpu].Setup(gpu_idx[gpu]);
-            enactor_stats[gpu].num_gpus = num_gpus;
-            enactor_stats[gpu].gpu_idx  = gpu_idx[gpu];
+            //enactor_stats[gpu].num_gpus = num_gpus;
+            //enactor_stats[gpu].gpu_idx  = gpu_idx[gpu];
             enactor_stats[gpu].node_locks    .SetName("node_locks"    );
             enactor_stats[gpu].node_locks_out.SetName("node_locks_out");
             //enactor_stats.d_node_locks = NULL;
@@ -139,6 +144,10 @@ protected:
             enactor_stats[gpu].node_locks    .Release();
             enactor_stats[gpu].node_locks_out.Release();
             if (work_progress[gpu].HostReset()) return;
+            if (util::GRError(cudaFreeHost((void*)enactor_stats[gpu].done), 
+                 "EnactorBase cudaFreeHost done failed", __FILE__, __LINE__)) return;
+            if (util::GRError(cudaEventDestroy(enactor_stats[gpu].throttle_event),
+                 "EnactorBase cudaEventDestroy throttle_event failed", __FILE__, __LINE__)) return;
             //if (enactor_stats.d_node_locks) util::GRError(cudaFree(enactor_stats.d_node_locks), "EnactorBase cudaFree d_node_locks failed", __FILE__, __LINE__);
             //if (enactor_stats.d_node_locks_out) util::GRError(cudaFree(enactor_stats.d_node_locks_out), "EnactorBase cudaFree d_node_locks_out failed", __FILE__, __LINE__);
         }
@@ -167,12 +176,27 @@ protected:
 
             if (retval = enactor_stats[gpu].advance_kernel_stats.Setup(enactor_stats[gpu].advance_grid_size)) return retval;
             if (retval = enactor_stats[gpu]. filter_kernel_stats.Setup(enactor_stats[gpu]. filter_grid_size)) return retval;
+            //initialize the host-mapped "done"
+            int flags = cudaHostAllocMapped;
 
+            // Allocate pinned memory for done
+            if (retval = util::GRError(cudaHostAlloc((void**)&(enactor_stats[gpu].done), sizeof(int) * 1, flags),
+                    "BFSEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
+
+            // Map done into GPU space
+            if (retval = util::GRError(cudaHostGetDevicePointer((void**)&(enactor_stats[gpu].d_done), (void*) enactor_stats[gpu].done, 0),  
+                    "BFSEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
+
+            // Create throttle event
+            if (retval = util::GRError(cudaEventCreateWithFlags(&enactor_stats[gpu].throttle_event, cudaEventDisableTiming),                
+                    "BFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
+                
             enactor_stats[gpu].iteration             = 0;
             enactor_stats[gpu].total_runtimes        = 0;
             enactor_stats[gpu].total_lifetimes       = 0;
             enactor_stats[gpu].total_queued          = 0;
-
+            enactor_stats[gpu].done[0]               = -1;
+            enactor_stats[gpu].retval                = cudaSuccess;
             //enactor_stats.num_gpus              = 1;
             //enactor_stats.gpu_id                = 0;
 

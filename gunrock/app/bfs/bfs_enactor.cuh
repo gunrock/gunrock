@@ -134,20 +134,46 @@ namespace bfs {
     static CUT_THREADPROC BFSThread(
         void * thread_data_)
     {
-            
-        /*unsigned int    *d_scanned_edges = NULL; 
-            // Single-gpu graph slice
-            typename BFSProblem::GraphSlice *graph_slice = problem->graph_slices[0];
-            typename BFSProblem::DataSlice *data_slice = problem->d_data_slices[0];
+        typedef typename BFSProblem::SizeT      SizeT;
+        typedef typename BFSProblem::VertexId   VertexId;
+        typedef typename BFSProblem::Value      Value;
+        typedef typename BFSProblem::DataSlice  DataSlice;
+        typedef typename BFSProblem::GraphSlice GraphSlice;
+        //typedef typename BFSEnactor<BFSProblem, INSTRUMENT> BfsEnactor;
 
-            frontier_attribute.queue_length         = 1;
-            frontier_attribute.queue_index          = 0;        // Work queue index
-            frontier_attribute.selector             = 0;
+        ThreadSlice  *thread_data          = (ThreadSlice *) thread_data_;
+        BFSProblem   *problem              = (BFSProblem*) thread_data->problem;
+        BFSEnactor<BFSProblem, INSTRUMENT>
+                     *enactor              = (BFSEnactor<BFSProblem, INSTRUMENT>*) thread_data->enactor;
+        int          thread_num            =   thread_data-> thread_num;
+        DataSlice    *data_slice           = &(problem    -> data_slices       [thread_num]);
+        GraphSlice   *graph_slice          =   problem    -> graph_slices      [thread_num];
+        typename BFSEnactor<BFSProblem, INSTRUMENT>::FrontierAttribute
+                     *frontier_attribute   = &(enactor    -> frontier_attribute[thread_num]);
+        typename BFSEnactor<BFSProblem, INSTRUMENT>::EnactorStats 
+                     *eanctor_stats        = &(enactor    -> enactor_stats     [thread_num]);
+        int          num_gpus              =   problem    -> num_gpus;
+        util::scan::MultiScan<VertexId,SizeT,true,256,8>*
+                     Scaner                = NULL;
+        bool         break_clean           = true;
+        SizeT*       out_offset            = NULL;
+        char*        message               = new char [1024];
+        util::Array1D<SizeT, unsigned int> scanned_edges;
+        frontier_attribute->queue_index    = 0;        // Work queue index
+        frontier_attribute->selector       = 0;
+        frontier_attribute->queue_length   = thread_data->init_size; //? 
+        frontier_attribute->queue_reset    = true;
+        
 
-            frontier_attribute.queue_reset = true; 
-
-            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
-                if (retval = util::GRError(cudaMalloc(
+        if (num_gpus >1)
+        {
+            Scan = new util::scan::MultiScan<VertexId, SizeT, true, 256, 8>;
+            out_offset = new SizeT[num_gpus +1];
+        }
+        
+        scanned_edges.SetName("scanned_edges");
+        if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
+            if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_scanned_edges,
                                 graph_slice->edges * sizeof(unsigned int)),
                             "PBFSProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
@@ -156,7 +182,7 @@ namespace bfs {
 
             
             fflush(stdout);
-            // Step through BFS iterations
+            /*// Step through BFS iterations
             
             while (done[0] < 0) {
 
@@ -326,10 +352,10 @@ class BFSEnactor : public EnactorBase
     /**
      * A pinned, mapped word that the traversal kernels will signal when done
      */
-    volatile int                      **dones;
-    int                               **d_dones;
-    util::Array1D<SizeT, cudaEvent_t> throttle_events;
-    util::Array1D<SizeT, cudaError_t> retvals;
+    //volatile int                      **dones;
+    //int                               **d_dones;
+    //util::Array1D<SizeT, cudaEvent_t> throttle_events;
+    //util::Array1D<SizeT, cudaError_t> retvals;
 
     texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *ts_bitmask;
     texture<SizeT        , cudaTextureType1D, cudaReadModeElementType> *ts_rowoffset;
@@ -351,14 +377,14 @@ class BFSEnactor : public EnactorBase
         BFSProblem *problem)
     {
         cudaError_t retval = cudaSuccess;
-        this->num_gpus     = problem->num_gpus;
-        this->gpu_idx      = problem->gpu_idx;
-        throttle_events.Allocate(this->num_gpus);
-        retvals.Allocate(this->num_gpus);
+        //this->num_gpus     = problem->num_gpus;
+        //this->gpu_idx      = problem->gpu_idx;
+        //throttle_events.Allocate(this->num_gpus);
+        //retvals.Allocate(this->num_gpus);
 
         do {
-            dones   = new volatile int* [this->num_gpus];
-            d_dones = new          int* [this->num_gpus];
+            //dones   = new volatile int* [this->num_gpus];
+            //d_dones = new          int* [this->num_gpus];
             ts_bitmask       = new texture<unsigned char, cudaTextureType1D, cudaReadModeElementType>[this->num_gpus];
             ts_rowoffset     = new texture<SizeT        , cudaTextureType1D, cudaReadModeElementType>[this->num_gpus];
             ts_columnindices = new texture<VertexId     , cudaTextureType1D, cudaReadModeElementType>[this->num_gpus];
@@ -367,22 +393,22 @@ class BFSEnactor : public EnactorBase
             {
                 if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
                 //initialize the host-mapped "done"
-                int flags = cudaHostAllocMapped;
+                //int flags = cudaHostAllocMapped;
 
                 // Allocate pinned memory for done
-                if (retval = util::GRError(cudaHostAlloc((void**)&(dones[gpu]), sizeof(int) * 1, flags),
-                    "BFSEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
+                //if (retval = util::GRError(cudaHostAlloc((void**)&(enactor_stats[gpu].done), sizeof(int) * 1, flags),
+                //    "BFSEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
 
                 // Map done into GPU space
-                if (retval = util::GRError(cudaHostGetDevicePointer((void**)&(d_dones[gpu]), (void*) dones[gpu], 0),
-                    "BFSEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
+                //if (retval = util::GRError(cudaHostGetDevicePointer((void**)&(enactor_stats[gpu].d_done), (void*) enactor_stats[gpu].done, 0),
+                //    "BFSEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
 
                 // Create throttle event
-                if (retval = util::GRError(cudaEventCreateWithFlags(&throttle_events[gpu], cudaEventDisableTiming),
-                    "BFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
+                //if (retval = util::GRError(cudaEventCreateWithFlags(&enactor_stats[gpu].throttle_event, cudaEventDisableTiming),
+                //    "BFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
                 
-                dones  [gpu][0] = -1;
-                retvals[gpu]    = cudaSuccess;
+                //enactor_stats[gpu].done   = -1;
+                //enactor_stats[gpu].retval = cudaSuccess;
                 
                 // Bind row-offsets and bitmask texture
                 cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
@@ -434,9 +460,9 @@ class BFSEnactor : public EnactorBase
      * @brief BFSEnactor constructor
      */
     BFSEnactor(bool DEBUG = false, int num_gpus = 1, int* gpu_idx = NULL) :
-        EnactorBase(EDGE_FRONTIERS, DEBUG, num_gpus, gpu_idx),
-        dones(NULL),
-        d_dones(NULL)
+        EnactorBase(EDGE_FRONTIERS, DEBUG, num_gpus, gpu_idx)//,
+        //dones(NULL),
+        //d_dones(NULL)
     {}
 
     /**
@@ -444,24 +470,24 @@ class BFSEnactor : public EnactorBase
      */
     virtual ~BFSEnactor()
     {
-        if (All_Done(dones,retvals.GetPointer(),num_gpus)) {
+        /*if (All_Done(dones,retvals.GetPointer(),num_gpus)) {
             for (int gpu=0;gpu<num_gpus;gpu++)
             {   
                 if (num_gpus !=1)
                     util::GRError(cudaSetDevice(gpu_idx[gpu]),
                         "BFSEnactor cudaSetDevice gpu failed", __FILE__, __LINE__);
 
-                util::GRError(cudaFreeHost((void*)(dones[gpu])),
-                    "BFSEnactor cudaFreeHost done failed", __FILE__, __LINE__);
+                //util::GRError(cudaFreeHost((void*)(dones[gpu])),
+                //    "BFSEnactor cudaFreeHost done failed", __FILE__, __LINE__);
 
-                util::GRError(cudaEventDestroy(throttle_events[gpu]),
-                    "BFSEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
+                //util::GRError(cudaEventDestroy(throttle_events[gpu]),
+                //    "BFSEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
             }   
-            delete[] dones;          dones           = NULL;
-            throttle_events.Release();
-            retvals        .Release();
+            //delete[] dones;          dones           = NULL;
+            //throttle_events.Release();
+            //retvals        .Release();
             //delete[] throttle_event ;throttle_event  = NULL; 
-        }
+        }*/
     }
 
     /**
