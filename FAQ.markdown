@@ -92,57 +92,44 @@ documentation.
 How would someone install it?
 -----------------------------
 
-TODO: Add shared library part.
+For C/C++ programmer, integrating Gunrock into your projects is easy. Since it
+is a template based library, just add the include files in your code. The
+simple example and all the testrigs will provide detailed information on how to
+do this.
+
+For programmers who use Python, Julia, or other language and want to call
+Gunrock APIs, we are building a shared library with binary compatible
+C interfaces. It will be included in the soon-to-arrive next release of
+Gunrock.
 
 Can anyone install it? Do they need IT help?
 --------------------------------------------
 
 Gunrock is targeted at developers who are familiar with basic software
-engineering.
+engineering. For non-technical people, IT help might needed.
 
 Does this process actually work? All the time? On all systems specified?
 ------------------------------------------------------------------------
-
-TODO: Add Mac/Windows Testing Report and performance report when finish cmake
-porting.
+Currently, Gunrock has been tested on two Linux distributions: Linux Mint and
+Ubuntu. But we expect it to run correctly on other Linux distributions too.
+We are currently building a Cmake solution to port Gunrock to Mac and Windows.
+The feature will be included in the soon-to-arrive next release of Gunrock.
 
 How would someone test that it's working with provided sample data?
 -------------------------------------------------------------------
 
 Testrigs are provided as well as a small simple example for users to test the
-correctness and performance of every graph primitive.
-
-Is the loading of sample data clear?
-------------------------------------
-
-TODO: Update the graph IO when Yuduo finished his part.
+correctness and performance of every graph primitive. 
 
 Is the "using" of sample data clear?
 ------------------------------------
 
 On linux, one only needs to go to the dataset directory and run "make", the
-script will automatically download all the needed datasets.
-
-Does this process actually work? With the sample data?
-------------------------------------------------------
-
-TODO: Add a section in documentation for the use of sample data.
+script will automatically download all the needed datasets. One can also choose
+to download a single dataset in its separated directory.
 
 How would someone use it with their own data?
 ---------------------------------------------
 
-As of now, Gunrock only supports matrix market format (mtx). We also provide
-Python script to transfer edge list into mtx format.
-    
-# Is a specific format required?
-# Is the formatting process clear?
-# Does this process actually work?
-
-Does the software's output match its description in the documentation?
-----------------------------------------------------------------------
-
-TODO: Update the output format with other members in Thunderdome team.
-
-
-# Is the instructional material structured well?
-# What are the keywords that you would associate with this software based on the doc?
+Gunrock supports Matrix Market (.mtx) file format, users need to pre-process
+the graph data into this format before running Gunrock.

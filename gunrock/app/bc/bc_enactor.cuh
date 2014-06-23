@@ -64,9 +64,6 @@ class BCEnactor : public EnactorBase
      * @brief Prepare the enactor for BC kernel call. Must be called prior to each BC search.
      *
      * @param[in] problem BC Problem object which holds the graph data and BC problem data to compute.
-     * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] filter_grid_size CTA occupancy for filter kernel call.
-     *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template <typename ProblemData>
@@ -174,11 +171,10 @@ class BCEnactor : public EnactorBase
     /**
      * @brief Enacts a brandes betweenness centrality computing on the specified graph.
      *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam FilterPolicy Kernel policy for filter operator.
+     * @tparam AdvanceKernelPolicy Kernel policy for advance operator.
+     * @tparam FilterKernelPolicy Kernel policy for filter operator.
      * @tparam BCProblem BC Problem type.
-     * @tparam ForwardFunctor Forward Functor type used in the forward sigma computing pass.
-     * @tparam BackwardFunctor Backward Functor type used in the backward bc value accumulation pass.
+     * @param[in] context CudaContext pointer for moderngpu APIs
      * @param[in] problem BCProblem object.
      * @param[in] src Source node for BC. -1 to compute BC value for each node.
      * @param[in] max_grid_size Max grid size for BC kernel calls.
@@ -550,6 +546,7 @@ class BCEnactor : public EnactorBase
      *
      * @tparam BCProblem BC Problem type. @see BCProblem
      *
+     * @param[in] context CudaContedt pointer for moderngpu APIs
      * @param[in] problem Pointer to BCProblem object.
      * @param[in] src Source node for BC. -1 indicates computing BC value for all nodes.
      * @param[in] max_grid_size Max grid size for BC kernel calls.

@@ -446,10 +446,11 @@ struct Csr
     }
 
     /**
-     * @brief Display the neighbor list of a node
+     * @brief Display the neighbor list of a given node
      */
     void DisplayNeighborList(VertexId node)
     {
+        if (node < 0 || node >= nodes) return;
         for (SizeT edge = row_offsets[node];
                  edge < row_offsets[node + 1];
                  edge++) {
@@ -459,6 +460,9 @@ struct Csr
             printf("\n");
     }
 
+    /**
+     * @brief Get the average degree of all the nodes in graph
+     */
     SizeT GetAverageDegree() {
         if (average_degree == 0) {
             double mean = 0, count = 0;
@@ -471,6 +475,9 @@ struct Csr
         return average_degree;
     }
 
+    /**
+     * @brief Get the average node value in graph
+     */
     Value GetAverageNodeValue() {
         if (abs(average_node_value - 0) < 0.001 && node_values != NULL) {
             double mean = 0, count = 0;
@@ -485,6 +492,9 @@ struct Csr
         return average_node_value;
     }
 
+    /**
+     * @brief Get the average edge value in graph
+     */
     Value GetAverageEdgeValue() {
         if (abs(average_edge_value - 0) < 0.001 && edge_values != NULL) {
             double mean = 0, count = 0;

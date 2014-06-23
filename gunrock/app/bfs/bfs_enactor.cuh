@@ -56,9 +56,6 @@ class BFSEnactor : public EnactorBase
      * @brief Prepare the enactor for BFS kernel call. Must be called prior to each BFS search.
      *
      * @param[in] problem BFS Problem object which holds the graph data and BFS problem data to compute.
-     * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] filter_grid_size CTA occupancy for filter kernel call.
-     *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template <typename ProblemData>
@@ -187,10 +184,11 @@ class BFSEnactor : public EnactorBase
     /**
      * @brief Enacts a breadth-first search computing on the specified graph.
      *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam FilterPolicy Kernel policy for filter.
+     * @tparam AdvanceKernelPolicy Kernel policy for advance operator.
+     * @tparam FilterKernelPolicy Kernel policy for filter operator.
      * @tparam BFSProblem BFS Problem type.
      *
+     * @param[in] context CudaContext pointer for moderngpu APIs
      * @param[in] problem BFSProblem object.
      * @param[in] src Source node for BFS.
      * @param[in] max_grid_size Max grid size for BFS kernel calls.
@@ -423,6 +421,7 @@ class BFSEnactor : public EnactorBase
      *
      * @tparam BFSProblem BFS Problem type. @see BFSProblem
      *
+     * @param[in] context CudaContext pointer for moderngpu APIs
      * @param[in] problem Pointer to BFSProblem object.
      * @param[in] src Source node for BFS.
      * @param[in] max_grid_size Max grid size for BFS kernel calls.
