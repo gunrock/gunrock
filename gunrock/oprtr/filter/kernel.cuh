@@ -121,7 +121,8 @@ struct Dispatch
         util::CtaWorkProgress       &work_progress,
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
-        util::KernelRuntimeStats    &kernel_stats)
+        util::KernelRuntimeStats    &kernel_stats,
+        texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *&ts_bitmask)
     {
         // empty
     }
@@ -153,7 +154,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         util::CtaWorkProgress       &work_progress,
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
-        util::KernelRuntimeStats    &kernel_stats)
+        util::KernelRuntimeStats    &kernel_stats,
+        texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *&ts_bitmask)
     {
 
         // Shared storage for the kernel
@@ -271,7 +273,8 @@ void Kernel(
     util::CtaWorkProgress                   work_progress,        
     typename KernelPolicy::SizeT            max_in_queue,        
     typename KernelPolicy::SizeT            max_out_queue,      
-    util::KernelRuntimeStats                kernel_stats)      
+    util::KernelRuntimeStats                kernel_stats,
+    texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *ts_bitmask)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
         iteration,
@@ -288,7 +291,8 @@ void Kernel(
         work_progress,
         max_in_queue,
         max_out_queue,
-        kernel_stats);
+        kernel_stats,
+        ts_bitmask);
 }
 
 

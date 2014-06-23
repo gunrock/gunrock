@@ -80,6 +80,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     max_in,                   // max_in_queue
                     max_out,                 // max_out_queue
                     enactor_stats.advance_kernel_stats,
+                    NULL,
+                    NULL,
                     ADVANCE_TYPE,
                     inverse_graph);
             break;
