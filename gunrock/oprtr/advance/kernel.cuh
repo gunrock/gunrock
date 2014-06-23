@@ -66,7 +66,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                 <<<enactor_stats.advance_grid_size, KernelPolicy::THREAD_WARP_CTA_FORWARD::THREADS>>>(
                     frontier_attribute.queue_reset,
                     frontier_attribute.queue_index,
-                    enactor_stats.num_gpus,
+                    //enactor_stats.num_gpus,
                     enactor_stats.iteration,
                     frontier_attribute.queue_length,
                     d_done,

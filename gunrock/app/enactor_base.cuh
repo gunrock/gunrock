@@ -72,7 +72,7 @@ struct FrontierAttribute
  */
 class EnactorBase
 {
-protected:  
+public:  
 
     int                             num_gpus;
     int                             *gpu_idx;

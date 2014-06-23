@@ -111,8 +111,8 @@ namespace edge_map_forward {
             // Shared memory for the CTA
             SmemStorage             &smem_storage;
             
-            texture<SizeT, cudaTextureType1D, cudaReadModeElementType> *ts_rowoffset,
-            texture<VertexId, cudaTextureType1D, cudaReadModeElementType> *ts_columnindices, 
+            texture<SizeT, cudaTextureType1D, cudaReadModeElementType> *ts_rowoffset;
+            texture<VertexId, cudaTextureType1D, cudaReadModeElementType> *ts_columnindices; 
  
 
             /**
@@ -191,14 +191,14 @@ namespace edge_map_forward {
                                         Vec2SizeT   row_range;
                                         SizeT       row_id1;
                                         if (cta->advance_type == gunrock::oprtr::advance::V2V || cta->advance_type == gunrock::oprtr::advance::V2E) {
-                                            row_range.x = tex1Dfetch(ts_rowoffset[0], row_id);
-                                            row_range.y = tex1Dfetch(ts_rowoffset[0], row_id + 1);
+                                            row_range.x = tex1Dfetch(cta->ts_rowoffset[0], row_id);
+                                            row_range.y = tex1Dfetch(cta->ts_rowoffset[0], row_id + 1);
                                         }
 
                                         if (cta->advance_type == gunrock::oprtr::advance::E2V || cta->advance_type == gunrock::oprtr::advance::E2E) {
                                             row_id1 = (cta->inverse_graph) ? cta->d_inverse_column_indices[row_id] : cta->d_column_indices[row_id];
-                                            row_range.x = tex1Dfetch(ts_rowoffset[0], row_id1);
-                                            row_range.y = tex1Dfetch(ts_rowoffset[0], row_id1+1);
+                                            row_range.x = tex1Dfetch(cta->ts_rowoffset[0], row_id1);
+                                            row_range.y = tex1Dfetch(cta->ts_rowoffset[0], row_id1+1);
                                         }
 
                                         // compute row offset and length

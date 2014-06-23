@@ -128,8 +128,8 @@ namespace bfs {
 
     template<
         bool     INSTRUMENT,
-        typename EdgeMapPolicy,
-        typename VertexMapPolicy,
+        typename AdvanceKernelPolicy,
+        typename FilterKernelPolity,
         typename BFSProblem>
     static CUT_THREADPROC BFSThread(
         void * thread_data_)
@@ -146,13 +146,15 @@ namespace bfs {
         BFSEnactor<BFSProblem, INSTRUMENT>
                      *enactor              = (BFSEnactor<BFSProblem, INSTRUMENT>*) thread_data->enactor;
         int          thread_num            =   thread_data-> thread_num;
-        DataSlice    *data_slice           = &(problem    -> data_slices       [thread_num]);
+        int          gpu                   =   problem    -> gpu_idx           [thread_num];
+        util::Array1D<SizeT,DataSlice>
+                     *data_slice           = &(problem    -> data_slices       [thread_num]);
         GraphSlice   *graph_slice          =   problem    -> graph_slices      [thread_num];
-        typename BFSEnactor<BFSProblem, INSTRUMENT>::FrontierAttribute
+        FrontierAttribute
                      *frontier_attribute   = &(enactor    -> frontier_attribute[thread_num]);
-        typename BFSEnactor<BFSProblem, INSTRUMENT>::EnactorStats 
-                     *eanctor_stats        = &(enactor    -> enactor_stats     [thread_num]);
+        EnactorStats *enactor_stats        = &(enactor    -> enactor_stats     [thread_num]);
         int          num_gpus              =   problem    -> num_gpus;
+        util::cpu_mt::CPUBarrier* cpu_barrier = thread_data->cpu_barrier;
         util::scan::MultiScan<VertexId,SizeT,true,256,8>*
                      Scaner                = NULL;
         bool         break_clean           = true;
@@ -164,24 +166,25 @@ namespace bfs {
         frontier_attribute->queue_length   = thread_data->init_size; //? 
         frontier_attribute->queue_reset    = true;
         
-
-        if (num_gpus >1)
-        {
-            Scan = new util::scan::MultiScan<VertexId, SizeT, true, 256, 8>;
-            out_offset = new SizeT[num_gpus +1];
-        }
+        do {
+            if (enactor_stats->retval = util::SetDevice(gpu)) break;
+            if (num_gpus >1)
+            {
+                Scaner = new util::scan::MultiScan<VertexId, SizeT, true, 256, 8>;
+                out_offset = new SizeT[num_gpus +1];
+            }
         
-        scanned_edges.SetName("scanned_edges");
-        if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
-            if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_scanned_edges,
-                                graph_slice->edges * sizeof(unsigned int)),
-                            "PBFSProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
+            scanned_edges.SetName("scanned_edges");
+            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
+                if (enactor_stats->retval = scanned_edges.Allocate(graph_slice->edges, util::DEVICE)) break;//= util::GRError(cudaMalloc(
+                                //(void**)&d_scanned_edges,
+                                //graph_slice->edges * sizeof(unsigned int)),
+                                //"PBFSProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
             }
 
 
             
-            fflush(stdout);
+            //fflush(stdout);
             /*// Step through BFS iterations
             
             while (done[0] < 0) {
@@ -333,8 +336,25 @@ namespace bfs {
                 break;
             }
         if (d_scanned_edges) cudaFree(d_scanned_edges);*/
-    CUT_THREADEND;
-}
+
+        } while(0);
+
+        if (num_gpus >1) 
+        {   
+            if (break_clean) 
+            {   
+                //printf("%d\t",thread_num);
+                util::cpu_mt::ReleaseBarrier(&(cpu_barrier[0]));
+            }   
+            //util::cpu_mt::ReleaseBarrier(&(cpu_barrier[0]));
+            //util::cpu_mt::ReleaseBarrier(&(cpu_barrier[1]));
+            delete Scaner; Scaner=NULL;
+            //delete[] out_offset; out_offset=NULL;
+        }   
+        delete[] message;message=NULL;
+
+        CUT_THREADEND;
+    }
 
 /**
  * @brief BFS problem enactor class.
@@ -602,7 +622,7 @@ class BFSEnactor : public EnactorBase
             util::cpu_mt::DestoryBarrier(&cpu_barrier);
             
             for (int gpu=0;gpu<num_gpus;gpu++)
-            if (this->retvals[gpu]!=cudaSuccess) {retval=this->retvals[gpu];break;}
+            if (this->enactor_stats[gpu].retval!=cudaSuccess) {retval=this->enactor_stats[gpu].retval;break;}
         } while(0);
 
         if (DEBUG) printf("\nGPU BFS Done.\n");
