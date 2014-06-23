@@ -58,8 +58,6 @@ class PREnactor : public EnactorBase
      * @brief Prepare the enactor for PR kernel call. Must be called prior to each PR search.
      *
      * @param[in] problem PR Problem object which holds the graph data and PR problem data to compute.
-     * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] filter_grid_size CTA occupancy for vertex mapping kernel call.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -172,10 +170,11 @@ class PREnactor : public EnactorBase
     /**
      * @brief Enacts a page rank computing on the specified graph.
      *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam FilterPolicy Kernel policy for vertex mapping.
+     * @tparam AdvanceKernelPolicy Kernel policy for advance operator.
+     * @tparam FilterKernelPolicy Kernel policy for filter operator.
      * @tparam PRProblem PR Problem type.
      *
+     * @param[in] context CudaContext pointer for moderngpu APIs.
      * @param[in] problem PRProblem object.
      * @param[in] src Source node for PR.
      * @param[in] max_grid_size Max grid size for PR kernel calls.
@@ -473,6 +472,7 @@ class PREnactor : public EnactorBase
      *
      * @tparam PRProblem PR Problem type. @see PRProblem
      *
+     * @param[in] context CudaContext pointer for moderngpu APIs.
      * @param[in] problem Pointer to PRProblem object.
      * @param[in] src Source node for PR.
      * @param[in] max_grid_size Max grid size for PR kernel calls.

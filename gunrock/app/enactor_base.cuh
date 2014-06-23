@@ -30,6 +30,9 @@ using namespace mgpu;
 namespace gunrock {
 namespace app {
 
+/**
+ * @brief Structure for auxiliary variables used in enactor.
+ */
 struct EnactorStats
 {
     long long           iteration;
@@ -51,6 +54,9 @@ struct EnactorStats
 
 };
 
+/**
+ * @brief Structure for auxiliary variables used in frontier operations.
+ */
 struct FrontierAttribute
 {
     unsigned int        queue_length;
@@ -106,13 +112,24 @@ protected:
         enactor_stats.d_node_locks_out = NULL;
     }
 
-
+    /**
+     * @brief Destructor
+     */
     virtual ~EnactorBase()
     {
         if (enactor_stats.d_node_locks) util::GRError(cudaFree(enactor_stats.d_node_locks), "EnactorBase cudaFree d_node_locks failed", __FILE__, __LINE__);
         if (enactor_stats.d_node_locks_out) util::GRError(cudaFree(enactor_stats.d_node_locks_out), "EnactorBase cudaFree d_node_locks_out failed", __FILE__, __LINE__);
     }
 
+    /**
+     * @brief Setup function for enactor base class
+     *
+     * @param[in] problem The problem object for the graph primitive
+     * @param[in] max_grid_size Maximum CUDA block numbers in on grid
+     * @param[in] advance_occupancy CTA Occupancy for Advance operator
+     * @param[in] filter_occupancy CTA Occupancy for Filter operator
+     * @param[in] node_lock_size The size of an auxiliary array used in enactor, 256 by default.
+     */
     template <typename ProblemData>
     cudaError_t Setup(
         ProblemData *problem,

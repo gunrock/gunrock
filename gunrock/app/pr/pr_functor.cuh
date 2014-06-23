@@ -64,7 +64,7 @@ struct PRFunctor
     }
 
     /**
-     * @brief Vertex mapping condition function. Check if the Vertex Id is valid (not equal to -1).
+     * @brief Vertex mapping condition function. Check if the Vertex Id is valid (not equal to -1). Personal PageRank feature will be activated when a source node ID is set.
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
