@@ -305,7 +305,7 @@ template <
     bool        MARK_PREDECESSORS,
     bool        ENABLE_IDEMPOTENCE>
 void RunTests(
-    const Csr<VertexId, Value, SizeT> 
+    Csr<VertexId, Value, SizeT> 
                 &graph,
     VertexId    src,
     int         max_grid_size,
@@ -346,6 +346,7 @@ void RunTests(
     util::GRError(csr_problem->Init(
         g_stream_from_host,
         graph,
+        NULL,
         num_gpus,
         gpu_idx), "Problem BFS Initialization Failed", __FILE__, __LINE__);
 

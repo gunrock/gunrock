@@ -306,6 +306,7 @@ namespace bfs {
                 break;
             }
         if (d_scanned_edges) cudaFree(d_scanned_edges);*/
+    CUT_THREADEND;
 }
 
 /**
@@ -327,8 +328,12 @@ class BFSEnactor : public EnactorBase
      */
     volatile int                      **dones;
     int                               **d_dones;
-    util::Array1D<SizeT, cudaEvent_t> throttle_event;
+    util::Array1D<SizeT, cudaEvent_t> throttle_events;
     util::Array1D<SizeT, cudaError_t> retvals;
+
+    texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *ts_bitmask;
+    texture<SizeT        , cudaTextureType1D, cudaReadModeElementType> *ts_rowoffset;
+    texture<VertexId     , cudaTextureType1D, cudaReadModeElementType> *ts_columnindices;
 
     // Methods
     protected:
@@ -347,15 +352,20 @@ class BFSEnactor : public EnactorBase
     {
         cudaError_t retval = cudaSuccess;
         this->num_gpus     = problem->num_gpus;
-        this->gpu_idx.SetPointer(problem->gpu_idx, num_gpus);
+        this->gpu_idx      = problem->gpu_idx;
+        throttle_events.Allocate(this->num_gpus);
+        retvals.Allocate(this->num_gpus);
 
         do {
-            dones   = new volatile int* [num_gpus];
-            d_dojes = new          int* [num_gpus];
+            dones   = new volatile int* [this->num_gpus];
+            d_dones = new          int* [this->num_gpus];
+            ts_bitmask       = new texture<unsigned char, cudaTextureType1D, cudaReadModeElementType>[this->num_gpus];
+            ts_rowoffset     = new texture<SizeT        , cudaTextureType1D, cudaReadModeElementType>[this->num_gpus];
+            ts_columnindices = new texture<VertexId     , cudaTextureType1D, cudaReadModeElementType>[this->num_gpus];
 
             for (int gpu=0;gpu<num_gpus;gpu++)
             {
-                if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
+                if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
                 //initialize the host-mapped "done"
                 int flags = cudaHostAllocMapped;
 
@@ -373,6 +383,28 @@ class BFSEnactor : public EnactorBase
                 
                 dones  [gpu][0] = -1;
                 retvals[gpu]    = cudaSuccess;
+                
+                // Bind row-offsets and bitmask texture
+                cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
+                ts_rowoffset[gpu].channelDesc = row_offsets_desc;
+                if (retval = util::GRError(cudaBindTexture(
+                    0,
+                    ts_rowoffset[gpu],
+                    problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
+                    (problem->graph_slices[gpu]->nodes + 1) * sizeof(SizeT)),
+                        "BFSEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
+
+                if (BFSProblem::ENABLE_IDEMPOTENCE) {
+                    int bytes = (problem->graph_slices[gpu]->nodes + 8 - 1) / 8;
+                    cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
+                    ts_bitmask[gpu].channelDesc = bitmask_desc;
+                    if (retval = util::GRError(cudaBindTexture(
+                                0,
+                                ts_bitmask[gpu],
+                                problem->data_slices[gpu]->visited_mask.GetPointer(util::DEVICE),
+                                bytes),
+                            "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
+                }
             }
 
             /*//graph slice
@@ -381,27 +413,7 @@ class BFSEnactor : public EnactorBase
 
         do {
 
-            // Bind row-offsets and bitmask texture
-            cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
-            gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref.channelDesc = row_offsets_desc;
-            if (retval = util::GRError(cudaBindTexture(
-                    0,
-                    gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
-                    graph_slice->d_row_offsets,
-                    (graph_slice->nodes + 1) * sizeof(SizeT)),
-                        "BFSEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
-
-            if (ProblemData::ENABLE_IDEMPOTENCE) {
-                int bytes = (graph_slice->nodes + 8 - 1) / 8;
-                cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
-                gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
-                if (retval = util::GRError(cudaBindTexture(
-                                0,
-                                gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref,
-                                data_slice->d_visited_mask,
-                                bytes),
-                            "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
-            }*/
+           }*/
 
             /*cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
             gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref.channelDesc = column_indices_desc;
@@ -442,12 +454,12 @@ class BFSEnactor : public EnactorBase
                 util::GRError(cudaFreeHost((void*)(dones[gpu])),
                     "BFSEnactor cudaFreeHost done failed", __FILE__, __LINE__);
 
-                util::GRError(cudaEventDestroy(throttle_event[gpu]),
+                util::GRError(cudaEventDestroy(throttle_events[gpu]),
                     "BFSEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
             }   
             delete[] dones;          dones           = NULL;
-            throttle_event.Release();
-            retvals       .Release();
+            throttle_events.Release();
+            retvals        .Release();
             //delete[] throttle_event ;throttle_event  = NULL; 
         }
     }
@@ -481,10 +493,11 @@ class BFSEnactor : public EnactorBase
                     "BFSEnactor cudaSetDevice gpu failed", __FILE__, __LINE__);
             cudaThreadSynchronize();
 
-            total_queued += this->total_queued[gpu];
-            if (this->iterations[gpu] > search_depth) search_depth = this->iterations[gpu];
-            total_lifetimes += this->total_lifetimes[gpu];
-            total_runtimes += this->total_runtimes[gpu];
+            total_queued += this->enactor_stats[gpu].total_queued;
+            if (this->enactor_stats[gpu].iteration > search_depth) 
+                search_depth = this->enactor_stats[gpu].iteration;
+            total_lifetimes += this->enactor_stats[gpu].total_lifetimes;
+            total_runtimes  += this->enactor_stats[gpu].total_runtimes;
         }
         avg_duty = (total_lifetimes >0) ?
             double(total_runtimes) / total_lifetimes : 0.0;
@@ -509,7 +522,7 @@ class BFSEnactor : public EnactorBase
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy>
     cudaError_t EnactBFS(
-    CudaContext *context,
+    ContextPtr *context,
     BFSProblem  *problem,
     VertexId    src,
     int         max_grid_size = 0)
@@ -588,13 +601,19 @@ class BFSEnactor : public EnactorBase
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Enact(
-        CudaContext *context,
+        ContextPtr *context,
         BFSProblem  *problem,
         VertexId    src,
         int         max_grid_size = 0)
     {
+        int min_sm_version = -1;
+        for (int i=0;i<this->num_gpus;i++)
+            if (min_sm_version == -1 || this->cuda_props[i].device_sm_version < min_sm_version)
+                min_sm_version = this->cuda_props[i].device_sm_version;
+
         if (BFSProblem::ENABLE_IDEMPOTENCE) {
-            if (this->cuda_props.device_sm_version >= 300) {
+            //if (this->cuda_props.device_sm_version >= 300) {
+            if (min_sm_version >= 300) {
                 typedef gunrock::oprtr::filter::KernelPolicy<
                     BFSProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
@@ -631,7 +650,8 @@ class BFSEnactor : public EnactorBase
                         context, problem, src, max_grid_size);
             }
         } else {
-                if (this->cuda_props.device_sm_version >= 300) {
+                //if (this->cuda_props.device_sm_version >= 300) {
+                if (min_sm_version >= 300) {
                 typedef gunrock::oprtr::filter::KernelPolicy<
                     BFSProblem,                         // Problem data type
                 300,                                // CUDA_ARCH

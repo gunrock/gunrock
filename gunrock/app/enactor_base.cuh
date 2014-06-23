@@ -165,8 +165,8 @@ protected:
             enactor_stats[gpu].advance_grid_size = MaxGridSize(gpu, advance_occupancy, max_grid_size);
             enactor_stats[gpu].filter_grid_size  = MaxGridSize(gpu, filter_occupancy, max_grid_size);
 
-            if (retval = enactor_stats[gpu].advance_kernel_stats.Setup(enactor_stats.advance_grid_size)) return retval;
-            if (retval = enactor_stats[gpu]. filter_kernel_stats.Setup(enactor_stats. filter_grid_size)) return retval;
+            if (retval = enactor_stats[gpu].advance_kernel_stats.Setup(enactor_stats[gpu].advance_grid_size)) return retval;
+            if (retval = enactor_stats[gpu]. filter_kernel_stats.Setup(enactor_stats[gpu]. filter_grid_size)) return retval;
 
             enactor_stats[gpu].iteration             = 0;
             enactor_stats[gpu].total_runtimes        = 0;
@@ -186,7 +186,7 @@ protected:
             //                (void**)&enactor_stats.d_node_locks_out,
             //                node_lock_size * sizeof(unsigned int)),
             //            "EnactorBase cudaMalloc d_node_locks_out failed", __FILE__, __LINE__)) return retval;
-            if (retval = enactor_stats[gpu].node_noces_out.Allocate(node_lock_size, util::DEVICE) return retval;
+            if (retval = enactor_stats[gpu].node_locks_out.Allocate(node_lock_size, util::DEVICE)) return retval;
         }
         return retval;
     }

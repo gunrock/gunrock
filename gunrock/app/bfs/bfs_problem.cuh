@@ -321,7 +321,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
      */
     cudaError_t Init(
             bool        stream_from_host,       // Only meaningful for single-GPU
-            const Csr<VertexId, Value, SizeT> &graph,
+            Csr<VertexId, Value, SizeT> &graph,
             Csr<VertexId, Value, SizeT> *inversgraph = NULL,
             int         num_gpus = 1,
             int*        gpu_idx  = NULL,
@@ -330,6 +330,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         ProblemBase<VertexId, SizeT,Value,_USE_DOUBLE_BUFFER>::Init(
             stream_from_host,
             &graph,
+            NULL,
             num_gpus,
             gpu_idx,
             partition_method);
@@ -391,9 +392,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
 
         cudaError_t retval = cudaSuccess;
 
-        for (int gpu = 0; gpu < num_gpus; ++gpu) {
+        for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             // Set device
-            if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
+            if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
 
             // Allocate output labels if necessary
             if (data_slices[gpu]->labels.GetPointer(util::DEVICE)==NULL)
@@ -409,7 +410,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             }
 
             if (_ENABLE_IDEMPOTENCE) {
-                int visited_mask_bytes  = ((nodes * sizeof(unsigned char))+7)/8;
+                int visited_mask_bytes  = ((this->nodes * sizeof(unsigned char))+7)/8;
                 int visited_mask_elements = visited_mask_bytes * sizeof(unsigned char);
                 util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->visited_mask.GetPointer(util::DEVICE), (unsigned char)0, visited_mask_elements);
             }
