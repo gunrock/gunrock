@@ -529,7 +529,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 };
 
 /**
- * @brief Kernel entry for relax partitioned edge function
+ * @brief Kernel entry for relax light edge function
  *
  * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
  * @tparam ProblemData Problem data type for partitioned edge mapping.
@@ -537,14 +537,17 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  *
  * @param[in] queue_reset       If reset queue counter
  * @param[in] queue_index       Current frontier queue counter index
+ * @param[in] label             label value to use in functor
  * @param[in] d_row_offset      Device pointer of SizeT to the row offsets queue
  * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
+ * @param[in] d_inverse_column_indices  Device pointer of VertexId to the inverse column indices queue
  * @param[in] d_scanned_edges   Device pointer of scanned neighbor list queue of the current frontier
- * @param[in] partition_starts  Device pointer of partition start index computed by sorted search in moderngpu lib
- * @param[in] num_partitions    Number of partitions in the current frontier
+ * @param[in] partition_stats   Device pointer which marks the starting index of each partition
+ * @param[in] num_partitions    Number of partitions
  * @param[in] d_done            Pointer of volatile int to the flag to set when we detect incoming frontier is empty
  * @param[in] d_queue           Device pointer of VertexId to the incoming frontier queue
- * @param[out] d_out            Device pointer of VertexId to the outgoing frontier queue
+ * @param[out] d_bitmap_in      Device pointer of bool to the input frontier bitmap
+ * @param[out] d_bitmap_out     Device pointer of bool to the output frontier bitmap
  * @param[in] problem           Device pointer to the problem object
  * @param[in] input_queue_len   Length of the incoming frontier queue
  * @param[in] output_queue_len  Length of the outgoing frontier queue
@@ -552,6 +555,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @param[in] max_edges         Maximum number of elements we can place into the outgoing frontier
  * @param[in] work_progress     queueing counters to record work progress
  * @param[in] kernel_stats      Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT is set)
+ * @param[in] ADVANCE_TYPE      enumerator which shows the advance type: V2V, V2E, E2V, or E2E
+ * @param[in] inverse_graph     Whether this iteration's advance operator is in the opposite direction to the previous iteration
  */
     template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
@@ -616,12 +621,15 @@ void RelaxPartitionedEdges(
  *
  * @param[in] queue_reset       If reset queue counter
  * @param[in] queue_index       Current frontier queue counter index
+ * @param[in] label             label value to use in functor
  * @param[in] d_row_offset      Device pointer of SizeT to the row offsets queue
  * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
+ * @param[in] d_inverse_column_indices  Device pointer of VertexId to the inverse column indices queue
  * @param[in] d_scanned_edges   Device pointer of scanned neighbor list queue of the current frontier
  * @param[in] d_done            Pointer of volatile int to the flag to set when we detect incoming frontier is empty
  * @param[in] d_queue           Device pointer of VertexId to the incoming frontier queue
- * @param[out] d_out            Device pointer of VertexId to the outgoing frontier queue
+ * @param[out] d_bitmap_in      Device pointer of bool to the input frontier bitmap
+ * @param[out] d_bitmap_out     Device pointer of bool to the output frontier bitmap
  * @param[in] problem           Device pointer to the problem object
  * @param[in] input_queue_len   Length of the incoming frontier queue
  * @param[in] output_queue_len  Length of the outgoing frontier queue
@@ -629,6 +637,8 @@ void RelaxPartitionedEdges(
  * @param[in] max_edges         Maximum number of elements we can place into the outgoing frontier
  * @param[in] work_progress     queueing counters to record work progress
  * @param[in] kernel_stats      Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT is set)
+ * @param[in] ADVANCE_TYPE      enumerator which shows the advance type: V2V, V2E, E2V, or E2E
+ * @param[in] inverse_graph     Whether this iteration's advance operator is in the opposite direction to the previous iteration
  */
     template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
@@ -685,12 +695,14 @@ void RelaxLightEdges(
  * @tparam ProblemData Problem data type for partitioned edge mapping.
  * @tparam Functor Functor type for the specific problem type.
  *
- * @param[in] d_row_offset      Device pointer of SizeT to the row offsets queue
+ * @param[in] d_row_offsets     Device pointer of SizeT to the row offsets queue
+ * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
  * @param[in] d_queue           Device pointer of VertexId to the incoming frontier queue
- * @param[out] d_scanned_edges   Device pointer of scanned neighbor list queue of the current frontier
+ * @param[out] d_scanned_edges  Device pointer of scanned neighbor list queue of the current frontier
  * @param[in] num_elements      Length of the current frontier queue
  * @param[in] max_vertices      Maximum number of elements we can place into the incoming frontier
  * @param[in] max_edges         Maximum number of elements we can place into the outgoing frontier
+ * @param[in] ADVANCE_TYPE      enumerator which shows the advance type: V2V, V2E, E2V, or E2E
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
