@@ -541,6 +541,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  *
  * @param[in] queue_reset       If reset queue counter
  * @param[in] queue_index       Current frontier queue counter index
+ * @param[in] label             label value to use in functor
  * @param[in] d_row_offset      Device pointer of SizeT to the row offsets queue
  * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
  * @param[in] d_scanned_edges   Device pointer of scanned neighbor list queue of the current frontier
@@ -556,6 +557,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @param[in] max_edges         Maximum number of elements we can place into the outgoing frontier
  * @param[in] work_progress     queueing counters to record work progress
  * @param[in] kernel_stats      Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT is set)
+ * @param[in] ADVANCE_TYPE      enumerator which shows the advance type: V2V, V2E, E2V, or E2E
+ * @param[in] inverse_graph     Whether this iteration's advance operator is in the opposite direction to the previous iteration
  */
     template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
@@ -618,6 +621,7 @@ void RelaxPartitionedEdges(
  *
  * @param[in] queue_reset       If reset queue counter
  * @param[in] queue_index       Current frontier queue counter index
+ * @param[in] label             label value to use in functor
  * @param[in] d_row_offset      Device pointer of SizeT to the row offsets queue
  * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
  * @param[in] d_scanned_edges   Device pointer of scanned neighbor list queue of the current frontier
@@ -631,6 +635,8 @@ void RelaxPartitionedEdges(
  * @param[in] max_edges         Maximum number of elements we can place into the outgoing frontier
  * @param[in] work_progress     queueing counters to record work progress
  * @param[in] kernel_stats      Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT is set)
+ * @param[in] ADVANCE_TYPE      enumerator which shows the advance type: V2V, V2E, E2V, or E2E
+ * @param[in] inverse_graph     Whether this iteration's advance operator is in the opposite direction to the previous iteration
  */
     template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
@@ -645,9 +651,7 @@ void RelaxLightEdges(
         unsigned int    *d_scanned_edges,
         volatile int                    *d_done,
         typename KernelPolicy::VertexId *d_queue,
-        typename KernelPolicy::VertexId *d_out,
-        typename ProblemData::DataSlice *problem,
-        typename KernelPolicy::SizeT    input_queue_len,
+        typename KernelPolicy::VertexId *d_out, typename ProblemData::DataSlice *problem, typename KernelPolicy::SizeT    input_queue_len,
         typename KernelPolicy::SizeT    output_queue_len,
         typename KernelPolicy::SizeT    max_vertices,
         typename KernelPolicy::SizeT    max_edges,
@@ -685,12 +689,14 @@ void RelaxLightEdges(
  * @tparam ProblemData Problem data type for partitioned edge mapping.
  * @tparam Functor Functor type for the specific problem type.
  *
- * @param[in] d_row_offset      Device pointer of SizeT to the row offsets queue
+ * @param[in] d_row_offsets     Device pointer of SizeT to the row offsets queue
+ * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
  * @param[in] d_queue           Device pointer of VertexId to the incoming frontier queue
- * @param[out] d_scanned_edges   Device pointer of scanned neighbor list queue of the current frontier
+ * @param[out] d_scanned_edges  Device pointer of scanned neighbor list queue of the current frontier
  * @param[in] num_elements      Length of the current frontier queue
  * @param[in] max_vertices      Maximum number of elements we can place into the incoming frontier
  * @param[in] max_edges         Maximum number of elements we can place into the outgoing frontier
+ * @param[in] ADVANCE_TYPE      enumerator which shows the advance type: V2V, V2E, E2V, or E2E
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)

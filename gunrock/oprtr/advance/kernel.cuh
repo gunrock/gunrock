@@ -30,8 +30,36 @@ namespace gunrock {
 namespace oprtr {
 namespace advance {
 
-//TODO: finish LaucnKernel, should load diferent kernels according to their AdvanceMode
-//AdvanceType is the argument to send into each kernel call
+/**
+ * @brief Advance operator kernel entry point.
+ *
+ * @tparam KernelPolicy Kernel policy type for advance operator.
+ * @tparam ProblemData Problem data type for advance operator.
+ * @tparam Functor Functor type for the specific problem type.
+ *
+ * @param[in] d_done                    Pointer of volatile int to the flag to set when we detect incoming frontier is empty
+ * @param[in] enactor_stats             EnactorStats object to store enactor related variables and stast
+ * @param[in] frontier_attribute        FrontierAttribute object to store frontier attribute while doing the advance operation
+ * @param[in] data_slice                Device pointer to the problem object's data_slice member
+ * @param[in] backward_index_queue      If backward mode is activated, this is used to store the vertex index. (deprecated)
+ * @param[in] backward_frontier_map_in  If backward mode is activated, this is used to store input frontier bitmap
+ * @param[in] backward_frontier_map_out If backward mode is activated, this is used to store output frontier bitmap
+ * @param[in] partitioned_scanned_edges If load balanced mode is activated, this is used to store the scanned edge number for neighbor lists in current frontier
+ * @param[in] d_in_key_queue            Device pointer of input key array to the incoming frontier queue
+ * @param[in] d_out_key_queue           Device pointer of output key array to the outgoing frontier queue
+ * @param[in] d_in_value_queue          Device pointer of input value array to the incoming frontier queue
+ * @param[in] d_out_value_queue         Device pointer of output value array to the outgoing frontier queue
+ * @param[in] d_row_offsets             Device pointer of SizeT to the row offsets queue  
+ * @param[in] d_column_indices          Device pointer of VertexId to the column indices queue
+ * @param[in] d_column_offsets          Device pointer of SizeT to the row offsets queue for inverse graph
+ * @param[in] d_row_indices             Device pointer of VertexId to the column indices queue for inverse graph
+ * @param[in] max_in_queue              Maximum number of elements we can place into the incoming frontier
+ * @param[in] max_out_queue             Maximum number of elements we can place into the outgoing frontier
+ * @param[in] work_progress             queueing counters to record work progress
+ * @param[in] context                   CudaContext pointer for moderngpu APIs
+ * @param[in] ADVANCE_TYPE              enumerator of advance type: V2V, V2E, E2V, or E2E
+ * @param[in] inverse_graph             whether this iteration of advance operation is in the opposite direction to the previous iteration (false by default)
+ */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
     void LaunchKernel(
             volatile int                            *d_done,
