@@ -1,4 +1,4 @@
-Gunrock FAQ
+Gunrock FAQ     {#faq}
 ===========
 
 What does it do?
@@ -11,7 +11,7 @@ general operations in graph processing for other developers to build
 high-performance graph algorithm prototyes with minimum programming effort.
 
 How does it do it?
------------------
+------------------
 
 Gunrock takes advantage of the immense computational power available in
 commodity-level, off-the-shelf Graphics Processing Units (GPUs), originally
