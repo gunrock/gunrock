@@ -157,6 +157,19 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
     }
 };
 
+/**
+ * @brief Mark the queue index in a lookup table, if multiple queue indices
+ * map to same vertex ID, only one (the last one written) will be kept
+ *
+ * @tparam KernelPolicy Kernel policy type.
+ * @tparam ProblemData Problem data type.
+ * @tparam PriorityQueue PriorityQueue data type.
+ * @tparam Functor Functor type.
+ *
+ * @param[in] vertex_in     Device pointer of the input vertex IDs
+ * @param[in] problem       Problem object which stores user-defined priority value
+ * @param[in] input_queue_length Input queue length
+ */
 template<typename KernelPolicy, typename ProblemData, typename PriorityQueue, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::BLOCKS)
     __global__
@@ -171,6 +184,21 @@ void MarkVisit(
             input_queue_length);
 }
 
+/**
+ * @brief Mark whether the vertex ID is valid in near pile/far pile
+ *
+ * @tparam KernelPolicy Kernel policy type.
+ * @tparam ProblemData Problem data type.
+ * @tparam PriorityQueue PriorityQueue data type.
+ * @tparam Functor Functor type.
+ *
+ * @param[in] vertex_in     Device pointer of the input vertex IDs
+ * @param[out] pq           PriorityQueue pointer which will be used to store the near/far pile after the input vertices is splitted.
+ * @param[in] problem       Problem object which stores user-defined priority value
+ * @param[in] input_queue_length Input queue length
+ * @param[in] lower_priority_score_limit   Near pile priority value threshold
+ * @param[in] upper_priority_score_limit   Far pile priority value threshold
+ */
 template<typename KernelPolicy, typename ProblemData, typename PriorityQueue, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::BLOCKS)
     __global__
@@ -191,6 +219,24 @@ void MarkNF(
             upper_priority_score_limit);
 }
 
+/**
+ * @brief Compact the input queue into near far pile, remove the duplicate IDs,
+ * append the newly generated far pile at the end of current priority queue
+ * and output the vertices in the output queue
+ *
+ * @tparam KernelPolicy Kernel policy type.
+ * @tparam ProblemData Problem data type.
+ * @tparam PriorityQueue PriorityQueue data type.
+ * @tparam Functor Functor type.
+ *
+ * @param[in] vertex_in     Device pointer of the input vertex IDs
+ * @param[out] pq           PriorityQueue pointer which will be used to store the near/far pile after the input vertices is splitted.
+ * @param[in] selector      Binary switch for choosing from ping-pong buffers
+ * @param[in] input_queue_length Input queue length
+ * @param[out] vertex_out   Device pointer of the output vertex IDs, will be used for any other following operators
+ * @param[in] v_out_offset  The near pile queue offset
+ * @param[in] far_pile_offset Where to append the newly generated elements in the far pile
+ */
 template<typename KernelPolicy, typename ProblemData, typename PriorityQueue, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::BLOCKS)
     __global__
@@ -213,6 +259,25 @@ void Compact(
         far_pile_offset);
 }
 
+/**
+ * @brief Split a queue into two parts (near/far piles) according to
+ * its user-defined priority value.
+ *
+ * @tparam KernelPolicy Kernel policy type.
+ * @tparam ProblemData Problem data type.
+ * @tparam PriorityQueue PriorityQueue data type.
+ * @tparam Functor Functor type.
+ *
+ * @param[in] vertex_in     Device pointer of the input vertex IDs
+ * @param[out] pq           PriorityQueue pointer which will be used to store the near/far pile after the input vertices is splitted.
+ * @param[in] input_queue_length Input queue length
+ * @param[in] problem       Problem object which stores user-defined priority value
+ * @param[out] vertex_out   Device pointer of the output vertex IDs, will be used for any other following operators
+ * @param[in] far_pile_offset Where to append the newly generated elements in the far pile
+ * @param[in] lower_limit   Near pile priority value threshold
+ * @param[in] upper_limit   Far pile priority value threshold
+ * @param[in] context       CudaContext pointer for moderngpu APIs
+ */
 template <typename KernelPolicy, typename ProblemData, typename PriorityQueue, typename Functor>
     unsigned int Bisect(
         typename KernelPolicy::VertexId     *vertex_in,
