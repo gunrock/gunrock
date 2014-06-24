@@ -18,7 +18,7 @@
 #include <gunrock/util/cta_work_progress.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
 
-#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
+//#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_partitioned_backward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
 
@@ -59,14 +59,14 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
 {
     switch (KernelPolicy::ADVANCE_MODE)
     {
-        case TWC_FORWARD:
+        /*case TWC_FORWARD:
         {
             // Load Thread Warp CTA Forward Kernel
             gunrock::oprtr::edge_map_forward::Kernel<typename KernelPolicy::THREAD_WARP_CTA_FORWARD, ProblemData, Functor>
                 <<<enactor_stats.advance_grid_size, KernelPolicy::THREAD_WARP_CTA_FORWARD::THREADS>>>(
                     frontier_attribute.queue_reset,
                     frontier_attribute.queue_index,
-                    //enactor_stats.num_gpus,
+                    1,//enactor_stats.num_gpus,
                     enactor_stats.iteration,
                     frontier_attribute.queue_length,
                     d_done,
@@ -85,7 +85,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     ADVANCE_TYPE,
                     inverse_graph);
             break;
-        }
+        }*/
         case TWC_BACKWARD:
         {
             // Load Thread Warp CTA Backward Kernel

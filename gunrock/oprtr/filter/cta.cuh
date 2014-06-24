@@ -35,14 +35,13 @@ namespace filter {
 /**
 * Templated texture reference for visited mask
 */
-/*template <typename VisitedMask>
+template <typename VisitedMask>
 struct BitmaskTex
 {
    static texture<VisitedMask, cudaTextureType1D, cudaReadModeElementType> ref;
 };
 template <typename VisitedMask>
 texture<VisitedMask, cudaTextureType1D, cudaReadModeElementType> BitmaskTex<VisitedMask>::ref;
-*/
 
 /**
  * @brief CTA tile-processing abstraction for the filter operator.
@@ -93,6 +92,7 @@ struct Cta
 
     // Whether or not to perform bitmask culling (incurs extra latency on small frontiers)
     bool                    bitmask_cull;
+    //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *t_bitmask;
 
     //---------------------------------------------------------------------
     // Helper Structures
@@ -175,7 +175,7 @@ struct Cta
 
                     // Read byte from visited mask in tex
                     unsigned char tex_mask_byte = tex1Dfetch(
-                        cta->ts_bitmask[0],
+                        BitmaskTex<unsigned char>::ref,//cta->t_bitmask[0],
                         mask_byte_offset);
 
                     if (mask_bit & tex_mask_byte) {
@@ -220,7 +220,7 @@ struct Cta
                         VertexId label;
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                     label,
-                                                    (VertexId*)cta->problem->d_labels + row_id);
+                                                    cta->problem->labels + row_id);
                         if (label != -1) {
                             // Seen it
                             tile->element_id[LOAD][VEC] = -1;
@@ -427,7 +427,8 @@ struct Cta
         DataSlice               *problem,
         unsigned char           *d_visited_mask,
         util::CtaWorkProgress   &work_progress,
-        SizeT                   max_out_frontier) :
+        SizeT                   max_out_frontier):
+        //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *t_bitmask):
             iteration(iteration),
             queue_index(queue_index),
             num_gpus(num_gpus),
@@ -443,6 +444,7 @@ struct Cta
             d_visited_mask(d_visited_mask),
             work_progress(work_progress),
             max_out_frontier(max_out_frontier),
+	    //t_bitmask(t_bitmask),
             bitmask_cull(
                 (KernelPolicy::END_BITMASK_CULL < 0) ?
                     true :

@@ -272,9 +272,9 @@ public:
                 // Allocate and initialize
                 if (retval = util::GRError(cudaGetDevice(&gpu),
                     "CtaWorkProgress cudaGetDevice failed: ", __FILE__, __LINE__)) break;
-                if (retval = util::GRError(cudaMalloc((void**) &d_counters, sizeof(h_counters)),
+                if (retval = util::GRError(cudaMalloc((void**) &d_counters, sizeof(size_t) * COUNTERS),
                     "CtaWorkProgress cudaMalloc d_counters failed", __FILE__, __LINE__)) break;
-                if (retval = util::GRError(cudaMemcpy(d_counters, h_counters, sizeof(h_counters), cudaMemcpyHostToDevice),
+                if (retval = util::GRError(cudaMemcpy(d_counters, h_counters, sizeof(size_t) * COUNTERS, cudaMemcpyHostToDevice),
                     "CtaWorkProgress cudaMemcpy d_counters failed", __FILE__, __LINE__)) break;
             }
 

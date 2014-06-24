@@ -67,6 +67,23 @@ struct FrontierAttribute
     gunrock::oprtr::advance::TYPE   advance_type;
 };
 
+bool All_Done(EnactorStats *enactor_stats,int num_gpus)
+{   
+    for (int gpu=0;gpu<num_gpus;gpu++)
+    if (enactor_stats[gpu].retval!=cudaSuccess)
+    {   
+        printf("(CUDA error %d @ GPU %d: %s\n", enactor_stats[gpu].retval, gpu, cudaGetErrorString(enactor_stats[gpu].retval)); fflush(stdout);
+        return true;
+    }   
+
+    for (int gpu=0;gpu<num_gpus;gpu++)
+    if (enactor_stats[gpu].done[0]!=0)
+    {   
+        return false;
+    }   
+    return true;
+} 
+
 /**
  * @brief Base class for graph problem enactors.
  */

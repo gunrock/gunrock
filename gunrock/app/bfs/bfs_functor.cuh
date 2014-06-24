@@ -51,9 +51,9 @@ struct BFSFunctor
         } else {
             // Check if the destination node has been claimed as someone's child
             if (ProblemData::MARK_PREDECESSORS)
-                return (atomicCAS(&problem->preds[d_id], -2, s_id) == -2) ? true : false;
+                return (atomicCAS( problem->preds + d_id , -2, s_id) == -2) ? true : false;
             else { 
-                return (atomicCAS(&problem->labels[d_id], -1, s_id+1) == -1) ? true : false;
+                return (atomicCAS( problem->labels + d_id, -1, s_id+1) == -1) ? true : false;
             }
         }
     }

@@ -43,6 +43,7 @@ struct SweepPass
         util::CtaWorkProgress                   &work_progress,
         util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition,
         typename KernelPolicy::SizeT            &max_out_frontier)
+        //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *&t_bitmask)
     {
         typedef Cta<KernelPolicy, ProblemData, Functor>     Cta;
         typedef typename KernelPolicy::SizeT                SizeT;
@@ -71,6 +72,7 @@ struct SweepPass
             d_visited_mask,
             work_progress,
             max_out_frontier);
+	    //t_bitmask);
 
         // Process full tiles
         while (work_limits.offset < work_limits.guarded_offset) {
@@ -121,8 +123,8 @@ struct Dispatch
         util::CtaWorkProgress       &work_progress,
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
-        util::KernelRuntimeStats    &kernel_stats,
-        texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *&ts_bitmask)
+        util::KernelRuntimeStats    &kernel_stats)
+        //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *&ts_bitmask)
     {
         // empty
     }
@@ -154,8 +156,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         util::CtaWorkProgress       &work_progress,
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
-        util::KernelRuntimeStats    &kernel_stats,
-        texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *&ts_bitmask)
+        util::KernelRuntimeStats    &kernel_stats)
+        //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *&t_bitmask)
     {
 
         // Shared storage for the kernel
@@ -224,6 +226,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 work_progress,
                 smem_storage.state.work_decomposition,
                 max_out_frontier);
+		//t_bitmask);
 
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
             kernel_stats.MarkStop();
@@ -273,8 +276,8 @@ void Kernel(
     util::CtaWorkProgress                   work_progress,        
     typename KernelPolicy::SizeT            max_in_queue,        
     typename KernelPolicy::SizeT            max_out_queue,      
-    util::KernelRuntimeStats                kernel_stats,
-    texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *ts_bitmask)
+    util::KernelRuntimeStats                kernel_stats)
+    //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *ts_bitmask)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
         iteration,
@@ -291,8 +294,8 @@ void Kernel(
         work_progress,
         max_in_queue,
         max_out_queue,
-        kernel_stats,
-        ts_bitmask);
+        kernel_stats);
+        //ts_bitmask);
 }
 
 
