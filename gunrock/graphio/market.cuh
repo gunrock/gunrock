@@ -225,8 +225,10 @@ int ReadCsrArrays(char *f_in,
  * @brief Loads a MARKET-formatted CSR graph from the specified file.
  *
  * @param[in] mm_filename Graph file name, if empty, then it is loaded from stdin.
+ * @param[in] output_file Output file to store the computed graph topology info.
  * @param[in] csr_graph Reference to CSR graph object. @see Csr
  * @param[in] undirected Is the graph undirected or not?
+ * @param[in] reversed Is the graph reversed or not?
  *
  * \return If there is any File I/O error along the way. 0 for no error.
  */
@@ -273,7 +275,7 @@ int BuildMarketGraph(char *mm_filename,
 }
 
 /**
- * @read in graph function read in graph according to it's type
+ * @brief read in graph function read in graph according to it's type
  *
  */
 template <bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>

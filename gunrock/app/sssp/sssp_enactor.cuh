@@ -191,6 +191,7 @@ class SSSPEnactor : public EnactorBase
      * @param[in] context CudaContext pointer for moderngpu APIs
      * @param[in] problem SSSPProblem object.
      * @param[in] src Source node for SSSP.
+     * @param[in] queue_sizing Scaling factor for frontier queue
      * @param[in] max_grid_size Max grid size for SSSP kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -466,6 +467,7 @@ class SSSPEnactor : public EnactorBase
      * @param[in] context CudaContext pointer for moderngpu APIs
      * @param[in] problem Pointer to SSSPProblem object.
      * @param[in] src Source node for SSSP.
+     * @param[in] queue_sizing Scaling factor for input queue size.
      * @param[in] max_grid_size Max grid size for SSSP kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.

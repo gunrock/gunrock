@@ -98,7 +98,8 @@ bool PRCompare(
  /**
   * @brief Displays the BFS result (i.e., distance from source)
   *
-  * @param[in] source_path Search depth from the source for each node.
+  * @param[in] node_id Node vertex Id
+  * @param[in] rank Rank value for the node
   * @param[in] nodes Number of nodes in the graph.
   */
  template<typename VertexId, typename Value, typename SizeT>
@@ -181,6 +182,7 @@ void DisplayStats(
   * @tparam SizeT
   *
   * @param[in] graph Reference to the CSR graph we process on
+  * @param[in] node_id Source node for personalized PageRank (if any)
   * @param[in] rank Host-side vector to store CPU computed labels for each node
   * @param[in] delta delta for computing PR
   * @param[in] error error threshold
@@ -267,6 +269,7 @@ void SimpleReferencePr(
  * @tparam INSTRUMENT
  *
  * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] src Source node for personalized PageRank (if any)
  * @param[in] delta Delta value for computing PageRank, usually set to .85
  * @param[in] error Error threshold value
  * @param[in] max_iter Max iteration for Page Rank computing
@@ -391,6 +394,7 @@ void RunTests(
  *
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] args Reference to the command line arguments
+ * @param[in] context CudaContext pointer for moderngpu APIs
  */
 template <
     typename VertexId,

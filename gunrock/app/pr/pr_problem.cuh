@@ -144,6 +144,7 @@ struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
      * @brief Copy result labels and/or predecessors computed on the GPU back to host-side vectors.
      *
      * @param[out] h_rank host-side vector to store page rank values.
+     * @param[out] h_node_id host-side vector to store node Vertex ID.
      *
      *\return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -300,6 +301,8 @@ struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
      *  @brief Performs any initialization work needed for PR problem type. Must be called prior to each PR iteration.
      *
      *  @param[in] src Source node for one PR computing pass.
+     *  @param[in] delta Tuning parameter for switching to backward BFS
+     *  @param[in] threshold Threshold for remove node from PR computation process.
      *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
      * 
      *  \return cudaError_t object which indicates the success of all CUDA function calls.

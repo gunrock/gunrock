@@ -473,10 +473,11 @@ unsigned int RefCPUCC(SizeT *row_offsets, VertexId *column_indices,
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] graph Reference to ...
+ * @param[in] graph Reference to the CSR graph we process on
  * @param[in] max_grid_size
  * @param[in] num_gpus
  * @param[in] max_queue_sizing
+ * @param[in] context CudaContext pointer for moderngpu APIs
  */
 template <
     typename VertexId,

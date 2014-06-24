@@ -130,6 +130,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
      * @brief Copy result labels computed on the GPU back to host-side vectors.
      *
      * @param[out] h_labels host-side vector to store computed node labels (distances from the source).
+     * @param[out] h_preds host-side vector to store computed node predecessors (used for extracting the actual shortest path).
      *
      *\return cudaError_t object which indicates the success of all CUDA function calls.
      */

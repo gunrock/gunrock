@@ -87,6 +87,7 @@ bool g_stream_from_host;
   * @param[in] preds Predecessor node id for each node.
   * @param[in] nodes Number of nodes in the graph.
   * @param[in] MARK_PREDECESSORS Whether to show predecessor of each node.
+  * @param[in] ENABLE_IDEMPOTENCE Whether to enable idempotence mode.
   */
  template<typename VertexId, typename SizeT>
  void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes, bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE)
@@ -213,6 +214,7 @@ void DisplayStats(
   *
   * @param[in] graph Reference to the CSR graph we process on
   * @param[in] source_path Host-side vector to store CPU computed labels for each node
+  * @param[in] predecessor Host-side vector to store CPU computed predecessor for each node
   * @param[in] src Source node where BFS starts
   */
  template<
@@ -295,6 +297,7 @@ void SimpleReferenceBfs(
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] num_gpus Number of GPUs
  * @param[in] max_queue_sizing Scaling factor used in edge mapping
+ * @param[in] context CudaContext pointer for moderngpu APIs
  *
  */
 template <
@@ -431,6 +434,7 @@ void RunTests(
  *
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] args Reference to the command line arguments
+ * @param[in] context CudaContext pointer for moderngpu APIs
  */
 template <
     typename VertexId,

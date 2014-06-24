@@ -90,9 +90,7 @@ bool g_stream_from_host;
   * @brief Displays the SSSP result (i.e., distance from source)
   *
   * @param[in] source_path Search depth from the source for each node.
-  * @param[in] preds Predecessor node id for each node.
   * @param[in] nodes Number of nodes in the graph.
-  * @param[in] MARK_PREDECESSORS Whether to show predecessor of each node.
   */
  template<typename VertexId, typename SizeT>
  void DisplaySolution(VertexId *source_path, SizeT nodes)
@@ -207,9 +205,11 @@ void DisplayStats(
   * @tparam VertexId
   * @tparam Value
   * @tparam SizeT
+  * @tparam MARK_PREDECESSORS
   *
   * @param[in] graph Reference to the CSR graph we process on
-  * @param[in] source_path Host-side vector to store CPU computed labels for each node
+  * @param[in] node_values Host-side vector to store CPU computed labels for each node
+  * @param[in] node_preds Host-side vector to store CPU computed predecessors for each node
   * @param[in] src Source node where SSSP starts
   */
  template<
@@ -320,9 +320,9 @@ void SimpleReferenceSssp(
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] src Source node where SSSP starts
  * @param[in] max_grid_size Maximum CTA occupancy
+ * @param[in] queue_sizing Scaling factor used in edge mapping
  * @param[in] num_gpus Number of GPUs
- * @param[in] max_queue_sizing Scaling factor used in edge mapping
- *
+ * @param[in] context CudaContext pointer for moderngpu APIs
  */
 template <
     typename VertexId,
@@ -452,6 +452,7 @@ void RunTests(
  *
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] args Reference to the command line arguments
+ * @param[in] context CudaContext pointer for moderngpu APIs
  */
 template <
     typename VertexId,

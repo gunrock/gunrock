@@ -132,7 +132,7 @@ struct Csr
     }
 
     /**
-     * @store graph information into files
+     * @brief Store graph information into files
      * 
      */
   void WriteToFile(char * file_name,
@@ -227,10 +227,13 @@ struct Csr
     /**
      * @brief Build CSR graph from COO graph, sorted or unsorted
      *
+     * @param[in] output_file Output file to dump the graph topology info
      * @param[in] coo Pointer to COO-format graph
      * @param[in] coo_nodes Number of nodes in COO-format graph
      * @param[in] coo_edges Number of edges in COO-format graph
      * @param[in] ordered_rows Are the rows sorted? If not, sort them.
+     * @param[in] undirected Is the graph directed or not?
+     * @param[in] reversed Is the graph reversed or not?
      * Default: Assume rows are not sorted.
      */
     template <bool LOAD_EDGE_VALUES, typename Tuple>
