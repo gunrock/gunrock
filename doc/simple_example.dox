@@ -12,8 +12,8 @@ This simple example shows you how to initialize graph primitive data
 structures, run the algorithm, and extract results. The following description
 first shows each block of code and then explains it.
 
-\skip int dev = 0
-\until ContextPtr context == mgpu::
+\skip int dev =
+\until ContextPtr
 
 The \c mgpu::CreateCudaDevice function finds the device that supports CUDA and
 initializes it.
