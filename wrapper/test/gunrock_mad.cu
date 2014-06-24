@@ -4,11 +4,12 @@
  *
  */
 
-
 #include <wrapper/app/mad/mad_enactor.cuh>
 #include <wrapper/app/mad/mad_functor.cuh>
 #include <wrapper/app/mad/mad_problem.cuh>
 #include <wrapper/util/util.cuh>
+
+using namespace wrapper::app::mad;
 
 #ifdef __cplusplus
 extern "C"
@@ -34,7 +35,7 @@ extern "C"
 
     void gunrock_mad_float(float *origin_elements, int num_elements)
     {
-        typedef MADProblem<int> Problem;
+        typedef MADProblem<float> Problem;
         float   *h_results = (float*)malloc(sizeof(float) * num_elements);
         MADEnactor mad_enactor;
         Problem *simple_problem = new Problem;
