@@ -7,7 +7,7 @@
 #include <wrapper/app/mad/mad_enactor.cuh>
 #include <wrapper/app/mad/mad_functor.cuh>
 #include <wrapper/app/mad/mad_problem.cuh>
-#include <wrapper/util/util.cuh>
+#include <stdio.h> // used for print out
 
 using namespace wrapper::app::mad;
 
