@@ -145,16 +145,16 @@ FULL_PATH_NAMES        = YES
 
 STRIP_FROM_PATH        = ./ \
                          ./gunrock \
-                         ./gunrock/oprtr \
-                         ./gunrock/priority_queue \
-                         ./gunrock/util \
-                         ./gunrock/app \
-                         ./gunrock/app/bc \
-                         ./gunrock/app/bfs \
-                         ./gunrock/app/cc \
-                         ./gunrock/app/dobfs \
-                         ./gunrock/app/pr \
-                         ./gunrock/app/sssp \
+                         ./oprtr \
+                         ./priority_queue \
+                         ./util \
+                         ./app \
+                         ./app/bc \
+                         ./app/bfs \
+                         ./app/cc \
+                         ./app/dobfs \
+                         ./app/pr \
+                         ./app/sssp \
                          ./simple_example
 
 # The STRIP_FROM_INC_PATH tag can be used to strip a user-defined part of
