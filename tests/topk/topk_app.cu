@@ -58,7 +58,7 @@ void topk_run(const SizeT    row_offsets,
   
   // malloc host memory
   VertexId *h_node_id = (VertexId*)malloc(sizeof(VertexId) * top_nodes);
-  Value    *h_degrees = (  Value* )malloc(sizeof(  Value ) * top_nodes);
+  Value    *h_degrees = ( Value* )malloc(sizeof( Value ) * top_nodes);
   
   // copy data from CPU to GPU, initialize data members in DataSlice for graph
   util::GRError(topk_problem->Init(g_stream_from_host,
@@ -91,8 +91,8 @@ void topk_run(const SizeT    row_offsets,
   
   // cleanup if neccessary
   if (topk_problem) { delete topk_problem; }
-  if (h_node_id)    {   free(h_node_id);   }
-  if (h_degrees)    {   free(h_degrees);   }
+  if (h_node_id)    { free(h_node_id); }
+  if (h_degrees)    { free(h_degrees); }
   
   cudaDeviceSynchronize();
 }
