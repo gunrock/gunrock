@@ -186,6 +186,8 @@ extern "C" {
         if      (typeid(_Value) == typeid(int   ) || typeid(_Value) == typeid(unsigned int  ) ||
                  typeid(_Value) == typeid(short ) || typeid(_Value) == typeid(unsigned short ))
             sprintf(buffer,"%s%d"  ,buffer,val);
+        else if (typeid(_Value) == typeid(unsigned char))
+            sprintf(buffer,"%s%d"  ,buffer,int(val));
         else if (typeid(_Value) == typeid(long  ) || typeid(_Value) == typeid(unsigned long  ))
             sprintf(buffer,"%s%ld" ,buffer,val);
         else if (typeid(_Value) == typeid(long long) || typeid(_Value) == typeid(unsigned long long)) 

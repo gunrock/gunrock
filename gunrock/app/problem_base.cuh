@@ -114,6 +114,7 @@ struct ProblemBase
             edges(0),
             stream(stream)
         {
+            util::cpu_mt::PrintMessage("GraphSlice() begin.");
             row_offsets     .SetName("row_offsets"     );
             column_indices  .SetName("column_indices"  );
             column_offsets  .SetName("column_offsets"  );
@@ -129,6 +130,7 @@ struct ProblemBase
             {
                 frontier_elements[i] = 0;
             }
+            util::cpu_mt::PrintMessage("GraphSlice() end.");
         }
 
         /**
@@ -136,6 +138,7 @@ struct ProblemBase
          */
         virtual ~GraphSlice()
         {
+            util::cpu_mt::PrintMessage("~GraphSlice() begin.");
             // Set device (use slice index)
             //util::GRError(cudaSetDevice(index), "GpuSlice cudaSetDevice failed", __FILE__, __LINE__);
             util::SetDevice(index);
@@ -160,6 +163,7 @@ struct ProblemBase
             if (stream) {
                 util::GRError(cudaStreamDestroy(stream), "GpuSlice cudaStreamDestroy failed", __FILE__, __LINE__);
             }
+            util::cpu_mt::PrintMessage("~GraphSlice() end.");
         }
 
        /**
@@ -184,6 +188,7 @@ struct ProblemBase
             SizeT*                     in_offset,
             SizeT*                     out_offset)
         {
+            util::cpu_mt::PrintMessage("GraphSlice Init() begin.");
             cudaError_t retval     = cudaSuccess;
             this->graph            = graph;
             nodes                  = graph->nodes;
@@ -243,6 +248,7 @@ struct ProblemBase
                 } // end if num_gpu>1
             } while (0);
 
+            util::cpu_mt::PrintMessage("GraphSlice Init() end.");
             return retval;
         } // end of Init(...)
 
@@ -258,6 +264,7 @@ struct ProblemBase
             FrontierType frontier_type,     // The frontier type (i.e., edge/vertex/mixed)
             double queue_sizing = 2.0)            // Size scaling factor for work queue allocation
         {   
+            util::cpu_mt::PrintMessage("GraphSlice Reset() begin.");
             cudaError_t retval = cudaSuccess;
 
             // Set device
@@ -313,6 +320,7 @@ struct ProblemBase
                 } //end if
             } // end for i<2
 
+            util::cpu_mt::PrintMessage("GraphSlice Reset() end.");
             return retval;
         } // end Reset(...)
 
@@ -351,13 +359,17 @@ struct ProblemBase
         original_vertexes(NULL),
         in_offsets       (NULL),
         out_offsets      (NULL)
-        {}
+    {
+        util::cpu_mt::PrintMessage("ProblemBase() begin.");
+        util::cpu_mt::PrintMessage("ProblemBase() end.");
+    }
     
     /**
      * @brief ProblemBase default destructor to free all graph slices allocated.
      */
     virtual ~ProblemBase()
     {
+        util::cpu_mt::PrintMessage("~ProblemBase() begin.");
         // Cleanup graph slices on the heap
         for (int i = 0; i < num_gpus; ++i)
         {
@@ -385,6 +397,7 @@ struct ProblemBase
         }
         delete[] graph_slices; graph_slices = NULL;
         delete[] gpu_idx;      gpu_idx      = NULL;
+        util::cpu_mt::PrintMessage("~ProblemBase() end.");
    }
 
     /**
@@ -453,9 +466,10 @@ struct ProblemBase
         int         *gpu_idx          = NULL,
         std::string partition_method  = "random")
     {
+        util::cpu_mt::PrintMessage("ProblemBase Init() begin.");
         cudaError_t retval      = cudaSuccess;
-        this->nodes             = nodes;
-        this->edges             = edges;
+        this->nodes             = graph->nodes;
+        this->edges             = graph->edges;
         this->num_gpus          = num_gpus;
         this->gpu_idx           = new int [num_gpus];
 
@@ -472,6 +486,7 @@ struct ProblemBase
 
             if (num_gpus >1)
             {
+                printf("partition_method=%s\n", partition_method.c_str());
                 if (partition_method=="random")
                     partitioner=new rp::RandomPartitioner<VertexId, SizeT, Value>(*graph,num_gpus);
                 else if (partition_method=="metis")
@@ -521,6 +536,7 @@ struct ProblemBase
 
        } while (0);
 
+        util::cpu_mt::PrintMessage("ProblemBase Init() end.");
         return retval;
     }
 
@@ -536,12 +552,14 @@ struct ProblemBase
         FrontierType frontier_type,     // The frontier type (i.e., edge/vertex/mixed)
         double queue_sizing = 2.0)            // Size scaling factor for work queue allocation
         {
+            util::cpu_mt::PrintMessage("ProblemBase Reset() begin.");
             cudaError_t retval = cudaSuccess;
 
             for (int gpu = 0; gpu < num_gpus; ++gpu) {
                 if (retval = graph_slices[gpu]->Reset(frontier_type,queue_sizing)) break;
             }
             
+            util::cpu_mt::PrintMessage("ProblemBase Reset() end.");
             return retval;
         }
 };

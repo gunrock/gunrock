@@ -183,8 +183,9 @@ struct Cta
                         tile->element_id[LOAD][VEC] = -1;
                     } else {
                         unsigned char mask_byte;
-                        util::io::ModifiedLoad<util::io::ld::cg>::Ld(
-                            mask_byte, cta->d_visited_mask + mask_byte_offset);
+                        //util::io::ModifiedLoad<util::io::ld::cg>::Ld(
+                        //    mask_byte, cta->d_visited_mask + mask_byte_offset);
+                        mask_byte = cta->d_visited_mask[mask_byte_offset];
 
                         mask_byte |= tex_mask_byte;
 
@@ -215,7 +216,7 @@ struct Cta
             {
                 if (ProblemData::ENABLE_IDEMPOTENCE && cta->iteration != -1) {
                     if (tile->element_id[LOAD][VEC] >= 0) {
-                        VertexId row_id = (tile->element_id[LOAD][VEC]&KernelPolicy::ELEMENT_ID_MASK)/cta->num_gpus;
+                        VertexId row_id = (tile->element_id[LOAD][VEC]&KernelPolicy::ELEMENT_ID_MASK);///cta->num_gpus;
 
                         VertexId label;
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -237,7 +238,7 @@ struct Cta
                 } else {
                     if (tile->element_id[LOAD][VEC] >= 0) {
                         // Row index on our GPU (for multi-gpu, element ids are striped across GPUs)
-                        VertexId row_id = (tile->element_id[LOAD][VEC]) / cta->num_gpus;
+                        VertexId row_id = (tile->element_id[LOAD][VEC]);// / cta->num_gpus;
 
                         if (Functor::CondFilter(row_id, cta->problem)) {
                             // ApplyFilter(row_id)

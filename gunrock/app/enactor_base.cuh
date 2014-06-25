@@ -129,6 +129,7 @@ protected:
         frontier_type(frontier_type),
         DEBUG(DEBUG)
     {
+        util::cpu_mt::PrintMessage("EnactorBase() begin.");
         this->num_gpus     = num_gpus;
         this->gpu_idx      = gpu_idx;
         cuda_props         = new util::CudaProperties          [num_gpus];
@@ -150,11 +151,13 @@ protected:
             //enactor_stats.d_node_locks = NULL;
             //enactor_stats.d_node_locks_out = NULL;
         }
+        util::cpu_mt::PrintMessage("EnactorBase() end.");
     }
 
 
     virtual ~EnactorBase()
     {
+        util::cpu_mt::PrintMessage("~EnactorBase() begin.");
         for (int gpu=0;gpu<num_gpus;gpu++)
         {
             if (util::SetDevice(gpu_idx[gpu])) return;
@@ -172,6 +175,7 @@ protected:
         delete[] cuda_props        ; cuda_props         = NULL;
         delete[] enactor_stats     ; enactor_stats      = NULL;
         delete[] frontier_attribute; frontier_attribute = NULL;
+        util::cpu_mt::PrintMessage("~EnactorBase() end.");
     }
 
     template <typename ProblemData>
@@ -182,6 +186,7 @@ protected:
         int filter_occupancy,
         int node_lock_size = 256)
     {
+        util::cpu_mt::PrintMessage("EnactorBase Setup() begin.");
         cudaError_t retval = cudaSuccess;
 
         for (int gpu=0;gpu<num_gpus;gpu++)
@@ -229,6 +234,7 @@ protected:
             //            "EnactorBase cudaMalloc d_node_locks_out failed", __FILE__, __LINE__)) return retval;
             if (retval = enactor_stats[gpu].node_locks_out.Allocate(node_lock_size, util::DEVICE)) return retval;
         }
+        util::cpu_mt::PrintMessage("EnactorBase Setup() end.");
         return retval;
     }
 

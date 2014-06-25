@@ -348,7 +348,8 @@ void RunTests(
         graph,
         NULL,
         num_gpus,
-        gpu_idx), "Problem BFS Initialization Failed", __FILE__, __LINE__);
+        gpu_idx,
+        partition_method), "Problem BFS Initialization Failed", __FILE__, __LINE__);
 
     //
     // Compute reference CPU BFS solution for source-distance
@@ -480,6 +481,7 @@ void RunTests(
     g_verbose   = args.CheckCmdLineFlag("v");
     if (args.CheckCmdLineFlag  ("partition_method")) 
         args.GetCmdLineArgument("partition_method",partition_method);
+    printf("partition_method0=%s\n",partition_method.c_str());
     if (instrumented) {
         if (mark_pred) {
             if (idempotence) {

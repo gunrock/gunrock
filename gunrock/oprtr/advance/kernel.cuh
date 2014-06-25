@@ -57,6 +57,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             TYPE                                    ADVANCE_TYPE,
             bool                                    inverse_graph = false)
 {
+    if (frontier_attribute.queue_length == 0) return;
     switch (KernelPolicy::ADVANCE_MODE)
     {
         /*case TWC_FORWARD:

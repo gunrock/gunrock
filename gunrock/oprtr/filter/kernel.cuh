@@ -200,7 +200,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                     if (d_done) d_done[0] = num_elements;
                 }
             }
-
+            
             // Initialize work decomposition in smem
             smem_storage.state.work_decomposition.template Init<KernelPolicy::LOG_SCHEDULE_GRANULARITY>(
                     num_elements, gridDim.x);
