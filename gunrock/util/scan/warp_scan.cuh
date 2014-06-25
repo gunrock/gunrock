@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include <gunrock/util/basic_utils.cuh>
+#include <gunrock/util/basic_utils.h>
 #include <gunrock/util/operators.cuh>
 
 namespace gunrock {

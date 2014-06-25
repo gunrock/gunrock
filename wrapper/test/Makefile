@@ -44,7 +44,7 @@ DEFINES =
 #-------------------------------------------------------------------------------
 
 ifneq ($(force64), 1)
-	# Compile with 32-bit device pointers by default
+# Compile with 32-bit device pointers by default
 	ARCH_SUFFIX = i386
 	ARCH = -m32
 else
@@ -80,16 +80,21 @@ DEPS = 			./Makefile \
 				$(wildcard ../cuda/*.cuh) \
 				$(wildcard ../app/*.cuh) \
 				$(wildcard ../app/**/*.cuh)
-				 
+
 #-------------------------------------------------------------------------------
 # (make test) Test driver for 
 #-------------------------------------------------------------------------------
+test : gunrock_mad.o gunrock.o util.o $(DEPS)
+	nvcc -o test gunrock_mad.o gunrock.o util.o $(ARCH) $(INC) -O3
 
-test: bin/test_$(NVCC_VERSION)_$(ARCH_SUFFIX)
+gunrock_mad.o : gunrock_mad.cu $(DEPS)
+	nvcc -c gunrock_mad.cu $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
-bin/test_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test.cu $(DEPS)
-	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_$(NVCC_VERSION)_$(ARCH_SUFFIX) test.cu $(NVCCFLAGS) $(ARCH) $(INC) -O3
+util.o : ../util/util.cu $(DEPS)
+	nvcc -c ../util/util.cu $(NVCCFLAGS) $(ARCH) $(INC) -O3
+
+gunrock.o : gunrock.cpp $(DEPS)
+	gcc -c gunrock.cpp $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean
@@ -98,4 +103,3 @@ bin/test_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test.cu $(DEPS)
 clean :
 	rm -f bin/*_$(NVCC_VERSION)_$(ARCH_SUFFIX)* 
 	rm -f *.i* *.cubin *.cu.c *.cudafe* *.fatbin.c *.ptx *.hash *.cu.cpp *.o
-

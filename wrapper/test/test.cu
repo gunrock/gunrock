@@ -5,7 +5,7 @@
 #include <wrapper/app/mad/mad_problem.cuh>
 #include <wrapper/app/mad/mad_functor.cuh>
 
-#include <wrapper/util/util.cuh>
+#include <wrapper/util/util.h>
 
 using namespace wrapper;
 using namespace wrapper::util;

@@ -41,7 +41,7 @@ extern "C"
         Problem *simple_problem = new Problem;
         
         simple_problem->Init(num_elements, origin_elements);
-        mad_enactor.Enact<Problem(simple_problem);
+        mad_enactor.Enact<Problem>(simple_problem);
         simple_problem->Extract(h_results);
         printf("Complete.\n");
 
