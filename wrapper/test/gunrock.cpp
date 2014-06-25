@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 
-#include <wrapper/util/util.cuh> //TODO: avoid .cuh header
+#include <wrapper/util/util.h> //TODO: avoid .cuh header
 #include "gunrock.h"
 
 using namespace wrapper;

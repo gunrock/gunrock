@@ -19,7 +19,7 @@
 
 #include <algorithm>
 
-#include <gunrock/util/basic_utils.cuh>
+#include <gunrock/util/basic_utils.h>
 #include <gunrock/util/error_utils.cuh>
 
 namespace gunrock {

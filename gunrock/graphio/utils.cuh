@@ -20,7 +20,7 @@
 #include <algorithm>
 
 #include <gunrock/util/error_utils.cuh>
-#include <gunrock/util/random_bits.cuh>
+#include <gunrock/util/random_bits.h>
 
 #include <gunrock/coo.cuh>
 #include <gunrock/csr.cuh>

@@ -15,6 +15,7 @@
 #pragma once
 
 #include <gunrock/util/test_utils.h>
+#include <gunrock/util/error_utils.cuh>
 
 namespace gunrock {
 namespace util {

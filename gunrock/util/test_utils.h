@@ -33,9 +33,8 @@
 #include <fstream>
 #include <algorithm>
 #include <utility>
-#include <gunrock/util/random_bits.cuh>
-#include <gunrock/util/basic_utils.cuh>
-#include <gunrock/util/error_utils.cuh>
+#include <gunrock/util/random_bits.h>
+#include <gunrock/util/basic_utils.h>
 
 namespace gunrock {
 namespace util {
