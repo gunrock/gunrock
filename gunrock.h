@@ -10,9 +10,9 @@
  * gunrock.h
  *
  * @brief Main Library header file. Defines public interface.
- * The Gunrock public interface is a C-only interface to enable
- * linking with code written in other languages. While the int-
- * ernals of Gunrock are not limited to C.
+ * The Gunrock public interface is a C-only interface to enable linking 
+ * with code written in other languages. While the internals of Gunrock 
+ * are not limited to C.
  */
 
 #ifdef __cplusplus
@@ -25,22 +25,22 @@ extern "C" {
     enum VertexIdType
     {
 	VTXID_UINT, //!< unsigned int type VertexId
-	VTXID_LINT, //!< long int type VertexId
+	VTXID_LONG, //!< long int type VertexId
     };
     enum SizeTType
     {
 	SIZET_UINT, //!< unsigned int type SizeT
-	SIZET_LINT, //!< long int type SizeT
+	SIZET_LONG, //!< long int type SizeT
     };
     enum ValueType
     {	
-	VALUE_UNIT,   //!< unsigned int type Value
+	VALUE_UINT,   //!< unsigned int type Value
 	VALUE_FLOAT,  //!< float type Value
 	VALUE_DOUBLE, //!< double type Value 
     };
     
     /**
-     * @brief datatype configuration struct
+     * @brief datatype configuration struct used to specify datatypes
      */
     struct GunrockDataType
     {
@@ -49,22 +49,21 @@ extern "C" {
 	ValueType    VALUE_TYPE; //!< Value    datatype
     };
     
-    void gunrock_topk(const void *row_offsets, const void *col_indices,
-		      const void *row_offsets, const void *col_indices,
+    // topk algorithm
+    void gunrock_topk(const void *row_offsets_i, const void *col_indices_i,
+		      const void *row_offsets_j, const void *col_indices_j,
 		      size_t num_nodes, size_t num_edges, size_t top_nodes);
     
-    void topk_dispatch(const void *row_offsets, const void *col_indices,
-		       const void *row_offsets, const void *col_indices,
-		       size_t num_nodes, 
-		       size_t num_edges, 
-		       size_t top_nodes, 
+    // topk dispatch function
+    void topk_dispatch(const void *row_offsets_i, const void *col_indices_i,
+		       const void *row_offsets_i, const void *col_indices_j,
+		       size_t num_nodes, size_t num_edges, size_t top_nodes, 
 		       GunrockDatatype data_type);
     
-    void topk_tun(const void *row_offsets, const void *col_indices,
-		  const void *row_offsets, const void *col_indices,
-		  size_t num_nodes, 
-		  size_t num_edges,
-		  size_t top_nodes, 
+    // topk implementation
+    void topk_tun(const void *row_offsets_i, const void *col_indices_i,
+		  const void *row_offsets_j, const void *col_indices_j,
+		  size_t num_nodes, size_t num_edges, size_t top_nodes, 
 		  GunrockDataType data_type);
     
 #ifdef __cplusplus

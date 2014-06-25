@@ -21,20 +21,22 @@
  * largest degree centrality. Consider both in and out degrees.
  *
  */
-void gunrock_topk(const void *row_offsets,
-		  const void *col_indices,
-		  const void *row_offsets,
-		  const void *col_indices,
+void gunrock_topk(const void *row_offsets_i,
+		  const void *col_indices_i,
+		  const void *row_offsets_j,
+		  const void *col_indices_j,
 		  size_t     num_nodes,
 		  size_t     num_edges,
 		  size_t     top_nodes)
 {
-  
-  topk_dispatch(row_offsets, col_indices, 
-		row_offsets, col_indices, 
-		num_nodes, num_edges, 
-		top_nodes, data_type);
+    // get user defined datatype
 
+    // call topk implementations
+    topk_dispatch(row_offsets_i, col_indices_i, 
+		  row_offsets_j, col_indices_j, 
+		  num_nodes, num_edges, 
+		  top_nodes, data_type);
+    
 }
 
 // Leave this at the end of the file
