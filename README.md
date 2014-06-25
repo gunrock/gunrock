@@ -76,7 +76,7 @@ Road Map
    want to find the right set of operators that can abstract most
    graph primitives while delivering high performance.
 
- - Primitives: Primitives: Our near-term goal is to implement minimal spanning tree algorithm, build better support for bipartite graph algorithms, and explore community detection algorithms. The long term goal includes algorithms on dynamic graphs, priority queue support, graph partitioning and multi-GPU algorithms.
+ - Primitives: Our near-term goal is to implement minimal spanning tree algorithm, build better support for bipartite graph algorithms, and explore community detection algorithms. The long term goal includes algorithms on dynamic graphs, priority queue support, graph partitioning and multi-GPU algorithms.
 
 Credits
 =======
