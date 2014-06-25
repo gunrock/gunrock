@@ -76,13 +76,7 @@ Road Map
    want to find the right set of operators that can abstract most
    graph primitives while delivering high performance.
 
- - Primitives: Our near-term goal is to implement direction-optimal
-   BFS (as described in *Direction-Optimizing Breadth-First Search*
-   ([DOI](http://dx.doi.org/10.1109/SC.2012.50)) by Scott Beamer,
-   Krste Asanovic and David Patterson) using the backward edge-mapping
-   operator in Gunrock. The long-term goal includes other basic graph
-   primitives such as single-source shortest path and minimal spanning
-   tree.
+ - Primitives: Primitives: Our near-term goal is to implement minimal spanning tree algorithm, build better support for bipartite graph algorithms, and explore community detection algorithms. The long term goal includes algorithms on dynamic graphs, priority queue support, graph partitioning and multi-GPU algorithms.
 
 Credits
 =======
@@ -98,8 +92,10 @@ Gunrock Developers
 
 - [Yuduo Wu](http://www.ece.ucdavis.edu/~wyd855/), University of California, Davis
 
+- Andy Riffel, University of California, Davis
+
 - [John Owens](http://www.ece.ucdavis.edu/~jowens/), University of California,
-  Davis [general help]
+  Davis
 
 Acknowledgements
 ----------------
