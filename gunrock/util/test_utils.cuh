@@ -194,6 +194,213 @@ bool EnoughDeviceMemory(unsigned int mem_needed)
     return (mem_needed <= free_mem);
 }
 
+/******************************************************************************
+ * Templated routines for printing keys/values to the console 
+ ******************************************************************************/
+
+template<typename T> 
+void PrintValue(T val) {
+    val.Print();
+}
+
+template<>
+void PrintValue<char>(char val) {
+    printf("%d", val);
+}
+
+template<>
+void PrintValue<short>(short val) {
+    printf("%d", val);
+}
+
+template<>
+void PrintValue<int>(int val) {
+    printf("%d", val);
+}
+
+template<>
+void PrintValue<long>(long val) {
+    printf("%ld", val);
+}
+
+template<>
+void PrintValue<long long>(long long val) {
+    printf("%lld", val);
+}
+
+template<>
+void PrintValue<float>(float val) {
+    printf("%f", val);
+}
+
+template<>
+void PrintValue<double>(double val) {
+    printf("%f", val);
+}
+
+template<>
+void PrintValue<unsigned char>(unsigned char val) {
+    printf("%u", val);
+}
+
+template<>
+void PrintValue<unsigned short>(unsigned short val) {
+    printf("%u", val);
+}
+
+template<>
+void PrintValue<unsigned int>(unsigned int val) {
+    printf("%u", val);
+}
+
+template<>
+void PrintValue<unsigned long>(unsigned long val) {
+    printf("%lu", val);
+}
+
+template<>
+void PrintValue<unsigned long long>(unsigned long long val) {
+    printf("%llu", val);
+}
+
+template<>
+void PrintValue<bool>(bool val) {
+    if (val)
+        printf("true");
+    else
+        printf("false");
+}
+
+
+/******************************************************************************
+ * Helper routines for list construction and validation 
+ ******************************************************************************/
+
+/**
+ * \addtogroup PublicInterface
+ * @{
+ */
+
+/**
+ * @brief Compares the equivalence of two arrays. If incorrect, print the location
+ * of the first incorrect value appears, the incorrect value, and the reference
+ * value.
+ *
+ * @tparam T datatype of the values being compared with.
+ * @tparam SizeT datatype of the array length.
+ *
+ * @param[in] computed Vector of values to be compared.
+ * @param[in] reference Vector of reference values
+ * @param[in] len Vector length
+ * @param[in] verbose Whether to print values around the incorrect one.
+ *
+ * \return Zero if two vectors are exactly the same, non-zero if there is any difference.
+ *
+ */
+template <typename T, typename SizeT>
+int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
+{
+    int flag = 0;
+    for (SizeT i = 0; i < len; i++) {
+
+        if (computed[i] != reference[i] && flag == 0) {
+            printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
+            PrintValue<T>(computed[i]);
+            printf(" != ");
+            PrintValue<T>(reference[i]);
+
+            if (verbose) {
+                printf("\nresult[...");
+                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+                    PrintValue<T>(computed[j]);
+                    printf(", ");
+                }
+                printf("...]");
+                printf("\nreference[...");
+                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+                    PrintValue<T>(reference[j]);
+                    printf(", ");
+                }
+                printf("...]");
+            }
+            flag += 1;
+            //return flag;
+        }
+        if (computed[i] != reference[i] && flag > 0) flag+=1;
+    }
+    printf("\n");
+    if (flag == 0)
+        printf("CORRECT");
+    return flag;
+}
+
+
+/**
+ * @brief Compares the equivalence of two arrays. Partial specialization for
+ * float type. If incorrect, print the location of the first incorrect value
+ * appears, the incorrect value, and the reference value.
+ *
+ * @tparam T datatype of the values being compared with.
+ * @tparam SizeT datatype of the array length.
+ *
+ * @param[in] computed Vector of values to be compared.
+ * @param[in] reference Vector of reference values
+ * @param[in] len Vector length
+ * @param[in] verbose Whether to print values around the incorrect one.
+ *
+ * \return Zero if difference between each element of the two vectors are less
+ * than a certain threshold, non-zero if any difference is equal to or larger
+ * than the threshold.
+ *
+ */
+template <typename SizeT>
+int CompareResults(float* computed, float* reference, SizeT len, bool verbose = true)
+{
+    float THRESHOLD = 0.05f;
+    int flag = 0;
+    for (SizeT i = 0; i < len; i++) {
+
+        // Use relative error rate here.
+        bool is_right = true;
+        if (fabs(computed[i] - 0.0) < 0.01f) {
+            if ((computed[i] - reference[i]) > THRESHOLD)
+                is_right = false;
+        } else {
+            if (fabs((computed[i] - reference[i])/reference[i]) > THRESHOLD)
+                is_right = false;
+        }
+        if (!is_right && flag == 0) {
+            printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
+            PrintValue<float>(computed[i]);
+            printf(" != ");
+            PrintValue<float>(reference[i]);
+
+            if (verbose) {
+                printf("\nresult[...");
+                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+                    PrintValue<float>(computed[j]);
+                    printf(", ");
+                }
+                printf("...]");
+                printf("\nreference[...");
+                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+                    PrintValue<float>(reference[j]);
+                    printf(", ");
+                }
+                printf("...]");
+            }
+            flag += 1;
+            //return flag;
+        }
+        if (!is_right && flag > 0) flag += 1;
+    }
+    printf("\n");
+    if (!flag)
+        printf("CORRECT");
+    return flag;
+}
+
+/** @} */
 
 }// namespace util
 }// namespace gunrock

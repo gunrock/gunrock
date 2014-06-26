@@ -53,6 +53,21 @@ struct GunrockDataType
     ValueType    VALUE_TYPE; //!< Value    datatype
 };
 
+/**
+ * @brief GunrockGraph struct as a standard graph interface
+ */
+struct GunrockGraph
+{
+    size_t  num_nodes;
+    size_t  num_edges;
+    void    *row_offsets;
+    void    *col_indices;
+    void    *col_offsets;
+    void    *row_indices;
+    void    *node_values;
+    void    *edge_values;
+}
+
 // topk algorithm
 void gunrock_topk(const void *row_offsets_i, const void *col_indices_i,
 		  const void *row_offsets_j, const void *col_indices_j,

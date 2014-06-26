@@ -108,9 +108,9 @@ DEPS = 			./Makefile \
 
 test: bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_cc.cu $(DEPS)
+bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_cc.cu ../../gunrock/util/test_utils.cu $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_cc.cu $(NVCCFLAGS) $(ARCH) $(INC) -O3  
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_cc.cu ../../gunrock/util/test_utils.cu $(NVCCFLAGS) $(ARCH) $(INC) -O3  
 
 #-------------------------------------------------------------------------------
 # Clean
