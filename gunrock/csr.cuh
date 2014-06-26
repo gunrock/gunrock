@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <iterator>
 
+#include <gunrock/util/test_utils.cuh>
 #include <gunrock/util/error_utils.cuh>
 
 using namespace std;
