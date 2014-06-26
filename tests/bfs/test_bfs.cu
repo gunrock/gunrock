@@ -424,7 +424,7 @@ void RunTests(
     if (h_labels        ) {delete[] h_labels        ; h_labels         = NULL;}
     if (h_preds         ) {delete[] h_preds         ; h_preds          = NULL;}
 
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
 }
 
 /**
@@ -587,8 +587,8 @@ void RunTests(
 int main( int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
-    int       num_gpus = 0;
-    int       *gpu_idx = NULL;
+    int        num_gpus = 0;
+    int        *gpu_idx = NULL;
     ContextPtr *context = NULL;
 
     if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
@@ -647,10 +647,10 @@ int main( int argc, char** argv)
 
         // Matrix-market coordinate-formatted graph file
 
-        typedef int VertexId;							// Use as the node identifier type
-        typedef int Value;								// Use as the value type
-        typedef int SizeT;								// Use as the graph size type
-        Csr<VertexId, Value, SizeT> csr(false);         // default value for stream_from_host is false
+        typedef int VertexId;                   // Use as the node identifier type
+        typedef int Value;                      // Use as the value type
+        typedef int SizeT;                      // Use as the graph size type
+        Csr<VertexId, Value, SizeT> csr(false); // default value for stream_from_host is false
 
         if (graph_args < 1) { Usage(); return 1; }
         char *market_filename = (graph_args == 2) ? argv[2] : NULL;

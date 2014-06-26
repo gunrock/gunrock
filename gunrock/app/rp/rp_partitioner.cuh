@@ -118,7 +118,7 @@ struct RandomPartitioner : PartitionerBase<VertexId,SizeT,Value>
     {
         cudaError_t retval = cudaSuccess;
         int*        tpartition_table=this->partition_tables[0];
-        time_t      t = 1402580570;//time(NULL);
+        time_t      t = time(NULL);
         SizeT       nodes  = this->graph->nodes;
         sort_node<SizeT> *sort_list = new sort_node<SizeT>[nodes];
 

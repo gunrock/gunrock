@@ -252,6 +252,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         if (data_slices==NULL) return;
         for (int i = 0; i < this->num_gpus; ++i)
         {
+            util::SetDevice(this->gpu_idx[i]);
             data_slices[i].Release();
         }
         delete[] data_slices;data_slices=NULL;
@@ -435,8 +436,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;
         }
  
-        // Fillin the initial input_queue for BFS problem, this needs to be modified
-        // in multi-GPU scene
+        // Fillin the initial input_queue for BFS problem
         int gpu;
         VertexId tsrc;
         if (this->num_gpus <= 1)

@@ -48,14 +48,14 @@ struct SSSPFunctor
         unsigned int label, weight;
 
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                        label, problem->d_labels + s_id);
+                        label, problem->labels + s_id);
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                        weight, problem->d_weights + e_id);
+                        weight, problem->weights + e_id);
         unsigned int new_weight = weight + label;
        
         
         // Check if the destination node has been claimed as someone's child
-        return (new_weight < atomicMin(&problem->d_labels[d_id], new_weight));
+        return (new_weight < atomicMin(problem->labels + d_id, new_weight));
     }
 
     /**
@@ -72,7 +72,7 @@ struct SSSPFunctor
     { 
         if (ProblemData::MARK_PATHS)
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    s_id, problem->d_preds + d_id); 
+                    s_id, problem->preds + d_id); 
     }
 
     /**
@@ -120,10 +120,10 @@ struct PQFunctor
     {
         unsigned int weight;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                        weight, problem->d_labels + node_id);
+                        weight, problem->labels + node_id);
         float delta;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                        delta, problem->d_delta);
+                        delta, problem->delta);
         return (delta == 0) ? weight : weight/delta;
     }
 };

@@ -193,7 +193,7 @@ public:
             node_counter+=cross_counter[peer];
         }
         out_offsets[gpu][num_gpus]=node_counter;
-
+        util::cpu_mt::PrintCPUArray<SizeT, SizeT>("cross_counter",cross_counter,num_gpus,gpu);
         util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,gpu);
         
         in_offsets[gpu][0]=0;

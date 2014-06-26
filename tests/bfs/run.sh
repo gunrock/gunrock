@@ -20,7 +20,7 @@ MARK[6]=${MARK[2]}".idempotence"
 MARK[7]=${MARK[3]}".idempotence"
 
 #put OS and Device type here
-SUFFIX="ubuntu12.04.k40cx4"
+SUFFIX="ubuntu12.04.k40cx4_metis"
 EXCUTION="./bin/test_bfs_6.0_x86_64"
 DATADIR="/data/gunrock_dataset/large"
 
@@ -28,7 +28,7 @@ mkdir -p eval/$SUFFIX
 
 for i in ak2010 belgium_osm coAuthorsDBLP delaunay_n13 delaunay_n21 soc-LiveJournal1 kron_g500-logn21 webbase-1M
 do
-    for j in 0 1 2 3 4 5 6 7
+    for j in 0 1 2 3 4 6
     do
         echo $EXCUTION market $DATADIR/$i/$i.mtx ${OPTION[$j]} "> eval/$SUFFIX/$i.$SUFFIX${MARK[$j]}.txt"
         $EXCUTION market $DATADIR/$i/$i.mtx ${OPTION[$j]} > eval/$SUFFIX/$i.$SUFFIX${MARK[$j]}.txt

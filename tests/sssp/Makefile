@@ -40,7 +40,7 @@ SM_TARGETS = $(GEN_SM35)
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
 MGPU_INC = "../../../moderngpu/include"
 BOOST_INC = "../../../boost_1_53_0"
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(BOOST_INC) -I.. -I../..
+INC = -Xlinker "/usr/local/lib/libmetis.so" -I$(CUDA_INC) -I$(MGPU_INC) -I$(BOOST_INC) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -107,7 +107,7 @@ test: bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
 bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_sssp.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_sssp.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3 -lcuda
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_sssp.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O0 -G -g -lcuda
 
 #-------------------------------------------------------------------------------
 # Clean
