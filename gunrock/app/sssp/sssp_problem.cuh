@@ -31,10 +31,10 @@ namespace sssp {
 template <
     typename    VertexId,                       
     typename    SizeT,
+    typename    Value,
     bool        _MARK_PATHS>
-struct SSSPProblem : ProblemBase<VertexId, SizeT, unsigned int, false>
+struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
 {
-    typedef unsigned int Value;
     static const bool MARK_PREDECESSORS     = true;
     static const bool ENABLE_IDEMPOTENCE    = false;
     static const bool MARK_PATHS            = _MARK_PATHS;
@@ -95,7 +95,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, unsigned int, false>
             //delta         .Release();
             keys_in    [0].Release();
             keys_in    [1].Release();
-            visited_mask  .Release();
+            //visited_mask  .Release();
             in_length  [0].Release();
             in_length  [1].Release();
             out_length    .Release();
@@ -139,8 +139,8 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, unsigned int, false>
             this->num_associate = num_associate;
             if (retval = util::SetDevice(gpu_idx))  return retval;
             // Create SoA on device
-            if (retval = labels .Allocate(graph->num_nodes,util::DEVICE)) return retval;
-            if (retval = weights.Allocate(graph->num_edges,util::DEVICE)) return retval;
+            if (retval = labels .Allocate(graph->nodes,util::DEVICE)) return retval;
+            if (retval = weights.Allocate(graph->edges,util::DEVICE)) return retval;
             weights.SetPointer(graph->edge_values, util::HOST);
             if (retval = weights.Move(util::HOST, util::DEVICE)) return retval;
             
@@ -154,7 +154,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, unsigned int, false>
 
             if (MARK_PATHS)
             {
-                if (retval = preds.Allocate(graph->num_nodes,util::DEVICE)) return retval;
+                if (retval = preds.Allocate(graph->nodes,util::DEVICE)) return retval;
             }
 
             if (num_associate != 0)
@@ -375,7 +375,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, unsigned int, false>
             {
                 data_slices[gpu].SetName("data_slices[]");
                 if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-                if (retval = data_slices[gpu].Allocate(1, util::DEVICE | uitl::HOST)) return retval;
+                if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST)) return retval;
                 DataSlice* _data_slice = data_slices[gpu].GetPointer(util::HOST);
 
                 if (this->num_gpus > 1)
@@ -431,22 +431,22 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, unsigned int, false>
 
         cudaError_t retval = cudaSuccess;
 
-        for (int gpu = 0; gpu < num_gpus; ++gpu) {
+        for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             // Set device
             if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
 
             // Allocate output labels if necessary
             if (data_slices[gpu]->labels.GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->labels.Allocate(this->sub_graph[gpu].nodes, util::DEVICE)) return retval;
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->labels.GetPointer(util::DEVICE), UINT_MAX, this->sub_graph[gpu].nodes);
+                if (retval = data_slices[gpu]->labels.Allocate(this->sub_graphs[gpu].nodes, util::DEVICE)) return retval;
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->labels.GetPointer(util::DEVICE), INT_MAX, this->sub_graphs[gpu].nodes);
 
             if (data_slices[gpu]->preds.GetPointer(util::DEVICE) == NULL && MARK_PATHS)
-                if (retval = data_slices[gpu]->preds.Allocate(this->sub_graph[gpu].nodes, util::DEVICE)) return retval;
+                if (retval = data_slices[gpu]->preds.Allocate(this->sub_graphs[gpu].nodes, util::DEVICE)) return retval;
 
             //if (data_slices[gpu]->visit_loopup.GetPointer(util::DEVICE) == NULL)
             //    if (retval = data_slices[gpu]->visit_loopup.Allocate(this->sub_graph[gpu].nodes, util::DEVICE)) return retval;
             
-            if (MARK_PATHS) util::MemsetIdxKernel<<<128, 128>>>(data_slices[gpu]->preds.GetPointer(util::DEVICE), this->sub_graph[gpu].nodes);
+            if (MARK_PATHS) util::MemsetIdxKernel<<<128, 128>>>(data_slices[gpu]->preds.GetPointer(util::DEVICE), this->sub_graphs[gpu].nodes);
             //util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->visit_lookup.GetPointer(util::DEVICE), -1, this->sub_graph[gpu].nodes);
 
             if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;

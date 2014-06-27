@@ -28,7 +28,7 @@ namespace sssp {
  * @tparam ProblemData         Problem data type which contains data slice for SSSP problem
  *
  */
-template<typename VertexId, typename SizeT, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct SSSPFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
@@ -45,13 +45,13 @@ struct SSSPFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        unsigned int label, weight;
+        Value label, weight;
 
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                         label, problem->labels + s_id);
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                         weight, problem->weights + e_id);
-        unsigned int new_weight = weight + label;
+        Value new_weight = weight + label;
        
         
         // Check if the destination node has been claimed as someone's child
@@ -83,7 +83,7 @@ struct SSSPFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, unsigned int v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
         return (node != -1);
     }
@@ -95,13 +95,13 @@ struct SSSPFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, unsigned int v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
         // Doing nothing here
     }
 };
 
-template<typename VertexId, typename SizeT, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct PQFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
@@ -116,9 +116,9 @@ struct PQFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ unsigned int ComputePriorityScore(VertexId node_id, DataSlice *problem)
+    static __device__ __forceinline__ Value ComputePriorityScore(VertexId node_id, DataSlice *problem)
     {
-        unsigned int weight;
+        Value weight;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                         weight, problem->labels + node_id);
         float delta;

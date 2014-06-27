@@ -148,7 +148,7 @@ template<
 void DisplayStats(
     Stats               &stats,
     VertexId            src,
-    unsigned int        *h_labels,
+    Value               *h_labels,
     const Csr<VertexId, Value, SizeT> &graph,
     double              elapsed,
     VertexId            search_depth,
@@ -219,21 +219,21 @@ void DisplayStats(
     bool     MARK_PREDECESSORS>
 void SimpleReferenceSssp(
     const Csr<VertexId, Value, SizeT>       &graph,
-    unsigned int                            *node_values,
-    unsigned int                            *node_preds,
-    VertexId                                src)
+    Value    *node_values,
+    VertexId *node_preds,
+    VertexId src)
 {
     using namespace boost; 
     // Prepare Boost Datatype and Data structure
     typedef adjacency_list<vecS, vecS, directedS,
-            no_property, property <edge_weight_t, unsigned int> > Graph;
+            no_property, property <edge_weight_t, int> > Graph;
     typedef graph_traits<Graph>::vertex_descriptor vertex_descriptor;
     typedef graph_traits<Graph>::edge_descriptor edge_descriptor;
 
-    typedef std::pair<unsigned int, unsigned int> Edge;
+    typedef std::pair<VertexId, VertexId> Edge;
 
     Edge* edges = (Edge*)malloc(sizeof(Edge)*graph.edges);
-    unsigned int *weight = (unsigned int*)malloc(sizeof(unsigned int)*graph.edges);
+    Value *weight = (Value*)malloc(sizeof(Value)*graph.edges);
 
     for (int i = 0; i < graph.nodes; ++i)
     {
@@ -246,7 +246,7 @@ void SimpleReferenceSssp(
 
     Graph g(edges, edges + graph.edges, weight, graph.nodes);
 
-    std::vector<unsigned int> d(graph.nodes);
+    std::vector<Value> d(graph.nodes);
     std::vector<vertex_descriptor> p(graph.nodes);
     vertex_descriptor s = vertex(src, g);
 
@@ -331,7 +331,7 @@ template <
     bool INSTRUMENT,
     bool MARK_PREDECESSORS>
 void RunTests(
-    const Csr<VertexId, Value, SizeT> &graph,
+    Csr<VertexId, Value, SizeT> &graph,
     VertexId    src,
     int         max_grid_size,
     int         num_gpus,
@@ -347,12 +347,12 @@ void RunTests(
             MARK_PREDECESSORS> Problem;
 
         // Allocate host-side label array (for both reference and gpu-computed results)
-        unsigned int    *reference_labels       = new Value[graph.nodes];
-        unsigned int    *h_labels               = new Value[graph.nodes];
-        unsigned int    *reference_check_label  = (g_quick) ? NULL : reference_labels;
-        unsigned int    *reference_preds        = NULL;
-        VertexId        *h_preds                = NULL;
-        unsigned int    *reference_check_pred   = NULL;
+        Value     *reference_labels       = new Value[graph.nodes];
+        Value     *h_labels               = new Value[graph.nodes];
+        Value     *reference_check_label  = (g_quick) ? NULL : reference_labels;
+        VertexId  *reference_preds        = NULL;
+        VertexId  *h_preds                = NULL;
+        VertexId  *reference_check_pred   = NULL;
 
         if (MARK_PREDECESSORS) {
             reference_preds       = new VertexId[graph.nodes];
@@ -396,12 +396,12 @@ void RunTests(
         // Perform SSSP
         CpuTimer cpu_timer;
 
-        util::GRError(csr_problem->Reset(src, sssp_enactor.GetFrontierType(), queue_sizing), "SSSP Problem Data Reset Failed", __FILE__, __LINE__); 
+        util::GRError(csr_problem->Reset(src, sssp_enactor->GetFrontierType(), queue_sizing), "SSSP Problem Data Reset Failed", __FILE__, __LINE__); 
         cpu_timer.Start();
-        util::GRError(sssp_enactor.Enact(context, csr_problem, src, queue_sizing, max_grid_size), "SSSP Problem Enact Failed", __FILE__, __LINE__);
-        gpu_timer.Stop();
+        util::GRError(sssp_enactor->Enact(context, csr_problem, src, queue_sizing, max_grid_size), "SSSP Problem Enact Failed", __FILE__, __LINE__);
+        cpu_timer.Stop();
 
-        sssp_enactor.GetStatistics(total_queued, search_depth, avg_duty);
+        sssp_enactor->GetStatistics(total_queued, search_depth, avg_duty);
 
         float elapsed = cpu_timer.ElapsedMillis();
 
@@ -468,14 +468,14 @@ void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
     CommandLineArgs             &args,
     int                         num_gpus,
-    ContexPtr                   *context,
+    ContextPtr                  *context,
     int                         *gpu_idx)
 {
     VertexId            src                 = -1;           // Use whatever the specified graph-type's default is
     std::string         src_str;
     bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
-    int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
+    //int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
     float               max_queue_sizing    = 1.0;
     bool                mark_pred           = false;
     std::string         partition_method    = "random";
@@ -616,7 +616,7 @@ int main( int argc, char** argv)
     // Matrix-market coordinate-formatted graph file
 
         typedef int VertexId;                   // Use as the node identifier type
-        typedef unsigned int Value;             // Use as the value type
+        typedef int Value;             // Use as the value type
         typedef int SizeT;                      // Use as the graph size type
         Csr<VertexId, Value, SizeT> csr(false); // default value for stream_from_host is false
 

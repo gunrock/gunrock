@@ -172,10 +172,10 @@ namespace bfs {
         bool         break_clean           = true;
         SizeT*       out_offset            = NULL;
         char*        message               = new char [1024];
-        util::Array1D<SizeT, unsigned int> scanned_edges;
+        util::Array1D<SizeT, unsigned int>   scanned_edges;
         frontier_attribute->queue_index    = 0;        // Work queue index
         frontier_attribute->selector       = 0;
-        frontier_attribute->queue_length   =   thread_data -> init_size; //? 
+        frontier_attribute->queue_length   = thread_data -> init_size; //? 
         frontier_attribute->queue_reset    = true;
         
         do {
@@ -716,8 +716,8 @@ class BFSEnactor : public EnactorBase
     template <typename VertexId>
     void GetStatistics(
         long long &total_queued,
-        VertexId &search_depth,
-        double &avg_duty)
+        VertexId  &search_depth,
+        double    &avg_duty)
     {
         unsigned long long total_lifetimes=0;
         unsigned long long total_runtimes =0;
@@ -726,8 +726,7 @@ class BFSEnactor : public EnactorBase
         for (int gpu=0;gpu<num_gpus;gpu++)
         {
             if (num_gpus!=1)
-                util::GRError(cudaSetDevice(gpu_idx[gpu]),
-                    "BFSEnactor cudaSetDevice gpu failed", __FILE__, __LINE__);
+                if (util::SetDevice(gpu_idx[gpu])) return;
             cudaThreadSynchronize();
 
             total_queued += this->enactor_stats[gpu].total_queued;
@@ -759,7 +758,7 @@ class BFSEnactor : public EnactorBase
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy>
     cudaError_t EnactBFS(
-    ContextPtr *context,
+    ContextPtr  *context,
     BFSProblem  *problem,
     VertexId    src,
     int         max_grid_size = 0)
@@ -840,7 +839,7 @@ class BFSEnactor : public EnactorBase
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Enact(
-        ContextPtr *context,
+        ContextPtr  *context,
         BFSProblem  *problem,
         VertexId    src,
         int         max_grid_size = 0)
@@ -855,7 +854,7 @@ class BFSEnactor : public EnactorBase
             //if (this->cuda_props.device_sm_version >= 300) {
             if (min_sm_version >= 300) {
                 typedef gunrock::oprtr::filter::KernelPolicy<
-                    BFSProblem,                         // Problem data type
+                BFSProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 0,                                  // SATURATION QUIT
