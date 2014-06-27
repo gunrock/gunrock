@@ -417,6 +417,8 @@ class SSSPEnactor : public EnactorBase
                 frontier_attribute.selector ^= 1;
                 enactor_stats.iteration++;
 
+                if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
                     enactor_stats.total_queued += frontier_attribute.queue_length;

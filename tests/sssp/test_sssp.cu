@@ -388,7 +388,7 @@ void RunTests(
         double              avg_duty = 0.0;
 
         // Perform SSSP
-        GpuTimer gpu_timer;
+        CpuTimer gpu_timer;
 
         util::GRError(csr_problem->Reset(src, sssp_enactor.GetFrontierType(), queue_sizing), "SSSP Problem Data Reset Failed", __FILE__, __LINE__); 
         gpu_timer.Start();
@@ -501,7 +501,7 @@ void RunTests(
                     num_gpus,
                     context);
         } else {
-            RunTests<VertexId, Value, SizeT, true, true>(
+            RunTests<VertexId, Value, SizeT, false, true>(
                     graph,
                     src,
                     max_grid_size,
@@ -519,7 +519,7 @@ void RunTests(
                     num_gpus,
                     context);
         } else {
-            RunTests<VertexId, Value, SizeT, true, false>(
+            RunTests<VertexId, Value, SizeT, false, false>(
                     graph,
                     src,
                     max_grid_size,

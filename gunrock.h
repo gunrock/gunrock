@@ -16,10 +16,7 @@
  *
  */
 
-#include <gunrock/app/topk/topk_enactor.cuh>
-#include <gunrock/app/topk/topk_problem.cuh>
-
-using namespace gunrock::app::topk;
+#include <stdlib.h>
     
 /**
  * @brief Vertex_id datatypes enumerators.
@@ -48,9 +45,9 @@ enum ValueType
  */
 struct GunrockDataType
 {
-    VertexIdType VTXID_TYPE; //!< VertexId datatype
-    SizeTType    SIZET_TYPE; //!< SizeT    datatype
-    ValueType    VALUE_TYPE; //!< Value    datatype
+    enum VertexIdType VTXID_TYPE; //!< VertexId datatype
+    enum SizeTType    SIZET_TYPE; //!< SizeT    datatype
+    enum ValueType    VALUE_TYPE; //!< Value    datatype
 };
 
 /**
@@ -66,25 +63,25 @@ struct GunrockGraph
     void    *row_indices;
     void    *node_values;
     void    *edge_values;
-}
+};
 
 // topk algorithm
 void gunrock_topk(
-                GunrockGraph        *g_out,
+                struct GunrockGraph        *g_out,
                 void                *node_ids,
                 void                *centrality_values,
                 size_t              top_node,
-                const GunrockGraph  *g_in,
-                GunrockDataType     data_type);
+                const struct GunrockGraph  *g_in,
+                struct GunrockDataType     data_type);
 
 // topk dispatch function
 void topk_dispatch(
-                GunrockGraph        *g_out,
+                struct GunrockGraph        *g_out,
                 void                *node_ids,
                 void                *centrality_values,
                 size_t              top_node,
-                const GunrockGraph  *g_in,
-                GunrockDataType     data_type);
+                const struct GunrockGraph  *g_in,
+                struct GunrockDataType     data_type);
 
 // TODO: Add other algorithms
 
