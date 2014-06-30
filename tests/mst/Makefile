@@ -25,7 +25,7 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
-SM_TARGETS = $(GEN_SM35)
+SM_TARGETS = $(GEN_SM30)
 #$(GEN_SM35)
 
 #-------------------------------------------------------------------------------
@@ -37,9 +37,11 @@ SM_TARGETS = $(GEN_SM35)
 # Includes
 #-------------------------------------------------------------------------------
 
-CUDA_INC = "$(shell dirname $(NVCC))/../include"
-MGPU_INC = "../../../moderngpu/include"
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I.. -I../..
+CUDA_INC  = "$(shell dirname $(NVCC))/../include"
+MGPU_INC  = "../../../moderngpu/include"
+BOOST_INC = "../../../boost_1_53_0"
+CUB_INC   = "../../../cub"
+INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) -I$(BOOST_INC) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -52,7 +54,7 @@ DEFINES =
 #-------------------------------------------------------------------------------
 
 ifneq ($(force64), 1)
-# Compile with 32-bit device pointers by default
+	# Compile with 32-bit device pointers by default
 	ARCH_SUFFIX = i386
 	ARCH = -m32
 else
@@ -60,12 +62,18 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo
+NVCCFLAGS = -Xptxas -v -Xcudafe -\#
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
 endif
 
+#ifeq (,$(findstring 3.0, $(NVCC_VERSION)))
+#ifneq ($(abi), 1)
+	# Disable the ABI by default for 3.1+
+	#NVCCFLAGS += -Xptxas -abi=no
+#endif
+#endif
 
 ifeq ($(verbose), 1)
     NVCCFLAGS += -v
@@ -100,11 +108,11 @@ DEPS =			./Makefile \
 # (make test) Test driver for
 #-------------------------------------------------------------------------------
 
-test: bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX)
+test: bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_bfs.cu  ../../gunrock/util/test_utils.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_mst.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_bfs.cu ../../gunrock/util/test_utils.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_mst.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean
@@ -113,3 +121,9 @@ bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_bfs.cu  ../../gunrock/util/te
 clean :
 	rm -f bin/*_$(NVCC_VERSION)_$(ARCH_SUFFIX)*
 	rm -f *.i* *.cubin *.cu.c *.cudafe* *.fatbin.c *.ptx *.hash *.cu.cpp *.o
+
+# Leave this at the end of the file
+# Local Variables:
+# mode:c++
+# c-file-style: "NVIDIA"
+# End:
