@@ -6,9 +6,9 @@
 // ----------------------------------------------------------------
 
 /**
- * @file: segment_operators.cuh
+ * @file: mark_segment.cuh
  *
- * @brief Simple markSegment Kernel
+ * @brief Simple mark_segmentation Kernel
  */
 
 /******************************************************************************
@@ -17,7 +17,7 @@
 #pragma once
 
 namespace gunrock {
-	namespace util {
+namespace util {
 
 /**
  * @brief flag array kernel with 1 indicating the start of 
@@ -52,6 +52,7 @@ template <typename T>
 __global__ void markSegmentFromOffsets(int *flag, T *offsets, int length)
 {
 	const	int STRIDE = gridDim.x * blockDim.x;
+	// skip the first one facilitate scan for keys array
 	for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x + 1;
 			 idx < length;
 			 idx += STRIDE)
@@ -60,6 +61,11 @@ __global__ void markSegmentFromOffsets(int *flag, T *offsets, int length)
 	}
 }
 
-
-	} // namespace util
+} // namespace util
 } // namespace gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

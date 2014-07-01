@@ -451,7 +451,7 @@ public:
           (bool*)NULL,
           (bool*)NULL,
           d_scanned_edges,
-      	  problem->data_slices[0]->d_reduced_keys, 
+      	  graph_slice->frontier_queues.d_keys[frontier_attribute.selector],
     	    graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],
     	    (VertexId*)NULL,
           (VertexId*)NULL,
@@ -468,50 +468,59 @@ public:
       	if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
       		"advance::Kernel failed", __FILE__, __LINE__))) break;
 
+        printf("----> finished advance kernel (edge mapping): successors array. \n");
+
       	if (debug_info)
       	{
       	  printf(":: successor array ::\n");
       	  util::DisplayDeviceResults(problem->data_slices[0]->d_successors, graph_slice->nodes);
-      	  printf(":: mst_output array ::\n");
+      	  printf(":: mst_output boolean array ::\n");
       	  util::DisplayDeviceResults(problem->data_slices[0]->d_mst_output, graph_slice->edges);
       	}
-        /*
-      	// Remove cycles using RmCycFuntor - Advance Edge Mapping, S(S(u)) = u
+        
+      	// remove cycles using RmCycFuntor - Advance Edge Mapping, S(S(u)) = u
       	frontier_attribute.queue_index  = 0;
       	frontier_attribute.selector     = 0;
       	frontier_attribute.queue_length = graph_slice->nodes;
-      	frontier_attribute.frontier_attribute.queue_reset = true;
+      	frontier_attribute.queue_reset = true;
 
-      	gunrock::oprtr::advance::Kernel<AdvanceKernelPolicy, MSTProblem, RcFunctor>(
-      	    frontier_attribute.queue_reset,
-      	    frontier_attribute.queue_index,
-      	    1,
-      	    enactor_stats.iteration,
-      	    frontier_attribute.queue_length,
-      	    d_done,
-      	    graph_slice->frontier_queues.d_keys[frontier_attribute.selector],          // d_in_queue
-      	    NULL,
-      	    graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],        // d_out_queue
-      	    graph_slice->d_column_indices,
-      	    data_slice,
-      	    this->work_progress,
-      	    graph_slice->frontier_elements[frontier_attribute.selector],               // max_in_queue
-      	    graph_slice->frontier_elements[frontier_attribute.selector^1],             // max_out_queue
-      	    this->edge_map_kernel_stats);
+      	gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, MSTProblem, RmCycFunctor>(
+      	  d_done,
+          enactor_stats,
+          frontier_attribute,
+          data_slice,
+          (VertexId*)NULL,
+          (bool*)NULL,
+          (bool*)NULL,
+          d_scanned_edges,
+          graph_slice->frontier_queues.d_keys[frontier_attribute.selector],
+          graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],
+          (VertexId*)NULL,
+          (VertexId*)NULL,
+          graph_slice->d_row_offsets,
+          graph_slice->d_column_indices,
+          (SizeT*)NULL,
+          (VertexId*)NULL,
+          graph_slice->frontier_elements[frontier_attribute.selector],  
+          graph_slice->frontier_elements[frontier_attribute.selector^1],
+          this->work_progress,
+          context,
+          gunrock::oprtr::advance::V2E);
 
       	if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
       		"advance::Kernel failed", __FILE__, __LINE__))) break;
 
+        printf("----> finished removing cycles from successors: successors array. \n");
+
       	if (debug_info)
       	{
-      	  printf(":: Removed Cycles Successor Array ::");
+      	  printf(":: remove cycles from successors ::");
       	  util::DisplayDeviceResults(problem->data_slices[0]->d_successors, graph_slice->nodes);
-      	  printf(":: Selector after filter ::");
+      	  printf(":: mst_output boolean array ::");
       	  util::DisplayDeviceResults(problem->data_slices[0]->d_mst_output, graph_slice->edges);
       	}
 
-      	printf("----> 1.generated Successor Array and removed cycles \n");
-
+      	/*
       	// Pointer Jumpping to get Representative Array
       	util::MemsetCopyVectorKernel<<<128,128>>>(
           problem->data_slices[0]->d_representatives,
@@ -1679,15 +1688,14 @@ public:
 
       	// final selected edges for current iteration
       	// printf("\n Selected Edges for current iteration \n");
-      	// util::DisplayDeviceResults(problem->data_slices[0]->d_mst_output, original_edge_length);
-
+      	// util::DisplayDeviceResults(problem->data_slices[0]->d_mst_output, num_edges_origin);
+*/
       	// final number of selected edges
       	int tmp_length = Reduce(
           problem->data_slices[0]->d_mst_output,
-          original_edge_length,
+          num_edges_origin,
           context);
       	printf(" Number of selected edges so far - %d\n", tmp_length);
-        */
 
       	enactor_stats.iteration++;
 
@@ -1717,13 +1725,13 @@ public:
       // final number of selected edges
       int num_edges_select = Reduce(
         problem->data_slices[0]->d_mst_output, 
-        original_edge_length, context);
+        num_edges_origin, context);
       printf("----> Number of edges selected - %d\n", num_edges_select);
 
       // mgpu reduce to calculate total edge_values
       // int total_weights_gpu = Reduce(
         problem->data_slices[0]->d_oriWeights, 
-        original_edge_length, context);
+        num_edges_origin, context);
       // printf(" total edge_values gpu = %d\n", total_weights_gpu);
       */
       if (retval) break;

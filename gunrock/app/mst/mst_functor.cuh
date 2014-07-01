@@ -53,14 +53,6 @@ struct SuccFunctor
   static __device__ __forceinline__ bool CondEdge(VertexId s_id, 
     VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    if (problem->d_reduced_vals[s_id] == problem->d_edge_vals[e_id] &&
-      (atomicCAS(&problem->d_temp_storage[s_id], -1, s_id) == -1))
-    {
-      //printf("s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
-      problem->d_successors[s_id] = d_id;
-      // mark edges that have mimimum edge values as MST output
-      problem->d_mst_output[problem->d_eId[e_id]] = 1;
-    }
     return true;
   }
 
@@ -75,6 +67,14 @@ struct SuccFunctor
   static __device__ __forceinline__ void ApplyEdge(VertexId s_id, 
     VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
+    if (problem->d_reduced_vals[s_id] == problem->d_edge_vals[e_id] &&
+      (atomicCAS(&problem->d_temp_storage[s_id], -1, s_id) == -1))
+    {
+      //printf("s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
+      problem->d_successors[s_id] = d_id;
+      // mark edges that have mimimum edge values as MST output
+      problem->d_mst_output[problem->d_eId[e_id]] = 1;
+    }
     return;
   }
 
@@ -156,14 +156,13 @@ struct RmCycFunctor
   static __device__ __forceinline__ void ApplyEdge(VertexId s_id, 
     VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    //printf("----> suc[suc]:%4d suc:%4d s_id:%4d\n",
-    //problem->d_successors[problem->d_successors[s_id]],
-    //problem->d_successors[s_id], s_id);
-    if (problem->d_successors[problem->d_successors[s_id]] == s_id && problem->d_successors[s_id] > s_id)
+    if (problem->d_successors[s_id] > s_id &&
+      problem->d_successors[problem->d_successors[s_id]] == s_id)
     {
       //printf("s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
       problem->d_successors[s_id] = s_id;
-      problem->d_mst_output[problem->d_eId[e_id]] = 0; // remove edges form a cycle from output
+      // remove edges form a cycle from MST output
+      problem->d_mst_output[problem->d_eId[e_id]] = 0; 
     }
     return;
   }
@@ -180,10 +179,13 @@ struct RmCycFunctor
   static __device__ __forceinline__ bool CondFilter(
     VertexId node, DataSlice *problem, Value v = 0)
   {
-    if (problem->d_successors[problem->d_successors[node]] == node && problem->d_successors[node] > node)
-      {
+    /*
+    if (problem->d_successors[problem->d_successors[node]] == node &&
+     problem->d_successors[node] > node)
+    {
 	      problem->d_successors[node] = node;
-      }
+    }
+    */
     return true;
   }
 
