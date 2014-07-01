@@ -23,7 +23,7 @@ namespace mst {
 
 /**
  * @brief Structure contains device functions in MST graph traverse.
- * Used for generating Flag array.
+ * Find the successor of each vertex and add to mst outputs
  *
  * @tparam VertexId    Type of signed integer use as vertex id
  * @tparam SizeT       Type of unsigned integer for array indexing
@@ -31,14 +31,17 @@ namespace mst {
  *
  */
 template<
-  typename VertexId, typename SizeT, typename Value, typename ProblemData>
+  typename VertexId, 
+  typename SizeT, 
+  typename Value, 
+  typename ProblemData>
 struct SuccFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
 
   /**
    * @brief Forward Edge Mapping condition function.
-   * Used for generating flag array and successor array
+   * Used for generating successor array
    *
    * @param[in] s_id Vertex Id of the edge source node
    * @param[in] d_id Vertex Id of the edge destination node
@@ -47,16 +50,16 @@ struct SuccFunctor
    * \return Whether to load the apply function for the edge and include
    * the destination node in the next frontier.
    */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ bool CondEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    if (problem->d_reduced_vals[s_id] == problem->d_weights[e_id] &&
-      (atomicCAS(&problem->d_keysCopy[s_id], -1, s_id) == -1))
+    if (problem->d_reduced_vals[s_id] == problem->d_edge_vals[e_id] &&
+      (atomicCAS(&problem->d_temp_storage[s_id], -1, s_id) == -1))
     {
       //printf("s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
       problem->d_successors[s_id] = d_id;
-      // mark edges that have mimimum weight values as output
-      problem->d_mark_results[problem->d_eId[e_id]] = 1;
+      // mark edges that have mimimum edge values as MST output
+      problem->d_mst_output[problem->d_eId[e_id]] = 1;
     }
     return true;
   }
@@ -69,8 +72,8 @@ struct SuccFunctor
    * @param[in] problem Data slice object
    *
    */
-  static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ void ApplyEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return;
   }
@@ -118,7 +121,10 @@ struct SuccFunctor
  *
  */
 template<
-  typename VertexId, typename SizeT, typename Value, typename ProblemData>
+  typename VertexId, 
+  typename SizeT, 
+  typename Value, 
+  typename ProblemData>
 struct RmCycFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
@@ -134,8 +140,8 @@ struct RmCycFunctor
    * \return Whether to load the apply function for the edge and include
    * the destination node in the next frontier.
    */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id)
+  static __device__ __forceinline__ bool CondEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return true;
   }
@@ -147,8 +153,8 @@ struct RmCycFunctor
    * @param[in] d_id Vertex Id of the edge destination node
    * @param[in] problem Data slice object
    */
-  static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ void ApplyEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     //printf("----> suc[suc]:%4d suc:%4d s_id:%4d\n",
     //problem->d_successors[problem->d_successors[s_id]],
@@ -157,7 +163,7 @@ struct RmCycFunctor
     {
       //printf("s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
       problem->d_successors[s_id] = s_id;
-      problem->d_mark_results[problem->d_eId[e_id]] = 0; // remove edges form a cycle from output
+      problem->d_mst_output[problem->d_eId[e_id]] = 0; // remove edges form a cycle from output
     }
     return;
   }
@@ -205,7 +211,10 @@ struct RmCycFunctor
  *
  */
 template<
-  typename VertexId, typename SizeT, typename Value, typename ProblemData>
+  typename VertexId, 
+  typename SizeT, 
+  typename Value, 
+  typename ProblemData>
 struct PtrJumpFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
@@ -238,16 +247,16 @@ struct PtrJumpFunctor
   {
     VertexId parent;
     util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-      parent, problem->d_represent + node);
+      parent, problem->d_representatives + node);
     VertexId grand_parent;
     util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-      grand_parent, problem->d_represent + parent);
+      grand_parent, problem->d_representatives + parent);
     if (parent != grand_parent)
     {
 	    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
         0, problem->d_vertex_flag);
 	    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        grand_parent, problem->d_represent + node);
+        grand_parent, problem->d_representatives + node);
     }
   }
 };
@@ -262,7 +271,10 @@ struct PtrJumpFunctor
  *
  */
 template<
-  typename VertexId, typename SizeT, typename Value, typename ProblemData>
+  typename VertexId, 
+  typename SizeT, 
+  typename Value, 
+  typename ProblemData>
 struct PtrJumpMaskFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
@@ -300,15 +312,15 @@ struct PtrJumpMaskFunctor
       {
 	      VertexId parent;
 	      util::io::ModifiedLoad<
-          ProblemData::COLUMN_READ_MODIFIER>::Ld(parent, problem->d_represent + node);
+          ProblemData::COLUMN_READ_MODIFIER>::Ld(parent, problem->d_representatives + node);
 	      VertexId grand_parent;
 	      util::io::ModifiedLoad<
-          ProblemData::COLUMN_READ_MODIFIER>::Ld(grand_parent, problem->d_represent + parent);
+          ProblemData::COLUMN_READ_MODIFIER>::Ld(grand_parent, problem->d_representatives + parent);
 	      if (parent != grand_parent)
 	      {
 		problem->d_vertex_flag[0] = 0;
 	       util::io::ModifiedStore<
-            ProblemData::QUEUE_WRITE_MODIFIER>::St(grand_parent, problem->d_represent + node);
+            ProblemData::QUEUE_WRITE_MODIFIER>::St(grand_parent, problem->d_representatives + node);
 	      }
 	    else
 	    {
@@ -328,7 +340,10 @@ struct PtrJumpMaskFunctor
  *
  */
 template<
-  typename VertexId, typename SizeT, typename Value, typename ProblemData>
+  typename VertexId, 
+  typename SizeT, 
+  typename Value, 
+  typename ProblemData>
 struct EdgeRmFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
@@ -343,16 +358,16 @@ struct EdgeRmFunctor
    * \return Whether to load the apply function for the edge and include
    * the destination node in the next frontier.
    */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ bool CondEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    problem->d_edges[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_edges[e_id];
-    problem->d_weights[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_weights[e_id];
-    problem->d_keys_array[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_keys_array[e_id];
+    problem->d_edges[e_id] = (problem->d_representatives[s_id] == problem->d_representatives[d_id]) ? -1 : problem->d_edges[e_id];
+    problem->d_edge_vals[e_id] = (problem->d_representatives[s_id] == problem->d_representatives[d_id]) ? -1 : problem->d_edge_vals[e_id];
+    problem->d_keys_array[e_id] = (problem->d_representatives[s_id] == problem->d_representatives[d_id]) ? -1 : problem->d_keys_array[e_id];
     // New flag for calculating reduced length
-    problem->d_flag_array[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_flag_array[e_id];
-    problem->d_eId[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_eId[e_id];
-    problem->d_edgeFlag[e_id] = (problem->d_represent[s_id] == problem->d_represent[d_id]) ? -1 : problem->d_edgeFlag[e_id];
+    problem->d_flag_array[e_id] = (problem->d_representatives[s_id] == problem->d_representatives[d_id]) ? -1 : problem->d_flag_array[e_id];
+    problem->d_eId[e_id] = (problem->d_representatives[s_id] == problem->d_representatives[d_id]) ? -1 : problem->d_eId[e_id];
+    problem->d_edgeFlag[e_id] = (problem->d_representatives[s_id] == problem->d_representatives[d_id]) ? -1 : problem->d_edgeFlag[e_id];
     return true;
   }
 
@@ -364,8 +379,8 @@ struct EdgeRmFunctor
    * @param[in] problem Data slice object
    *
    */
-  static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ void ApplyEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return;
   }
@@ -411,7 +426,10 @@ struct EdgeRmFunctor
  *
  */
 template<
-  typename VertexId, typename SizeT, typename Value, typename ProblemData>
+  typename VertexId, 
+  typename SizeT, 
+  typename Value, 
+  typename ProblemData>
 struct RmFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
@@ -426,8 +444,8 @@ struct RmFunctor
    * \return Whether to load the apply function for the edge and include
    * the destination node in the next frontier.
    */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ bool CondEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return true;
   }
@@ -440,8 +458,8 @@ struct RmFunctor
    * @param[in] problem Data slice object
    *
    */
-  static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ void ApplyEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return;
   }
@@ -492,8 +510,8 @@ struct VtxLenFunctor
    * \return Whether to load the apply function for the edge and include
    * the destination node in the next frontier.
    */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ bool CondEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return true;
   }
@@ -506,8 +524,8 @@ struct VtxLenFunctor
    * @param[in] problem Data slice object
    *
    */
-  static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ void ApplyEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return;
   }
@@ -554,7 +572,10 @@ struct VtxLenFunctor
  *
  */
 template<
-  typename VertexId, typename SizeT, typename Value, typename ProblemData>
+  typename VertexId, 
+  typename SizeT, 
+  typename Value, 
+  typename ProblemData>
 struct EdgeLenFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
@@ -569,8 +590,8 @@ struct EdgeLenFunctor
    * \return Whether to load the apply function for the edge and include
    * the destination node in the next frontier.
    */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ bool CondEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return true;
   }
@@ -583,8 +604,8 @@ struct EdgeLenFunctor
    * @param[in] problem Data slice object
    *
    */
-  static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ void ApplyEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return;
   }
@@ -629,7 +650,10 @@ struct EdgeLenFunctor
  *
  */
 template<
-  typename VertexId, typename SizeT, typename Value, typename ProblemData>
+  typename VertexId, 
+  typename SizeT, 
+  typename Value, 
+  typename ProblemData>
 struct RowOffsetsFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
@@ -644,8 +668,8 @@ struct RowOffsetsFunctor
    * \return Whether to load the apply function for the edge and include
    * the destination node in the next frontier.
    */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ bool CondEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return true;
   }
@@ -658,8 +682,8 @@ struct RowOffsetsFunctor
    * @param[in] problem Data slice object
    *
    */
-  static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ void ApplyEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return;
   }
@@ -699,7 +723,10 @@ struct RowOffsetsFunctor
 };
 
 template<
-  typename VertexId, typename SizeT, typename Value, typename ProblemData>
+  typename VertexId, 
+  typename SizeT, 
+  typename Value, 
+  typename ProblemData>
 struct EdgeOffsetsFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
@@ -714,8 +741,8 @@ struct EdgeOffsetsFunctor
    * \return Whether to load the apply function for the edge and include
    * the destination node in the next frontier.
    */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ bool CondEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return true;
   }
@@ -728,8 +755,8 @@ struct EdgeOffsetsFunctor
    * @param[in] problem Data slice object
    *
    */
-  static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ void ApplyEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return;
   }
@@ -779,7 +806,10 @@ struct EdgeOffsetsFunctor
  *
  */
 template<
-  typename VertexId, typename SizeT, typename Value, typename ProblemData>
+  typename VertexId, 
+  typename SizeT, 
+  typename Value, 
+  typename ProblemData>
 struct SuEdgeRmFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
@@ -794,8 +824,8 @@ struct SuEdgeRmFunctor
    * \return Whether to load the apply function for the edge and include
    * the destination node in the next frontier.
    */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ bool CondEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return true;
   }
@@ -808,8 +838,8 @@ struct SuEdgeRmFunctor
    * @param[in] problem Data slice object
    *
    */
-  static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ void ApplyEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return;
   }
@@ -829,7 +859,7 @@ struct SuEdgeRmFunctor
   {
     problem->d_flag_array[0] = 1;
     problem->d_edges[node] = (problem->d_flag_array[node] == 0) ? -1 : problem->d_edges[node];
-    problem->d_weights[node] = (problem->d_flag_array[node] == 0) ? -1 : problem->d_weights[node];
+    problem->d_edge_vals[node] = (problem->d_flag_array[node] == 0) ? -1 : problem->d_edge_vals[node];
     problem->d_keys_array[node] = (problem->d_flag_array[node] == 0) ? -1 : problem->d_keys_array[node];
     problem->d_eId[node] = (problem->d_flag_array[node] == 0) ? -1 : problem->d_eId[node];
     return true;
@@ -851,7 +881,10 @@ struct SuEdgeRmFunctor
 
 
 template<
-  typename VertexId, typename SizeT, typename Value, typename ProblemData>
+  typename VertexId, 
+  typename SizeT, 
+  typename Value, 
+  typename ProblemData>
 struct OrFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
@@ -866,8 +899,8 @@ struct OrFunctor
    * \return Whether to load the apply function for the edge and include
    * the destination node in the next frontier.
    */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ bool CondEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return true;
   }
@@ -880,8 +913,8 @@ struct OrFunctor
    * @param[in] problem Data slice object
    *
    */
-  static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0)
+  static __device__ __forceinline__ void ApplyEdge(VertexId s_id, 
+    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
     return;
   }
