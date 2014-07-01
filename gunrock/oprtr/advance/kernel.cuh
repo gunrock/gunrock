@@ -23,6 +23,7 @@
 #include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
 
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
+#include <gunrock/util/multithread_utils.cuh>
 
 #include <moderngpu.cuh>
 
@@ -191,7 +192,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         max_in,
                                         max_out,
                                         ADVANCE_TYPE);
-
+            //util::cpu_mt::PrintGPUArray<SizeT, int>("pse",(int*)partitioned_scanned_edges,frontier_attribute.queue_length);
             Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
 

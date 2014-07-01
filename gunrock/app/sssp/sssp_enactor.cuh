@@ -96,18 +96,38 @@ namespace sssp {
         }
     }
 
+    /*template <typename VertexId, typename SizeT>
+    __global__ void Copy_Preds (
+        const SizeT     num_elements,
+        const VertexId* keys,
+        const VertexId* in_preds,
+              VertexId* out_preds)
+    {
+        VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
+        if (x>=num_elements) return;
+        VertexId t = keys[x];
+        out_preds[x]=in_preds[t];
+    }
+
     template <typename VertexId, typename SizeT>
     __global__ void Update_Preds (
         const SizeT     num_elements,
         const VertexId* keys,
         const VertexId* org_vertexs,
-              VertexId* preds)
+        const VertexId* in_preds,
+              VertexId* out_preds)
     {
-        SizeT x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
+        VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
+        //long long x= blockIdx.y;
+        //x = x*gridDim.x+blockIdx.x;
+        //x = x*blockDim.y+threadIdx.y;
+        //x = x*blockDim.x+threadIdx.x;
+
         if (x>=num_elements) return;
-        SizeT t = keys[x];
-        preds[t]=org_vertexs[preds[t]];
-    }
+        VertexId t = keys[x];
+        VertexId p = in_preds[x];
+        out_preds[t]=org_vertexs[p];
+    }*/
 
     template <
         bool     INSTRUMENT,
@@ -153,6 +173,7 @@ namespace sssp {
         SizeT*       out_offset           = NULL;
         char*        message              = new char [1024];
         util::Array1D<SizeT, unsigned int>  scanned_edges;
+        util::Array1D<SizeT, VertexId    >  temp_preds;
         frontier_attribute-> queue_index  = 0;        // Work queue index
         frontier_attribute-> selector     = 0;
         frontier_attribute-> queue_length = thread_data -> init_size; //? 
@@ -168,17 +189,37 @@ namespace sssp {
             }
             scanned_edges.SetName("scanned_edges");
             if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
-                if (enactor_stats->retval = scanned_edges.Allocate(graph_slice->edges, util::DEVICE)) break; 
+                if (enactor_stats->retval = scanned_edges.Allocate(graph_slice->edges*2, util::DEVICE)) break; 
             }
+            temp_preds.SetName("temp_preds");
+            if (SSSPProblem::MARK_PATHS) 
+                if (enactor_stats->retval = temp_preds.Allocate(graph_slice->nodes*4, util::DEVICE)) break;
 
             //unsigned int pq_level = 0; 
             //unsigned int out_length = 0;
 
             // Step through SSSP iterations
             //while (out_length > 0 || pq->queue_length > 0 || frontier_attribute.queue_length > 0) {
-            while (frontier_attribute->queue_length > 0 || (!All_Done(s_enactor_stats, num_gpus))) {
+            while (!All_Done(s_enactor_stats, num_gpus)) {
                 if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1,0)) break;
+                if (DEBUG)
+                {   
+                    SizeT _queue_length;
+                    if (frontier_attribute->queue_reset) _queue_length = frontier_attribute->queue_length;
+                    else if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, _queue_length)) break;      
+                    printf("%d\t %d\t wQueue_Length = %d fQueue_Length = %d\n", thread_num, enactor_stats->iteration, _queue_length, frontier_attribute->queue_length);fflush(stdout);                
+                    //util::cpu_mt::PrintCPUArray<SizeT, Value>("_weig",data_slice[0]->weights.GetPointer(util::HOST),graph_slice->edges,thread_num,enactor_stats->iteration);
+                    //util::cpu_mt::PrintGPUArray<SizeT, Value>("weigh",data_slice[0]->weights.GetPointer(util::DEVICE),graph_slice->edges,thread_num,enactor_stats->iteration);
+                    //util::cpu_mt::PrintGPUArray<SizeT, SizeT>("row_o",graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration);
+                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys0", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
+                    //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
+                    //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu0", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
+                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labe0", data_slice[0]->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
+                    if (SSSPProblem::MARK_PATHS)
+                        util::cpu_mt::PrintGPUArray<SizeT, VertexId>("pred0", data_slice[0]->preds.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
+                }
                 // Edge Map
+                //util::cpu_mt::PrintMessage("Edge map begin.", thread_num, enactor_stats->iteration);
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SSSPProblem, SsspFunctor>
                 (
                     enactor_stats->d_done,
@@ -210,17 +251,32 @@ namespace sssp {
 
                 if (DEBUG && (enactor_stats->retval = util::GRError(cudaThreadSynchronize(), "advance::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(enactor_stats->throttle_event);                                 // give host memory mapped visibility to GPU updates
+                //util::cpu_mt::PrintMessage("Edge map end.", thread_num, enactor_stats->iteration);
 
                 frontier_attribute->queue_index++;
                 frontier_attribute->selector ^= 1;
 
-                if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
-                    if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
+                if (DEBUG)
+                {   
+                    SizeT _queue_length;
+                    if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, _queue_length)) break;      
+                    printf("%d\t %d\t wQueue_Length = %d fQueue_Length = %d\n", thread_num, enactor_stats->iteration, _queue_length, frontier_attribute->queue_length);fflush(stdout);                
+                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys1", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
+                    //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
+                    //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu1", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
+                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labe1", data_slice[0]->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
+                    if (SSSPProblem::MARK_PATHS)
+                        util::cpu_mt::PrintGPUArray<SizeT, VertexId>("pred1", data_slice[0]->preds.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
                 }
-    
+                
+                //if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
+                //    if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
+                //}
+
+   
+                if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
                 if (DEBUG) {
-                    if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
-                    printf(", %lld", (long long) frontier_attribute->queue_length);
+                    //printf(", %lld", (long long) frontier_attribute->queue_length);
                     //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
                     //util::DisplayDeviceResults(problem->data_slices[0]->d_labels, graph_slice->nodes);
                 }
@@ -245,7 +301,9 @@ namespace sssp {
                 // Disable here because of Priority Queue
                 //if (done[0] == 0) break;
 
+                if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1,0)) break;
                 // Vertex Map
+                //util::cpu_mt::PrintMessage("Vertex map begin.", thread_num, enactor_stats->iteration);
                 gunrock::oprtr::filter::Kernel<FilterKernelPolicy, SSSPProblem, SsspFunctor>
                 <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS>>>(
                     enactor_stats->iteration+1,
@@ -266,10 +324,24 @@ namespace sssp {
 
                 if (DEBUG && (enactor_stats->retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(enactor_stats->throttle_event); // give host memory mapped visibility to GPU updates
+                //util::cpu_mt::PrintMessage("Vertex map end.", thread_num, enactor_stats->iteration);
 
                 frontier_attribute->queue_index++;
                 frontier_attribute->selector ^= 1;
 
+                if (DEBUG)
+                {   
+                    SizeT _queue_length;
+                    if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, _queue_length)) break;      
+                    printf("%d\t %d\t wQueue_Length = %d fQueue_Length = %d\n", thread_num, enactor_stats->iteration, _queue_length, frontier_attribute->queue_length);fflush(stdout);                
+                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys2", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
+                    //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
+                    //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu2", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
+                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labe2", data_slice[0]->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
+                    if (SSSPProblem::MARK_PATHS)
+                        util::cpu_mt::PrintGPUArray<SizeT, VertexId>("pred2", data_slice[0]->preds.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
+                }
+ 
                 if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
 
                 //TODO: split the output queue into near/far pile, put far pile in far queue, put near pile as the input queue
@@ -316,9 +388,9 @@ namespace sssp {
                 enactor_stats.iteration++;*/
 
                 if (INSTRUMENT || DEBUG) {
-                    if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
+                    //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
                     enactor_stats->total_queued += frontier_attribute->queue_length;
-                    if (DEBUG) printf(", %lld", (long long) frontier_attribute->queue_length);
+                    //if (DEBUG) printf(", %lld", (long long) frontier_attribute->queue_length);
                     if (INSTRUMENT) {
                         if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
                             enactor_stats->filter_grid_size,
@@ -341,14 +413,21 @@ namespace sssp {
                         //printf("%d\t%d\tScan map begin.\n",thread_num,iteration[0]);fflush(stdout);
                         //int* _partition_table = graph_slice->partition_table.GetPointer(util::DEVICE);
                         //SizeT* _convertion_table = graph_slice->convertion_table.GetPointer(util::DEVICE);
+                        printf("%d\t %d\t Update begin, n=%d\n",thread_num,enactor_stats->iteration,n);
                         if (SSSPProblem::MARK_PATHS)
                         {   
                             //util::cpu_mt::PrintGPUArray<SizeT,SizeT>("orgi",graph_slice->original_vertex.GetPointer(util::DEVICE),graph_slice->nodes,thread_num,iteration[0]);
                             int grid_size = n%256 == 0? n/256 : n/256+1;
+                            Copy_Preds<VertexId,SizeT> <<<grid_size,256>>>(
+                                n,
+                                graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),
+                                data_slice[0]->preds.GetPointer(util::DEVICE),
+                                temp_preds.GetPointer(util::DEVICE));
                             Update_Preds<VertexId,SizeT> <<<grid_size,256>>>(
                                 n,  
                                 graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),
                                 graph_slice->original_vertex.GetPointer(util::DEVICE),
+                                temp_preds.GetPointer(util::DEVICE),
                                 data_slice[0]->preds.GetPointer(util::DEVICE));
                         }
                         Scaner->Scan_with_Keys(n,
@@ -363,6 +442,7 @@ namespace sssp {
                             data_slice[0]->associate_outs   .GetPointer(util::DEVICE));
                         if (enactor_stats->retval = data_slice[0]->out_length.Move(util::DEVICE,util::HOST)) break;
                         out_offset[0]=0;
+                        util::cpu_mt::PrintCPUArray<SizeT, SizeT>("out_length",data_slice[0]->out_length.GetPointer(util::HOST),num_gpus,thread_num,enactor_stats->iteration);
                         for (int i=0;i<num_gpus;i++) out_offset[i+1]=out_offset[i]+data_slice[0]->out_length[i];
 
                         frontier_attribute->queue_index++;
@@ -382,6 +462,7 @@ namespace sssp {
                                       = data_slice[0]->out_length[peer_];
                             if (data_slice[0]->out_length[peer_] == 0) continue;
                             s_enactor_stats[peer].done[0]=-1;
+                            //printf("%d\t %d\t %p+%d ==> %p+%d @ %d,%d\n", thread_num, enactor_stats->iteration, s_data_slice[peer]->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE), s_graph_slice[peer]->in_offset[gpu_], graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), out_offset[peer_], peer, data_slice[0]->out_length[peer_]);
                             if (enactor_stats->retval = util::GRError(cudaMemcpy(
                                   s_data_slice[peer] -> keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE)
                                       + s_graph_slice[peer] -> in_offset[gpu_],
@@ -420,7 +501,12 @@ namespace sssp {
                     }
 
                     //CPU global barrier
-                    util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,thread_num);
+                    //if (!All_Done(s_enactor_stats,num_gpus))
+                    {
+                        //util::cpu_mt::PrintMessage("WaitingBarrier",thread_num,enactor_stats->iteration);
+                        util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,thread_num);
+                        //util::cpu_mt::PrintMessage("PastBarrier",thread_num,enactor_stats->iteration);
+                    }
                     //if (All_Done(s_enactor_stats,num_gpus))
                     //{
                     //    break_clean=false;
@@ -436,9 +522,9 @@ namespace sssp {
                         SizeT m     = data_slice[0]->in_length[enactor_stats->iteration%2][peer_];
                         if (m ==0) continue;
                         int grid_size = (m%256) == 0? m/ 256 : m/256+1;
-                        printf("%d\t %d\tin_length = %d\tnum_associate = %d\tin_offset = %d\n", thread_num, enactor_stats->iteration, m, data_slice[0]->num_associate, graph_slice->in_offset[peer_]);
-                        if (DEBUG) util::cpu_mt::PrintGPUArray<SizeT,VertexId>("keys_in",data_slice[0]->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE) + graph_slice->in_offset[peer_],m,thread_num,enactor_stats->iteration);
-                        if (DEBUG) util::cpu_mt::PrintGPUArray<SizeT,VertexId>("asso_i0",data_slice[0]->associate_ins[enactor_stats->iteration%2][0]+graph_slice->in_offset[peer_],m,thread_num,enactor_stats->iteration);
+                        //printf("%d\t %d\tin_length = %d\tnum_associate = %d\tin_offset = %d @ %d\n", thread_num, enactor_stats->iteration, m, data_slice[0]->num_associate, graph_slice->in_offset[peer_],peer);
+                        //if (DEBUG) util::cpu_mt::PrintGPUArray<SizeT,VertexId>("keys_in",data_slice[0]->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE) + graph_slice->in_offset[peer_],m,thread_num,enactor_stats->iteration);
+                        //if (DEBUG) util::cpu_mt::PrintGPUArray<SizeT,VertexId>("asso_i0",data_slice[0]->associate_ins[enactor_stats->iteration%2][0]+graph_slice->in_offset[peer_],m,thread_num,enactor_stats->iteration);
                         //util::cpu_mt::PrintGPUArray<SizeT,VertexId>("asso_i1",data_slice[0]->associate_ins[iteration[0]%2][1]+graph_slice->in_offset[peer_],m,thread_num,iteration[0]);
                         Expand_Incoming <VertexId, SizeT>
                             <<<grid_size,256>>> (
@@ -451,7 +537,7 @@ namespace sssp {
                             data_slice[0]  ->associate_orgs.GetPointer(util::DEVICE));
                         if (enactor_stats->retval = util::GRError("Expand_Incoming failed", __FILE__, __LINE__)) break;
                         //util::cpu_mt::PrintGPUArray<SizeT,VertexId>("asso_orgs",data_slice[0]->associate_orgs[0],graph_slice->nodes,thread_num,iteration[0]);
-                        if (DEBUG) util::cpu_mt::PrintGPUArray<SizeT,VertexId>("labe4",data_slice[0]->labels.GetPointer(util::GPU),graph_slice->nodes,thread_num,enactor_stats->iteration);
+                        //if (DEBUG) util::cpu_mt::PrintGPUArray<SizeT,VertexId>("labe4",data_slice[0]->labels.GetPointer(util::GPU),graph_slice->nodes,thread_num,enactor_stats->iteration);
                         //util::cpu_mt::PrintGPUArray<SizeT,VertexId>("pred4",data_slice[0]->preds.GetPointer(util::GPU),graph_slice->nodes,thread_num,iteration[0]);
                         //util::cpu_mt::PrintGPUArray<SizeT,VertexId>("pred5",data_slice[0]->associate_orgs[1],graph_slice->nodes,thread_num,iteration[0]);
                         total_length+=data_slice[0]->in_length[enactor_stats->iteration%2][peer_];
@@ -468,11 +554,12 @@ namespace sssp {
                     }
                 }
 
+                //util::cpu_mt::PrintMessage("Iteration end",thread_num,enactor_stats->iteration);
                 enactor_stats->iteration++;
                 //if (DEBUG) printf("\n%lld", (long long) enactor_stats->iteration);
-
             }
             //}
+            util::cpu_mt::PrintMessage("Loop end",thread_num,enactor_stats->iteration);
 
             if (enactor_stats->retval) break;
 
@@ -486,13 +573,14 @@ namespace sssp {
             
             //if (d_scanned_edges) cudaFree(d_scanned_edges);
             scanned_edges.Release();
+            temp_preds.Release();
         } while(0);
 
         if (num_gpus >1)
         {
             if (break_clean)
             {
-                util::cpu_mt::ReleaseBarrier(&(cpu_barrier[0]));
+                util::cpu_mt::ReleaseBarrier(cpu_barrier);
             }
             delete Scaner; Scaner=NULL;
         }
@@ -765,7 +853,7 @@ class SSSPEnactor : public EnactorBase
         if (DEBUG) printf("\nGPU SSSP Done.\n");
         delete[] thread_Ids   ; thread_Ids    = NULL;
         delete[] thread_slices; thread_slices = NULL;
-        util::cpu_mt::PrintMessage("BFSEnactor EnactBFS() end.");
+        util::cpu_mt::PrintMessage("SSSPEnactor EnactSSSP() end.");
         return retval;
     }
 

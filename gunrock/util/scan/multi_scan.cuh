@@ -258,13 +258,13 @@ struct MultiScan
               SizeT*          d_Length,    // Length of each sub-array
               SizeT*          d_Result)    // The scan result
     {
-        SizeT *History_Size = new SizeT[20];
-        SizeT **d_Buffer    = new SizeT*[20];
+        SizeT *History_Size = new SizeT[40];
+        SizeT **d_Buffer    = new SizeT*[40];
         SizeT Current_Size  = Num_Elements;
         int   Current_Level = 0;
         dim3  Block_Size,Grid_Size;
 
-        for (int i=0;i<20;i++) d_Buffer[i]=NULL;
+        for (int i=0;i<40;i++) d_Buffer[i]=NULL;
         d_Buffer[0]=d_Result;
         History_Size[0] = Current_Size;
         History_Size[1] = Current_Size/BLOCK_SIZE;
@@ -342,7 +342,7 @@ struct MultiScan
         cudaDeviceSynchronize();
         util::GRError("Step3 failed", __FILE__, __LINE__);
 
-        for (int i=1;i<20;i++) 
+        for (int i=1;i<40;i++) 
         if (d_Buffer[i]!=NULL) 
         {
             util::GRError(cudaFree(d_Buffer[i]),
@@ -366,8 +366,8 @@ struct MultiScan
               VertexId**       d_Associate_out)    // The scan result
     {
         if (Num_Elements <= 0) return;
-        SizeT *History_Size = new SizeT[20];
-        SizeT **d_Buffer    = new SizeT*[20];
+        SizeT *History_Size = new SizeT[40];
+        SizeT **d_Buffer    = new SizeT*[40];
         SizeT Current_Size  = Num_Elements;
         int   Current_Level = 0;
         dim3  Block_Size,Grid_Size;
@@ -376,7 +376,7 @@ struct MultiScan
         
         util::GRError(cudaMalloc((void**)&d_Offset1, sizeof(SizeT)*(Num_Rows+1)), "cudaMalloc d_Offset1 failed", __FILE__, __LINE__);
 
-        for (int i=0;i<20;i++) d_Buffer[i]=NULL;
+        for (int i=0;i<40;i++) d_Buffer[i]=NULL;
         History_Size[0] = Current_Size;
         History_Size[1] = Current_Size/BLOCK_SIZE;
         if ((History_Size[0]%BLOCK_SIZE)!=0) History_Size[1]++;
@@ -469,7 +469,7 @@ struct MultiScan
         cudaDeviceSynchronize();
         util::GRError("Step3b failed", __FILE__, __LINE__);
 
-        for (int i=0;i<20;i++) 
+        for (int i=0;i<40;i++) 
         if (d_Buffer[i]!=NULL) 
         {
             util::GRError(cudaFree(d_Buffer[i]),

@@ -113,7 +113,7 @@ namespace bfs {
         }
     }
 
-    template <typename VertexId, typename SizeT>
+    /*template <typename VertexId, typename SizeT>
     __global__ void Update_Preds (
         const SizeT     num_elements,
         const VertexId* keys,
@@ -124,7 +124,7 @@ namespace bfs {
         if (x>=num_elements) return;
         SizeT t = keys[x];
         preds[t]=org_vertexs[preds[t]];
-    }
+    }*/
 
     template<
         bool     INSTRUMENT,
@@ -173,6 +173,7 @@ namespace bfs {
         SizeT*       out_offset            = NULL;
         char*        message               = new char [1024];
         util::Array1D<SizeT, unsigned int>   scanned_edges;
+        util::Array1D<SizeT, VertexId    >   temp_preds;
         frontier_attribute->queue_index    = 0;        // Work queue index
         frontier_attribute->selector       = 0;
         frontier_attribute->queue_length   = thread_data -> init_size; //? 
@@ -193,6 +194,11 @@ namespace bfs {
                                 //(void**)&d_scanned_edges,
                                 //graph_slice->edges * sizeof(unsigned int)),
                                 //"PBFSProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
+            }
+            temp_preds.SetName("temp_preds");
+            if (BFSProblem::MARK_PREDECESSORS)
+            {
+                if (enactor_stats->retval = temp_preds.Allocate(graph_slice->nodes*4, util::DEVICE)) break;
             }
 
             // Step through BFS iterations
@@ -373,10 +379,16 @@ namespace bfs {
                         {   
                             //util::cpu_mt::PrintGPUArray<SizeT,SizeT>("orgi",graph_slice->original_vertex.GetPointer(util::DEVICE),graph_slice->nodes,thread_num,iteration[0]);
                             int grid_size = n%256 == 0? n/256 : n/256+1;
+                            Copy_Preds<VertexId, SizeT> <<<grid_size,256>>>(
+                                n,
+                                graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),
+                                data_slice[0]->preds.GetPointer(util::DEVICE),
+                                temp_preds.GetPointer(util::DEVICE));
                             Update_Preds<VertexId,SizeT> <<<grid_size,256>>>(
                                 n,  
                                 graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),
                                 graph_slice->original_vertex.GetPointer(util::DEVICE),
+                                temp_preds.GetPointer(util::DEVICE),
                                 data_slice[0]->preds.GetPointer(util::DEVICE));
                         }   
                         Scaner->Scan_with_Keys(n,

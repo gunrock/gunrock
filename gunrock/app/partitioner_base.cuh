@@ -285,6 +285,13 @@ public:
         }
 
         cutWaitForThreads(thread_Ids,num_gpus);
+
+        for (int gpu=0;gpu<num_gpus;gpu++)
+        for (int i=0;i<=num_gpus;i++)
+        {
+            in_offsets[gpu][i]*=2;
+            out_offsets[gpu][i]*=2;
+        }
         util::cpu_mt::DestoryBarrier(&cpu_barrier);
         delete[] thread_Ids ;thread_Ids =NULL;
         delete[] thread_data;thread_data=NULL;

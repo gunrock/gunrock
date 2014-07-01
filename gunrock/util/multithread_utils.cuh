@@ -157,6 +157,7 @@ extern "C" {
 
     void IncrementnWaitBarrier(CPUBarrier *CB, int thread_num)
     {
+        if (CB->released) return;
         CB->marker[thread_num]=1;
         pthread_barrier_wait(&(CB->barrier));
         CB->marker[thread_num]=0;

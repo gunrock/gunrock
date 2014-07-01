@@ -505,6 +505,15 @@ struct ProblemBase
                     out_offsets);
                 cpu_timer.Stop();
                 printf("partition end. (%f ms)\n", cpu_timer.ElapsedMillis());fflush(stdout);
+                //util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);
+                //util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion0",convertion_tables[0],graph->nodes);
+                //util::cpu_mt::PrintCPUArray<SizeT,Value>("edge_value",graph->edge_values,graph->edges);
+                //for (int gpu=0;gpu<num_gpus;gpu++)
+                //{
+                //    printf("%d\n",gpu);
+                //    util::cpu_mt::PrintCPUArray<SizeT,int>("partition",partition_tables[gpu+1],sub_graphs[gpu].nodes);
+                //    util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion",convertion_tables[gpu+1],sub_graphs[gpu].nodes);
+                //}
                 if (retval) break;
             } else {
                 sub_graphs=graph;

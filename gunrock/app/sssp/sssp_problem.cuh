@@ -87,6 +87,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
 
         ~DataSlice()
         {
+            util::cpu_mt::PrintMessage("~DataSlice() begin.");
             if (util::SetDevice(gpu_idx)) return;
             labels        .Release();
             preds         .Release();
@@ -101,7 +102,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
             out_length    .Release();
             associate_orgs.Release();
 
-            if (associate_in != NULL)
+            if (associate_in[0] != NULL)
             {
                 for (int i=0;i<num_associate;i++)
                 {
@@ -124,6 +125,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
                 associate_out=NULL;
                 associate_outs.Release();
             }
+            util::cpu_mt::PrintMessage("~DataSlice() end.");
         }
 
         cudaError_t Init(
@@ -139,10 +141,13 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
             this->num_associate = num_associate;
             if (retval = util::SetDevice(gpu_idx))  return retval;
             // Create SoA on device
+            //printf("#edges=%d, edge_values=%p\n",graph->edges,graph->edge_values);
+            //util::cpu_mt::PrintCPUArray<SizeT,Value>("weight",graph->edge_values,graph->edges);
             if (retval = labels .Allocate(graph->nodes,util::DEVICE)) return retval;
             if (retval = weights.Allocate(graph->edges,util::DEVICE)) return retval;
-            weights.SetPointer(graph->edge_values, util::HOST);
+            weights.SetPointer(graph->edge_values, graph->edges, util::HOST);
             if (retval = weights.Move(util::HOST, util::DEVICE)) return retval;
+            //printf("on cpu=%p, on gpu=%p\n",weights.GetPointer(util::HOST),weights.GetPointer(util::DEVICE));
             
             /*if (retval = delta.Allocate(1,util::DEVICE)) return retval;
             float _delta = EstimatedDelta(graph)*2;
@@ -168,7 +173,8 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
 
             if (retval = in_length[0].Allocate(num_gpus,util::HOST)) return retval;
             if (retval = in_length[1].Allocate(num_gpus,util::HOST)) return retval;
-
+            if (retval = out_length.Allocate(num_gpus,util::HOST | util::DEVICE)) return retval;
+            
             // Create incoming buffer on device
             if (num_in_nodes > 0)
             for (int t=0;t<2;t++) {
@@ -198,7 +204,6 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
                     associate_outs[i]=associate_out[i].GetPointer(util::DEVICE);
                 }
                 if (retval = associate_outs.Move(util::HOST, util::DEVICE)) return retval;
-                if (retval = out_length.Allocate(num_gpus,util::HOST | util::DEVICE)) return retval;
             }
 
             return retval;
@@ -470,7 +475,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
                     "SSSPProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
         VertexId src_label = 0; 
         if (retval = util::GRError(cudaMemcpy(
-                        data_slices[gpu]->labels.GetPointer(util::DEVICE)+src,
+                        data_slices[gpu]->labels.GetPointer(util::DEVICE)+tsrc,
                         &src_label,
                         sizeof(VertexId),
                         cudaMemcpyHostToDevice),

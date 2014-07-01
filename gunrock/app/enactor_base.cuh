@@ -84,6 +84,39 @@ bool All_Done(EnactorStats *enactor_stats,int num_gpus)
     return true;
 } 
 
+    template <typename VertexId, typename SizeT>
+    __global__ void Copy_Preds (
+        const SizeT     num_elements,
+        const VertexId* keys,
+        const VertexId* in_preds,
+              VertexId* out_preds)
+    {   
+        VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
+        if (x>=num_elements) return;
+        VertexId t = keys[x];
+        out_preds[x]=in_preds[t];
+    }   
+
+    template <typename VertexId, typename SizeT>
+    __global__ void Update_Preds (
+        const SizeT     num_elements,
+        const VertexId* keys,
+        const VertexId* org_vertexs,
+        const VertexId* in_preds,
+              VertexId* out_preds)
+    {   
+        VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
+        /*long long x= blockIdx.y;
+        x = x*gridDim.x+blockIdx.x;
+        x = x*blockDim.y+threadIdx.y;
+        x = x*blockDim.x+threadIdx.x;*/
+
+        if (x>=num_elements) return;
+        VertexId t = keys[x];
+        VertexId p = in_preds[x];
+        out_preds[t]=org_vertexs[p];
+    }   
+
 /**
  * @brief Base class for graph problem enactors.
  */

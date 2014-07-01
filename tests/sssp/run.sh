@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OPTION[0]="--src=largestdegree --device=0 --partition_method=random --queue-sizing=4.0"
+OPTION[0]="--src=largestdegree --device=0,1,2,3 --partition_method=random --queue-sizing=5.0"
 OPTION[1]=${OPTION[0]}" --undirected" #undirected and do not mark-pred"
 OPTION[2]=${OPTION[0]}" --mark-path" #undirected and mark-pred"
 OPTION[3]=${OPTION[1]}" --mark-path"
@@ -11,7 +11,7 @@ MARK[2]=${MARK[0]}".mark_path"
 MARK[3]=${MARK[1]}".mark_path"
 
 #put OS and Device type here
-SUFFIX="ubuntu12.04.k40c"
+SUFFIX="ubuntu12.04.k40cx4"
 EXCUTION="./bin/test_sssp_6.0_x86_64"
 DATADIR="/data/gunrock_dataset/large"
 

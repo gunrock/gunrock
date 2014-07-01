@@ -52,10 +52,12 @@ struct SSSPFunctor
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                         weight, problem->weights + e_id);
         Value new_weight = weight + label;
-       
-        
+        //Value old_weight = problem->labels[d_id];
+        //bool temp =  (new_weight < atomicMin(problem->labels + d_id, new_weight));
+        //printf("\t n=%d,la=%d,w=%d,ow=%d,nw=%d,co=%s",d_id,label,weight,old_weight,new_weight,temp?"true":"false");
         // Check if the destination node has been claimed as someone's child
         return (new_weight < atomicMin(problem->labels + d_id, new_weight));
+        //return temp;
     }
 
     /**
