@@ -31,9 +31,9 @@ namespace mst {
  *
  */
 template<
-  typename VertexId, 
-  typename SizeT, 
-  typename Value, 
+  typename VertexId,
+  typename SizeT,
+  typename Value,
   typename ProblemData>
 struct SuccFunctor
 {
@@ -67,13 +67,11 @@ struct SuccFunctor
   static __device__ __forceinline__ void ApplyEdge(VertexId s_id, 
     VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    if (problem->d_reduced_vals[s_id] == problem->d_edge_vals[e_id] &&
-      (atomicCAS(&problem->d_temp_storage[s_id], -1, s_id) == -1))
+    if (problem->d_reduced_vals[s_id] == problem->d_edge_vals[e_id] && (atomicCAS(&problem->d_temp_storage[s_id], -1, s_id) == -1))
     {
-      //printf("s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
+      //printf(" mark - s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
       problem->d_successors[s_id] = d_id;
-      // mark edges that have mimimum edge values as MST output
-      problem->d_mst_output[problem->d_eId[e_id]] = 1;
+      problem->d_mst_output[e_id] = 1; // mark edges that have mimimum edge values as MST output
     }
     return;
   }
@@ -156,13 +154,11 @@ struct RmCycFunctor
   static __device__ __forceinline__ void ApplyEdge(VertexId s_id, 
     VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    if (problem->d_successors[s_id] > s_id &&
-      problem->d_successors[problem->d_successors[s_id]] == s_id)
+    if (problem->d_successors[s_id] > s_id && problem->d_successors[problem->d_successors[s_id]] == s_id)
     {
-      //printf("s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
+      //printf(" remove - s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
       problem->d_successors[s_id] = s_id;
-      // remove edges form a cycle from MST output
-      problem->d_mst_output[problem->d_eId[e_id]] = 0; 
+      problem->d_mst_output[e_id] = 0; // remove edges form a cycle from MST output
     }
     return;
   }
@@ -213,9 +209,9 @@ struct RmCycFunctor
  *
  */
 template<
-  typename VertexId, 
-  typename SizeT, 
-  typename Value, 
+  typename VertexId,
+  typename SizeT,
+  typename Value,
   typename ProblemData>
 struct PtrJumpFunctor
 {

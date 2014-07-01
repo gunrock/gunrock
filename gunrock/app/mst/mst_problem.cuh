@@ -59,17 +59,19 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
     // device storage arrays
     SizeT			*d_labels;
     
-    int 			*d_flag_array;	 		//!< flag (1 indicate start of segment, 0 otherwise)
-    SizeT			*d_keys_array; 	 		//!< keys array (inclusive scan of the flag array)
- 		Value			*d_reduced_vals; 		//!< store reduced minimum edge values (weights)
-    SizeT 		*d_reduced_keys; 		//!< reduced keys array
-    VertexId	*d_successors;	 		//!< destination vertices that have min edge_values
-    VertexId  *d_representatives; //!< representative vertices for each successors
-    int				*d_mst_output; 	 		//!< mark selected edges (1 indicate selected edges)
-    Value 		*d_edge_vals;				//!< store edge values per edge (a.k.a. weights)
-    Value     *d_temp_storage;		//!< used for storing temporary arrays
+    int 		 *d_flag_array;	 		 //!< flag (1 indicate start of segment, 0 otherwise)
+    SizeT		 *d_keys_array; 	 	 //!< keys array (inclusive scan of the flag array)
+ 		Value		 *d_reduced_vals; 	 //!< store reduced minimum edge values (weights)
+    SizeT 	 *d_reduced_keys; 	 //!< reduced keys array
+    VertexId *d_successors;	 		 //!< destination vertices that have min edge_values
+    VertexId *d_representatives; //!< representative vertices for each successors
+    int			 *d_mst_output; 	 	 //!< mark selected edges (1 indicate selected edges)
+    Value 	 *d_edge_vals;			 //!< store edge values per edge (a.k.a. weights)
+    Value    *d_temp_storage;		 //!< used for storing temporary arrays
+    
 
-    SizeT	*d_eId;         /* Used for keeping current iteration edge Ids to select edges */
+    SizeT			*d_eId;         /* Used for keeping current iteration edge Ids to select edges */
+    
     SizeT	*d_edges;	/* Edge list */
     // can this be replaced by column_indices?? TODO
     SizeT	*d_edgeFlag;        /* Used for removing edges between supervertices */

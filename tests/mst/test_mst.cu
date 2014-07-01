@@ -119,8 +119,8 @@ void SimpleReferenceMST(
 {
   const int num_nodes = graph.nodes;
   const int num_edges = graph.edges;
-  printf(" CPU Reference: #nodes: %d #edges: %d\n", num_nodes, num_edges); 
-  
+  printf(" CPU Reference: #nodes: %d #edges: %d\n", num_nodes, num_edges);
+
   //Preparation
   using namespace boost;
   typedef adjacency_list <
@@ -394,7 +394,7 @@ int main(int argc, char** argv)
     // run gpu tests
     RunTests(csr_gpu, args, *context);
 
-    // run cpu reference 
+    // run cpu reference
     // build a directed graph required by cpu reference computing
     Csr<VertexId, Value, SizeT> csr_cpu(false);
     if (graphio::BuildMarketGraph<true>(

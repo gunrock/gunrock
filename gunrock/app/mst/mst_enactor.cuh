@@ -334,12 +334,12 @@ public:
       // keep record of original number of edges in graph
       int  num_edges_origin = graph_slice->edges;
       int  loop_limit = 0;
-      bool debug_info = 1;
+      bool debug_info = 0;
 
       // recursive Loop for MST implementations
       while (graph_slice->nodes > 1)
       {
-	      printf(" \n===== Begin: Iteration:%lld #nodes:%d #edges:%d =====\n",
+	      printf("\nBEGIN: ITERATION:%lld #NODES:%d #EDGES:%d\n",
 	        enactor_stats.iteration, graph_slice->nodes, graph_slice->edges);
 
 	      // bind row_offsets and bitmask texture
@@ -354,7 +354,7 @@ public:
           __FILE__, __LINE__)) break;
 
         printf("----> finished binding row_offsets: new row_offsets. \n");
-        
+
         /* // vertex mapping replaced with mark_segment kernel
       	// generate flag array using SuccFunctor - vertex mapping
       	frontier_attribute.queue_length = graph_slice->nodes;
@@ -384,6 +384,8 @@ public:
       		"Filter::Kernel failed", __FILE__, __LINE__))) break;
         */
         
+        printf("MARKING THE MST EDGES ...\n");
+
         // generate flag array using mark_segment kernel
         util::markSegmentFromOffsets<<<128, 128>>>(
           problem->data_slices[0]->d_flag_array,
@@ -408,7 +410,7 @@ public:
       		graph_slice->edges,
           std::numeric_limits<int>::max(), 
           mgpu::minimum<int>(),
-      		mgpu::equal_to<int>(), 
+      		mgpu::equal_to<int>(),
           problem->data_slices[0]->d_reduced_keys,
       		problem->data_slices[0]->d_reduced_vals, 
           &numSegments, (int*)0, context);
@@ -421,8 +423,6 @@ public:
       	  util::DisplayDeviceResults(problem->data_slices[0]->d_flag_array, num_edges_origin);
       	  printf(":: origin keys array ::");
       	  util::DisplayDeviceResults(problem->data_slices[0]->d_keys_array, num_edges_origin);
-      	  printf(":: origin edge list ::");
-      	  util::DisplayDeviceResults(graph_slice->d_column_indices, num_edges_origin);
       	  printf(":: origin edge_values ::");
       	  util::DisplayDeviceResults(problem->data_slices[0]->d_edge_vals, num_edges_origin);
       	  printf(":: reduced keys array ::");
@@ -431,16 +431,16 @@ public:
       	  util::DisplayDeviceResults(problem->data_slices[0]->d_reduced_vals, graph_slice->nodes);
         }
 
-        // reset keysCopy in order to avoid same weight issue, used for atomicCAS
+        // reset d_temp_storage used for atomicCAS to avoid multuple selections
       	util::MemsetKernel<<<128, 128>>>(
           problem->data_slices[0]->d_temp_storage, -1, graph_slice->nodes);
 
       	// Generate Successor Array using SuccFunctor - edge mapping
       	// Successor Array holds the outgoing v for each u
-      	frontier_attribute.queue_index = 0;
-      	frontier_attribute.selector    = 0;
+      	frontier_attribute.queue_index  = 0;
+      	frontier_attribute.selector     = 0;
       	frontier_attribute.queue_length = graph_slice->nodes;
-      	frontier_attribute.queue_reset = true;
+      	frontier_attribute.queue_reset  = true;
 
       	gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, MSTProblem, SuccFunctor>(
           d_done,
@@ -482,7 +482,7 @@ public:
       	frontier_attribute.queue_index  = 0;
       	frontier_attribute.selector     = 0;
       	frontier_attribute.queue_length = graph_slice->nodes;
-      	frontier_attribute.queue_reset = true;
+      	frontier_attribute.queue_reset  = true;
 
       	gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, MSTProblem, RmCycFunctor>(
       	  d_done,
@@ -510,28 +510,29 @@ public:
       	if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
       		"advance::Kernel failed", __FILE__, __LINE__))) break;
 
-        printf("----> finished removing cycles from successors: successors array. \n");
+        printf("----> finished removing cycles from successors: new successors array. \n");
 
       	if (debug_info)
       	{
-      	  printf(":: remove cycles from successors ::");
+      	  printf(":: remove cycles from successors ::\n");
       	  util::DisplayDeviceResults(problem->data_slices[0]->d_successors, graph_slice->nodes);
-      	  printf(":: mst_output boolean array ::");
+      	  printf(":: mst output boolean array ::");
       	  util::DisplayDeviceResults(problem->data_slices[0]->d_mst_output, graph_slice->edges);
       	}
 
+        printf("GRAPH CONSTRUCTION ...\n");
       	/*
-      	// Pointer Jumpping to get Representative Array
+      	// Pointer Jumpping to get representative array
       	util::MemsetCopyVectorKernel<<<128,128>>>(
           problem->data_slices[0]->d_representatives,
       		problem->data_slices[0]->d_successors,
       		graph_slice->nodes);
-
+        */
       	// Using Vertex Mapping: PtrJumpFunctor
-      	frontier_attribute.queue_index = 0;
-      	frontier_attribute.selector = 0;
+      	frontier_attribute.queue_index  = 0;
+      	frontier_attribute.selector     = 0;
       	frontier_attribute.queue_length = graph_slice->nodes;
-      	frontier_attribute.frontier_attribute.queue_reset = true;
+      	frontier_attribute.queue_reset  = true;
 
       	vertex_flag[0] = 0;
       	while (!vertex_flag[0])
@@ -545,49 +546,52 @@ public:
       			"MSTProblem cudaMemcpy vertex_flag to d_vertex_flag failed",
       			__FILE__, __LINE__)) return retval;
 
-      	    gunrock::oprtr::filter::Kernel<FilterKernelPolicy, MSTProblem, PtrJumpFunctor>
-      	      <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
-      	        0,
-            		frontier_attribute.queue_reset,
-            		frontier_attribute.queue_index,
-            		1,
-            		frontier_attribute.queue_length,
-            		NULL,						    //d_done,
-            		graph_slice->frontier_queues.d_keys[frontier_attribute.selector],      // d_in_queue
-            		NULL,
-            		graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],    // d_out_queue
-            		data_slice,
-            		NULL,
-            		work_progress,
-            		graph_slice->frontier_elements[frontier_attribute.selector],           // max_in_queue
-            		graph_slice->frontier_elements[frontier_attribute.selector^1],         // max_out_queue
-            		enactor_stats.filter_kernel_stats);
+    	    gunrock::oprtr::filter::Kernel<FilterKernelPolicy, MSTProblem, PtrJumpFunctor>
+    	      <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
+    	        0,
+          		frontier_attribute.queue_reset,
+          		frontier_attribute.queue_index,
+          		1,
+          		frontier_attribute.queue_length,
+          		NULL,						  
+          		graph_slice->frontier_queues.d_keys[frontier_attribute.selector],    
+          		NULL,
+          		graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],
+          		data_slice,
+          		NULL,
+          		work_progress,
+          		graph_slice->frontier_elements[frontier_attribute.selector], 
+          		graph_slice->frontier_elements[frontier_attribute.selector^1],
+          		enactor_stats.filter_kernel_stats);
 
-      	    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
-      				"filter::Kernel First Pointer Jumping Round failed",
-      				__FILE__, __LINE__))) break;
+    	    if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
+    				"filter::Kernel First Pointer Jumping Round failed",
+    				__FILE__, __LINE__))) break;
 
-      	    if (frontier_attribute.queue_reset) frontier_attribute.queue_reset = false; // only need to reset once
+    	    if (frontier_attribute.queue_reset) frontier_attribute.queue_reset = false;
+          frontier_attribute.queue_index++;
+          frontier_attribute.selector^=1;
 
-      	    if (retval = util::GRError(cudaMemcpy(
-              vertex_flag,
-      				problem->data_slices[0]->d_vertex_flag,
-      				sizeof(int),
-      				cudaMemcpyDeviceToHost),
-      				"MSTProblem cudaMemcpy d_vertex_flag to vertex_flag failed",
-      				__FILE__, __LINE__)) return retval;
+    	    if (retval = util::GRError(cudaMemcpy(
+            vertex_flag,
+    				problem->data_slices[0]->d_vertex_flag,
+    				sizeof(int),
+    				cudaMemcpyDeviceToHost),
+    				"MSTProblem cudaMemcpy d_vertex_flag to vertex_flag failed",
+    				__FILE__, __LINE__)) return retval;
 
-      	    if (vertex_flag[0]) break; // check if done
-      	  }
-
-      	if (debug_info)
-      	{
-      	  printf(":: Pointer Jumping (Representative Array) ::");
-      	  util::DisplayDeviceResults(problem->data_slices[0]->d_representatives, graph_slice->nodes);
+    	    if (vertex_flag[0]) break; // check if done
       	}
 
-      	printf("----> 2.got Representative Array using Pointer Jumping \n");
+        printf("----> finished pointer doubling operation: representatives.\n");
+      	
+        if (debug_info)
+      	{
+      	  printf(":: Pointer Jumping: successors (now contains representatives) ::");
+      	  util::DisplayDeviceResults(problem->data_slices[0]->d_successors, graph_slice->nodes);
+      	}
 
+        /*
       	// Assigning Ids to supervertices stored in d_superVertex
       	// copy representatives to d_superVertex
       	util::MemsetCopyVectorKernel<<<128,128>>>(
@@ -1683,7 +1687,7 @@ public:
       	// Break the Loop if only 1 super_vertex left.
       	// if (graph_slice->nodes == 1) break;
 
-      	printf("===== End of Iteration.%lld, #Nodes Left: %d, #Edges Left: %d ===== \n",
+      	printf("END OF ITERATION:%lld #NODES LEFT: %lld #EDGES LEFT: %lld\n",
       	  enactor_stats.iteration, graph_slice->nodes, graph_slice->edges);
 
       	// final selected edges for current iteration
