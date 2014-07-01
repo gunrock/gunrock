@@ -9,33 +9,20 @@
  * @file
  * topk_app.cu
  *
- * @brief Simple test driver program for computing Top K
+ * @brief topk app implementation
  */
 
 #include <cstdlib>
-#include <stdio.h> 
+#include <stdio.h>
+#include "../../gunrock.h"
+#include <gunrock/graphio/market.cuh>
 #include <gunrock/app/topk/topk_enactor.cuh>
 #include <gunrock/app/topk/topk_problem.cuh>
 
+using namespace gunrock;
+using namespace gunrock::util;
+using namespace gunrock::oprtr;
 using namespace gunrock::app::topk;
-
-/**
- * @brief displays the top K results
- *
- */
-template<typename VertexId, typename Value, typename SizeT>
-void DisplaySolution(VertexId *h_node_id,
-		     Value    *h_degrees,
-		     SizeT    num_nodes)
-{
-  // at most display first 100 results
-  if (num_nodes > 100) { num_nodes = 100; }
-  printf("==> Top %d centrality nodes:\n", num_nodes);
-  for (SizeT i = 0; i < num_nodes; ++i)
-  { printf("%d %d\n", h_node_id[i], h_degrees[i]); }
-  printf("\n");
-  fflush(stdout);
-}
 
 /**
  * @brief Run TopK
@@ -43,151 +30,157 @@ void DisplaySolution(VertexId *h_node_id,
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] max_grid_size Maximum CTA occupancy
- * @param[in] num_gpus Number of GPUs
+ * @param[out] node_ids return the top k nodes
+ * @param[out] centrality_values return associated centrality
+ * @param[in] original  graph to the CSR graph we process on
+ * @param[in] reversed  graph to the CSR graph we process on
+ * @param[in] top_nodes K value for top K problem
  *
  */
-template <typename VertexId, typename SizeT, typename Value>
-void topk_run(const SizeT    row_offsets_i,
-	      const VertexId col_indices_i,
-	      const SizeT    row_offsets_j,
-	      const VertexId col_indices_j,
-	      const SizeT    num_nodes,
-	      const SizeT    num_edges,
-	      const SizeT    top_nodes,
-	      const int      data_type)
+template <
+  typename VertexId,
+  typename Value,
+  typename SizeT>
+void topk_run(
+//Csr<VertexId, SizeT, Value> &graph_output,
+  VertexId *node_ids,
+  Value    *centrality_values,
+  const Csr<VertexId, Value, SizeT> &graph_original,
+  const Csr<VertexId, Value, SizeT> &graph_reversed,
+  SizeT top_nodes)
 {
-  
-  // define the problem data structure for graph primitive
+  // preparations
   typedef TOPKProblem<VertexId, SizeT, Value> Problem;
-  
-  // INSTRUMENT specifies whether we want to keep such statistical data
-  // Allocate TopK enactor map 
-  TOPKEnactor<INSTRUMENT> topk_enactor(g_verbose);
-  
-  // allocate problem on GPU, create a pointer of the TOPKProblem type 
+  TOPKEnactor<false> topk_enactor(false);
   Problem *topk_problem = new Problem;
-  
-  // reset top_nodes if input k > total number of nodes
-  if (top_nodes > num_nodes) { top_nodes = num_nodes; }
-  
-  // malloc host memory
-  VertexId *h_node_id = (VertexId*)malloc(sizeof(VertexId) * top_nodes);
-  Value    *h_degrees = ( Value* )malloc(sizeof( Value ) * top_nodes);
-  
-  // TODO: build graph_i and graph_j from csr arrays
-  
 
-  // copy data from CPU to GPU, initialize data members in DataSlice for graph
-  util::GRError(topk_problem->Init(g_stream_from_host,
-				   graph_i,
-				   graph_j,
-				   num_gpus), 
-		"Problem TOPK Initialization Failed", __FILE__, __LINE__);
-  
-  // reset values in DataSlice for graph
-  util::GRError(topk_problem->Reset(topk_enactor.GetFrontierType()), 
-		"TOPK Problem Data Reset Failed", __FILE__, __LINE__);
-  
+  // reset top_nodes if necessary
+  top_nodes =
+    (top_nodes > graph_original.nodes) ? graph_original.nodes : top_nodes;
+
+  // initialization
+  util::GRError(topk_problem->Init(
+    false,
+    graph_original,
+    graph_reversed,
+    1),
+    "Problem TOPK Initialization Failed", __FILE__, __LINE__);
+
+  // reset data slices
+  util::GRError(topk_problem->Reset(
+    topk_enactor.GetFrontierType()),
+    "TOPK Problem Data Reset Failed", __FILE__, __LINE__);
+
   // launch topk enactor
-  util::GRError(topk_enactor.template Enact<Problem>(context, 
-						     topk_problem, 
-						     top_nodes, 
-						     max_grid_size), 
-		"TOPK Problem Enact Failed", __FILE__, __LINE__);
-  
-  // copy out results back to CPU from GPU using Extract
-  util::GRError(topk_problem->Extract(h_node_id,
-				      h_degrees,
-				      top_nodes),
-		"TOPK Problem Data Extraction Failed", __FILE__, __LINE__);
-  
-  // display solution
-  DisplaySolution(h_node_id, h_degrees, top_nodes);
-  
+  util::GRError(topk_enactor.template Enact<Problem>(
+    topk_problem,
+    top_nodes),
+    "TOPK Problem Enact Failed", __FILE__, __LINE__);
+
+  // copy out results back to cpu
+  util::GRError(topk_problem->Extract(
+    node_ids,
+    centrality_values,
+    top_nodes), "TOPK Problem Data Extraction Failed", __FILE__, __LINE__);
+
   // cleanup if neccessary
   if (topk_problem) { delete topk_problem; }
-  if (h_node_id)    { free(h_node_id); }
-  if (h_degrees)    { free(h_degrees); }
-  
+
   cudaDeviceSynchronize();
 }
 
-void topk_dispatch(const void *row_offsets_i,
-		   const void *col_indices_i,
-		   const void *row_offsets_j,
-		   const void *col_indices_j,
-		   size_t     num_nodes,
-		   size_t     num_edges,
-		   size_t     top_nodes,
-		   const int  data_type);
+void topk_dispatch(
+  GunrockGraph       *graph_out,
+  void               *node_ids,
+  void               *centrality_values,
+  const GunrockGraph *graph_in,
+  size_t             top_nodes,
+  GunrockDataType    data_type)
 {
-  //TODO: add more supportive if necessary
-  switch (VTXID_TYPE)
-  {
-  case VTXID_UINT:
-    switch (VALUE_TYPE)
-    {
-    case VALUE_UINT:
-      topk_run<unsigned int, unsigned int, unsigned int>
-	((const unsigned int*)row_offsets_i,
-	 (const unsigned int*)col_indices_i,
-	 (const unsigned int*)row_offsets_j,
-	 (const unsigned int*)col_indices_j,
-	 num_nodes,  num_edges,  top_nodes); 
-      break;
-      
-    case VALUE_FLOAT:
-      topk_run<unsigned int, unsigned int, float>
-	((const unsigned int*)row_offsets_i,
-	 (const unsigned int*)col_indices_i,
-	 (const unsigned int*)row_offsets_j,
-	 (const unsigned int*)col_indices_j,
-	 num_nodes,  num_edges,  top_nodes); 
-      break;
-      
-    case VALUE_DOUBLE:
-      topk_run<unsigned int, unsigned int, double>
-	((const unsigned int*)row_offsets_i,
-	 (const unsigned int*)col_indices_i,
-	 (const unsigned int*)row_offsets_j,
-	 (const unsigned int*)col_indices_j,
-	 num_nodes,  num_edges,  top_nodes);
+  //TODO: add more supportive datatypes if necessary
 
-    }
-  case VTXID_LONG:
-    switch (VALUE_TYPE)
+  switch (data_type.VTXID_TYPE)
     {
-    case VALUE_UINT:
-      topk_run<long int, long int, unsigned int>
-	((const unsigned int*)row_offsets_i,
-	 (const unsigned int*)col_indices_i,
-	 (const unsigned int*)row_offsets_j,
-	 (const unsigned int*)col_indices_j,
-	 num_nodes,  num_edges,  top_nodes); 
+    case VTXID_INT:
+      switch(data_type.SIZET_TYPE)
+	{
+	case SIZET_UINT:
+	  switch (data_type.VALUE_TYPE)
+	    {
+	    case VALUE_INT:
+	      {
+		// case that VertexId, SizeT, Value are all have the type int
+
+		// original graph
+		Csr<int, int, int> graph_original(false);
+		graph_original.nodes = graph_in->num_nodes;
+		graph_original.edges = graph_in->num_edges;
+		graph_original.row_offsets    = (int*)graph_in->row_offsets;
+		graph_original.column_indices = (int*)graph_in->col_indices;
+
+		// reversed graph
+		Csr<int, int, int> graph_reversed(false);
+		graph_reversed.nodes = graph_in->num_nodes;
+		graph_reversed.edges = graph_in->num_edges;
+		graph_reversed.row_offsets    = (int*)graph_in->col_offsets;
+		graph_reversed.column_indices = (int*)graph_in->row_indices;
+
+		topk_run<int, int, int>((int*)node_ids,
+					(int*)centrality_values,
+					graph_original,
+					graph_reversed,
+					top_nodes);
+
+		// reset for free memory
+		graph_original.row_offsets    = NULL;
+		graph_original.column_indices = NULL;
+		graph_reversed.row_offsets    = NULL;
+		graph_reversed.column_indices = NULL;
+
+		break;
+	      }
+	    case VALUE_FLOAT:
+	      {
+		// case that VertexId and SizeT have type int, Value is float
+		/*
+		// original graph
+		Csr<int, float, int> graph_original(false);
+		graph_original.nodes = graph_in->num_nodes;
+		graph_original.edges = graph_in->num_edges;
+		graph_original.row_offsets    = (int*)graph_in->row_offsets;
+		graph_original.column_indices = (int*)graph_in->col_indices;
+
+		// reversed graph
+		Csr<int, float, int> graph_reversed(false);
+		graph_reversed.nodes = graph_in->num_nodes;
+		graph_reversed.edges = graph_in->num_edges;
+		graph_reversed.row_offsets    = (int*)graph_in->col_offsets;
+		graph_reversed.column_indices = (int*)graph_in->row_indices;
+
+		topk_run<int, float, int>((int*)node_ids,
+					  (float*)centrality_values,
+					  graph_original,
+					  graph_reversed,
+					  top_nodes);
+
+		// reset for free memory
+		graph_original.row_offsets    = NULL;
+		graph_original.column_indices = NULL;
+		graph_reversed.row_offsets    = NULL;
+		graph_reversed.column_indices = NULL;
+		*/
+		break;
+	      }
+	    }
+	  break;
+	}
       break;
-   
-    case VALUE_FLOAT:
-      topk_run<long int, long int, float>
-	((const unsigned int*)row_offsets_i,
-	 (const unsigned int*)col_indices_i,
-	 (const unsigned int*)row_offsets_j,
-	 (const unsigned int*)col_indices_j,
-	 num_nodes,  num_edges,  top_nodes); 
-      break;
-    
-    case VALUE_DOUBLE:
-      topk_run<long int, long int, float>
-	((const unsigned int*)row_offsets_i,
-	 (const unsigned int*)col_indices_i,
-	 (const unsigned int*)row_offsets_j,
-	 (const unsigned int*)col_indices_j,
-	 num_nodes,  num_edges,  top_nodes);
     }
-  }
 }
 
-/* end */
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

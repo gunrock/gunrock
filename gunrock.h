@@ -10,38 +10,36 @@
  * gunrock.h
  *
  * @brief Main Library header file. Defines public interface.
- * The Gunrock public interface is a C-only interface to enable linking 
- * with code written in other languages. While the internals of Gunrock 
+ * The Gunrock public interface is a C-only interface to enable linking
+ * with code written in other languages. While the internals of Gunrock
  * are not limited to C.
  *
  */
 
 #include <stdlib.h>
-    
+
 /**
  * @brief Vertex_id datatypes enumerators.
- * TODO: add more types
+ * TODO: add more data types
  */
 enum VertexIdType
 {
-    VTXID_UINT,   //!< unsigned int type VertexId
-    VTXID_ULLONG, //!< ussigned long long int type VertexId
+    VTXID_INT,   //!< int type VertexId
 };
 enum SizeTType
 {
     SIZET_UINT,   //!< unsigned int type SizeT
-    SIZET_ULLONG, //!< unsigned long long int type SizeT
 };
 enum ValueType
-{	
+{
     VALUE_INT,    //!< int    type Value
     VALUE_FLOAT,  //!< float  type Value
-    VALUE_DOUBLE, //!< double type Value 
+    VALUE_DOUBLE, //!< double type Value
 };
 
 /**
  * @brief datatype configuration struct used to specify datatypes
- * TODO: 
+ *
  */
 struct GunrockDataType
 {
@@ -65,23 +63,35 @@ struct GunrockGraph
     void    *edge_values;
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void Test();
+
 // topk algorithm
+/*
 void gunrock_topk(
-                struct GunrockGraph        *g_out,
-                void                *node_ids,
-                void                *centrality_values,
-                size_t              top_node,
-                const struct GunrockGraph  *g_in,
-                struct GunrockDataType     data_type);
+  struct GunrockGraph *graph_out,
+  void                *node_ids,
+  void                *centrality_values,
+  size_t              top_nodes,
+  const struct GunrockGraph  *graph_in,
+  struct GunrockDataType     data_type);
+*/
 
 // topk dispatch function
 void topk_dispatch(
-                struct GunrockGraph        *g_out,
-                void                *node_ids,
-                void                *centrality_values,
-                size_t              top_node,
-                const struct GunrockGraph  *g_in,
-                struct GunrockDataType     data_type);
+  struct GunrockGraph       *graph_out,
+  void                      *node_ids,
+  void                      *centrality_values,
+  const struct GunrockGraph *graph_in,
+  size_t                    top_nodes,
+  struct GunrockDataType    data_type);
+
+#ifdef __cplusplus
+}
+#endif
 
 // TODO: Add other algorithms
 
