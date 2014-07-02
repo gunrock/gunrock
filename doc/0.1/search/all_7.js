@@ -18,7 +18,7 @@ var searchData=
   ['graphslice',['GraphSlice',['../structgunrock_1_1app_1_1_problem_base_1_1_graph_slice.html#aea1c079e71cbceaae9a30e0da72636e7',1,'gunrock::app::ProblemBase::GraphSlice']]],
   ['graphslicerow',['GraphSliceRow',['../structgunrock_1_1app_1_1_problem_base.html#aca1ff898d024182ed81f92e552097b11',1,'gunrock::app::ProblemBase']]],
   ['ld',['ld',['../namespacegunrock_1_1util_1_1io_1_1ld.html',1,'gunrock::util::io']]],
-  ['gunrock_20documentation',['Gunrock documentation',['../md__home_yzh__demo_gunrock__r_e_a_d_m_e.html',1,'']]],
+  ['gunrock_20documentation',['Gunrock documentation',['../md__home_yzh__projects_gunrock__r_e_a_d_m_e.html',1,'']]],
   ['gunrock_20public_20interface',['Gunrock Public Interface',['../group___public_interface.html',1,'']]],
   ['st',['st',['../namespacegunrock_1_1util_1_1io_1_1st.html',1,'gunrock::util::io']]]
 ];

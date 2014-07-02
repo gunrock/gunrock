@@ -87,7 +87,8 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <h2>Home Page </h2>
 <p>Homepage for Gunrock: <a href="http://gunrock.github.io/">http://gunrock.github.io/</a></p>
 <h2>Getting Started with Gunrock </h2>
-<p>For information on building Gunrock, see <a href="http://gunrock.github.io/gunrock/doc/0.1/building_gunrock.html">Building Gunrock</a>.</p>
+<p>For Frequently Asked Questions, see <a href="http://gunrock.github.io/gunrock/doc/0.1/faq.html">FAQ</a>.</p>
+<p>For information on building Gunrock, see <a href="http://gunrock.github.io/gunrock/doc/0.1/building_gunrock.html">Building Gunrock</a> and refer to <a href="https://github.com/gunrock/gunrock#operating-system-support-and-requirements">Operating System Support and Requirements</a>.</p>
 <p>The "tests" subdirectory included with Gunrock has a comprehensive test application for all the functionality of Gunrock.</p>
 <p>For the programming model we use in Gunrock, see <a href="http://gunrock.github.io/gunrock/doc/0.1/programming_model.html">Programming Model</a>.</p>
 <p>We have also provided a code walkthrough of a <a href="http://gunrock.github.io/gunrock/doc/0.1/simple_example.html">simple example</a>.</p>
@@ -105,7 +106,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <h1>Road Map </h1>
 <ul>
 <li>Framework: The structure of the operator code in Gunrock may change significantly during near-term future development. Generally we want to find the right set of operators that can abstract most graph primitives while delivering high performance.</li>
-<li>Primitives: Our near-term goal is to implement direction-optimal BFS (as described in <em>Direction-Optimizing Breadth-First Search</em> (<a href="http://dx.doi.org/10.1109/SC.2012.50">DOI</a>) by Scott Beamer, Krste Asanovic and David Patterson) using the backward edge-mapping operator in Gunrock. The long-term goal includes other basic graph primitives such as single-source shortest path and minimal spanning tree.</li>
+<li>Primitives: Our near-term goal is to implement minimal spanning tree algorithm, build better support for bipartite graph algorithms, and explore community detection algorithms. The long term goal includes algorithms on dynamic graphs, priority queue support, graph partitioning and multi-GPU algorithms.</li>
 </ul>
 <h1>Credits </h1>
 <h2>Gunrock Developers </h2>
@@ -113,7 +114,8 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <li><a href="http://www.idav.ucdavis.edu/~yzhwang/">Yangzihao Wang</a>, University of California, Davis</li>
 <li>Yuechao Pan, University of California, Davis</li>
 <li><a href="http://www.ece.ucdavis.edu/~wyd855/">Yuduo Wu</a>, University of California, Davis</li>
-<li><a href="http://www.ece.ucdavis.edu/~jowens/">John Owens</a>, University of California, Davis [general help]</li>
+<li>Andy Riffel, University of California, Davis</li>
+<li><a href="http://www.ece.ucdavis.edu/~jowens/">John Owens</a>, University of California, Davis</li>
 </ul>
 <h2>Acknowledgements </h2>
 <p>Thanks to the following developers who contributed code: The connected-component implementation was derived from code written by Jyothish Soman, Kothapalli Kishore, and P. J. Narayanan and described in their IPDPSW '10 paper <em>A Fast GPU Algorithm for Graph Connectivity</em> (<a href="http://dx.doi.org/10.1109/IPDPSW.2010.5470817">DOI</a>). The breadth-first search implementation and many of the utility functions in Gunrock are derived from the <a href="http://code.google.com/p/back40computing/">b40c</a> library of <a href="https://sites.google.com/site/duanemerrill/">Duane Merrill</a>. The algorithm is described in his PPoPP '12 paper <em>Scalable GPU Graph Traversal</em> (<a href="http://dx.doi.org/10.1145/2370036.2145832">DOI</a>). Thanks to Erich Elsen and Vishal Vaidyanathan from <a href="http://www.royal-caliber.com/">Royal Caliber</a> for their discussion on library development and the dataset auto-generating code.</p>
@@ -123,7 +125,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Jun 24 2014 13:23:03 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Wed Jul 2 2014 08:23:26 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.7
 </small></address>

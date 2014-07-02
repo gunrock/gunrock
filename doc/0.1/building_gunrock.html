@@ -82,7 +82,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <div class="title">Building Gunrock </div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p>This release (0.1) has currently been tested on Linux.</p>
+<div class="textblock"><p>This release (0.1) has currently been tested on Linux and has only been tuned for architectures with CUDA compute capability equal to or larger than 3.0. It is most likely that we will concentrate our future effort on 3.0+-capability devices going forward.</p>
 <h1><a class="anchor" id="build_boost"></a>
 Boost Dependency           </h1>
 <p>Gunrock uses the <a href="http://www.boost.org/doc/libs/1_53_0/libs/graph/doc/index.html">Boost Graph Library</a> for the implementation of connected component, betweenness centrality, PageRank, and Single-source shortest path CPU reference implementation. You will need to download the boost source distribution, install it, and modify the <code>BOOST_INC</code> variable in <code>tests/primitive_name/Makefile</code> to build test applications for bc, cc, pr, and sssp. To build the simple example, you will also need to modify the <code>BOOST_INC</code> variable in <code>simple_example/Makefile</code>.</p>
@@ -96,12 +96,11 @@ Generating Datasets           </h1>
 Running the Tests           </h1>
 <p>Before running the tests, make sure you have installed boost and have successfully generated the datasets.</p>
 <p>To build the tests, go into <code>tests/primitive_name</code> and simply type <code>make</code>.</p>
-<p>To run the tests for each graph primitive, go into <code>tests/primitive_name</code> and simply type <code>sh run.sh</code>.</p>
-<p>The current release (v0.1) has only been tuned for architectures with CUDA compute capability equal to or larger than 3.0. It is most likely that we will concentrate our future effort on 3.0+-capability devices going forward. </p>
+<p>To run the tests for each graph primitive, go into <code>tests/primitive_name</code> and simply type <code>sh run.sh</code>. </p>
 </div></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Jun 24 2014 13:23:03 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Wed Jul 2 2014 08:23:26 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.7
 </small></address>

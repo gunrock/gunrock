@@ -100,12 +100,12 @@ struct gunrock::util::MultipleBuffer&lt; BUFFER_COUNT, _KeyType, _ValueType &gt;
 <p>Storage wrapper for multi-pass stream transformations that require a more than one problem storage array to stream results back and forth from.</p>
 <p>This wrapper provides maximum flexibility for re-using device allocations for subsequent transformations. As such, it is the caller's responsibility to free any non-NULL storage arrays when no longer needed.</p>
 <p>Many multi-pass stream computations require at least two problem storage arrays, e.g., one for reading in from, the other for writing out to. (And their roles can be reversed for each subsequent pass.) This structure tracks two sets of device vectors (a keys and a values sets), and a "selector" member to index which vector in each set is "currently valid". I.e., the valid data within "MultipleBuffer&lt;2, int, int&gt; b" is accessible by: </p><pre class="fragment"> b.d_keys[b.selector];</pre> </div><hr/>The documentation for this struct was generated from the following file:<ul>
-<li>/home/yzh/Demo/gunrock/gunrock/util/<a class="el" href="multiple__buffering_8cuh.html">multiple_buffering.cuh</a></li>
+<li>/home/yzh/Projects/gunrock/gunrock/util/<a class="el" href="multiple__buffering_8cuh.html">multiple_buffering.cuh</a></li>
 </ul>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Jun 24 2014 13:23:03 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Wed Jul 2 2014 08:23:26 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.7
 </small></address>
