@@ -17,7 +17,8 @@
 #include <gunrock/app/sssp/sssp_problem.cuh>
 #include <stdio.h>
 
-namespace gunrock { namespace app {
+namespace gunrock { 
+namespace app {
 namespace sssp {
 
 /**

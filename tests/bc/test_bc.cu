@@ -341,13 +341,15 @@ template <
     typename SizeT,
     bool INSTRUMENT>
 void RunTests(
-    const Csr<VertexId, Value, SizeT> &graph,
-    VertexId src,
+    Csr<VertexId, Value, SizeT> &graph,
+    VertexId    src,
     std::string &ref_filename,
-    int max_grid_size,
-    int num_gpus,
-    double max_queue_sizing,
-    CudaContext& context)
+    int         max_grid_size,
+    int         num_gpus,
+    double      max_queue_sizing,
+    ContextPtr  *context,
+    std::string partition_method,
+    int         *gpu_idx)
 {
     typedef BCProblem<
         VertexId,
@@ -357,25 +359,29 @@ void RunTests(
         false> Problem; //does not use double buffer
 
     // Allocate host-side array (for both reference and gpu-computed results)
-    Value *reference_bc_values = (Value*)malloc(sizeof(Value) * graph.nodes);
-    Value *reference_ebc_values = (Value*)malloc(sizeof(Value) * graph.edges);
-    Value *reference_sigmas    = (Value*)malloc(sizeof(Value) * graph.nodes);
-    Value *h_sigmas            = (Value*)malloc(sizeof(Value) * graph.nodes);
-    Value *h_bc_values         = (Value*)malloc(sizeof(Value) * graph.nodes);
-    Value *h_ebc_values         = (Value*)malloc(sizeof(Value) * graph.edges);
-    Value *reference_check_bc_values = (g_quick) ? NULL : reference_bc_values;
+    Value *reference_bc_values        = new Value[graph.nodes];
+    Value *reference_ebc_values       = new Value[graph.nodes];
+    Value *reference_sigmas           = new Value[graph.nodes];
+    Value *h_sigmas                   = new Value[graph.nodes];
+    Value *h_bc_values                = new Value[graph.nodes];
+    Value *h_ebc_values               = new Value[graph.edges];
+    Value *reference_check_bc_values  = (g_quick)                ? NULL : reference_bc_values;
     Value *reference_check_ebc_values = (g_quick || (src != -1)) ? NULL : reference_ebc_values;
-    Value *reference_check_sigmas = (g_quick || (src == -1)) ? NULL : reference_sigmas;
+    Value *reference_check_sigmas     = (g_quick || (src == -1)) ? NULL : reference_sigmas;
 
     // Allocate BC enactor map
-    BCEnactor<INSTRUMENT> bc_enactor(g_verbose);
+    BCEnactor<Problem, INSTRUMENT>* bc_enactor
+        = new BCEnactor<Problem, INSTRUMENT>(g_verbose, num_gpus, gpu_idx);
     
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
     util::GRError(csr_problem->Init(
             g_stream_from_host,
             graph,
-            num_gpus), "BC Problem Initialization Failed", __FILE__, __LINE__);
+            NULL,
+            num_gpus,
+            gpu_idx,
+            partition_method), "BC Problem Initialization Failed", __FILE__, __LINE__);
 
     //
     // Compute reference CPU BC solution for source-distance
@@ -404,8 +410,7 @@ void RunTests(
     double              avg_duty = 0.0;
 
     // Perform BC
-    GpuTimer gpu_timer;
-
+    CpuTimer cpu_timer;
     VertexId start_src;
     VertexId end_src;
     if (src == -1)
@@ -420,21 +425,24 @@ void RunTests(
     }
 
 
-    gpu_timer.Start();
+    cpu_timer.Start();
     for (VertexId i = start_src; i < end_src; ++i)
     {
         util::GRError(csr_problem->Reset(i, bc_enactor.GetFrontierType(), max_queue_sizing), "BC Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(bc_enactor.template Enact<Problem>(context, csr_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(bc_enactor ->Enact(context, csr_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
     }
 
-    util::MemsetScaleKernel<<<128, 128>>>
-        (csr_problem->data_slices[0]->d_bc_values, (Value)0.5f, (int)graph.nodes);
+    for (int gpu=0;gpu<num_gpus;gpu++)
+    {
+        util::SetDevice(gpu_idx[gpu]);
+        util::MemsetScaleKernel<<<128, 128>>>
+            (csr_problem->data_slices[gpu]->bc_values.GetPointer(util::DEVICE), (Value)0.5f, (int)graph.nodes);
+    }
+    cpu_timer.Stop();
 
-    gpu_timer.Stop();
+    float elapsed = cpu_timer.ElapsedMillis();
 
-    float elapsed = gpu_timer.ElapsedMillis();
-
-    bc_enactor.GetStatistics(avg_duty);
+    bc_enactor->GetStatistics(avg_duty);
 
     // Copy out results
     util::GRError(csr_problem->Extract(h_sigmas, h_bc_values, h_ebc_values), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
@@ -473,14 +481,15 @@ void RunTests(
         printf("\n avg CTA duty: %.2f%% \n", avg_duty * 100);
     
     // Cleanup
-    if (csr_problem) delete csr_problem;
-    if (reference_sigmas) free(reference_sigmas);
-    if (reference_bc_values) free(reference_bc_values);
-    if (reference_ebc_values) free(reference_ebc_values);
-    if (h_sigmas) free(h_sigmas);
-    if (h_bc_values) free(h_bc_values);
+    if (csr_problem         ) {delete csr_problem         ; csr_problem          = NULL;}
+    if (bc_enactor          ) {delete bc_enactor          ; bc_enactor           = NULL;}
+    if (reference_sigmas    ) {delete reference_sigmas    ; reference_sigmas     = NULL;}
+    if (reference_bc_values ) {delete reference_bc_values ; reference_bc_values  = NULL;}
+    if (reference_ebc_values) {delete reference_ebc_values; reference_ebc_values = NULL;}
+    if (h_sigmas            ) {delete h_sigmas            ; h_sigmas             = NULL;}
+    if (h_bc_values         ) {delete h_bc_values         ; h_bc_values          = NULL;}
 
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
 }
 
 template <
@@ -489,16 +498,19 @@ template <
     typename SizeT>
 void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
-    CommandLineArgs &args,
-    CudaContext& context)
+    CommandLineArgs             &args,
+    int                         num_gpus,
+    ContextPtr                  *context,
+    int                         *gpu_idx)
 {
     VertexId    src              = -1;    // Use whatever the specified graph-type's default is
     std::string src_str;
     std::string ref_filename;
     bool        instrumented     = false; // Whether or not to collect instrumentation from kernels
     int         max_grid_size    = 0;     // maximum grid size (0: leave it up to the enactor)
-    int         num_gpus         = 1;     // Number of GPUs for multi-gpu enactor to use
+    //int         num_gpus         = 1;     // Number of GPUs for multi-gpu enactor to use
     double      max_queue_sizing = 1.0;   // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
+    std::string partition_method = "random";
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("src", src_str);
@@ -512,6 +524,8 @@ void RunTests(
     g_quick = args.CheckCmdLineFlag("quick");
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
     g_verbose = args.CheckCmdLineFlag("v");
+    if (args.CheckCmdLineFlag  ("partition_method"))
+        args.GetCmdLineArgument("partition_method",partition_method);
 
     if (instrumented) {
         RunTests<VertexId, Value, SizeT, true>(
@@ -521,7 +535,9 @@ void RunTests(
             max_grid_size,
             num_gpus,
             max_queue_sizing,
-            context);
+            context,
+            partition_method,
+            gpu_idx);
     } else {
         RunTests<VertexId, Value, SizeT, false>(
             graph,
@@ -530,7 +546,9 @@ void RunTests(
             max_grid_size,
             num_gpus,
             max_queue_sizing,
-            context);
+            context,
+            partition_method,
+            gpu_idx);
     }
 
 }
@@ -544,6 +562,9 @@ void RunTests(
 int main( int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
+    int        num_gpus = 0;
+    int        *gpu_idx = NULL;
+    ContextPtr *context = NULL;
 
     if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
         Usage();
@@ -552,10 +573,27 @@ int main( int argc, char** argv)
 
     //DeviceInit(args);
     //cudaSetDeviceFlags(cudaDeviceMapHost);
-
-    int dev = 0;
-    args.GetCmdLineArgument("device", dev);
-    ContextPtr context = mgpu::CreateCudaDevice(dev);
+    if (args.CheckCmdLineFlag  ("device"))
+    {
+        std::vector<int> gpus;
+        args.GetCmdLineArguments<int>("device",gpus);
+        num_gpus   = gpus.size();
+        gpu_idx    = new int[num_gpus];
+        for (int i=0;i<num_gpus;i++)
+            gpu_idx[i] = gpus[i];
+    } else {
+        num_gpus   = 1;
+        gpu_idx    = new int[num_gpus];
+        gpu_idx[0] = 0;
+    }
+    context  = new ContextPtr[num_gpus];
+    printf("Using %d gpus: ", num_gpus);
+    for (int i=0;i<num_gpus;i++)
+    {
+        printf(" %d ", gpu_idx[i]);
+        context[i] = mgpu::CreateCudaDevice(gpu_idx[i]);
+    }
+    printf("\n"); fflush(stdout);
 
     //srand(0);                                                                     // Presently deterministic
     //srand(time(NULL));
@@ -601,7 +639,7 @@ int main( int argc, char** argv)
         fflush(stdout);
 
         // Run tests
-        RunTests(csr, args, *context);
+        RunTests(csr, args, num_gpus, context, gpu_idx);
 
     } else {
 

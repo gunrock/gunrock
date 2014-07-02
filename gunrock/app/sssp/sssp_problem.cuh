@@ -315,7 +315,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
                         if (retval = data_slices[gpu]->preds.Move(util::DEVICE,util::HOST)) return retval;
                         th_preds[gpu]=data_slices[gpu]->preds.GetPointer(util::HOST);
                     }   
-               } //end for(gpu)
+                } //end for(gpu)
 
                 for (VertexId node=0;node<this->nodes;node++)
                     h_labels[node]=th_labels[this->partition_tables[0][node]][this->convertion_tables[0][node]];
@@ -467,6 +467,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
             gpu = this->partition_tables [0][src];
             tsrc= this->convertion_tables[0][src];
         }
+        if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
         if (retval = util::GRError(cudaMemcpy(
                         BaseProblem::graph_slices[gpu]->frontier_queues.keys[0].GetPointer(util::DEVICE),
                         &tsrc,

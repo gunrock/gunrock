@@ -333,6 +333,7 @@ struct ProblemBase
     SizeT               edges              ;
     GraphSlice          **graph_slices     ; // Set of graph slices (one for each GPU)
     Csr<VertexId,Value,SizeT> *sub_graphs  ; // Subgraphs for multi-gpu implementation
+    Csr<VertexId,Value,SizeT> *org_graph   ; // Original graph
     PartitionerBase<VertexId,SizeT,Value>
                         *partitioner       ; // Partitioner
     int                 **partition_tables ; // Multi-gpu partition table and convertion table
@@ -353,6 +354,7 @@ struct ProblemBase
         edges            (0   ),
         graph_slices     (NULL),
         sub_graphs       (NULL),
+        org_graph        (NULL),
         partitioner      (NULL),
         partition_tables (NULL),
         convertion_tables(NULL),
@@ -468,6 +470,7 @@ struct ProblemBase
     {
         util::cpu_mt::PrintMessage("ProblemBase Init() begin.");
         cudaError_t retval      = cudaSuccess;
+        this->org_graph         = graph;
         this->nodes             = graph->nodes;
         this->edges             = graph->edges;
         this->num_gpus          = num_gpus;
