@@ -56,11 +56,14 @@ centrality uses Boost Graph Library v1.53.0.
 CUDA
 ====
 
-Gunrock is implemented in [CUDA C/C++](http://developer.nvidia.com/cuda).
-It requires the CUDA Toolkit. Please see the NVIDIA
-[CUDA](http://developer.nvidia.com/cuda) homepage to download CUDA as well
-as the CUDA Programming Guide and CUDA SDK, which includes many CUDA code
-examples.
+Gunrock is implemented in [CUDA C/C++](http://developer.nvidia.com/cuda).  It
+requires the CUDA Toolkit. Please see the NVIDIA
+[CUDA](http://developer.nvidia.com/cuda-downloads) homepage to download CUDA as
+well as the CUDA Programming Guide and CUDA SDK, which includes many CUDA code
+examples. Please refer to [NVIDIA CUDA Getting Started Guide for
+Linux](http://docs.nvidia.com/cuda/cuda-getting-started-guide-for-linux) for
+detailed information.
+
 
 Design Goals
 ============
