@@ -63,9 +63,11 @@ graphs with billions of edges. Supercomputer or expensive clusters can achieve
 close to real-time feedback with high cost on hardware infrastructure. With
 GPUs, we can achieve the same real-time feedback with much lower cost on
 hardware. Gunrock has the best performance among the limited research efforts
-put on GPU graph processing. With a set of general graph processing operators
-exposed to users, it is also more flexible than other GPU/CPU graph library in
-terms of programmability.
+put on GPU graph processing. The peak Edge Traversed Per Second (ETPS) can
+reach 3.5G.  And all the primitives in Gunrock have 10x to 25x speedup over the
+equivalent single-node CPU implementation. With a set of general graph
+processing operators exposed to users, Gunrock is also more flexible than other
+GPU/CPU graph library in terms of programmability.
 
 How would someone get it?
 -------------------------

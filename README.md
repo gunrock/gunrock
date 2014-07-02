@@ -17,8 +17,10 @@ Homepage for Gunrock: <http://gunrock.github.io/>
 
 Getting Started with Gunrock
 ----------------------------
+For Frequently Asked Questions, see [FAQ](http://gunrock.github.io/gunrock/doc/0.1/faq.html).
 
-For information on building Gunrock, see [Building Gunrock](http://gunrock.github.io/gunrock/doc/0.1/building_gunrock.html).
+For information on building Gunrock, see [Building Gunrock](http://gunrock.github.io/gunrock/doc/0.1/building_gunrock.html)
+and refer to [Operating System Support and Requirements](https://github.com/gunrock/gunrock#operating-system-support-and-requirements).
 
 The "tests" subdirectory included with Gunrock has a comprehensive test
 application for all the functionality of Gunrock.
