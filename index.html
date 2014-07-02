@@ -34,11 +34,11 @@
 <h1>
 <a name="introduction" class="anchor" href="#introduction"><span class="octicon octicon-link"></span></a>Introduction</h1>
 
-<p>Gunrock is a fast-and-efficient graph processing library on the GPU which provides a
-set of graph algorithms used in big data analytics and visualization with high performance.
-It also provides a set of operators which abstract the general operations in graph
-processing for other developers to build high-performance graph algorithm prototypes
-with minimum programming effort.</p>
+<p>Gunrock is a CUDA library for graph primitives that refactors,
+integrates, and generalizes best-of-class GPU implementations
+of breadth-first search, connected components, and betweenness
+centrality into a unified code base useful for future
+development of high-performance GPU graph primitives.</p>
 
 <h2>
 <a name="home-page" class="anchor" href="#home-page"><span class="octicon octicon-link"></span></a>Home Page</h2>
@@ -48,9 +48,10 @@ with minimum programming effort.</p>
 <h2>
 <a name="getting-started-with-gunrock" class="anchor" href="#getting-started-with-gunrock"><span class="octicon octicon-link"></span></a>Getting Started with Gunrock</h2>
 
-<p>For Freguently Asked Questions, see <a href="http://gunrock.github.io/gunrock/doc/0.1/faq.html">FAQ</a>.</p>
+<p>For Frequently Asked Questions, see <a href="http://gunrock.github.io/gunrock/doc/0.1/faq.html">FAQ</a>.</p>
 
-<p>For information on building Gunrock, see <a href="http://gunrock.github.io/gunrock/doc/0.1/building_gunrock.html">Building Gunrock</a>.</p>
+<p>For information on building Gunrock, see <a href="http://gunrock.github.io/gunrock/doc/0.1/building_gunrock.html">Building Gunrock</a>
+and refer to <a href="https://github.com/gunrock/gunrock#operating-system-support-and-requirements">Operating System Support and Requirements</a>.</p>
 
 <p>The "tests" subdirectory included with Gunrock has a comprehensive test
 application for all the functionality of Gunrock.</p>
@@ -86,11 +87,13 @@ centrality uses Boost Graph Library v1.53.0.</p>
 <h1>
 <a name="cuda" class="anchor" href="#cuda"><span class="octicon octicon-link"></span></a>CUDA</h1>
 
-<p>Gunrock is implemented in <a href="http://developer.nvidia.com/cuda">CUDA C/C++</a>.
-It requires the CUDA Toolkit. Please see the NVIDIA
-<a href="http://developer.nvidia.com/cuda">CUDA</a> homepage to download CUDA as well
-as the CUDA Programming Guide and CUDA SDK, which includes many CUDA code
-examples.</p>
+<p>Gunrock is implemented in <a href="http://developer.nvidia.com/cuda">CUDA C/C++</a>.  It
+requires the CUDA Toolkit. Please see the NVIDIA
+<a href="http://developer.nvidia.com/cuda-downloads">CUDA</a> homepage to download CUDA as
+well as the CUDA Programming Guide and CUDA SDK, which includes many CUDA code
+examples. Please refer to <a href="http://docs.nvidia.com/cuda/cuda-getting-started-guide-for-linux">NVIDIA CUDA Getting Started Guide for
+Linux</a> for
+detailed information.</p>
 
 <h1>
 <a name="design-goals" class="anchor" href="#design-goals"><span class="octicon octicon-link"></span></a>Design Goals</h1>
@@ -108,12 +111,7 @@ while maintaining high performance.</p>
 significantly during near-term future development. Generally we
 want to find the right set of operators that can abstract most
 graph primitives while delivering high performance.</p></li>
-<li><p>Primitives: Our near-term goal is to implement minimal spanning
-tree algorithm, build better support for bipartite graph algorithms, and
-explore community detection algorithms. The long term goal includes
-algorithms on dynamic graphs, priority queue support, graph partitioning
-and multi-GPU algorithms.
-</p></li>
+<li><p>Primitives: Our near-term goal is to implement minimal spanning tree algorithm, build better support for bipartite graph algorithms, and explore community detection algorithms. The long term goal includes algorithms on dynamic graphs, priority queue support, graph partitioning and multi-GPU algorithms.</p></li>
 </ul><h1>
 <a name="credits" class="anchor" href="#credits"><span class="octicon octicon-link"></span></a>Credits</h1>
 
