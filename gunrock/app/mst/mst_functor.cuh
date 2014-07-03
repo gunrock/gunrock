@@ -253,13 +253,13 @@ struct EdgeRmFunctor
   static __device__ __forceinline__ bool CondEdge(VertexId s_id,
     VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    //problem->d_edges[e_id] = (problem->d_representatives[s_id] == problem->d_representatives[d_id]) ? -1 : problem->d_edges[e_id];
-    //problem->d_edge_weights[e_id] = (problem->d_representatives[s_id] == problem->d_representatives[d_id]) ? -1 : problem->d_edge_weights[e_id];
-    //problem->d_keys_array[e_id] = (problem->d_representatives[s_id] == problem->d_representatives[d_id]) ? -1 : problem->d_keys_array[e_id];
-    //problem->d_flag_array[e_id] = (problem->d_representatives[s_id] == problem->d_representatives[d_id]) ? -1 : problem->d_flag_array[e_id];
-    //problem->d_eId[e_id] = (problem->d_representatives[s_id] == problem->d_representatives[d_id]) ? -1 : problem->d_eId[e_id];
-    //problem->d_edgeFlag[e_id] = (problem->d_representatives[s_id] == problem->d_representatives[d_id]) ? -1 : problem->d_edgeFlag[e_id];
-    return (problem->d_successors[s_id] == problem->d_successors[d_id]);
+    //problem->d_super_edges[e_id] = (problem->d_successors[s_id] == problem->d_successors[d_id]) ? -1 : problem->d_super_edges[e_id];
+    //problem->d_edge_weights[e_id] = (problem->d_successors[s_id] == problem->d_successors[d_id]) ? -1 : problem->d_edge_weights[e_id];
+    //problem->d_keys_array[e_id] = (problem->d_successors[s_id] == problem->d_successors[d_id]) ? -1 : problem->d_keys_array[e_id];
+    //problem->d_flag_array[e_id] = (problem->d_successors[s_id] == problem->d_successors[d_id]) ? -1 : problem->d_flag_array[e_id];
+    //problem->d_eId[e_id] = (problem->d_successors[s_id] == problem->d_successors[d_id]) ? -1 : problem->d_eId[e_id];
+    //problem->d_edgeFlag[e_id] = (problem->d_successors[s_id] == problem->d_successors[d_id]) ? -1 : problem->d_edgeFlag[e_id];
+    return true;
   }
 
   /**
@@ -273,7 +273,8 @@ struct EdgeRmFunctor
   static __device__ __forceinline__ void ApplyEdge(VertexId s_id,
     VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    // doing nothing here.
+    problem->d_super_edges[e_id]  = (problem->d_successors[s_id] == problem->d_successors[d_id]) ? -1 : problem->d_super_edges[e_id];
+    problem->d_edge_weights[e_id] = (problem->d_successors[s_id] == problem->d_successors[d_id]) ? -1 : problem->d_edge_weights[e_id];
   }
 
   /**
@@ -302,8 +303,8 @@ struct EdgeRmFunctor
   static __device__ __forceinline__ void ApplyFilter(
     VertexId node, DataSlice *problem, Value v = 0)
   {
-    problem->d_keys_array[node] = problem->d_super_keys[problem->d_keys_array[node]];
-    problem->d_edges[node] = problem->d_super_keys[problem->d_edges[node]];
+    problem->d_keys_array[node] = problem->d_super_nodes[problem->d_keys_array[node]];
+    problem->d_origin_edges[node] = problem->d_super_nodes[problem->d_origin_edges[node]];
   }
 };
 
@@ -337,7 +338,7 @@ struct FilterFunctor
   static __device__ __forceinline__ bool CondFilter(
     VertexId node, DataSlice *problem, Value v = 0)
   {
-    return node != -1;
+    return (node != -1);
   }
 
   /**
@@ -353,75 +354,6 @@ struct FilterFunctor
     // doing nothing here.
   }
 };
-
-template<
-  typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct VtxLenFunctor
-{
-  typedef typename ProblemData::DataSlice DataSlice;
-
-  /**
-   * @brief Forward Edge Mapping condition function.
-   *
-   * @param[in] s_id Vertex Id of the edge source node
-   * @param[in] d_id Vertex Id of the edge destination node
-   * @param[in] problem Data slice object
-   *
-   * \return Whether to load the apply function for the edge and include
-   * the destination node in the next frontier.
-   */
-  static __device__ __forceinline__ bool CondEdge(VertexId s_id,
-    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-  {
-    return true;
-  }
-
-  /**
-   * @brief Forward Edge Mapping apply function.
-   *
-   * @param[in] s_id Vertex Id of the edge source node
-   * @param[in] d_id Vertex Id of the edge destination node
-   * @param[in] problem Data slice object
-   *
-   */
-  static __device__ __forceinline__ void ApplyEdge(VertexId s_id,
-    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-  {
-    return;
-  }
-
-  /**
-   * @brief Vertex mapping condition function.
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   *
-   * \return Whether to load the apply function for the node and include
-   * it in the outgoing vertex frontier.
-   */
-  static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
-  {
-    return true;
-  }
-
-  /**
-   * @brief Vertex mapping apply function.
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   *
-   */
-  static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
-  {
-    problem->d_row_offsets[node] = (problem->d_super_flag[node] == 0) ? -1 : 1;
-    problem->d_row_offsets[0] = 1;
-    return;
-  }
-};
-
-
 
 /**
  * @brief Structure contains device functions in MST graph traverse.
@@ -718,7 +650,7 @@ struct SuEdgeRmFunctor
     VertexId node, DataSlice *problem, Value v = 0)
   {
     problem->d_flag_array[0] = 1;
-    problem->d_edges[node] = (problem->d_flag_array[node] == 0) ? -1 : problem->d_edges[node];
+    problem->d_origin_edges[node] = (problem->d_flag_array[node] == 0) ? -1 : problem->d_origin_edges[node];
     problem->d_edge_weights[node] = (problem->d_flag_array[node] == 0) ? -1 : problem->d_edge_weights[node];
     problem->d_keys_array[node] = (problem->d_flag_array[node] == 0) ? -1 : problem->d_keys_array[node];
     problem->d_eId[node] = (problem->d_flag_array[node] == 0) ? -1 : problem->d_eId[node];
