@@ -71,7 +71,7 @@ struct ForwardFunctor
             if (label_d == label + 1)
             {
                 //Accumulate sigma value
-                atomicAdd(problem->sigmas + d_id, problem->sigmas + s_id);
+                atomicAdd(problem->sigmas + d_id, problem->sigmas[s_id]);
             }
             return false;
         }

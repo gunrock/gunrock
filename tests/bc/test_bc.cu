@@ -428,7 +428,7 @@ void RunTests(
     cpu_timer.Start();
     for (VertexId i = start_src; i < end_src; ++i)
     {
-        util::GRError(csr_problem->Reset(i, bc_enactor.GetFrontierType(), max_queue_sizing), "BC Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(csr_problem->Reset(i, bc_enactor->GetFrontierType(), max_queue_sizing), "BC Problem Data Reset Failed", __FILE__, __LINE__);
         util::GRError(bc_enactor ->Enact(context, csr_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
     }
 
