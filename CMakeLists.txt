@@ -31,12 +31,12 @@ set(gunrock_INCLUDE_DIRS
 include_directories(${gunrock_INCLUDE_DIRS})
 
 set(mgpu_INCLUDE_DIRS 
-    "" 
+    externals/moderngpu/include
     CACHE PATH
     "Directory to the Modern GPU include files")
 
 set(cub_INCLUDE_DIRS
-    ""
+    externals/cub
     CACHE PATH
     "Directory to the CUB include files")
 

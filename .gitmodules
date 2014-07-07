@@ -1,0 +1,6 @@
+[submodule "externals/cub"]
+	path = externals/cub
+	url = https://github.com/NVlabs/cub.git
+[submodule "externals/moderngpu"]
+	path = externals/moderngpu
+	url = https://github.com/NVlabs/moderngpu.git
