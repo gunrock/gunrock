@@ -30,13 +30,13 @@ set(gunrock_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR})
 include_directories(${gunrock_INCLUDE_DIRS})
 
-set(mgpu_INCLUDE_DIRS 
-    externals/moderngpu/include
+set(mgpu_INCLUDE_DIRS
+    ${CMAKE_SOURCE_DIR}/externals/moderngpu/include
     CACHE PATH
     "Directory to the Modern GPU include files")
 
 set(cub_INCLUDE_DIRS
-    externals/cub
+    ${CMAKE_SOURCE_DIR}/externals/cub
     CACHE PATH
     "Directory to the CUB include files")
 
@@ -175,5 +175,3 @@ if(GUNROCK_BUILD_APPLICATIONS)
     #add_subdirectory(tests/sssp)
     #add_subdirectory(tests/wtf)
 endif(GUNROCK_BUILD_APPLICATIONS)
-
-
