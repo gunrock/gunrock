@@ -135,15 +135,33 @@ endif (CUDA_VERBOSE_PTXAS)
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
  # also see how to do overrides:
  # https://gist.github.com/robertmaynard/11297565
- set( CUDA_HOST_COMPILER /opt/local/bin/g++-mp-4.7 CACHE FILEPATH
+
+ # comment from @jowens:
+ # this clang compiler version must be at least r201031, since that
+ # fixes a template bug in clang.
+ # http://llvm.org/bugs/show_bug.cgi?id=18009
+ # ALSO it must be named "clang"/"clang++", or else cmake goes
+ # bananas. (Naming it "clang-mp-3.5", the name under which MacPorts
+ # installs it, does not work.)
+ # The hardwired-to-jowens shell script below is a two-line sh script
+ # to a MacPorts llvm-3.5 (top-of-tree) install:
+ # #!/bin/sh
+ # exec /opt/local/libexec/llvm-3.5/bin/clang "${@}"
+
+set( CUDA_HOST_COMPILER /Users/jowens/bin/clang/clang++ CACHE FILEPATH
    "Host side compiler used by NVCC"
    FORCE )
- set(CMAKE_C_COMPILER /opt/local/bin/gcc-mp-4.7 CACHE FILEPATH
+ set(CMAKE_C_COMPILER /Users/jowens/bin/clang/clang CACHE FILEPATH
    "C compiler"
    FORCE )
- set(CMAKE_CXX_COMPILER /opt/local/bin/g++-mp-4.7 CACHE FILEPATH
+ set(CMAKE_CXX_COMPILER /Users/jowens/bin/clang/clang++ CACHE FILEPATH
    "CXX compiler"
    FORCE )
+
+# current CUDA on Mavericks uses libstdc++, not libc++
+ # https://github.com/cudpp/cudpp/wiki/BuildingCUDPPWithMavericks
+ set(CMAKE_CXX_FLAGS -stdlib=libstdc++)
+ set(CMAKE_C_FLAGS -stdlib=libstdc++)
 endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 if(GUNROCK_BUILD_LIB)
