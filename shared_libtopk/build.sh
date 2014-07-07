@@ -1,2 +1,2 @@
-gcc -c test.c -I ../
-gcc -o test test.o -L. -ltopk -lcuda
+gcc -c test.c -I ../gunrock
+gcc -o test test.o -L. -lgunrock

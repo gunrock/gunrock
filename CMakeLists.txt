@@ -25,6 +25,21 @@ if (Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
 endif (Boost_FOUND)
 
+
+set(gunrock_INCLUDE_DIRS
+    ${CMAKE_SOURCE_DIR})
+include_directories(${gunrock_INCLUDE_DIRS})
+
+set(mgpu_INCLUDE_DIRS 
+    "" 
+    CACHE PATH
+    "Directory to the Modern GPU include files")
+
+set(cub_INCLUDE_DIRS
+    ""
+    CACHE PATH
+    "Directory to the CUB include files")
+
 ## Set the directory where the binaries will be stored
 set(EXECUTABLE_OUTPUT_PATH
   ${PROJECT_BINARY_DIR}/bin
@@ -38,6 +53,8 @@ set(LIBRARY_OUTPUT_PATH
   "Directory where all the libraries will be stored")
 
 
+
+
 set(GENCODE_SM10 -gencode=arch=compute_10,code=sm_10 -gencode=arch=compute_10,code=compute_10)
 set(GENCODE_SM13 -gencode=arch=compute_13,code=sm_13 -gencode=arch=compute_13,code=compute_13)
 set(GENCODE_SM20 -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_20,code=compute_20)
@@ -48,16 +65,16 @@ set(GENCODE_SM50 -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_50,co
 #set(GENCODE -gencode=arch=compute_10,code=compute_10) # at least generate PTX
 
 option(GUNROCK_BUILD_LIB
-       "On to build library (Will eventually default to on.)"
-	   OFF)
+       "On to build library"
+       ON)
 
 option(GUNROCK_BUILD_SHARED_LIBS
        "On to build shared libraries, off for static libraries."
-       OFF)
-	   
+       ON)
+
 option(GUNROCK_BUILD_APPLICATIONS
        "If on, builds the sample applications."
-	   OFF)
+       OFF)
 
 option(GUNROCK_GENCODE_SM10
        "ON to generate code for Compute Capability 1.0 devices (e.g. Tesla C870)"
@@ -131,32 +148,32 @@ endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 if(GUNROCK_BUILD_LIB)
     if(GUNROCK_BUILD_SHARED_LIBS)
-	    set(LIB_TYPE SHARED)
-	else()
-	    set(LIB_TYPE STATIC)
-		set(GUNROCK_STATIC_LIB 1)
-	endif(GUNROCK_BUILD_SHARED_LIBS)
-	
-    configure_file(
-        ${CMAKE_CURRENT_SOURCE_DIR}/gunrock/gunrock_config.h.in
-        ${CMAKE_CURRENT_SOURCE_DIR}/gunrock/gunrock_config.h)
-	
+        set(LIB_TYPE SHARED)
+    else()
+        set(LIB_TYPE STATIC)
+        set(GUNROCK_STATIC_LIB 1)
+    endif(GUNROCK_BUILD_SHARED_LIBS)
+
+    #configure_file(
+    #    ${CMAKE_CURRENT_SOURCE_DIR}/gunrock/gunrock_config.h.in
+    #    ${CMAKE_CURRENT_SOURCE_DIR}/gunrock/gunrock_config.h)
+
     add_subdirectory(gunrock)
 endif(GUNROCK_BUILD_LIB)
 
 if(GUNROCK_BUILD_APPLICATIONS)
-    add_subdirectory(simple_example)
-	#add_subdirectory(tests/bc)
-	#add_subdirectory(tests/bfs)
-	#add_subdirectory(tests/cc)
-	#add_subdirectory(tests/dc)
-	#add_subdirectory(tests/dobfs)
-	#add_subdirectory(tests/hits)
-	#add_subdirectory(tests/pbfs)
-	#add_subdirectory(tests/pr)
-	#dd_subdirectory(tests/salsa)
-	#dd_subdirectory(tests/sssp)
-	#dd_subdirectory(tests/wtf)
+    #add_subdirectory(simple_example)
+    #add_subdirectory(tests/bc)
+    #add_subdirectory(tests/bfs)
+    #add_subdirectory(tests/cc)
+    #add_subdirectory(tests/dc)
+    #add_subdirectory(tests/dobfs)
+    #add_subdirectory(tests/hits)
+    #add_subdirectory(tests/pbfs)
+    #add_subdirectory(tests/pr)
+    #add_subdirectory(tests/salsa)
+    #add_subdirectory(tests/sssp)
+    #add_subdirectory(tests/wtf)
 endif(GUNROCK_BUILD_APPLICATIONS)
-	
-  
+
+

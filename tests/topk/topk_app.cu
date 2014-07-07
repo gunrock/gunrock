@@ -14,7 +14,7 @@
 
 #include <cstdlib>
 #include <stdio.h>
-#include "../../gunrock.h"
+#include <gunrock/gunrock.h>
 #include <gunrock/graphio/market.cuh>
 #include <gunrock/app/topk/topk_enactor.cuh>
 #include <gunrock/app/topk/topk_problem.cuh>

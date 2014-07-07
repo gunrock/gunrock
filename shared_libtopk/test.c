@@ -1,4 +1,5 @@
 #include <gunrock.h>
+#include <stdio.h>
 
 int main(int argc, char* argv[])
 {
@@ -34,12 +35,21 @@ int main(int argc, char* argv[])
 
   // run topk calculations
   topk_dispatch((struct GunrockGraph*)NULL,
-		node_ids,
-		centrality_values,
-		(const struct GunrockGraph*)graph,
-		top_nodes,
-		data_type);
+    node_ids,
+    centrality_values,
+    (const struct GunrockGraph*)graph,
+    top_nodes,
+    data_type);
 
+  int i;
+
+  for (i = 0; i < top_nodes; ++i)
+  {
+    printf("Node ID [%d] : CV [%d] \n", node_ids[i], centrality_values[i]);
+  }
+
+  free(centrality_values);
+  free(node_ids);
   free(graph);
   return 0;
 }
