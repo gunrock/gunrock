@@ -83,8 +83,9 @@ protected:
   template <typename ProblemData>
   cudaError_t Setup(ProblemData *problem)
   {
-    typedef typename ProblemData::SizeT    SizeT;
+    typedef typename ProblemData::Value    Value;
     typedef typename ProblemData::VertexId VertexId;
+    typedef typename ProblemData::SizeT    SizeT;
 
     cudaError_t retval = cudaSuccess;
 
@@ -382,7 +383,7 @@ public:
 
         // generate flag array using mark_segment kernel
         util::markSegmentFromOffsets<<<128, 128>>>(
-          problem->data_slices[0]->d_flag_array,
+          problem->data_slices[0]->d_flags_array,
           graph_slice->d_row_offsets,
           graph_slice->nodes);
 
@@ -390,7 +391,7 @@ public:
 
       	// generate keys array using sum scan
       	Scan<MgpuScanTypeInc>(
-          (int*)problem->data_slices[0]->d_flag_array, graph_slice->edges,
+          (int*)problem->data_slices[0]->d_flags_array, graph_slice->edges,
       		(int)0, mgpu::plus<int>(), (int*)0, (int*)0,
       		(int*)problem->data_slices[0]->d_keys_array, context);
 
@@ -415,7 +416,7 @@ public:
       	{
       	  printf(":: origin flag array ::");
       	  util::DisplayDeviceResults(
-            problem->data_slices[0]->d_flag_array, graph_slice->edges);
+            problem->data_slices[0]->d_flags_array, graph_slice->edges);
       	  printf(":: origin keys array ::");
       	  util::DisplayDeviceResults(
             problem->data_slices[0]->d_keys_array, graph_slice->edges);
@@ -473,10 +474,10 @@ public:
 
       	if (debug_info)
       	{
-      	  printf(":: successor array ::\n");
+      	  printf(":: successor array ::");
       	  util::DisplayDeviceResults(
             problem->data_slices[0]->d_successors, graph_slice->nodes);
-      	  printf(":: mst_output boolean array ::\n");
+      	  printf(":: mst_output boolean array ::");
       	  util::DisplayDeviceResults(
             problem->data_slices[0]->d_mst_output, graph_slice->edges);
       	}
@@ -517,7 +518,7 @@ public:
 
       	if (debug_info)
       	{
-      	  printf(":: remove cycles from successors ::\n");
+      	  printf(":: remove cycles from successors ::");
       	  util::DisplayDeviceResults(
             problem->data_slices[0]->d_successors, graph_slice->nodes);
       	  printf(":: mst output boolean array ::");
@@ -705,7 +706,7 @@ public:
           printf(":: before sorting d_super_vertex ::");
           util::DisplayDeviceResults(
             problem->data_slices[0]->d_super_vertex, current_nodes);
-          printf(":: before sorting d_origin_nodes ::\n");
+          printf(":: before sorting d_origin_nodes ::");
           util::DisplayDeviceResults(
             problem->data_slices[0]->d_origin_nodes, current_nodes);
         }
@@ -776,12 +777,12 @@ public:
       	  printf(":: edge mark (d_origin_edges) ::");
       	  util::DisplayDeviceResults(
             problem->data_slices[0]->d_origin_edges, graph_slice->edges);
-      	  //printf(":: edge mark (d_edgeFlag) ::");
-      	  //util::DisplayDeviceResults(problem->data_slices[0]->d_edgeFlag, graph_slice->edges);
+      	  //printf(":: edge mark (d_edge_flags) ::");
+      	  //util::DisplayDeviceResults(problem->data_slices[0]->d_edge_flags, graph_slice->edges);
       	  printf(":: sorted d_super_vertex ::");
       	  util::DisplayDeviceResults(
             problem->data_slices[0]->d_super_vertex, current_nodes);
-          printf(":: sorted d_origin_nodes ::\n");
+          printf(":: sorted d_origin_nodes ::");
           util::DisplayDeviceResults(
             problem->data_slices[0]->d_origin_nodes, current_nodes);
       	  //printf(":: ordered edge List ::");
@@ -994,7 +995,7 @@ public:
       	// Fill in frontier queue
       	util::MemsetCopyVectorKernel<<<128, 128>>>(
           graph_slice->frontier_queues.d_values[frontier_attribute.selector],
-      		problem->data_slices[0]->d_edgeFlag,
+      		problem->data_slices[0]->d_edge_flags,
       		graph_slice->edges);
 
       	gunrock::oprtr::filter::Kernel<FilterKernelPolicy, MSTProblem, FilterFunctor>
@@ -1018,9 +1019,9 @@ public:
       	if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
       		"advance::Kernel failed", __FILE__, __LINE__))) break;
 
-      	// Copy back to d_edgeFlag
+      	// Copy back to d_edge_flags
       	util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_edgeFlag,
+          problem->data_slices[0]->d_edge_flags,
       		graph_slice->frontier_queues.d_values[frontier_attribute.selector^1],
       		graph_slice->edges);
 
@@ -1034,7 +1035,7 @@ public:
       	// Fill in frontier queue
       	util::MemsetCopyVectorKernel<<<128, 128>>>(
           graph_slice->frontier_queues.d_values[frontier_attribute.selector],
-      		problem->data_slices[0]->d_flag_array,
+      		problem->data_slices[0]->d_flags_array,
       		graph_slice->edges);
 
       	gunrock::oprtr::filter::Kernel<FilterKernelPolicy, MSTProblem, FilterFunctor>
@@ -1058,9 +1059,9 @@ public:
       	if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
       		"advance::Kernel failed", __FILE__, __LINE__))) break;
 
-      	// Copy back to d_flag_array
+      	// Copy back to d_flags_array
       	util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_flag_array,
+          problem->data_slices[0]->d_flags_array,
       		graph_slice->frontier_queues.d_values[frontier_attribute.selector^1],
       		graph_slice->edges);
 
@@ -1130,10 +1131,10 @@ public:
 
         if (debug_info)
         {
-          printf(":: keys_array found representatives ::\n");
+          printf(":: keys_array found representatives ::");
           util::DisplayDeviceResults(
             problem->data_slices[0]->d_keys_array, graph_slice->edges);
-          printf(":: edgeId_list found representatives ::\n");
+          printf(":: edgeId_list found representatives ::");
           util::DisplayDeviceResults(
             problem->data_slices[0]->d_edgeId_list, graph_slice->edges);
         }
@@ -1143,9 +1144,9 @@ public:
           problem->data_slices[0]->d_temp_storage,
       		problem->data_slices[0]->d_keys_array,
       		graph_slice->edges);
-        // used for sorting: copy d_keys_array -> d_flag_array
+        // used for sorting: copy d_keys_array -> d_flags_array
         util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_flag_array,
+          problem->data_slices[0]->d_flags_array,
           problem->data_slices[0]->d_keys_array,
           graph_slice->edges);
 
@@ -1157,7 +1158,7 @@ public:
           problem->data_slices[0]->d_edgeId_list);
 
         // sort d_edge_weights by keys array
-        util::CUBRadixSort<int, VertexId>(
+        util::CUBRadixSort<int, VertexId>(  //TODO USE VALUE TYPE
           true, // is ascend
           graph_slice->edges,
           problem->data_slices[0]->d_temp_storage,
@@ -1167,7 +1168,7 @@ public:
         util::CUBRadixSort<int, VertexId>(
           true,
           graph_slice->edges,
-          problem->data_slices[0]->d_flag_array,
+          problem->data_slices[0]->d_flags_array,
           problem->data_slices[0]->d_origin_edges);
 
         /*
@@ -1180,7 +1181,7 @@ public:
 
       	// Sort edge_values by keys
       	MergesortPairs(
-          problem->data_slices[0]->d_flag_array,
+          problem->data_slices[0]->d_flags_array,
       		problem->data_slices[0]->d_edge_weights,
       		graph_slice->edges,
       		mgpu::less<int>(), context);
@@ -1212,21 +1213,21 @@ public:
       	// assign row_offsets to vertex list
       	// generate flag array for next iteration using markSegment kernel
       	util::markSegmentFromKeys<<<128, 128>>>(
-          problem->data_slices[0]->d_flag_array,
+          problem->data_slices[0]->d_flags_array,
       		problem->data_slices[0]->d_keys_array,
       		graph_slice->edges);
 
-        printf("  ----> finished create flag array for next iteration.\n");
+        printf("  ----> finished create edge flag array.\n");
 
         if (debug_info)
         {
           printf(":: mark segment to generate flag array for next iteration ::");
       	  util::DisplayDeviceResults(
-            problem->data_slices[0]->d_flag_array, graph_slice->edges);
+            problem->data_slices[0]->d_flags_array, graph_slice->edges);
         }
 
-      	// Generate row_offsets for next iteration using RowOFunctor - vertex mapping
-      	// if d_flag_array[node] == 1:
+      	// generate row_offsets for next iteration using RowOFunctor - vertex mapping
+      	// if d_flags_array[node] == 1:
       	// d_row_offsets[d_key[node]] == node
       	frontier_attribute.queue_index = 0;
       	frontier_attribute.selector = 0;
@@ -1252,7 +1253,7 @@ public:
             enactor_stats.filter_kernel_stats);
 
       	if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
-      		"advance::Kernel failed", __FILE__, __LINE__))) break;
+      		"filter::Kernel failed", __FILE__, __LINE__))) break;
 
         if (debug_info)
         {
@@ -1270,7 +1271,7 @@ public:
       		problem->data_slices[0]->d_edgeId_list,
       		graph_slice->edges);
 
-      	util::SegSortFromIndices(
+      	util::SegSortFromIndices<SizeT, VertexId, VertexId>( // TODO USE VALUE TYPE
           context,
           graph_slice->nodes,
           problem->data_slices[0]->d_row_offsets,
@@ -1278,13 +1279,15 @@ public:
           problem->data_slices[0]->d_edgeId_list,
           problem->data_slices[0]->d_edge_weights);
 
-        util::SegSortFromIndices(
+        util::SegSortFromIndices<SizeT, VertexId, VertexId>(
           context,
           graph_slice->nodes,
           problem->data_slices[0]->d_row_offsets,
           graph_slice->edges,
           problem->data_slices[0]->d_temp_storage,
           problem->data_slices[0]->d_origin_edges);
+
+        printf("  ----> finished segmented sort for edge list reduction.\n");
 
       	if (debug_info)
       	{
@@ -1299,240 +1302,158 @@ public:
             problem->data_slices[0]->d_origin_edges, graph_slice->edges);
       	}
 
+      	/*
+        util::MemsetCopyVectorKernel<<<128, 128>>>(
+          problem->data_slices[0]->d_edge_flags,
+      		problem->data_slices[0]->d_flags_array,
+      		graph_slice->edges);
+        */
 
-/*
-      	// Generate new edge flag array using markSegment kernel
-      	util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_edgeFlag,
-      		problem->data_slices[0]->d_flag_array,
+        // generate new edge flag array using markSegment kernel
+        // mark 1 for edges that have dst_vertices
+        util::markSegmentFromKeys<<<128, 128>>>(
+          problem->data_slices[0]->d_edge_flags,
+      		problem->data_slices[0]->d_edgeId_list,
       		graph_slice->edges);
 
-      	util::markSegment<<<128, 128>>>(
-          problem->data_slices[0]->d_flag_array,
-      		problem->data_slices[0]->d_origin_edges,
-      		graph_slice->edges);
+        // do or operation for d_edge_flags and d_flags_array
+        frontier_attribute.queue_length = graph_slice->edges;
+        frontier_attribute.queue_reset = true;
 
-      	// Segmented reduction: generate keys array using mgpu::scan
+        gunrock::oprtr::filter::Kernel<FilterKernelPolicy, MSTProblem, OrFunctor>
+          <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
+            enactor_stats.iteration+1,
+            frontier_attribute.queue_reset,
+            frontier_attribute.queue_index,
+            enactor_stats.num_gpus,
+            frontier_attribute.queue_length,
+            NULL,
+            graph_slice->frontier_queues.d_values[frontier_attribute.selector],
+            NULL,
+            graph_slice->frontier_queues.d_values[frontier_attribute.selector^1],
+            data_slice,
+            NULL,
+            work_progress,
+            graph_slice->frontier_elements[frontier_attribute.selector],
+            graph_slice->frontier_elements[frontier_attribute.selector^1],
+            enactor_stats.filter_kernel_stats);
+
+        if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
+          "filter::Kernel failed", __FILE__, __LINE__))) break;
+
+         printf("  ----> finished calculate edge flags array.\n");
+
+      	// segmented reduction: generate keys array using mgpu::scan
       	Scan<MgpuScanTypeInc>(
-          (int*)problem->data_slices[0]->d_flag_array, graph_slice->edges,
-      		(int)0, mgpu::plus<int>(), (int*)0, (int*)0,
-      		(int*)problem->data_slices[0]->d_edgeKeys, context);
+          (int*)problem->data_slices[0]->d_edge_flags,
+          graph_slice->edges, (int)0, mgpu::plus<int>(), (int*)0, (int*)0,
+      		(int*)problem->data_slices[0]->d_edge_keys, context);
 
-      	// Calculate edge_flag array using OrFunctor - vertex mapping
-      	frontier_attribute.queue_index  = 0;
-      	frontier_attribute.selector     = 0;
-      	frontier_attribute.queue_length = graph_slice->edges;
-      	frontier_attribute.queue_reset = true;
+        printf("  ----> finished scan of edge flags array: d_edge_keys\n");
 
-      	util::MemsetIdxKernel<<<128, 128>>>(
-          graph_slice->frontier_queues.d_values[frontier_attribute.selector],
-          graph_slice->edges);
+        if (debug_info)
+        {
+          printf(":: remove duplicated edges between supervertices d_edge_flags ::");
+          util::DisplayDeviceResults(
+            problem->data_slices[0]->d_edge_flags, graph_slice->edges);
+          printf(":: remove duplicated edges between supervertices d_edge_keys ::");
+          util::DisplayDeviceResults(
+            problem->data_slices[0]->d_edge_keys, graph_slice->edges);
+        }
 
-      	gunrock::oprtr::filter::Kernel<FilterKernelPolicy, MSTProblem, OrFunctor>
-      	  <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
-            0,              // Current graph traversal iteration
-      	    frontier_attribute.queue_reset,    // reset queue counter
-      	    frontier_attribute.queue_index,    // Current frontier queue counter index
-      	    1,              // Number of gpu(s)
-      	    frontier_attribute.queue_length,   // Number of element(s)
-      	    NULL,           // d_done
-      	    graph_slice->frontier_queues.d_values[frontier_attribute.selector],      // d_in_queue
-      	    NULL,           // d_pred_in_queue
-      	    graph_slice->frontier_queues.d_values[frontier_attribute.selector^1],    // d_out_queue
-      	    data_slice,     // Problem
-      	    NULL,           // visited mask
-      	    work_progress,  // work progress
-      	    graph_slice->frontier_elements[frontier_attribute.selector],       // max_in_queue
-      	    graph_slice->frontier_elements[frontier_attribute.selector^1],     // max_out_queue
-      	    enactor_stats.filter_kernel_stats);                 // kernel stats
-
-      	if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
-      		"vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-
-      	if (debug_info)
-      	{
-      	  printf(":: Edge Flag ::");
-      	  util::DisplayDeviceResults(problem->data_slices[0]->d_edgeFlag, graph_slice->edges);
-      	  printf(":: Edge Keys ::");
-      	  util::DisplayDeviceResults(problem->data_slices[0]->d_edgeKeys, graph_slice->edges);
-      	  printf(":: Old Keys ::");
-      	  util::DisplayDeviceResults(problem->data_slices[0]->d_keys_array, graph_slice->edges);
-      	}
-
-      	printf("----> 7.got edge flag, edge keys\n");
-
-      	// Calculate the length of New Edge offset array
-      	frontier_attribute.queue_index  = 0;
-      	frontier_attribute.selector     = 0;
-      	frontier_attribute.queue_length = graph_slice->edges;
-      	frontier_attribute.queue_reset = true;
-
-      	util::MemsetIdxKernel<<<128, 128>>>(
-          graph_slice->frontier_queues.d_values[frontier_attribute.selector],
-          graph_slice->edges);
-
-      	gunrock::oprtr::filter::Kernel<FilterKernelPolicy, MSTProblem, EdgeLenFunctor>
-      	  <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
-      	    0,              // Current graph traversal iteration
-      	    frontier_attribute.queue_reset,    // reset queue counter
-      	    frontier_attribute.queue_index,    // Current frontier queue counter index
-      	    1,              // Number of gpu(s)
-      	    frontier_attribute.queue_length,   // Number of element(s)
-      	    NULL,           // d_done
-      	    graph_slice->frontier_queues.d_values[frontier_attribute.selector],      // d_in_queue
-      	    NULL,           // d_pred_in_queue
-      	    graph_slice->frontier_queues.d_values[frontier_attribute.selector^1],    // d_out_queue
-      	    data_slice,     // Problem
-      	    NULL,           // visited mask
-      	    work_progress,  // work progress
-      	    graph_slice->frontier_elements[frontier_attribute.selector],       // max_in_queue
-      	    graph_slice->frontier_elements[frontier_attribute.selector^1],     // max_out_queue
-      	    enactor_stats.filter_kernel_stats);                 // kernel stats
-
-      	if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
-      		"vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-
-      	// Reduce Length using Rmfunctor
-      	frontier_attribute.queue_index = 0;
-      	frontier_attribute.selector = 0;
-      	frontier_attribute.queue_reset = true;
-
-      	util::MemsetCopyVectorKernel<<<128, 128>>>(
-          graph_slice->frontier_queues.d_values[frontier_attribute.selector],
-      		problem->data_slices[0]->d_edge_offsets,
-      		graph_slice->edges);
-
-      	gunrock::oprtr::filter::Kernel<FilterKernelPolicy, MSTProblem, FilterFunctor>
-      	  <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
-            0,
-      	    frontier_attribute.queue_reset,
-      	    frontier_attribute.queue_index,
-      	    1,
-      	    frontier_attribute.queue_length,
-      	    NULL,							//d_done,
-      	    graph_slice->frontier_queues.d_values[frontier_attribute.selector],	// d_in_queue
-      	    NULL,
-      	    graph_slice->frontier_queues.d_values[frontier_attribute.selector^1],    	// d_out_queue
-      	    data_slice,
-      	    NULL,
-      	    work_progress,
-      	    graph_slice->frontier_elements[frontier_attribute.selector],           	// max_in_queue
-      	    graph_slice->frontier_elements[frontier_attribute.selector^1],         	// max_out_queue
-      	    enactor_stats.filter_kernel_stats);
-
-      	if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
-      	  "advance::Kernel failed", __FILE__, __LINE__))) break;
-
-      	printf("----> 8.reduce length of edge offsets \n");
-      	// Get edge offset length
-      	// int edge_offsets_length;
-      	// frontier_attribute.queue_index++;
-      	// if (retval = work_progress.GetQueueLength(
-            frontier_attribute.queue_index, queue_length)) break;
-      	// edge_offsets_length = queue_length;
-      	// printf("\n edge offsets length = %ld \n", queue_length);
-
-      	// Generate New Edge offsets using EdgeOFunctor - vertex mapping
-      	// if d_flag_array[node] == 1: d_edge_offsets[d_edgeKeys[node]] = node
+      	// generate edge offsets using EdgeOffsetsFunctor
       	frontier_attribute.queue_index = 0;
       	frontier_attribute.selector = 0;
       	frontier_attribute.queue_length = graph_slice->edges;
       	frontier_attribute.queue_reset = true;
 
-      	// Fill in frontier queue
-      	util::MemsetIdxKernel<<<128, 128>>>(
-          graph_slice->frontier_queues.d_values[frontier_attribute.selector],
-          graph_slice->edges);
-
-      	gunrock::oprtr::filter::Kernel<FilterKernelPolicy, MSTProblem, EdgeOFunctor>
+      	gunrock::oprtr::filter::Kernel<FilterKernelPolicy, MSTProblem, EdgeOffsetsFunctor>
       	  <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
-      	    0,
-      	    frontier_attribute.queue_reset,
-      	    frontier_attribute.queue_index,
-      	    1,
-      	    frontier_attribute.queue_length,
-      	    NULL,//d_done,
-      	    graph_slice->frontier_queues.d_values[frontier_attribute.selector],      // d_in_queue
-      	    NULL,
-      	    graph_slice->frontier_queues.d_values[frontier_attribute.selector^1],    // d_out_queue
-      	    data_slice,
-      	    NULL,
-      	    work_progress,
-      	    graph_slice->frontier_elements[frontier_attribute.selector],           // max_in_queue
-      	    graph_slice->frontier_elements[frontier_attribute.selector^1],         // max_out_queue
-      	    enactor_stats.filter_kernel_stats);
+            enactor_stats.iteration+1,
+            frontier_attribute.queue_reset,
+            frontier_attribute.queue_index,
+            enactor_stats.num_gpus,
+            frontier_attribute.queue_length,
+            NULL,
+            graph_slice->frontier_queues.d_values[frontier_attribute.selector],
+            NULL,
+            graph_slice->frontier_queues.d_values[frontier_attribute.selector^1],
+            data_slice,
+            NULL,
+            work_progress,
+            graph_slice->frontier_elements[frontier_attribute.selector],
+            graph_slice->frontier_elements[frontier_attribute.selector^1],
+            enactor_stats.filter_kernel_stats);
 
       	if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
-      		"advance::Kernel failed", __FILE__, __LINE__))) break;
+      		"filter::Kernel failed", __FILE__, __LINE__))) break;
 
-      	// printf(":: Edge_offsets ::");
-      	// util::DisplayDeviceResults(problem->data_slices[0]->d_edge_offsets, edge_offsets_length);
+        printf("  ----> finished filter to generate edge offsets.\n");
+       	//printf(":: edge_offsets ::");
+      	//util::DisplayDeviceResults(
+        //  problem->data_slices[0]->d_edge_offsets, graph_slice->edges);
 
-      	printf("----> 9.got edge offsets\n");
-
-      	// Segment Sort edge_values and eId using edge_offsets
-      	SegSortPairsFromIndices(
+      	// segmented sort d_edge_weights and d_origin_edges using d_edge_offsets
+      	util::SegSortFromIndices<SizeT, VertexId, VertexId>(
+          context,
+          graph_slice->nodes,
+          problem->data_slices[0]->d_edge_offsets,
+          graph_slice->edges,
           problem->data_slices[0]->d_edge_weights,
-      		problem->data_slices[0]->d_origin_edges,
-      		graph_slice->edges,
-      		problem->data_slices[0]->d_edge_offsets,
-      		graph_slice->nodes, context);
+          problem->data_slices[0]->d_origin_edges);
 
       	if (debug_info)
       	{
-      	  printf(":: SegmentedSort using edge_offsets (d_origin_edges) ::");
-      	  util::DisplayDeviceResults(problem->data_slices[0]->d_origin_edges, graph_slice->edges);
-      	  printf(":: SegmentedSort using edge_offsets (d_edge_weights) ::");
+      	  printf(":: segmented sort using edge_offsets (d_edgeId_list) ::");
+      	  util::DisplayDeviceResults(problem->data_slices[0]->d_edgeId_list, graph_slice->edges);
+      	  printf(":: segmented sort using edge_offsets (d_edge_weights) ::");
       	  util::DisplayDeviceResults(problem->data_slices[0]->d_edge_weights, graph_slice->edges);
-      	  printf(":: SegmentedSort using edge_offsets (d_origin_edges) ::");
+      	  printf(":: segmented sort using edge_offsets (d_origin_edges) ::");
       	  util::DisplayDeviceResults(problem->data_slices[0]->d_origin_edges, graph_slice->edges);
       	}
-
-      	// Mark -1 to Edges needed to be removed using advance
-      	// d_origin_edges, d_edge_weights, d_keys_array, d_origin_edges = -1 if (d_flag_array[node] == 0)
+/*
+      	// mark -1 to edges that needed to be removed using advance
+      	// d_origin_edges, d_edge_weights, d_keys_array, d_origin_edges = -1 if d_flags_array[node] == 0
       	frontier_attribute.queue_index = 0;
       	frontier_attribute.selector = 0;
       	frontier_attribute.queue_length = graph_slice->edges;
       	frontier_attribute.queue_reset = true;
-
-      	util::MemsetIdxKernel<<<128, 128>>>(
-          graph_slice->frontier_queues.d_values[frontier_attribute.selector],
-          graph_slice->edges);
 
       	gunrock::oprtr::filter::Kernel<FilterKernelPolicy, MSTProblem, SuEdgeRmFunctor>
       	  <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
-      	    0,
-      	    frontier_attribute.queue_reset,
-      	    frontier_attribute.queue_index,
-      	    1,
-      	    frontier_attribute.queue_length,
-      	    NULL, //d_done,
-      	    graph_slice->frontier_queues.d_values[frontier_attribute.selector],      // d_in_queue
-      	    NULL,
-      	    graph_slice->frontier_queues.d_values[frontier_attribute.selector^1],    // d_out_queue
-      	    data_slice,
-      	    NULL,
-      	    work_progress,
-      	    graph_slice->frontier_elements[frontier_attribute.selector],           // max_in_queue
-      	    graph_slice->frontier_elements[frontier_attribute.selector^1],         // max_out_queue
-      	    enactor_stats.filter_kernel_stats);
+      	    enactor_stats.iteration+1,
+            frontier_attribute.queue_reset,
+            frontier_attribute.queue_index,
+            enactor_stats.num_gpus,
+            frontier_attribute.queue_length,
+            NULL,
+            graph_slice->frontier_queues.d_values[frontier_attribute.selector],
+            NULL,
+            graph_slice->frontier_queues.d_values[frontier_attribute.selector^1],
+            data_slice,
+            NULL,
+            work_progress,
+            graph_slice->frontier_elements[frontier_attribute.selector],
+            graph_slice->frontier_elements[frontier_attribute.selector^1],
+            enactor_stats.filter_kernel_stats);
 
       	if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
-          "advance::Kernel failed", __FILE__, __LINE__))) break;
+          "filter::Kernel failed", __FILE__, __LINE__))) break;
 
       	if (debug_info)
         {
         	// mark -1 check
-        	printf(":: -1 edges for current iteration ::");
-        	util::DisplayDeviceResults(problem->data_slices[0]->d_origin_edges, graph_slice->edges);
-        	printf(":: -1 keys for current iteration ::");
+        	printf(":: mark -1 d_edgeId_list for current iteration ::");
+        	util::DisplayDeviceResults(problem->data_slices[0]->d_edgeId_list, graph_slice->edges);
+        	printf(":: mark -1 d_keys_array for current iteration ::");
         	util::DisplayDeviceResults(problem->data_slices[0]->d_keys_array, graph_slice->edges);
-        	printf(":: -1 edge_values for current iteration ::");
+        	printf(":: mark -1 d_edge_weights for current iteration ::");
         	util::DisplayDeviceResults(problem->data_slices[0]->d_edge_weights, graph_slice->edges);
-        	printf(":: -1 d_origin_edges for current iteration ::");
+        	printf(":: mark -1 d_origin_edges for current iteration ::");
         	util::DisplayDeviceResults(problem->data_slices[0]->d_origin_edges, graph_slice->edges);
         }
-
+*/
+/*
       	// Reduce new edges, edge_values, eId, keys using Rmfunctor
       	frontier_attribute.queue_index = 0;
       	frontier_attribute.selector = 0;
@@ -1700,7 +1621,7 @@ public:
       		problem->data_slices[0]->d_keys_array,
           graph_slice->edges);
       	util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_flag_array,
+          problem->data_slices[0]->d_flags_array,
       		problem->data_slices[0]->d_keys_array,
           graph_slice->edges);
 
@@ -1716,7 +1637,7 @@ public:
       		graph_slice->edges,
       		mgpu::less<int>(), context);
       	MergesortPairs(
-          problem->data_slices[0]->d_flag_array,
+          problem->data_slices[0]->d_flags_array,
       		problem->data_slices[0]->d_origin_edges,
       		graph_slice->edges,
       		mgpu::less<int>(), context);
@@ -1744,12 +1665,12 @@ public:
       	// Finding final flag array for next iteration
       	// Generate edge flag array for next iteration using markSegment kernel
       	util::markSegment<<<128, 128>>>(
-          problem->data_slices[0]->d_flag_array,
+          problem->data_slices[0]->d_flags_array,
       		problem->data_slices[0]->d_keys_array,
       		graph_slice->edges);
 
-      	//printf(":: Final d_flag_array for current iteration ::");
-      	//util::DisplayDeviceResults(problem->data_slices[0]->d_flag_array, graph_slice->edges);
+      	//printf(":: Final d_flags_array for current iteration ::");
+      	//util::DisplayDeviceResults(problem->data_slices[0]->d_flags_array, graph_slice->edges);
 
       	printf("----> 12.finish final edges, keys, edge_values and eId \n");
 
@@ -1799,7 +1720,6 @@ public:
       	// printf("\n Selected Edges for current iteration \n");
       	// util::DisplayDeviceResults(problem->data_slices[0]->d_mst_output, num_edges_origin);
 
-
       	// final number of selected edges
       	int tmp_length = Reduce(
           problem->data_slices[0]->d_mst_output,
@@ -1810,27 +1730,26 @@ public:
       	enactor_stats.iteration++;
 
       	if (INSTRUMENT || DEBUG)
+      	{
+      	  if (retval = work_progress.GetQueueLength(
+            frontier_attribute.queue_index,
+            frontier_attribute.queue_length)) break;
+      	  enactor_stats.total_queued += frontier_attribute.queue_length;
+      	  if (DEBUG) printf(", %lld", (long long) frontier_attribute.queue_length);
+      	  if (INSTRUMENT)
       	  {
-      	    if (retval = work_progress.GetQueueLength(
-              frontier_attribute.queue_index,
-              frontier_attribute.queue_length)) break;
-      	    enactor_stats.total_queued += frontier_attribute.queue_length;
-      	    if (DEBUG) printf(", %lld", (long long) frontier_attribute.queue_length);
-      	    if (INSTRUMENT)
-      	    {
-      		    if (retval = enactor_stats.filter_kernel_stats.Accumulate(
-                enactor_stats.filter_grid_size,
-                enactor_stats.total_runtimes,
-                enactor_stats.total_lifetimes)) break;
-      	    }
-      	    if (done[0] == 0) break; // check if done
-      	    if (DEBUG) printf("\n %lld \n", (long long) enactor_stats.iteration);
+      	    if (retval = enactor_stats.filter_kernel_stats.Accumulate(
+              enactor_stats.filter_grid_size,
+              enactor_stats.total_runtimes,
+              enactor_stats.total_lifetimes)) break;
       	  }
+      	  if (done[0] == 0) break; // check if done
+      	  if (DEBUG) printf("\n %lld \n", (long long) enactor_stats.iteration);
+      	}
 
-      	// Test
-      	loop_limit++;
+      	loop_limit++; // debug
       	if (loop_limit >= 1) break;
-      } // Recursive Loop
+      } // end of the recursive loop
       /*
       // final number of selected edges
       int num_edges_select = Reduce(

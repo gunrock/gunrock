@@ -102,8 +102,8 @@ struct SuccFunctor
     VertexId node, DataSlice *problem, Value v = 0)
   {
     // not use anymore, now use mark_segment kernel instead
-    //problem->d_flag_array[problem->d_row_offsets[node]] = 1;
-    //problem->d_flag_array[0] = 0; // For scanning keys array.
+    //problem->d_flags_array[problem->d_row_offsets[node]] = 1;
+    //problem->d_flags_array[0] = 0; // For scanning keys array.
   }
 };
 
@@ -262,15 +262,15 @@ struct EdgeRmFunctor
     problem->d_keys_array[e_id] =
       (problem->d_successors[s_id] == problem->d_successors[d_id]) ?
         -1 : problem->d_keys_array[e_id];
-    problem->d_flag_array[e_id] =
+    problem->d_flags_array[e_id] =
       (problem->d_successors[s_id] == problem->d_successors[d_id]) ?
-        -1 : problem->d_flag_array[e_id];
+        -1 : problem->d_flags_array[e_id];
     problem->d_origin_edges[e_id] =
       (problem->d_successors[s_id] == problem->d_successors[d_id]) ?
         -1 : problem->d_origin_edges[e_id];
-    problem->d_edgeFlag[e_id] =
+    problem->d_edge_flags[e_id] =
       (problem->d_successors[s_id] == problem->d_successors[d_id]) ?
-      -1 : problem->d_edgeFlag[e_id];
+      -1 : problem->d_edge_flags[e_id];
     */
     return true;
   }
@@ -428,10 +428,49 @@ struct RowOffsetsFunctor
   static __device__ __forceinline__ void ApplyFilter(
     VertexId node, DataSlice *problem, Value v = 0)
   {
-    if (problem->d_flag_array[node] == 1)
+    if (problem->d_flags_array[node] == 1)
     {
       problem->d_row_offsets[problem->d_keys_array[node]] = node;
     }
+  }
+};
+
+template<
+  typename VertexId,
+  typename SizeT,
+  typename Value,
+  typename ProblemData>
+struct OrFunctor
+{
+  typedef typename ProblemData::DataSlice DataSlice;
+
+  /**
+   * @brief Vertex mapping condition function.
+   *
+   * @param[in] node Vertex Id
+   * @param[in] problem Data slice object
+   *
+   * \return Whether to load the apply function for the node and include
+   * it in the outgoing vertex frontier.
+   */
+  static __device__ __forceinline__ bool CondFilter(
+    VertexId node, DataSlice *problem, Value v = 0)
+  {
+    return true;
+  }
+
+  /**
+   * @brief Vertex mapping apply function.
+   *
+   * @param[in] node Vertex Id
+   * @param[in] problem Data slice object
+   *
+   */
+  static __device__ __forceinline__ void ApplyFilter(
+    VertexId node, DataSlice *problem, Value v = 0)
+  {
+    problem->d_edge_flags[node] =
+      problem->d_edge_flags[node] | problem->d_flags_array[node];
   }
 };
 
@@ -486,14 +525,6 @@ struct EdgeOffsetsFunctor
   static __device__ __forceinline__ bool CondFilter(
     VertexId node, DataSlice *problem, Value v = 0)
   {
-    problem->d_edge_offsets[0] = 0;
-    if (problem->d_flag_array[node] == 1)
-      {
-	      problem->d_edge_offsets[problem->d_edgeKeys[node]] = node;
-      }
-    //problem->d_row_offsets[problem->d_keys_array[node]] =
-    //  (problem->d_flag_array[node] == 1) ?
-    //    node : problem->d_row_offsets[problem->d_keys_array[node]];
     return true;
   }
 
@@ -507,7 +538,10 @@ struct EdgeOffsetsFunctor
   static __device__ __forceinline__ void ApplyFilter(
     VertexId node, DataSlice *problem, Value v = 0)
   {
-    return;
+    if (problem->d_edge_flags[node] == 1)
+    {
+      problem->d_edge_offsets[problem->d_edge_keys[node]] = node;
+    }
   }
 };
 
@@ -572,15 +606,15 @@ struct SuEdgeRmFunctor
   static __device__ __forceinline__ bool CondFilter(
     VertexId node, DataSlice *problem, Value v = 0)
   {
-    problem->d_flag_array[0] = 1;
+    problem->d_flags_array[0] = 1;
     problem->d_origin_edges[node] =
-      (problem->d_flag_array[node] == 0) ? -1 : problem->d_origin_edges[node];
+      (problem->d_flags_array[node] == 0) ? -1 : problem->d_origin_edges[node];
     problem->d_edge_weights[node] =
-      (problem->d_flag_array[node] == 0) ? -1 : problem->d_edge_weights[node];
+      (problem->d_flags_array[node] == 0) ? -1 : problem->d_edge_weights[node];
     problem->d_keys_array[node] =
-      (problem->d_flag_array[node] == 0) ? -1 : problem->d_keys_array[node];
+      (problem->d_flags_array[node] == 0) ? -1 : problem->d_keys_array[node];
     problem->d_origin_edges[node] =
-      (problem->d_flag_array[node] == 0) ? -1 : problem->d_origin_edges[node];
+      (problem->d_flags_array[node] == 0) ? -1 : problem->d_origin_edges[node];
     return true;
   }
 
@@ -597,78 +631,6 @@ struct SuEdgeRmFunctor
     return;
   }
 };
-
-
-template<
-  typename VertexId,
-  typename SizeT,
-  typename Value,
-  typename ProblemData>
-struct OrFunctor
-{
-  typedef typename ProblemData::DataSlice DataSlice;
-
-  /**
-   * @brief Forward Edge Mapping condition function.
-   *
-   * @param[in] s_id Vertex Id of the edge source node
-   * @param[in] d_id Vertex Id of the edge destination node
-   * @param[in] problem Data slice object
-   *
-   * \return Whether to load the apply function for the edge and include
-   * the destination node in the next frontier.
-   */
-  static __device__ __forceinline__ bool CondEdge(VertexId s_id,
-    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-  {
-    return true;
-  }
-
-  /**
-   * @brief Forward Edge Mapping apply function.
-   *
-   * @param[in] s_id Vertex Id of the edge source node
-   * @param[in] d_id Vertex Id of the edge destination node
-   * @param[in] problem Data slice object
-   *
-   */
-  static __device__ __forceinline__ void ApplyEdge(VertexId s_id,
-    VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-  {
-    return;
-  }
-
-  /**
-   * @brief Vertex mapping condition function.
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   *
-   * \return Whether to load the apply function for the node and include
-   * it in the outgoing vertex frontier.
-   */
-  static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
-  {
-    problem->d_edgeFlag[node] = atomicOr(
-      &problem->d_edgeFlag[node], problem->d_flag_array[node]);
-    return true;
-  }
-
-  /**
-   * @brief Vertex mapping apply function.
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   *
-   */
-  static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
-  {
-    return;
-  }
-};
-
 
 } // mst
 } // app

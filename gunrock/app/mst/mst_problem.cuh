@@ -59,8 +59,8 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
   	SizeT    *d_labels;
 
     // device storage arrays
-    int 		 *d_flag_array;	 	//!< flag (1 indicate start of segment, 0 otherwise)
-    SizeT		 *d_keys_array; 	//!< keys array (inclusive scan of the flag array)
+    int 		 *d_flags_array;	//!< flags (1 indicate start of segment, 0 otherwise)
+    SizeT		 *d_keys_array; 	//!< keys array (inclusive scan of the flags array)
  		Value		 *d_reduced_vals; //!< store reduced minimum edge values (weights)
     SizeT 	 *d_reduced_keys; //!< reduced keys array
     VertexId *d_successors;	 	//!< destination vertices that have min edge_values
@@ -73,17 +73,18 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
     VertexId *d_origin_edges;	//!< origin edge list keep track of edge ids
     SizeT		 *d_super_vertex;	//!< super vertex ids scaned from super flag
     VertexId *d_super_edges;	//!< super edge list for next iteration
-    VertexId *d_edgeId_list;  //!< storing inital column indices
+    VertexId *d_edgeId_list;  //!< storing destination vertex ids (a.k.a. edges)
+    SizeT		 *d_row_offsets;	//!< storing new row_offsets for next iteration
+    int      *d_edge_flags;	  //!< a flags array from the output of segmented sort
+    SizeT    *d_edge_keys;		//!< a keys array scan of edge flags array
+    SizeT    *d_edge_offsets; //!< edge offsets used for filter edge list
 
-    SizeT	*d_edgeFlag;        /* Used for removing edges between supervertices */
-    SizeT	*d_edgeKeys;        /* Used for removing edges between supervertices */
+
     Value	*d_oriWeights;      /* Original weight list used for total weight calculate */ // Do we need that?
     VertexId	*d_superVertex;         /* Used for storing supervertex in order */
-    SizeT	*d_row_offsets;		/* Used for accessing row_offsets */    // Try to use graph_slice
     VertexId	*d_edgeId;		/* Used for storing vid of edges have min_weights */
 
     VertexId *d_representatives; //!< representative vertices for each successors // TODO
-    VertexId	*d_edge_offsets;    /* Used for removing edges between supervertices */
 
 
   };
@@ -161,9 +162,9 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 		  if (data_slices[i]->d_reduced_vals)
 			  util::GRError(cudaFree(data_slices[i]->d_reduced_vals),
 					"GpuSlice cudaFree d_reduced_vals failed", __FILE__, __LINE__);
-			if (data_slices[i]->d_flag_array)
-			  util::GRError(cudaFree(data_slices[i]->d_flag_array),
-					"GpuSlice cudaFree d_flag_array failed", __FILE__, __LINE__);
+			if (data_slices[i]->d_flags_array)
+			  util::GRError(cudaFree(data_slices[i]->d_flags_array),
+					"GpuSlice cudaFree d_flags_array failed", __FILE__, __LINE__);
 			if (data_slices[i]->d_keys_array)
 			  util::GRError(cudaFree(data_slices[i]->d_keys_array),
 					"GpuSlice cudaFree d_keys_array failed", __FILE__, __LINE__);
@@ -209,12 +210,12 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 			if (data_slices[i]->d_edge_offsets)
 			  util::GRError(cudaFree(data_slices[i]->d_edge_offsets),
 					"GpuSlice cudaFree d_edge_offsets failed", __FILE__, __LINE__);
-			if (data_slices[i]->d_edgeFlag)
-			  util::GRError(cudaFree(data_slices[i]->d_edgeFlag),
-					"GpuSlice cudaFree d_edgeFlag failed", __FILE__, __LINE__);
-			if (data_slices[i]->d_edgeKeys)
-			  util::GRError(cudaFree(data_slices[i]->d_edgeKeys),
-					"GpuSlice cudaFree d_edgeKeys failed", __FILE__, __LINE__);
+			if (data_slices[i]->d_edge_flags)
+			  util::GRError(cudaFree(data_slices[i]->d_edge_flags),
+					"GpuSlice cudaFree d_edge_flags failed", __FILE__, __LINE__);
+			if (data_slices[i]->d_edge_keys)
+			  util::GRError(cudaFree(data_slices[i]->d_edge_keys),
+					"GpuSlice cudaFree d_edge_keys failed", __FILE__, __LINE__);
 			if (data_slices[i]->d_super_edges)
 			  util::GRError(cudaFree(data_slices[i]->d_super_edges),
 					"GpuSlice cudaFree d_super_edges failed", __FILE__, __LINE__);
@@ -316,7 +317,7 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 			  // Create a single data slice for the currently-set gpu
 			  int gpu;
 			  if (retval = util::GRError(cudaGetDevice(&gpu),
-					"MSTProblem cudaGetDevice failed", 
+					"MSTProblem cudaGetDevice failed",
 					__FILE__, __LINE__)) break;
 			  gpu_idx[0] = gpu;
 
@@ -398,15 +399,15 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 			  util::MemsetKernel<<<128, 128>>>(
 			  	data_slices[0]->d_reduced_vals, 0, nodes);
 
-			  int	*d_flag_array;
+			  int	*d_flags_array;
 			  if (retval = util::GRError(cudaMalloc(
-					(void**)&d_flag_array,
+					(void**)&d_flags_array,
 					edges * sizeof(int)),
-					"MSTProblem cudaMalloc d_flag_array Failed",
+					"MSTProblem cudaMalloc d_flags_array Failed",
 					__FILE__, __LINE__)) return retval;
-			  data_slices[0]->d_flag_array = d_flag_array;
+			  data_slices[0]->d_flags_array = d_flags_array;
 			  util::MemsetKernel<<<128, 128>>>(
-			  	data_slices[0]->d_flag_array, 0, edges);
+			  	data_slices[0]->d_flags_array, 0, edges);
 
 			  SizeT *d_keys_array;
 			  if (retval = util::GRError(cudaMalloc(
@@ -561,25 +562,25 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 			  util::MemsetKernel<<<128, 128>>>(
 			  	data_slices[0]->d_edge_offsets, 0, edges);
 
-			  SizeT *d_edgeFlag;
+			  SizeT *d_edge_flags;
 			  if (retval = util::GRError(cudaMalloc(
-					(void**)&d_edgeFlag,
+					(void**)&d_edge_flags,
 					edges * sizeof(SizeT)),
-					"MSTProblem cudaMalloc d_edgeFlag Failed",
+					"MSTProblem cudaMalloc d_edge_flags Failed",
 					__FILE__, __LINE__)) return retval;
-			  data_slices[0]->d_edgeFlag = d_edgeFlag;
+			  data_slices[0]->d_edge_flags = d_edge_flags;
 			  util::MemsetKernel<<<128, 128>>>(
-			  	data_slices[0]->d_edgeFlag, 0, edges);
+			  	data_slices[0]->d_edge_flags, 0, edges);
 
-			  SizeT *d_edgeKeys;
+			  SizeT *d_edge_keys;
 			  if (retval = util::GRError(cudaMalloc(
-					(void**)&d_edgeKeys,
+					(void**)&d_edge_keys,
 					edges * sizeof(SizeT)),
-					"MSTProblem cudaMalloc d_edgeKeys Failed",
+					"MSTProblem cudaMalloc d_edge_keys Failed",
 					__FILE__, __LINE__)) return retval;
-				data_slices[0]->d_edgeKeys = d_edgeKeys;
+				data_slices[0]->d_edge_keys = d_edge_keys;
 				util::MemsetKernel<<<128, 128>>>(
-					data_slices[0]->d_edgeKeys, 0, edges);
+					data_slices[0]->d_edge_keys, 0, edges);
 
 				data_slices[0]->d_labels = NULL;
 
@@ -675,15 +676,15 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 				data_slices[gpu]->d_reduced_vals = d_reduced_vals;
       }
 
-      if (!data_slices[gpu]->d_flag_array)
+      if (!data_slices[gpu]->d_flags_array)
       {
-				int	*d_flag_array;
+				int	*d_flags_array;
 				if (retval = util::GRError(cudaMalloc(
-					(void**)&d_flag_array,
+					(void**)&d_flags_array,
 					edges * sizeof(int)),
-				  "MSTProblem cudaMalloc d_flag_array Failed",
+				  "MSTProblem cudaMalloc d_flags_array Failed",
 				  __FILE__, __LINE__)) return retval;
-				data_slices[gpu]->d_flag_array = d_flag_array;
+				data_slices[gpu]->d_flags_array = d_flags_array;
 			}
 
       if (!data_slices[gpu]->d_keys_array)
@@ -862,26 +863,26 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 				data_slices[gpu]->d_edge_offsets = d_edge_offsets;
 			}
 
-      if (!data_slices[gpu]->d_edgeFlag)
+      if (!data_slices[gpu]->d_edge_flags)
 			{
-				SizeT *d_edgeFlag;
+				SizeT *d_edge_flags;
 				if (retval = util::GRError(cudaMalloc(
-					(void**)&d_edgeFlag,
+					(void**)&d_edge_flags,
 					edges * sizeof(SizeT)),
-				  "MSTProblem cudaMalloc d_edgeFlag Failed",
+				  "MSTProblem cudaMalloc d_edge_flags Failed",
 				  __FILE__, __LINE__)) return retval;
-				data_slices[gpu]->d_edgeFlag = d_edgeFlag;
+				data_slices[gpu]->d_edge_flags = d_edge_flags;
 			}
 
-      if (!data_slices[gpu]->d_edgeKeys)
+      if (!data_slices[gpu]->d_edge_keys)
 			{
-				SizeT   *d_edgeKeys;
+				SizeT   *d_edge_keys;
 				if (retval = util::GRError(cudaMalloc(
-					(void**)&d_edgeKeys,
+					(void**)&d_edge_keys,
 					edges * sizeof(SizeT)),
-				  "MSTProblem cudaMalloc d_edgeKeys Failed",
+				  "MSTProblem cudaMalloc d_edge_keys Failed",
 				  __FILE__, __LINE__)) return retval;
-				data_slices[gpu]->d_edgeKeys = d_edgeKeys;
+				data_slices[gpu]->d_edge_keys = d_edge_keys;
       }
 
       data_slices[0]->d_labels = NULL;
