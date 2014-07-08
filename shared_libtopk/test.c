@@ -1,4 +1,4 @@
-#include <gunrock.h>
+#include <gunrock/gunrock.h>
 #include <stdio.h>
 
 int main(int argc, char* argv[])

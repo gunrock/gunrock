@@ -74,7 +74,7 @@ option(GUNROCK_BUILD_SHARED_LIBS
 
 option(GUNROCK_BUILD_APPLICATIONS
        "If on, builds the sample applications."
-       OFF)
+       ON)
 
 option(GUNROCK_GENCODE_SM10
        "ON to generate code for Compute Capability 1.0 devices (e.g. Tesla C870)"
@@ -185,6 +185,7 @@ if(GUNROCK_BUILD_LIB)
 endif(GUNROCK_BUILD_LIB)
 
 if(GUNROCK_BUILD_APPLICATIONS)
+    add_subdirectory(shared_libtopk)
     #add_subdirectory(simple_example)
     #add_subdirectory(tests/bc)
     #add_subdirectory(tests/bfs)
@@ -198,3 +199,5 @@ if(GUNROCK_BUILD_APPLICATIONS)
     #add_subdirectory(tests/sssp)
     #add_subdirectory(tests/wtf)
 endif(GUNROCK_BUILD_APPLICATIONS)
+
+
