@@ -200,4 +200,9 @@ if(GUNROCK_BUILD_APPLICATIONS)
     #add_subdirectory(tests/wtf)
 endif(GUNROCK_BUILD_APPLICATIONS)
 
+enable_testing()
+
+add_test(NAME IsItACow COMMAND test_topk)
+set_tests_properties(IsItACow
+    PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*2.*: CV.*6")
 
