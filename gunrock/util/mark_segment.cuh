@@ -30,6 +30,7 @@ namespace util {
 __global__ void markSegmentFromKeys(int *flag, int *vid, int length)
 {
 	const int STRIDE = gridDim.x * blockDim.x;
+	// skip the first one facilitate scan for keys array
 	for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x + 1;
 			 idx < length;
 			 idx += STRIDE)
