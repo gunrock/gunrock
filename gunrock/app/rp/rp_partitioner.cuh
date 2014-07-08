@@ -62,8 +62,9 @@ namespace rp {
 template <
     typename VertexId,
     typename SizeT,
-    typename Value>
-struct RandomPartitioner : PartitionerBase<VertexId,SizeT,Value>
+    typename Value,
+    bool     ENABLE_BACKWARD = false>
+struct RandomPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD>
 {
     typedef Csr<VertexId,Value,SizeT> GraphT;
 
@@ -114,7 +115,10 @@ struct RandomPartitioner : PartitionerBase<VertexId,SizeT,Value>
         VertexId** &convertion_tables,
         VertexId** &original_vertexes,
         SizeT**    &in_offsets,
-        SizeT**    &out_offsets)
+        SizeT**    &out_offsets,
+        SizeT**    &backward_offsets,
+        int**      &backward_partitions,
+        VertexId** &backward_convertions)
     {
         cudaError_t retval = cudaSuccess;
         int*        tpartition_table=this->partition_tables[0];
@@ -141,12 +145,15 @@ struct RandomPartitioner : PartitionerBase<VertexId,SizeT,Value>
         delete[] sort_list;sort_list=NULL;
         retval = this->MakeSubGraph
                  ();
-        sub_graphs        = this->sub_graphs;
-        partition_tables  = this->partition_tables;
-        convertion_tables = this->convertion_tables;
-        original_vertexes = this->original_vertexes;
-        in_offsets        = this->in_offsets;
-        out_offsets       = this->out_offsets;
+        sub_graphs          = this->sub_graphs;
+        partition_tables    = this->partition_tables;
+        convertion_tables   = this->convertion_tables;
+        original_vertexes   = this->original_vertexes;
+        in_offsets          = this->in_offsets;
+        out_offsets         = this->out_offsets;
+        backward_offsets    = this->backward_offsets;
+        backward_partitions = this->backward_partitions;
+        backward_convertions= this->backward_convertions;
         return retval;
     }
 };

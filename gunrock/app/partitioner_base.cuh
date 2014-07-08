@@ -33,7 +33,7 @@ template <
     typename   _VertexId,
     typename   _SizeT,
     typename   _Value,
-    bool       ENABLE_BACKWARD>
+    bool       ENABLE_BACKWARD = false>
 struct PartitionerBase
 {
     typedef _VertexId  VertexId;
@@ -56,9 +56,9 @@ public:
     int           **partition_tables;
     VertexId      **convertion_tables;
     VertexId      **original_vertexes;
-    unsigned char **backward_partitions;
+    int           **backward_partitions;
     VertexId      **backward_convertions;
-    SizeT         **backward_offset;
+    SizeT         **backward_offsets;
     SizeT         **in_offsets;
     SizeT         **out_offsets;
     //Mthods
@@ -70,18 +70,20 @@ public:
     struct ThreadSlice
     {
     public:
-        const GraphT     *graph;
-        GraphT     *sub_graph;
-        int        thread_num,num_gpus;
+        const GraphT  *graph;
+        GraphT        *sub_graph;
+        int           thread_num,num_gpus;
         util::cpu_mt::CPUBarrier* cpu_barrier;
-        CUTThread  thread_Id;
-        int        *partition_table0,**partition_table1;
-        VertexId   *convertion_table0,**convertion_table1;
-        unsigned char **backward_partition;
-        VertexId   **backward_convertion;
-        SizeT      **backward_offset;
-        VertexId   **original_vertexes;
-        SizeT      **in_offsets,**out_offsets;
+        CUTThread     thread_Id;
+        int           *partition_table0;
+        int           **partition_table1;
+        VertexId      *convertion_table0;
+        VertexId      **convertion_table1;
+        int           **backward_partitions;
+        VertexId      **backward_convertions;
+        SizeT         **backward_offsets;
+        VertexId      **original_vertexes;
+        SizeT         **in_offsets,**out_offsets;
     };
 
     /**
@@ -105,9 +107,7 @@ public:
 
     virtual ~PartitionerBase()
     {
-        if (Status == 0) return;        
-        Status   = 0;
-        num_gpus = 0;
+        Release();        
     } 
 
     cudaError_t Init(
@@ -117,6 +117,8 @@ public:
         cudaError_t retval= cudaSuccess;
         this->num_gpus    = num_gpus;
         this->graph       = &graph;
+        Release();
+
         sub_graphs        = new GraphT   [num_gpus  ];
         partition_tables  = new int*     [num_gpus+1];
         convertion_tables = new VertexId*[num_gpus+1];
@@ -125,9 +127,9 @@ public:
         out_offsets       = new SizeT*   [num_gpus  ];
         if (ENABLE_BACKWARD)
         {
-            backward_partitions  = new unsigned char* [num_gpus];
-            backward_convertions = new VertexId*      [num_gpus];
-            backward_offsets     = new SizeT*         [num_gpus];
+            backward_partitions  = new int*      [num_gpus];
+            backward_convertions = new VertexId* [num_gpus];
+            backward_offsets     = new SizeT*    [num_gpus];
         }
         
         for (int i=0;i<num_gpus+1;i++)
@@ -136,9 +138,12 @@ public:
             convertion_tables[i] = NULL;
             if (i!=num_gpus) {
                 original_vertexes   [i] = NULL;
-                backward_partitions [i] = NULL;
-                backward_convertions[i] = NULL;
-                backward_offsets    [i] = NULL;
+                if (ENABLE_BACKWARD)
+                {
+                    backward_partitions [i] = NULL;
+                    backward_convertions[i] = NULL;
+                    backward_offsets    [i] = NULL;
+                }
             }
         }
         partition_tables [0] = new int     [graph.nodes];
@@ -156,6 +161,37 @@ public:
 
         return retval;
     }
+
+    void Release()
+    {
+        if (Status==0) return;
+        for (int i=0;i<num_gpus+1;i++)
+        {
+            free(convertion_tables [i]); convertion_tables [i] = NULL;
+            free(partition_tables  [i]); partition_tables  [i] = NULL;
+            if (i == num_gpus) continue;
+            free(original_vertexes [i]); original_vertexes [i] = NULL;
+            if (ENABLE_BACKWARD)
+            {
+                free(backward_partitions [i]); backward_partitions [i] = NULL;
+                free(backward_convertions[i]); backward_convertions[i] = NULL;
+                free(backward_offsets    [i]); backward_offsets    [i] = NULL;
+            }
+        }
+        delete[] convertion_tables; convertion_tables = NULL;
+        delete[] partition_tables ; partition_tables  = NULL;
+        delete[] original_vertexes; original_vertexes = NULL;
+        delete[] sub_graphs       ; sub_graphs        = NULL;
+        delete[] in_offsets       ; in_offsets        = NULL;
+        delete[] out_offsets      ; out_offsets       = NULL;
+        if (ENABLE_BACKWARD)
+        {
+            delete[] backward_convertions; backward_convertions = NULL;
+            delete[] backward_partitions ; backward_partitions  = NULL;
+            delete[] backward_offsets    ; backward_offsets     = NULL;
+        }
+        Status = 0;
+    }
     
     static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
     {
@@ -170,7 +206,7 @@ public:
         int**           partition_table1      = thread_data->partition_table1;
         VertexId**      convertion_table1     = thread_data->convertion_table1;
         VertexId**      original_vertexes     = thread_data->original_vertexes;
-        unsigned char** backward_patitions    = thread_data->backward_patitions;
+        int**           backward_partitions   = thread_data->backward_partitions;
         VertexId**      backward_convertions  = thread_data->backward_convertions;
         SizeT**         backward_offsets      = thread_data->backward_offsets;
         SizeT**         out_offsets           = thread_data->out_offsets;
@@ -242,18 +278,19 @@ public:
         else sub_graph->template FromScratch < true  , true   >(num_nodes,num_edges);
 
         if (convertion_table1[0] != NULL) free(convertion_table1[0]);
-        if (partition_table1 [0] != NULL) free(partition_table1[0]);
+        if (partition_table1 [0] != NULL) free(partition_table1 [0]);
+        if (original_vertexes[0] != NULL) free(original_vertexes[0]);
         convertion_table1[0]= (VertexId*) malloc (sizeof(VertexId) * num_nodes);//new VertexId[num_nodes];
         partition_table1 [0]= (int*)      malloc (sizeof(int)      * num_nodes);//new int     [num_nodes];
         original_vertexes[0]= (VertexId*) malloc (sizeof(VertexId) * num_nodes);//new VertexId[num_nodes];
         if (ENABLE_BACKWARD)
         {
-            if (backward_partitions [gpu] !=NULL) free(backward_partition [gpu]);
-            if (backward_convertions[gpu] !=NULL) free(backward_convertion[gpu]);
-            if (backward_offsets    [gpu] !=NULL) free(backward_offset    [gpu]);
-            backward_offsets    [gpu] = (SizeT*        ) malloc (sizeof(SizeT        ) * (cross_counter[gpu]+1)   );
-            backward_convertions[gpu] = (VertexId*     ) malloc (sizeof(VertexId     ) * in_offsets[gpu][num_gpus]);
-            backward_partitions [gpu] = (unsigned char*) malloc (sizeof(unsigned char) * in_offsets[gpu][num_gpus]);
+            if (backward_partitions [gpu] !=NULL) free(backward_partitions [gpu]);
+            if (backward_convertions[gpu] !=NULL) free(backward_convertions[gpu]);
+            if (backward_offsets    [gpu] !=NULL) free(backward_offsets    [gpu]);
+            backward_offsets    [gpu] = (SizeT*    ) malloc (sizeof(SizeT     ) * (cross_counter[gpu]+1)   );
+            backward_convertions[gpu] = (VertexId* ) malloc (sizeof(VertexId  ) * in_offsets[gpu][num_gpus]);
+            backward_partitions [gpu] = (int*      ) malloc (sizeof(int       ) * in_offsets[gpu][num_gpus]);
             marker     = new int[num_gpus*cross_counter[gpu]];
             memset(marker,0,sizeof(int)*num_gpus*cross_counter[gpu]);
             in_counter = 0;
@@ -278,7 +315,9 @@ public:
                     in_counter++;
                 }
             }
-            memset(marker,0,sizeof(int)*num_gpus*cross_counter[gpu]);
+            backward_offsets[gpu][cross_counter[gpu]]=in_counter;
+            //memset(marker,0,sizeof(int)*num_gpus*cross_counter[gpu]);
+            delete[] marker;marker=NULL;
             util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,gpu);
         }
         edge_counter=0;
@@ -309,7 +348,14 @@ public:
                     original_vertexes[0][neibor_] = neibor;
                     if (ENABLE_BACKWARD)
                     {
-                        
+                        SizeT _neibor = convertion_table0[neibor];
+                        int   _gpu    = gpu < peer? gpu+1: gpu; 
+                        for (SizeT i=backward_offsets[peer][_neibor];i<backward_offsets[peer][_neibor+1];i++)
+                        if (_gpu == backward_partitions[peer][i])
+                        {
+                            backward_convertions[peer][i]=neibor_;
+                            break;
+                        }
                     }
                 }
                 edge_counter++;
@@ -343,9 +389,9 @@ public:
             thread_data[gpu].convertion_table1   = &(convertion_tables[gpu+1]);
             thread_data[gpu].original_vertexes   = &(original_vertexes[gpu]);
             if (ENABLE_BACKWARD) {
-                thread_data[gpu].backward_partition [gpu] = &(backward_partitions [gpu]);
-                thread_data[gpu].backward_convertion[gpu] = &(backward_convertions[gpu]);
-                thread_data[gpu].backward_offset    [gpu] = &(backward_offsets    [gpu]);
+                thread_data[gpu].backward_partitions  = backward_partitions ;
+                thread_data[gpu].backward_convertions = backward_convertions;
+                thread_data[gpu].backward_offsets     = backward_offsets    ;
             }
             thread_data[gpu].in_offsets          = in_offsets;
             thread_data[gpu].out_offsets         = out_offsets;
@@ -368,13 +414,39 @@ public:
         return retval;
     }
 
-    virtual cudaError_t Partition(
+    cudaError_t Partition(
         GraphT*    &sub_graphs,
         int**      &partition_tables,
         VertexId** &convertion_tables,
         VertexId** &original_vertexes,
         SizeT**    &in_offsets,
         SizeT**    &out_offsets)
+    {   
+        SizeT**    backward_offsets     = NULL;
+        int**      backward_partitions  = NULL;
+        VertexId** backward_convertions = NULL;
+        return Partition(
+                   sub_graphs,
+                   partition_tables,
+                   convertion_tables,
+                   original_vertexes,
+                   in_offsets,
+                   out_offsets,
+                   backward_offsets,
+                   backward_partitions,
+                   backward_convertions);
+    }   
+
+    virtual cudaError_t Partition(
+        GraphT*    &sub_graphs,
+        int**      &partition_tables,
+        VertexId** &convertion_tables,
+        VertexId** &original_vertexes,
+        SizeT**    &in_offsets,
+        SizeT**    &out_offsets,
+        SizeT**    &backward_offsets,
+        int**      &backward_partitions,
+        VertexId** &backward_convertions)
     {
         return util::GRError("PartitionBase::Partition is undefined", __FILE__, __LINE__);
     }

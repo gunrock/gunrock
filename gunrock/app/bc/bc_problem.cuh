@@ -36,11 +36,12 @@ template <
     bool        _MARK_PREDECESSORS,
     bool        _USE_DOUBLE_BUFFER>
 struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
-                                _USE_DOUBLE_BUFFER>
+                                _USE_DOUBLE_BUFFER,true>
 {
     typedef _VertexId       VertexId;
     typedef _SizeT          SizeT;
     typedef _Value          Value;
+    //typedef ProblemBase<VertexId, SizeT, Value, _USE_DOUBLE_BUFFER, true>::DataSliceBase DataSliceBase;
 
     static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
     static const bool ENABLE_IDEMPOTENCE    = false;
@@ -50,7 +51,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
     /** 
      * @brief Data slice structure which contains BC problem specific data.
      */
-    struct DataSlice //: DataSliceBase<VertexId, SizeT, Value>
+    struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
     {
         // device storage arrays
         util::Array1D<SizeT, VertexId  >  labels;              /**< Used for source distance */
@@ -61,7 +62,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
         util::Array1D<SizeT, Value     >  deltas;              /**< Accumulated delta values for each node */
         util::Array1D<SizeT, VertexId  >  src_node;            /**< Used to store source node ID */
 
-        int                               num_vertex_associate,num_value__associate,gpu_idx;
+        /*int                               num_vertex_associate,num_value__associate,gpu_idx;
         util::Array1D<SizeT, VertexId  > *vertex_associate_in[2];
         util::Array1D<SizeT, VertexId* >  vertex_associate_ins[2];
         util::Array1D<SizeT, VertexId  > *vertex_associate_out;
@@ -74,7 +75,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
         util::Array1D<SizeT, Value*    >  value__associate_orgs;
         util::Array1D<SizeT, SizeT     >  out_length    ;   
         util::Array1D<SizeT, SizeT     >  in_length[2]  ;   
-        util::Array1D<SizeT, VertexId  >  keys_in  [2]  ;
+        util::Array1D<SizeT, VertexId  >  keys_in  [2]  ;*/
 
         DataSlice()
         {   
@@ -86,7 +87,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
             deltas      .SetName("deltas"      );
             src_node    .SetName("src_node"    );  
 
-            num_vertex_associate   = 0;
+            /*num_vertex_associate   = 0;
             num_value__associate   = 0;
             gpu_idx                = 0;
             vertex_associate_in[0] = NULL;
@@ -107,13 +108,13 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
             in_length           [0].SetName("in_length[0]"           );
             in_length           [1].SetName("in_length[1]"           );
             keys_in             [0].SetName("keys_in[0]"             );
-            keys_in             [1].SetName("keys_in[1]"             );
+            keys_in             [1].SetName("keys_in[1]"             );*/
         }
 
         ~DataSlice()
         {
             util::cpu_mt::PrintMessage("~DataSlice() begin.");
-            if (util::SetDevice(gpu_idx)) return;
+            if (util::SetDevice(this->gpu_idx)) return;
             labels        .Release();
             preds         .Release();
             bc_values     .Release();
@@ -121,7 +122,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
             sigmas        .Release();
             deltas        .Release();
             src_node      .Release();
-
+/*
             if (vertex_associate_in[0] != NULL)
             {
                 for (int i=0;i<num_vertex_associate;i++)
@@ -177,7 +178,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
             out_length    .Release();
             vertex_associate_orgs.Release();
             value__associate_orgs.Release();
-
+*/
             util::cpu_mt::PrintMessage("~DataSlice() end.");
         }
 
@@ -191,7 +192,15 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
             SizeT num_out_nodes)
         {
             cudaError_t retval         = cudaSuccess;
-            this->gpu_idx              = gpu_idx;
+            if (retval = DataSliceBase<SizeT, VertexId, Value>::Init(
+                num_gpus,
+                gpu_idx,
+                num_vertex_associate,
+                num_value__associate,
+                graph,
+                num_in_nodes,
+                num_out_nodes)) return retval;
+            /*this->gpu_idx              = gpu_idx;
             this->num_vertex_associate = num_vertex_associate;
             this->num_value__associate = num_value__associate;
             if (retval = util::SetDevice(gpu_idx))  return retval;
@@ -252,7 +261,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
                     value__associate_outs[i]=value__associate_out[i].GetPointer(util::DEVICE);
                 }
                 if (retval = value__associate_outs.Move(util::HOST, util::DEVICE)) return retval;
-            }
+            }*/
             
             // Create SoA on device
             if (retval = labels    .Allocate(graph->nodes, util::DEVICE)) return retval;
@@ -265,13 +274,13 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
             util::MemsetKernel<<<128, 128>>>( bc_values.GetPointer(util::DEVICE), (Value)0.0f, graph->nodes);
             util::MemsetKernel<<<128, 128>>>(ebc_values.GetPointer(util::DEVICE), (Value)0.0f, graph->edges);
 
-            vertex_associate_orgs[0] = labels    .GetPointer(util::DEVICE);
-            vertex_associate_orgs[1] = preds     .GetPointer(util::DEVICE);
-            value__associate_orgs[0] = bc_values .GetPointer(util::DEVICE);
-            value__associate_orgs[1] = sigmas    .GetPointer(util::DEVICE);
-            value__associate_orgs[2] = deltas    .GetPointer(util::DEVICE);
-            if (retval = vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
-            if (retval = value__associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
+            this->vertex_associate_orgs[0] = labels    .GetPointer(util::DEVICE);
+            this->vertex_associate_orgs[1] = preds     .GetPointer(util::DEVICE);
+            this->value__associate_orgs[0] = bc_values .GetPointer(util::DEVICE);
+            this->value__associate_orgs[1] = sigmas    .GetPointer(util::DEVICE);
+            this->value__associate_orgs[2] = deltas    .GetPointer(util::DEVICE);
+            if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
+            if (retval = this->value__associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
 
             return retval;
         } // Init
@@ -454,7 +463,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
         edges = graph.edges;
         VertexId *h_row_offsets = graph.row_offsets;
         VertexId *h_column_indices = graph.column_indices;*/
-        ProblemBase<VertexId, SizeT, Value, _USE_DOUBLE_BUFFER>::Init(
+        ProblemBase<VertexId, SizeT, Value, _USE_DOUBLE_BUFFER, true>::Init(
             stream_from_host,
             &graph,
             inversgraph,
@@ -509,7 +518,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
             FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
             double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
     {
-        typedef ProblemBase<VertexId, SizeT, Value, _USE_DOUBLE_BUFFER> BaseProblem;
+        typedef ProblemBase<VertexId, SizeT, Value, _USE_DOUBLE_BUFFER,true> BaseProblem;
         //load ProblemBase Reset
         BaseProblem::Reset(frontier_type, queue_sizing);
 

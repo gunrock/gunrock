@@ -117,6 +117,29 @@ bool All_Done(EnactorStats *enactor_stats,int num_gpus)
         out_preds[t]=org_vertexs[p];
     }   
 
+    template <
+        typename SizeT, 
+        typename VertexId,
+        typename Value,
+        SizeT    num_vertex_associate,
+        SizeT    num_value__associate>
+    cudaError_t UpdateNeiborBackward (
+        SizeT        num_elements,
+        int          thread_num,
+        util::scan::MultiScan<VertexId, SizeT, true, 256, 8, Value>* Scaner,
+        GraphSlice        *s_graph_slice,
+        DataSlice         *s_data_slice,
+        EnactorStats      *s_enactor_stats,
+        FrontierAttribute *s_frontier_attribute)
+    {
+        cudaError_t retval = cudaSuccess;
+        
+        Scaner->template Scan_with_dKeys_Backward
+            <num_vertex_associate, num_value__associate>(
+            num_elements,
+            
+        return retval;
+    }
 /**
  * @brief Base class for graph problem enactors.
  */

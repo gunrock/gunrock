@@ -62,7 +62,7 @@ namespace bc {
         }
     };
 
-    template <typename VertexId, typename SizeT>
+    template <typename VertexId, typename SizeT, typename Value>
     __global__ void Expand_Incoming1 (
         const SizeT            num_elements,
         //const SizeT            num_vertex_associates,
@@ -92,7 +92,7 @@ namespace bc {
            }
         }   
         keys_out[x]=key;
-        atomicAdd(value_associate_org[1]+key,value_associate_in[1][x2]);
+        atomicAdd(value__associate_org[1]+key,value__associate_in[1][x2]);
     }   
 
     template <
@@ -432,11 +432,11 @@ namespace bc {
                             graph_slice    ->in_offset[peer_],
                             data_slice[0]  ->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE),
                             graph_slice    ->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE) + total_length,
-                            data_slice[0]  ->associate_vertex_ins[enactor_stats->iteration%2].GetPointer(util::DEVICE),
-                            data_slice[0]  ->associate_vertex_orgs.GetPointer(util::DEVICE),
-                            data_slice[0]  ->associate_value__ins[enactor_stats->iteration%2].GetPointer(util::DEVICE),
-                            data_slice[0]  ->associate_value__orgs.GetPointer(util::DEVICE));
-                        if (DEBUG && enactor_stats->retval = util::GRError("Expand_Incoming failed", __FILE__, __LINE__)) break;
+                            data_slice[0]  ->vertex_associate_ins[enactor_stats->iteration%2].GetPointer(util::DEVICE),
+                            data_slice[0]  ->vertex_associate_orgs.GetPointer(util::DEVICE),
+                            data_slice[0]  ->value__associate_ins[enactor_stats->iteration%2].GetPointer(util::DEVICE),
+                            data_slice[0]  ->value__associate_orgs.GetPointer(util::DEVICE));
+                        if (DEBUG && (enactor_stats->retval = util::GRError("Expand_Incoming failed", __FILE__, __LINE__))) break;
                        
                         //util::cpu_mt::PrintGPUArray<SizeT,VertexId>("asso_orgs",data_slice[0]->associate_orgs[0],graph_slice->nodes,thread_num,iteration[0]);
                         //if (DEBUG) util::cpu_mt::PrintGPUArray<SizeT,VertexId>("labe4",data_slice[0]->labels.GetPointer(util::GPU),graph_slice->nodes,thread_num,enactor_stats->iteration);
@@ -462,8 +462,8 @@ namespace bc {
             //delete[] sigmas;
             //delete[] labels;
             //delete[] vids;
-            enactor_stats->done[0]=-1;
             if (num_gpus>1 && break_clean) util::cpu_mt::ReleaseBarrier(cpu_barrier);
+            enactor_stats->done[0]=-1;
             if (All_Done(s_enactor_stats,num_gpus)) break;
 
             enactor_stats->iteration               = enactor_stats->iteration - 2;
