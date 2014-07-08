@@ -34,7 +34,7 @@ enum ValueType
 {
     VALUE_INT,    //!< int    type Value
     VALUE_FLOAT,  //!< float  type Value
-    VALUE_DOUBLE, //!< double type Value
+    //VALUE_DOUBLE, //!< double type Value
 };
 
 /**
