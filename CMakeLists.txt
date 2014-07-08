@@ -35,6 +35,11 @@ set(mgpu_INCLUDE_DIRS
     CACHE PATH
     "Directory to the Modern GPU include files")
 
+set(mgpu_SOURCE_DIRS
+    ${CMAKE_SOURCE_DIR}/externals/moderngpu/src
+    CACHE PATH
+    "Directory to the Modern GPU source files")
+
 set(cub_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/externals/cub
     CACHE PATH
@@ -186,7 +191,7 @@ endif(GUNROCK_BUILD_LIB)
 
 if(GUNROCK_BUILD_APPLICATIONS)
     add_subdirectory(shared_libtopk)
-    #add_subdirectory(simple_example)
+    add_subdirectory(simple_example)
     #add_subdirectory(tests/bc)
     #add_subdirectory(tests/bfs)
     #add_subdirectory(tests/cc)

@@ -43,13 +43,7 @@
 #include <gunrock/oprtr/filter/kernel.cuh>
 #include <gunrock/oprtr/advance/kernel.cuh>
 
-// Boost includes for CPU CC reference algorithm
-// and BC algorithm
-#include <boost/config.hpp>
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/connected_components.hpp>
-#include <boost/graph/bc_clustering.hpp>
-#include <boost/graph/iteration_macros.hpp>
+#include "cpu_graph_lib.hpp"
 
 
 using namespace gunrock;
@@ -350,121 +344,6 @@ void SimpleReferenceBfs(
            elapsed, search_depth);
 }
 
-// Graph edge properties (bundled properties)
-struct EdgeProperties
-{
-    int weight;
-};
-
-/**
- * @brief A simple CPU-based reference BC ranking implementation.
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] graph Reference to ...
- * @param[in] bc_values Pointer to ...
- * @param[in] src
- */
-template<
-    typename VertexId,
-    typename Value,
-    typename SizeT>
-void RefCPUBC(
-    const Csr<VertexId, Value, SizeT>       &graph,
-    Value                                   *bc_values,
-    VertexId                                src)
-{
-    // Perform full exact BC using BGL
-
-    using namespace boost;
-    typedef adjacency_list <setS, vecS, undirectedS, no_property,
-                            EdgeProperties> Graph;
-    typedef Graph::vertex_descriptor Vertex;
-    typedef Graph::edge_descriptor Edge;
-
-    Graph G;
-    for (int i = 0; i < graph.nodes; ++i)
-    {
-        for (int j = graph.row_offsets[i]; j < graph.row_offsets[i+1]; ++j)
-        {
-            add_edge(vertex(i, G), vertex(graph.column_indices[j], G), G);
-        }
-    }
-
-    typedef std::map<Edge, int> StdEdgeIndexMap;
-    StdEdgeIndexMap my_e_index;
-    typedef boost::associative_property_map< StdEdgeIndexMap > EdgeIndexMap;
-    EdgeIndexMap e_index(my_e_index);
-
-    // Define EdgeCentralityMap
-    std::vector< double > e_centrality_vec(boost::num_edges(G), 0.0);
-    // Create the external property map
-    boost::iterator_property_map< std::vector< double >::iterator, EdgeIndexMap >
-        e_centrality_map(e_centrality_vec.begin(), e_index);
-
-    // Define VertexCentralityMap
-    typedef boost::property_map< Graph, boost::vertex_index_t>::type VertexIndexMap;
-    VertexIndexMap v_index = get(boost::vertex_index, G);
-    std::vector< double > v_centrality_vec(boost::num_vertices(G), 0.0);
-
-    // Create the external property map
-    boost::iterator_property_map< std::vector< double >::iterator, VertexIndexMap>
-        v_centrality_map(v_centrality_vec.begin(), v_index);
-
-    //
-    //Perform BC
-    //
-    CpuTimer cpu_timer;
-    cpu_timer.Start();
-    brandes_betweenness_centrality( G, v_centrality_map, e_centrality_map );
-    cpu_timer.Stop();
-    float elapsed = cpu_timer.ElapsedMillis();
-
-    BGL_FORALL_VERTICES(vertex, G, Graph)
-    {
-        bc_values[vertex] = (Value)v_centrality_map[vertex];
-    }
-
-    printf("CPU BC finished in %lf msec.", elapsed);
-
-}
-
-
-/**
- * @brief CPU-based reference CC algorithm using Boost Graph Library
- *
- * @param[in] row_offsets Pointer to ...
- * @param[in] column_indices Pointer to ...
- * @param[in] num_nodes
- * @param[in] labels Pointer to ...
- *
- * @returns Number of components of the input graph
- */
-template<typename VertexId, typename SizeT>
-unsigned int RefCPUCC(SizeT *row_offsets, VertexId *column_indices,
-                      int num_nodes, int *labels)
-{
-    using namespace boost;
-    typedef adjacency_list <vecS, vecS, undirectedS> Graph;
-    Graph G;
-    for (int i = 0; i < num_nodes; ++i)
-    {
-        for (int j = row_offsets[i]; j < row_offsets[i+1]; ++j)
-        {
-            add_edge(i, column_indices[j], G);
-        }
-    }
-    CpuTimer cpu_timer;
-    cpu_timer.Start();
-    int num_components = connected_components(G, &labels[0]);
-    cpu_timer.Stop();
-    float elapsed = cpu_timer.ElapsedMillis();
-    printf("CPU CC finished in %lf msec.\n", elapsed);
-    return num_components;
-}
-
 /**
  * @brief Run tests
  *
@@ -725,8 +604,10 @@ void RunTests(
     {
         printf("compute ref value\n");
         RefCPUBC(
-            graph,
+            graph.row_offsets,
+            graph.column_indices,
             reference_check_bc_values,
+            graph.nodes,
             src);
         printf("\n");
     }
