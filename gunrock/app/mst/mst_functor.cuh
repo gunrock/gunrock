@@ -428,7 +428,6 @@ struct RowOffsetsFunctor
   static __device__ __forceinline__ void ApplyFilter(
     VertexId node, DataSlice *problem, Value v = 0)
   {
-    //problem->d_row_offsets[0] = 0;
     if (problem->d_flag_array[node] == 1)
     {
       problem->d_row_offsets[problem->d_keys_array[node]] = node;

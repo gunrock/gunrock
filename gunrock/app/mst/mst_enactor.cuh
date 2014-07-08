@@ -1262,39 +1262,45 @@ public:
         }
         printf("  ----> finished generate row_offsets for next iteration. \n");
 
-/*
-      	// Removing Duplicated Edges Between Supervertices
-      	// Segmented Sort Edges, Weights and eId
-      	// Copy d_origin_edges to d_temp_storage to use for second sort
+      	// removing duplicated edges between supervertices
+      	// segmented sort d_edgeId_list, d_edge_weights and d_origin_edges
+      	// copy d_origin_edges to d_temp_storage to use for second sort
       	util::MemsetCopyVectorKernel<<<128, 128>>>(
           problem->data_slices[0]->d_temp_storage,
-      		problem->data_slices[0]->d_origin_edges,
+      		problem->data_slices[0]->d_edgeId_list,
       		graph_slice->edges);
 
-      	SegSortPairsFromIndices(
-          problem->data_slices[0]->d_origin_edges,
-      		problem->data_slices[0]->d_edge_weights,
-      		graph_slice->edges,
-      		problem->data_slices[0]->d_row_offsets,
-      		graph_slice->nodes, context);
+      	util::SegSortFromIndices(
+          context,
+          graph_slice->nodes,
+          problem->data_slices[0]->d_row_offsets,
+          graph_slice->edges,
+          problem->data_slices[0]->d_edgeId_list,
+          problem->data_slices[0]->d_edge_weights);
 
-      	SegSortPairsFromIndices(
+        util::SegSortFromIndices(
+          context,
+          graph_slice->nodes,
+          problem->data_slices[0]->d_row_offsets,
+          graph_slice->edges,
           problem->data_slices[0]->d_temp_storage,
-      		problem->data_slices[0]->d_origin_edges,
-      		graph_slice->edges,
-      		problem->data_slices[0]->d_row_offsets,
-      		graph_slice->nodes, context);
+          problem->data_slices[0]->d_origin_edges);
 
       	if (debug_info)
       	{
-      	  printf(":: Removing Duplicated Edges Between Supervertices After sort (d_origin_edges) ::");
-      	  util::DisplayDeviceResults(problem->data_slices[0]->d_origin_edges, graph_slice->edges);
-      	  printf(":: Removing Duplicated Edges Between Supervertices After sort (d_edge_weights) ::");
-      	  util::DisplayDeviceResults(problem->data_slices[0]->d_edge_weights, graph_slice->edges);
-      	  printf(":: Removing Duplicated Edges Between Supervertices After sort (d_origin_edges) ::");
-      	  util::DisplayDeviceResults(problem->data_slices[0]->d_origin_edges, graph_slice->edges);
+      	  printf(":: removing duplicated edges between supervertices (d_edgeId_list) ::");
+      	  util::DisplayDeviceResults(
+            problem->data_slices[0]->d_edgeId_list, graph_slice->edges);
+      	  printf(":: removing duplicated edges between supervertices (d_edge_weights) ::");
+      	  util::DisplayDeviceResults(
+            problem->data_slices[0]->d_edge_weights, graph_slice->edges);
+      	  printf(":: removing duplicated edges between supervertices (d_origin_edges) ::");
+      	  util::DisplayDeviceResults(
+            problem->data_slices[0]->d_origin_edges, graph_slice->edges);
       	}
 
+
+/*
       	// Generate new edge flag array using markSegment kernel
       	util::MemsetCopyVectorKernel<<<128, 128>>>(
           problem->data_slices[0]->d_edgeFlag,
