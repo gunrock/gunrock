@@ -140,25 +140,30 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
  # this clang compiler version must be at least r201031, since that
  # fixes a template bug in clang.
  # http://llvm.org/bugs/show_bug.cgi?id=18009
- # ALSO it must be named "clang"/"clang++", or else cmake goes
+ # ALSO it must be named "clang"/"clang++", or else nvcc goes
  # bananas. (Naming it "clang-mp-3.5", the name under which MacPorts
- # installs it, does not work.)
+ # installs it, does not work for nvcc; nvcc decides its base compiler
+ # based only the executable name, "clang"/"clang++", and if it
+ # doesn't match those, it defaults back to a non-clang compiler.)
  # The hardwired-to-jowens shell script below is a two-line sh script
  # to a MacPorts llvm-3.5 (top-of-tree) install:
  # #!/bin/sh
  # exec /opt/local/libexec/llvm-3.5/bin/clang "${@}"
 
-set( CUDA_HOST_COMPILER /Users/jowens/bin/clang/clang++ CACHE FILEPATH
+ set( CUDA_HOST_COMPILER /Users/jowens/bin/clang/clang++ CACHE FILEPATH
+ # set( CUDA_HOST_COMPILER /opt/local/bin/clang++-mp-3.5 CACHE FILEPATH
    "Host side compiler used by NVCC"
    FORCE )
  set(CMAKE_C_COMPILER /Users/jowens/bin/clang/clang CACHE FILEPATH
+ # set(CMAKE_C_COMPILER /opt/local/bin/clang-mp-3.5 CACHE FILEPATH
    "C compiler"
    FORCE )
  set(CMAKE_CXX_COMPILER /Users/jowens/bin/clang/clang++ CACHE FILEPATH
+ # set(CMAKE_CXX_COMPILER /opt/local/bin/clang++-mp-3.5 CACHE FILEPATH
    "CXX compiler"
    FORCE )
 
-# current CUDA on Mavericks uses libstdc++, not libc++
+ # current CUDA on Mavericks uses libstdc++, not libc++
  # https://github.com/cudpp/cudpp/wiki/BuildingCUDPPWithMavericks
  set(CMAKE_CXX_FLAGS -stdlib=libstdc++)
  set(CMAKE_C_FLAGS -stdlib=libstdc++)
