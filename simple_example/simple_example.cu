@@ -414,7 +414,7 @@ void RunTests(
 
     util::GRError(cc_problem->Reset(cc_enactor.GetFrontierType()), "CC Problem Data Reset Failed", __FILE__, __LINE__);
     gpu_timer.Start();
-    util::GRError(cc_enactor.template Enact<CCProblem_T>(cc_problem, max_grid_size), "CC Problem Enact Failed", __FILE__, __LINE__);
+    util::GRError(cc_enactor.Enact(cc_problem, max_grid_size), "CC Problem Enact Failed", __FILE__, __LINE__);
     gpu_timer.Stop();
 
     float elapsed = gpu_timer.ElapsedMillis();
@@ -532,7 +532,7 @@ void RunTests(
     util::GRError(bfs_problem->Reset(src, bfs_enactor.GetFrontierType(),
                                     max_queue_sizing), "BFS Problem Data Reset Failed", __FILE__, __LINE__);
     gpu_timer.Start();
-    util::GRError(bfs_enactor.template Enact<BFSProblem_T>(context, bfs_problem, src, max_grid_size), "BFS Problem Enact Failed", __FILE__, __LINE__);
+    util::GRError(bfs_enactor.Enact(context, bfs_problem, src, max_grid_size), "BFS Problem Enact Failed", __FILE__, __LINE__);
     gpu_timer.Stop();
 
     bfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
@@ -623,7 +623,7 @@ void RunTests(
     {
         util::GRError(bc_problem->Reset(i, bc_enactor.GetFrontierType(),
                                        max_queue_sizing), "BC Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(bc_enactor.template Enact<BCProblem_T>(context, bc_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(bc_enactor.Enact(context, bc_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
     }
 
     // Normalize BC value
