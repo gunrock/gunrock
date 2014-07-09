@@ -169,6 +169,7 @@ enum FrontierType {
             if (retval = in_length[1].Allocate(num_gpus,util::HOST)) return retval;
             if (retval = out_length  .Allocate(num_gpus,util::HOST | util::DEVICE)) return retval;
             if (retval = vertex_associate_orgs.Allocate(num_vertex_associate, util::HOST | util::DEVICE)) return retval;
+            if (retval = value__associate_orgs.Allocate(num_value__associate, util::HOST | util::DEVICE)) return retval;
 
             // Create incoming buffer on device
             if (num_in_nodes > 0)
@@ -400,9 +401,6 @@ struct ProblemBase
             this->out_offset         .SetPointer(out_offset           , num_gpus+1);
             this->row_offsets        .SetPointer(graph->row_offsets   , nodes+1   );
             this->column_indices     .SetPointer(graph->column_indices, edges     );
-            this->backward_offset    .SetPointer(backward_offsets     , out_offset[1]+1);
-            this->backward_partition .SetPointer(backward_partition   , in_offset[num_gpus]);
-            this->backward_convertion.SetPointer(backward_convertion  , in_offset[num_gpus]);
 
             do {
                 if (retval = util::GRError(cudaSetDevice(index), "GpuSlice cudaSetDevice failed", __FILE__, __LINE__)) break;
@@ -451,13 +449,17 @@ struct ProblemBase
 
                     if (_ENABLE_BACKWARD)
                     {
-                        if (retval = this->backward_offset    .Allocate(out_offset[1]+1, util::DEVICE)) break;
+                        this->backward_offset    .SetPointer(backward_offsets     , out_offset[1]/2+1);
+                        this->backward_partition .SetPointer(backward_partition   , in_offset[num_gpus]/2);
+                        this->backward_convertion.SetPointer(backward_convertion  , in_offset[num_gpus]/2);
+
+                        if (retval = this->backward_offset    .Allocate(out_offset[1]/2+1, util::DEVICE)) break;
                         if (retval = this->backward_offset    .Move(util::HOST, util::DEVICE)) break;
                         
-                        if (retval = this->backward_partition .Allocate(in_offset[num_gpus], util::DEVICE)) break;
+                        if (retval = this->backward_partition .Allocate(in_offset[num_gpus]/2, util::DEVICE)) break;
                         if (retval = this->backward_partition .Move(util::HOST, util::DEVICE)) break;
                         
-                        if (retval = this->backward_convertion.Allocate(in_offset[num_gpus], util::DEVICE)) break;
+                        if (retval = this->backward_convertion.Allocate(in_offset[num_gpus]/2, util::DEVICE)) break;
                         if (retval = this->backward_convertion.Move(util::HOST, util::DEVICE)) break;
                     }
                 } // end if num_gpu>1

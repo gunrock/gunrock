@@ -274,13 +274,16 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
             util::MemsetKernel<<<128, 128>>>( bc_values.GetPointer(util::DEVICE), (Value)0.0f, graph->nodes);
             util::MemsetKernel<<<128, 128>>>(ebc_values.GetPointer(util::DEVICE), (Value)0.0f, graph->edges);
 
-            this->vertex_associate_orgs[0] = labels    .GetPointer(util::DEVICE);
-            this->vertex_associate_orgs[1] = preds     .GetPointer(util::DEVICE);
-            this->value__associate_orgs[0] = bc_values .GetPointer(util::DEVICE);
-            this->value__associate_orgs[1] = sigmas    .GetPointer(util::DEVICE);
-            this->value__associate_orgs[2] = deltas    .GetPointer(util::DEVICE);
-            if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
-            if (retval = this->value__associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
+            if (num_gpus > 1)
+            {
+                this->vertex_associate_orgs[0] = labels    .GetPointer(util::DEVICE);
+                this->vertex_associate_orgs[1] = preds     .GetPointer(util::DEVICE);
+                this->value__associate_orgs[0] = bc_values .GetPointer(util::DEVICE);
+                this->value__associate_orgs[1] = sigmas    .GetPointer(util::DEVICE);
+                this->value__associate_orgs[2] = deltas    .GetPointer(util::DEVICE);
+                if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
+                if (retval = this->value__associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
+            }
 
             return retval;
         } // Init
@@ -487,16 +490,28 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
                 data_slices[gpu].SetName("data_slices[]");
                 if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
                 if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST)) return retval;
-                
-                retval = data_slices[gpu]->Init(
-                    this->num_gpus,
-                    this->gpu_idx[gpu],
-                    2,
-                    3,
-                    &(this->sub_graphs[gpu]),
-                    this->graph_slices[gpu]-> in_offset[this->num_gpus],
-                    this->graph_slices[gpu]->out_offset[this->num_gpus]
-                        - this->graph_slices[gpu]->out_offset[1]); 
+                //printf("%p ",&(this->sub_graphs[gpu])); fflush(stdout);
+                //printf("%d ",this->gpu_idx[gpu]); fflush(stdout);
+                //printf("%d ",this->graph_slices[gpu]->in_offset[this->num_gpus]);fflush(stdout);
+                //printf("%d ",this->graph_slices[gpu]->out_offset[this->num_gpus]);fflush(stdout); 
+                if (this->num_gpus > 1)
+                    retval = data_slices[gpu]->Init(
+                        this->num_gpus,
+                        this->gpu_idx[gpu],
+                        2,
+                        3,
+                        &(this->sub_graphs[gpu]),
+                        this->graph_slices[gpu]-> in_offset[this->num_gpus],
+                        this->graph_slices[gpu]->out_offset[this->num_gpus]
+                            - this->graph_slices[gpu]->out_offset[1]); 
+                else retval = data_slices[gpu]->Init(
+                        this->num_gpus,
+                        this->gpu_idx[gpu],
+                        0,
+                        0,
+                        &(this->sub_graphs[gpu]),
+                        0,
+                        0);
                 if (retval) return retval;
           }
         } while (0);

@@ -360,7 +360,7 @@ void RunTests(
 
     // Allocate host-side array (for both reference and gpu-computed results)
     Value *reference_bc_values        = new Value[graph.nodes];
-    Value *reference_ebc_values       = new Value[graph.nodes];
+    Value *reference_ebc_values       = new Value[graph.edges];
     Value *reference_sigmas           = new Value[graph.nodes];
     Value *h_sigmas                   = new Value[graph.nodes];
     Value *h_bc_values                = new Value[graph.nodes];
@@ -481,13 +481,14 @@ void RunTests(
         printf("\n avg CTA duty: %.2f%% \n", avg_duty * 100);
     
     // Cleanup
-    if (csr_problem         ) {delete csr_problem         ; csr_problem          = NULL;}
-    if (bc_enactor          ) {delete bc_enactor          ; bc_enactor           = NULL;}
-    if (reference_sigmas    ) {delete reference_sigmas    ; reference_sigmas     = NULL;}
-    if (reference_bc_values ) {delete reference_bc_values ; reference_bc_values  = NULL;}
-    if (reference_ebc_values) {delete reference_ebc_values; reference_ebc_values = NULL;}
-    if (h_sigmas            ) {delete h_sigmas            ; h_sigmas             = NULL;}
-    if (h_bc_values         ) {delete h_bc_values         ; h_bc_values          = NULL;}
+    if (csr_problem         ) {delete   csr_problem         ; csr_problem          = NULL;}
+    if (bc_enactor          ) {delete   bc_enactor          ; bc_enactor           = NULL;}
+    if (reference_sigmas    ) {delete[] reference_sigmas    ; reference_sigmas     = NULL;}
+    if (reference_bc_values ) {delete[] reference_bc_values ; reference_bc_values  = NULL;}
+    if (reference_ebc_values) {delete[] reference_ebc_values; reference_ebc_values = NULL;}
+    if (h_sigmas            ) {delete[] h_sigmas            ; h_sigmas             = NULL;}
+    if (h_bc_values         ) {delete[] h_bc_values         ; h_bc_values          = NULL;}
+    if (h_ebc_values        ) {delete[] h_ebc_values        ; h_ebc_values         = NULL;}
 
     //cudaDeviceSynchronize();
 }
