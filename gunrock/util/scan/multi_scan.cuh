@@ -15,6 +15,7 @@
 #pragma once
 
 #include <gunrock/util/test_utils.cuh>
+#include <gunrock/util/multithread_utils.cuh>
 
 namespace gunrock {
 namespace util {
@@ -182,8 +183,8 @@ namespace scan {
             if (x/blockDim.x/2 < N_Next) ScanLoop<_SizeT,Block_N>(s_Buffer,Sum,y*N_Next + x/blockDim.x/2);
             else ScanLoop<_SizeT,Block_N>(s_Buffer,Sum,-1);
             
-            if (mark0) Buffer[x] = s_Buffer[threadIdx.x];
-            if (mark1) Buffer[x + blockDim.x] = s_Buffer[threadIdx.x + blockDim.x];
+            if (mark0) Buffer[x + y*N] = s_Buffer[threadIdx.x];
+            if (mark1) Buffer[x + blockDim.x + y*N] = s_Buffer[threadIdx.x + blockDim.x];
         }
     }
 
@@ -364,7 +365,7 @@ namespace scan {
         for (_SizeT i=In_Offset[key];i<In_Offset[key+1];i++)
         {
             _SizeT    splict  = Splict[i];
-            _SizeT          r = Buffer[x] + Out_Offset[splict];//?
+            _SizeT          r = Buffer[x + splict*N] + Out_Offset[splict];
             if (x_Next>0) r+=Sum[splict*N_Next+x_Next];
             if (!EXCLUSIVE) r+=1;
             Result[r]=Convertion[i];
@@ -793,7 +794,7 @@ struct MultiScan
         History_Size[0] = Current_Size;
         History_Size[1] = Current_Size/BLOCK_SIZE;
         if ((History_Size[0]%BLOCK_SIZE)!=0) History_Size[1]++;
-        util::GRError(cudaMalloc(&(d_Buffer[0]), sizeof(SizeT) * History_Size[0]),
+        util::GRError(cudaMalloc(&(d_Buffer[0]), sizeof(SizeT) * History_Size[0] * Num_Rows),
               "cudaMalloc d_Buffer[0] failed", __FILE__, __LINE__);
         util::GRError(cudaMalloc(&(d_Buffer[1]), sizeof(SizeT) * History_Size[1] * Num_Rows),
               "cudaMalloc d_Buffer[1] failed", __FILE__, __LINE__);
@@ -865,6 +866,9 @@ struct MultiScan
         util::GRError(cudaMemcpy(d_Offset1, h_Offset1, sizeof(SizeT)*(Num_Rows+1), cudaMemcpyHostToDevice),
                      "cudaMemcpy d_Offset1 failed", __FILE__, __LINE__);
 
+        //for (int k=0;k<Num_Rows;k++)
+        //    util::cpu_mt::PrintGPUArray<SizeT, SizeT>("Buffer1",d_Buffer[1]+k*History_Size[1],History_Size[1]);
+        //util::cpu_mt::PrintGPUArray<SizeT, SizeT>("Buffer0",d_Buffer[0],History_Size[0]);
         if ((History_Size[1]%32)!=0) Grid_Size.x++;
         Step3d <VertexId,SizeT,Value,EXCLUSIVE,Num_Vertex_Associate,Num_Value__Associate> 
             <<<Grid_Size,Block_Size>>> (

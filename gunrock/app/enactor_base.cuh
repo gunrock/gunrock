@@ -121,24 +121,208 @@ bool All_Done(EnactorStats *enactor_stats,int num_gpus)
         typename SizeT, 
         typename VertexId,
         typename Value,
+        typename GraphSlice,
+        typename DataSlice,
         SizeT    num_vertex_associate,
         SizeT    num_value__associate>
-    cudaError_t UpdateNeiborBackward (
+    void UpdateNeiborForward (
         SizeT        num_elements,
+        int          num_gpus,
         int          thread_num,
         util::scan::MultiScan<VertexId, SizeT, true, 256, 8, Value>* Scaner,
-        GraphSlice        *s_graph_slice,
-        DataSlice         *s_data_slice,
+        GraphSlice        **s_graph_slice,
+        util::Array1D<SizeT,DataSlice> *s_data_slice,
         EnactorStats      *s_enactor_stats,
         FrontierAttribute *s_frontier_attribute)
     {
-        cudaError_t retval = cudaSuccess;
-        
-        Scaner->template Scan_with_dKeys_Backward
-            <num_vertex_associate, num_value__associate>(
+        FrontierAttribute
+                     *frontier_attribute  = &(s_frontier_attribute [thread_num]);
+        EnactorStats *enactor_stats       = &(s_enactor_stats      [thread_num]);
+        GraphSlice   *graph_slice         =   s_graph_slice        [thread_num]; 
+        util::Array1D<SizeT, DataSlice>
+                     *data_slice          = &(s_data_slice         [thread_num]);
+        SizeT        *out_offset          = new SizeT [num_gpus+1];
+
+        if (num_elements ==0)
+        {
+            for (int peer=0;peer<num_gpus;peer++)
+            {
+                int gpu_ = peer<thread_num? thread_num: thread_num+1;
+                if (peer == thread_num) continue;
+                s_data_slice[peer]->in_length[enactor_stats->iteration%2][gpu_]=0;
+            }
+            data_slice[0]->out_length[0]=0;
+            return;
+        }
+
+        Scaner->Scan_with_dKeys(
             num_elements,
-            
-        return retval;
+            num_gpus,
+            num_vertex_associate, 
+            num_value__associate,
+            graph_slice->frontier_queues.keys[frontier_attribute->queue_index  ].GetPointer(util::DEVICE),
+            graph_slice->frontier_queues.keys[frontier_attribute->queue_index^1].GetPointer(util::DEVICE),
+            graph_slice->partition_table .GetPointer(util::DEVICE),
+            graph_slice->convertion_table.GetPointer(util::DEVICE),
+            data_slice[0]->out_length           .GetPointer(util::DEVICE),
+            data_slice[0]->vertex_associate_orgs.GetPointer(util::DEVICE),
+            data_slice[0]->vertex_associate_outs.GetPointer(util::DEVICE),
+            data_slice[0]->value__associate_orgs.GetPointer(util::DEVICE),
+            data_slice[0]->value__associate_outs.GetPointer(util::DEVICE));
+        if (enactor_stats->retval = data_slice[0]->out_length.Move(util::DEVICE, util::HOST)) return;
+        out_offset[0]=0;
+        for (int i=0;i<num_gpus;i++) out_offset[i+1]=out_offset[i]+data_slice[0]->out_length[i];
+        
+        frontier_attribute->queue_index++;
+        frontier_attribute->selector ^= 1;
+        
+        for (int peer=0; peer<num_gpus; peer++)
+        {
+            if (peer == thread_num) continue;
+            int peer_ = peer<thread_num? peer+1     : peer;
+            int gpu_  = peer<thread_num? thread_num : thread_num+1;
+            s_data_slice[peer]->in_length[enactor_stats->iteration%2][gpu_]
+                      = data_slice[0]->out_length[peer_];
+            if (data_slice[0]->out_length[peer_] == 0) continue;
+            s_enactor_stats[peer].done[0]=-1;
+            //printf("%d\t %d\t %p+%d ==> %p+%d @ %d,%d\n", thread_num, enactor_stats->iteration, s_data_slice[peer]->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE), s_graph_slice[peer]->in_offset[gpu_], graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), out_offset[peer_], peer, data_slice[0]->out_length[peer_]);
+            if (enactor_stats->retval = util::GRError(cudaMemcpy(
+                s_data_slice[peer] -> keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE)
+                                      + s_graph_slice[peer] -> in_offset[gpu_],
+                graph_slice -> frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE)
+                                      + out_offset[peer_],
+                sizeof(VertexId) * data_slice[0]->out_length[peer_], cudaMemcpyDefault),
+                "cudaMemcpyPeer d_keys failed", __FILE__, __LINE__)) break;
+                
+            for (int i=0;i<num_vertex_associate;i++)
+            {   
+                if (enactor_stats->retval = util::GRError(cudaMemcpy(
+                    s_data_slice[peer]->vertex_associate_ins[enactor_stats->iteration%2][i]
+                        + s_graph_slice[peer]->in_offset[gpu_],
+                    data_slice[0]->vertex_associate_outs[i]
+                        + (out_offset[peer_] - out_offset[1]),
+                    sizeof(VertexId) * data_slice[0]->out_length[peer_], cudaMemcpyDefault),
+                    "cudaMemcpyPeer vertex_associate_out failed", __FILE__, __LINE__)) break;
+            }
+            if (enactor_stats->retval) break;   
+
+            for (int i=0;i<num_value__associate;i++)
+            {   
+                if (enactor_stats->retval = util::GRError(cudaMemcpy(
+                    s_data_slice[peer]->value__associate_ins[enactor_stats->iteration%2][i]
+                        + s_graph_slice[peer]->in_offset[gpu_],
+                    data_slice[0]->value__associate_outs[i]
+                        + (out_offset[peer_] - out_offset[1]),
+                    sizeof(Value) * data_slice[0]->out_length[peer_], cudaMemcpyDefault),
+                    "cudaMemcpyPeer value__associate_out failed", __FILE__, __LINE__)) break;
+            }
+            if (enactor_stats->retval) break;
+        }
+        delete[] out_offset;out_offset=NULL;
+    }
+
+    template <
+        typename SizeT, 
+        typename VertexId,
+        typename Value,
+        typename GraphSlice,
+        typename DataSlice,
+        SizeT    num_vertex_associate,
+        SizeT    num_value__associate>
+    void UpdateNeiborBackward (
+        SizeT        num_elements,
+        int          num_gpus,
+        int          thread_num,
+        util::scan::MultiScan<VertexId, SizeT, true, 256, 8, Value>* Scaner,
+        GraphSlice        **s_graph_slice,
+        util::Array1D<SizeT, DataSlice> *s_data_slice,
+        EnactorStats      *s_enactor_stats,
+        FrontierAttribute *s_frontier_attribute)
+    {
+        FrontierAttribute
+                     *frontier_attribute  = &(s_frontier_attribute [thread_num]);
+        EnactorStats *enactor_stats       = &(s_enactor_stats      [thread_num]);
+        GraphSlice   *graph_slice         =   s_graph_slice        [thread_num] ; 
+        util::Array1D<SizeT, DataSlice>
+                     *data_slice          = &(s_data_slice         [thread_num]);
+        SizeT        *out_offset          = new SizeT [num_gpus+1];
+
+        if (num_elements ==0)
+        {
+            for (int peer=0;peer<num_gpus;peer++)
+            {
+                int gpu_ = peer<thread_num? thread_num: thread_num+1;
+                if (peer == thread_num) continue;
+                s_data_slice[peer]->in_length[enactor_stats->iteration%2][gpu_]=0;
+            }
+            data_slice[0]->out_length[0]=0;
+            return;
+        }
+
+        Scaner->template Scan_with_dKeys_Backward
+            <num_vertex_associate, num_value__associate> (
+            num_elements,
+            num_gpus,
+            graph_slice->frontier_queues.keys[frontier_attribute->queue_index  ].GetPointer(util::DEVICE),
+            graph_slice->backward_offset    .GetPointer(util::DEVICE),
+            graph_slice->frontier_queues.keys[frontier_attribute->queue_index^1].GetPointer(util::DEVICE),
+            graph_slice->backward_partition .GetPointer(util::DEVICE),
+            graph_slice->backward_convertion.GetPointer(util::DEVICE),
+            data_slice[0]->out_length           .GetPointer(util::DEVICE),
+            data_slice[0]->vertex_associate_orgs.GetPointer(util::DEVICE),
+            data_slice[0]->vertex_associate_outs.GetPointer(util::DEVICE),
+            data_slice[0]->value__associate_orgs.GetPointer(util::DEVICE),
+            data_slice[0]->value__associate_outs.GetPointer(util::DEVICE));
+        if (enactor_stats->retval = data_slice[0]->out_length.Move(util::DEVICE, util::HOST)) return;
+        out_offset[0]=0;
+        for (int i=0;i<num_gpus;i++) out_offset[i+1]=out_offset[i]+data_slice[0]->out_length[i];
+        
+        frontier_attribute->queue_index++;
+        frontier_attribute->selector ^= 1;
+        
+        for (int peer=0; peer<num_gpus; peer++)
+        {
+            if (peer == thread_num) continue;
+            int peer_ = peer<thread_num? peer+1     : peer;
+            int gpu_  = peer<thread_num? thread_num : thread_num+1;
+            s_data_slice[peer]->in_length[enactor_stats->iteration%2][gpu_]
+                      = data_slice[0]->out_length[peer_];
+            if (data_slice[0]->out_length[peer_] == 0) continue;
+            s_enactor_stats[peer].done[0]=-1;
+            //printf("%d\t %d\t %p+%d ==> %p+%d @ %d,%d\n", thread_num, enactor_stats->iteration, s_data_slice[peer]->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE), s_graph_slice[peer]->in_offset[gpu_], graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), out_offset[peer_], peer, data_slice[0]->out_length[peer_]);
+            if (enactor_stats->retval = util::GRError(cudaMemcpy(
+                s_data_slice[peer] -> keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE)
+                                      + s_graph_slice[peer] -> out_offset[gpu_],
+                graph_slice -> frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE)
+                                      + out_offset[peer_],
+                sizeof(VertexId) * data_slice[0]->out_length[peer_], cudaMemcpyDefault),
+                "cudaMemcpyPeer d_keys failed", __FILE__, __LINE__)) break;
+                
+            for (int i=0;i<num_vertex_associate;i++)
+            {   
+                if (enactor_stats->retval = util::GRError(cudaMemcpy(
+                    s_data_slice[peer]->vertex_associate_ins[enactor_stats->iteration%2][i]
+                        + s_graph_slice[peer]->out_offset[gpu_],
+                    data_slice[0]->vertex_associate_outs[i]
+                        + (out_offset[peer_] - out_offset[1]),
+                    sizeof(VertexId) * data_slice[0]->out_length[peer_], cudaMemcpyDefault),
+                    "cudaMemcpyPeer vertex_associate_out failed", __FILE__, __LINE__)) break;
+            }
+            if (enactor_stats->retval) break;   
+
+            for (int i=0;i<num_value__associate;i++)
+            {   
+                if (enactor_stats->retval = util::GRError(cudaMemcpy(
+                    s_data_slice[peer]->value__associate_ins[enactor_stats->iteration%2][i]
+                        + s_graph_slice[peer]->out_offset[gpu_],
+                    data_slice[0]->value__associate_outs[i]
+                        + (out_offset[peer_] - out_offset[1]),
+                    sizeof(Value) * data_slice[0]->out_length[peer_], cudaMemcpyDefault),
+                    "cudaMemcpyPeer value__associate_out failed", __FILE__, __LINE__)) break;
+            }
+            if (enactor_stats->retval) break;
+        }
+        delete[] out_offset;out_offset=NULL;
     }
 /**
  * @brief Base class for graph problem enactors.
