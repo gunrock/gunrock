@@ -9,7 +9,7 @@
  * @file
  * test_topk.cu
  *
- * @brief Simple test driver program for computing Pagerank.
+ * @brief Simple test driver program for computing Topk.
  */
 
 #include <stdio.h>
@@ -83,7 +83,7 @@ void DisplaySolution(
   Value    *h_degrees,
   SizeT    num_nodes)
 {
-  // at most display first 100 results
+  // at most display the first 100 results
   if (num_nodes > 100)
   {
     num_nodes = 100;
@@ -124,8 +124,8 @@ template<
   typename Value,
   typename SizeT>
 void SimpleReferenceTopK(
-  const Csr<VertexId, Value, SizeT> &graph_n,
-  const Csr<VertexId, Value, SizeT> &graph_r,
+  const Csr<VertexId, Value, SizeT> &graph_original,
+  const Csr<VertexId, Value, SizeT> &graph_reversed,
   VertexId *ref_node_id,
   Value    *ref_degrees,
   SizeT    top_nodes)
@@ -133,24 +133,32 @@ void SimpleReferenceTopK(
   printf("CPU reference test.\n");
   CpuTimer cpu_timer;
 
-  // preparation
-  Value    *ref_degrees_n = (Value*)malloc(sizeof(Value) * graph_n.nodes);
-  Value    *ref_degrees_r = (Value*)malloc(sizeof(Value) * graph_r.nodes);
+  // malloc degree centrality spaces
+  Value    *ref_degrees_original =
+    (Value*)malloc(sizeof(Value) * graph_original.nodes);
+  Value    *ref_degrees_reversed =
+    (Value*)malloc(sizeof(Value) * graph_reversed.nodes);
 
+  // store reference output results
   std::vector< pair<int, int> > results;
 
-  for (SizeT node = 0; node < graph_n.nodes; ++node)
+  // calculations
+  for (SizeT node = 0; node < graph_original.nodes; ++node)
   {
-    ref_degrees_n[node] = graph_n.row_offsets[node+1] - graph_n.row_offsets[node];
-    ref_degrees_r[node] = graph_r.row_offsets[node+1] - graph_r.row_offsets[node];
+    ref_degrees_original[node] =
+      graph_original.row_offsets[node+1] - graph_original.row_offsets[node];
+    ref_degrees_reversed[node] =
+      graph_reversed.row_offsets[node+1] - graph_reversed.row_offsets[node];
   }
 
   cpu_timer.Start();
 
-  for (SizeT node = 0; node < graph_n.nodes; ++node)
+  // add ingoing degrees and outgoing degrees together
+  for (SizeT node = 0; node < graph_original.nodes; ++node)
   {
-    ref_degrees_n[node] = ref_degrees_n[node] + ref_degrees_r[node];
-    results.push_back( std::make_pair (node, ref_degrees_n[node]) );
+    ref_degrees_original[node] =
+      ref_degrees_original[node] + ref_degrees_reversed[node];
+    results.push_back( std::make_pair (node, ref_degrees_original[node]) );
   }
 
   // pair sort according to second elements - degree centrality
@@ -167,8 +175,8 @@ void SimpleReferenceTopK(
   printf("==> CPU Degree Centrality finished in %lf msec.\n", elapsed_cpu);
 
   // clean up if neccessary
-  if (ref_degrees_n) { free(ref_degrees_n); }
-  if (ref_degrees_r) { free(ref_degrees_r); }
+  if (ref_degrees_original) { free(ref_degrees_original); }
+  if (ref_degrees_reversed) { free(ref_degrees_reversed); }
   results.clear();
 
 }
@@ -192,8 +200,8 @@ template <
   typename SizeT,
   bool INSTRUMENT>
 void RunTests(
-  const Csr<VertexId, Value, SizeT> &graph,
-  const Csr<VertexId, Value, SizeT> &graph_inv,
+  const Csr<VertexId, Value, SizeT> &graph_original,
+  const Csr<VertexId, Value, SizeT> &graph_reversed,
   CommandLineArgs                   &args,
   int                               max_grid_size,
   int                               num_gpus,
@@ -213,9 +221,9 @@ void RunTests(
   Problem *topk_problem = new Problem;
 
   // reset top_nodes if input k > total number of nodes
-  if (top_nodes > graph.nodes)
+  if (top_nodes > graph_original.nodes)
   {
-    top_nodes = graph.nodes;
+    top_nodes = graph_original.nodes;
   }
 
   // malloc host memory
@@ -228,8 +236,8 @@ void RunTests(
   // initialize data members in DataSlice for graph
   util::GRError(topk_problem->Init(
     g_stream_from_host,
-    graph,
-    graph_inv,
+    graph_original,
+    graph_reversed,
     num_gpus),
     "Problem TOPK Initialization Failed", __FILE__, __LINE__);
 
@@ -263,10 +271,18 @@ void RunTests(
     __FILE__, __LINE__);
 
   // display solution
-  DisplaySolution(h_node_id, h_degrees, top_nodes);
+  DisplaySolution(
+    h_node_id,
+    h_degrees,
+    top_nodes);
 
   // validation
-  SimpleReferenceTopK(graph, graph_inv, ref_node_id, ref_degrees, top_nodes);
+  SimpleReferenceTopK(
+    graph_original,
+    graph_reversed,
+    ref_node_id,
+    ref_degrees,
+    top_nodes);
 
   int error_num = CompareResults(h_node_id, ref_node_id, top_nodes, true);
   if (error_num > 0)
@@ -298,8 +314,8 @@ template <
   typename Value,
   typename SizeT>
 void RunTests(
-  Csr<VertexId, Value, SizeT> &graph,
-  Csr<VertexId, Value, SizeT> &graph_inv,
+  Csr<VertexId, Value, SizeT> &graph_original,
+  Csr<VertexId, Value, SizeT> &graph_reversed,
   CommandLineArgs             &args,
   SizeT                       top_nodes,
   CudaContext                 &context)
@@ -316,8 +332,8 @@ void RunTests(
   if (instrumented)
   {
     RunTests<VertexId, Value, SizeT, true>(
-      graph,
-      graph_inv,
+      graph_original,
+      graph_reversed,
       args,
       max_grid_size,
       num_gpus,
@@ -327,8 +343,8 @@ void RunTests(
   else
   {
     RunTests<VertexId, Value, SizeT, false>(
-      graph,
-      graph_inv,
+      graph_original,
+      graph_reversed,
       args,
       max_grid_size,
       num_gpus,
@@ -387,8 +403,8 @@ int main(int argc, char** argv)
     typedef int Value;    //!< Use as the value type
     typedef int SizeT;    //!< Use as the graph size type
 
-    Csr<VertexId, Value, SizeT> csr(false);
-    Csr<VertexId, Value, SizeT> csr_inv(false);
+    Csr<VertexId, Value, SizeT> csr_original(false);
+    Csr<VertexId, Value, SizeT> csr_reversed(false);
 
     // Default value for stream_from_host is false
     if (graph_args < 1)
@@ -404,9 +420,9 @@ int main(int argc, char** argv)
     // read in non-inversed graph
     if (graphio::BuildMarketGraph<true>(
       market_filename,
-      csr,
+      csr_original,
       g_undirected,
-      false) != 0) // no inverse graph
+      false) != 0) // original graph
     {
       return 1;
     }
@@ -414,15 +430,17 @@ int main(int argc, char** argv)
     // read in inversed graph
     if (graphio::BuildMarketGraph<true>(
       market_filename,
-      csr_inv,
+      csr_reversed,
       g_undirected,
-      true) != 0) // inversed graph
+      true) != 0) // reversed graph
     {
       return 1;
     }
 
+    csr_original.DisplayGraph();
+
     // run gpu tests
-    RunTests(csr, csr_inv, args, top_nodes, *context);
+    RunTests(csr_original, csr_reversed, args, top_nodes, *context);
 
   }
   else
