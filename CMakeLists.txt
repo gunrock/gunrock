@@ -207,7 +207,11 @@ endif(GUNROCK_BUILD_APPLICATIONS)
 
 enable_testing()
 
-add_test(NAME IsItACow COMMAND test_topk)
-set_tests_properties(IsItACow
+add_test(NAME TestTopK COMMAND test_topk)
+set_tests_properties(TestTopK
     PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*2.*: CV.*6")
+    
+add_test(NAME SimpleExample COMMAND simple_example market data/simple_example/bips98_606.mtx)
+set_tests_properties(SimpleExample
+    PROPERTIES PASS_REGULAR_EXPRESSION "TEST PASSED")
 

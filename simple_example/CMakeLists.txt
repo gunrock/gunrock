@@ -6,6 +6,8 @@ else()
     message(SEND_ERROR "Modern GPU include directory not set.")
 endif()
 
+file(COPY bips98_606.mtx bips98_606.mtx_ud DESTINATION ${PROJECT_BINARY_DIR}/data/simple_example)
+
 set (mgpu_SOURCE_FILES ${mgpu_SOURCE_DIRS}/mgpucontext.cu ${mgpu_SOURCE_DIRS}/mgpuutil.cpp)
 
 CUDA_ADD_EXECUTABLE(simple_example

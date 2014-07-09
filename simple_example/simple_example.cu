@@ -421,7 +421,8 @@ void RunTests(
 
     // Copy out results
     util::GRError(cc_problem->Extract(h_component_ids), "CC Problem Data Extraction Failed", __FILE__, __LINE__);
-
+    
+    int num_errors = 0;
     // Validity
     if (ref_num_components == cc_problem->num_components)
         printf("CORRECT.\n");
@@ -429,6 +430,7 @@ void RunTests(
         printf("INCORRECT. Ref Component Count: %d, "
                "GPU Computed Component Count: %d\n",
                ref_num_components, cc_problem->num_components);
+        printf("TEST FAILED\n");
         return;
     }
 
@@ -545,7 +547,7 @@ void RunTests(
     // Verify the result
     if (reference_check != NULL) {
         printf("Validity: ");
-        CompareResults(h_labels, reference_check, graph.nodes);
+        num_errors += CompareResults(h_labels, reference_check, graph.nodes);
     }
     printf("\nFirst 40 labels of the GPU result.");
     // Display Solution
@@ -642,7 +644,7 @@ void RunTests(
     // Verify the result
     if (reference_check_bc_values != NULL) {
         printf("Validity BC Value: ");
-        CompareResults(h_bc_values, reference_check_bc_values, graph.nodes,
+        num_errors += CompareResults(h_bc_values, reference_check_bc_values, graph.nodes,
                        true);
         printf("\n");
     }
@@ -652,9 +654,15 @@ void RunTests(
     DisplayBCSolution(h_bc_values, graph.nodes);
 
     printf("GPU BC finished in %lf msec.\n", elapsed);
-    if (avg_duty != 0)
-        printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
+    if (INSTRUMENT &&  avg_duty != 0)
+        printf("\n avg CTA duty: %.2f%%\n", avg_duty * 100);
 
+    if( 0 == num_errors ) {
+        printf("\nTEST PASSED\n");
+    }
+    else {
+        printf("\nTEST FAILED\n");
+    }
 
     // Cleanup
     delete bc_problem;
