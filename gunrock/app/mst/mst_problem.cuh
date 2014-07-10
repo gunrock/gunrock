@@ -79,8 +79,6 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
     SizeT    *d_edge_keys;		//!< a keys array scan of edge flags array
     SizeT    *d_edge_offsets; //!< edge offsets used for filter edge list
 
-
-    Value	*d_oriWeights;      /* Original weight list used for total weight calculate */ // Do we need that?
     VertexId	*d_superVertex;         /* Used for storing supervertex in order */
     VertexId	*d_edgeId;		/* Used for storing vid of edges have min_weights */
 
@@ -156,9 +154,6 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 			if (data_slices[i]->d_edge_weights)
 			  util::GRError(cudaFree(data_slices[i]->d_edge_weights),
 				  "GpuSlice cudaFree d_edge_weights failed", __FILE__, __LINE__);
-			if (data_slices[i]->d_oriWeights)
-			  util::GRError(cudaFree(data_slices[i]->d_oriWeights),
-					"GpuSlice cudaFree d_oriWeights failed", __FILE__, __LINE__);
 		  if (data_slices[i]->d_reduced_vals)
 			  util::GRError(cudaFree(data_slices[i]->d_reduced_vals),
 					"GpuSlice cudaFree d_reduced_vals failed", __FILE__, __LINE__);
@@ -374,21 +369,6 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 					__FILE__, __LINE__)) return retval;
 			  data_slices[0]->d_edge_weights = d_edge_weights;
 
-			  Value   *d_oriWeights;
-			  if (retval = util::GRError(cudaMalloc(
-					(void**)&d_oriWeights,
-					edges * sizeof(Value)),
-					"MSTProblem cudaMalloc d_oriWeights failed",
-					__FILE__, __LINE__)) return retval;
-			  if (retval = util::GRError(cudaMemcpy(
-					d_oriWeights,
-					graph.edge_values,
-					edges * sizeof(Value),
-					cudaMemcpyHostToDevice),
-					"ProblemBase cudaMemcpy d_oriWeights failed",
-					__FILE__, __LINE__)) return retval;
-			  data_slices[0]->d_oriWeights = d_oriWeights;
-
 			  Value	*d_reduced_vals;
 			  if (retval = util::GRError(cudaMalloc(
 					(void**)&d_reduced_vals,
@@ -469,16 +449,16 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 			  util::MemsetKernel<<<128, 128>>>(
 			  	data_slices[0]->d_superVertex, 0, nodes);
 
-			  VertexId        *d_row_offsets;
+			  SizeT *d_row_offsets;
 			  if (retval = util::GRError(cudaMalloc(
 					(void**)&d_row_offsets,
-					nodes * sizeof(VertexId)),
+					(nodes + 1) * sizeof(SizeT)),
 					"MSTProblem cudaMalloc d_row_offsets Failed",
 					__FILE__, __LINE__)) return retval;
 			  if (retval = util::GRError(cudaMemcpy(
 					d_row_offsets,
 					graph.row_offsets,
-					nodes * sizeof(VertexId),
+					(nodes + 1) * sizeof(SizeT),
 					cudaMemcpyHostToDevice),
 					"ProblemBase cudaMemcpy d_row_offsets failed",
 					__FILE__, __LINE__)) return retval;
@@ -653,17 +633,6 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 				  __FILE__, __LINE__)) return retval;
 				data_slices[gpu]->d_edge_weights = d_edge_weights;
 			}
-
-      if (!data_slices[gpu]->d_oriWeights)
-      {
-				Value    *d_oriWeights;
-				if (retval = util::GRError(cudaMalloc(
-					(void**)&d_oriWeights,
-					edges * sizeof(Value)),
-				  "MSTProblem cudaMalloc d_oriWeights failed",
-				  __FILE__, __LINE__)) return retval;
-				data_slices[gpu]->d_oriWeights = d_oriWeights;
-      }
 
       if(!data_slices[gpu]->d_reduced_vals)
       {

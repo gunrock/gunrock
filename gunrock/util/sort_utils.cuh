@@ -13,7 +13,6 @@
  * and CUB radix sort.
  */
 
-
 /******************************************************************************
  * Sorting utility functions
  ******************************************************************************/
@@ -182,14 +181,17 @@ namespace util {
 
 
   /*
-   * @brief mordern gpu segmentated sort pairs
-   * using mgpu::SegSortPairsFromIndices()
+   * @brief mordern gpu segmentated sort from indices
+   * using SegSortKeysFromInidices(), SegSortPairsFromIndices()
    */
-  template <typename KeyType, typename ValueType>
+  template <
+    typename SizeType,
+    typename KeyType,
+    typename ValueType>
   cudaError_t SegSortFromIndices(
     mgpu::CudaContext &context,
     size_t    num_indices,
-    KeyType   *d_indices,
+    SizeType   *d_indices,
     size_t    num_elements,
     KeyType   *d_key,
     ValueType *d_value = NULL)
@@ -197,7 +199,8 @@ namespace util {
 
     cudaError_t retval = cudaSuccess;
 
-    if (d_value){
+    if (d_value)
+    {
       mgpu::SegSortPairsFromIndices(
 	d_key,
 	d_value,
@@ -206,7 +209,8 @@ namespace util {
 	num_indices,
 	context);
     }
-    else {
+    else
+    {
       mgpu::SegSortKeysFromIndices(
 	d_key,
 	num_elements,
@@ -218,7 +222,51 @@ namespace util {
     return retval;
   }
 
+  /*
+   * @brief modern gpu segmented sort from flags
+   * using SegSortKeysFromFlags(), SegSortPairsFromFlags()
+   */
+  template <
+    typename SizeType,
+    typename KeyType,
+    typename ValueType>
+  cudaError_t SegSortFromFlags(
+    mgpu::CudaContext &context,
+    SizeType  num_elements,
+    int       *d_flag,
+    KeyType   *d_key,
+    ValueType *d_value = NULL)
+  {
+    cudaError_t retval = cudaSuccess;
+
+    if (d_value)
+    {
+      mgpu::SegSortPairsFromFlags(
+	d_key,
+	d_value,
+	d_flag,
+	num_elements,
+	context);
+    }
+    else
+    {
+      mgpu::SegSortKeysFromFlags(
+	d_key,
+	num_elements,
+	d_flag,
+	context);
+     }
+
+    return retval;
+}
+
   /** @} */
 
 } //util
 } //gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

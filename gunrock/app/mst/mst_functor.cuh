@@ -70,9 +70,9 @@ struct SuccFunctor
     if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id]
       && (atomicCAS(&problem->d_temp_storage[s_id], -1, s_id) == -1))
     {
-      //printf(" mark - s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
+      // printf(" mark - s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
       problem->d_successors[s_id] = d_id;
-      problem->d_mst_output[e_id] = 1; // mark MST output
+      problem->d_mst_output[problem->d_origin_edges[e_id]] = 1; // mark MST output
     }
   }
 
@@ -155,9 +155,9 @@ struct RmCycFunctor
     if (problem->d_successors[s_id] > s_id && // remove from the lower of the ids
       problem->d_successors[problem->d_successors[s_id]] == s_id)
     {
-      //printf(" remove - s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
+      // printf(" remove - s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
       problem->d_successors[s_id] = s_id;
-      problem->d_mst_output[e_id] = 0; // remove edges form a cycle from output
+      problem->d_mst_output[problem->d_origin_edges[e_id]] = 0; // remove edges form a cycle from output
     }
   }
 };
@@ -606,15 +606,15 @@ struct SuEdgeRmFunctor
   static __device__ __forceinline__ bool CondFilter(
     VertexId node, DataSlice *problem, Value v = 0)
   {
-    problem->d_flags_array[0] = 1;
-    problem->d_origin_edges[node] =
-      (problem->d_flags_array[node] == 0) ? -1 : problem->d_origin_edges[node];
+    problem->d_edge_flags[0] = 1;
+    problem->d_edgeId_list[node] =
+      (problem->d_edge_flags[node] == 0) ? -1 : problem->d_edgeId_list[node];
     problem->d_edge_weights[node] =
-      (problem->d_flags_array[node] == 0) ? -1 : problem->d_edge_weights[node];
+      (problem->d_edge_flags[node] == 0) ? -1 : problem->d_edge_weights[node];
     problem->d_keys_array[node] =
-      (problem->d_flags_array[node] == 0) ? -1 : problem->d_keys_array[node];
+      (problem->d_edge_flags[node] == 0) ? -1 : problem->d_keys_array[node];
     problem->d_origin_edges[node] =
-      (problem->d_flags_array[node] == 0) ? -1 : problem->d_origin_edges[node];
+      (problem->d_edge_flags[node] == 0) ? -1 : problem->d_origin_edges[node];
     return true;
   }
 
