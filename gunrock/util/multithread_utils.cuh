@@ -12,6 +12,7 @@
  * @brief utilities for cpu multithreading
  */
 
+#include <time.h>
 #pragma once
 #include <typeinfo>
 #ifdef _WIN32
@@ -145,37 +146,55 @@ extern "C" {
         return CB;
     }
 
-    void ReleaseBarrier(CPUBarrier *CB)
+    void ReleaseBarrier(CPUBarrier *CB, int thread_num=-1)
     {
+        printf("%p thread %d releaseing\n", CB, thread_num);fflush(stdout);
         CB->released=true;
         bool to_release=false;
         for (int i=0;i<CB->releaseCount;i++) 
-            if (CB->marker[i]==1) {to_release=true;break;}
+            if (CB->marker[i]==1) 
+            {
+                printf("%p thread %d to release\n", CB, thread_num);fflush(stdout);
+                to_release=true;break;
+            }
         if (to_release)
+        {
+            if (thread_num!=-1) CB->marker[thread_num]=1;
             pthread_barrier_wait(&(CB->barrier));
+            if (thread_num!=-1) CB->marker[thread_num]=0;
+        }
+        printf("%p thread %d Released\n",CB, thread_num);fflush(stdout);
     }
 
     void IncrementnWaitBarrier(CPUBarrier *CB, int thread_num)
     {
         if (CB->released) return;
+        printf("%p thread %d waiting\n",CB,thread_num);fflush(stdout);
         CB->marker[thread_num]=1;
         pthread_barrier_wait(&(CB->barrier));
         CB->marker[thread_num]=0;
+        printf("%p thread %d past\n",CB, thread_num);fflush(stdout);
     }
 
     void DestoryBarrier(CPUBarrier *CB)
     {
         pthread_barrier_destroy(&(CB->barrier));
-        //printf("barrier destoried\n");fflush(stdout);
+        delete[] CB->marker;CB->marker=NULL;
+        printf("barrier destoried\n");fflush(stdout);
     }
 #endif //_WIN32
 
-    void PrintMessage (const char* const message, const int gpu=-1, const int iteration=-1)
+    void PrintMessage (const char* const message, const int gpu=-1, const int iteration=-1, clock_t stime = -1)
     {
-        if (gpu!=-1 && iteration!=-1) printf("%d\t %d\t %s\n",gpu,iteration,message);
-        else if (gpu!=-1) printf("%d\t \t %s\n",gpu,message);
-        else if (iteration!=-1) printf("\t %d\t %s\n",iteration,message);
-        else printf("\t \t %s\n",message);
+        float ft = (float)stime*1000/CLOCKS_PER_SEC;
+        if      (gpu!=-1 && iteration!=-1 && stime>=0) printf("%d\t %d\t %.2f\t %s\n",gpu,iteration,ft,message);
+        else if (gpu!=-1                  && stime>=0) printf("%d\t   \t %.2f\t %s\n",gpu,          ft,message);
+        else if (           iteration!=-1 && stime>=0) printf("  \t %d\t %.2f\t %s\n",    iteration,ft,message);
+        else if (                            stime>=0) printf("  \t   \t %.2f\t %s\n",              ft,message);
+        else if (gpu!=-1 && iteration!=-1            ) printf("%d\t %d\t     \t %s\n",gpu,iteration,   message);
+        else if (gpu!=-1                             ) printf("%d\t   \t     \t %s\n",gpu,             message);
+        else if (           iteration!=-1            ) printf("  \t %d\t     \t %s\n",    iteration,   message);
+        else                                           printf("  \t   \t     \t %s\n",                 message);
         fflush(stdout);
     }
 
@@ -184,7 +203,7 @@ extern "C" {
     {
         if (prebuffer != NULL) sprintf(buffer,"%s", prebuffer);
         else sprintf(buffer,"");
-        if      (typeid(_Value) == typeid(int   ) || typeid(_Value) == typeid(unsigned int  ) ||
+        /*if      (typeid(_Value) == typeid(int   ) || typeid(_Value) == typeid(unsigned int  ) ||
                  typeid(_Value) == typeid(short ) || typeid(_Value) == typeid(unsigned short ))
             sprintf(buffer,"%s%d"  ,buffer,val);
         else if (typeid(_Value) == typeid(unsigned char))
@@ -197,12 +216,84 @@ extern "C" {
             sprintf(buffer,"%s%f"  ,buffer,val);
         else if (typeid(_Value) == typeid(double))// || typeid(_Value) == typeid(unsigned double))  
             sprintf(buffer,"%s%lf" ,buffer,val);
-        else if (typeid(_Value) == typeid(bool  ))
+        else */if (typeid(_Value) == typeid(bool  ))
             sprintf(buffer,val?"%strue":"%sfalse",buffer);
     }
 
+    template <>
+    void PrintValue<         char >(char* buffer,          char val, char* perbuffer)
+    {
+        sprintf(buffer,"%s%d",  buffer, (int)val);
+    }
+
+    template <>
+    void PrintValue<unsigned char >(char* buffer, unsigned char  val, char* perbuffer)
+    {
+        sprintf(buffer,"%s%d",  buffer, (int)val);
+    }
+
+    template <>
+    void PrintValue<         float>(char* buffer,          float val, char* perbuffer)
+    {
+        sprintf(buffer,"%s%f",  buffer, val);
+    }
+
+    template <>
+    void PrintValue<         double>(char* buffer,         double val, char* perbuffer)
+    {
+        sprintf(buffer,"%s%lf",  buffer, val);
+    }
+
+    template <>
+    void PrintValue<         short>(char* buffer,          short val, char* perbuffer)
+    {
+        sprintf(buffer,"%s%d",  buffer, val);
+    }
+
+    template <>
+    void PrintValue<unsigned short>(char* buffer, unsigned short val, char* perbuffer)
+    {
+        sprintf(buffer,"%s%d",  buffer, val);
+    }
+
+    template <>
+    void PrintValue<         int  >(char* buffer,          int   val, char* perbuffer)
+    {
+        sprintf(buffer,"%s%d",  buffer, val);
+    }
+
+    template <>
+    void PrintValue<unsigned int  >(char* buffer, unsigned int   val, char* perbuffer)
+    {
+        sprintf(buffer,"%s%d",  buffer, val);
+    }
+
+    template <>
+    void PrintValue<         long >(char* buffer,          long  val, char* perbuffer)
+    {
+        sprintf(buffer,"%s%ld",  buffer, val);
+    }
+
+    template <>
+    void PrintValue<unsigned long >(char* buffer, unsigned long  val, char* perbuffer)
+    {
+        sprintf(buffer,"%s%ld",  buffer, val);
+    }
+
+    template <>
+    void PrintValue<         long long>(char* buffer, long long val, char* perbuffer)
+    {
+        sprintf(buffer,"%s%lld", buffer, val);
+    }
+
+    template <>
+    void PrintValue<unsigned long long>(char* buffer, unsigned long long val, char* perbuffer)
+    {
+        sprintf(buffer,"%s%lld", buffer, val);
+    }
+
     template <typename _SizeT, typename _Value>
-    void PrintCPUArray(const char* const name, const _Value* const array, const _SizeT limit, const int gpu=-1, const int iteration=-1)
+    void PrintCPUArray(const char* const name, const _Value* const array, const _SizeT limit, const int gpu=-1, const int iteration=-1, clock_t stime = -1)
     {
         char *buffer = new char[1024 * 128];
         
@@ -213,17 +304,17 @@ extern "C" {
             if (i!=0) sprintf(buffer,"%s, ",buffer);
             PrintValue(buffer,array[i],buffer);     
         }
-        PrintMessage(buffer,gpu,iteration);
+        PrintMessage(buffer,gpu,iteration, stime);
         delete []buffer;buffer=NULL;
     }
 
     template <typename _SizeT, typename _Value>
-    void PrintGPUArray(const char* const name, const _Value* const array, const _SizeT limit, const int gpu=-1, const int iteration=-1)
+    void PrintGPUArray(const char* const name, const _Value* const array, const _SizeT limit, const int gpu=-1, const int iteration=-1, clock_t stime = -1)
     {
         if (limit==0) return;
         _Value* h_array = new _Value[limit];
         util::GRError(cudaMemcpy(h_array,array,sizeof(_Value) * limit, cudaMemcpyDeviceToHost), "cuaMemcpy failed", __FILE__, __LINE__);
-        PrintCPUArray<_SizeT,_Value>(name,h_array,limit,gpu,iteration);
+        PrintCPUArray<_SizeT,_Value>(name,h_array,limit,gpu,iteration, stime);
         delete[] h_array;h_array=NULL;
     }
 } //namespace cpu_mt

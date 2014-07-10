@@ -222,11 +222,15 @@ namespace bc {
             }
             temp_preds.SetName("temp_preds");
             if (num_gpus>1)
-                if (enactor_stats->retval = temp_preds.Allocate(graph_slice->nodes*4, util::DEVICE)) break;
+                if (enactor_stats->retval = temp_preds.Allocate(graph_slice->nodes, util::DEVICE)) break;
 
             // Forward BC iteration
             while (!All_Done(s_enactor_stats, num_gpus)) {
                 if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1, 0)) break;
+                if (DEBUG) {
+                    printf("%d\t %d\t Advance begin.\t Queue_Length = %d\n", thread_num, enactor_stats->iteration, frontier_attribute->queue_length);fflush(stdout);
+                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("Keys0", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration);
+                }
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BCProblem, ForwardFunctor>(
                     enactor_stats->d_done,
@@ -263,6 +267,8 @@ namespace bc {
                 if (enactor_stats->retval = work_progress -> GetQueueLength(frontier_attribute->queue_index  , frontier_attribute->queue_length)) break;
                 if (enactor_stats->retval = work_progress -> SetQueueLength(frontier_attribute->queue_index+1, 0)) break;
                 if (DEBUG) {
+                    printf("%d\t %d\t Advance end.\t Queue_Length = %d\n", thread_num, enactor_stats->iteration, frontier_attribute->queue_length);fflush(stdout);                   
+                    //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("Keys1", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration);
                     //if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
                     //printf(", %lld", (long long) frontier_attribute.queue_length);
                 }
@@ -285,6 +291,11 @@ namespace bc {
                 // Check if done
                 if (All_Done(s_enactor_stats,num_gpus)) break;
 
+                if (DEBUG)
+                {
+                    printf("%d\t %d\t Filter begin.\t Queue_Length = %d\n", thread_num, enactor_stats->iteration, frontier_attribute->queue_length);
+                    fflush(stdout); 
+                }
                 // Filter
                 gunrock::oprtr::filter::Kernel<FilterKernelPolicy, BCProblem, ForwardFunctor>
                 <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS>>>(
@@ -314,7 +325,11 @@ namespace bc {
 
                 if (INSTRUMENT || DEBUG) {
                     //if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
-                    if (DEBUG) printf(", %lld", (long long) frontier_attribute->queue_length);
+                    if (DEBUG) 
+                    {
+                        printf("%d\t %d\t Filter end.\t Queue_Length = %d\n", thread_num, enactor_stats->iteration, frontier_attribute->queue_length);
+                        fflush(stdout);
+                    }
                     if (INSTRUMENT) {
                         if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
                             enactor_stats->filter_grid_size,
@@ -512,16 +527,20 @@ namespace bc {
                     }
                 }
 
-                //if (DEBUG) printf("\n%lld", (long long) enactor_stats->iteration); 
+                if (DEBUG) util::cpu_mt::PrintMessage("Iteration finished.",thread_num,enactor_stats->iteration); 
                 enactor_stats->iteration++;
             } // end while (!All_Done(...))
             //delete[] sigmas;
             //delete[] labels;
             //delete[] vids;
-            if (num_gpus>1 && break_clean) util::cpu_mt::ReleaseBarrier(cpu_barrier);
-            enactor_stats->done[0]=-1;
-            if (All_Done(s_enactor_stats,num_gpus)) break;
+            if (DEBUG) util::cpu_mt::PrintMessage("Forward phase finished.", thread_num, enactor_stats->iteration);
 
+            if (num_gpus>1 && break_clean) util::cpu_mt::ReleaseBarrier(cpu_barrier, thread_num);
+            if (num_gpus>1) util::cpu_mt::IncrementnWaitBarrier(&cpu_barrier[1],thread_num);
+            if (DEBUG) util::cpu_mt::PrintMessage("barrier1 past.", thread_num, enactor_stats->iteration);
+            enactor_stats->done[0]                 = -1;
+            if (All_Done(s_enactor_stats, num_gpus)) break;
+ 
             enactor_stats->iteration               = enactor_stats->iteration - 2;
             //frontier_attribute->queue_length       = graph_slice->nodes;
             frontier_attribute->queue_index        = 0;        // Work queue index
@@ -531,8 +550,8 @@ namespace bc {
 
             if (num_gpus>1)
             {
-                frontier_attribute->queue_length = graph_slice->out_offset[1];
-                util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.keys[frontier_attribute->queue_index].GetPointer(util::DEVICE),graph_slice->out_offset[1]);
+                frontier_attribute->queue_length = graph_slice->cross_counter[0];
+                util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),graph_slice->cross_counter[0]);
                 data_slice[0]->vertex_associate_orgs[0] = data_slice[0] -> labels.GetPointer(util::DEVICE);
                 data_slice[0]->vertex_associate_orgs[1] = data_slice[0] -> preds .GetPointer(util::DEVICE);
                 data_slice[0]->value__associate_orgs[0] = data_slice[0] -> sigmas.GetPointer(util::DEVICE);
@@ -582,12 +601,13 @@ namespace bc {
                 }
            }
 
+            enactor_stats->done[0]=-1;
             // Prepare the label array
             VertexId            label_adjust       = -enactor_stats->iteration;
             util::MemsetAddKernel<<<128, 128>>>(
                 data_slice[0]->labels.GetPointer(util::DEVICE), label_adjust, graph_slice->nodes);
 
-            if (DEBUG) printf("\nStart backward phase\n%lld", (long long) enactor_stats->iteration);
+            if (DEBUG) util::cpu_mt::PrintMessage("Start backward phase.", thread_num, enactor_stats->iteration);
             // Backward BC iteration
             for (;enactor_stats->iteration >= 0; --enactor_stats->iteration) {
                 frontier_attribute->queue_length        = graph_slice->nodes;
@@ -630,7 +650,7 @@ namespace bc {
 
                 if (DEBUG) {
                     //if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
-                    printf(", %lld", (long long) frontier_attribute->queue_length);
+                    //printf(", %lld", (long long) frontier_attribute->queue_length);
                 }
                 if (INSTRUMENT) {
                     if (enactor_stats->retval = enactor_stats->advance_kernel_stats.Accumulate(
@@ -763,7 +783,7 @@ namespace bc {
                         if (DEBUG && (enactor_stats->retval = util::GRError("Expand_Incoming2 failed", __FILE__, __LINE__))) break;
                     }
                 }
-                if (DEBUG) printf("\n%lld", (long long) enactor_stats->iteration-1);
+                if (DEBUG) util::cpu_mt::PrintMessage("BIteration finished.", thread_num, enactor_stats->iteration);
                 if (enactor_stats->retval) break;
             }
             if (enactor_stats->retval) break;
@@ -783,7 +803,7 @@ namespace bc {
         {
             if (break_clean)
             {
-                util::cpu_mt::ReleaseBarrier(&cpu_barrier[1]);
+                util::cpu_mt::ReleaseBarrier(&cpu_barrier[1],thread_num);
             }
             delete Scaner; Scaner=NULL;
         }

@@ -193,7 +193,7 @@ namespace sssp {
             }
             temp_preds.SetName("temp_preds");
             if (SSSPProblem::MARK_PATHS) 
-                if (enactor_stats->retval = temp_preds.Allocate(graph_slice->nodes*4, util::DEVICE)) break;
+                if (enactor_stats->retval = temp_preds.Allocate(graph_slice->nodes, util::DEVICE)) break;
 
             //unsigned int pq_level = 0; 
             //unsigned int out_length = 0;

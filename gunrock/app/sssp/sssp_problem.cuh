@@ -350,7 +350,8 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
             Csr<VertexId, Value, SizeT> *inversgraph = NULL,
             int           num_gpus = 1,
             int*          gpu_idx  = NULL,
-            std::string   partition_method = "random")
+            std::string   partition_method = "random",
+            float         queue_sizing = 2.0)
     {
         //num_gpus = _num_gpus;
         //nodes = graph.nodes;
@@ -363,7 +364,8 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
             inversgraph,
             num_gpus,
             gpu_idx,
-            partition_method);
+            partition_method,
+            queue_sizing);
 
         // No data in DataSlice needs to be copied from host
 

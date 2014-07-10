@@ -78,6 +78,7 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value, ENABLE_BACKWARD>
         VertexId** &original_vertexes,
         SizeT**    &in_offsets,
         SizeT**    &out_offsets,
+        SizeT**    &cross_counter,
         SizeT**    &backward_offsets,
         int**      &backward_partitions,
         VertexId** &backward_convertions)
@@ -114,6 +115,7 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value, ENABLE_BACKWARD>
         original_vertexes    = this->original_vertexes;
         in_offsets           = this->in_offsets;
         out_offsets          = this->out_offsets;
+        cross_counter        = this->cross_counter;
         backward_offsets     = this->backward_offsets;
         backward_partitions  = this->backward_partitions;
         backward_convertions = this->backward_convertions;

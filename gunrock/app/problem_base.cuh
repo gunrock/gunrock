@@ -281,6 +281,7 @@ struct ProblemBase
         util::Array1D<SizeT, VertexId> original_vertex    ;
         util::Array1D<SizeT, SizeT   > in_offset          ;
         util::Array1D<SizeT, SizeT   > out_offset         ;
+        util::Array1D<SizeT, SizeT   > cross_counter      ;
         util::Array1D<SizeT, SizeT   > backward_offset    ;
         util::Array1D<SizeT, int     > backward_partition ;
         util::Array1D<SizeT, VertexId> backward_convertion;
@@ -316,6 +317,7 @@ struct ProblemBase
             original_vertex    .SetName("original_vertex"    );
             in_offset          .SetName("in_offset"          );  
             out_offset         .SetName("out_offset"         );
+            cross_counter      .SetName("cross_counter"      );
             backward_offset    .SetName("backward_offset"    );
             backward_partition .SetName("backward_partition" );
             backward_convertion.SetName("backward_convertion");
@@ -348,6 +350,7 @@ struct ProblemBase
             original_vertex    .Release();
             in_offset          .Release();
             out_offset         .Release();
+            cross_counter      .Release();
             backward_offset    .Release();
             backward_partition .Release();
             backward_convertion.Release();
@@ -385,6 +388,7 @@ struct ProblemBase
             VertexId*                  original_vertex,
             SizeT*                     in_offset,
             SizeT*                     out_offset,
+            SizeT*                     cross_counter,
             SizeT*                     backward_offsets   = NULL,
             int*                       backward_partition = NULL,
             VertexId*                  backward_convertion= NULL)
@@ -399,6 +403,7 @@ struct ProblemBase
             this->original_vertex    .SetPointer(original_vertex      , nodes     );
             this->in_offset          .SetPointer(in_offset            , num_gpus+1);
             this->out_offset         .SetPointer(out_offset           , num_gpus+1);
+            this->cross_counter      .SetPointer(cross_counter        , num_gpus+1);
             this->row_offsets        .SetPointer(graph->row_offsets   , nodes+1   );
             this->column_indices     .SetPointer(graph->column_indices, edges     );
 
@@ -449,17 +454,17 @@ struct ProblemBase
 
                     if (_ENABLE_BACKWARD)
                     {
-                        this->backward_offset    .SetPointer(backward_offsets     , out_offset[1]/2+1);
-                        this->backward_partition .SetPointer(backward_partition   , in_offset[num_gpus]/2);
-                        this->backward_convertion.SetPointer(backward_convertion  , in_offset[num_gpus]/2);
+                        this->backward_offset    .SetPointer(backward_offsets     , cross_counter[0]+1);
+                        this->backward_partition .SetPointer(backward_partition   , cross_counter[num_gpus]);
+                        this->backward_convertion.SetPointer(backward_convertion  , cross_counter[num_gpus]);
 
-                        if (retval = this->backward_offset    .Allocate(out_offset[1]/2+1, util::DEVICE)) break;
+                        if (retval = this->backward_offset    .Allocate(cross_counter[0]+1, util::DEVICE)) break;
                         if (retval = this->backward_offset    .Move(util::HOST, util::DEVICE)) break;
                         
-                        if (retval = this->backward_partition .Allocate(in_offset[num_gpus]/2, util::DEVICE)) break;
+                        if (retval = this->backward_partition .Allocate(cross_counter[num_gpus], util::DEVICE)) break;
                         if (retval = this->backward_partition .Move(util::HOST, util::DEVICE)) break;
                         
-                        if (retval = this->backward_convertion.Allocate(in_offset[num_gpus]/2, util::DEVICE)) break;
+                        if (retval = this->backward_convertion.Allocate(cross_counter[num_gpus], util::DEVICE)) break;
                         if (retval = this->backward_convertion.Move(util::HOST, util::DEVICE)) break;
                     }
                 } // end if num_gpu>1
@@ -558,6 +563,7 @@ struct ProblemBase
     VertexId            **original_vertexes   ;
     SizeT               **in_offsets          ; // Offsets for data movement between GPUs
     SizeT               **out_offsets         ;
+    SizeT               **cross_counter       ;
     SizeT               **backward_offsets    ;
     int                 **backward_partitions ;
     VertexId            **backward_convertions;
@@ -581,6 +587,7 @@ struct ProblemBase
         original_vertexes   (NULL),
         in_offsets          (NULL),
         out_offsets         (NULL),
+        cross_counter       (NULL),
         backward_offsets    (NULL),
         backward_partitions (NULL),
         backward_convertions(NULL)
@@ -673,7 +680,8 @@ struct ProblemBase
         //VertexId    *row_indices    = NULL,
         int         num_gpus          = 1,
         int         *gpu_idx          = NULL,
-        std::string partition_method  = "random")
+        std::string partition_method  = "random",
+        float       queue_sizing      = 2.0)
     {
         util::cpu_mt::PrintMessage("ProblemBase Init() begin.");
         cudaError_t retval      = cudaSuccess;
@@ -715,6 +723,7 @@ struct ProblemBase
                     original_vertexes,
                     in_offsets,
                     out_offsets,
+                    cross_counter,
                     backward_offsets,
                     backward_partitions,
                     backward_convertions);
@@ -729,6 +738,21 @@ struct ProblemBase
                 //    util::cpu_mt::PrintCPUArray<SizeT,int>("partition",partition_tables[gpu+1],sub_graphs[gpu].nodes);
                 //    util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion",convertion_tables[gpu+1],sub_graphs[gpu].nodes);
                 //}
+                for (int gpu=0;gpu<num_gpus;gpu++)
+                {
+                    cross_counter[gpu][num_gpus]=0;
+                    for (int peer=0;peer<num_gpus;peer++)
+                    {
+                        cross_counter[gpu][peer]=out_offsets[gpu][peer];
+                    }
+                    cross_counter[gpu][num_gpus]=in_offsets[gpu][num_gpus];
+                }
+                for (int gpu=0;gpu<num_gpus;gpu++)
+                for (int peer=0;peer<=num_gpus;peer++)
+                {
+                    in_offsets[gpu][peer]*=queue_sizing;
+                    out_offsets[gpu][peer]*=queue_sizing;
+                }
                 if (retval) break;
             } else {
                 sub_graphs=graph;
@@ -750,6 +774,7 @@ struct ProblemBase
                             original_vertexes   [gpu],
                             in_offsets          [gpu],
                             out_offsets         [gpu],
+                            cross_counter       [gpu],
                             backward_offsets    [gpu],
                             backward_partitions [gpu],
                             backward_convertions[gpu]);
@@ -764,6 +789,7 @@ struct ProblemBase
                             original_vertexes[gpu],
                             in_offsets[gpu],
                             out_offsets[gpu],
+                            cross_counter[gpu],
                             NULL,
                             NULL,
                             NULL);
@@ -771,6 +797,7 @@ struct ProblemBase
                         stream_from_host,
                         num_gpus,
                         &(sub_graphs[gpu]),
+                        NULL,
                         NULL,
                         NULL,
                         NULL,

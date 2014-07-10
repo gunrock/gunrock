@@ -436,7 +436,7 @@ void RunTests(
     {
         util::SetDevice(gpu_idx[gpu]);
         util::MemsetScaleKernel<<<128, 128>>>
-            (csr_problem->data_slices[gpu]->bc_values.GetPointer(util::DEVICE), (Value)0.5f, (int)graph.nodes);
+            (csr_problem->data_slices[gpu]->bc_values.GetPointer(util::DEVICE), (Value)0.5f, (int)(csr_problem->sub_graphs[gpu].nodes));
     }
     cpu_timer.Stop();
 

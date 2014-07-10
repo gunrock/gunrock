@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OPTION[0]="--src=largestdegree --device=0,1,2,3 --partition_method=random --queue-sizing=5.0"
+OPTION[0]="--src=largestdegree --device=0,1,2,3 --partition_method=random --queue-sizing=8.0"
 OPTION[1]=${OPTION[0]}" --undirected" #undirected and do not mark-pred"
 OPTION[2]=${OPTION[0]}" --mark-path" #undirected and mark-pred"
 OPTION[3]=${OPTION[1]}" --mark-path"

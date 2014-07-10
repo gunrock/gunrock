@@ -315,14 +315,17 @@ public:
     template <typename IterationT, typename SizeT>
     cudaError_t GetQueueLength(
         IterationT iteration,
-        SizeT &queue_length)        // out param
+        SizeT &queue_length,
+        bool  DEBUG = false)        // out param
     {
         cudaError_t retval = cudaSuccess;
 
         do {
             int queue_length_idx = iteration & 0x3;
 
-            if (retval = util::GRError(cudaMemcpy(
+            if (!DEBUG)
+                cudaMemcpy(&queue_length, ((SizeT*) d_counters) + queue_length_idx, sizeof(SizeT), cudaMemcpyDeviceToHost);
+            else if (retval = util::GRError(cudaMemcpy(
                     &queue_length,
                     ((SizeT*) d_counters) + queue_length_idx,
                     1 * sizeof(SizeT),
@@ -339,13 +342,15 @@ public:
     template <typename IterationT, typename SizeT>
     cudaError_t SetQueueLength(
         IterationT iteration,
-        SizeT queue_length)
+        SizeT queue_length,
+        bool  DEBUG = false)
     {
         cudaError_t retval = cudaSuccess;
 
         do {
             int queue_length_idx = iteration & 0x3;
-
+            if (!DEBUG)
+                cudaMemcpy(((SizeT*) d_counters) + queue_length_idx, &queue_length, sizeof(SizeT), cudaMemcpyHostToDevice);
             if (retval = util::GRError(cudaMemcpy(
                     ((SizeT*) d_counters) + queue_length_idx,
                     &queue_length,

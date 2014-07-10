@@ -372,7 +372,8 @@ void RunTests(
             NULL,
             num_gpus,
             gpu_idx,
-            partition_method), "Problem SSSP Initialization Failed", __FILE__, __LINE__);
+            partition_method,
+            queue_sizing), "Problem SSSP Initialization Failed", __FILE__, __LINE__);
 
         //
         // Compute reference CPU SSSP solution for source-distance
