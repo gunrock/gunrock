@@ -40,15 +40,18 @@ namespace util {
 
     KeyType *key = NULL;
     ValueType *value = NULL;
+
     if (util::GRError((retval = cudaMalloc(
       &key, sizeof(KeyType)*num_elements)),
       "CUBRadixSort key malloc failed",
       __FILE__, __LINE__)) return retval;
     if (d_value)
+    {
       if (util::GRError((retval = cudaMalloc(
         &value, sizeof(ValueType)*num_elements)),
         "CUBRadixSort value malloc failed",
         __FILE__, __LINE__)) return retval;
+    }
 
     cub::DoubleBuffer<KeyType>   key_buffer(d_key, key);
     cub::DoubleBuffer<ValueType> value_buffer(d_value, value);
@@ -158,13 +161,17 @@ namespace util {
       cudaMemcpyDeviceToDevice)),
       "CUB RadixSort copy back keys failed",
       __FILE__, __LINE__)) return retval;
-    if (util::GRError((retval = cudaMemcpy(
-      d_value,
-      value_buffer.Current(),
-      sizeof(ValueType)*num_elements,
-      cudaMemcpyDeviceToDevice)),
-      "CUB RadixSort copy back values failed",
-      __FILE__, __LINE__)) return retval;
+
+    if (d_value)
+    {
+	if (util::GRError((retval = cudaMemcpy(
+	    d_value,
+	    value_buffer.Current(),
+	    sizeof(ValueType)*num_elements,
+	    cudaMemcpyDeviceToDevice)),
+	    "CUB RadixSort copy back values failed",
+	    __FILE__, __LINE__)) return retval;
+    }
 
     if (util::GRError((retval = cudaFree(d_temp_storage)),
       "CUB Radixsort free d_temp_storage failed",
@@ -172,9 +179,12 @@ namespace util {
     if (util::GRError((retval = cudaFree(key)),
       "CUB Radixsort free key failed",
       __FILE__, __LINE__)) return retval;
-    if (util::GRError((retval = cudaFree(value)),
-      "CUB Radixsort free value failed",
-      __FILE__, __LINE__)) return retval;
+    if (d_value)
+    {
+	if (util::GRError((retval = cudaFree(value)),
+	    "CUB Radixsort free value failed",
+	    __FILE__, __LINE__)) return retval;
+    }
 
     return retval;
   }
