@@ -210,7 +210,7 @@ namespace bfs {
                     SizeT _queue_length;
                     if (frontier_attribute->queue_reset) _queue_length = frontier_attribute->queue_length;
                     else if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, _queue_length)) break;
-                    util::cpu_mt::PrintCPUArray<SizeT, unsigned int>("Queue_Length", &(frontier_attribute->queue_length), thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
+                    util::cpu_mt::PrintCPUArray<SizeT, unsigned int>("Queue_Length", &(frontier_attribute->queue_length), 1, thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
                     //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys0", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
                     //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
                     //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu0", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
@@ -262,12 +262,14 @@ namespace bfs {
                 //}
                 
                 //util::cpu_mt::PrintMessage("A->F 0", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
+                if (DEBUG || INSTRUMENT) 
+                    enactor_stats->total_queued += frontier_attribute->queue_length;
                 if (DEBUG)
                 {
                     //SizeT _queue_length = frontier_attribute->queue_length;
                     //if (frontier_attribute->queue_reset) _queue_length = frontier_attribute->queue_length;
                     //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, _queue_length)) break;
-                    util::cpu_mt::PrintCPUArray<SizeT, unsigned int>("Queue_Length", &(frontier_attribute->queue_length), thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
+                    util::cpu_mt::PrintCPUArray<SizeT, unsigned int>("Queue_Length", &(frontier_attribute->queue_length), 1, thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
                     //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys1", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
                     //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
                     //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu1", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
@@ -338,7 +340,7 @@ namespace bfs {
 
                 if (INSTRUMENT || DEBUG) {
                     //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
-                    enactor_stats->total_queued += frontier_attribute->queue_length;
+                    //enactor_stats->total_queued += frontier_attribute->queue_length;
                     //if (DEBUG) printf(", %lld", (long long) frontier_attribute->queue_length);
                     if (INSTRUMENT) {
                         if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
@@ -352,7 +354,7 @@ namespace bfs {
                     //SizeT _queue_length = frontier_attribute->queue_length;
                     //if (frontier_attribute->queue_reset) _queue_length = frontier_attribute->queue_length;
                     //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, _queue_length)) break;
-                    util::cpu_mt::PrintCPUArray<SizeT, unsigned int>("Queue_Length", &(frontier_attribute->queue_length), thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
+                    util::cpu_mt::PrintCPUArray<SizeT, unsigned int>("Queue_Length", &(frontier_attribute->queue_length), 1, thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
                     //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys2", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
                     //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
                     //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu2", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
@@ -381,7 +383,7 @@ namespace bfs {
                         if (BFSProblem::MARK_PREDECESSORS)
                         {   
                             //util::cpu_mt::PrintGPUArray<SizeT,SizeT>("orgi",graph_slice->original_vertex.GetPointer(util::DEVICE),graph_slice->nodes,thread_num,iteration[0]);
-                            int grid_size = n%256 == 0? n/256 : n/256+1;
+                            int grid_size = (n%256) == 0? n/256 : n/256+1;
                             Copy_Preds<VertexId, SizeT> <<<grid_size,256>>>(
                                 n,
                                 graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),
@@ -410,7 +412,9 @@ namespace bfs {
  
                         frontier_attribute->queue_index++;
                         frontier_attribute->selector ^= 1;
-    
+   
+                        int grid_size = (out_offset[1]%256)==0 ? out_offset[1]%256 : out_offset[1]%256+1;
+                         
                         if (enactor_stats->iteration!=0)
                         {  //CPU global barrier
                             //util::cpu_mt::IncrementnWaitBarrier(&(cpu_barrier[0]),thread_num);

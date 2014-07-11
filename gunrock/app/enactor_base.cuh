@@ -119,6 +119,16 @@ bool All_Done(EnactorStats *enactor_stats,int num_gpus)
         out_preds[t]=org_vertexs[p];
     }   
 
+    template <typename VertexId, typename SizeT>
+    __global__ void Mark_Queue (
+        const SizeT     num_elements,
+        const VertexId* keys,
+              VertexId* marker)
+    {
+        VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
+        if (x< num_elements) marker[keys[x]]=1;
+    }
+
     template <
         typename SizeT, 
         typename VertexId,
