@@ -72,7 +72,7 @@ struct SuccFunctor
 	if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id]
 	    && (atomicCAS(&problem->d_temp_storage[s_id], -1, s_id) == -1))
 	{
-	    // printf(" mark - s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
+	    //printf(" mark - s_id: %4d d_id: %4d e_id: %4d\n", s_id, d_id, e_id);
 	    problem->d_successors[s_id] = d_id;
 	    // mark MST output results
 	    problem->d_mst_output[problem->d_origin_edges[e_id]] = 1;
@@ -160,7 +160,7 @@ struct RmCycFunctor
 	if (problem->d_successors[s_id] > s_id &&
 	    problem->d_successors[problem->d_successors[s_id]] == s_id)
 	{
-	    // printf(" remove-s_id:%4d d_id:%4d e_id:%4d\n", s_id, d_id, e_id);
+	    //printf(" remove-s_id:%4d d_id:%4d e_id:%4d\n", s_id, d_id, e_id);
 	    problem->d_successors[s_id] = s_id;
 	    // remove edges in the mst output results
 	    problem->d_mst_output[problem->d_origin_edges[e_id]] = 0;
@@ -296,9 +296,9 @@ struct EdgeRmFunctor
 	VertexId s_id, VertexId d_id, DataSlice *problem,
 	VertexId e_id = 0, VertexId e_id_in = 0)
     {
-	problem->d_edgeId_list[e_id]  =
+	problem->d_col_indices[e_id]  =
 	    (problem->d_successors[s_id] == problem->d_successors[d_id]) ?
-	    -1 : problem->d_edgeId_list[e_id];
+	    -1 : problem->d_col_indices[e_id];
 
 	problem->d_edge_weights[e_id] =
 	    (problem->d_successors[s_id] == problem->d_successors[d_id]) ?
@@ -342,8 +342,8 @@ struct EdgeRmFunctor
 	problem->d_keys_array[node]  =
 	    problem->d_super_vertex[problem->d_keys_array[node]];
 	// finding super vertex ids for v list - dst vertices
-	problem->d_edgeId_list[node] =
-	    problem->d_super_vertex[problem->d_edgeId_list[node]];
+	problem->d_col_indices[node] =
+	    problem->d_super_vertex[problem->d_col_indices[node]];
     }
 };
 
@@ -632,8 +632,8 @@ struct SuEdgeRmFunctor
 	VertexId node, DataSlice *problem, Value v = 0)
     {
 	problem->d_edge_flags[0] = 1;
-	problem->d_edgeId_list[node] =
-	    (problem->d_edge_flags[node]==0) ? -1:problem->d_edgeId_list[node];
+	problem->d_col_indices[node] =
+	    (problem->d_edge_flags[node]==0) ? -1:problem->d_col_indices[node];
 	problem->d_edge_weights[node] =
 	    (problem->d_edge_flags[node]==0) ? -1:problem->d_edge_weights[node];
 	problem->d_keys_array[node] =
