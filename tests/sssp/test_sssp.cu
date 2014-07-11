@@ -114,14 +114,14 @@ bool g_stream_from_host;
   */ 
 
 struct Stats {
-    char *name;
+    const char *name;
     Statistic rate;
     Statistic search_depth;
     Statistic redundant_work;
     Statistic duty;
 
     Stats() : name(NULL), rate(), search_depth(), redundant_work(), duty() {}
-    Stats(char *name) : name(name), rate(), search_depth(), redundant_work(), duty() {}
+    Stats(const char *name) : name(name), rate(), search_depth(), redundant_work(), duty() {}
 };
 
 /**
