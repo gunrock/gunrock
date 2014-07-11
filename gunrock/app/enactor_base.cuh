@@ -123,7 +123,7 @@ bool All_Done(EnactorStats *enactor_stats,int num_gpus)
     __global__ void Mark_Queue (
         const SizeT     num_elements,
         const VertexId* keys,
-              VertexId* marker)
+              unsigned char* marker)
     {
         VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
         if (x< num_elements) marker[keys[x]]=1;
@@ -145,7 +145,8 @@ bool All_Done(EnactorStats *enactor_stats,int num_gpus)
         GraphSlice        **s_graph_slice,
         util::Array1D<SizeT,DataSlice> *s_data_slice,
         EnactorStats      *s_enactor_stats,
-        FrontierAttribute *s_frontier_attribute)
+        FrontierAttribute *s_frontier_attribute,
+        unsigned char *d_marker = NULL)
     {
         FrontierAttribute
                      *frontier_attribute  = &(s_frontier_attribute [thread_num]);
@@ -157,6 +158,8 @@ bool All_Done(EnactorStats *enactor_stats,int num_gpus)
 
         if (num_elements ==0)
         {
+            if (d_marker!=NULL)
+                util::MemsetKernel<<<128, 128>>>(d_marker, (unsigned char)0, graph_slice->nodes);
             for (int peer=0;peer<num_gpus;peer++)
             {
                 int gpu_ = peer<thread_num? thread_num: thread_num+1;
@@ -166,12 +169,13 @@ bool All_Done(EnactorStats *enactor_stats,int num_gpus)
             data_slice[0]->out_length[0]=0;
             return;
         }
-
-        Scaner->Scan_with_dKeys(
+ 
+        Scaner->template Scan_with_dKeys2
+            <num_vertex_associate, num_value__associate> (
             num_elements,
             num_gpus,
-            num_vertex_associate, 
-            num_value__associate,
+            //num_vertex_associate, 
+            //num_value__associate,
             graph_slice->frontier_queues.keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
             graph_slice->frontier_queues.keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
             graph_slice->partition_table .GetPointer(util::DEVICE),
@@ -182,13 +186,26 @@ bool All_Done(EnactorStats *enactor_stats,int num_gpus)
             data_slice[0]->value__associate_orgs.GetPointer(util::DEVICE),
             data_slice[0]->value__associate_outs.GetPointer(util::DEVICE));
         if (enactor_stats->retval = data_slice[0]->out_length.Move(util::DEVICE, util::HOST)) return;
-        util::cpu_mt::PrintCPUArray<SizeT, SizeT>("out_length",data_slice[0]->out_length.GetPointer(util::HOST),num_gpus,thread_num,enactor_stats->iteration);
+        //util::cpu_mt::PrintCPUArray<SizeT, SizeT>("out_length",data_slice[0]->out_length.GetPointer(util::HOST),num_gpus,thread_num,enactor_stats->iteration);
         out_offset[0]=0;
         for (int i=0;i<num_gpus;i++) out_offset[i+1]=out_offset[i]+data_slice[0]->out_length[i];
         
         frontier_attribute->queue_index++;
         frontier_attribute->selector ^= 1;
-        
+        if (d_marker!=NULL)
+        {
+            util::MemsetKernel<<<128, 128>>>(d_marker, (unsigned char)0, graph_slice->nodes);
+            if (data_slice[0]->out_length[0]>0)
+            {
+                int grid_size = (data_slice[0]->out_length[0]%256)==0?
+                                 data_slice[0]->out_length[0]/256:
+                                 data_slice[0]->out_length[0]/256+1;
+                Mark_Queue<VertexId, SizeT> <<<grid_size, 256>>> (
+                    data_slice[0]->out_length[0],
+                    graph_slice -> frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),
+                    d_marker);
+            }
+        }
         for (int peer=0; peer<num_gpus; peer++)
         {
             if (peer == thread_num) continue;

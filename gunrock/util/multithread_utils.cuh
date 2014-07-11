@@ -148,7 +148,7 @@ extern "C" {
 
     void ReleaseBarrier(CPUBarrier *CB, int thread_num=-1)
     {
-        printf("%p thread %d releaseing\n", CB, thread_num);fflush(stdout);
+        //printf("%p thread %d releaseing\n", CB, thread_num);fflush(stdout);
         CB->released=true;
         bool to_release=false;
         for (int i=0;i<CB->releaseCount;i++) 
@@ -163,24 +163,24 @@ extern "C" {
             pthread_barrier_wait(&(CB->barrier));
             if (thread_num!=-1) CB->marker[thread_num]=0;
         }
-        printf("%p thread %d Released\n",CB, thread_num);fflush(stdout);
+        //printf("%p thread %d Released\n",CB, thread_num);fflush(stdout);
     }
 
     void IncrementnWaitBarrier(CPUBarrier *CB, int thread_num)
     {
         if (CB->released) return;
-        printf("%p thread %d waiting\n",CB,thread_num);fflush(stdout);
+        //printf("%p thread %d waiting\n",CB,thread_num);fflush(stdout);
         CB->marker[thread_num]=1;
         pthread_barrier_wait(&(CB->barrier));
         CB->marker[thread_num]=0;
-        printf("%p thread %d past\n",CB, thread_num);fflush(stdout);
+        //printf("%p thread %d past\n",CB, thread_num);fflush(stdout);
     }
 
     void DestoryBarrier(CPUBarrier *CB)
     {
         pthread_barrier_destroy(&(CB->barrier));
         delete[] CB->marker;CB->marker=NULL;
-        printf("barrier destoried\n");fflush(stdout);
+        //printf("barrier destoried\n");fflush(stdout);
     }
 #endif //_WIN32
 

@@ -51,13 +51,13 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
     /**
      * @brief Data slice structure which contains BFS problem specific data.
      */
-    struct DataSlice
+    struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
     {
         // device storage arrays
         util::Array1D<SizeT,VertexId > labels        ;   
         util::Array1D<SizeT,VertexId > preds         ;   
         util::Array1D<SizeT,unsigned char > visited_mask  ;
-        int             num_associate,gpu_idx;
+        /*int             num_associate,gpu_idx;
         util::Array1D<SizeT,VertexId > *associate_in[2];
         util::Array1D<SizeT,VertexId*> associate_ins[2];
         util::Array1D<SizeT,VertexId > *associate_out;
@@ -65,20 +65,20 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT,VertexId*> associate_orgs;
         util::Array1D<SizeT,SizeT    > out_length    ;   
         util::Array1D<SizeT,SizeT    > in_length[2]  ;
-        util::Array1D<SizeT,VertexId > keys_in  [2]  ;
+        util::Array1D<SizeT,VertexId > keys_in  [2]  ;*/
 
         DataSlice()
         {   
-            util::cpu_mt::PrintMessage("DataSlice() begin.");
+            /*util::cpu_mt::PrintMessage("DataSlice() begin.");
             num_associate   = 0;
             gpu_idx         = 0;
             associate_in[0] = NULL;
             associate_in[1] = NULL;
-            associate_out   = NULL;
+            associate_out   = NULL;*/
             labels          .SetName("labels"          );  
             preds           .SetName("preds"           );  
             visited_mask    .SetName("visited_mask"    );  
-            associate_ins[0].SetName("associate_ins[0]");
+            /*associate_ins[0].SetName("associate_ins[0]");
             associate_ins[1].SetName("associate_ins[1]");
             associate_outs  .SetName("associate_outs"  );  
             associate_orgs  .SetName("associate_orgs"  );  
@@ -87,19 +87,19 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             in_length    [1].SetName("in_length[1]"    );  
             keys_in      [0].SetName("keys_in[0]"      );  
             keys_in      [1].SetName("keys_in[1]"      );
-            util::cpu_mt::PrintMessage("DataSlice() end.");
+            util::cpu_mt::PrintMessage("DataSlice() end.");*/
         }
 
         ~DataSlice()
         {
             util::cpu_mt::PrintMessage("~DataSlice() begin.");
-            if (util::SetDevice(gpu_idx)) return;
+            if (util::SetDevice(this->gpu_idx)) return;
             labels        .Release();
             preds         .Release();
-            keys_in    [0].Release();
-            keys_in    [1].Release();
+            //keys_in    [0].Release();
+            //keys_in    [1].Release();
             visited_mask  .Release();
-            in_length  [0].Release();
+            /*in_length  [0].Release();
             in_length  [1].Release();
             out_length    .Release();
             associate_orgs.Release();
@@ -126,37 +126,55 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 delete[] associate_out;
                 associate_out=NULL;
                 associate_outs.Release();
-            }
+            }*/
             util::cpu_mt::PrintMessage("~DataSlice() end.");
         }
 
         cudaError_t Init(
             int   num_gpus,
             int   gpu_idx,
-            int   num_associate,
-            SizeT num_nodes,
+            int   num_vertex_associate,
+            int   num_value__associate,
+            Csr<VertexId, Value, SizeT> *graph,
+            //SizeT num_nodes,
             SizeT num_in_nodes,
             SizeT num_out_nodes)
         {
-            util::cpu_mt::PrintMessage("DataSlice Init() begin.");
+            //util::cpu_mt::PrintMessage("DataSlice Init() begin.");
             cudaError_t retval = cudaSuccess;
-            this->gpu_idx       = gpu_idx;
-            this->num_associate = num_associate;
-            if (retval = util::SetDevice(gpu_idx))  return retval;
+            //this->gpu_idx       = gpu_idx;
+            //this->num_associate = num_associate;
+            //if (retval = util::SetDevice(gpu_idx))  return retval;
+            if (retval = DataSliceBase<SizeT, VertexId, Value>::Init(
+                num_gpus,
+                gpu_idx,
+                num_vertex_associate,
+                num_value__associate,
+                graph, 
+                num_in_nodes,
+                num_out_nodes)) return retval;
+
             // Create SoA on device
-            if (retval = labels.Allocate(num_nodes,util::DEVICE)) return retval;
+            if (retval = labels.Allocate(graph->nodes,util::DEVICE)) return retval;
 
             if (_MARK_PREDECESSORS)
             {
-                if (retval = preds.Allocate(num_nodes,util::DEVICE)) return retval;
+                if (retval = preds.Allocate(graph->nodes,util::DEVICE)) return retval;
             }
 
             if (_ENABLE_IDEMPOTENCE) 
             {
-                if (retval = visited_mask.Allocate((num_nodes +7)/8, util::DEVICE)) return retval;
+                if (retval = visited_mask.Allocate((graph->nodes +7)/8, util::DEVICE)) return retval;
             } 
 
-            if (num_associate != 0)
+            if (num_gpus > 1)
+            {
+                this->vertex_associate_orgs[0] = labels.GetPointer(util::DEVICE);
+                if (_MARK_PREDECESSORS)
+                    this->vertex_associate_orgs[1] = preds.GetPointer(util::DEVICE);
+                if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
+            }
+            /*if (num_associate != 0)
             {
                 if (retval = associate_orgs.Allocate(num_associate, util::HOST | util::DEVICE)) return retval;
                 associate_orgs[0]=labels.GetPointer(util::DEVICE);
@@ -198,9 +216,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 }
                 if (retval = associate_outs.Move(util::HOST, util::DEVICE)) return retval;
                 if (retval = out_length.Allocate(num_gpus,util::HOST | util::DEVICE)) return retval;
-            }
+            }*/
 
-            util::cpu_mt::PrintMessage("DataSlice Init() end.");
+            //util::cpu_mt::PrintMessage("DataSlice Init() end.");
             return retval;
         } // Init
 
@@ -368,17 +386,33 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 if (this->num_gpus > 1)
                 {
                     if (_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE)
-                        _data_slice->Init(this->num_gpus,this->gpu_idx[gpu], 2,
-                            this->sub_graphs[gpu].nodes,
+                        _data_slice->Init(
+                            this->num_gpus,
+                            this->gpu_idx[gpu], 
+                            2,
+                            0,
+                            &(this->sub_graphs[gpu]),
                             this->graph_slices[gpu]->in_offset[this->num_gpus],
-                            this->graph_slices[gpu]->out_offset[this->num_gpus]-this->graph_slices[gpu]->out_offset[1]);
-                    else _data_slice->Init(this->num_gpus, this->gpu_idx[gpu], 1,
-                            this->sub_graphs[gpu].nodes,
+                            this->graph_slices[gpu]->out_offset[this->num_gpus]
+                              - this->graph_slices[gpu]->out_offset[1]);
+                    else _data_slice->Init(
+                            this->num_gpus, 
+                            this->gpu_idx[gpu], 
+                            1,
+                            0,
+                            &(this->sub_graphs[gpu]),
                             this->graph_slices[gpu]->in_offset[this->num_gpus],
-                            this->graph_slices[gpu]->out_offset[this->num_gpus]-this->graph_slices[gpu]->out_offset[1]);
+                            this->graph_slices[gpu]->out_offset[this->num_gpus]
+                                - this->graph_slices[gpu]->out_offset[1]);
                 } else {
-                    _data_slice->Init(this->num_gpus, this->gpu_idx[gpu], 0,
-                        this->sub_graphs[gpu].nodes, 0, 0);
+                    _data_slice->Init(
+                        this->num_gpus, 
+                        this->gpu_idx[gpu], 
+                        0,
+                        0,
+                        &(this->sub_graphs[gpu]), 
+                        0, 
+                        0);
                 }
             } //end for(gpu)
         } while (0);
