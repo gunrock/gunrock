@@ -142,29 +142,38 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
  # https://gist.github.com/robertmaynard/11297565
 
  # comment from @jowens:
- # this clang compiler version must be at least r201031, since that
- # fixes a template bug in clang.
+ #
+ # The clang compiler version to compile Gunrock must be at least
+ # r201031, since that fixes a template bug in clang.
  # http://llvm.org/bugs/show_bug.cgi?id=18009
- # ALSO it must be named "clang"/"clang++", or else nvcc goes
- # bananas. (Naming it "clang-mp-3.5", the name under which MacPorts
- # installs it, does not work for nvcc; nvcc decides its base compiler
- # based only the executable name, "clang"/"clang++", and if it
- # doesn't match those, it defaults back to a non-clang compiler.)
- # The hardwired-to-jowens shell script below is a two-line sh script
- # to a MacPorts llvm-3.5 (top-of-tree) install:
+ # As of July 2014, xcode's clang compiler version has not reached
+ # this point, and we don't expect it to in the near future. Thus,
+ # below, we use the macports (top-of-tree) build of clang for OS X.
+ #
+ # NOTE FOR CUDA 6.0: The clang compiler version must be named
+ # "clang"/"clang++", or else nvcc goes bananas. (Naming it
+ # "clang-mp-3.5", the name under which MacPorts installs it, does not
+ # work for nvcc; nvcc decides its base compiler based only the
+ # executable name, "clang"/"clang++", and if it doesn't match those,
+ # it defaults back to a non-clang compiler.) To solve this, write
+ # your own 2-line shell script named 'clang' that looks like this:
+ #
  # #!/bin/sh
  # exec /opt/local/libexec/llvm-3.5/bin/clang "${@}"
+ #
+ # NOTE FOR CUDA 6.5 RC: This appears to be fixed! This file thus
+ # reflects CUDA 6.5+.
 
- set( CUDA_HOST_COMPILER /Users/jowens/bin/clang/clang++ CACHE FILEPATH
- # set( CUDA_HOST_COMPILER /opt/local/bin/clang++-mp-3.5 CACHE FILEPATH
+ # set( CUDA_HOST_COMPILER /Users/jowens/bin/clang/clang++ CACHE FILEPATH
+ set( CUDA_HOST_COMPILER /opt/local/bin/clang++-mp-3.5 CACHE FILEPATH
    "Host side compiler used by NVCC"
    FORCE )
- set(CMAKE_C_COMPILER /Users/jowens/bin/clang/clang CACHE FILEPATH
- # set(CMAKE_C_COMPILER /opt/local/bin/clang-mp-3.5 CACHE FILEPATH
+ # set(CMAKE_C_COMPILER /Users/jowens/bin/clang/clang CACHE FILEPATH
+ set(CMAKE_C_COMPILER /opt/local/bin/clang-mp-3.5 CACHE FILEPATH
    "C compiler"
    FORCE )
- set(CMAKE_CXX_COMPILER /Users/jowens/bin/clang/clang++ CACHE FILEPATH
- # set(CMAKE_CXX_COMPILER /opt/local/bin/clang++-mp-3.5 CACHE FILEPATH
+ # set(CMAKE_CXX_COMPILER /Users/jowens/bin/clang/clang++ CACHE FILEPATH
+ set(CMAKE_CXX_COMPILER /opt/local/bin/clang++-mp-3.5 CACHE FILEPATH
    "CXX compiler"
    FORCE )
 
@@ -210,12 +219,11 @@ enable_testing()
 add_test(NAME TestTopK COMMAND test_topk)
 set_tests_properties(TestTopK
     PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*2.*: CV.*6")
-    
+
 add_test(NAME SimpleExample COMMAND simple_example market data/simple_example/bips98_606.mtx)
 set_tests_properties(SimpleExample
     PROPERTIES PASS_REGULAR_EXPRESSION "TEST PASSED")
-    
+
 add_test(NAME TestBFS COMMAND test_bfs market data/simple_example/bips98_606.mtx --src=largestdegree)
 set_tests_properties(TestBFS
     PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
-
