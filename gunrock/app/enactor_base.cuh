@@ -450,14 +450,14 @@ protected:
     }
 
     template <typename ProblemData>
-    cudaError_t Setup(
+    cudaError_t Init(
         ProblemData *problem,
         int max_grid_size,
         int advance_occupancy,
         int filter_occupancy,
         int node_lock_size = 256)
-    {
-        util::cpu_mt::PrintMessage("EnactorBase Setup() begin.");
+    { 
+        util::cpu_mt::PrintMessage("EnactorBase Init() begin.");
         cudaError_t retval = cudaSuccess;
 
         for (int gpu=0;gpu<num_gpus;gpu++)
@@ -484,12 +484,12 @@ protected:
             if (retval = util::GRError(cudaEventCreateWithFlags(&enactor_stats[gpu].throttle_event, cudaEventDisableTiming),                
                     "BFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
                 
-            enactor_stats[gpu].iteration             = 0;
-            enactor_stats[gpu].total_runtimes        = 0;
-            enactor_stats[gpu].total_lifetimes       = 0;
-            enactor_stats[gpu].total_queued          = 0;
-            enactor_stats[gpu].done[0]               = -1;
-            enactor_stats[gpu].retval                = cudaSuccess;
+            //enactor_stats[gpu].iteration             = 0;
+            //enactor_stats[gpu].total_runtimes        = 0;
+            //enactor_stats[gpu].total_lifetimes       = 0;
+            //enactor_stats[gpu].total_queued          = 0;
+            //enactor_stats[gpu].done[0]               = -1;
+            //enactor_stats[gpu].retval                = cudaSuccess;
             //enactor_stats.num_gpus              = 1;
             //enactor_stats.gpu_id                = 0;
 
@@ -509,6 +509,81 @@ protected:
         return retval;
     }
 
+    //template <typename ProblemData>
+    cudaError_t Reset()
+        //ProblemData *problem,
+        //int max_grid_size,
+        //int advance_occupancy,
+        //int filter_occupancy,
+        //int node_lock_size = 256)
+    {
+        util::cpu_mt::PrintMessage("EnactorBase Reset() begin.");
+        cudaError_t retval = cudaSuccess;
+
+        for (int gpu=0;gpu<num_gpus;gpu++)
+        {
+            /*if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
+            //initialize runtime stats
+            enactor_stats[gpu].advance_grid_size = MaxGridSize(gpu, advance_occupancy, max_grid_size);
+            enactor_stats[gpu].filter_grid_size  = MaxGridSize(gpu, filter_occupancy, max_grid_size);
+
+            if (retval = enactor_stats[gpu].advance_kernel_stats.Setup(enactor_stats[gpu].advance_grid_size)) return retval;
+            if (retval = enactor_stats[gpu]. filter_kernel_stats.Setup(enactor_stats[gpu]. filter_grid_size)) return retval;
+            //initialize the host-mapped "done"
+            int flags = cudaHostAllocMapped;
+
+            // Allocate pinned memory for done
+            if (retval = util::GRError(cudaHostAlloc((void**)&(enactor_stats[gpu].done), sizeof(int) * 1, flags),
+                    "BFSEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
+
+            // Map done into GPU space
+            if (retval = util::GRError(cudaHostGetDevicePointer((void**)&(enactor_stats[gpu].d_done), (void*) enactor_stats[gpu].done, 0),  
+                    "BFSEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
+
+            // Create throttle event
+            if (retval = util::GRError(cudaEventCreateWithFlags(&enactor_stats[gpu].throttle_event, cudaEventDisableTiming),                
+                    "BFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
+            */
+    
+            enactor_stats[gpu].iteration             = 0;
+            enactor_stats[gpu].total_runtimes        = 0;
+            enactor_stats[gpu].total_lifetimes       = 0;
+            enactor_stats[gpu].total_queued          = 0;
+            enactor_stats[gpu].done[0]               = -1;
+            enactor_stats[gpu].retval                = cudaSuccess;
+            //enactor_stats.num_gpus              = 1;
+            //enactor_stats.gpu_id                = 0;
+
+            //if (retval = util::GRError(cudaMalloc(
+            //                (void**)&enactor_stats.d_node_locks,
+            //                node_lock_size * sizeof(unsigned int)),
+            //            "EnactorBase cudaMalloc d_node_locks failed", __FILE__, __LINE__)) return retval;
+            //if (retval = enactor_stats[gpu].node_locks.Allocate(node_lock_size,util::DEVICE)) return retval;
+
+            //if (retval = util::GRError(cudaMalloc(
+            //                (void**)&enactor_stats.d_node_locks_out,
+            //                node_lock_size * sizeof(unsigned int)),
+            //            "EnactorBase cudaMalloc d_node_locks_out failed", __FILE__, __LINE__)) return retval;
+            //if (retval = enactor_stats[gpu].node_locks_out.Allocate(node_lock_size, util::DEVICE)) return retval;
+        }
+        util::cpu_mt::PrintMessage("EnactorBase Reset() end.");
+        return retval;
+    }
+
+    template <typename ProblemData>
+    cudaError_t Setup(
+        ProblemData *problem,
+        int max_grid_size,
+        int advance_occupancy,
+        int filter_occupancy,
+        int node_lock_size = 256)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        if (retval = Init(problem, max_grid_size, advance_occupancy, filter_occupancy, node_lock_size)) return retval;
+        if (retval = Reset()) return retval;
+        return retval;
+    }
     /**
      * @brief Utility function for getting the max grid size.
      *

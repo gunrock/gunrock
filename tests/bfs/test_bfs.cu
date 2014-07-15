@@ -350,7 +350,8 @@ void RunTests(
         num_gpus,
         gpu_idx,
         partition_method), "Problem BFS Initialization Failed", __FILE__, __LINE__);
-
+    util::GRError(bfs_enactor->Init (csr_problem, max_grid_size), "BFS Enactor init failed", __FILE__, __LINE__);
+    
     //
     // Compute reference CPU BFS solution for source-distance
     //
@@ -369,11 +370,13 @@ void RunTests(
     long long total_queued = 0;
     VertexId  search_depth = 0;
     double    avg_duty     = 0.0;
+   
 
     // Perform BFS
     CpuTimer cpu_timer;
 
     util::GRError(csr_problem->Reset(src, bfs_enactor->GetFrontierType(), max_queue_sizing), "BFS Problem Data Reset Failed", __FILE__, __LINE__);
+
     cpu_timer.Start();
     util::GRError(bfs_enactor->Enact(context, csr_problem, src, max_grid_size), "BFS Problem Enact Failed", __FILE__, __LINE__);
     cpu_timer.Stop();
@@ -584,7 +587,7 @@ void RunTests(
 * Main
 ******************************************************************************/
 
-int main( int argc, char** argv)
+int cpp_main( int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
     int        num_gpus = 0;

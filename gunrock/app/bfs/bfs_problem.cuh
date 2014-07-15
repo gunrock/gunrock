@@ -54,9 +54,14 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
     struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
     {
         // device storage arrays
-        util::Array1D<SizeT,VertexId > labels        ;   
-        util::Array1D<SizeT,VertexId > preds         ;   
-        util::Array1D<SizeT,unsigned char > visited_mask  ;
+        util::Array1D<SizeT, VertexId      > labels        ;   
+        util::Array1D<SizeT, VertexId      > preds         ;   
+        util::Array1D<SizeT, unsigned char > visited_mask  ;
+        util::Array1D<SizeT, unsigned char > temp_marker   ;
+        util::Array1D<SizeT, VertexId      > temp_preds    ;
+        util::Array1D<SizeT, unsigned int  > scanned_edges ;
+        util::scan::MultiScan<VertexId, SizeT, true, 256, 8>*
+                                             Scaner;
         /*int             num_associate,gpu_idx;
         util::Array1D<SizeT,VertexId > *associate_in[2];
         util::Array1D<SizeT,VertexId*> associate_ins[2];
@@ -77,7 +82,11 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             associate_out   = NULL;*/
             labels          .SetName("labels"          );  
             preds           .SetName("preds"           );  
-            visited_mask    .SetName("visited_mask"    );  
+            visited_mask    .SetName("visited_mask"    );
+            scanned_edges   .SetName("scanned_edges"   );
+            temp_preds      .SetName("temp_preds"      );
+            temp_marker     .SetName("temp_marker"     );
+            Scaner          = NULL;
             /*associate_ins[0].SetName("associate_ins[0]");
             associate_ins[1].SetName("associate_ins[1]");
             associate_outs  .SetName("associate_outs"  );  
@@ -99,6 +108,10 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             //keys_in    [0].Release();
             //keys_in    [1].Release();
             visited_mask  .Release();
+            scanned_edges .Release();
+            temp_preds    .Release();
+            temp_marker   .Release();
+            delete Scaner; Scaner=NULL;
             /*in_length  [0].Release();
             in_length  [1].Release();
             out_length    .Release();
@@ -155,11 +168,13 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 num_out_nodes)) return retval;
 
             // Create SoA on device
-            if (retval = labels.Allocate(graph->nodes,util::DEVICE)) return retval;
+            if (retval = labels       .Allocate(graph->nodes,util::DEVICE)) return retval;
+            if (retval = scanned_edges.Allocate(graph->edges,util::DEVICE)) return retval;
 
             if (_MARK_PREDECESSORS)
             {
-                if (retval = preds.Allocate(graph->nodes,util::DEVICE)) return retval;
+                if (retval = preds     .Allocate(graph->nodes,util::DEVICE)) return retval;
+                if (retval = temp_preds.Allocate(graph->nodes,util::DEVICE)) return retval;
             }
 
             if (_ENABLE_IDEMPOTENCE) 
@@ -173,6 +188,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 if (_MARK_PREDECESSORS)
                     this->vertex_associate_orgs[1] = preds.GetPointer(util::DEVICE);
                 if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
+                if (retval = temp_marker. Allocate(graph->nodes, util::DEVICE)) return retval;
+                Scaner = new util::scan::MultiScan<VertexId, SizeT, true, 256, 8>;
             }
             /*if (num_associate != 0)
             {

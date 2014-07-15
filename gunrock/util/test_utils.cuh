@@ -33,6 +33,9 @@
 #include <fstream>
 #include <algorithm>
 #include <utility>
+#include <boost/timer/timer.hpp>
+#include <boost/chrono/chrono.hpp>
+#include <boost/detail/lightweight_main.hpp>
 #include <gunrock/util/random_bits.cuh>
 #include <gunrock/util/basic_utils.cuh>
 #include <gunrock/util/error_utils.cuh>
@@ -606,7 +609,7 @@ struct CpuTimer
 
 #else
 
-    rusage start;
+    /*rusage start;
     rusage stop;
 
     void Start()
@@ -625,6 +628,23 @@ struct CpuTimer
         float usec = stop.ru_utime.tv_usec - start.ru_utime.tv_usec;
 
         return (sec * 1000) + (usec / 1000);
+    }*/
+
+    boost::timer::cpu_timer::cpu_timer cpu_t;
+
+    void Start()
+    {
+        cpu_t.start();
+    }
+
+    void Stop()
+    {
+        cpu_t.stop();
+    }
+
+    float ElapsedMillis()
+    {
+        return cpu_t.elapsed().wall/1000000.0;
     }
 
 #endif
