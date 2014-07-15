@@ -178,7 +178,11 @@ struct Csr
   {
     printf("  Reading directly from previously stored CSR arrays ...\n");
     
-    ifstream _file(f_in);
+    ifstream _file;
+    char buf[65536];
+    _file.rdbuf()->pubsetbuf(buf,65536);
+
+    _file.open(f_in);
     
     if (_file.is_open())
     {
