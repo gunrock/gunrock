@@ -135,6 +135,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             SizeT       &max_edge,
                             gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
     {
+        if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
+            d_vertex_id = d_column_indices[d_vertex_id];
+        }
         SizeT first = d_vertex_id >= max_vertex ? max_edge : d_row_offsets[d_vertex_id];
         SizeT second = (d_vertex_id + 1) >= max_vertex ? max_edge : d_row_offsets[d_vertex_id+1];
 

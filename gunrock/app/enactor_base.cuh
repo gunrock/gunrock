@@ -62,6 +62,7 @@ struct EnactorStats
 struct FrontierAttribute
 {
     unsigned int        queue_length;
+    unsigned int        output_length;
     unsigned int        queue_index;
     int                 selector;
     bool                queue_reset;
