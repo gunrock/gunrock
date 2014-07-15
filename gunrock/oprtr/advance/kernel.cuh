@@ -31,6 +31,42 @@ namespace gunrock {
 namespace oprtr {
 namespace advance {
 
+template<typename KernelPolicy, typename ProblemData, typename Functor>
+unsigned int ComputeOutputLength(
+                                    int                             num_block,
+                                    gunrock::app::FrontierAttribute &frontier_attribute,
+                                    typename KernelPolicy::SizeT    *d_offsets,
+                                    typename KernelPolicy::VertexId *d_indices,
+                                    typename KernelPolicy::VertexId *d_in_key_queue,
+                                    unsigned int                    *partitioned_scanned_edges,
+                                    typename KernelPolicy::SizeT    max_in,
+                                    typename KernelPolicy::SizeT    max_out,
+                                    CudaContext                     &context,
+                                    TYPE                            ADVANCE_TYPE) {
+
+    typedef typename ProblemData::SizeT         SizeT;
+
+    gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<KernelPolicy, ProblemData, Functor>
+        <<< num_block, KernelPolicy::THREADS >>>(
+                d_offsets,
+                d_indices,
+                d_in_key_queue,
+                partitioned_scanned_edges,
+                frontier_attribute.queue_length,
+                max_in,
+                max_out,
+                ADVANCE_TYPE);
+
+    Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length, (int)0, mgpu::plus<int>(),
+            (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
+
+    SizeT *temp = new SizeT[1];
+    cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
+    SizeT ret = temp[0];
+    delete[] temp;
+    return ret;
+}
+
 //TODO: finish LaucnKernel, should load diferent kernels according to their AdvanceMode
 //AdvanceType is the argument to send into each kernel call
 template <typename KernelPolicy, typename ProblemData, typename Functor>
@@ -56,7 +92,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             util::CtaWorkProgress                   work_progress,
             CudaContext                             &context,
             TYPE                                    ADVANCE_TYPE,
-            bool                                    inverse_graph = false)
+            bool                                    inverse_graph = false,
+            bool                                    get_output_length = true)
 {
     if (frontier_attribute.queue_length == 0) return;
     switch (KernelPolicy::ADVANCE_MODE)
@@ -101,7 +138,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             // load edge-expand-partitioned kernel
             //util::DisplayDeviceResults(d_in_key_queue, frontier_attribute.queue_length);
             int num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
-            gunrock::oprtr::edge_map_partitioned_backward::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
+            /*gunrock::oprtr::edge_map_partitioned_backward::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
             <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
                                         d_column_offsets,
                                         d_row_indices,
@@ -117,8 +154,20 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
 
             SizeT *temp = new SizeT[1];
             cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
-            SizeT output_queue_len = temp[0];
-            //printf("input queue:%d, output_queue:%d\n", frontier_attribute.queue_length, output_queue_len);
+            SizeT output_queue_len = temp[0];*/
+            //printf("input queue:%d, output_queue:%d\n", frontier_attribute.queue_length, frontier_attribute.output_length); 
+            if (get_output_length)
+                frontier_attribute.output_length = ComputeOutputLength<LBPOLICY, ProblemData, Functor>(
+                                    num_block,
+                                    frontier_attribute,
+                                    d_column_offsets,
+                                    d_row_indices,
+                                    d_in_key_queue,
+                                    partitioned_scanned_edges,
+                                    max_in,
+                                    max_out,
+                                    context,
+                                    ADVANCE_TYPE);
 
             if (frontier_attribute.selector == 1) {
                 // Edge Map
@@ -137,7 +186,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         backward_frontier_map_out,
                         data_slice,
                         frontier_attribute.queue_length,
-                        output_queue_len,
+                        frontier_attribute.output_length,
                         max_in,
                         max_out,
                         work_progress,
@@ -161,7 +210,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         backward_frontier_map_in,
                         data_slice,
                         frontier_attribute.queue_length,
-                        output_queue_len,
+                        frontier_attribute.output_length,
                         max_in,
                         max_out,
                         work_progress,
@@ -182,7 +231,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             // Use sorted sort to compute partition bound for each work-chunk
             // load edge-expand-partitioned kernel
             int num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
-            gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
+            /*gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
             <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
                                         d_row_offsets,
                                         d_column_indices,
@@ -198,11 +247,25 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
 
             SizeT *temp = new SizeT[1];
             cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
-            SizeT output_queue_len = temp[0];
+            SizeT output_queue_len = temp[0];*/
+
+            if (get_output_length)
+                frontier_attribute.output_length = ComputeOutputLength<LBPOLICY, ProblemData, Functor>(
+                                    num_block,
+                                    frontier_attribute,
+                                    d_row_offsets,
+                                    d_column_indices,
+                                    d_in_key_queue,
+                                    partitioned_scanned_edges,
+                                    max_in,
+                                    max_out,
+                                    context,
+                                    ADVANCE_TYPE);
             //printf("input_queue_len:%d\n", frontier_attribute.queue_length);
             //printf("output_queue_len:%d\n", output_queue_len);
 
-            //if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
+
+            //if (frontier_attribute.output_length < LBPOLICY::LIGHT_EDGE_THRESHOLD)
             {
                 gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
@@ -218,7 +281,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         d_out_key_queue,
                         data_slice,
                         frontier_attribute.queue_length,
-                        output_queue_len,
+                        frontier_attribute.output_length,
                         max_in,
                         max_out,
                         work_progress,
@@ -228,7 +291,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             }
             /*else
             {
-                unsigned int split_val = (output_queue_len + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
+                unsigned int split_val = (frontier_attribute.output_length + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
                 util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.d_node_locks, KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
                 SortedSearch<MgpuBoundsLower>(
                 enactor_stats.d_node_locks,
@@ -256,7 +319,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         d_out_key_queue,
                                         data_slice,
                                         frontier_attribute.queue_length,
-                                        output_queue_len,
+                                        frontier_attribute.output_length,
                                         split_val,
                                         max_in,
                                         max_out,
