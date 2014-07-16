@@ -47,7 +47,7 @@ namespace util {
 	VertexId  *d_input,
 	SizeT     num_elements,
 	VertexId  *d_output,
-	SizeT     *num_selected)
+	unsigned int *num_selected)
     {
 	cudaError_t retval = cudaSuccess;
 
@@ -68,9 +68,9 @@ namespace util {
 	  cub::DoubleBuffer<VertexId> d_output_buffer(d_output, output);
 	*/
 
-	SizeT *d_num_selected = NULL;
+	unsigned int *d_num_selected = NULL;
 	if (util::GRError((retval = cudaMalloc(
-	    (void**)&d_num_selected, sizeof(int))),
+	    (void**)&d_num_selected, sizeof(unsigned int))),
 	    "CUBSelect d_num_selected malloc failed",
 	    __FILE__, __LINE__)) return retval;
 
@@ -122,7 +122,7 @@ namespace util {
 	if (util::GRError((retval = cudaMemcpy(
 	    num_selected,
 	    d_num_selected,
-	    sizeof(int),
+	    sizeof(unsigned int),
 	    cudaMemcpyDeviceToHost)),
 	    "CUBSelect copy back num_selected failed",
 	    __FILE__, __LINE__)) return retval;
