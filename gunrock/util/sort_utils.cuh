@@ -197,23 +197,23 @@ namespace util {
   template <
     typename SizeType,
     typename KeyType,
-    typename ValueType>
+    typename ValType>
   cudaError_t SegSortFromIndices(
     mgpu::CudaContext &context,
-    size_t    num_indices,
-    SizeType   *d_indices,
-    size_t    num_elements,
-    KeyType   *d_key,
-    ValueType *d_value = NULL)
+    size_t            num_indices,
+    SizeType          *d_indices,
+    size_t            num_elements,
+    KeyType           *d_key,
+    ValType           *d_val = NULL)
   {
 
     cudaError_t retval = cudaSuccess;
 
-    if (d_value)
+    if (d_val)
     {
       mgpu::SegSortPairsFromIndices(
 	d_key,
-	d_value,
+	d_val,
 	num_elements,
 	d_indices,
 	num_indices,
@@ -239,23 +239,23 @@ namespace util {
   template <
     typename SizeType,
     typename KeyType,
-    typename ValueType>
+    typename ValType>
   cudaError_t SegSortFromFlags(
-    mgpu::CudaContext &context,
-    SizeType  num_elements,
-    int       *d_flag,
-    KeyType   *d_key,
-    ValueType *d_value = NULL)
+    mgpu::CudaContext  &context,
+    SizeType           num_elements,
+    const unsigned int *d_flag,
+    KeyType            *d_key,
+    ValType            *d_val = NULL)
   {
     cudaError_t retval = cudaSuccess;
 
-    if (d_value)
+    if (d_val)
     {
       mgpu::SegSortPairsFromFlags(
 	d_key,
-	d_value,
-	d_flag,
+	d_val,
 	num_elements,
+	d_flag,
 	context);
     }
     else

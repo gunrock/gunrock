@@ -318,8 +318,6 @@ public:
       SizeT        num_edges_origin = graph_slice->edges; // used for mst output bitmap
       int          loop_limit = 0; // used for debug purpose
       bool         debug_info = 0; // used for debug purpose
-      int          tmp_length = 0; // used for debug purpose
-      int          tmp_select = 0; // used for debug purpose
       unsigned int *num_selected = new unsigned int; // used in cub::select
 
       // recursive Loop for minimum spanning tree implementations
@@ -343,12 +341,10 @@ public:
         {
           printf(":: read in row_offsets ::");
           util::DisplayDeviceResults(
-           graph_slice->d_row_offsets, graph_slice->nodes+1);
+            problem->data_slices[0]->d_row_offsets, graph_slice->nodes + 1);
         }
 
-        // generate d_flags_array from d_row_offsets using MarkSegmentFromIndices
-        util::MemsetKernel<unsigned int><<<128, 128>>>(
-          problem->data_slices[0]->d_flags_array, 0, graph_slice->edges);
+        // generate d_flags_array from d_row_offsets using MarkSegmentFromIndices kernel
         util::MarkSegmentFromIndices<<<128, 128>>>(
           problem->data_slices[0]->d_flags_array,
           graph_slice->d_row_offsets,
@@ -365,7 +361,7 @@ public:
         printf("* finished segmented sum inclusive scan: d_keys_array.\n");
         printf("A. MARKING THE MST EDGES\n");
         printf(" a. Finding Minimum Weighted Edges\n");
-
+        
         // each vertex u ﬁnds the minimum weighted edge to another vertex v
         // select minimum edge_weights and keys using ReduceByKey
         int num_segments;
@@ -380,19 +376,19 @@ public:
           problem->data_slices[0]->d_reduced_vals,
           &num_segments, (int*)0, context);
 
-        printf("  * finished segmented reduction: reduced keys and weights.\n");
+        printf("  * finished segmented reduction: reduced keys and edge weights.\n");
 
         if (debug_info)
         {
-           printf(":: origin d_flags_array ::");
-            util::DisplayDeviceResults(
-             problem->data_slices[0]->d_flags_array, graph_slice->edges);
+          printf(":: origin d_flags_array ::");
+          util::DisplayDeviceResults(
+            problem->data_slices[0]->d_flags_array, graph_slice->edges);
           printf(":: origin d_keys_array ::");
           util::DisplayDeviceResults(
             problem->data_slices[0]->d_keys_array, graph_slice->edges);
           printf(":: origin d_col_indices - edge list ::");
           util::DisplayDeviceResults(
-            graph_slice->d_column_indices, graph_slice->edges);
+            problem->data_slices[0]->d_col_indices, graph_slice->edges);
           printf(":: origin d_edge_weights ::");
           util::DisplayDeviceResults(
             problem->data_slices[0]->d_edge_weights, graph_slice->edges);
@@ -438,24 +434,24 @@ public:
           graph_slice->frontier_elements[frontier_attribute.selector^1],
           this->work_progress,
           context,
-          gunrock::oprtr::advance::V2V);
+          gunrock::oprtr::advance::V2E);
 
         if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
           "advance::Kernel failed", __FILE__, __LINE__))) break;
 
-        printf("  * finished find minimum weighted edges: successors array.\n");
+        printf("  * finished advance kernel created the successors array. \n");
 
         if (debug_info)
         {
           printf(":: successor array ::");
           util::DisplayDeviceResults(
             problem->data_slices[0]->d_successors, graph_slice->nodes);
-        /*  printf(":: mark select for mst_output boolean array ::");
+        /*  printf(":: mst_output boolean array ::");
           util::DisplayDeviceResults(
             problem->data_slices[0]->d_mst_output, num_edges_origin); */
         }
 
-        // remove cycles using RmCycFuntor - vertives with S(S(u)) = u forms cycles
+        // remove cycles using RmCycFuntor - Advance Edge Mapping, S(S(u)) = u
         frontier_attribute.queue_index  = 0;
         frontier_attribute.selector     = 0;
         frontier_attribute.queue_length = graph_slice->nodes;
@@ -487,7 +483,7 @@ public:
         if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
           "advance::Kernel failed", __FILE__, __LINE__))) break;
 
-        printf("  * finished removing cycles making vertices: new successors.\n");
+        printf("  * finished removing cycles making nodes: new successors. \n");
 
         if (debug_info)
         {
@@ -501,11 +497,14 @@ public:
 
         printf("B. GRAPH CONSTRUCTION\n");
         printf(" (a). Merging Vertices\n");
-        // Then, we combine vertices to form a supervertex by employing
+        // Next, we combine vertices to form a supervertex by employing
         // pointer doubling to achieve this result, iteratively setting
         // S(u) = S(S(u)) until no further change occurs in S
 
-        // using vertex mapping: PtrJumpFunctor // TODO: STUCK for large graph sometimes
+        // using vertex mapping: PtrJumpFunctor - successors set to representaties
+        // each vertex sets its value to its successor's successor, the vertices whose
+        // successors are set t themselves are represetatves for each supervertex
+        // TODO: STUCK for large graph sometimes!!!
         frontier_attribute.queue_index  = 0;
         frontier_attribute.selector     = 0;
         frontier_attribute.queue_length = graph_slice->nodes;
@@ -566,67 +565,64 @@ public:
 
         printf("  * finished pointer doubling: representatives.\n");
         printf(" (b).Assigning IDs to Supervertices\n");
-        // each vertex of a supervertex now has a representative, but the
-        // supervertices are not numbered in order. The vertices assigned
-        // to a supervertex are also not placed in order in the successor
+        // each vertex of a supervertex now has a representative, the the supervertices
+        // are not numbered in order. The vertices assigned to a supervertex are also
+        // not placed in order in the successor array.
 
-        // bring all vertices of a supervertex together by sorting Constructing the Vertex List
+        // bring all vertices of a supervertex together
         util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_super_vids,
+          problem->data_slices[0]->d_super_vertex,
           problem->data_slices[0]->d_successors,
           graph_slice->nodes);
-
-        util::MemsetIdxKernel<<<128, 128>>>(
-        problem->data_slices[0]->d_origin_nodes, graph_slice->nodes);
-
         util::CUBRadixSort<VertexId, VertexId>(
           true,
           graph_slice->nodes,
-          problem->data_slices[0]->d_super_vids,
-          problem->data_slices[0]->d_origin_nodes);
+          problem->data_slices[0]->d_super_vertex);
 
         if (debug_info)
         {
           printf(":: pointer jumping: representatives ::");
           util::DisplayDeviceResults(
             problem->data_slices[0]->d_successors, graph_slice->nodes);
-          printf(":: bring all vertices of a supervertex together ::");
-          util::DisplayDeviceResults(
-            problem->data_slices[0]->d_super_vids, graph_slice->nodes);
         }
 
         // create a flag to mark the boundaries of representative vertices
         util::MarkSegmentFromKeys<<<128, 128>>>(
           problem->data_slices[0]->d_flags_array,
-          problem->data_slices[0]->d_super_vids,
+          problem->data_slices[0]->d_super_vertex,
           graph_slice->nodes);
 
         printf("  * finished mark segment for supervertices: super flags.\n");
 
-        // sum scan of the super flags to assign new supervertex ids
+        // sum scan of super flags array to assign new supervertex ids
         Scan<MgpuScanTypeInc>(
           (int*)problem->data_slices[0]->d_flags_array, graph_slice->nodes,
           (int)0, mgpu::plus<int>(), (int*)0, (int*)0,
-          (int*)problem->data_slices[0]->d_super_vids, context);
+          (int*)problem->data_slices[0]->d_super_vertex, context);
 
-        printf("  * finished assign new supervertex ids: d_super_vids.\n");
+        printf("  * finished the scan of d_flags_array: d_super_vertex.\n");
 
         if (debug_info)
         {
+          //printf(":: new assigned super vertex ids ::");
+          //util::DisplayDeviceResults(
+          //  problem->data_slices[0]->d_super_vertex, graph_slice->nodes);
+          printf(":: selected vertices that will be super vertices ::");
+          util::DisplayDeviceResults(
+            problem->data_slices[0]->d_successors, graph_slice->nodes);
+          //printf(":: sorted origin_vertex ids by supervertices ::");
+          //util::DisplayDeviceResults(
+          //  problem->data_slices[0]->d_origin_nodes, graph_slice->nodes);
           printf(":: super flags (a.k.a. c flag) ::");
           util::DisplayDeviceResults(
             problem->data_slices[0]->d_flags_array, graph_slice->nodes);
-          printf(":: new assigned supervertex ids ::");
+          printf(":: scan of super flags - new super_vertex ids ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_super_vids, graph_slice->nodes);
+            problem->data_slices[0]->d_super_vertex, graph_slice->nodes);
         }
 
-        // used for finding supervertex ids for next iteration
-        util::CUBRadixSort<VertexId, VertexId>(
-          true,
-          graph_slice->nodes,
-          problem->data_slices[0]->d_origin_nodes,
-          problem->data_slices[0]->d_super_vids);
+        printf(" (c). Removing Edges and Forming the new Edge List\n");
+        // shorten the edge list by removing self edges in the new graph
 
         // update graph_slice->nodes with number of supervertices
         SizeT current_nodes = graph_slice->nodes;
@@ -643,9 +639,6 @@ public:
         {
           printf("END OF THE MINIMUM SPANNING TREE ALGORITHM.\n"); break;
         }
-
-        printf(" (c). Removing Edges and Forming the new Edge List\n");
-        // shorten the edge list by removing self edges in the new graph
 
         // advance edge mapping remove edges belonging to the same supervertex
         // each edge examines the supervertex id of both end vertices and removes
@@ -694,7 +687,7 @@ public:
           problem->data_slices[0]->d_col_indices,
           num_selected);
 
-        // filter to remove all -1 in d_edge_weights
+        // filter to remove all -1 in d_col_indices
         util::MemsetCopyVectorKernel<<<128, 128>>>(
           problem->data_slices[0]->d_temp_storage,
           problem->data_slices[0]->d_edge_weights,
@@ -705,7 +698,7 @@ public:
           problem->data_slices[0]->d_edge_weights,
           num_selected);
 
-        // filter to remove all -1 in d_keys_array
+        // filter to remove all -1 in d_col_indices
         util::MemsetCopyVectorKernel<<<128, 128>>>(
           problem->data_slices[0]->d_temp_storage,
           problem->data_slices[0]->d_keys_array,
@@ -716,7 +709,7 @@ public:
           problem->data_slices[0]->d_keys_array,
           num_selected);
 
-        // filter to remove all -1 in d_origin_edges
+        // filter to remove all -1 in d_col_indices
         util::MemsetCopyVectorKernel<<<128, 128>>>(
           problem->data_slices[0]->d_temp_storage,
           problem->data_slices[0]->d_origin_edges,
@@ -750,7 +743,7 @@ public:
             problem->data_slices[0]->d_origin_edges, graph_slice->edges);
         }
 
-        // find supervertex ids for d_keys_array and d_col_indices
+        // find representatives for keys array
         frontier_attribute.queue_index  = 0;
         frontier_attribute.selector     = 0;
         frontier_attribute.queue_length = graph_slice->edges;
@@ -777,19 +770,19 @@ public:
         if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
           "filter::Kernel failed", __FILE__, __LINE__))) break;
 
-        printf("  * finished find supervertex ids for keys and col_indices. \n");
+        printf("  * finished find representatives for keys and col_indices. \n");
 
         if (debug_info)
         {
-          printf(":: keys_array found supervertex ids ::");
+          printf(":: keys_array found representatives ::");
           util::DisplayDeviceResults(
             problem->data_slices[0]->d_keys_array, graph_slice->edges);
-          printf(":: edgeId_list found supervertex ids ::");
+          printf(":: edgeId_list found representatives ::");
           util::DisplayDeviceResults(
             problem->data_slices[0]->d_col_indices, graph_slice->edges);
         }
 
-        if (false)// (enactor_stats.iteration == 0)
+        if (0)//(enactor_stats.iteration == 0)
         {
           // generate flag array for next iteration using MarkSegmentFromKeys kernel
           util::MarkSegmentFromKeys<<<128, 128>>>(
@@ -800,7 +793,7 @@ public:
           util::MemsetKernel<unsigned int><<<128, 128>>>(
             problem->data_slices[0]->d_flags_array, 1, 1);
 
-          printf("  * finished create edge flag array for segmented sort.\n");
+          printf("  * finished create edge flag array to mark segment for sorting.\n");
 
           if (debug_info)
           {
@@ -835,13 +828,13 @@ public:
 
           if (debug_info)
           {
-            printf(":: duplicated edges between supervertices (d_col_indices) ::");
+            printf(":: removing duplicated edges between supervertices (d_col_indices) ::");
             util::DisplayDeviceResults(
               problem->data_slices[0]->d_col_indices, graph_slice->edges);
-            printf(":: duplicated edges between supervertices (d_edge_weights) ::");
+            printf(":: removing duplicated edges between supervertices (d_edge_weights) ::");
             util::DisplayDeviceResults(
               problem->data_slices[0]->d_edge_weights, graph_slice->edges);
-            printf(":: duplicated edges between supervertices (d_origin_edges) ::");
+            printf(":: removing duplicated edges between supervertices (d_origin_edges) ::");
             util::DisplayDeviceResults(
               problem->data_slices[0]->d_origin_edges, graph_slice->edges);
           }
@@ -881,18 +874,27 @@ public:
             "filter::Kernel failed", __FILE__, __LINE__))) break;
 
           printf("  * finished calculate edge flags for second edge removal.\n");
+/*
+          // scan output used for compaction
+          Scan<MgpuScanTypeInc>(
+            (int*)problem->data_slices[0]->d_edge_flags,
+            graph_slice->edges, (int)0, mgpu::plus<int>(), (int*)0, (int*)0,
+            (int*)problem->data_slices[0]->d_edge_keys, context);
 
+          printf("  * finished scan of edge flags array: d_edge_keys\n");
+*/
           if (debug_info)
           {
-            printf(":: duplicated edges between supervertices d_edge_flags ::");
+            printf(":: remove duplicated edges between supervertices d_edge_flags ::");
             util::DisplayDeviceResults(
               problem->data_slices[0]->d_edge_flags, graph_slice->edges);
-            printf(":: duplicated edges between supervertices d_edge_keys ::");
+            printf(":: remove duplicated edges between supervertices d_edge_keys ::");
             util::DisplayDeviceResults(
               problem->data_slices[0]->d_edge_keys, graph_slice->edges);
           }
 
-          // mark -1 to edges that needed to be removed using advance kernel
+          // mark -1 to edges that needed to be removed using advance
+          // d_origin_edges, d_edge_weights, d_keys_array, d_origin_edges = -1 if d_flags_array[node] == 0
           frontier_attribute.queue_index  = 0;
           frontier_attribute.selector     = 0;
           frontier_attribute.queue_length = graph_slice->edges;
@@ -994,36 +996,13 @@ public:
           }
         } // end if
 
+        // copy back new generated d_col_indices back to column indices in graph_slice
+        util::MemsetCopyVectorKernel<<<128, 128>>>(
+          graph_slice->d_column_indices,
+          problem->data_slices[0]->d_col_indices,
+          graph_slice->edges);
+
         printf(" (d). Constructing the Vertex List.\n");
-
-        // bring edges, weights, origin_eids together according to keys
-        util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_temp_storage,
-          problem->data_slices[0]->d_keys_array,
-          graph_slice->edges);
-
-        util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_edge_offsets, // used as another temp storage space TODO:
-          problem->data_slices[0]->d_keys_array,
-          graph_slice->edges);
-
-        util::CUBRadixSort<VertexId, VertexId>(
-          true,
-          graph_slice->edges,
-          problem->data_slices[0]->d_keys_array,
-          problem->data_slices[0]->d_col_indices);
-
-        util::CUBRadixSort<VertexId, Value>(
-          true,
-          graph_slice->edges,
-          problem->data_slices[0]->d_temp_storage,
-          problem->data_slices[0]->d_edge_weights);
-
-        util::CUBRadixSort<VertexId, VertexId>(
-          true,
-          graph_slice->edges,
-          problem->data_slices[0]->d_edge_offsets,
-          problem->data_slices[0]->d_origin_edges);
 
         // flag array used for getting row_offsets for next iteration
         util::MarkSegmentFromKeys<<<128, 128>>>(
@@ -1062,12 +1041,6 @@ public:
         if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
           "filter::Kernel failed", __FILE__, __LINE__))) break;
 
-        // copy back new generated d_col_indices back to column indices in graph_slice
-        util::MemsetCopyVectorKernel<<<128, 128>>>(
-          graph_slice->d_column_indices,
-          problem->data_slices[0]->d_col_indices,
-          graph_slice->edges);
-
         // set last element of row_offsets manually & copy back to graph_slice
         util::MemsetKernel<<<128, 128>>>(
           problem->data_slices[0]->d_row_offsets + graph_slice->nodes,
@@ -1082,11 +1055,10 @@ public:
         printf("END OF ITERATION:%lld #NODES LEFT: %d #EDGES LEFT: %d\n",
           enactor_stats.iteration, graph_slice->nodes, graph_slice->edges);
 
-        // number of selected edges current iteration
-        tmp_select = tmp_length;
-        tmp_length = Reduce(
+        // number of selected edges so far
+        int tmp_length = Reduce(
           problem->data_slices[0]->d_mst_output, num_edges_origin, context);
-        printf(" Number of selected edges current iteration - %d\n", tmp_length-tmp_select);
+        printf(" Number of selected edges so far - %d\n", tmp_length);
 
         enactor_stats.iteration++;
 
@@ -1096,7 +1068,7 @@ public:
             frontier_attribute.queue_index,
             frontier_attribute.queue_length)) break;
           enactor_stats.total_queued += frontier_attribute.queue_length;
-          if (DEBUG) printf(", %lld", (long long) frontier_attribute.queue_length);
+          //if (DEBUG) printf(", %lld", (long long) frontier_attribute.queue_length);
           if (INSTRUMENT)
           {
             if (retval = enactor_stats.filter_kernel_stats.Accumulate(
@@ -1105,17 +1077,17 @@ public:
               enactor_stats.total_lifetimes)) break;
           }
           //if (done[0] == 0) break; // check if done
-          if (DEBUG) printf("\n %lld \n", (long long) enactor_stats.iteration);
+          //if (DEBUG) printf("\n %lld \n", (long long) enactor_stats.iteration);
         }
 
         loop_limit++; // debug
-        if (loop_limit >= 1000) break; // debug
+        if (loop_limit >= 1) break; // debug
       } // end of the recursive loop
 
       // final number of selected edges
       int num_edges_selected = Reduce(
         problem->data_slices[0]->d_mst_output, num_edges_origin, context);
-      printf("NUMBER OF EDGES SELECTED - %4d\n", num_edges_selected);
+      printf("* Number of edges selected - %4d\n", num_edges_selected);
 
       delete num_selected;
 

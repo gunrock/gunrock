@@ -42,11 +42,11 @@ template <
     bool     _USE_DOUBLE_BUFFER>
 struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 {
-    typedef _VertexId VertexId;
-    typedef _SizeT    SizeT;
-    typedef _Value    Value;
+    typedef _VertexId	VertexId;
+    typedef _SizeT	SizeT;
+    typedef _Value	Value;
 
-    static const bool MARK_PREDECESSORS  = true;
+    static const bool MARK_PREDECESSORS	 = true;
     static const bool ENABLE_IDEMPOTENCE = false;
 
     //Helper structures
@@ -59,24 +59,24 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 	SizeT    *d_labels;
 
 	// device storage arrays
-	unsigned int *d_flags_array;  //!< flags 1 start of segment, 0 otherwise
-	VertexId     *d_keys_array;   //!< keys array - scan of the flags array
-	Value        *d_reduced_vals; //!< store reduced minimum weights
-	VertexId     *d_reduced_keys; //!< reduced keys array
-	VertexId     *d_successors;   //!< dst vertices that have min weight
-	int          *d_mst_output;   //!< mark selected edges with 1
-	Value        *d_edge_weights; //!< store weights per edge
-	Value        *d_temp_storage; //!< used for storing temp arrays
-	int          *d_vertex_flag;  //!< finish flag for per-vertex kernels
-	VertexId     *d_origin_nodes; //!< used to track origin vertex ids
-	VertexId     *d_origin_edges; //!< origin edge list keep track of eids
-	SizeT        *d_super_vids;   //!< super vertex ids scaned from flags
-	VertexId     *d_super_edges;  //!< super edge list for next iteration
-	VertexId     *d_col_indices;  //!< column indices of csr graph (edges)
-	SizeT        *d_row_offsets;  //!< row offsets of csr graph
-	unsigned int *d_edge_flags;   //!< flags from the output of seg sort
-	VertexId     *d_edge_keys;    //!< a keys array scan of edge flags array
-	SizeT        *d_edge_offsets; //!< edge offsets used for filter edges
+	unsigned int *d_flags_array;  //!< flags - 1 start of segment, 0 otherwise
+	VertexId *d_keys_array;   //!< keys array - scan of the flags array
+	Value	 *d_reduced_vals; //!< store reduced minimum weights
+	VertexId *d_reduced_keys; //!< reduced keys array
+	VertexId *d_successors;	  //!< dst vertices that have min weight
+	int	 *d_mst_output;   //!< mark selected edges with 1
+	Value    *d_edge_weights; //!< store weights per edge
+	Value    *d_temp_storage; //!< used for storing temp arrays
+	int	 *d_vertex_flag;  //!< finish flag for per-vertex kernels
+	VertexId *d_origin_nodes; //!< used to track origin vertex ids
+	VertexId *d_origin_edges; //!< origin edge list keep track of edge ids
+	SizeT	 *d_super_vertex; //!< super vertex ids scaned from super flag
+	VertexId *d_super_edges;  //!< super edge list for next iteration
+	VertexId *d_col_indices;  //!< column indices of csr graph (dst vertex ids)
+	SizeT	 *d_row_offsets;  //!< row offsets of csr graph
+	unsigned int *d_edge_flags;   //!< flags array from the output of seg sort
+	VertexId *d_edge_keys;	  //!< a keys array scan of edge flags array
+	SizeT    *d_edge_offsets; //!< edge offsets used for filter edge list
     };
 
     // Members
@@ -171,9 +171,9 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 	    if (data_slices[i]->d_origin_nodes)
 		util::GRError(cudaFree(data_slices[i]->d_origin_nodes),
 		"GpuSlice cudaFree d_origin_nodes failed", __FILE__, __LINE__);
-	    if (data_slices[i]->d_super_vids)
-		util::GRError(cudaFree(data_slices[i]->d_super_vids),
-		"GpuSlice cudaFree d_super_vids failed", __FILE__, __LINE__);
+	    if (data_slices[i]->d_super_vertex)
+		util::GRError(cudaFree(data_slices[i]->d_super_vertex),
+		"GpuSlice cudaFree d_super_vertex failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_origin_edges)
 		util::GRError(cudaFree(data_slices[i]->d_origin_edges),
 		"GpuSlice cudaFree d_origin_edges failed", __FILE__, __LINE__);
@@ -238,7 +238,7 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 		// TODO: multi-GPU extract result
 	    } //end if (data_slices.size() ==1)
 	} while(0);
-	return retval;
+	return cudaSuccess;
     }
 
     /**
@@ -436,15 +436,15 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 		util::MemsetIdxKernel<<<128, 128>>>(
 		    data_slices[0]->d_origin_nodes, nodes);
 
-		VertexId *d_super_vids;
+		VertexId *d_super_vertex;
 		if (retval = util::GRError(cudaMalloc(
-		    (void**)&d_super_vids,
+		    (void**)&d_super_vertex,
 		    nodes * sizeof(VertexId)),
-		    "MSTProblem cudaMalloc d_super_vids Failed",
+		    "MSTProblem cudaMalloc d_super_vertex Failed",
 		    __FILE__, __LINE__)) return retval;
-		data_slices[0]->d_super_vids = d_super_vids;
+		data_slices[0]->d_super_vertex = d_super_vertex;
 		util::MemsetKernel<<<128, 128>>>(
-		    data_slices[0]->d_super_vids, 0, nodes);
+		    data_slices[0]->d_super_vertex, 0, nodes);
 
 		VertexId *d_origin_edges;
 		if (retval = util::GRError(cudaMalloc(
@@ -664,14 +664,14 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
 		data_slices[gpu]->d_origin_nodes = d_origin_nodes;
 	    }
 
-	    if (!data_slices[gpu]->d_super_vids) {
-		VertexId *d_super_vids;
+	    if (!data_slices[gpu]->d_super_vertex) {
+		VertexId *d_super_vertex;
 		if (retval = util::GRError(cudaMalloc(
-		    (void**)&d_super_vids,
+		    (void**)&d_super_vertex,
 		    nodes * sizeof(VertexId)),
-		    "MSTProblem cudaMalloc d_super_vids Failed",
+		    "MSTProblem cudaMalloc d_super_vertex Failed",
 		    __FILE__, __LINE__)) return retval;
-		data_slices[gpu]->d_super_vids = d_super_vids;
+		data_slices[gpu]->d_super_vertex = d_super_vertex;
 	    }
 
 	    if (!data_slices[gpu]->d_origin_edges) {

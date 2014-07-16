@@ -60,19 +60,19 @@ bool g_stream_from_host;
  ******************************************************************************/
 void Usage()
 {
-    printf(
-	"\ntest_mst <graph type> <graph type args> [--device=<device_index>] "
-	"[--instrumented] [--quick] "
-	"[--v]\n"
-	"\n"
-	"Graph types and args:\n"
-	"  market [<file>]\n"
-	"    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
-	"    edges from stdin (or from the optionally-specified file).\n"
-	"  --device=<device_index>  Set GPU device for running the graph primitive.\n"
-	"  --instrumented If set then kernels keep track of queue-search_depth\n"
-	"  and barrier duty (a relative indicator of load imbalance.)\n"
-	"  --quick If set will skip the CPU validation code.\n");
+  printf(
+  "\ntest_mst <graph type> <graph type args> [--device=<device_index>] "
+  "[--instrumented] [--quick] "
+  "[--v]\n"
+  "\n"
+  "Graph types and args:\n"
+  "  market [<file>]\n"
+  "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
+  "    edges from stdin (or from the optionally-specified file).\n"
+  "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
+  "  --instrumented If set then kernels keep track of queue-search_depth\n"
+  "  and barrier duty (a relative indicator of load imbalance.)\n"
+  "  --quick If set will skip the CPU validation code.\n");
 }
 
 /**
@@ -80,11 +80,38 @@ void Usage()
  *
  */
 template<
-    typename Value,
-    typename SizeT>
-void DisplaySolution()
+  typename VertexId,
+  typename Value,
+  typename SizeT>
+void DisplaySolution(
+  const Csr<VertexId, Value, SizeT> &graph, int *mst_output)
 {
-    // TODO:
+  VertexId *temp_keys = new VertexId[graph.edges];
+  for (int i = 0; i < graph.nodes; ++i)
+  {
+    for (int j = graph.row_offsets[i]; j < graph.row_offsets[i+1]; ++j)
+    {
+      temp_keys[j] = i;
+    }
+  }
+
+  for (int i = 0; i < graph.edges; ++i)
+  {
+    if (mst_output[i] == 1)
+    {
+      if (graph.column_indices[i] != temp_keys[i])
+      {
+        std::cout << "parent[" << temp_keys[i] << "] = "
+                  << graph.column_indices[i] << std::endl;
+      }
+      else
+      {
+        std::cout << "parent[" << temp_keys[i] << "] = no parent" << std::endl;
+      }
+    }
+  }
+
+  if (temp_keys) { delete [] temp_keys; }
 }
 
 /**
@@ -93,9 +120,9 @@ void DisplaySolution()
  */
 int compareResults()
 {
-    // TODO:
-    printf(" Comparing results ...\n");
-    return 0;
+  // TODO:
+  printf(" Comparing results ...\n");
+  return 0;
 }
 
 /******************************************************************************
@@ -111,88 +138,76 @@ int compareResults()
  * @param[in] graph Reference to the CSR graph we process on
  */
 template<
-    typename VertexId,
-    typename Value,
-    typename SizeT>
+  typename VertexId,
+  typename Value,
+  typename SizeT>
 void SimpleReferenceMST(
-    Value *edge_values,
-    const Csr<VertexId, Value, SizeT> &graph)
+  Value *edge_values, const Csr<VertexId, Value, SizeT> &graph)
 {
-    const int num_nodes = graph.nodes;
-    const int num_edges = graph.edges;
-    printf(" CPU Reference: #nodes: %d #edges: %d\n", num_nodes, num_edges);
+  const int num_nodes = graph.nodes;
+  const int num_edges = graph.edges;
+  printf(" CPU Reference Test: #nodes: %d #edges: %d\n", num_nodes, num_edges);
 
-    //Preparation
-    using namespace boost;
-    typedef adjacency_list <
-	vecS, vecS, undirectedS,
-	property< vertex_distance_t, int >,
-	property < edge_weight_t, int > > Graph;
+  //Preparation
+  using namespace boost;
+  typedef adjacency_list <
+    vecS, vecS, undirectedS,
+    property< vertex_distance_t, int >,
+    property < edge_weight_t, int > > Graph;
 
-    typedef std::pair<int, int> E;
-    E *edge_pairs = new E[num_edges];
-    int idx = 0;
+  typedef std::pair<int, int> E;
+  E *edge_pairs = new E[num_edges];
+  int idx = 0;
 
-    for (int i = 0; i < num_nodes; ++i)
+  for (int i = 0; i < num_nodes; ++i)
+  {
+    for (int j = graph.row_offsets[i]; j < graph.row_offsets[i+1]; ++j)
     {
-	for (int j = graph.row_offsets[i]; j < graph.row_offsets[i+1]; ++j)
-	{
-	    edge_pairs[idx++] = std::make_pair(i, graph.column_indices[j]);
-	}
+      edge_pairs[idx++] = std::make_pair(i, graph.column_indices[j]);
     }
+  }
 
-    // original total edge_values
-    int weight_sum = 0;
-    for (int edgeIter = 0; edgeIter < num_edges; ++edgeIter)
+  Graph g(edge_pairs, edge_pairs + num_edges, edge_values, num_nodes);
+  property_map<Graph, edge_weight_t>::type weightmap = get(edge_weight, g);
+  std::vector<graph_traits<Graph>::vertex_descriptor> p(num_vertices(g));
+
+  typedef graph_traits<Graph>::edge_iterator edge_iterator;
+
+  std::pair<edge_iterator, edge_iterator> ei = edges(g);
+
+  // selected total edge_values
+  int weight_sum = 0;
+  for (int edgeIter = 0; edgeIter < num_edges; ++edgeIter)
+  {
+    weight_sum += edge_values[edgeIter];
+  }
+
+  // Compute MST using CPU
+  CpuTimer cpu_timer; // record the kernel running time
+
+  cpu_timer.Start();
+  prim_minimum_spanning_tree(g, &p[0]);
+  cpu_timer.Stop();
+
+  float elapsed_cpu = cpu_timer.ElapsedMillis();
+
+  // display graph results
+  for (std::size_t i = 0; i != p.size(); ++i)
+  {
+    if (p[i] != i)
     {
-	weight_sum += edge_values[edgeIter];
+      std::cout << "parent[" << i << "] = " << p[i] << std::endl;
     }
-    //printf(" Original Total Weights: %d\n", weight_sum);
-
-    Graph g(edge_pairs, edge_pairs + num_edges, edge_values, num_nodes);
-    property_map<Graph, edge_weight_t>::type weightmap = get(edge_weight, g);
-    std::vector<graph_traits<Graph>::vertex_descriptor> p(num_vertices(g));
-
-    typedef graph_traits<Graph>::edge_iterator edge_iterator;
-
-    std::pair<edge_iterator, edge_iterator> ei = edges(g);
-
-    /*
-    // display graph
-    for(edge_iterator edge_iter = ei.first; edge_iter != ei.second; ++edge_iter)
+    else
     {
-    std::cout << "(" << source(*edge_iter, g)
-              << ", " << target(*edge_iter, g) << ")\n";
+      std::cout << "parent[" << i << "] = no parent" << std::endl;
     }
-    */
+  }
 
-    // Compute MST using CPU
-    CpuTimer cpu_timer; // record the kernel running time
+  printf(" Number of edges in MST: %ld\n", p.size() - 1);
+  //printf(" Selected Total Weights: %d\n", weight_sum);
+  printf(" CPU Minimum Spanning Tree Computation Complete in %lf msec.\n", elapsed_cpu);
 
-    cpu_timer.Start();
-    prim_minimum_spanning_tree(g, &p[0]);
-    cpu_timer.Stop();
-
-    float elapsed_cpu = cpu_timer.ElapsedMillis();
-
-    /*
-    // display graph results
-    for (std::size_t i = 0; i != p.size(); ++i)
-    {
-        if (p[i] != i)
-	{
-	std::cout << "parent[" << i << "] = " << p[i] << std::endl;
-	}
-	else
-	{
-	std::cout << "parent[" << i << "] = no parent" << std::endl;
-	}
-    }
-    */
-
-    printf(" Number of edges in MST - %ld\n", p.size() - 1);
-    printf(" CPU Minimum Spanning Tree Computation Complete. \n");
-    printf(" CPU MST finished in %lf msec.\n", elapsed_cpu);
 }
 
 /**
@@ -210,72 +225,76 @@ void SimpleReferenceMST(
  *
  */
 template <
-    typename VertexId,
-    typename Value,
-    typename SizeT,
-    bool INSTRUMENT>
+  typename VertexId,
+  typename Value,
+  typename SizeT,
+  bool INSTRUMENT>
 void RunTests(
-    const Csr<VertexId, Value, SizeT> &graph,
-    int max_grid_size,
-    int num_gpus,
-    mgpu::CudaContext& context)
+  const Csr<VertexId, Value, SizeT> &graph,
+  int max_grid_size,
+  int num_gpus,
+  mgpu::CudaContext& context)
 {
-    // define the problem data structure for graph primitive
-    typedef MSTProblem<
-	VertexId,
-	SizeT,
-	Value,
-	true> Problem;
+  // define the problem data structure for graph primitive
+  typedef MSTProblem<
+  VertexId,
+  SizeT,
+  Value,
+  true> Problem;
 
-    // INSTRUMENT specifies whether we want to keep such statistical data
-    // allocate MST enactor map
-    MSTEnactor<INSTRUMENT> mst_enactor(g_verbose);
+  // INSTRUMENT specifies whether we want to keep such statistical data
+  // allocate MST enactor map
+  MSTEnactor<INSTRUMENT> mst_enactor(g_verbose);
 
-    // allocate problem on GPU
-    // Create a pointer of the MSTProblem type
-    Problem *mst_problem = new Problem;
+  // allocate problem on GPU
+  // Create a pointer of the MSTProblem type
+  Problem *mst_problem = new Problem;
 
-    // copy data from CPU to GPU
-    // initialize data members in DataSlice
-    util::GRError(mst_problem->Init(
-	g_stream_from_host,
-	graph,
-	num_gpus),
-	"Problem MST Initialization Failed",
-	__FILE__, __LINE__);
+  // malloc host results spaces
+  VertexId *h_mst_output = (VertexId*)malloc(sizeof(VertexId) * graph.edges);
 
-    // perform MST
-    GpuTimer gpu_timer; // Record the kernel running time
+  // copy data from CPU to GPU
+  // initialize data members in DataSlice
+  util::GRError(mst_problem->Init(
+    g_stream_from_host,
+    graph,
+    num_gpus),
+    "Problem MST Initialization Failed",
+    __FILE__, __LINE__);
 
-    // reset values in DataSlice
-    util::GRError(mst_problem->Reset(mst_enactor.GetFrontierType()),
-		  "MST Problem Data Reset Failed", __FILE__, __LINE__);
+  // perform MST
+  GpuTimer gpu_timer; // Record the kernel running time
 
-    gpu_timer.Start();
+  // reset values in DataSlice
+  util::GRError(mst_problem->Reset(mst_enactor.GetFrontierType()),
+    "MST Problem Data Reset Failed", __FILE__, __LINE__);
 
-    util::GRError(mst_enactor.template Enact<Problem>(
-        context,
-	mst_problem,
-	max_grid_size),
-	"MST Problem Enact Failed", __FILE__, __LINE__);
+  gpu_timer.Start();
 
-    gpu_timer.Stop();
+  util::GRError(mst_enactor.template Enact<Problem>(
+    context,
+    mst_problem,
+    max_grid_size),
+    "MST Problem Enact Failed", __FILE__, __LINE__);
 
-    float elapsed_gpu = gpu_timer.ElapsedMillis();
-    printf(" GPU MST finished in %lf msec.\n", elapsed_gpu);
+  gpu_timer.Stop();
 
-    // Copy results back to CPU from GPU using Extract
-    // TODO: write the extract function
-    // util::GRError(csr_problem->Extract(h_result),
-    //	"MST Problem Data Extraction Failed", __FILE__, __LINE__);
+  float elapsed_gpu = gpu_timer.ElapsedMillis();
+  printf(" GPU MST finished in %lf msec.\n", elapsed_gpu);
 
-    // Display computed results
-    // DisplaySolution()
+  // Copy results back to CPU from GPU using Extract
+  // TODO: write the extract function
+  util::GRError(mst_problem->Extract(h_mst_output),
+    "MST Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    // Clean up id neccessary
-    if (mst_problem) delete mst_problem;
+  // Display computed results
+  DisplaySolution(graph, h_mst_output);
 
-    cudaDeviceSynchronize();
+  // Clean up id neccessary
+  if (mst_problem)  { delete mst_problem; }
+  if (h_mst_output) { free(h_mst_output); }
+
+  cudaDeviceSynchronize();
 }
 
 /**
@@ -289,39 +308,39 @@ void RunTests(
  * @param[in] args Reference to the command line arguments
  */
 template <
-    typename VertexId,
-    typename Value,
-    typename SizeT>
+  typename VertexId,
+  typename Value,
+  typename SizeT>
 void RunTests(
-    Csr<VertexId, Value, SizeT> &graph,
-    CommandLineArgs    &args,
-    mgpu::CudaContext& context)
+  Csr<VertexId, Value, SizeT> &graph,
+  CommandLineArgs    &args,
+  mgpu::CudaContext& context)
 {
-    bool instrumented = false; //!< do not collect instrumentation from kernels
-    int  max_grid_size = 0;    //!< maximum grid size (up to the enactor)
-    int  num_gpus = 1;         //!< number of GPUs for multi-gpu enactor to use
+  bool instrumented = false; //!< do not collect instrumentation from kernels
+  int  max_grid_size = 0;    //!< maximum grid size (up to the enactor)
+  int  num_gpus = 1;         //!< number of GPUs for multi-gpu enactor to use
 
-    instrumented = args.CheckCmdLineFlag("instrumented");
+  instrumented = args.CheckCmdLineFlag("instrumented");
 
-    g_quick = args.CheckCmdLineFlag("quick");
-    g_verbose = args.CheckCmdLineFlag("v");
+  g_quick = args.CheckCmdLineFlag("quick");
+  g_verbose = args.CheckCmdLineFlag("v");
 
-    if (instrumented)
-    {
-	RunTests<VertexId, Value, SizeT, true>(
-	    graph,
-	    max_grid_size,
-	    num_gpus,
-	    context);
-    }
-    else
-    {
-	RunTests<VertexId, Value, SizeT, false>(
-	    graph,
-	    max_grid_size,
-	    num_gpus,
-	    context);
-    }
+  if (instrumented)
+  {
+    RunTests<VertexId, Value, SizeT, true>(
+      graph,
+      max_grid_size,
+      num_gpus,
+      context);
+  }
+  else
+  {
+    RunTests<VertexId, Value, SizeT, false>(
+      graph,
+      max_grid_size,
+      num_gpus,
+      context);
+  }
 }
 
 /******************************************************************************
@@ -330,93 +349,94 @@ void RunTests(
 
 int main(int argc, char** argv)
 {
-    CommandLineArgs args(argc, argv);
+  CommandLineArgs args(argc, argv);
 
-    if ((argc < 2) || (args.CheckCmdLineFlag("help")))
-    {
-	Usage();
-	return 1;
-    }
+  if ((argc < 2) || (args.CheckCmdLineFlag("help")))
+  {
+    Usage();
+    return 1;
+  }
 
-    //DeviceInit(args);
-    //cudaSetDeviceFlags(cudaDeviceMapHost);
-    int dev = 0;
-    args.GetCmdLineArgument("device", dev);
-    mgpu::ContextPtr context = mgpu::CreateCudaDevice(dev);
-    //srand(0);	// Presently deterministic
-    //srand(time(NULL));
+  //DeviceInit(args);
+  //cudaSetDeviceFlags(cudaDeviceMapHost);
+  int dev = 0;
+  args.GetCmdLineArgument("device", dev);
+  mgpu::ContextPtr context = mgpu::CreateCudaDevice(dev);
+  //srand(0); // Presently deterministic
+  //srand(time(NULL));
 
-    // Parse graph-contruction params
-    g_undirected = true;
+  // Parse graph-contruction params
+  g_undirected = true;
 
-    std::string graph_type = argv[1];
-    int flags = args.ParsedArgc();
-    int graph_args = argc - flags - 1;
+  std::string graph_type = argv[1];
+  int flags = args.ParsedArgc();
+  int graph_args = argc - flags - 1;
 
+  if (graph_args < 1)
+  {
+    Usage();
+    return 1;
+  }
+
+  //
+  // Construct graph and perform search(es)
+  //
+
+  if (graph_type == "market")
+  {
+
+    // Matrix-market coordinate-formatted graph file
+
+    typedef int VertexId; //!< Use as the node identifier type
+    typedef int Value;    //!< Use as the value type
+    typedef int SizeT;    //!< Use as the graph size type
+
+    // default value for stream_from_host is false
     if (graph_args < 1)
     {
-	Usage();
-	return 1;
+      Usage();
+      return 1;
     }
 
-    //
-    // Construct graph and perform search(es)
-    //
+    char *market_filename = (graph_args == 2) ? argv[2] : NULL;
 
-    if (graph_type == "market")
-    {
+    // buildMarketGraph() reads a mtx file into CSR data structure
+    // Template argumet = true because the graph has edge values
+    Csr<VertexId, Value, SizeT> csr_gpu(false);
+    if (graphio::BuildMarketGraph<true>(
+      market_filename,
+      csr_gpu,
+      g_undirected,
+      false) != 0) { return 1; }
 
-	// Matrix-market coordinate-formatted graph file
+    // display graph
+    //csr_gpu.DisplayGraph();
 
-	typedef int VertexId; //!< Use as the node identifier type
-	typedef int Value;    //!< Use as the value type
-	typedef int SizeT;    //!< Use as the graph size type
+    // run gpu tests
+    RunTests(csr_gpu, args, *context);
 
-	// default value for stream_from_host is false
-	if (graph_args < 1)
-	{
-	    Usage();
-	    return 1;
-	}
+    // run cpu reference
+    // build a directed graph required by cpu reference computing
+    Csr<VertexId, Value, SizeT> csr_cpu(false);
+    if (graphio::BuildMarketGraph<true>(
+      market_filename,
+      csr_cpu,
+      g_undirected,
+      false) != 0) { return 1; }
 
-	char *market_filename = (graph_args == 2) ? argv[2] : NULL;
+    SimpleReferenceMST(csr_cpu.edge_values, csr_cpu);
 
-	// buildMarketGraph() reads a mtx file into CSR data structure
-	// Template argumet = true because the graph has edge values
-	Csr<VertexId, Value, SizeT> csr_gpu(false);
-	if (graphio::BuildMarketGraph<true>(
-	    market_filename,
-	    csr_gpu,
-	    g_undirected,
-	    false) != 0) { return 1; }
+    // verify results using compareResults() function
 
-	// display graph
-	//csr_gpu.DisplayGraph();
+  }
+  else
+  {
+    // Unknown graph type
+    fprintf(stderr, "Unspecified graph type\n");
+    return 1;
+  }
 
-	// run gpu tests
-	RunTests(csr_gpu, args, *context);
-
-	// run cpu reference
-	// build a directed graph required by cpu reference computing
-	Csr<VertexId, Value, SizeT> csr_cpu(false);
-	if (graphio::BuildMarketGraph<true>(
-	    market_filename,
-	    csr_cpu,
-	    g_undirected,
-	    false) != 0) { return 1; }
-
-	// SimpleReferenceMST(csr_cpu.edge_values, csr_cpu);
-
-	// verify results using compareResults() function
-    }
-    else
-    {
-	// Unknown graph type
-	fprintf(stderr, "Unspecified graph type\n");
-	return 1;
-    }
-
-    return 0;
+  return 0;
 }
 
 // Leave this at the end of the file
