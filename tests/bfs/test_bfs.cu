@@ -306,14 +306,15 @@ template <
     bool        ENABLE_IDEMPOTENCE>
 void RunTests(
     Csr<VertexId, Value, SizeT> 
-                &graph,
-    VertexId    src,
-    int         max_grid_size,
-    int         num_gpus,
-    double      max_queue_sizing,
-    ContextPtr *context,
-    std::string partition_method,
-    int         *gpu_idx)
+                 &graph,
+    VertexId     src,
+    int          max_grid_size,
+    int          num_gpus,
+    double       max_queue_sizing,
+    ContextPtr   *context,
+    std::string  partition_method,
+    int          *gpu_idx,
+    cudaStream_t *streams)
 {
     typedef BFSProblem<
         VertexId,
@@ -349,7 +350,8 @@ void RunTests(
         NULL,
         num_gpus,
         gpu_idx,
-        partition_method), "Problem BFS Initialization Failed", __FILE__, __LINE__);
+        partition_method,
+        streams), "Problem BFS Initialization Failed", __FILE__, __LINE__);
     util::GRError(bfs_enactor->Init (csr_problem, max_grid_size), "BFS Enactor init failed", __FILE__, __LINE__);
     
     //
@@ -449,7 +451,8 @@ void RunTests(
     CommandLineArgs             &args,
     int                         num_gpus,
     ContextPtr                  *context,
-    int                         *gpu_idx)
+    int                         *gpu_idx,
+    cudaStream_t                *streams)
 {
     VertexId            src                 = -1;           // Use whatever the specified graph-type's default is
     std::string         src_str;
@@ -496,7 +499,8 @@ void RunTests(
                         max_queue_sizing,
                         context,
                         partition_method,
-                        gpu_idx);
+                        gpu_idx,
+                        streams);
             } else {
                 RunTests<VertexId, Value, SizeT, true, true, false>(
                         graph,
@@ -506,7 +510,8 @@ void RunTests(
                         max_queue_sizing,
                         context,
                         partition_method,
-                        gpu_idx);
+                        gpu_idx,
+                        streams);
             }
         } else {
             if (idempotence) {
@@ -518,7 +523,8 @@ void RunTests(
                         max_queue_sizing,
                         context,
                         partition_method,
-                        gpu_idx);
+                        gpu_idx,
+                        streams);
             } else {
                 RunTests<VertexId, Value, SizeT, true, false, false>(
                         graph,
@@ -528,7 +534,8 @@ void RunTests(
                         max_queue_sizing,
                         context,
                         partition_method,
-                        gpu_idx);
+                        gpu_idx,
+                        streams);
             }
         }
     } else {
@@ -542,7 +549,8 @@ void RunTests(
                         max_queue_sizing,
                         context,
                         partition_method,
-                        gpu_idx);
+                        gpu_idx,
+                        streams);
             } else {
                 RunTests<VertexId, Value, SizeT, false, true, false>(
                         graph,
@@ -552,7 +560,8 @@ void RunTests(
                         max_queue_sizing,
                         context,
                         partition_method,
-                        gpu_idx);
+                        gpu_idx,
+                        streams);
             }
         } else {
             if (idempotence) {
@@ -564,7 +573,8 @@ void RunTests(
                         max_queue_sizing,
                         context,
                         partition_method,
-                        gpu_idx);
+                        gpu_idx,
+                        streams);
             } else {
                 RunTests<VertexId, Value, SizeT, false, false, false>(
                         graph,
@@ -574,7 +584,8 @@ void RunTests(
                         max_queue_sizing,
                         context,
                         partition_method,
-                        gpu_idx);
+                        gpu_idx,
+                        streams);
             }
         }
     }
@@ -590,9 +601,10 @@ void RunTests(
 int cpp_main( int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
-    int        num_gpus = 0;
-    int        *gpu_idx = NULL;
-    ContextPtr *context = NULL;
+    int          num_gpus = 0;
+    int          *gpu_idx = NULL;
+    ContextPtr   *context = NULL;
+    cudaStream_t *streams = NULL;
 
     if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
         Usage();
@@ -613,13 +625,19 @@ int cpp_main( int argc, char** argv)
         num_gpus   = 1;
         gpu_idx    = new int[num_gpus];
         gpu_idx[0] = 0;
-    }  
-    context  = new ContextPtr[num_gpus];
+    }
+    streams  = new cudaStream_t[num_gpus * num_gpus];
+    context  = new ContextPtr[num_gpus * num_gpus];
     printf("Using %d gpus: ", num_gpus);
-    for (int i=0;i<num_gpus;i++) 
+    for (int gpu=0;gpu<num_gpus;gpu++) 
     {
-        printf(" %d ", gpu_idx[i]);
-        context[i] = mgpu::CreateCudaDevice(gpu_idx[i]);
+        printf(" %d ", gpu_idx[gpu]);
+        util::SetDevice(gpu_idx[gpu]);
+        for (int i=0;i<num_gpus;i++)
+        {
+            util::GRError(cudaStreamCreate(&streams[gpu*num_gpus+i]), "cudaStreamCreate fialed.",__FILE__,__LINE__);
+            context[i+gpu*num_gpus] = mgpu::CreateCudaDeviceAttachStream(gpu_idx[i],streams[gpu*num_gpus+i]);
+        }
     }
     printf("\n"); fflush(stdout);
  
@@ -669,7 +687,7 @@ int cpp_main( int argc, char** argv)
         csr.PrintHistogram();
 
         // Run tests
-        RunTests(csr, args, num_gpus, context, gpu_idx);
+        RunTests(csr, args, num_gpus, context, gpu_idx, streams);
 
     } else {
 

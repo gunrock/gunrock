@@ -373,7 +373,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             Csr<VertexId, Value, SizeT> *inversgraph = NULL,
             int         num_gpus = 1,
             int*        gpu_idx  = NULL,
-            std::string partition_method ="random")
+            std::string partition_method ="random",
+            cudaStream_t* streams = NULL)
     {
         util::cpu_mt::PrintMessage("BFSProblem Init() begin.");
         ProblemBase<VertexId, SizeT,Value,_USE_DOUBLE_BUFFER>::Init(
@@ -399,7 +400,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = util::GRError(cudaSetDevice(this->gpu_idx[gpu]), "BFSProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
                 if (retval = data_slices[gpu].Allocate(1,util::DEVICE | util::HOST)) return retval;
                 DataSlice* _data_slice = data_slices[gpu].GetPointer(util::HOST);
-
+                _data_slice->streams.SetPointer(streams,num_gpus);
                 if (this->num_gpus > 1)
                 {
                     if (_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE)

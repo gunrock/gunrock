@@ -42,12 +42,13 @@ unsigned int ComputeOutputLength(
                                     typename KernelPolicy::SizeT    max_in,
                                     typename KernelPolicy::SizeT    max_out,
                                     CudaContext                     &context,
+                                    cudaStream_t                    stream,
                                     TYPE                            ADVANCE_TYPE) {
 
     typedef typename ProblemData::SizeT         SizeT;
 
     gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<KernelPolicy, ProblemData, Functor>
-        <<< num_block, KernelPolicy::THREADS >>>(
+        <<< num_block, KernelPolicy::THREADS, 0, stream >>>(
                 d_offsets,
                 d_indices,
                 d_in_key_queue,
@@ -91,10 +92,12 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             typename KernelPolicy::SizeT            max_out,
             util::CtaWorkProgress                   work_progress,
             CudaContext                             &context,
+            cudaStream_t                            stream,
             TYPE                                    ADVANCE_TYPE,
             bool                                    inverse_graph = false,
             bool                                    get_output_length = true)
 {
+    printf("queue_length = %d\n", frontier_attribute.queue_length);fflush(stdout);
     if (frontier_attribute.queue_length == 0) return;
     switch (KernelPolicy::ADVANCE_MODE)
     {
@@ -167,12 +170,15 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                     max_in,
                                     max_out,
                                     context,
+                                    stream,
                                     ADVANCE_TYPE);
+
+            printf("output_length = %d\n", frontier_attribute.output_length);fflush(stdout);
 
             if (frontier_attribute.selector == 1) {
                 // Edge Map
                 gunrock::oprtr::edge_map_partitioned_backward::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
-                <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
+                <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, sizeof(typename LBPOLICY::SmemStorage),stream >>>(
                         frontier_attribute.queue_reset,
                         frontier_attribute.queue_index,
                         enactor_stats.iteration,
@@ -196,7 +202,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             } else {
                 // Edge Map
                 gunrock::oprtr::edge_map_partitioned_backward::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
-                <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
+                <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, sizeof(typename LBPOLICY::SmemStorage),stream >>>(
                         frontier_attribute.queue_reset,
                         frontier_attribute.queue_index,
                         enactor_stats.iteration,
@@ -260,15 +266,16 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                     max_in,
                                     max_out,
                                     context,
+                                    stream,
                                     ADVANCE_TYPE);
             //printf("input_queue_len:%d\n", frontier_attribute.queue_length);
             //printf("output_queue_len:%d\n", output_queue_len);
-
-
+            cudaStreamSynchronize(stream);
+            printf("output_length = %d\n", frontier_attribute.output_length);fflush(stdout);
             //if (frontier_attribute.output_length < LBPOLICY::LIGHT_EDGE_THRESHOLD)
             {
                 gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
-                <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
+                <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, sizeof(typename LBPOLICY::SmemStorage), stream>>>(
                         frontier_attribute.queue_reset,
                         frontier_attribute.queue_index,
                         enactor_stats.iteration,

@@ -61,6 +61,7 @@ enum FrontierType {
         util::Array1D<SizeT, SizeT     >  out_length    ;   
         util::Array1D<SizeT, SizeT     >  in_length[2]  ;   
         util::Array1D<SizeT, VertexId  >  keys_in  [2]  ;
+        util::Array1D<SizeT, cudaStream_t> streams;
 
         DataSliceBase()
         {
@@ -85,13 +86,21 @@ enum FrontierType {
             in_length           [0].SetName("in_length[0]"           );  
             in_length           [1].SetName("in_length[1]"           );  
             keys_in             [0].SetName("keys_in[0]"             );  
-            keys_in             [1].SetName("keys_in[1]"             ); 
+            keys_in             [1].SetName("keys_in[1]"             );
+            streams                .SetName("streams"                );
         } // DataSliceBase()
 
         ~DataSliceBase()
         {
             util::cpu_mt::PrintMessage("~DataSliceBase() begin.");
             if (util::SetDevice(gpu_idx)) return;
+
+            /*if (num_gpus > 1)
+            {
+                for (int gpu=0;gpu<num_gpus;gpu++)
+                    util::GRError(cudaStreamDestroy(streams[gpu]), "cudaStreamDestroy failed.", __FILE__, __LINE__);
+            }*/
+
             if (vertex_associate_in[0] != NULL)
             {
                 for (int i=0;i<num_vertex_associate;i++)
@@ -147,6 +156,7 @@ enum FrontierType {
             out_length    .Release();
             vertex_associate_orgs.Release();
             value__associate_orgs.Release();
+            streams       .Release();
 
             util::cpu_mt::PrintMessage("~DataSliceBase() end.");
         } // ~DataSliceBase()
@@ -168,8 +178,15 @@ enum FrontierType {
             if (retval = in_length[0].Allocate(num_gpus,util::HOST)) return retval;
             if (retval = in_length[1].Allocate(num_gpus,util::HOST)) return retval;
             if (retval = out_length  .Allocate(num_gpus,util::HOST | util::DEVICE)) return retval;
+            //if (retval = streams     .Allocate(num_gpus,util::HOST)) return retval;
             if (retval = vertex_associate_orgs.Allocate(num_vertex_associate, util::HOST | util::DEVICE)) return retval;
             if (retval = value__associate_orgs.Allocate(num_value__associate, util::HOST | util::DEVICE)) return retval;
+
+            /*if (num_gpus > 1)
+            for (int gpu=0;gpu<num_gpus;gpu++)
+            {
+                if (retval = util::GRError(cudaStreamCreate(&streams[gpu]), "cudaStreamCreate failed.", __FILE__, __LINE__)) return retval;
+            }*/
 
             // Create incoming buffer on device
             if (num_in_nodes > 0)

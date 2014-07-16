@@ -64,7 +64,7 @@ namespace bfs {
         util::cpu_mt::CPUBarrier* cpu_barrier;
         void*         problem;
         void*         enactor;
-        ContextPtr    context;
+        ContextPtr*   context;
 
         ThreadSlice()
         {
@@ -173,7 +173,7 @@ namespace bfs {
         util::CtaWorkProgressLifetime
                      *work_progress        = &(enactor     -> work_progress     [thread_num]);
         int          num_gpus              =   problem     -> num_gpus;
-        ContextPtr   context               =   thread_data -> context;
+        ContextPtr*  context               =   thread_data -> context;
         bool         DEBUG                 =   enactor     -> DEBUG;
         //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> 
         //             *t_bitmask            = &(ts_bitmask       [thread_num]);
@@ -221,7 +221,7 @@ namespace bfs {
                     if (frontier_attribute->queue_reset) _queue_length = frontier_attribute->queue_length;
                     else if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, _queue_length)) break;
                     util::cpu_mt::PrintCPUArray<SizeT, unsigned int>("Queue_Length", &(frontier_attribute->queue_length), 1, thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
-                    //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys0", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
+                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys0", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
                     //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
                     //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu0", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
                     //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labe0", data_slice[0]->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
@@ -252,13 +252,14 @@ namespace bfs {
                     graph_slice->frontier_elements[frontier_attribute->selector],
                     graph_slice->frontier_elements[frontier_attribute->selector^1],
                     work_progress[0],
-                    context[0],
+                    context[0][0],
+                    data_slice[0]->streams[0],
                     gunrock::oprtr::advance::V2V);
 
                 // Only need to reset queue for once
                 if (frontier_attribute->queue_reset)
                     frontier_attribute->queue_reset = false;
-
+                cudaStreamSynchronize(data_slice[0]->streams[0]);
                 if (DEBUG && (enactor_stats->retval = util::GRError(cudaThreadSynchronize(), "advance::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(enactor_stats->throttle_event);               // give host memory mapped visibility to GPU updates 
                 if (DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
@@ -275,7 +276,7 @@ namespace bfs {
                     //if (frontier_attribute->queue_reset) _queue_length = frontier_attribute->queue_length;
                     //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, _queue_length)) break;
                     util::cpu_mt::PrintCPUArray<SizeT, unsigned int>("Queue_Length", &(frontier_attribute->queue_length), 1, thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
-                    //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys1", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration);
+                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys1", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration);
                     //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
                     //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu1", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
                     //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labe1", data_slice[0]->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
@@ -360,7 +361,7 @@ namespace bfs {
                     //if (frontier_attribute->queue_reset) _queue_length = frontier_attribute->queue_length;
                     //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, _queue_length)) break;
                     util::cpu_mt::PrintCPUArray<SizeT, unsigned int>("Queue_Length", &(frontier_attribute->queue_length), 1, thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
-                    //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys2", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration);
+                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys2", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration);
                     //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
                     //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu2", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
                     //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labe2", data_slice[0]->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
@@ -405,6 +406,7 @@ namespace bfs {
                         }
                     }
                     
+                    if (enactor_stats->retval = util::GRError(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed",__FILE__,__LINE__)) break; 
                     /*data_slice[0]->vertex_associate_orgs[0] = data_slice[0]-> labels.GetPointer(util::DEVICE);
                     if (BFSProblem::MARK_PREDESSORS)
                         data_slice[0]->vertex_associate_orgs[1] = data_slice[0]-> preds.GetPointer(util::DEVICE);
@@ -525,6 +527,10 @@ namespace bfs {
                     }*/
 
                     //CPU global barrier
+                    for (int i=0;i<num_gpus;i++)
+                        if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(data_slice[0]->streams[i]), "cuStreamSynchronize failed.", __FILE__, __LINE__)) break; 
+                    if (enactor_stats->retval) break;
+
                     util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,thread_num);
                     if (All_Done(s_enactor_stats,num_gpus))
                     {
@@ -920,11 +926,13 @@ class BFSEnactor : public EnactorBase
 
             for (int gpu=0;gpu<num_gpus;gpu++)
             {
+                //for (int i=0;i<num_gpus;i++)
+                //    problem->data_slices[gpu]->streams[i] = context[gpu*num_gpus+1][0]._stream;
                 thread_slices[gpu].thread_num    = gpu;
                 thread_slices[gpu].problem       = (void*)problem;
                 thread_slices[gpu].enactor       = (void*)this;
                 thread_slices[gpu].cpu_barrier   = &cpu_barrier;
-                thread_slices[gpu].context       = context[gpu];
+                thread_slices[gpu].context       = &(context[gpu*num_gpus]);
                 enactor_stats[gpu].start_time    = start_time;
                 if ((num_gpus ==1) || (gpu==problem->partition_tables[0][src]))
                      thread_slices[gpu].init_size=1;
