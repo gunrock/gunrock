@@ -114,7 +114,7 @@ struct Dispatch
         VertexId                    &queue_index,
         int                         &num_gpus,
         SizeT                       &num_elements,
-        volatile int                *&d_done,
+        //volatile int                *&d_done,
         VertexId                    *&d_in,
         VertexId                    *&d_pred_in,
         VertexId                    *&d_out,
@@ -147,7 +147,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         VertexId                    &queue_index,
         int                         &num_gpus,
         SizeT                       &num_elements,
-        volatile int                *&d_done,
+        //volatile int                *&d_done,
         VertexId                    *&d_in,
         VertexId                    *&d_pred_in,
         VertexId                    *&d_out,
@@ -194,11 +194,11 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 }
 
                 // Signal to host that we're done
-                if ((num_elements == 0) ||
-                        (KernelPolicy::SATURATION_QUIT && (num_elements <= gridDim.x * KernelPolicy::SATURATION_QUIT)))
-                {
-                    if (d_done) d_done[0] = num_elements;
-                }
+                //if ((num_elements == 0) ||
+                //        (KernelPolicy::SATURATION_QUIT && (num_elements <= gridDim.x * KernelPolicy::SATURATION_QUIT)))
+                //{
+                //    if (d_done) d_done[0] = num_elements;
+                //}
             }
             
             // Initialize work decomposition in smem
@@ -267,7 +267,7 @@ void Kernel(
     typename KernelPolicy::VertexId         queue_index,                
     int                                     num_gpus,                  
     typename KernelPolicy::SizeT            num_elements,             
-    volatile int                            *d_done,                 
+    //volatile int                            *d_done,                 
     typename KernelPolicy::VertexId         *d_in_queue,            
     typename KernelPolicy::VertexId         *d_in_predecessor_queue,
     typename KernelPolicy::VertexId         *d_out_queue,          
@@ -285,7 +285,7 @@ void Kernel(
         queue_index,
         num_gpus,
         num_elements,
-        d_done,
+        //d_done,
         d_in_queue,
         d_in_predecessor_queue,
         d_out_queue,

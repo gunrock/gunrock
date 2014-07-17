@@ -80,7 +80,7 @@ struct Dispatch
                                 unsigned int *&d_scanned_edges,
                                 unsigned int *&partition_starts,
                                 unsigned int &num_partitions,
-                                volatile int *&d_done,
+                                //volatile int *&d_done,
                                 VertexId *&d_queue,
                                 bool     *&d_bitmap_in,
                                 bool     *&d_bitmap_out,
@@ -105,7 +105,7 @@ struct Dispatch
                                 VertexId *&d_column_indices,
                                 VertexId *&d_inverse_column_indices,
                                 unsigned int *&d_scanned_edges,
-                                volatile int *&d_done,
+                                //volatile int *&d_done,
                                 VertexId *&d_queue,
                                 bool     *&d_bitmap_in,
                                 bool     *&d_bitmap_out,
@@ -178,7 +178,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 unsigned int *&d_scanned_edges,
                                 unsigned int *&partition_starts,
                                 unsigned int &num_partitions,
-                                volatile int *&d_done,
+                                //volatile int *&d_done,
                                 VertexId *&d_queue,
                                 bool     *&d_bitmap_in,
                                 bool     *&d_bitmap_out,
@@ -219,9 +219,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 input_queue_len = work_progress.template LoadQueueLength<SizeT>(queue_index);
                 
                 // Signal to host that we're done
-                if (input_queue_len == 0) {
-                    if (d_done) d_done[0] = input_queue_len;
-                }
+                //if (input_queue_len == 0) {
+                //    if (d_done) d_done[0] = input_queue_len;
+                //}
             }
 
             work_progress.Enqueue(output_queue_len, queue_index+1);
@@ -382,7 +382,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 VertexId *&d_column_indices,
                                 VertexId *&d_inverse_column_indices,
                                 unsigned int *&d_scanned_edges,
-                                volatile int *&d_done,
+                                //volatile int *&d_done,
                                 VertexId *&d_queue,
                                 bool     *&d_bitmap_in,
                                 bool     *&d_bitmap_out,
@@ -422,9 +422,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 input_queue_len = work_progress.template LoadQueueLength<SizeT>(queue_index);
                 
                 // Signal to host that we're done
-                if (input_queue_len == 0) {
-                    if (d_done) d_done[0] = input_queue_len;
-                }
+                //if (input_queue_len == 0) {
+                //    if (d_done) d_done[0] = input_queue_len;
+                //}
             }
 
             work_progress.Enqueue(output_queue_len, queue_index+1);
@@ -591,7 +591,7 @@ void RelaxPartitionedEdges(
             d_scanned_edges,
             partition_starts,
             num_partitions,
-            d_done,
+            //d_done,
             d_queue,
             d_bitmap_in,
             d_bitmap_out,
@@ -641,7 +641,7 @@ void RelaxLightEdges(
         typename KernelPolicy::VertexId *d_column_indices,
         typename KernelPolicy::VertexId *d_inverse_column_indices,
         unsigned int    *d_scanned_edges,
-        volatile int                    *d_done,
+        //volatile int                    *d_done,
         typename KernelPolicy::VertexId *d_queue,
         bool                            *d_bitmap_in,
         bool                            *d_bitmap_out,
@@ -663,7 +663,7 @@ void RelaxLightEdges(
                                 d_column_indices,
                                 d_inverse_column_indices,
                                 d_scanned_edges,
-                                d_done,
+                                //d_done,
                                 d_queue,
                                 d_bitmap_in,
                                 d_bitmap_out,

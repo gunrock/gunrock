@@ -310,28 +310,36 @@ public:
         return retval;
     }
 
-
     // Acquire work queue length
     template <typename IterationT, typename SizeT>
     cudaError_t GetQueueLength(
         IterationT iteration,
         SizeT &queue_length,
-        bool  DEBUG = false)        // out param
+        bool  DEBUG = false,
+        cudaStream_t stream = 0)        // out param
     {
         cudaError_t retval = cudaSuccess;
 
         do {
             int queue_length_idx = iteration & 0x3;
 
-            if (!DEBUG)
-                cudaMemcpy(&queue_length, ((SizeT*) d_counters) + queue_length_idx, sizeof(SizeT), cudaMemcpyDeviceToHost);
-            else if (retval = util::GRError(cudaMemcpy(
+            if (stream == 0)
+            {
+                if (!DEBUG)
+                    cudaMemcpy(&queue_length, ((SizeT*) d_counters) + queue_length_idx, sizeof(SizeT), cudaMemcpyDeviceToHost);
+                else if (retval = util::GRError(cudaMemcpy(
                     &queue_length,
                     ((SizeT*) d_counters) + queue_length_idx,
                     1 * sizeof(SizeT),
                     cudaMemcpyDeviceToHost),
                 "CtaWorkProgress cudaMemcpy d_counters failed", __FILE__, __LINE__)) break;
-
+            } else {
+                if (!DEBUG)
+                    cudaMemcpyAsync(&queue_length, ((SizeT*)d_counters) + queue_length_idx, sizeof(SizeT), cudaMemcpyDeviceToHost,stream);
+                else if (retval = util::GRError(cudaMemcpyAsync(
+                    &queue_length, ((SizeT*)d_counters)+queue_length_idx, sizeof(SizeT),cudaMemcpyDeviceToHost,stream), "CtaWorkProgress cudaMemcpyAsync d_counter failed.", __FILE__, __LINE__)) break;
+                cudaStreamSynchronize(stream);
+             }
         } while (0);
 
         return retval;
@@ -343,21 +351,33 @@ public:
     cudaError_t SetQueueLength(
         IterationT iteration,
         SizeT queue_length,
-        bool  DEBUG = false)
+        bool  DEBUG = false,
+        cudaStream_t stream = 0)
     {
         cudaError_t retval = cudaSuccess;
 
         do {
             int queue_length_idx = iteration & 0x3;
-            if (!DEBUG)
-                cudaMemcpy(((SizeT*) d_counters) + queue_length_idx, &queue_length, sizeof(SizeT), cudaMemcpyHostToDevice);
-            if (retval = util::GRError(cudaMemcpy(
+            if (stream == 0)
+            {
+                if (!DEBUG)
+                    cudaMemcpy(((SizeT*) d_counters) + queue_length_idx, &queue_length, sizeof(SizeT), cudaMemcpyHostToDevice);
+                if (retval = util::GRError(cudaMemcpy(
                     ((SizeT*) d_counters) + queue_length_idx,
                     &queue_length,
                     1 * sizeof(SizeT),
                     cudaMemcpyHostToDevice),
-                "CtaWorkProgress cudaMemcpy d_counters failed", __FILE__, __LINE__)) break;
-
+                    "CtaWorkProgress cudaMemcpy d_counters failed", __FILE__, __LINE__)) break;
+            } else {
+                if (!DEBUG)
+                    cudaMemcpyAsync(((SizeT*) d_counters) + queue_length_idx, &queue_length, sizeof(SizeT), cudaMemcpyHostToDevice,stream);
+                if (retval = util::GRError(cudaMemcpyAsync(
+                    ((SizeT*) d_counters) + queue_length_idx,
+                    &queue_length,
+                    1 * sizeof(SizeT),
+                    cudaMemcpyHostToDevice,stream),
+                    "CtaWorkProgress cudaMemcpyAsync d_counters failed", __FILE__, __LINE__)) break;
+            }
         } while (0);
 
         return retval;

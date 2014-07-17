@@ -205,7 +205,8 @@ public:
         unsigned long long &total_runtimes,
         unsigned long long &total_lifetimes,
         unsigned long long &total_aggregate,
-        bool               check_gpu = true)
+        bool               check_gpu = true,
+        cudaStream_t       stream = 0)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -225,8 +226,15 @@ public:
             }
              
             // Copy out stats
-            if (retval = util::GRError(cudaMemcpy(h_stat, d_stat, stat_bytes, cudaMemcpyDeviceToHost),
-                "KernelRuntimeStatsLifetime d_stat failed", __FILE__, __LINE__)) break;
+            if (stream == 0)
+            {    
+                if (retval = util::GRError(cudaMemcpy(h_stat, d_stat, stat_bytes, cudaMemcpyDeviceToHost),
+                    "KernelRuntimeStatsLifetime d_stat failed", __FILE__, __LINE__)) break;
+            } else {
+                if (retval = util::GRError(cudaMemcpyAsync(h_stat, d_stat, stat_bytes, cudaMemcpyDeviceToHost, stream),
+                    "KernelRuntimeStatsLifetime d_stat failed", __FILE__, __LINE__)) break;
+                cudaStreamSynchronize(stream);
+            }
 
             if (check_gpu)
             {
@@ -268,10 +276,11 @@ public:
         int grid_size,
         unsigned long long &total_runtimes,
         unsigned long long &total_lifetimes,
-        bool check_gpu = true)
+        bool check_gpu = true,
+        cudaStream_t stream = 0)
     {
         unsigned long long total_aggregate = 0;
-        return Accumulate(grid_size, total_runtimes, total_lifetimes, total_aggregate, check_gpu);
+        return Accumulate(grid_size, total_runtimes, total_lifetimes, total_aggregate, check_gpu, stream);
     }
 };
 

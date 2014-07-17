@@ -167,9 +167,9 @@ namespace bfs {
         FrontierAttribute
                      *frontier_attribute   = &(enactor     -> frontier_attribute[thread_num]);
         FrontierAttribute
-                     *s_frontier_attribute =   enactor     -> frontier_attribute;
+                     *s_frontier_attribute = &(enactor     -> frontier_attribute[0         ]);
         EnactorStats *enactor_stats        = &(enactor     -> enactor_stats     [thread_num]);
-        EnactorStats *s_enactor_stats      =   enactor     -> enactor_stats;
+        EnactorStats *s_enactor_stats      = &(enactor     -> enactor_stats     [0         ]);
         util::CtaWorkProgressLifetime
                      *work_progress        = &(enactor     -> work_progress     [thread_num]);
         int          num_gpus              =   problem     -> num_gpus;
@@ -213,15 +213,16 @@ namespace bfs {
 
             // Step through BFS iterations
             //while (done[0] < 0) {
-            while (!All_Done(s_enactor_stats, num_gpus)) {
-                if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1,0)) break;
+            while (!All_Done(s_enactor_stats, s_frontier_attribute, num_gpus)) {
+                if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1,0,false,data_slice[0]->streams[0])) break;
                 if (DEBUG)
                 {
-                    SizeT _queue_length;
-                    if (frontier_attribute->queue_reset) _queue_length = frontier_attribute->queue_length;
-                    else if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, _queue_length)) break;
+                    //SizeT _queue_length;
+                    //if (frontier_attribute->queue_reset) _queue_length = frontier_attribute->queue_length;
+                    //else if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, _queue_length)) break;
                     util::cpu_mt::PrintCPUArray<SizeT, unsigned int>("Queue_Length", &(frontier_attribute->queue_length), 1, thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
-                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys0", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
+                    util::cpu_mt::PrintGPUArray<SizeT, SizeT   >("offs0", graph_slice->row_offsets.GetPointer(util::DEVICE),graph_slice->nodes,thread_num, enactor_stats->iteration);
+                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys0", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration);
                     //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
                     //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu0", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
                     //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labe0", data_slice[0]->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
@@ -233,7 +234,7 @@ namespace bfs {
                 }
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BFSProblem, BfsFunctor>(
-                    enactor_stats->d_done,
+                    //enactor_stats->d_done,
                     enactor_stats[0],
                     frontier_attribute[0],
                     data_slice[0].GetPointer(util::DEVICE),
@@ -259,15 +260,15 @@ namespace bfs {
                 // Only need to reset queue for once
                 if (frontier_attribute->queue_reset)
                     frontier_attribute->queue_reset = false;
-                cudaStreamSynchronize(data_slice[0]->streams[0]);
-                if (DEBUG && (enactor_stats->retval = util::GRError(cudaThreadSynchronize(), "advance::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(enactor_stats->throttle_event);               // give host memory mapped visibility to GPU updates 
+                //cudaStreamSynchronize(data_slice[0]->streams[0]);
+                if (DEBUG && (enactor_stats->retval = util::GRError(cudaStreamSynchronize(data_slice[0]->streams[0]), "advance::Kernel failed", __FILE__, __LINE__))) break;
+                //cudaEventQuery(enactor_stats->throttle_event);               // give host memory mapped visibility to GPU updates 
                 if (DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
 
                 frontier_attribute->queue_index++;
                 frontier_attribute->selector ^= 1;
 
-                if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
+                if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,data_slice[0]->streams[0])) break;
                 if (DEBUG || INSTRUMENT) 
                     enactor_stats->total_queued += frontier_attribute->queue_length;
                 if (DEBUG)
@@ -296,32 +297,33 @@ namespace bfs {
                     if (enactor_stats->retval = enactor_stats->advance_kernel_stats.Accumulate(
                         enactor_stats->advance_grid_size,
                         enactor_stats->total_runtimes,
-                        enactor_stats->total_lifetimes,false)) break;
+                        enactor_stats->total_lifetimes,
+                        false,data_slice[0]->streams[0])) break;
                 }
 
                 // Throttle
-                if (enactor_stats->iteration & 1) {
-                    if (enactor_stats->retval = util::GRError(cudaEventRecord(enactor_stats->throttle_event),
-                        "BFSEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
-                } else {
-                    if (enactor_stats->retval = util::GRError(cudaEventSynchronize(enactor_stats->throttle_event),
-                        "BFSEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
-                }
+                //if (enactor_stats->iteration & 1) {
+                //    if (enactor_stats->retval = util::GRError(cudaEventRecord(enactor_stats->throttle_event),
+                //        "BFSEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
+                //} else {
+                //    if (enactor_stats->retval = util::GRError(cudaEventSynchronize(enactor_stats->throttle_event),
+                //        "BFSEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
+                //}
 
                 // Check if done
-                if (All_Done(s_enactor_stats,num_gpus)) break;
-                if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1, 0)) break;
+                //if (All_Done(s_enactor_stats,num_gpus)) break;
+                if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1, 0, false, data_slice[0]->streams[0])) break;
                
                 if (DEBUG) util::cpu_mt::PrintMessage("Filter begin", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
                 // Filter
                 gunrock::oprtr::filter::Kernel<FilterKernelPolicy, BFSProblem, BfsFunctor>
-                <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS>>>(
+                <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, data_slice[0]->streams[0]>>>(
                     enactor_stats->iteration+1,
                     frontier_attribute->queue_reset,
                     frontier_attribute->queue_index,
                     num_gpus,
                     frontier_attribute->queue_length,
-                    enactor_stats->d_done,
+                    //enactor_stats->d_done,
                     graph_slice->frontier_queues.keys  [frontier_attribute->selector  ].GetPointer(util::DEVICE),      // d_in_queue
                     graph_slice->frontier_queues.values[frontier_attribute->selector  ].GetPointer(util::DEVICE),    // d_pred_in_queue
                     graph_slice->frontier_queues.keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE),    // d_out_queue
@@ -333,15 +335,15 @@ namespace bfs {
                     enactor_stats->filter_kernel_stats);
                     //t_bitmask);
 
-                if (DEBUG && (enactor_stats->retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(enactor_stats->throttle_event); // give host memory mapped visibility to GPU updates
+                if (DEBUG && (enactor_stats->retval = util::GRError(cudaStreamSynchronize(data_slice[0]->streams[0]), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
+                //cudaEventQuery(enactor_stats->throttle_event); // give host memory mapped visibility to GPU updates
                 if (DEBUG) util::cpu_mt::PrintMessage("Filter end.", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
 
                 frontier_attribute->queue_index++;
                 frontier_attribute->selector ^= 1;
 
                 //if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
-                if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
+                if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, data_slice[0]->streams[0])) break;
                 //}
 
                 if (INSTRUMENT || DEBUG) {
@@ -352,7 +354,8 @@ namespace bfs {
                         if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
                             enactor_stats->filter_grid_size,
                             enactor_stats->total_runtimes,
-                            enactor_stats->total_lifetimes,false)) break;
+                            enactor_stats->total_lifetimes,
+                            false, data_slice[0]->streams[0])) break;
                     }
                 }
                 if (DEBUG)
@@ -371,7 +374,7 @@ namespace bfs {
                     //    util::cpu_mt::PrintGPUArray<SizeT, unsigned char>("mask2", data_slice[0]->visited_mask.GetPointer(util::DEVICE), (graph_slice->nodes+7)/8, thread_num, enactor_stats->iteration);
                 }
                 // Check if done
-                if (All_Done(s_enactor_stats,num_gpus)) break;
+                if (All_Done(s_enactor_stats,s_frontier_attribute,num_gpus)) break;
 
                 //Use multi_scan to splict the workload into multi_gpus
                 if (num_gpus >1) 
@@ -392,12 +395,12 @@ namespace bfs {
                             int grid_size = (frontier_attribute->queue_length%256) == 0? 
                                              frontier_attribute->queue_length/256 : 
                                              frontier_attribute->queue_length/256+1;
-                            Copy_Preds<VertexId, SizeT> <<<grid_size,256>>>(
+                            Copy_Preds<VertexId, SizeT> <<<grid_size,256,0,data_slice[0]->streams[0]>>>(
                                 frontier_attribute->queue_length,
                                 graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),
                                 data_slice[0]->preds.GetPointer(util::DEVICE),
                                 data_slice[0]->temp_preds.GetPointer(util::DEVICE));
-                            Update_Preds<VertexId,SizeT> <<<grid_size,256>>>(
+                            Update_Preds<VertexId,SizeT> <<<grid_size,256,0,data_slice[0]->streams[0]>>>(
                                 frontier_attribute->queue_length,
                                 graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),
                                 graph_slice->original_vertex.GetPointer(util::DEVICE),
@@ -406,7 +409,7 @@ namespace bfs {
                         }
                     }
                     
-                    if (enactor_stats->retval = util::GRError(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed",__FILE__,__LINE__)) break; 
+                    if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(data_slice[0]->streams[0]),"cudaDeviceSynchronize failed",__FILE__,__LINE__)) break; 
                     /*data_slice[0]->vertex_associate_orgs[0] = data_slice[0]-> labels.GetPointer(util::DEVICE);
                     if (BFSProblem::MARK_PREDESSORS)
                         data_slice[0]->vertex_associate_orgs[1] = data_slice[0]-> preds.GetPointer(util::DEVICE);
@@ -532,7 +535,7 @@ namespace bfs {
                     if (enactor_stats->retval) break;
 
                     util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,thread_num);
-                    if (All_Done(s_enactor_stats,num_gpus))
+                    if (All_Done(s_enactor_stats,s_frontier_attribute,num_gpus))
                     {
                         break_clean=false;
                         //printf("%d exit0\n",thread_num);fflush(stdout);
@@ -580,14 +583,14 @@ namespace bfs {
                     }
                     if (enactor_stats->retval) break;
                     frontier_attribute->queue_length = total_length;
-                    if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index,total_length)) break;
+                    if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index,total_length,false,data_slice[0]->streams[0])) break;
                     //printf("%d\t%d\ttotal_length = %d\n",thread_num,iteration[0],total_length);fflush(stdout);
-                    if (total_length !=0)
-                    {
-                        enactor_stats->done[0]=-1;
-                    } else {
-                        enactor_stats->done[0]=0;
-                    }
+                    //if (total_length !=0)
+                    //{
+                    //    enactor_stats->done[0]=-1;
+                    //} else {
+                    //    enactor_stats->done[0]=0;
+                    //}
                     if (DEBUG) util::cpu_mt::PrintMessage("mgpu data exchange end.", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
                 }
 
@@ -995,7 +998,7 @@ class BFSEnactor : public EnactorBase
                 0,                                  // SATURATION QUIT
                 true,                               // DEQUEUE_PROBLEM_SIZE
                 8,                                  // MIN_CTA_OCCUPANCY
-                7,                                  // LOG_THREADS
+                8,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
@@ -1033,7 +1036,7 @@ class BFSEnactor : public EnactorBase
                 0,                                  // SATURATION QUIT
                 true,                               // DEQUEUE_PROBLEM_SIZE
                 8,                                  // MIN_CTA_OCCUPANCY
-                7,                                  // LOG_THREADS
+                8,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
@@ -1108,7 +1111,7 @@ class BFSEnactor : public EnactorBase
                 0,                                  // SATURATION QUIT
                 true,                               // DEQUEUE_PROBLEM_SIZE
                 8,                                  // MIN_CTA_OCCUPANCY
-                7,                                  // LOG_THREADS
+                8,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
@@ -1146,7 +1149,7 @@ class BFSEnactor : public EnactorBase
                 0,                                  // SATURATION QUIT
                 true,                               // DEQUEUE_PROBLEM_SIZE
                 8,                                  // MIN_CTA_OCCUPANCY
-                7,                                  // LOG_THREADS
+                8,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS

@@ -57,6 +57,12 @@ struct EnactorStats
     cudaEvent_t        throttle_event;
     cudaError_t        retval;
     clock_t            start_time;
+
+    EnactorStats()
+    {
+         util::cpu_mt::PrintMessage("EnactorStats() begin.");
+         util::cpu_mt::PrintMessage("EnactorStats() end.");
+    }
 };
 
 struct FrontierAttribute
@@ -70,7 +76,7 @@ struct FrontierAttribute
     gunrock::oprtr::advance::TYPE   advance_type;
 };
 
-bool All_Done(EnactorStats *enactor_stats,int num_gpus)
+bool All_Done(EnactorStats *enactor_stats,FrontierAttribute *frontier_attribute,int num_gpus)
 {   
     for (int gpu=0;gpu<num_gpus;gpu++)
     if (enactor_stats[gpu].retval!=cudaSuccess)
@@ -80,7 +86,7 @@ bool All_Done(EnactorStats *enactor_stats,int num_gpus)
     }   
 
     for (int gpu=0;gpu<num_gpus;gpu++)
-    if (enactor_stats[gpu].done[0]!=0)
+    if (frontier_attribute[gpu].queue_length!=0)
     {   
         return false;
     }   
@@ -367,19 +373,23 @@ public:
     int                             *gpu_idx;
     //Device properties
     //util::CudaProperties            cuda_props;
-    util::CudaProperties            *cuda_props;
+    //util::CudaProperties            *cuda_props;
+    util::Array1D<int, util::CudaProperties> cuda_props;
 
     // Queue size counters and accompanying functionality
     //util::CtaWorkProgressLifetime   work_progress;
-    util::CtaWorkProgressLifetime   *work_progress;
+    //util::CtaWorkProgressLifetime   *work_progress;
+    util::Array1D<int, util::CtaWorkProgressLifetime> work_progress;
 
     FrontierType                    frontier_type;
 
     //EnactorStats                    enactor_stats;
-    EnactorStats                    *enactor_stats;
+    //EnactorStats                    *enactor_stats;
+    util::Array1D<int, EnactorStats> enactor_stats;
 
     //FrontierAttribute               frontier_attribute;
-    FrontierAttribute               *frontier_attribute;
+    //FrontierAttribute               *frontier_attribute;
+    util::Array1D<int, FrontierAttribute> frontier_attribute;
 
 public:
 
@@ -404,11 +414,19 @@ protected:
         util::cpu_mt::PrintMessage("EnactorBase() begin.");
         this->num_gpus     = num_gpus;
         this->gpu_idx      = gpu_idx;
-        cuda_props         = new util::CudaProperties          [num_gpus];
-        work_progress      = new util::CtaWorkProgressLifetime [num_gpus];
-        enactor_stats      = new EnactorStats                  [num_gpus];
-        frontier_attribute = new FrontierAttribute             [num_gpus];
-
+        cuda_props        .SetName("cuda_props"        );
+        work_progress     .SetName("work_progress"     );
+        enactor_stats     .SetName("enactor_stats"     );
+        frontier_attribute.SetName("frontier_attribute");
+        //cuda_props         = new util::CudaProperties          [num_gpus];
+        //work_progress      = new util::CtaWorkProgressLifetime [num_gpus];
+        //enactor_stats      = new EnactorStats                  [num_gpus];
+        //frontier_attribute = new FrontierAttribute             [num_gpus];
+        cuda_props        .Init(num_gpus, util::HOST, true, cudaHostAllocMapped | cudaHostAllocPortable);
+        work_progress     .Init(num_gpus, util::HOST, true, cudaHostAllocMapped | cudaHostAllocPortable); 
+        enactor_stats     .Init(num_gpus, util::HOST, true, cudaHostAllocMapped | cudaHostAllocPortable);
+        frontier_attribute.Init(num_gpus, util::HOST, true, cudaHostAllocMapped | cudaHostAllocPortable);
+        
         for (int gpu=0;gpu<num_gpus;gpu++)
         {
             if (util::SetDevice(gpu_idx[gpu])) return;
@@ -443,10 +461,14 @@ protected:
             //if (enactor_stats.d_node_locks) util::GRError(cudaFree(enactor_stats.d_node_locks), "EnactorBase cudaFree d_node_locks failed", __FILE__, __LINE__);
             //if (enactor_stats.d_node_locks_out) util::GRError(cudaFree(enactor_stats.d_node_locks_out), "EnactorBase cudaFree d_node_locks_out failed", __FILE__, __LINE__);
         }
-        delete[] work_progress     ; work_progress      = NULL;
-        delete[] cuda_props        ; cuda_props         = NULL;
-        delete[] enactor_stats     ; enactor_stats      = NULL;
-        delete[] frontier_attribute; frontier_attribute = NULL;
+        work_progress     .Release();
+        cuda_props        .Release();
+        enactor_stats     .Release();
+        frontier_attribute.Release();
+        //delete[] work_progress     ; work_progress      = NULL;
+        //delete[] cuda_props        ; cuda_props         = NULL;
+        //delete[] enactor_stats     ; enactor_stats      = NULL;
+        //delete[] frontier_attribute; frontier_attribute = NULL;
         util::cpu_mt::PrintMessage("~EnactorBase() end.");
     }
 

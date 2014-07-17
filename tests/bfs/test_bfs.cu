@@ -637,6 +637,7 @@ int cpp_main( int argc, char** argv)
         {
             util::GRError(cudaStreamCreate(&streams[gpu*num_gpus+i]), "cudaStreamCreate fialed.",__FILE__,__LINE__);
             context[i+gpu*num_gpus] = mgpu::CreateCudaDeviceAttachStream(gpu_idx[i],streams[gpu*num_gpus+i]);
+            //context[i+gpu*num_gpus] = mgpu::CreateCudaDevice(gpu_idx[i]);
         }
     }
     printf("\n"); fflush(stdout);

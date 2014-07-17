@@ -21,13 +21,12 @@
 namespace gunrock {
 namespace util {
 
-static const unsigned int NONE     = 0x00;
 /*static const unsigned int FLAGBASE = 0x00;
 static const unsigned int PINNED   = 0x01;
 static const unsigned int UNIFIED  = 0x02;
 static const unsigned int STREAM   = 0x04;
 static const unsigned int MAPPED   = 0x04;*/
-
+static const unsigned int NONE       = 0x00;
 static const unsigned int TARGETBASE = 0x10;
 static const unsigned int HOST       = 0x11;
 static const unsigned int CPU        = 0x11;
@@ -36,7 +35,7 @@ static const unsigned int GPU        = 0x12;
 static const unsigned int DISK       = 0x14;
 static const unsigned int TARGETALL  = 0x1F;
 
-static const bool ARRAY_DEBUG = false;
+#define ARRAY_DEBUG false
 
 template <
     typename _SizeT,
@@ -51,6 +50,7 @@ private:
     std::string  file_name;
     SizeT        size;
     unsigned int flag;
+    bool         use_cuda_alloc;
     unsigned int setted, allocated;
     Value        *h_pointer;
     Value        *d_pointer;
@@ -62,25 +62,27 @@ public:
         file_name = "";
         h_pointer = NULL;
         d_pointer = NULL;
-        flag      = NONE;
+        flag      = cudaHostAllocDefault;
         setted    = NONE;
         allocated = NONE;
-        Init(0,NONE,NONE);
+        use_cuda_alloc = false;
+        Init(0,NONE,false,flag);
     } // Array1D()
 
-    Array1D(std::string name)
+    /*Array1D(char* name)
     {
-        this->name= name;
+        this->name= std::string(name);
         file_name = "";
         h_pointer = NULL;
         d_pointer = NULL;
         setted    = NONE;
         allocated = NONE;
-        flag      = NONE;
-        Init(0,NONE,NONE);
-    }
+        flag      = cudaHostAllocDefault;
+        use_cuda_alloc = false;
+        Init(0,NONE,false,NONE);
+    }*/
 
-    Array1D(SizeT size, std::string name = "", unsigned int target = HOST, unsigned int flag = NONE)
+    Array1D(SizeT size, std::string name = "", unsigned int target = HOST, bool use_cuda_alloc = false, unsigned int flag = cudaHostAllocDefault)
     {
         this->name= name;
         file_name = "";
@@ -88,7 +90,7 @@ public:
         d_pointer = NULL;
         setted    = NONE;
         allocated = NONE;
-        Init(size,target,flag);
+        Init(size,target,use_cuda_alloc,flag);
     } // Array1D(...)
 
     virtual ~Array1D()
@@ -96,7 +98,7 @@ public:
         Release();
     } // ~Array1D()
 
-    cudaError_t Init(SizeT size, unsigned int target = HOST, unsigned int flag = NONE)
+    cudaError_t Init(SizeT size, unsigned int target = HOST, bool use_cuda_alloc = false, unsigned int flag = cudaHostAllocDefault)
     {
         cudaError_t retval = cudaSuccess;
         
@@ -105,6 +107,7 @@ public:
         allocated  = NONE;
         this->size = size;
         this->flag = flag;
+        this->use_cuda_alloc = use_cuda_alloc;
 
         if (size == 0) return retval;
         retval = Allocate(size,target);
@@ -126,8 +129,8 @@ public:
     {
         cudaError_t retval = cudaSuccess;
         
-        if (((target & HOST) == HOST) && //((target & DEVICE) == DEVICE) &&
-            (flag != NONE))
+        /*if (((target & HOST) == HOST) && //((target & DEVICE) == DEVICE) &&
+            (use_cuda_alloc ))
         {
             if (retval = Release(HOST  )) return retval;
             //if (retval = Release(DEVICE)) return retval;
@@ -142,20 +145,23 @@ public:
             allocated = allocated | HOST  ;
             //allocated = allocated | DEVICE;
             if (ARRAY_DEBUG) {printf("%s allocated on HOST, size = %d, flag = %d\n",name.c_str(),size, flag);fflush(stdout);}
-        } else {
-            if ((target & HOST) == HOST)
+        } else {*/
+        if ((target & HOST) == HOST)
+        {
+            if (retval = Release(HOST)) return retval;
+            UnSetPointer(HOST);
+            if ((setted    & (~(target    | DISK)) == NONE) && 
+                (allocated & (~(allocated | DISK)) == NONE)) this->size=size;
+            h_pointer = new Value[size];
+            if (h_pointer == NULL) return GRError(name+" allocation on host failed", __FILE__, __LINE__);
+            if (use_cuda_alloc)
             {
-                if (retval = Release(HOST)) return retval;
-                UnSetPointer(HOST);
-                if ((setted    & (~(target    | DISK)) == NONE) && 
-                    (allocated & (~(allocated | DISK)) == NONE)) this->size=size;
-
-                h_pointer = new Value[size];
-                if (h_pointer == NULL) return GRError(name+" allocation on host failed", __FILE__, __LINE__);
-                allocated = allocated | HOST;    
-                if (ARRAY_DEBUG) {printf("%s allocated on HOST, size = %d pointer = %p\n",name.c_str(),size, h_pointer);fflush(stdout);}
-            }
+                if (retval = util::GRError(cudaHostRegister(h_pointer, sizeof(Value)*size, flag), 
+                                name+" cudaHostRegister failed.", __FILE__, __LINE__)) return retval;
+            } allocated = allocated | HOST;    
+            if (ARRAY_DEBUG) {printf("%s allocated on HOST, size = %d pointer = %p\n",name.c_str(),size, h_pointer);fflush(stdout);}
         }
+        //}
     
         if ((target & DEVICE) == DEVICE)
         {
@@ -178,9 +184,7 @@ public:
     {
         cudaError_t retval = cudaSuccess;
 
-        if (((allocated & HOST) == HOST) && ((allocated & DEVICE) == DEVICE) &&
-            (((target   & HOST) == HOST) || ((target    & DEVICE) == DEVICE)) &&
-            (flag !=0))
+        /*if (((allocated & HOST) == HOST)  && ((target    & DEVICE) == HOST) &&
         {
             if (retval = GRError(cudaFreeHost(h_pointer),name+" cudaFreeHost failed",__FILE__, __LINE__)) return retval;
             h_pointer = NULL;
@@ -188,9 +192,13 @@ public:
             allocated = allocated - HOST   + TARGETBASE;
             //allocated = allocated - DEVICE + TARGETBASE;
             if (ARRAY_DEBUG) {printf("%s released on HOST & DEVICE\n", name.c_str());fflush(stdout);}
-        } else {
+        } else {*/
             if (((target & HOST) == HOST)&&((allocated & HOST) == HOST))
             {
+                if (use_cuda_alloc)
+                {
+                    if (retval = GRError(cudaHostUnregister(h_pointer),name+" cudaHostUnregister failed",__FILE__,__LINE__)) return retval;
+                }
                 delete[] h_pointer;
                 h_pointer = NULL;
                 allocated = allocated - HOST + TARGETBASE;
@@ -198,7 +206,7 @@ public:
             } else if ((target & HOST)==HOST && (setted & HOST) == HOST) {
                 UnSetPointer(HOST);
             }
-        }
+        //}
 
         if (((target & DEVICE) == DEVICE)&&((allocated & DEVICE) ==DEVICE))
         {
@@ -244,7 +252,7 @@ public:
         if (target == HOST)
         {
             if (retval = Release(HOST)) return retval;
-            if (flag != NONE)
+            if (use_cuda_alloc)
             if (retval = util::GRError(cudaHostRegister(pointer, sizeof(Value)*size, flag), 
                                 name+" cudaHostRegister failed.", __FILE__, __LINE__)) return retval;
             h_pointer = pointer;
@@ -271,7 +279,7 @@ public:
             setted = setted - target + TARGETBASE;
             if (target == HOST  ) 
             {
-                if (flag !=NONE) util::GRError(cudaHostUnregister(h_pointer), 
+                if (use_cuda_alloc) util::GRError(cudaHostUnregister(h_pointer), 
                     name + " cudaHostUnregister failed.", __FILE__, __LINE__);
                 h_pointer = NULL;
                 if (ARRAY_DEBUG) {printf("%s unsetted on HOST\n",name.c_str());fflush(stdout);}
@@ -302,25 +310,35 @@ public:
         if (size+offset > this->size) return GRError(name+" size+offset is invalid", __FILE__, __LINE__);
         if (size == 0) return retval;
 
-        if        (source == HOST   && target == DEVICE) {
-           if (flag != NONE && stream != 0)
+        if      (source == HOST   && target == DEVICE) {
+           if (use_cuda_alloc && stream != 0)
+           {
                if (retval = GRError(cudaMemcpyAsync(d_pointer+offset, h_pointer+offset, sizeof(Value) * size, cudaMemcpyHostToDevice, stream), name+" cudaMemcpyAsync H2D failed", __FILE__, __LINE__)) return retval;
-           else if (retval = GRError(cudaMemcpy(d_pointer+offset,h_pointer+offset,sizeof(Value) * size, cudaMemcpyHostToDevice),name+" cudaMemcpy H2D failed", __FILE__, __LINE__)) return retval;
-        } else if (source == DEVICE && target == HOST  ) {
-           if (flag != NONE && stream != 0)
+           } else if (retval = GRError(cudaMemcpy(d_pointer+offset,h_pointer+offset,sizeof(Value) * size, cudaMemcpyHostToDevice),name+" cudaMemcpy H2D failed", __FILE__, __LINE__)) return retval;
+        } 
+
+        else if (source == DEVICE && target == HOST  ) {
+           if (use_cuda_alloc && stream != 0)
+           {    
                if (retval = GRError(cudaMemcpyAsync(h_pointer+offset, d_pointer+offset, sizeof(Value) * size, cudaMemcpyDeviceToHost), name+" cudaMemcpyAsync D2H failed", __FILE__, __LINE__)) return retval;
-           else if (retval = GRError(cudaMemcpy(h_pointer+offset,d_pointer+offset,sizeof(Value) * size, cudaMemcpyDeviceToHost),name+" cudaMemcpy D2H failed", __FILE__, __LINE__)) return retval;
-        } else if (source == HOST   && target == DISK  ) {
+           } else if (retval = GRError(cudaMemcpy(h_pointer+offset,d_pointer+offset,sizeof(Value) * size, cudaMemcpyDeviceToHost),name+" cudaMemcpy D2H failed", __FILE__, __LINE__)) return retval;
+        } 
+
+        else if (source == HOST   && target == DISK  ) {
            std::ofstream fout;
            fout.open(file_name.c_str(), std::ios::binary);
            fout.write((const char*)(h_pointer+offset),sizeof(Value)*size);
            fout.close();
-        } else if (source == DISK   && target == HOST  ) {
+        } 
+
+        else if (source == DISK   && target == HOST  ) {
            std::ifstream fin;
            fin.open(file_name.c_str(), std::ios::binary);
            fin.read((char*)(h_pointer+offset),sizeof(Value)*size);
            fin.close();
-        } else if (source == DEVICE && target == DISK  ) {
+        } 
+
+        else if (source == DEVICE && target == DISK  ) {
            bool t_allocated=false;
            if (((setted & HOST) != HOST) && ((allocated & HOST) !=HOST))
            {
@@ -333,7 +351,9 @@ public:
            {
                if (retval = Release(HOST)) return retval;
            }
-        } else if (source == DISK   && target == DEVICE) {
+        } 
+
+        else if (source == DISK   && target == DEVICE) {
            bool t_allocated=false;
            if (((setted & HOST) != HOST) && ((allocated & HOST) != HOST))
            {
