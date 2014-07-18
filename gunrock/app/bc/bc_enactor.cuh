@@ -568,7 +568,7 @@ class BCEnactor : public EnactorBase
                 0,                                  // SATURATION QUIT
                 true,                               // DEQUEUE_PROBLEM_SIZE
                 8,                                  // MIN_CTA_OCCUPANCY
-                7,                                  // LOG_THREADS
+                8,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS

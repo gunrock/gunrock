@@ -336,6 +336,7 @@ void RunTests(
     int max_grid_size,
     float queue_sizing,
     int num_gpus,
+    int delta_factor,
     CudaContext& context)
 {
         typedef SSSPProblem<
@@ -365,7 +366,8 @@ void RunTests(
         util::GRError(csr_problem->Init(
             g_stream_from_host,
             graph,
-            num_gpus), "Problem SSSP Initialization Failed", __FILE__, __LINE__);
+            num_gpus,
+            delta_factor), "Problem SSSP Initialization Failed", __FILE__, __LINE__);
 
         //
         // Compute reference CPU SSSP solution for source-distance
@@ -484,6 +486,8 @@ void RunTests(
 
     mark_pred = args.CheckCmdLineFlag("mark-pred");
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
+    int delta_factor;
+    args.GetCmdLineArgument("delta-factor", delta_factor);
 
     //printf("Display neighbor list of src:\n");
     //graph.DisplayNeighborList(src);
@@ -499,6 +503,7 @@ void RunTests(
                     max_grid_size,
                     max_queue_sizing,
                     num_gpus,
+                    delta_factor,
                     context);
         } else {
             RunTests<VertexId, Value, SizeT, false, true>(
@@ -507,6 +512,7 @@ void RunTests(
                     max_grid_size,
                     max_queue_sizing,
                     num_gpus,
+                    delta_factor,
                     context);
         }
     } else {
@@ -517,6 +523,7 @@ void RunTests(
                     max_grid_size,
                     max_queue_sizing,
                     num_gpus,
+                    delta_factor,
                     context);
         } else {
             RunTests<VertexId, Value, SizeT, false, false>(
@@ -525,6 +532,7 @@ void RunTests(
                     max_grid_size,
                     max_queue_sizing,
                     num_gpus,
+                    delta_factor,
                     context);
         }
     }

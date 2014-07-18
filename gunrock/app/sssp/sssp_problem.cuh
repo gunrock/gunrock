@@ -178,7 +178,8 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
     cudaError_t Init(
             bool        stream_from_host,       // Only meaningful for single-GPU
             const Csr<VertexId, unsigned int, SizeT> &graph,
-            int         _num_gpus)
+            int         _num_gpus,
+            int         delta_factor = 16)
     {
         num_gpus = _num_gpus;
         nodes = graph.nodes;
@@ -262,7 +263,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
 
                 data_slices[0]->d_weights = d_weights;
 
-                float delta = EstimatedDelta(graph)*16;
+                float delta = EstimatedDelta(graph)*delta_factor;
                 printf("estimated delta:%5f\n", delta);
 
                 if (retval = util::GRError(cudaMemcpy(
