@@ -390,7 +390,7 @@ public:
           printf(":: origin d_keys_array ::");
           util::DisplayDeviceResults(
             problem->data_slices[0]->d_keys_array, graph_slice->edges);
-          printf(":: origin d_col_indices - edge list ::");
+          printf(":: origin d_col_indices ::");
           util::DisplayDeviceResults(
             graph_slice->d_column_indices, graph_slice->edges);
           printf(":: origin d_edge_weights ::");
@@ -977,21 +977,6 @@ public:
             problem->data_slices[0]->d_col_indices,
             graph_slice->edges);
 
-          if (debug_info)
-          {
-            printf(":: final graph_slice d_column_indices ::");
-            util::DisplayDeviceResults(
-              graph_slice->d_column_indices, graph_slice->edges);
-            printf(":: final keys for current iteration ::");
-            util::DisplayDeviceResults(
-              problem->data_slices[0]->d_keys_array, graph_slice->edges);
-            printf(":: final edge_values for current iteration ::");
-            util::DisplayDeviceResults(
-              problem->data_slices[0]->d_edge_weights, graph_slice->edges);
-            printf(":: final d_origin_edges for current iteration ::");
-            util::DisplayDeviceResults(
-              problem->data_slices[0]->d_origin_edges, graph_slice->edges);
-          }
         } // end if
 
         printf(" (d). Constructing the Vertex List.\n");
@@ -1079,6 +1064,22 @@ public:
 
         printf("  * finished calculate row_offsets array for next iteration.\n");
 
+        if (debug_info)
+        {
+          printf(":: final graph_slice d_column_indices ::");
+          util::DisplayDeviceResults(
+            graph_slice->d_column_indices, graph_slice->edges);
+          printf(":: final keys for current iteration ::");
+          util::DisplayDeviceResults(
+            problem->data_slices[0]->d_keys_array, graph_slice->edges);
+          printf(":: final edge_values for current iteration ::");
+          util::DisplayDeviceResults(
+            problem->data_slices[0]->d_edge_weights, graph_slice->edges);
+          printf(":: final d_origin_edges for current iteration ::");
+          util::DisplayDeviceResults(
+            problem->data_slices[0]->d_origin_edges, graph_slice->edges);
+        }
+
         printf("END OF ITERATION:%lld #NODES LEFT: %d #EDGES LEFT: %d\n",
           enactor_stats.iteration, graph_slice->nodes, graph_slice->edges);
 
@@ -1112,11 +1113,6 @@ public:
         if (loop_limit >= 1000) break; // debug
       } // end of the recursive loop
 
-      // final number of selected edges
-      int num_edges_selected = Reduce(
-        problem->data_slices[0]->d_mst_output, num_edges_origin, context);
-      printf("NUMBER OF EDGES SELECTED - %4d\n", num_edges_selected);
-
       delete num_selected;
 
       if (retval) break;
@@ -1133,7 +1129,7 @@ public:
 
     }while(0);
 
-  printf("\n GPU Minimum Spanning Tree Computation Complete. \n");
+  if (DEBUG) printf("\n GPU Minimum Spanning Tree Computation Complete. \n");
 
   return retval;
 }

@@ -72,7 +72,8 @@ struct SuccFunctor
     if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id]
         && (atomicCAS(&problem->d_temp_storage[s_id], -1, s_id) == -1))
     {
-        //printf(" mark - s_id:%4d d_id:%4d e_id:%4d origin_e_id:%4d\n", s_id, d_id, e_id, problem->d_origin_edges[e_id]);
+        //printf(" mark - s_id:%4d d_id:%4d e_id:%4d origin_e_id:%4d\n",
+        //  s_id, d_id, e_id, problem->d_origin_edges[e_id]);
         problem->d_successors[s_id] = d_id;
         // mark MST output results
         problem->d_mst_output[problem->d_origin_edges[e_id]] = 1;
@@ -160,7 +161,8 @@ struct RmCycFunctor
     if (problem->d_successors[s_id] > s_id &&
         problem->d_successors[problem->d_successors[s_id]] == s_id)
     {
-        //printf(" remove-s_id:%4d d_id:%4d e_id:%4d origin_e_id:%4d\n", s_id, d_id, e_id, problem->d_origin_edges[e_id]);
+        //printf(" remove-s_id:%4d d_id:%4d e_id:%4d origin_e_id:%4d\n",
+        //  s_id, d_id, e_id, problem->d_origin_edges[e_id]);
         problem->d_successors[s_id] = s_id;
         // remove edges in the mst output results
         problem->d_mst_output[problem->d_origin_edges[e_id]] = 0;
@@ -276,8 +278,6 @@ struct EdgeRmFunctor
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
     {
-      //printf("s_id:%4d d_id%4d S[s_id]:%4d D[d_id]:%4d\n",
-      //  s_id, d_id, problem->d_successors[s_id], problem->d_successors[d_id]);
       if (problem->d_successors[s_id] == problem->d_successors[d_id])
       {
         problem->d_col_indices[e_id]  = -1;
