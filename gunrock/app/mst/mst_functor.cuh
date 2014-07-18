@@ -158,6 +158,8 @@ struct RmCycFunctor
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
     {
+    //printf("u:%4d S[u]:%4d S[S[u]]:%4d\n", s_id, problem->d_successors[s_id],
+    //  problem->d_successors[problem->d_successors[s_id]]);
     if (problem->d_successors[s_id] > s_id &&
         problem->d_successors[problem->d_successors[s_id]] == s_id)
     {

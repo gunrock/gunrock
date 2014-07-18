@@ -86,26 +86,25 @@ template<
 void DisplaySolution(
   const Csr<VertexId, Value, SizeT> &graph, int *mst_output)
 {
-  VertexId *temp_keys = new VertexId[graph.edges];
+  VertexId *source = new VertexId[graph.edges];
   for (int i = 0; i < graph.nodes; ++i)
   {
     for (int j = graph.row_offsets[i]; j < graph.row_offsets[i+1]; ++j)
     {
-      temp_keys[j] = i;
+      source[j] = i;
     }
   }
 
+  std::cout << "src " << "dst" << std::endl;
   for (int i = 0; i < graph.edges; ++i)
   {
     if (mst_output[i] == 1)
     {
-      std::cout << "parent[" << temp_keys[i] << "] = "
-                << graph.column_indices[i] << std::endl;
-
+      std::cout << source[i] << " " << graph.column_indices[i] << std::endl;
     }
   }
 
-  if (temp_keys) { delete [] temp_keys; }
+  if (source) { delete [] source; }
 }
 
 /******************************************************************************
@@ -118,7 +117,8 @@ void DisplaySolution(
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] weight value associated with per edge we used for calculation
+ * @param[in] graph reference to the CSR graph we process on
  */
 template<
   typename VertexId,
@@ -130,7 +130,7 @@ Value SimpleReferenceMST(
 
   const int num_nodes = graph.nodes;
   const int num_edges = graph.edges;
-  printf(" Reference Test: #nodes: %d #edges: %d\n", num_nodes, num_edges);
+  printf("REFERENCE TEST: #NODES: %d #EDGES: %d\n", num_nodes, num_edges);
 
   // kruskal_min_spanning_tree preparations
   using namespace boost;
@@ -165,19 +165,21 @@ Value SimpleReferenceMST(
 
   SizeT num_selected_cpu = 0;
   Value total_weight_cpu = 0;
-  std::cout << "Print the edges in the MST:" << std::endl;
+  //std::cout << "Print the edges in the MST:" << std::endl;
   for (std::vector < Edge >::iterator ei = spanning_tree.begin();
        ei != spanning_tree.end(); ++ei)
   {
-    //std::cout << source(*ei, g) << " <--> " << target(*ei, g)
+    //std::cout << source(*ei, g) << " " << target(*ei, g)
     //  << " with weight of " << weight[*ei]
     //  << std::endl;
     ++num_selected_cpu;
     total_weight_cpu += weight[*ei];
   }
 
+  if (edge_pairs) { delete [] edge_pairs; }
+
   printf(" CPU - Computation Complete in %lf msec.\n", elapsed_cpu);
-  printf(" CPU - Number of Edges in MST: %ld\n", num_selected_cpu);
+  printf(" CPU - Number of Edges in MST: %d\n", num_selected_cpu);
 
   return total_weight_cpu;
 }
@@ -223,7 +225,7 @@ void RunTests(
   Problem *mst_problem = new Problem;
 
   // malloc host results spaces
-  VertexId *h_mst_output = (VertexId*)malloc(sizeof(VertexId) * graph_gpu.edges);
+  VertexId *h_mst_output = new VertexId[graph_gpu.edges];
 
   // copy data from CPU to GPU initialize data members in DataSlice
   util::GRError(mst_problem->Init(
@@ -258,9 +260,6 @@ void RunTests(
   util::GRError(mst_problem->Extract(h_mst_output),
     "MST Problem Data Extraction Failed", __FILE__, __LINE__);
 
-  // display computed results
-  //DisplaySolution(graph_gpu, h_mst_output);
-
   // calculate gpu final number of selected edges
   int num_selected_gpu = 0;
   for (int iter = 0; iter < graph_gpu.edges; ++iter)
@@ -281,6 +280,7 @@ void RunTests(
   if (total_weight_cpu == total_weight_gpu)
   {
     printf("CORRECT.\n");
+    DisplaySolution(graph_gpu, h_mst_output); // display computed results
   }
   else
   {
@@ -289,8 +289,8 @@ void RunTests(
   }
 
   // clean up id neccessary
-  if (mst_problem)  { delete mst_problem; }
-  if (h_mst_output) { free(h_mst_output); }
+  if (mst_problem)  { delete    mst_problem;  }
+  if (h_mst_output) { delete [] h_mst_output; }
 
   cudaDeviceSynchronize();
 }
@@ -423,6 +423,13 @@ int main(int argc, char** argv)
     // display graph
     //csr_gpu.DisplayGraph();
     //csr_cpu.DisplayGraph();
+
+    /***************************************************************
+    * To make sure two graph have same weight values for each edge *
+    * we have to change ll_value = rand()%64 in market.cuh file to *
+    * some non-random value if the original graph does not contain *
+    * weight per edge.                                             *
+    ****************************************************************/
 
     // run gpu tests
     RunTests(csr_gpu, csr_cpu, args, *context);
