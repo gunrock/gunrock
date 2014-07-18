@@ -538,8 +538,10 @@ struct ProblemBase
 
             // Iterate through global frontier queue setups
             for (int i = 0; i < 2; i++) {
-
+                //frontier_elements[i] = new_frontier_elements[i];
                 // Allocate frontier queue if not big enough
+                //frontier_queues.keys[i].EnsureSize(frontier_elements[i]);
+                //if (_USE_DOUBLE_BUFFER) frontier_queues.values[i].EnsureSize(frontier_elements[i]);
                 if (frontier_elements[i] < new_frontier_elements[i]) {
 
                     // Free if previously allocated

@@ -345,7 +345,6 @@ public:
         return retval;
     }
 
-
     // Set work queue length
     template <typename IterationT, typename SizeT>
     cudaError_t SetQueueLength(
@@ -370,7 +369,8 @@ public:
                     "CtaWorkProgress cudaMemcpy d_counters failed", __FILE__, __LINE__)) break;
             } else {
                 if (!DEBUG)
-                    cudaMemcpyAsync(((SizeT*) d_counters) + queue_length_idx, &queue_length, sizeof(SizeT), cudaMemcpyHostToDevice,stream);
+                    util::MemsetKernel<<<1,1,0,stream>>>(((SizeT*) d_counters) + queue_length_idx, queue_length, 1);
+                    //cudaMemcpyAsync(((SizeT*) d_counters) + queue_length_idx, &queue_length, sizeof(SizeT), cudaMemcpyHostToDevice,stream);
                 if (retval = util::GRError(cudaMemcpyAsync(
                     ((SizeT*) d_counters) + queue_length_idx,
                     &queue_length,

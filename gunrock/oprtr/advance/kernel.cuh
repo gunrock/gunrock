@@ -31,9 +31,9 @@ namespace gunrock {
 namespace oprtr {
 namespace advance {
 
-template<typename KernelPolicy, typename ProblemData, typename Functor>
+template <typename KernelPolicy, typename ProblemData, typename Functor>
 void ComputeOutputLength(
-                                    int                             num_block,
+   //                                 int                             num_block,
                                     gunrock::app::FrontierAttribute *frontier_attribute,
                                     typename KernelPolicy::SizeT    *d_offsets,
                                     typename KernelPolicy::VertexId *d_indices,
@@ -46,9 +46,10 @@ void ComputeOutputLength(
                                     TYPE                            ADVANCE_TYPE) {
 
     typedef typename ProblemData::SizeT         SizeT;
-
-    gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<KernelPolicy, ProblemData, Functor>
-        <<< num_block, KernelPolicy::THREADS,0,stream>>>(
+    int num_block = (frontier_attribute->queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
+    
+    gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
+        <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS,0,stream>>>(
                 d_offsets,
                 d_indices,
                 d_in_key_queue,
@@ -163,8 +164,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             SizeT output_queue_len = temp[0];*/
             //printf("input queue:%d, output_queue:%d\n", frontier_attribute.queue_length, frontier_attribute.output_length); 
             if (get_output_length)
-                ComputeOutputLength<LBPOLICY, ProblemData, Functor>(
-                                    num_block,
+                ComputeOutputLength<KernelPolicy, ProblemData, Functor>(
+     //                               num_block,
                                     &frontier_attribute,
                                     d_column_offsets,
                                     d_row_indices,
@@ -259,8 +260,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             SizeT output_queue_len = temp[0];*/
 
             if (get_output_length)
-                ComputeOutputLength<LBPOLICY, ProblemData, Functor>(
-                                    num_block,
+                ComputeOutputLength<KernelPolicy, ProblemData, Functor>(
+                                    //num_block,
                                     &frontier_attribute,
                                     d_row_offsets,
                                     d_column_indices,

@@ -36,30 +36,11 @@ namespace bfs {
 
     template <typename BFSProblem, bool INSTRUMENT> class BFSEnactor;
         
-    /*    struct BitMaskTex
-        {
-            static texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *ref;
-        }
-        texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> BitMaskTex::*ref;
-    //static texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *ts_bitmask;
-    template <typename SizeT>
-        struct RowOffsetTex
-        {
-            static texture<SizeT, cudaTextureType1D, cudaReadModeElementType> *ref;
-        }
-    template <typename SizeT>
-        texture<SizeT, cudaTextureType1D, cudaReadModeElementType> RowOffsetTex<SizeT>::ref;
-    template <typename VertexId>
-    static texture<VertexId     , cudaTextureType1D, cudaReadModeElementType> *ts_columnindices;*/
-
     class ThreadSlice
     {
     public:
         int           thread_num;
         int           init_size;
-        //int           max_grid_size;
-        //int           edge_map_grid_size;
-        //int           vertex_map_grid_size;
         CUTThread     thread_Id;
         util::cpu_mt::CPUBarrier* cpu_barrier;
         void*         problem;
@@ -84,7 +65,6 @@ namespace bfs {
     template <typename VertexId, typename SizeT, SizeT num_associates>
     __global__ void Expand_Incoming (
         const SizeT            num_elements,
-        //const SizeT            num_associates,
         const SizeT            incoming_offset,
         const VertexId*  const keys_in,
               VertexId*        keys_out,
@@ -182,11 +162,6 @@ namespace bfs {
         //util::scan::MultiScan<VertexId,SizeT,true,256,8>*
         //             Scaner                = NULL;
         bool         break_clean           = true;
-        //SizeT*       out_offset            = NULL;
-        //char*        message               = new char [1024];
-        //util::Array1D<SizeT, unsigned int>   scanned_edges;
-        //util::Array1D<SizeT, VertexId    >   temp_preds;
-        //util::Array1D<SizeT, unsigned char>  temp_marker;
         frontier_attribute->queue_index    = 0;        // Work queue index
         frontier_attribute->selector       = 0;
         frontier_attribute->queue_length   = thread_data -> init_size; //? 
@@ -195,21 +170,6 @@ namespace bfs {
         do {
             util::cpu_mt::PrintMessage("BFS Thread begin.",thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
             if (enactor_stats->retval = util::SetDevice(gpu)) break;
-            /*if (num_gpus >1)
-            {
-                Scaner = new util::scan::MultiScan<VertexId, SizeT, true, 256, 8>;
-            }
-        
-            scanned_edges.SetName("scanned_edges");
-            temp_preds   .SetName("temp_preds"   );
-            temp_marker  .SetName("temp_marker"  );
-            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) 
-                if (enactor_stats->retval = scanned_edges.Allocate(graph_slice->edges, util::DEVICE)) break;
-            if (BFSProblem::MARK_PREDECESSORS)
-                if (enactor_stats->retval = temp_preds   .Allocate(graph_slice->nodes, util::DEVICE)) break;
-            if (num_gpus >1)
-                if (enactor_stats->retval = temp_marker  .Allocate(graph_slice->nodes, util::DEVICE)) break;
-            */
 
             // Step through BFS iterations
             //while (done[0] < 0) {
@@ -233,6 +193,19 @@ namespace bfs {
                    util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
                 }
                 // Edge Map
+
+                gunrock::oprtr::advance::ComputeOutputLength <AdvanceKernelPolicy, BFSProblem, BfsFunctor>(
+                    frontier_attribute,
+                    graph_slice->row_offsets   .GetPointer(util::DEVICE),
+                    graph_slice->column_indices.GetPointer(util::DEVICE),
+                    graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),
+                    data_slice[0]->scanned_edges.GetPointer(util::DEVICE),
+                    graph_slice->frontier_elements[frontier_attribute->selector  ],
+                    graph_slice->frontier_elements[frontier_attribute->selector^1],
+                    context[0][0],
+                    data_slice[0]->streams[0],
+                    gunrock::oprtr::advance::V2V);
+
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BFSProblem, BfsFunctor>(
                     //enactor_stats->d_done,
                     enactor_stats[0],
@@ -255,20 +228,20 @@ namespace bfs {
                     work_progress[0],
                     context[0][0],
                     data_slice[0]->streams[0],
-                    gunrock::oprtr::advance::V2V);
+                    gunrock::oprtr::advance::V2V,
+                    false,
+                    false);
 
                 // Only need to reset queue for once
-                if (frontier_attribute->queue_reset)
+                //if (frontier_attribute->queue_reset)
                     frontier_attribute->queue_reset = false;
-                //cudaStreamSynchronize(data_slice[0]->streams[0]);
                 if (DEBUG && (enactor_stats->retval = util::GRError(cudaStreamSynchronize(data_slice[0]->streams[0]), "advance::Kernel failed", __FILE__, __LINE__))) break;
-                //cudaEventQuery(enactor_stats->throttle_event);               // give host memory mapped visibility to GPU updates 
                 if (DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
 
                 frontier_attribute->queue_index++;
                 frontier_attribute->selector ^= 1;
 
-                if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,data_slice[0]->streams[0])) break;
+                //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,data_slice[0]->streams[0])) break;
                 if (DEBUG || INSTRUMENT) 
                     enactor_stats->total_queued += frontier_attribute->queue_length;
                 if (DEBUG)
@@ -286,12 +259,6 @@ namespace bfs {
                     //if (BFSProblem::ENABLE_IDEMPOTENCE)
                     //    util::cpu_mt::PrintGPUArray<SizeT, unsigned char>("mask1", data_slice[0]->visited_mask.GetPointer(util::DEVICE), (graph_slice->nodes+7)/8, thread_num, enactor_stats->iteration);
                 }
-                /*if (DEBUG) {
-                    if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
-                    printf(", %lld", (long long) frontier_attribute->queue_length);
-                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
-                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_values[frontier_attribute.selector], frontier_attribute.queue_length);
-                }*/
 
                 if (INSTRUMENT) {
                     if (enactor_stats->retval = enactor_stats->advance_kernel_stats.Accumulate(
@@ -300,15 +267,6 @@ namespace bfs {
                         enactor_stats->total_lifetimes,
                         false,data_slice[0]->streams[0])) break;
                 }
-
-                // Throttle
-                //if (enactor_stats->iteration & 1) {
-                //    if (enactor_stats->retval = util::GRError(cudaEventRecord(enactor_stats->throttle_event),
-                //        "BFSEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
-                //} else {
-                //    if (enactor_stats->retval = util::GRError(cudaEventSynchronize(enactor_stats->throttle_event),
-                //        "BFSEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
-                //}
 
                 // Check if done
                 //if (All_Done(s_enactor_stats,num_gpus)) break;
@@ -343,7 +301,7 @@ namespace bfs {
                 frontier_attribute->selector ^= 1;
 
                 //if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
-                if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, data_slice[0]->streams[0])) break;
+                //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, data_slice[0]->streams[0])) break;
                 //}
 
                 if (INSTRUMENT || DEBUG) {
@@ -373,7 +331,9 @@ namespace bfs {
                     //if (BFSProblem::ENABLE_IDEMPOTENCE)
                     //    util::cpu_mt::PrintGPUArray<SizeT, unsigned char>("mask2", data_slice[0]->visited_mask.GetPointer(util::DEVICE), (graph_slice->nodes+7)/8, thread_num, enactor_stats->iteration);
                 }
+
                 // Check if done
+                if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, data_slice[0]->streams[0])) break;
                 if (All_Done(s_enactor_stats,s_frontier_attribute,num_gpus)) break;
 
                 //Use multi_scan to splict the workload into multi_gpus
@@ -385,7 +345,7 @@ namespace bfs {
                     //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, n)) break;
                     if (frontier_attribute->queue_length >0) 
                     {   
-                        enactor_stats->done[0]=-1;
+                        //enactor_stats->done[0]=-1;
                         //printf("%d\t%d\tScan map begin.\n",thread_num,iteration[0]);fflush(stdout);
                         //int* _partition_table = graph_slice->partition_table.GetPointer(util::DEVICE);
                         //SizeT* _convertion_table = graph_slice->convertion_table.GetPointer(util::DEVICE);
@@ -557,7 +517,6 @@ namespace bfs {
                         if (data_slice[0]->num_vertex_associate==1) Expand_Incoming <VertexId, SizeT, 1>
                             <<<grid_size,256>>> (
                             m,
-                            //data_slice[0]  ->num_associate,
                             graph_slice    ->in_offset[peer_],
                             data_slice[0]  ->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE),
                             graph_slice    ->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE) + total_length,
@@ -567,7 +526,6 @@ namespace bfs {
                         else if (data_slice[0]->num_vertex_associate==2) Expand_Incoming <VertexId, SizeT, 2>
                             <<<grid_size,256>>> (
                             m,
-                            //data_slice[0]  ->num_associate,
                             graph_slice    ->in_offset[peer_],
                             data_slice[0]  ->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE),
                             graph_slice    ->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE) + total_length,
@@ -595,7 +553,6 @@ namespace bfs {
                 }
 
                 enactor_stats->iteration++;
-                //if (DEBUG) printf("\n%lld", (long long) enactor_stats->iteration);
             }
 
             if (enactor_stats->retval) break;
@@ -607,26 +564,15 @@ namespace bfs {
                 enactor_stats->retval = util::GRError(cudaErrorInvalidConfiguration, "Frontier queue overflow. Please increase queue-sizing factor.",__FILE__, __LINE__);
                 break;
             }
-            //if (d_scanned_edges) cudaFree(d_scanned_edges);
-            //scanned_edges.Release();
-
         } while(0);
 
         if (num_gpus >1) 
         {   
             if (break_clean) 
             {   
-                //printf("%d\t",thread_num);
                 util::cpu_mt::ReleaseBarrier(&(cpu_barrier[0]));
             }   
-            //util::cpu_mt::ReleaseBarrier(&(cpu_barrier[0]));
-            //util::cpu_mt::ReleaseBarrier(&(cpu_barrier[1]));
-            //delete Scaner; Scaner=NULL;
-            //delete[] out_offset; out_offset=NULL;
         }
-        //delete[] message;message=NULL;
-        //temp_marker.Release();
-        //temp_preds.Release();
         util::cpu_mt::PrintMessage("GPU BFS thread finished.", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
         CUT_THREADEND;
     }
@@ -642,125 +588,15 @@ class BFSEnactor : public EnactorBase
     typedef typename BFSProblem::SizeT    SizeT   ;
     typedef typename BFSProblem::VertexId VertexId;
     typedef typename BFSProblem::Value    Value   ;
-    // Members
-    public:
-
-    /**
-     * A pinned, mapped word that the traversal kernels will signal when done
-     */
-    //volatile int                      **dones;
-    //int                               **d_dones;
-    //util::Array1D<SizeT, cudaEvent_t> throttle_events;
-    //util::Array1D<SizeT, cudaError_t> retvals;
 
     // Methods
-    protected:
-
-    /**
-     * @brief Prepare the enactor for BFS kernel call. Must be called prior to each BFS search.
-     *
-     * @param[in] problem BFS Problem object which holds the graph data and BFS problem data to compute.
-     * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] filter_grid_size CTA occupancy for filter kernel call.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    /*cudaError_t Setup(
-        BFSProblem *problem)
-    {
-        util::cpu_mt::PrintMessage("BFSEnactor Setup() begin.");
-        cudaError_t retval = cudaSuccess;
-        //this->num_gpus     = problem->num_gpus;
-        //this->gpu_idx      = problem->gpu_idx;
-        //throttle_events.Allocate(this->num_gpus);
-        //retvals.Allocate(this->num_gpus);
-
-        do {
-            //dones   = new volatile int* [this->num_gpus];
-            //d_dones = new          int* [this->num_gpus];
-            //ts_bitmask       = new texture<unsigned char, cudaTextureType1D, cudaReadModeElementType>[this->num_gpus];
-            //ts_rowoffset     = new texture<SizeT        , cudaTextureType1D, cudaReadModeElementType>[this->num_gpus];
-            //ts_columnindices = new texture<VertexId     , cudaTextureType1D, cudaReadModeElementType>[this->num_gpus];
-
-            for (int gpu=0;gpu<num_gpus;gpu++)
-            {
-                if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-                //initialize the host-mapped "done"
-                //int flags = cudaHostAllocMapped;
-
-                // Allocate pinned memory for done
-                //if (retval = util::GRError(cudaHostAlloc((void**)&(enactor_stats[gpu].done), sizeof(int) * 1, flags),
-                //    "BFSEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
-
-                // Map done into GPU space
-                //if (retval = util::GRError(cudaHostGetDevicePointer((void**)&(enactor_stats[gpu].d_done), (void*) enactor_stats[gpu].done, 0),
-                //    "BFSEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
-
-                // Create throttle event
-                //if (retval = util::GRError(cudaEventCreateWithFlags(&enactor_stats[gpu].throttle_event, cudaEventDisableTiming),
-                //    "BFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
-                
-                //enactor_stats[gpu].done   = -1;
-                //enactor_stats[gpu].retval = cudaSuccess;
-                
-                // Bind row-offsets and bitmask texture
-                //texture<SizeT, cudaTextureType1D, cudaReadModeElementType> t_rowoffset; 
-                //cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
-                //gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref.channelDesc = row_offsets_desc;
-                //ts_rowoffset[gpu].channelDesc = row_offsets_desc;
-                //t_rowoffset.channelDesc = row_offsets_desc;
-                //util::cpu_mt::PrintGPUArray<SizeT, SizeT>("row_offsets",problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE), problem->graph_slices[gpu]->nodes+1);
-                //if (retval = util::GRError(cudaBindTexture(
-                //    0,
-                //    gunrock::oprtr::edge_map_forward::RowOffsetTex<Sizet>::ref,//t_rowoffset,//ts_rowoffset[gpu],
-                //    problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
-                //    (problem->graph_slices[gpu]->nodes + 1) * sizeof(SizeT)),
-                //        "BFSEnactor cudaBindTexture row_offset failed", __FILE__, __LINE__)) break;
-
-                if (BFSProblem::ENABLE_IDEMPOTENCE) {
-                    int bytes = (problem->graph_slices[gpu]->nodes + 8 - 1) / 8;
-                    cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
-                    gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
-                    if (retval = util::GRError(cudaBindTexture(
-                                0,
-                                gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref,//ts_bitmask[gpu],
-                                problem->data_slices[gpu]->visited_mask.GetPointer(util::DEVICE),
-                                bytes),
-                            "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
-                }
-            }
-
-            //graph slice
-            //typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
-            //typename ProblemData::DataSlice *data_slice = problem->data_slices[0];
-
-        //do {
-
-           }
-
-            //cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
-            //gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref.channelDesc = column_indices_desc;
-            //if (retval = util::GRError(cudaBindTexture(
-            //                0,
-            //                gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref,
-            //                graph_slice->d_column_indices,
-            //                graph_slice->edges * sizeof(VertexId)),
-            //            "BFSEnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;
-        } while (0);
-        
-        util::cpu_mt::PrintMessage("BFSEnactor Setup() end.");
-        return retval;
-    }*/
-
-    public:
+public:
 
     /**
      * @brief BFSEnactor constructor
      */
     BFSEnactor(bool DEBUG = false, int num_gpus = 1, int* gpu_idx = NULL) :
         EnactorBase(EDGE_FRONTIERS, DEBUG, num_gpus, gpu_idx)//,
-        //dones(NULL),
-        //d_dones(NULL)
     {
         util::cpu_mt::PrintMessage("BFSEnactor() begin.");
         util::cpu_mt::PrintMessage("BFSEnactor() end.");
@@ -780,24 +616,6 @@ class BFSEnactor : public EnactorBase
                 cudaUnbindTexture(gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref);
             }
         }
-        /*if (All_Done(dones,retvals.GetPointer(),num_gpus)) {
-            for (int gpu=0;gpu<num_gpus;gpu++)
-            {   
-                if (num_gpus !=1)
-                    util::GRError(cudaSetDevice(gpu_idx[gpu]),
-                        "BFSEnactor cudaSetDevice gpu failed", __FILE__, __LINE__);
-
-                //util::GRError(cudaFreeHost((void*)(dones[gpu])),
-                //    "BFSEnactor cudaFreeHost done failed", __FILE__, __LINE__);
-
-                //util::GRError(cudaEventDestroy(throttle_events[gpu]),
-                //    "BFSEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
-            }   
-            //delete[] dones;          dones           = NULL;
-            //throttle_events.Release();
-            //retvals        .Release();
-            //delete[] throttle_event ;throttle_event  = NULL; 
-        }*/
         util::cpu_mt::PrintMessage("~BFSEnactor() end.");
     }
 
@@ -871,6 +689,10 @@ class BFSEnactor : public EnactorBase
         return retval;
     }
 
+    cudaError_t Reset()
+    {
+        return EnactorBase::Reset();
+    }
     /** @} */
 
     /**
@@ -896,16 +718,6 @@ class BFSEnactor : public EnactorBase
     int         max_grid_size = 0)
     {
         clock_t  start_time = clock();
-        util::cpu_mt::PrintMessage("BFSEnactor EnactBFS() begin.", -1, -1, clock()-start_time);
-        /*typedef typename BFSProblem::SizeT      SizeT;
-        typedef typename BFSProblem::VertexId   VertexId;
-
-        typedef BFSFunctor<
-            VertexId,
-            SizeT,
-            VertexId,
-            BFSProblem> BfsFunctor;*/
-
         cudaError_t              retval         = cudaSuccess;
         util::cpu_mt::CPUBarrier cpu_barrier    = util::cpu_mt::CreateBarrier(num_gpus);
         ThreadSlice              *thread_slices = new ThreadSlice [num_gpus];
@@ -918,19 +730,9 @@ class BFSEnactor : public EnactorBase
                 printf("0");
             }
 
-            // Lazy initialization
-            //if (retval = EnactorBase::Setup(problem,
-            //                                max_grid_size,
-            //                                AdvanceKernelPolicy::CTA_OCCUPANCY, 
-            //                                FilterKernelPolicy::CTA_OCCUPANCY)) break;
-            //if (retval = Setup(problem)) break;
-
-            if (retval = EnactorBase::Reset()) break;
-
+           // if (retval = EnactorBase::Reset()) break;
             for (int gpu=0;gpu<num_gpus;gpu++)
             {
-                //for (int i=0;i<num_gpus;i++)
-                //    problem->data_slices[gpu]->streams[i] = context[gpu*num_gpus+1][0]._stream;
                 thread_slices[gpu].thread_num    = gpu;
                 thread_slices[gpu].problem       = (void*)problem;
                 thread_slices[gpu].enactor       = (void*)this;
@@ -956,7 +758,6 @@ class BFSEnactor : public EnactorBase
         if (DEBUG) printf("\nGPU BFS Done.\n");
         delete[] thread_Ids   ; thread_Ids    = NULL;
         delete[] thread_slices; thread_slices = NULL;
-        util::cpu_mt::PrintMessage("BFSEnactor EnactBFS() end.", -1, -1, clock()-start_time);
         return retval;
     }
 

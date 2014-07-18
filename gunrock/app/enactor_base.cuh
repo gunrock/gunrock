@@ -52,9 +52,9 @@ struct EnactorStats
     util::Array1D<int, unsigned int> node_locks;
     util::Array1D<int, unsigned int> node_locks_out;
 
-    volatile int       *done;
-    int                *d_done;
-    cudaEvent_t        throttle_event;
+//    volatile int       *done;
+//    int                *d_done;
+    //cudaEvent_t        throttle_event;
     cudaError_t        retval;
     clock_t            start_time;
 
@@ -221,7 +221,7 @@ bool All_Done(EnactorStats *enactor_stats,FrontierAttribute *frontier_attribute,
             s_data_slice[peer]->in_length[enactor_stats->iteration%2][gpu_]
                       = data_slice[0]->out_length[peer_];
             if (data_slice[0]->out_length[peer_] == 0) continue;
-            s_enactor_stats[peer].done[0]=-1;
+            //s_enactor_stats[peer].done[0]=-1;
             //printf("%d\t %d\t %p+%d ==> %p+%d @ %d,%d\n", thread_num, enactor_stats->iteration, s_data_slice[peer]->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE), s_graph_slice[peer]->in_offset[gpu_], graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), out_offset[peer_], peer, data_slice[0]->out_length[peer_]);
             if (enactor_stats->retval = util::GRError(cudaMemcpyAsync(
                 s_data_slice[peer] -> keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE)
@@ -326,7 +326,7 @@ bool All_Done(EnactorStats *enactor_stats,FrontierAttribute *frontier_attribute,
             s_data_slice[peer]->in_length[enactor_stats->iteration%2][gpu_]
                       = data_slice[0]->out_length[peer_];
             if (data_slice[0]->out_length[peer_] == 0) continue;
-            s_enactor_stats[peer].done[0]=-1;
+            //s_enactor_stats[peer].done[0]=-1;
             printf("%d\t %d\t %p+%d <== %p+%d @ %d,%d\n", thread_num, enactor_stats->iteration, s_data_slice[peer]->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE), s_graph_slice[peer]->out_offset[gpu_]-s_graph_slice[peer]->out_offset[1], graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), out_offset[peer_], peer, data_slice[0]->out_length[peer_]);
             if (enactor_stats->retval = util::GRError(cudaMemcpy(
                 s_data_slice[peer] -> keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE)
@@ -391,8 +391,6 @@ public:
     //FrontierAttribute               *frontier_attribute;
     util::Array1D<int, FrontierAttribute> frontier_attribute;
 
-public:
-
     // if DEBUG is set, print details to stdout
     bool DEBUG;
 
@@ -454,10 +452,10 @@ protected:
             enactor_stats[gpu].node_locks    .Release();
             enactor_stats[gpu].node_locks_out.Release();
             if (work_progress[gpu].HostReset()) return;
-            if (util::GRError(cudaFreeHost((void*)enactor_stats[gpu].done), 
-                 "EnactorBase cudaFreeHost done failed", __FILE__, __LINE__)) return;
-            if (util::GRError(cudaEventDestroy(enactor_stats[gpu].throttle_event),
-                 "EnactorBase cudaEventDestroy throttle_event failed", __FILE__, __LINE__)) return;
+            //if (util::GRError(cudaFreeHost((void*)enactor_stats[gpu].done), 
+            //     "EnactorBase cudaFreeHost done failed", __FILE__, __LINE__)) return;
+            //if (util::GRError(cudaEventDestroy(enactor_stats[gpu].throttle_event),
+            //     "EnactorBase cudaEventDestroy throttle_event failed", __FILE__, __LINE__)) return;
             //if (enactor_stats.d_node_locks) util::GRError(cudaFree(enactor_stats.d_node_locks), "EnactorBase cudaFree d_node_locks failed", __FILE__, __LINE__);
             //if (enactor_stats.d_node_locks_out) util::GRError(cudaFree(enactor_stats.d_node_locks_out), "EnactorBase cudaFree d_node_locks_out failed", __FILE__, __LINE__);
         }
@@ -493,19 +491,19 @@ protected:
             if (retval = enactor_stats[gpu].advance_kernel_stats.Setup(enactor_stats[gpu].advance_grid_size)) return retval;
             if (retval = enactor_stats[gpu]. filter_kernel_stats.Setup(enactor_stats[gpu]. filter_grid_size)) return retval;
             //initialize the host-mapped "done"
-            int flags = cudaHostAllocMapped;
+            //int flags = cudaHostAllocMapped;
 
             // Allocate pinned memory for done
-            if (retval = util::GRError(cudaHostAlloc((void**)&(enactor_stats[gpu].done), sizeof(int) * 1, flags),
-                    "BFSEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
+            //if (retval = util::GRError(cudaHostAlloc((void**)&(enactor_stats[gpu].done), sizeof(int) * 1, flags),
+            //        "BFSEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
 
             // Map done into GPU space
-            if (retval = util::GRError(cudaHostGetDevicePointer((void**)&(enactor_stats[gpu].d_done), (void*) enactor_stats[gpu].done, 0),  
-                    "BFSEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
+            //if (retval = util::GRError(cudaHostGetDevicePointer((void**)&(enactor_stats[gpu].d_done), (void*) enactor_stats[gpu].done, 0),  
+            //        "BFSEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
 
             // Create throttle event
-            if (retval = util::GRError(cudaEventCreateWithFlags(&enactor_stats[gpu].throttle_event, cudaEventDisableTiming),                
-                    "BFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
+            //if (retval = util::GRError(cudaEventCreateWithFlags(&enactor_stats[gpu].throttle_event, cudaEventDisableTiming),                
+            //        "BFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
                 
             //enactor_stats[gpu].iteration             = 0;
             //enactor_stats[gpu].total_runtimes        = 0;
@@ -572,8 +570,8 @@ protected:
             enactor_stats[gpu].total_runtimes        = 0;
             enactor_stats[gpu].total_lifetimes       = 0;
             enactor_stats[gpu].total_queued          = 0;
-            enactor_stats[gpu].done[0]               = -1;
-            enactor_stats[gpu].retval                = cudaSuccess;
+            //enactor_stats[gpu].done[0]               = -1;
+            //enactor_stats[gpu].retval                = cudaSuccess;
             //enactor_stats.num_gpus              = 1;
             //enactor_stats.gpu_id                = 0;
 
