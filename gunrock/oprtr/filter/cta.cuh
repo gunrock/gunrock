@@ -82,7 +82,7 @@ struct Cta
     VertexId                queue_index;                // Current frontier queue counter index
     util::CtaWorkProgress   &work_progress;             // Atomic workstealing and queueing counters
     SizeT                   max_out_frontier;           // Maximum size (in elements) of outgoing frontier
-    int                     num_gpus;                   // Number of GPUs
+    //int                     num_gpus;                   // Number of GPUs
 
     // Operational details for raking_scan_grid
     RakingDetails           raking_details;
@@ -420,7 +420,7 @@ struct Cta
     __device__ __forceinline__ Cta(
         VertexId                iteration,
         VertexId                queue_index,
-        int                     num_gpus,
+        //int                     num_gpus,
         SmemStorage             &smem_storage,
         VertexId                *d_in,
         VertexId                *d_pred_in,
@@ -432,7 +432,7 @@ struct Cta
         //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *t_bitmask):
             iteration(iteration),
             queue_index(queue_index),
-            num_gpus(num_gpus),
+            //num_gpus(num_gpus),
             raking_details(
                 smem_storage.state.raking_elements,
                 smem_storage.state.warpscan,

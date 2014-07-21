@@ -116,6 +116,148 @@ namespace bfs {
         }
     }
 
+    template <typename BFSProblem>
+    void ShowDebugInfo(
+        int                    thread_num,
+        FrontierAttribute      *frontier_attribute,
+        EnactorStats           *enactor_stats,
+        typename BFSProblem::DataSlice  *data_slice,
+        typename BFSProblem::GraphSlice *graph_slice,
+        util::CtaWorkProgressLifetime *work_progress,
+        std::string            check_name = "")
+    {
+        typedef typename BFSProblem::SizeT    SizeT;
+        typedef typename BFSProblem::VertexId VertexId;
+        typedef typename BFSProblem::Value    Value;
+        SizeT queue_length;
+
+        if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, queue_length)) return;
+	util::cpu_mt::PrintCPUArray<SizeT, SizeT>((check_name+" Queue_Length").c_str(), &(queue_length), 1, thread_num, enactor_stats->iteration);
+	util::cpu_mt::PrintGPUArray<SizeT, VertexId>((check_name+" keys").c_str(), graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), queue_length, thread_num, enactor_stats->iteration);
+	//if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
+	//    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu1", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
+	//util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labe1", data_slice[0]->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
+	//if (BFSProblem::MARK_PREDECESSORS)
+	//    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("pred1", data_slice[0]->preds.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
+	//if (BFSProblem::ENABLE_IDEMPOTENCE)
+	//    util::cpu_mt::PrintGPUArray<SizeT, unsigned char>("mask1", data_slice[0]->visited_mask.GetPointer(util::DEVICE), (graph_slice->nodes+7)/8, thread_num, enactor_stats->iteration);
+    }
+     
+    template<
+        bool     INSTRUMENT,
+        typename AdvanceKernelPolicy,
+        typename FilterKernelPolicy,
+        typename BFSProblem>
+    void BFSCore(
+        bool                   DEBUG,
+        int                    thread_num,
+        FrontierAttribute      *frontier_attribute,
+        EnactorStats          *enactor_stats,
+        typename BFSProblem::DataSlice  *data_slice,
+        typename BFSProblem::DataSlice  *d_data_slice,
+        typename BFSProblem::GraphSlice *graph_slice,
+        util::CtaWorkProgressLifetime *work_progress,
+        ContextPtr             context,
+        cudaStream_t           stream)
+    {
+        typedef typename BFSProblem::SizeT      SizeT;
+        typedef typename BFSProblem::VertexId   VertexId;
+        typedef typename BFSProblem::Value      Value;
+        typedef typename BFSProblem::DataSlice  DataSlice;
+        typedef typename BFSProblem::GraphSlice GraphSlice;
+        typedef BFSEnactor<BFSProblem, INSTRUMENT> BfsEnactor;
+        typedef BFSFunctor<VertexId, SizeT, VertexId, BFSProblem> BfsFunctor;
+
+        if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1,0,false,stream)) return;
+        if (DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
+        // Edge Map
+        gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BFSProblem, BfsFunctor>(
+            enactor_stats[0],
+            frontier_attribute[0],
+            d_data_slice,
+            (VertexId*)NULL,
+            (bool*)    NULL,
+            (bool*)    NULL,
+            data_slice ->scanned_edges.GetPointer(util::DEVICE),
+            graph_slice->frontier_queues.keys  [frontier_attribute->selector  ].GetPointer(util::DEVICE),          
+            graph_slice->frontier_queues.keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE),          
+            (VertexId*)NULL,          // d_pred_in_queue
+            graph_slice->frontier_queues.values[frontier_attribute->selector^1].GetPointer(util::DEVICE),          
+            graph_slice->row_offsets   .GetPointer(util::DEVICE),
+            graph_slice->column_indices.GetPointer(util::DEVICE),
+            (SizeT*)   NULL,
+            (VertexId*)NULL,
+            graph_slice->frontier_elements[frontier_attribute->selector],
+            graph_slice->frontier_elements[frontier_attribute->selector^1],
+            work_progress[0],
+            context[0],
+            stream,
+            gunrock::oprtr::advance::V2V,
+            false,
+            false);
+
+        // Only need to reset queue for once
+        //if (frontier_attribute->queue_reset)
+        frontier_attribute->queue_reset = false;
+        if (DEBUG && (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "advance::Kernel failed", __FILE__, __LINE__))) return;
+        if (DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
+        frontier_attribute->queue_index++;
+        frontier_attribute->selector ^= 1;
+        if (DEBUG || INSTRUMENT)
+        {
+            //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,data_slice[0]->streams[0])) break;
+            enactor_stats->total_queued += frontier_attribute->queue_length;
+            if (DEBUG) ShowDebugInfo<BFSProblem>(thread_num, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_advance");
+            if (INSTRUMENT) {
+                if (enactor_stats->retval = enactor_stats->advance_kernel_stats.Accumulate(
+                    enactor_stats->advance_grid_size,
+                    enactor_stats->total_runtimes,
+                    enactor_stats->total_lifetimes,
+                    false,stream)) return;
+            }
+        }
+
+        if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1, 0, false, stream)) return; 
+        if (DEBUG) util::cpu_mt::PrintMessage("Filter begin", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
+
+        // Filter
+        gunrock::oprtr::filter::Kernel<FilterKernelPolicy, BFSProblem, BfsFunctor>
+        <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+            enactor_stats->iteration+1,
+            frontier_attribute->queue_reset,
+            frontier_attribute->queue_index,
+            //num_gpus,
+            frontier_attribute->queue_length,
+            //enactor_stats->d_done,
+            graph_slice->frontier_queues.keys  [frontier_attribute->selector  ].GetPointer(util::DEVICE),      // d_in_queue
+            graph_slice->frontier_queues.values[frontier_attribute->selector  ].GetPointer(util::DEVICE),    // d_pred_in_queue
+            graph_slice->frontier_queues.keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE),    // d_out_queue
+            d_data_slice,
+            data_slice->visited_mask.GetPointer(util::DEVICE),
+            work_progress[0],
+            graph_slice->frontier_elements[frontier_attribute->selector],           // max_in_queue
+            graph_slice->frontier_elements[frontier_attribute->selector^1],         // max_out_queue
+            enactor_stats->filter_kernel_stats);
+	    //t_bitmask);
+
+	if (DEBUG && (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "filter_forward::Kernel failed", __FILE__, __LINE__))) return;
+	if (DEBUG) util::cpu_mt::PrintMessage("Filter end.", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
+	frontier_attribute->queue_index++;
+	frontier_attribute->selector ^= 1;
+	if (INSTRUMENT || DEBUG) {
+	    //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
+	    //enactor_stats->total_queued += frontier_attribute->queue_length;
+            if (DEBUG) ShowDebugInfo<BFSProblem>(thread_num, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_filter");
+	    if (INSTRUMENT) {
+		if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
+		    enactor_stats->filter_grid_size,
+		    enactor_stats->total_runtimes,
+		    enactor_stats->total_lifetimes,
+		    false, stream)) return;
+	    }
+	}
+    }
+
     template<
         bool     INSTRUMENT,
         typename AdvanceKernelPolicy,
@@ -172,387 +314,211 @@ namespace bfs {
             if (enactor_stats->retval = util::SetDevice(gpu)) break;
 
             // Step through BFS iterations
-            //while (done[0] < 0) {
             while (!All_Done(s_enactor_stats, s_frontier_attribute, num_gpus)) {
-                if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1,0,false,data_slice[0]->streams[0])) break;
-                if (DEBUG)
+                if (num_gpus>1 && enactor_stats->iteration>0)
                 {
-                    //SizeT _queue_length;
-                    //if (frontier_attribute->queue_reset) _queue_length = frontier_attribute->queue_length;
-                    //else if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, _queue_length)) break;
-                    util::cpu_mt::PrintCPUArray<SizeT, unsigned int>("Queue_Length", &(frontier_attribute->queue_length), 1, thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
-                    util::cpu_mt::PrintGPUArray<SizeT, SizeT   >("offs0", graph_slice->row_offsets.GetPointer(util::DEVICE),graph_slice->nodes,thread_num, enactor_stats->iteration);
-                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys0", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration);
-                    //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
-                    //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu0", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
-                    //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labe0", data_slice[0]->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
-                    //if (BFSProblem::MARK_PREDECESSORS)
-                    //    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("pred0", data_slice[0]->preds.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
-                    //if (BFSProblem::ENABLE_IDEMPOTENCE)
-                    //    util::cpu_mt::PrintGPUArray<SizeT, unsigned char>("mask0", data_slice[0]->visited_mask.GetPointer(util::DEVICE), (graph_slice->nodes+7)/8, thread_num, enactor_stats->iteration);
-                   util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
-                }
-                // Edge Map
+                    if (BFSProblem::MARK_PREDECESSORS)
+                        Scaner->template Scan_with_dKeys2 <2,0> (
+                            frontier_attribute[0].queue_length,
+                            num_gpus,
+                            graph_slice->frontier_queues.keys[frontier_attribute[0].selector  ].GetPointer(util::DEVICE),
+                            graph_slice->frontier_queues.keys[frontier_attribute[0].selector^1].GetPointer(util::DEVICE),
+                            graph_slice  ->partition_table      .GetPointer(util::DEVICE),
+                            graph_slice  ->convertion_table     .GetPointer(util::DEVICE),
+                            data_slice[0]->out_length           .GetPointer(util::DEVICE),
+                            data_slice[0]->vertex_associate_orgs.GetPointer(util::DEVICE),
+                            data_slice[0]->vertex_associate_outs.GetPointer(util::DEVICE),
+                            data_slice[0]->value__associate_orgs.GetPointer(util::DEVICE),
+                            data_slice[0]->value__associate_outs.GetPointer(util::DEVICE));
+                   else Scaner->template Scan_with_dKeys2 <1,0> (
+                            frontier_attribute->queue_length,
+                            num_gpus,
+                            graph_slice->frontier_queues.keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
+                            graph_slice->frontier_queues.keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
+                            graph_slice  ->partition_table      .GetPointer(util::DEVICE),
+                            graph_slice  ->convertion_table     .GetPointer(util::DEVICE),
+                            data_slice[0]->out_length           .GetPointer(util::DEVICE),
+                            data_slice[0]->vertex_associate_orgs.GetPointer(util::DEVICE),
+                            data_slice[0]->vertex_associate_outs.GetPointer(util::DEVICE),
+                            data_slice[0]->value__associate_orgs.GetPointer(util::DEVICE),
+                            data_slice[0]->value__associate_outs.GetPointer(util::DEVICE));
+                    if (enactor_stats[0].retval = data_slice[0]->out_length.Move(util::DEVICE, util::HOST)) return;
 
+                    frontier_attribute[0].queue_offset = 0;
+                    frontier_attribute[0].queue_length = out_length[0];
+                    for (int i=1;i<num_gpus;i++)
+                    {
+                        frontier_attribute[i].selector      = frontier_attribute[0].selector;
+                        frontier_attribute[i].advance_type  = frontier_attribute[0].advance_type;
+                        frontier_attribute[i].queue_length  = out_length[i];
+                        frontier_attribute[i].queue_offset  = frontier_attribute[i-1].queue_offset + out_length[i];
+                        frontier_attribute[i].queue_reset   = enactor_stats->iteration==1? true: false;
+                        frontier_attribute[i].queue_index   = frontier_attribute[0].queue_index;
+                        frontier_attribute[i].current_label = frontier_attribute[0].current_label;
+                    }
+                }
+
+                if (DEBUG) ShowDebugInfo<BFSProblem>(thread_num, frontier_attribute, enactor_stats, data_slice[0].GetPointer(util::HOST), graph_slice, work_progress, std::string("pre_advance"));
                 gunrock::oprtr::advance::ComputeOutputLength <AdvanceKernelPolicy, BFSProblem, BfsFunctor>(
-                    frontier_attribute,
-                    graph_slice->row_offsets   .GetPointer(util::DEVICE),
-                    graph_slice->column_indices.GetPointer(util::DEVICE),
-                    graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),
-                    data_slice[0]->scanned_edges.GetPointer(util::DEVICE),
-                    graph_slice->frontier_elements[frontier_attribute->selector  ],
-                    graph_slice->frontier_elements[frontier_attribute->selector^1],
+                    &(frontier_attribute[0]),
+                    graph_slice  ->row_offsets     .GetPointer(util::DEVICE),
+                    graph_slice  ->column_indices  .GetPointer(util::DEVICE),
+                    graph_slice  ->frontier_queues.keys[frontier_attribute[0].selector].GetPointer(util::DEVICE)
+                        + frontier_attribute[0].queue_offset,
+                    data_slice[0]->scanned_edges[0].GetPointer(util::DEVICE),
+                    graph_slice  ->frontier_elements[0][frontier_attribute[0].selector  ],
+                    graph_slice  ->frontier_elements[0][frontier_attribute[0].selector^1],
                     context[0][0],
                     data_slice[0]->streams[0],
                     gunrock::oprtr::advance::V2V);
 
-                gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BFSProblem, BfsFunctor>(
-                    //enactor_stats->d_done,
-                    enactor_stats[0],
-                    frontier_attribute[0],
+                BFSCore < INSTRUMENT, AdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(
+                    DEBUG,
+                    thread_num,
+                    &(frontier_attribute[0]),
+                    &(enactor_stats[0]),
+                    data_slice[0].GetPointer(util::HOST),
                     data_slice[0].GetPointer(util::DEVICE),
-                    (VertexId*)NULL,
-                    (bool*)NULL,
-                    (bool*)NULL,
-                    data_slice[0]->scanned_edges.GetPointer(util::DEVICE),
-                    graph_slice->frontier_queues.keys  [frontier_attribute->selector  ].GetPointer(util::DEVICE),              // d_in_queue
-                    graph_slice->frontier_queues.keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE),            // d_out_queue
-                    (VertexId*)NULL,          // d_pred_in_queue
-                    graph_slice->frontier_queues.values[frontier_attribute->selector^1].GetPointer(util::DEVICE),          // d_pred_out_queue
-                    graph_slice->row_offsets   .GetPointer(util::DEVICE),
-                    graph_slice->column_indices.GetPointer(util::DEVICE),
-                    (SizeT*)NULL,
-                    (VertexId*)NULL,
-                    graph_slice->frontier_elements[frontier_attribute->selector],
-                    graph_slice->frontier_elements[frontier_attribute->selector^1],
-                    work_progress[0],
-                    context[0][0],
-                    data_slice[0]->streams[0],
-                    gunrock::oprtr::advance::V2V,
-                    false,
-                    false);
+                    graph_slice,
+                    &(work_progress[0]),
+                    context[0],
+                    data_slice[0]->streams[0]);
 
-                // Only need to reset queue for once
-                //if (frontier_attribute->queue_reset)
-                    frontier_attribute->queue_reset = false;
-                if (DEBUG && (enactor_stats->retval = util::GRError(cudaStreamSynchronize(data_slice[0]->streams[0]), "advance::Kernel failed", __FILE__, __LINE__))) break;
-                if (DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
-
-                frontier_attribute->queue_index++;
-                frontier_attribute->selector ^= 1;
-
-                //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,data_slice[0]->streams[0])) break;
-                if (DEBUG || INSTRUMENT) 
-                    enactor_stats->total_queued += frontier_attribute->queue_length;
-                if (DEBUG)
+                if (num_gpus>1 && enactor_stats[0].iteration>0)
                 {
-                    //SizeT _queue_length = frontier_attribute->queue_length;
-                    //if (frontier_attribute->queue_reset) _queue_length = frontier_attribute->queue_length;
-                    //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, _queue_length)) break;
-                    util::cpu_mt::PrintCPUArray<SizeT, unsigned int>("Queue_Length", &(frontier_attribute->queue_length), 1, thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
-                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys1", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration);
-                    //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
-                    //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu1", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
-                    //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labe1", data_slice[0]->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
-                    //if (BFSProblem::MARK_PREDECESSORS)
-                    //    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("pred1", data_slice[0]->preds.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
-                    //if (BFSProblem::ENABLE_IDEMPOTENCE)
-                    //    util::cpu_mt::PrintGPUArray<SizeT, unsigned char>("mask1", data_slice[0]->visited_mask.GetPointer(util::DEVICE), (graph_slice->nodes+7)/8, thread_num, enactor_stats->iteration);
-                }
-
-                if (INSTRUMENT) {
-                    if (enactor_stats->retval = enactor_stats->advance_kernel_stats.Accumulate(
-                        enactor_stats->advance_grid_size,
-                        enactor_stats->total_runtimes,
-                        enactor_stats->total_lifetimes,
-                        false,data_slice[0]->streams[0])) break;
-                }
-
-                // Check if done
-                //if (All_Done(s_enactor_stats,num_gpus)) break;
-                if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1, 0, false, data_slice[0]->streams[0])) break;
-               
-                if (DEBUG) util::cpu_mt::PrintMessage("Filter begin", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
-                // Filter
-                gunrock::oprtr::filter::Kernel<FilterKernelPolicy, BFSProblem, BfsFunctor>
-                <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, data_slice[0]->streams[0]>>>(
-                    enactor_stats->iteration+1,
-                    frontier_attribute->queue_reset,
-                    frontier_attribute->queue_index,
-                    num_gpus,
-                    frontier_attribute->queue_length,
-                    //enactor_stats->d_done,
-                    graph_slice->frontier_queues.keys  [frontier_attribute->selector  ].GetPointer(util::DEVICE),      // d_in_queue
-                    graph_slice->frontier_queues.values[frontier_attribute->selector  ].GetPointer(util::DEVICE),    // d_pred_in_queue
-                    graph_slice->frontier_queues.keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE),    // d_out_queue
-                    data_slice[0].GetPointer(util::DEVICE),
-                    data_slice[0]->visited_mask.GetPointer(util::DEVICE),
-                    work_progress[0],
-                    graph_slice->frontier_elements[frontier_attribute->selector],           // max_in_queue
-                    graph_slice->frontier_elements[frontier_attribute->selector^1],         // max_out_queue
-                    enactor_stats->filter_kernel_stats);
-                    //t_bitmask);
-
-                if (DEBUG && (enactor_stats->retval = util::GRError(cudaStreamSynchronize(data_slice[0]->streams[0]), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
-                //cudaEventQuery(enactor_stats->throttle_event); // give host memory mapped visibility to GPU updates
-                if (DEBUG) util::cpu_mt::PrintMessage("Filter end.", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
-
-                frontier_attribute->queue_index++;
-                frontier_attribute->selector ^= 1;
-
-                //if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
-                //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, data_slice[0]->streams[0])) break;
-                //}
-
-                if (INSTRUMENT || DEBUG) {
-                    //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
-                    //enactor_stats->total_queued += frontier_attribute->queue_length;
-                    //if (DEBUG) printf(", %lld", (long long) frontier_attribute->queue_length);
-                    if (INSTRUMENT) {
-                        if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
-                            enactor_stats->filter_grid_size,
-                            enactor_stats->total_runtimes,
-                            enactor_stats->total_lifetimes,
-                            false, data_slice[0]->streams[0])) break;
-                    }
-                }
-                if (DEBUG)
-                {
-                    //SizeT _queue_length = frontier_attribute->queue_length;
-                    //if (frontier_attribute->queue_reset) _queue_length = frontier_attribute->queue_length;
-                    //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, _queue_length)) break;
-                    util::cpu_mt::PrintCPUArray<SizeT, unsigned int>("Queue_Length", &(frontier_attribute->queue_length), 1, thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
-                    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys2", graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration);
-                    //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
-                    //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu2", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
-                    //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labe2", data_slice[0]->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
-                    //if (BFSProblem::MARK_PREDECESSORS)
-                    //    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("pred2", data_slice[0]->preds.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
-                    //if (BFSProblem::ENABLE_IDEMPOTENCE)
-                    //    util::cpu_mt::PrintGPUArray<SizeT, unsigned char>("mask2", data_slice[0]->visited_mask.GetPointer(util::DEVICE), (graph_slice->nodes+7)/8, thread_num, enactor_stats->iteration);
-                }
-
-                // Check if done
-                if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, data_slice[0]->streams[0])) break;
-                if (All_Done(s_enactor_stats,s_frontier_attribute,num_gpus)) break;
-
-                //Use multi_scan to splict the workload into multi_gpus
-                if (num_gpus >1) 
-                {   
-                    if (DEBUG) util::cpu_mt::PrintMessage("mgpu data exchange begin.", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
-                    // Split the frontier into multiple frontiers for multiple GPUs, local remains infront
-                    //SizeT n;
-                    //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, n)) break;
-                    if (frontier_attribute->queue_length >0) 
-                    {   
-                        //enactor_stats->done[0]=-1;
-                        //printf("%d\t%d\tScan map begin.\n",thread_num,iteration[0]);fflush(stdout);
-                        //int* _partition_table = graph_slice->partition_table.GetPointer(util::DEVICE);
-                        //SizeT* _convertion_table = graph_slice->convertion_table.GetPointer(util::DEVICE);
-                        if (BFSProblem::MARK_PREDECESSORS)
-                        {   
-                            //util::cpu_mt::PrintGPUArray<SizeT,SizeT>("orgi",graph_slice->original_vertex.GetPointer(util::DEVICE),graph_slice->nodes,thread_num,iteration[0]);
-                            int grid_size = (frontier_attribute->queue_length%256) == 0? 
-                                             frontier_attribute->queue_length/256 : 
-                                             frontier_attribute->queue_length/256+1;
-                            Copy_Preds<VertexId, SizeT> <<<grid_size,256,0,data_slice[0]->streams[0]>>>(
-                                frontier_attribute->queue_length,
-                                graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),
-                                data_slice[0]->preds.GetPointer(util::DEVICE),
-                                data_slice[0]->temp_preds.GetPointer(util::DEVICE));
-                            Update_Preds<VertexId,SizeT> <<<grid_size,256,0,data_slice[0]->streams[0]>>>(
-                                frontier_attribute->queue_length,
-                                graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),
-                                graph_slice->original_vertex.GetPointer(util::DEVICE),
-                                data_slice[0]->temp_preds.GetPointer(util::DEVICE),
-                                data_slice[0]->preds.GetPointer(util::DEVICE));
-                        }
-                    }
-                    
-                    if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(data_slice[0]->streams[0]),"cudaDeviceSynchronize failed",__FILE__,__LINE__)) break; 
-                    /*data_slice[0]->vertex_associate_orgs[0] = data_slice[0]-> labels.GetPointer(util::DEVICE);
-                    if (BFSProblem::MARK_PREDESSORS)
-                        data_slice[0]->vertex_associate_orgs[1] = data_slice[0]-> preds.GetPointer(util::DEVICE);
-                    data_slice[0]->vertex_associate_orgs.Move(util::HOST, util::DEVICE);*/
-                    
-                    if (BFSProblem::MARK_PREDECESSORS)
-                        UpdateNeiborForward <SizeT, VertexId, Value, GraphSlice, DataSlice, 2, 0> (
-                            (SizeT)frontier_attribute->queue_length,
-                            num_gpus,
-                            thread_num,
-                            data_slice[0]->Scaner,
-                            s_graph_slice,
-                            s_data_slice,
-                            s_enactor_stats,
-                            s_frontier_attribute,
-                            data_slice[0]->temp_marker.GetPointer(util::DEVICE));
-                    else UpdateNeiborForward <SizeT, VertexId, Value, GraphSlice, DataSlice, 1, 0> (
-                            (SizeT)frontier_attribute->queue_length,
-                            num_gpus,
-                            thread_num,
-                            data_slice[0]->Scaner,
-                            s_graph_slice,
-                            s_data_slice,
-                            s_enactor_stats,
-                            s_frontier_attribute,
-                            data_slice[0]->temp_marker.GetPointer(util::DEVICE));
-
-                    /*util::MemsetKernel<<<128, 128>>>(temp_preds.GetPointer(util::DEVICE),0,graph_slice->nodes);
-                    if (data_slice[0]->out_length[0]>0)
+                    for (int peer=0; peer<num_gpus; peer++)
                     {
-                        int grid_size = (data_slice[0]->out_length[0]%256)==0 ? 
-                                         data_slice[0]->out_length[0]/256 : 
-                                         data_slice[0]->out_length[0]/256+1;
-                        Mark_Queue<VertexId, SizeT> <<<grid_size,256>>>(
-                            data_slice[0]->out_length[0],
-                            graph_slice -> frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),
-                            temp_preds.GetPointer(util::DEVICE));
-                    }*/
-
-                        /*Scaner->Scan_with_Keys(n,
-                            num_gpus,
-                            data_slice[0]->num_associate,
-                            graph_slice  ->frontier_queues  .keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
-                            graph_slice  ->frontier_queues  .keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
-                            graph_slice  ->partition_table  .GetPointer(util::DEVICE),
-                            graph_slice  ->convertion_table .GetPointer(util::DEVICE),
-                            data_slice[0]->out_length       .GetPointer(util::DEVICE),
-                            data_slice[0]->associate_orgs   .GetPointer(util::DEVICE),
-                            data_slice[0]->associate_outs   .GetPointer(util::DEVICE));
-                        if (enactor_stats->retval = data_slice[0]->out_length.Move(util::DEVICE,util::HOST)) break;
-                        out_offset[0]=0;
-                        for (int i=0;i<num_gpus;i++) out_offset[i+1]=out_offset[i]+data_slice[0]->out_length[i];
- 
-                        frontier_attribute->queue_index++;
-                        frontier_attribute->selector ^= 1;
-                        
-                        //util::cpu_mt::PrintCPUArray<SizeT, SizeT>("out_offset",out_offset,num_gpus+1,thread_num,enactor_stats->iteration);
-                        util::MemsetKernel<<<128, 128>>>(temp_preds.GetPointer(util::DEVICE),0,graph_slice->nodes);
-                        if (out_offset[1]>0)
-                        {
-                            int grid_size = (out_offset[1]%256)==0 ? out_offset[1]/256 : out_offset[1]/256+1;
-                            Mark_Queue<VertexId, SizeT> <<<grid_size,256>>>(
-                                out_offset[1],
-                                graph_slice -> frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE),
-                                temp_preds.GetPointer(util::DEVICE));
-                        }
- 
-                        if (enactor_stats->iteration!=0)
-                        {  //CPU global barrier
-                            //util::cpu_mt::IncrementnWaitBarrier(&(cpu_barrier[0]),thread_num);
-                            //if (All_Done(dones,retvals,num_gpus)) {break;}
-                        }
-                        for (int peer=0;peer<num_gpus;peer++)
-                        {
-                            if (peer == thread_num) continue;
-                            int peer_ = peer<thread_num? peer+1     : peer;
-                            int gpu_  = peer<thread_num? thread_num : thread_num+1;
-                            s_data_slice[peer]->in_length[enactor_stats->iteration%2][gpu_]
-                                      = data_slice[0]->out_length[peer_];
-                            if (data_slice[0]->out_length[peer_] == 0) continue;
-                            s_enactor_stats[peer].done[0]=-1;
-                            if (enactor_stats->retval = util::GRError(cudaMemcpy(
-                                  s_data_slice[peer] -> keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE)
-                                      + s_graph_slice[peer] -> in_offset[gpu_],
-                                  graph_slice -> frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE)
-                                      + out_offset[peer_],
-                                  sizeof(VertexId) * data_slice[0]->out_length[peer_], cudaMemcpyDefault),
-                                  "cudaMemcpyPeer d_keys failed", __FILE__, __LINE__)) break;
-
-                            for (int i=0;i<data_slice[0]->num_associate;i++)
-                            {
-                                if (enactor_stats->retval = util::GRError(cudaMemcpy(
-                                    s_data_slice[peer]->associate_ins[enactor_stats->iteration%2][i]
-                                        + s_graph_slice[peer]->in_offset[gpu_],
-                                    data_slice[0]->associate_outs[i]
-                                        + (out_offset[peer_] - out_offset[1]),
-                                    sizeof(VertexId) * data_slice[0]->out_length[peer_], cudaMemcpyDefault),
-                                    "cudaMemcpyPeer associate_out failed", __FILE__, __LINE__)) break;
-                            }
-                            if (enactor_stats->retval) break;
-                        }
-                        if (enactor_stats->retval) break;
-                    }  else {
-                        if (enactor_stats->iteration!=0)
-                        {  //CPU global barrier
-                            //util::cpu_mt::IncrementnWaitBarrier(&(cpu_barrier[0]),thread_num);
-                            //if (All_Done(dones,retvals,num_gpus)) {break;}
-                        }
-
-                        util::MemsetKernel<<<128, 128>>>(temp_preds.GetPointer(util::DEVICE),0,graph_slice->nodes);
-                        for (int peer=0;peer<num_gpus;peer++)
-                        {
-                            int gpu_ = peer<thread_num? thread_num: thread_num+1;
-                            if (peer == thread_num) continue;
-                            s_data_slice[peer]->in_length[enactor_stats->iteration%2][gpu_]=0;
-                        }
-                        data_slice[0]->out_length[0]=0;
-                    }*/
+                        int peer_ = peer<thread_num> peer+1: peer;
+                        if (BFSProblem::MARK_PREDECESSORS)
+                            PushNeibor <SizeT, VertexId, Value, GraphSlice, DataSlice, 2, 0> (
+                                thread_num,
+                                peer, 
+                                &frontier_attribute[peer_],
+                                &enactor_stats[peer_],
+                                data_slice,
+                                &s_data_slice[peer],
+                                graph_slice,
+                                &s_graph_slice[peer],
+                                data_slice[0]->streams[peer_]);
+                        else PushNeibor <SizeT, VertexId, Value, GraphSlice, DataSlice, 1, 0> (
+                                thread_num,
+                                peer, 
+                                &frontier_attribute[peer_],
+                                &enactor_stats[peer_],
+                                data_slice,
+                                &s_data_slice[peer],
+                                graph_slice,
+                                &s_graph_slice[peer],
+                                data_slice[0]->streams[peer_]);
+                    }
 
                     //CPU global barrier
-                    for (int i=0;i<num_gpus;i++)
-                        if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(data_slice[0]->streams[i]), "cuStreamSynchronize failed.", __FILE__, __LINE__)) break; 
-                    if (enactor_stats->retval) break;
-
+                    for (int i=1;i<num_gpus;i++)
+                        if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(data_slice[0]->streams[i]), "cuStreamSynchronize failed.", __FILE__, __LINE__)) break;  
                     util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,thread_num);
-                    if (All_Done(s_enactor_stats,s_frontier_attribute,num_gpus))
-                    {
-                        break_clean=false;
-                        //printf("%d exit0\n",thread_num);fflush(stdout);
-                        break;
-                    }
-                    SizeT total_length=data_slice[0]->out_length[0];
-                    //printf("%d\t%d\tExpand begin.\n",thread_num,iteration[0]);fflush(stdout);
+                    
                     for (int peer=0;peer<num_gpus;peer++)
                     {
                         if (peer==thread_num) continue;
                         int   peer_   = peer<thread_num ? peer+1: peer ;
-                        SizeT m       = data_slice[0]->in_length[enactor_stats->iteration%2][peer_];
-                        if (m ==0) continue;
-                        int grid_size = (m%256) == 0? m/ 256 : m/256+1;
-                        //if (DEBUG) printf("%d\t %lld\t %.2f\t in_length = %d\t num_associate = %d\t in_offset = %d\n", thread_num, enactor_stats->iteration, (clock()-enactor_stats->start_time)*(float)1000/CLOCKS_PER_SEC, m, data_slice[0]->num_associate, graph_slice->in_offset[peer_]);
-                        //if (DEBUG) util::cpu_mt::PrintGPUArray<SizeT,VertexId>("keys_in",data_slice[0]->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE) + graph_slice->in_offset[peer_],m,thread_num,enactor_stats->iteration);
-                        //if (DEBUG) util::cpu_mt::PrintGPUArray<SizeT,VertexId>("asso_i0",data_slice[0]->associate_ins[enactor_stats->iteration%2][0]+graph_slice->in_offset[peer_],m,thread_num,enactor_stats->iteration);
-                        //util::cpu_mt::PrintGPUArray<SizeT,VertexId>("asso_i1",data_slice[0]->associate_ins[iteration[0]%2][1]+graph_slice->in_offset[peer_],m,thread_num,iteration[0]);
-                        if (data_slice[0]->num_vertex_associate==1) Expand_Incoming <VertexId, SizeT, 1>
-                            <<<grid_size,256>>> (
-                            m,
+                        frontier_attribute[peer_].queue_length = data_slice[0]->in_length[enactor_stats[peer_].iteration%2][peer_];
+                        if (frontier_attribute[peer_].queue_length ==0) continue;
+                        int grid_size = frontier_attribute[peer_].queue_length/256+1;
+                        if (BFSProblem::MARK_PREDECESSOR) Expand_Incoming <VertexId, SizeT, 2>
+                            <<<grid_size,256,0,data_slice[0]->streams[peer_]>>> (
+                            frontier_attribute[peer_].queue_length,
                             graph_slice    ->in_offset[peer_],
-                            data_slice[0]  ->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE),
-                            graph_slice    ->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE) + total_length,
+                            data_slice[0]  ->keys_in  [enactor_stats[peer_].iteration%2].GetPointer(util::DEVICE),
+                            graph_slice    ->frontier_queues[peer_].keys[frontier_attribute[peer_].selector].GetPointer(util::DEVICE),
                             data_slice[0]  ->temp_marker     .GetPointer(util::DEVICE),
-                            data_slice[0]  ->vertex_associate_ins[enactor_stats->iteration%2].GetPointer(util::DEVICE),
+                            data_slice[0]  ->vertex_associate_ins[enactor_stats[peer_].iteration%2].GetPointer(util::DEVICE),
                             data_slice[0]  ->vertex_associate_orgs.GetPointer(util::DEVICE));
-                        else if (data_slice[0]->num_vertex_associate==2) Expand_Incoming <VertexId, SizeT, 2>
-                            <<<grid_size,256>>> (
+                        else if Expand_Incoming <VertexId, SizeT, 1>
+                            <<<grid_size,256,0,data_slice[0]->streams[peer_]>>> (
                             m,
                             graph_slice    ->in_offset[peer_],
-                            data_slice[0]  ->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE),
-                            graph_slice    ->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE) + total_length,
+                            data_slice[0]  ->keys_in[enactor_stats[peer_].iteration%2].GetPointer(util::DEVICE),
+                            graph_slice    ->frontier_queues[peer_].keys[frontier_attribute[peer_].selector].GetPointer(util::DEVICE),
                             data_slice[0]  ->temp_marker   .GetPointer(util::DEVICE),
-                            data_slice[0]  ->vertex_associate_ins[enactor_stats->iteration%2].GetPointer(util::DEVICE),
+                            data_slice[0]  ->vertex_associate_ins[enactor_stats[peer_].iteration%2].GetPointer(util::DEVICE),
                             data_slice[0]  ->vertex_associate_orgs.GetPointer(util::DEVICE));
                         if (DEBUG &&(enactor_stats->retval = util::GRError("Expand_Incoming failed", __FILE__, __LINE__))) break;
-                        //util::cpu_mt::PrintGPUArray<SizeT,VertexId>("asso_orgs",data_slice[0]->associate_orgs[0],graph_slice->nodes,thread_num,iteration[0]);
-                        //if (DEBUG) util::cpu_mt::PrintGPUArray<SizeT,VertexId>("labe4",data_slice[0]->labels.GetPointer(util::GPU),graph_slice->nodes,thread_num,enactor_stats->iteration);
-                        //util::cpu_mt::PrintGPUArray<SizeT,VertexId>("pred4",data_slice[0]->preds.GetPointer(util::GPU),graph_slice->nodes,thread_num,iteration[0]);
-                        //util::cpu_mt::PrintGPUArray<SizeT,VertexId>("pred5",data_slice[0]->associate_orgs[1],graph_slice->nodes,thread_num,iteration[0]);
-                        total_length+=data_slice[0]->in_length[enactor_stats->iteration%2][peer_];
-                    }
-                    if (enactor_stats->retval) break;
-                    frontier_attribute->queue_length = total_length;
-                    if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index,total_length,false,data_slice[0]->streams[0])) break;
-                    //printf("%d\t%d\ttotal_length = %d\n",thread_num,iteration[0],total_length);fflush(stdout);
-                    //if (total_length !=0)
-                    //{
-                    //    enactor_stats->done[0]=-1;
-                    //} else {
-                    //    enactor_stats->done[0]=0;
-                    //}
-                    if (DEBUG) util::cpu_mt::PrintMessage("mgpu data exchange end.", thread_num, enactor_stats->iteration, clock()-enactor_stats->start_time);
-                }
+                    }   
 
-                enactor_stats->iteration++;
+                    for (int peer_=1; peer_<num_gpus;peer_++)
+                    {
+                        gunrock::oprtr::advance::ComputeOutputLength <AdvanceKernelPolicy, BFSProblem, BfsFunctor>(
+                            &(frontier_attribute[peer_]),
+                            graph_slice  ->row_offsets     .GetPointer(util::DEVICE),
+                            graph_slice  ->column_indices  .GetPointer(util::DEVICE),
+                            graph_slice  ->frontier_queues[peer_].keys[frontier_attribute[peer_].selector].GetPointer(util::DEVICE),
+                            data_slice[0]->scanned_edges  [peer_].GetPointer(util::DEVICE),
+                            graph_slice  ->frontier_elements[peer_][frontier_attribute[peer_].selector  ],
+                            graph_slice  ->frontier_elements[peer_][frontier_attribute[peer_].selector^1],
+                            context[peer_][0],
+                            data_slice[0]->streams[peer_],
+                            gunrock::oprtr::advance::V2V);
+                    }
+
+                    for (int peer_=1; peer<num_gpus;peer_++)
+                    {
+                        BFSCore < INSTRUMENT, AdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(
+                            DEBUG,
+                            thread_num,
+                            &(frontier_attribute[peer_]),
+                            &(enactor_stats[peer_]),
+                            data_slice[0].GetPointer(util::HOST),
+                            data_slice[0].GetPointer(util::DEVICE),
+                            graph_slice,
+                            &(work_progress[peer_]),
+                            context[peer_][0],
+                            data_slice[0]->streams[peer_]);
+                    }
+                }
+                
+                if (num_gpus>1 && BFSProblem::MARK_PREDECESSORS)
+                {  
+                    for (int peer=0;peer<num_gpus;peer++)
+                    {
+                        if (enactor_stats[peer].retval = work_progress[peer].GetQueueLength(frontier_attribute[peer]->queue_index, frontier_attribute[peer]->queue_length, false, data_slice[0]->streams[peer])) break; 
+                        int grid_size = frontier_attribute[peer].queue_length/256+1;
+                        Copy_Preds<VertexId, SizeT> <<<grid_size,256,0,data_slice[0]->streams[peer]>>>(
+                            frontier_attribute[peer].queue_length,
+                            graph_slice->frontier_queues[peer].keys[frontier_attribute[peer].selector].GetPointer(util::DEVICE),
+                            data_slice[0]->preds.GetPointer(util::DEVICE),
+                            data_slice[0]->temp_preds.GetPointer(util::DEVICE));
+                    }
+                    for (int peer=0;peer<num_gpus;peer++) 
+                        cudaStreamSynchronize(data_slice[0]->streams[peer]);
+                    for (int peer=0;peer<num_gpus;peer++)
+                    {
+                        int grid_size = frontier_attribute[peer].queue_length/256+1;
+                        Update_Preds<VertexId,SizeT> <<<grid_size,256,0,data_slice[0]->streams[peer]>>>(
+                            frontier_attribute[peer].queue_length,
+                            graph_slice->frontier_queues[peer].keys[frontier_attribute[peer].selector].GetPointer(util::DEVICE),
+                            graph_slice->original_vertex.GetPointer(util::DEVICE),
+                            data_slice[0]->temp_preds.GetPointer(util::DEVICE),
+                            data_slice[0]->preds.GetPointer(util::DEVICE));
+                    }
+                }
+ 
+                if (num_gpus>1)
+                {
+                    SizeT Total_Length=0;
+                    for (int peer=0;peer<num_gpus;peer++)
+                    {
+                        if (!BFSProblem::MARK_PREDECESSORS) 
+                            if (enactor_stats[peer].retval = work_progress[peer].GetQueueLength(frontier_attribute[peer]->queue_index, frontier_attribute[peer]->queue_length, false, data_slice[0]->streams[peer])) break; 
+                        if (peer ==0)
+                            util::MemsetKernel<<<128, 128, 0, data_slice[0]->strems[peer]>>>
+                                (data_slice[0]->temp_marker.GetPointer(util::DEVICE), (unsigned char)0, graph_slice->nodes);
+                        else util::MemsetCopyKernel<<<128, 128, 0, data_slice[0]->streams[peer]>>>(
+                            graph_slice->frontier_queues[0].keys[frontier_attribute[0].selector].GetPointer(util::DEVICE) + Total_Length, graph_slice->frontier_queues[peer].keys[frontier_attribute[peer].selector].GetPointer(util::DEVICE), frontier_attribute[peer]->queue_length);
+                        Total_Length+=frontier_attribute[peer]->queue_length;
+                    }
+                    frontier_attribute[0]->queue_length = Total_Length;
+                }
+                enactor_stats[0].iteration++;
             }
 
             if (enactor_stats->retval) break;
