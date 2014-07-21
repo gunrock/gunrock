@@ -199,7 +199,7 @@ if(GUNROCK_BUILD_LIB)
 endif(GUNROCK_BUILD_LIB)
 
 if(GUNROCK_BUILD_APPLICATIONS)
-    add_subdirectory(shared_libtopk)
+    add_subdirectory(shared_lib_tests)
     add_subdirectory(simple_example)
     #add_subdirectory(tests/bc)
     add_subdirectory(tests/bfs)

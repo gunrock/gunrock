@@ -8,11 +8,12 @@ int main(int argc, char* argv[])
   data_type.VTXID_TYPE = VTXID_INT;
   data_type.SIZET_TYPE = SIZET_UINT;
   data_type.VALUE_TYPE = VALUE_INT;
+  struct GunrockConfig topk_config;
+  topk_config.top_nodes = 3;
 
   // define graph
   size_t num_nodes = 7;
   size_t num_edges = 15;
-  size_t top_nodes = 3;
 
   unsigned int row_offsets[8] = {0,3,6,9,11,14,15,15};
   int col_indices[15] = {1,2,3,0,2,4,3,4,5,5,6,2,5,6,6};
@@ -33,21 +34,21 @@ int main(int argc, char* argv[])
   // malloc output result arrays
   struct GunrockGraph *graph_output =
     (struct GunrockGraph*)malloc(sizeof(struct GunrockGraph));
-  int *node_ids          = (int*)malloc(sizeof(int) * top_nodes);
-  int *centrality_values = (int*)malloc(sizeof(int) * top_nodes);
+  int *node_ids          = (int*)malloc(sizeof(int) * topk_config.top_nodes);
+  int *centrality_values = (int*)malloc(sizeof(int) * topk_config.top_nodes);
 
   // run topk calculations
-  topk_dispatch(
+  gunrock_topk(
     (struct GunrockGraph*)graph_output,
     node_ids,
     centrality_values,
     (const struct GunrockGraph*)graph_input,
-    top_nodes,
+    topk_config,
     data_type);
 
   // print results for check correctness
   int i;
-  for (i = 0; i < top_nodes; ++i)
+  for (i = 0; i < topk_config.top_nodes; ++i)
   {
     printf("Node ID [%d] : CV [%d] \n", node_ids[i], centrality_values[i]);
   }

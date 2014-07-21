@@ -13,21 +13,24 @@ else()
     message(SEND_ERROR "CUB library include directory not set.")
 endif()
 
+set (mgpu_SOURCE_FILES ${mgpu_SOURCE_DIRS}/mgpucontext.cu ${mgpu_SOURCE_DIRS}/mgpuutil.cpp)
 
 set(HFILES_PUBLIC
     gunrock.h
     )
 
 set(CUFILES
-    ../tests/topk/topk_app.cu
+    #../tests/topk/topk_app.cu
+    ../tests/bfs/bfs_app.cu
     util/test_utils.cu
+    ${mgpu_SOURCE_FILES}
     )
 
-cuda_add_library(gunrock ${LIB_TYPE} 
-  ${CCFILES} 
+cuda_add_library(gunrock ${LIB_TYPE}
+  ${CCFILES}
   ${HFILES}
   ${CUHFILES}
   ${HFILES_PUBLIC}
-  ${CUFILES} 
+  ${CUFILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS}
   )

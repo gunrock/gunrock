@@ -20,7 +20,6 @@
 #include <gunrock/graphio/market.cuh>
 #include <gunrock/app/topk/topk_enactor.cuh>
 #include <gunrock/app/topk/topk_problem.cuh>
-#include <gunrock/util/test_utils.cuh>
 
 using namespace gunrock;
 using namespace gunrock::util;
@@ -240,12 +239,12 @@ void topk_run(
  * @param[in]  k value of topk problem
  * @param[in]  gunrock datatype struct
  */
-void topk_dispatch(
+void gunrock_topk(
     GunrockGraph       *graph_out,
     void               *node_ids,
     void               *centrality_values,
     const GunrockGraph *graph_in,
-    size_t             top_nodes,
+    GunrockConfig	   topk_config,
     GunrockDataType    data_type)
 {
     //TODO: add more supportive datatypes if necessary
@@ -284,7 +283,7 @@ void topk_dispatch(
 		    (int*)centrality_values,
 		    graph_original,
 		    graph_reversed,
-		    top_nodes);
+		    topk_config.top_nodes);
 
 		// reset for free memory
 		graph_original.row_offsets    = NULL;
