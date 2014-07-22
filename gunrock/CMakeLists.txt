@@ -21,7 +21,8 @@ set(HFILES_PUBLIC
 
 set(CUFILES
     #app/topk/topk_app.cu
-    app/bfs/bfs_app.cu
+    #app/bfs/bfs_app.cu
+    app/cc/cc_app.cu
     util/test_utils.cu
     ${mgpu_SOURCE_FILES}
     )

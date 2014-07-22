@@ -87,12 +87,27 @@ struct GunrockConfig
 extern "C" {
 #endif
 
-// BFS Implementation
+// BFS Function Define
 void gunrock_bfs(
     struct GunrockGraph       *graph_out,
     const struct GunrockGraph *graph_in,
-    struct GunrockConfig      bfs_config,
+    struct GunrockConfig      configs,
     struct GunrockDataType    data_type);
+
+// BC Function Define
+
+
+
+// CC Function Define
+void gunrock_cc(
+    struct GunrockGraph       *graph_out,
+    const struct GunrockGraph *graph_in,
+    struct GunrockConfig      configs,
+    struct GunrockDataType    data_type);
+
+// SSSP Function Define
+
+// PR Function Define
 
 // TODO: Add other algorithms
 
