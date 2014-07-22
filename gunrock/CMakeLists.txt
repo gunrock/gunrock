@@ -20,8 +20,8 @@ set(HFILES_PUBLIC
     )
 
 set(CUFILES
-    #../tests/topk/topk_app.cu
-    ../tests/bfs/bfs_app.cu
+    #app/topk/topk_app.cu
+    app/bfs/bfs_app.cu
     util/test_utils.cu
     ${mgpu_SOURCE_FILES}
     )
