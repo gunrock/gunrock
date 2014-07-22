@@ -430,6 +430,7 @@ void gunrock_bfs(
 {
   // moderngpu preparations
   int device = 0;
+  device = bfs_config.device;
   ContextPtr context = mgpu::CreateCudaDevice(device);
 
   // build input csr format graph

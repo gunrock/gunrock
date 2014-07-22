@@ -95,8 +95,11 @@ void gunrock_bfs(
     struct GunrockDataType    data_type);
 
 // BC Function Define
-
-
+void gunrock_bc(
+    struct GunrockGraph       *graph_out,
+    const struct GunrockGraph *graph_in,
+    struct GunrockConfig      configs,
+    struct GunrockDataType    data_type);
 
 // CC Function Define
 void gunrock_cc(
