@@ -74,7 +74,7 @@ struct GunrockConfig
     int   source;      //!< source vertex define where to start
     int   device;      //!< setting which gpu device to use
     int   max_iter;    //!< maximum mumber of iterations allowed
-    int   top_nodes;   //!< k value or top nodes for topk problem
+    int   top_nodes;   //!< k value for topk / page_rank problem
     float alpha;       //!< betweeness centrality specific value
     float beta;        //!< betweeness centrality specific value
     float delta;       //!< page rank specific value
@@ -111,6 +111,13 @@ void gunrock_cc(
 // SSSP Function Define
 
 // PR Function Define
+void gunrock_pr(
+    struct GunrockGraph       *graph_out,
+    void                      *node_ids,
+    void                      *page_rank,
+    const struct GunrockGraph *graph_in,
+    struct GunrockConfig      configs,
+    struct GunrockDataType    data_type);
 
 // TODO: Add other algorithms
 
@@ -120,7 +127,7 @@ void gunrock_topk(
     void                      *node_ids,
     void                      *centrality_values,
     const struct GunrockGraph *graph_in,
-    struct GunrockConfig      topk_config,
+    struct GunrockConfig      configs,
     struct GunrockDataType    data_type);
 
 #ifdef __cplusplus
