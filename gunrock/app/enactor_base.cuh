@@ -61,6 +61,11 @@ struct EnactorStats
     EnactorStats()
     {
          util::cpu_mt::PrintMessage("EnactorStats() begin.");
+         iteration       = 0;
+         total_lifetimes = 0;
+         total_queued    = 0;
+         total_runtimes  = 0;
+         retval          = cudaSuccess;
          util::cpu_mt::PrintMessage("EnactorStats() end.");
     }
 };
@@ -75,20 +80,31 @@ struct FrontierAttribute
     bool                queue_reset;
     int                 current_label;
     gunrock::oprtr::advance::TYPE   advance_type;
+
+    FrontierAttribute()
+    {
+        queue_length  = 0;
+        output_length = 0;
+        queue_index   = 0;
+        queue_offset  = 0;
+        selector      = 0;
+        queue_reset   = false; 
+    }
 };
 
 bool All_Done(EnactorStats *enactor_stats,FrontierAttribute *frontier_attribute,int num_gpus)
 {   
-    for (int gpu=0;gpu<num_gpus;gpu++)
+    for (int gpu=0;gpu<num_gpus*num_gpus;gpu++)
     if (enactor_stats[gpu].retval!=cudaSuccess)
     {   
         printf("(CUDA error %d @ GPU %d: %s\n", enactor_stats[gpu].retval, gpu, cudaGetErrorString(enactor_stats[gpu].retval)); fflush(stdout);
         return true;
     }   
 
-    for (int gpu=0;gpu<num_gpus;gpu++)
+    for (int gpu=0;gpu<num_gpus*num_gpus;gpu++)
     if (frontier_attribute[gpu].queue_length!=0)
-    {   
+    {
+        printf("gpu=%d, queue_length=%d\n",gpu,frontier_attribute[gpu].queue_length);   
         return false;
     }   
     return true;
@@ -149,7 +165,7 @@ bool All_Done(EnactorStats *enactor_stats,FrontierAttribute *frontier_attribute,
         int gpu,
         int peer,
         FrontierAttribute *frontier_attribute,
-        EnactorStats      *encator_stats,
+        EnactorStats      *enactor_stats,
         DataSlice         *data_slice_l,
         DataSlice         *data_slice_p,
         GraphSlice        *graph_slice_l,
@@ -157,8 +173,8 @@ bool All_Done(EnactorStats *enactor_stats,FrontierAttribute *frontier_attribute,
         cudaStream_t      stream)
     {
         if (peer == gpu) return;
-        int peer_ = peer<gpu? peer+1     : peer;
-        int gpu_  = peer<gpu? gpu : thread_num+1;
+        //int peer_ = peer<gpu? peer+1     : peer;
+        int gpu_  = peer<gpu? gpu : gpu+1;
         data_slice_p->in_length[enactor_stats->iteration%2][gpu_]
                       = frontier_attribute->queue_length;
         if (frontier_attribute->queue_length == 0) return;
@@ -168,7 +184,7 @@ bool All_Done(EnactorStats *enactor_stats,FrontierAttribute *frontier_attribute,
         if (enactor_stats->retval = util::GRError(cudaMemcpyAsync(
             data_slice_p  -> keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE)
                 + graph_slice_p -> in_offset[gpu_],
-            graph_slice_l -> frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE)
+            graph_slice_l -> frontier_queues[0].keys[frontier_attribute->selector].GetPointer(util::DEVICE)
                 + frontier_attribute->queue_offset,
             sizeof(VertexId) * frontier_attribute->queue_length, cudaMemcpyDefault, stream),
             "cudaMemcpyPeer d_keys failed", __FILE__, __LINE__)) return;
@@ -308,7 +324,7 @@ bool All_Done(EnactorStats *enactor_stats,FrontierAttribute *frontier_attribute,
                 if (enactor_stats->retval = util::GRError(cudaMemcpyAsync(
                     s_data_slice[peer]->value__associate_ins[enactor_stats->iteration%2][i]
                         + s_graph_slice[peer]->in_offset[gpu_],
-                    data_slice[0]->value__ass ciate_outs[i]
+                    data_slice[0]->value__associate_outs[i]
                         + (out_offset[peer_] - out_offset[1]),
                     sizeof(Value) * data_slice[0]->out_length[peer_], cudaMemcpyDefault, data_slice[0]->streams[peer_]),
                     "cudaMemcpyPeer value__associate_out failed", __FILE__, __LINE__)) break;
@@ -481,23 +497,26 @@ protected:
         //enactor_stats      = new EnactorStats                  [num_gpus];
         //frontier_attribute = new FrontierAttribute             [num_gpus];
         cuda_props        .Init(num_gpus, util::HOST, true, cudaHostAllocMapped | cudaHostAllocPortable);
-        work_progress     .Init(num_gpus, util::HOST, true, cudaHostAllocMapped | cudaHostAllocPortable); 
-        enactor_stats     .Init(num_gpus, util::HOST, true, cudaHostAllocMapped | cudaHostAllocPortable);
-        frontier_attribute.Init(num_gpus, util::HOST, true, cudaHostAllocMapped | cudaHostAllocPortable);
+        work_progress     .Init(num_gpus*num_gpus, util::HOST, true, cudaHostAllocMapped | cudaHostAllocPortable); 
+        enactor_stats     .Init(num_gpus*num_gpus, util::HOST, true, cudaHostAllocMapped | cudaHostAllocPortable);
+        frontier_attribute.Init(num_gpus*num_gpus, util::HOST, true, cudaHostAllocMapped | cudaHostAllocPortable);
         
         for (int gpu=0;gpu<num_gpus;gpu++)
         {
             if (util::SetDevice(gpu_idx[gpu])) return;
             // Setup work progress (only needs doing once since we maintain
             // it in our kernel code)
-            work_progress[gpu].Setup();
             cuda_props   [gpu].Setup(gpu_idx[gpu]);
-            //enactor_stats[gpu].num_gpus = num_gpus;
-            //enactor_stats[gpu].gpu_idx  = gpu_idx[gpu];
-            enactor_stats[gpu].node_locks    .SetName("node_locks"    );
-            enactor_stats[gpu].node_locks_out.SetName("node_locks_out");
-            //enactor_stats.d_node_locks = NULL;
-            //enactor_stats.d_node_locks_out = NULL;
+            for (int peer=0;peer<num_gpus;peer++)
+            {
+                work_progress[gpu*num_gpus+peer].Setup();
+                //enactor_stats[gpu].num_gpus = num_gpus;
+                //enactor_stats[gpu].gpu_idx  = gpu_idx[gpu];
+                enactor_stats[gpu*num_gpus+peer].node_locks    .SetName("node_locks"    );
+                enactor_stats[gpu*num_gpus+peer].node_locks_out.SetName("node_locks_out");
+                //enactor_stats.d_node_locks = NULL;
+                //enactor_stats.d_node_locks_out = NULL;
+            }
         }
         util::cpu_mt::PrintMessage("EnactorBase() end.");
     }
@@ -509,9 +528,12 @@ protected:
         for (int gpu=0;gpu<num_gpus;gpu++)
         {
             if (util::SetDevice(gpu_idx[gpu])) return;
-            enactor_stats[gpu].node_locks    .Release();
-            enactor_stats[gpu].node_locks_out.Release();
-            if (work_progress[gpu].HostReset()) return;
+            for (int peer=0;peer<num_gpus;peer++)
+            {
+                enactor_stats[gpu*num_gpus+peer].node_locks    .Release();
+                enactor_stats[gpu*num_gpus+peer].node_locks_out.Release();
+                if (work_progress[gpu*num_gpus+peer].HostReset()) return;
+            }
             //if (util::GRError(cudaFreeHost((void*)enactor_stats[gpu].done), 
             //     "EnactorBase cudaFreeHost done failed", __FILE__, __LINE__)) return;
             //if (util::GRError(cudaEventDestroy(enactor_stats[gpu].throttle_event),
@@ -544,47 +566,50 @@ protected:
         for (int gpu=0;gpu<num_gpus;gpu++)
         {
             if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
-            //initialize runtime stats
-            enactor_stats[gpu].advance_grid_size = MaxGridSize(gpu, advance_occupancy, max_grid_size);
-            enactor_stats[gpu].filter_grid_size  = MaxGridSize(gpu, filter_occupancy, max_grid_size);
+            for (int peer=0;peer<num_gpus;peer++)
+            {
+                //initialize runtime stats
+                enactor_stats[gpu*num_gpus+peer].advance_grid_size = MaxGridSize(gpu, advance_occupancy, max_grid_size);
+                enactor_stats[gpu*num_gpus+peer].filter_grid_size  = MaxGridSize(gpu, filter_occupancy, max_grid_size);
 
-            if (retval = enactor_stats[gpu].advance_kernel_stats.Setup(enactor_stats[gpu].advance_grid_size)) return retval;
-            if (retval = enactor_stats[gpu]. filter_kernel_stats.Setup(enactor_stats[gpu]. filter_grid_size)) return retval;
-            //initialize the host-mapped "done"
-            //int flags = cudaHostAllocMapped;
+                if (retval = enactor_stats[gpu*num_gpus+peer].advance_kernel_stats.Setup(enactor_stats[gpu].advance_grid_size)) return retval;
+                if (retval = enactor_stats[gpu*num_gpus+peer]. filter_kernel_stats.Setup(enactor_stats[gpu]. filter_grid_size)) return retval;
+                //initialize the host-mapped "done"
+                //int flags = cudaHostAllocMapped;
 
-            // Allocate pinned memory for done
-            //if (retval = util::GRError(cudaHostAlloc((void**)&(enactor_stats[gpu].done), sizeof(int) * 1, flags),
-            //        "BFSEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
+                // Allocate pinned memory for done
+                //if (retval = util::GRError(cudaHostAlloc((void**)&(enactor_stats[gpu].done), sizeof(int) * 1, flags),
+                //        "BFSEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) return retval;
 
-            // Map done into GPU space
-            //if (retval = util::GRError(cudaHostGetDevicePointer((void**)&(enactor_stats[gpu].d_done), (void*) enactor_stats[gpu].done, 0),  
-            //        "BFSEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
+                // Map done into GPU space
+                //if (retval = util::GRError(cudaHostGetDevicePointer((void**)&(enactor_stats[gpu].d_done), (void*) enactor_stats[gpu].done, 0),  
+                //        "BFSEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) return retval;
 
-            // Create throttle event
-            //if (retval = util::GRError(cudaEventCreateWithFlags(&enactor_stats[gpu].throttle_event, cudaEventDisableTiming),                
-            //        "BFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
+                // Create throttle event
+                //if (retval = util::GRError(cudaEventCreateWithFlags(&enactor_stats[gpu].throttle_event, cudaEventDisableTiming),                
+                //        "BFSEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) return retval;
                 
-            //enactor_stats[gpu].iteration             = 0;
-            //enactor_stats[gpu].total_runtimes        = 0;
-            //enactor_stats[gpu].total_lifetimes       = 0;
-            //enactor_stats[gpu].total_queued          = 0;
-            //enactor_stats[gpu].done[0]               = -1;
-            //enactor_stats[gpu].retval                = cudaSuccess;
-            //enactor_stats.num_gpus              = 1;
-            //enactor_stats.gpu_id                = 0;
+                //enactor_stats[gpu].iteration             = 0;
+                //enactor_stats[gpu].total_runtimes        = 0;
+                //enactor_stats[gpu].total_lifetimes       = 0;
+                //enactor_stats[gpu].total_queued          = 0;
+                //enactor_stats[gpu].done[0]               = -1;
+                //enactor_stats[gpu].retval                = cudaSuccess;
+                //enactor_stats.num_gpus              = 1;
+                //enactor_stats.gpu_id                = 0;
 
-            //if (retval = util::GRError(cudaMalloc(
-            //                (void**)&enactor_stats.d_node_locks,
-            //                node_lock_size * sizeof(unsigned int)),
-            //            "EnactorBase cudaMalloc d_node_locks failed", __FILE__, __LINE__)) return retval;
-            if (retval = enactor_stats[gpu].node_locks.Allocate(node_lock_size,util::DEVICE)) return retval;
+                //if (retval = util::GRError(cudaMalloc(
+                //                (void**)&enactor_stats.d_node_locks,
+                //                node_lock_size * sizeof(unsigned int)),
+                //            "EnactorBase cudaMalloc d_node_locks failed", __FILE__, __LINE__)) return retval;
+                if (retval = enactor_stats[gpu*num_gpus+peer].node_locks.Allocate(node_lock_size,util::DEVICE)) return retval;
 
-            //if (retval = util::GRError(cudaMalloc(
-            //                (void**)&enactor_stats.d_node_locks_out,
-            //                node_lock_size * sizeof(unsigned int)),
-            //            "EnactorBase cudaMalloc d_node_locks_out failed", __FILE__, __LINE__)) return retval;
-            if (retval = enactor_stats[gpu].node_locks_out.Allocate(node_lock_size, util::DEVICE)) return retval;
+                //if (retval = util::GRError(cudaMalloc(
+                //                (void**)&enactor_stats.d_node_locks_out,
+                //                node_lock_size * sizeof(unsigned int)),
+                //            "EnactorBase cudaMalloc d_node_locks_out failed", __FILE__, __LINE__)) return retval;
+                if (retval = enactor_stats[gpu*num_gpus+peer].node_locks_out.Allocate(node_lock_size, util::DEVICE)) return retval;
+            }
         }
         util::cpu_mt::PrintMessage("EnactorBase Setup() end.");
         return retval;
@@ -601,7 +626,7 @@ protected:
         util::cpu_mt::PrintMessage("EnactorBase Reset() begin.");
         cudaError_t retval = cudaSuccess;
 
-        for (int gpu=0;gpu<num_gpus;gpu++)
+        for (int gpu=0;gpu<num_gpus*num_gpus;gpu++)
         {
             /*if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
             //initialize runtime stats

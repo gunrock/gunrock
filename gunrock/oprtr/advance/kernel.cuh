@@ -46,8 +46,14 @@ void ComputeOutputLength(
                                     TYPE                            ADVANCE_TYPE) {
 
     typedef typename ProblemData::SizeT         SizeT;
+    if (frontier_attribute->queue_length ==0) 
+    {
+        frontier_attribute->output_length =0;
+        return;
+    }
+
     int num_block = (frontier_attribute->queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
-    
+    //printf("%p, %p, %p, %p, %d, %d, %d, %d, %d\n",d_offsets, d_indices, d_in_key_queue, partitioned_scanned_edges, frontier_attribute->queue_length, max_in, max_out, num_block, stream); 
     gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
         <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS,0,stream>>>(
                 d_offsets,
@@ -58,15 +64,16 @@ void ComputeOutputLength(
                 max_in,
                 max_out,
                 ADVANCE_TYPE);
-
+    util::GRError(cudaStreamSynchronize(stream),"ComputeOutputLength failed", __FILE__, __LINE__);
+    //return;
     //cudaDeviceSynchronize();
     Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute->queue_length, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
     //cudaDeviceSynchronize();
     //SizeT *temp;// = new SizeT[1];
     //cudaHostAlloc((void**)&temp, sizeof(SizeT), cudaHostAllocDefault);
-    cudaMemcpyAsync(&(frontier_attribute->output_length),partitioned_scanned_edges+frontier_attribute->queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost,stream);
-    cudaStreamSynchronize(stream);
+    util::GRError(cudaMemcpyAsync(&(frontier_attribute->output_length),partitioned_scanned_edges+frontier_attribute->queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost,stream), "cudaMemcpyAsync failed", __FILE__, __LINE__);
+    util::GRError(cudaStreamSynchronize(stream),"ComputeOutputLength failed", __FILE__, __LINE__);
     //SizeT ret = temp[0];
     //delete[] temp;
     //cudaFreeHost(temp);
@@ -276,7 +283,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             //printf("output_queue_len:%d\n", output_queue_len);
             //printf("output_length = %d\n", frontier_attribute.output_length);fflush(stdout);
             //if (frontier_attribute.output_length < LBPOLICY::LIGHT_EDGE_THRESHOLD)
-            {
+            if (frontier_attribute.output_length !=0) {
                 gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(
                         frontier_attribute.queue_reset,

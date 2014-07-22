@@ -59,7 +59,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, unsigned char > visited_mask  ;
         util::Array1D<SizeT, unsigned char > temp_marker   ;
         util::Array1D<SizeT, VertexId      > temp_preds    ;
-        util::Array1D<SizeT, unsigned int  > scanned_edges ;
+        util::Array1D<SizeT, unsigned int  > *scanned_edges ;
         util::scan::MultiScan<VertexId, SizeT, true, 256, 8>*
                                              Scaner;
         /*int             num_associate,gpu_idx;
@@ -83,10 +83,11 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             labels          .SetName("labels"          );  
             preds           .SetName("preds"           );  
             visited_mask    .SetName("visited_mask"    );
-            scanned_edges   .SetName("scanned_edges"   );
+            //scanned_edges   .SetName("scanned_edges"   );
             temp_preds      .SetName("temp_preds"      );
             temp_marker     .SetName("temp_marker"     );
             Scaner          = NULL;
+            scanned_edges   = NULL;
             /*associate_ins[0].SetName("associate_ins[0]");
             associate_ins[1].SetName("associate_ins[1]");
             associate_outs  .SetName("associate_outs"  );  
@@ -108,10 +109,12 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             //keys_in    [0].Release();
             //keys_in    [1].Release();
             visited_mask  .Release();
-            scanned_edges .Release();
+            for (int gpu=0;gpu<this->num_gpus;gpu++)
+                scanned_edges[gpu].Release();
             temp_preds    .Release();
             temp_marker   .Release();
             delete Scaner; Scaner=NULL;
+            delete[] scanned_edges;scanned_edges=NULL;
             /*in_length  [0].Release();
             in_length  [1].Release();
             out_length    .Release();
@@ -169,7 +172,12 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
 
             // Create SoA on device
             if (retval = labels       .Allocate(graph->nodes,util::DEVICE)) return retval;
-            if (retval = scanned_edges.Allocate(graph->edges,util::DEVICE)) return retval;
+            scanned_edges=new util::Array1D<SizeT, unsigned int>[num_gpus];
+            for (int gpu=0;gpu<num_gpus;gpu++)
+            {
+                scanned_edges[gpu].SetName("scanned_edges[]");
+                if (retval = scanned_edges[gpu].Allocate(graph->edges,util::DEVICE)) return retval;
+            }
 
             if (_MARK_PREDECESSORS)
             {
@@ -400,7 +408,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = util::GRError(cudaSetDevice(this->gpu_idx[gpu]), "BFSProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
                 if (retval = data_slices[gpu].Allocate(1,util::DEVICE | util::HOST)) return retval;
                 DataSlice* _data_slice = data_slices[gpu].GetPointer(util::HOST);
-                _data_slice->streams.SetPointer(streams,num_gpus);
+                _data_slice->streams.SetPointer(&streams[gpu*num_gpus],num_gpus);
                 if (this->num_gpus > 1)
                 {
                     if (_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE)
@@ -501,7 +509,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
 
         if (retval = util::GRError(cudaMemcpy(
-                        BaseProblem::graph_slices[gpu]->frontier_queues.keys[0].GetPointer(util::DEVICE),
+                        BaseProblem::graph_slices[gpu]->frontier_queues[0].keys[0].GetPointer(util::DEVICE),
                         &tsrc,
                         sizeof(VertexId),
                         cudaMemcpyHostToDevice),

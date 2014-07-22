@@ -47,7 +47,7 @@ enum FrontierType {
         typename Value>
     struct DataSliceBase
     {
-        int                               num_vertex_associate,num_value__associate,gpu_idx;
+        int                               num_gpus,num_vertex_associate,num_value__associate,gpu_idx;
         util::Array1D<SizeT, VertexId  > *vertex_associate_in[2];
         util::Array1D<SizeT, VertexId* >  vertex_associate_ins[2];
         util::Array1D<SizeT, VertexId  > *vertex_associate_out;
@@ -171,6 +171,7 @@ enum FrontierType {
             SizeT num_out_nodes)
         {
             cudaError_t retval         = cudaSuccess;
+            this->num_gpus             = num_gpus;
             this->gpu_idx              = gpu_idx;
             this->num_vertex_associate = num_vertex_associate;
             this->num_value__associate = num_value__associate;
@@ -283,10 +284,11 @@ struct ProblemBase
      */
     struct GraphSlice
     {
+        int             num_gpus;
         int             index;                              // Slice index
         VertexId        nodes;                              // Number of nodes in slice
         SizeT           edges;                              // Number of edges in slice
-        cudaStream_t    stream;                             // CUDA stream to use for processing the slice
+        //cudaStream_t    stream;                             // CUDA stream to use for processing the slice
 
         Csr<VertexId, Value, SizeT   > *graph             ; // Pointer to CSR format subgraph
         util::Array1D<SizeT, SizeT   > row_offsets        ; // CSR format row offset on device memory
@@ -304,8 +306,8 @@ struct ProblemBase
         util::Array1D<SizeT, VertexId> backward_convertion;
 
         //Frontier queues. Used to track working frontier.
-        util::DoubleBuffer<SizeT, VertexId, VertexId>  frontier_queues;
-        SizeT                                          frontier_elements[2];
+        util::DoubleBuffer<SizeT, VertexId, VertexId>  *frontier_queues;
+        SizeT                                          **frontier_elements;
 
         /**
          * @brief GraphSlice Constructor
@@ -313,16 +315,19 @@ struct ProblemBase
          * @param[in] index GPU index, reserved for multi-GPU use in future.
          * @param[in] stream CUDA Stream we use to allocate storage for this graph slice.
          */
-        GraphSlice(int index, cudaStream_t stream) :
+        GraphSlice(int index) :
             index(index),
             graph(NULL),
+            num_gpus(0),
+            frontier_elements(NULL),
+            frontier_queues(NULL),
             //d_row_offsets(NULL),
             //d_column_indices(NULL),
             //d_column_offsets(NULL),
             //d_row_indices(NULL),
             nodes(0),
-            edges(0),
-            stream(stream)
+            edges(0)//,
+            //stream(stream)
         {
             util::cpu_mt::PrintMessage("GraphSlice() begin.");
             row_offsets        .SetName("row_offsets"        );
@@ -340,10 +345,10 @@ struct ProblemBase
             backward_convertion.SetName("backward_convertion");
 
             // Initialize double buffer frontier queue lengths
-            for (int i = 0; i < 2; ++i)
+            /*for (int i = 0; i < 2; ++i)
             {
                 frontier_elements[i] = 0;
-            }
+            }*/
             util::cpu_mt::PrintMessage("GraphSlice() end.");
         }
 
@@ -372,15 +377,21 @@ struct ProblemBase
             backward_partition .Release();
             backward_convertion.Release();
 
-            for (int i = 0; i < 2; ++i) {
-                frontier_queues.keys  [i].Release();
-                frontier_queues.values[i].Release();
+            for (int gpu = 0; gpu<num_gpus; gpu++)
+            {
+                delete[] frontier_elements[gpu];frontier_elements[gpu]=NULL;
+                for (int i = 0; i < 2; ++i) {
+                    frontier_queues[gpu].keys  [i].Release();
+                    frontier_queues[gpu].values[i].Release();
+                }
             }
+            delete[] frontier_elements; frontier_elements=NULL;
+            delete[] frontier_queues; frontier_queues=NULL;
 
             // Destroy stream
-            if (stream) {
+            /*if (stream) {
                 util::GRError(cudaStreamDestroy(stream), "GpuSlice cudaStreamDestroy failed", __FILE__, __LINE__);
-            }
+            }*/
             util::cpu_mt::PrintMessage("~GraphSlice() end.");
         }
 
@@ -412,6 +423,7 @@ struct ProblemBase
         {
             util::cpu_mt::PrintMessage("GraphSlice Init() begin.");
             cudaError_t retval     = cudaSuccess;
+            this->num_gpus         = num_gpus;
             this->graph            = graph;
             nodes                  = graph->nodes;
             edges                  = graph->edges;
@@ -433,7 +445,14 @@ struct ProblemBase
                 // Allocate and initialize column_indices
                 if (retval = this->column_indices.Allocate(edges     ,util::DEVICE)) break;
                 if (retval = this->column_indices.Move    (util::HOST,util::DEVICE)) break;
-              
+                frontier_queues   = new util::DoubleBuffer<SizeT, VertexId, VertexId>[num_gpus]; 
+                frontier_elements = new SizeT*[num_gpus];
+                for (int gpu=0;gpu<num_gpus;gpu++)
+                { 
+                    frontier_elements[gpu] = new SizeT[2];
+                    frontier_elements[gpu][0]=0;
+                    frontier_elements[gpu][1]=0;
+                }
                 /*if (graph->column_offsets !=NULL)
                 {
                     // Allocate and initalize column_offsets
@@ -516,51 +535,54 @@ struct ProblemBase
             // Determine frontier queue sizes
             SizeT new_frontier_elements[2] = {0,0};
 
-            switch (frontier_type) {
-                case VERTEX_FRONTIERS :
-                    // O(n) ping-pong global vertex frontiers
-                    new_frontier_elements[0] = double(nodes) * queue_sizing;
-                    new_frontier_elements[1] = new_frontier_elements[0];
-                    break;
+            for (int peer=0;peer<num_gpus;peer++)
+            {
+                switch (frontier_type) {
+                    case VERTEX_FRONTIERS :
+                        // O(n) ping-pong global vertex frontiers
+                        new_frontier_elements[0] = double(nodes) * queue_sizing;
+                        new_frontier_elements[1] = new_frontier_elements[0];
+                        break;
 
-                case EDGE_FRONTIERS :
-                    // O(m) ping-pong global edge frontiers
-                    new_frontier_elements[0] = double(edges) * queue_sizing;
-                    new_frontier_elements[1] = new_frontier_elements[0];
-                    break;
+                    case EDGE_FRONTIERS :
+                        // O(m) ping-pong global edge frontiers
+                        new_frontier_elements[0] = double(edges) * queue_sizing;
+                        new_frontier_elements[1] = new_frontier_elements[0];
+                        break;
 
-                case MIXED_FRONTIERS :
-                    // O(n) global vertex frontier, O(m) global edge frontier
-                    new_frontier_elements[0] = double(nodes) * queue_sizing;
-                    new_frontier_elements[1] = double(edges) * queue_sizing;
-                    break;
-             }   
+                    case MIXED_FRONTIERS :
+                        // O(n) global vertex frontier, O(m) global edge frontier
+                        new_frontier_elements[0] = double(nodes) * queue_sizing;
+                        new_frontier_elements[1] = double(edges) * queue_sizing;
+                        break;
+                 }    
 
-            // Iterate through global frontier queue setups
-            for (int i = 0; i < 2; i++) {
-                //frontier_elements[i] = new_frontier_elements[i];
-                // Allocate frontier queue if not big enough
-                //frontier_queues.keys[i].EnsureSize(frontier_elements[i]);
-                //if (_USE_DOUBLE_BUFFER) frontier_queues.values[i].EnsureSize(frontier_elements[i]);
-                if (frontier_elements[i] < new_frontier_elements[i]) {
+                // Iterate through global frontier queue setups
+                for (int i = 0; i < 2; i++) {
+                    //frontier_elements[i] = new_frontier_elements[i];
+                    // Allocate frontier queue if not big enough
+                    //frontier_queues.keys[i].EnsureSize(frontier_elements[i]);
+                    //if (_USE_DOUBLE_BUFFER) frontier_queues.values[i].EnsureSize(frontier_elements[i]);
+                    printf("peer = %d, i = %d, [] = %d\n", peer, i, new_frontier_elements[i]);
+                    if (frontier_elements[peer][i] < new_frontier_elements[i]) {
 
-                    // Free if previously allocated
-                    if (retval = frontier_queues.keys[i].Release()) return retval;
+                        // Free if previously allocated
+                        if (retval = frontier_queues[peer].keys[i].Release()) return retval;
 
-                    // Free if previously allocated
-                    if (_USE_DOUBLE_BUFFER) {
-                        if (retval = frontier_queues.values[i].Release()) return retval;
-                    }
+                        // Free if previously allocated
+                        if (_USE_DOUBLE_BUFFER) {
+                            if (retval = frontier_queues[peer].values[i].Release()) return retval;
+                        }
 
-                    frontier_elements[i] = new_frontier_elements[i];
+                        frontier_elements[peer][i] = new_frontier_elements[i];
 
-                    if (retval = frontier_queues.keys[i].Allocate(frontier_elements[i],util::DEVICE)) return retval;
-                    if (_USE_DOUBLE_BUFFER) {
-                        if (retval = frontier_queues.values[i].Allocate(frontier_elements[i],util::DEVICE)) return retval;
-                    }
-                } //end if
-            } // end for i<2
-
+                        if (retval = frontier_queues[peer].keys[i].Allocate(frontier_elements[peer][i],util::DEVICE)) return retval;
+                        if (_USE_DOUBLE_BUFFER) {
+                            if (retval = frontier_queues[peer].values[i].Allocate(frontier_elements[peer][i],util::DEVICE)) return retval;
+                        }
+                    } //end if
+                } // end for i<2
+            }
             util::cpu_mt::PrintMessage("GraphSlice Reset() end.");
             return retval;
         } // end Reset(...)
@@ -779,7 +801,7 @@ struct ProblemBase
 
             for (int gpu=0;gpu<num_gpus;gpu++)
             {
-                graph_slices[gpu] = new GraphSlice(this->gpu_idx[gpu], 0);
+                graph_slices[gpu] = new GraphSlice(this->gpu_idx[gpu]);
                 if (num_gpus > 1)
                 {
                     if (_ENABLE_BACKWARD)

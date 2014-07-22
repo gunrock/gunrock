@@ -627,7 +627,7 @@ int cpp_main( int argc, char** argv)
         gpu_idx[0] = 0;
     }
     streams  = new cudaStream_t[num_gpus * num_gpus];
-    context  = new ContextPtr[num_gpus * num_gpus];
+    context  = new ContextPtr  [num_gpus * num_gpus];
     printf("Using %d gpus: ", num_gpus);
     for (int gpu=0;gpu<num_gpus;gpu++) 
     {
@@ -637,6 +637,7 @@ int cpp_main( int argc, char** argv)
         {
             util::GRError(cudaStreamCreate(&streams[gpu*num_gpus+i]), "cudaStreamCreate fialed.",__FILE__,__LINE__);
             context[i+gpu*num_gpus] = mgpu::CreateCudaDeviceAttachStream(gpu_idx[i],streams[gpu*num_gpus+i]);
+            printf("%d, %d ",streams[gpu*num_gpus+i],context[i+gpu*num_gpus][0].Stream());
             //context[i+gpu*num_gpus] = mgpu::CreateCudaDevice(gpu_idx[i]);
         }
     }
