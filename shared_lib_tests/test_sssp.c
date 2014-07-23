@@ -20,11 +20,11 @@ int main(int argc, char* argv[])
   // pr configurations (optional)
   struct GunrockConfig sssp_config;
   sssp_config.device       =    0;
-  sssp_config.src          = manually;
-  sssp_config.source       =    1;
   sssp_config.mark_pred    = true;
   sssp_config.queue_size   = 1.0f;
   sssp_config.delta_factor =    1;
+  sssp_config.src          = manually;
+  sssp_config.source       =    1;
 
   // define graph
   size_t num_nodes = 7;
@@ -50,14 +50,15 @@ int main(int argc, char* argv[])
 
   // run sssp calculations
   gunrock_sssp(
-	       (struct GunrockGraph*)graph_output,
-	       predecessor,
-	       (const struct GunrockGraph*)graph_input,
-	       sssp_config,
-	       data_type);
+    graph_output,
+    predecessor,
+    graph_input,
+    sssp_config,
+    data_type);
 
   // test print
   int i;
+  printf("Demo Outputs:\n");
   int *label = (int*)malloc(sizeof(int) * num_nodes);
   label = (int*)graph_output->node_values;
   for (i = 0; i < num_nodes; ++i)

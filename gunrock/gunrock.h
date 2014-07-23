@@ -54,14 +54,14 @@ struct GunrockDataType
  */
 struct GunrockGraph
 {
-    size_t  num_nodes;    //!< number of nodes in graph
-    size_t  num_edges;    //!< number of edges in graph
-    void    *row_offsets; //!< C.S.R. row offsets
-    void    *col_indices; //!< C.S.R. column indices
-    void    *col_offsets; //!< C.S.C. column offsets
-    void    *row_indices; //!< C.S.C. row indices
-    void    *node_values; //!< associated values per node
-    void    *edge_values; //!< associated values per edge
+    size_t num_nodes;    //!< number of nodes in graph
+    size_t num_edges;    //!< number of edges in graph
+    void   *row_offsets; //!< C.S.R. row offsets
+    void   *col_indices; //!< C.S.R. column indices
+    void   *col_offsets; //!< C.S.C. column offsets
+    void   *row_indices; //!< C.S.C. row indices
+    void   *node_values; //!< associated values per node
+    void   *edge_values; //!< associated values per edge
 };
 
 /**
@@ -134,8 +134,6 @@ void gunrock_pr(
     struct GunrockConfig      configs,
     struct GunrockDataType    data_type);
 
-// TODO: Add other algorithms
-
 // TopK Implementation
 void gunrock_topk(
     struct GunrockGraph       *graph_out,
@@ -145,11 +143,11 @@ void gunrock_topk(
     struct GunrockConfig      configs,
     struct GunrockDataType    data_type);
 
+// TODO: Add other algorithms
+
 #ifdef __cplusplus
 }
 #endif
-
-
 
 // Leave this at the end of the file
 // Local Variables:
