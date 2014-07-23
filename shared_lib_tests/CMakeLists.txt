@@ -13,5 +13,8 @@ target_link_libraries(test_bc gunrock)
 add_executable (test_cc test_cc.c)
 target_link_libraries(test_cc gunrock)
 
+add_executable (test_sssp test_sssp.c)
+target_link_libraries(test_sssp gunrock)
+
 add_executable (test_pr test_pr.c)
 target_link_libraries(test_pr gunrock)

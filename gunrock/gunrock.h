@@ -34,6 +34,7 @@ enum SizeTType
 enum ValueType
 {
     VALUE_INT,    //!< integer type
+    VALUE_UINT, //!< unsigned int type
     VALUE_FLOAT,  //!< float type
 };
 
@@ -66,15 +67,23 @@ struct GunrockGraph
 /**
  * @brief arguments configuration struct used to specify arguments
  */
+enum SrcMode
+{
+    manually,
+    randomize,
+    largest_degree,
+};
 struct GunrockConfig
 {
     bool  undirected;  //!< whether the graph is undirected or not
     bool  mark_pred;   //!< whether to mark predecessor or not
     bool  idempotence; //!< whether or not to enable idempotence
+    enum  SrcMode src; //!< source vertex mode rand/largest_degree
     int   source;      //!< source vertex define where to start
     int   device;      //!< setting which gpu device to use
     int   max_iter;    //!< maximum mumber of iterations allowed
     int   top_nodes;   //!< k value for topk / page_rank problem
+    int   delta_factor; //!< sssp delta-factor parameter
     float alpha;       //!< betweeness centrality specific value
     float beta;        //!< betweeness centrality specific value
     float delta;       //!< page rank specific value
@@ -109,6 +118,12 @@ void gunrock_cc(
     struct GunrockDataType    data_type);
 
 // SSSP Function Define
+void gunrock_sssp(
+    struct GunrockGraph       *graph_out,
+    void                      *predecessor,
+    const struct GunrockGraph *graph_in,
+    struct GunrockConfig      congis,
+    struct GunrockDataType    data_type);
 
 // PR Function Define
 void gunrock_pr(
