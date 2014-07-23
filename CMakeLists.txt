@@ -224,6 +224,6 @@ add_test(NAME SimpleExample COMMAND simple_example market data/simple_example/bi
 set_tests_properties(SimpleExample
     PROPERTIES PASS_REGULAR_EXPRESSION "TEST PASSED")
 
-add_test(NAME TestBFS COMMAND test_bfs market data/simple_example/bips98_606.mtx --src=largestdegree)
-set_tests_properties(TestBFS
-    PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+#add_test(NAME TestBFS COMMAND test_bfs market data/simple_example/bips98_606.mtx --src=largestdegree)
+#set_tests_properties(TestBFS
+#    PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")

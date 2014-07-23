@@ -34,10 +34,10 @@ using namespace gunrock::app::pr;
 /******************************************************************************
  * Defines, constants, globals
  ******************************************************************************/
-bool g_verbose;
-bool g_undirected;
-bool g_quick;
-bool g_stream_from_host;
+static bool g_verbose;
+//static bool g_undirected;
+//static bool g_quick;
+static bool g_stream_from_host;
 
 template <typename VertexId, typename Value>
 struct RankPair {
@@ -57,7 +57,8 @@ __inline__ bool PRCompare(
 /******************************************************************************
  * Housekeeping Routines
  ******************************************************************************/
-void Usage()
+/*
+static void Usage()
 {
     printf(
         "\ntest_pr <graph type> <graph type args> [--device=<device_index>] "
@@ -75,6 +76,7 @@ void Usage()
         "  --quick If set will skip the CPU validation code.\n"
         );
 }
+*/
 
 /**
  * @brief Displays the BFS result (i.e., distance from source)

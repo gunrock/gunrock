@@ -34,15 +34,16 @@ using namespace gunrock::app::bc;
 /******************************************************************************
  * Defines, constants, globals
  ******************************************************************************/
-bool g_verbose;
-bool g_undirected;
-bool g_quick;
-bool g_stream_from_host;
+static bool g_verbose;
+//static bool g_undirected;
+//static bool g_quick;
+static bool g_stream_from_host;
 
 /******************************************************************************
  * Housekeeping Routines
  ******************************************************************************/
-void Usage()
+/*
+static void Usage()
 {
     printf(
         "\ntest_bc <graph type> <graph type args> [--device=<device_index>] "
@@ -66,6 +67,7 @@ void Usage()
         "--ref-file: If set, use pre-computed result stored in ref-file to verify.\n"
         );
 }
+*/
 
 /**
  * @brief Displays the BC result (sigma value and BC value)

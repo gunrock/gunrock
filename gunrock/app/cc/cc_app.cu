@@ -35,10 +35,10 @@ using namespace gunrock::app::cc;
 /******************************************************************************
  * Defines, constants, globals
  ******************************************************************************/
-bool g_verbose;
-bool g_undirected;
-bool g_quick;
-bool g_stream_from_host;
+static bool g_verbose;
+//static bool g_undirected;
+//static bool g_quick;
+static bool g_stream_from_host;
 
 template <typename VertexId>
 struct CcList {
@@ -58,7 +58,8 @@ __inline__ bool CCCompare(
 /******************************************************************************
  * Housekeeping Routines
  ******************************************************************************/
-void Usage()
+/*
+static void Usage()
 {
     printf(
         "\ntest_cc <graph type> <graph type args> [--device=<device_index>] "
@@ -73,6 +74,7 @@ void Usage()
         "  and barrier duty (a relative indicator of load imbalance.)\n"
         "  --quick If set will skip the CPU validation code.\n");
 }
+*/
 
  /**
   * @brief Displays the CC result (i.e., number of components)

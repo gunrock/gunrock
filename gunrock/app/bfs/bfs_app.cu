@@ -34,16 +34,17 @@ using namespace gunrock::app::bfs;
 /******************************************************************************
 * Defines, constants, globals
 ******************************************************************************/
-bool g_verbose;
-bool g_undirected;
-bool g_quick;
-bool g_stream_from_host;
+static bool g_verbose;
+//static bool g_undirected;
+//static bool g_quick;
+static bool g_stream_from_host;
 
 
 /******************************************************************************
 * Housekeeping Routines
 ******************************************************************************/
-void Usage()
+/*
+static void Usage()
 {
   printf(
     "\ntest_bfs <graph type> <graph type args> [--device=<device_index>] "
@@ -67,6 +68,7 @@ void Usage()
     " --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
     " Default is 1.0\n");
  }
+*/
 
 /**
  * @brief Displays the BFS result (i.e., distance from source)
