@@ -26,6 +26,7 @@ set(CUFILES
     #app/cc/cc_app.cu
     app/pr/pr_app.cu
     util/test_utils.cu
+	util/error_utils.cu
     ${mgpu_SOURCE_FILES}
     )
 

@@ -62,7 +62,7 @@ int CompareDeviceResults(
     return retval;
 }
 
-int CompareDeviceResults(
+inline int CompareDeviceResults(
     util::NullType *h_reference,
     util::NullType *d_data,
     size_t num_elements,
@@ -186,7 +186,7 @@ struct GpuTimer
 };
 
 // Check available device memory
-bool EnoughDeviceMemory(unsigned int mem_needed)
+inline bool EnoughDeviceMemory(unsigned int mem_needed)
 {
     size_t free_mem, total_mem;
     if (util::GRError(cudaMemGetInfo(&free_mem, &total_mem),
@@ -199,72 +199,72 @@ bool EnoughDeviceMemory(unsigned int mem_needed)
  ******************************************************************************/
 
 template<typename T> 
-void PrintValue(T val) {
+inline void PrintValue(T val) {
     val.Print();
 }
 
 template<>
-void PrintValue<char>(char val) {
+inline void PrintValue<char>(char val) {
     printf("%d", val);
 }
 
 template<>
-void PrintValue<short>(short val) {
+inline void PrintValue<short>(short val) {
     printf("%d", val);
 }
 
 template<>
-void PrintValue<int>(int val) {
+inline void PrintValue<int>(int val) {
     printf("%d", val);
 }
 
 template<>
-void PrintValue<long>(long val) {
+inline void PrintValue<long>(long val) {
     printf("%ld", val);
 }
 
 template<>
-void PrintValue<long long>(long long val) {
+inline void PrintValue<long long>(long long val) {
     printf("%lld", val);
 }
 
 template<>
-void PrintValue<float>(float val) {
+inline void PrintValue<float>(float val) {
     printf("%f", val);
 }
 
 template<>
-void PrintValue<double>(double val) {
+inline void PrintValue<double>(double val) {
     printf("%f", val);
 }
 
 template<>
-void PrintValue<unsigned char>(unsigned char val) {
+inline void PrintValue<unsigned char>(unsigned char val) {
     printf("%u", val);
 }
 
 template<>
-void PrintValue<unsigned short>(unsigned short val) {
+inline void PrintValue<unsigned short>(unsigned short val) {
     printf("%u", val);
 }
 
 template<>
-void PrintValue<unsigned int>(unsigned int val) {
+inline void PrintValue<unsigned int>(unsigned int val) {
     printf("%u", val);
 }
 
 template<>
-void PrintValue<unsigned long>(unsigned long val) {
+inline void PrintValue<unsigned long>(unsigned long val) {
     printf("%lu", val);
 }
 
 template<>
-void PrintValue<unsigned long long>(unsigned long long val) {
+inline void PrintValue<unsigned long long>(unsigned long long val) {
     printf("%llu", val);
 }
 
 template<>
-void PrintValue<bool>(bool val) {
+inline void PrintValue<bool>(bool val) {
     if (val)
         printf("true");
     else
