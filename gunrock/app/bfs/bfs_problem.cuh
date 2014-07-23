@@ -507,7 +507,6 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             tsrc= this->convertion_tables[0][src];
         }
         if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-
         if (retval = util::GRError(cudaMemcpy(
                         BaseProblem::graph_slices[gpu]->frontier_queues[0].keys[0].GetPointer(util::DEVICE),
                         &tsrc,

@@ -378,6 +378,7 @@ void RunTests(
     util::GRError(csr_problem->Reset(src, bfs_enactor->GetFrontierType(), max_queue_sizing), "BFS Problem Data Reset Failed", __FILE__, __LINE__);
     util::GRError(bfs_enactor->Reset(), "BFS Enactor Reset failed", __FILE__, __LINE__);
 
+    util::GRError("Error before Enact", __FILE__, __LINE__);
     cpu_timer.Start();
     util::GRError(bfs_enactor->Enact(context, csr_problem, src, max_grid_size), "BFS Problem Enact Failed", __FILE__, __LINE__);
     cpu_timer.Stop();

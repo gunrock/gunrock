@@ -79,6 +79,7 @@ struct FrontierAttribute
     int                 selector;
     bool                queue_reset;
     int                 current_label;
+    bool                has_incoming;
     gunrock::oprtr::advance::TYPE   advance_type;
 
     FrontierAttribute()
@@ -88,7 +89,8 @@ struct FrontierAttribute
         queue_index   = 0;
         queue_offset  = 0;
         selector      = 0;
-        queue_reset   = false; 
+        queue_reset   = false;
+        has_incoming = false;
     }
 };
 
@@ -102,11 +104,12 @@ bool All_Done(EnactorStats *enactor_stats,FrontierAttribute *frontier_attribute,
     }   
 
     for (int gpu=0;gpu<num_gpus*num_gpus;gpu++)
-    if (frontier_attribute[gpu].queue_length!=0)
+    if (frontier_attribute[gpu].queue_length!=0 || frontier_attribute[gpu].has_incoming)
     {
         printf("gpu=%d, queue_length=%d\n",gpu,frontier_attribute[gpu].queue_length);   
         return false;
-    }   
+    }
+    printf("all gpu done\n");fflush(stdout);
     return true;
 } 
 
@@ -179,12 +182,21 @@ bool All_Done(EnactorStats *enactor_stats,FrontierAttribute *frontier_attribute,
                       = frontier_attribute->queue_length;
         if (frontier_attribute->queue_length == 0) return;
         //s_enactor_stats[peer].done[0]=-1;
-        //printf("%d\t %d\t %p+%d ==> %p+%d @ %d,%d\n", thread_num, enactor_stats->iteration, s_data_slice[peer]->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE), s_graph_slice[peer]->in_offset[gpu_], graph_slice->frontier_queues.keys[frontier_attribute->selector].GetPointer(util::DEVICE), out_offset[peer_], peer, data_slice[0]->out_length[peer_]);
+        printf("%d\t %d\t %p+%d <== %p+%d @ %d,%d\n", 
+            gpu, 
+            enactor_stats->iteration, 
+            data_slice_p->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE), 
+            graph_slice_p->in_offset[gpu_], 
+            graph_slice_l->frontier_queues[data_slice_l->num_gpus].keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
+            frontier_attribute->queue_offset,
+            peer, 
+            frontier_attribute->queue_length);
         
+        util::cpu_mt::PrintGPUArray<SizeT, VertexId>("out_keys",graph_slice_l->frontier_queues[data_slice_l->num_gpus].keys[frontier_attribute->selector].GetPointer(util::DEVICE) + frontier_attribute->queue_offset,frontier_attribute->queue_length, gpu, enactor_stats->iteration); 
         if (enactor_stats->retval = util::GRError(cudaMemcpyAsync(
             data_slice_p  -> keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE)
                 + graph_slice_p -> in_offset[gpu_],
-            graph_slice_l -> frontier_queues[0].keys[frontier_attribute->selector].GetPointer(util::DEVICE)
+            graph_slice_l -> frontier_queues[data_slice_l->num_gpus].keys[frontier_attribute->selector].GetPointer(util::DEVICE)
                 + frontier_attribute->queue_offset,
             sizeof(VertexId) * frontier_attribute->queue_length, cudaMemcpyDefault, stream),
             "cudaMemcpyPeer d_keys failed", __FILE__, __LINE__)) return;

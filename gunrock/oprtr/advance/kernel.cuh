@@ -53,7 +53,8 @@ void ComputeOutputLength(
     }
 
     int num_block = (frontier_attribute->queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
-    //printf("%p, %p, %p, %p, %d, %d, %d, %d, %d\n",d_offsets, d_indices, d_in_key_queue, partitioned_scanned_edges, frontier_attribute->queue_length, max_in, max_out, num_block, stream); 
+    printf("%p, %p, %p, %p, %d, %d, %d, %d, %d\n",d_offsets, d_indices, d_in_key_queue, partitioned_scanned_edges, frontier_attribute->queue_length, max_in, max_out, num_block, stream); 
+    fflush(stdout);
     gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
         <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS,0,stream>>>(
                 d_offsets,
@@ -64,11 +65,15 @@ void ComputeOutputLength(
                 max_in,
                 max_out,
                 ADVANCE_TYPE);
-    util::GRError(cudaStreamSynchronize(stream),"ComputeOutputLength failed", __FILE__, __LINE__);
+    util::GRError(cudaStreamSynchronize(stream),"cudaStreamSynchronize failed", __FILE__, __LINE__);
+    util::GRError("GetEdgeCounts failed", __FILE__, __LINE__);
     //return;
     //cudaDeviceSynchronize();
     Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute->queue_length, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
+    util::GRError(cudaStreamSynchronize(stream),"cudaStreamSynchronize failed", __FILE__, __LINE__);
+    util::GRError("Scan failed", __FILE__, __LINE__);
+    
     //cudaDeviceSynchronize();
     //SizeT *temp;// = new SizeT[1];
     //cudaHostAlloc((void**)&temp, sizeof(SizeT), cudaHostAllocDefault);

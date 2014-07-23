@@ -824,7 +824,11 @@ struct MultiScan
               Value**          d_Value__Associate_in,
               Value**          d_Value__Associate_out)    // The scan result
     {
-        if (Num_Elements <= 0) return;
+        if (Num_Elements <= 0) 
+        {
+            util::MemsetKernel<<<128,128>>>(d_Length,0,Num_Rows);
+            return;
+        }
         SizeT *History_Size = new SizeT[40];
         SizeT **d_Buffer    = new SizeT*[40];
         SizeT Current_Size  = Num_Elements;

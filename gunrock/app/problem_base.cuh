@@ -377,7 +377,7 @@ struct ProblemBase
             backward_partition .Release();
             backward_convertion.Release();
 
-            for (int gpu = 0; gpu<num_gpus; gpu++)
+            for (int gpu = 0; gpu<=num_gpus; gpu++)
             {
                 delete[] frontier_elements[gpu];frontier_elements[gpu]=NULL;
                 for (int i = 0; i < 2; ++i) {
@@ -445,9 +445,9 @@ struct ProblemBase
                 // Allocate and initialize column_indices
                 if (retval = this->column_indices.Allocate(edges     ,util::DEVICE)) break;
                 if (retval = this->column_indices.Move    (util::HOST,util::DEVICE)) break;
-                frontier_queues   = new util::DoubleBuffer<SizeT, VertexId, VertexId>[num_gpus]; 
-                frontier_elements = new SizeT*[num_gpus];
-                for (int gpu=0;gpu<num_gpus;gpu++)
+                frontier_queues   = new util::DoubleBuffer<SizeT, VertexId, VertexId>[num_gpus+1]; 
+                frontier_elements = new SizeT*[num_gpus+1];
+                for (int gpu=0;gpu<=num_gpus;gpu++)
                 { 
                     frontier_elements[gpu] = new SizeT[2];
                     frontier_elements[gpu][0]=0;
@@ -535,7 +535,7 @@ struct ProblemBase
             // Determine frontier queue sizes
             SizeT new_frontier_elements[2] = {0,0};
 
-            for (int peer=0;peer<num_gpus;peer++)
+            for (int peer=0;peer<=num_gpus;peer++)
             {
                 switch (frontier_type) {
                     case VERTEX_FRONTIERS :
@@ -770,15 +770,17 @@ struct ProblemBase
                     backward_convertions);
                 cpu_timer.Stop();
                 printf("partition end. (%f ms)\n", cpu_timer.ElapsedMillis());fflush(stdout);
-                //util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);
-                //util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion0",convertion_tables[0],graph->nodes);
+                graph->DisplayGraph("org_graph");
+                util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);
+                util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion0",convertion_tables[0],graph->nodes);
                 //util::cpu_mt::PrintCPUArray<SizeT,Value>("edge_value",graph->edge_values,graph->edges);
-                //for (int gpu=0;gpu<num_gpus;gpu++)
-                //{
+                for (int gpu=0;gpu<num_gpus;gpu++)
+                {
+                    sub_graphs[gpu].DisplayGraph("sub_graph");
                 //    printf("%d\n",gpu);
-                //    util::cpu_mt::PrintCPUArray<SizeT,int>("partition",partition_tables[gpu+1],sub_graphs[gpu].nodes);
-                //    util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion",convertion_tables[gpu+1],sub_graphs[gpu].nodes);
-                //}
+                    util::cpu_mt::PrintCPUArray<SizeT,int>("partition",partition_tables[gpu+1],sub_graphs[gpu].nodes);
+                    util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion",convertion_tables[gpu+1],sub_graphs[gpu].nodes);
+                }
                 for (int gpu=0;gpu<num_gpus;gpu++)
                 {
                     cross_counter[gpu][num_gpus]=0;
