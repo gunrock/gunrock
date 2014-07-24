@@ -361,22 +361,21 @@ public:
             {
                 if (!DEBUG)
                     cudaMemcpy(((SizeT*) d_counters) + queue_length_idx, &queue_length, sizeof(SizeT), cudaMemcpyHostToDevice);
-                if (retval = util::GRError(cudaMemcpy(
+                else if (retval = util::GRError(cudaMemcpy(
                     ((SizeT*) d_counters) + queue_length_idx,
                     &queue_length,
                     1 * sizeof(SizeT),
                     cudaMemcpyHostToDevice),
                     "CtaWorkProgress cudaMemcpy d_counters failed", __FILE__, __LINE__)) break;
             } else {
-                if (!DEBUG)
-                    util::MemsetKernel<<<1,1,0,stream>>>(((SizeT*) d_counters) + queue_length_idx, queue_length, 1);
-                    //cudaMemcpyAsync(((SizeT*) d_counters) + queue_length_idx, &queue_length, sizeof(SizeT), cudaMemcpyHostToDevice,stream);
-                if (retval = util::GRError(cudaMemcpyAsync(
-                    ((SizeT*) d_counters) + queue_length_idx,
-                    &queue_length,
-                    1 * sizeof(SizeT),
-                    cudaMemcpyHostToDevice,stream),
-                    "CtaWorkProgress cudaMemcpyAsync d_counters failed", __FILE__, __LINE__)) break;
+               // printf("gpu = %d, queue_idx = %d, d_counters = %p, stream = %d, queue_length = %d\n",gpu, queue_length_idx, d_counters, stream, queue_length);fflush(stdout);
+                util::MemsetKernel<<<1,1,0,stream>>>(((SizeT*) d_counters) + queue_length_idx, queue_length, 1);
+                //cudaMemcpyAsync(((SizeT*) d_counters) + queue_length_idx, &queue_length, sizeof(SizeT), cudaMemcpyHostToDevice,stream);
+                if (DEBUG) 
+                {
+                    cudaStreamSynchronize(stream);
+                    retval = util::GRError("CtaWorkProgress MemsetKernel d_counters failed", __FILE__, __LINE__);
+                }
             }
         } while (0);
 

@@ -106,10 +106,10 @@ bool All_Done(EnactorStats *enactor_stats,FrontierAttribute *frontier_attribute,
     for (int gpu=0;gpu<num_gpus*num_gpus;gpu++)
     if (frontier_attribute[gpu].queue_length!=0 || frontier_attribute[gpu].has_incoming)
     {
-        printf("gpu=%d, queue_length=%d\n",gpu,frontier_attribute[gpu].queue_length);   
+        //printf("gpu=%d, queue_length=%d\n",gpu,frontier_attribute[gpu].queue_length);   
         return false;
     }
-    printf("all gpu done\n");fflush(stdout);
+    //printf("all gpu done\n");fflush(stdout);
     return true;
 } 
 
@@ -182,17 +182,17 @@ bool All_Done(EnactorStats *enactor_stats,FrontierAttribute *frontier_attribute,
                       = frontier_attribute->queue_length;
         if (frontier_attribute->queue_length == 0) return;
         //s_enactor_stats[peer].done[0]=-1;
-        printf("%d\t %d\t %p+%d <== %p+%d @ %d,%d\n", 
-            gpu, 
-            enactor_stats->iteration, 
-            data_slice_p->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE), 
-            graph_slice_p->in_offset[gpu_], 
-            graph_slice_l->frontier_queues[data_slice_l->num_gpus].keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
-            frontier_attribute->queue_offset,
-            peer, 
-            frontier_attribute->queue_length);
+        //printf("%d\t %d\t %p+%d <== %p+%d @ %d,%d\n", 
+        //    gpu, 
+        //    enactor_stats->iteration, 
+        //    data_slice_p->keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE), 
+        //    graph_slice_p->in_offset[gpu_], 
+        //    graph_slice_l->frontier_queues[data_slice_l->num_gpus].keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
+        //    frontier_attribute->queue_offset,
+        //    peer, 
+        //    frontier_attribute->queue_length);
         
-        util::cpu_mt::PrintGPUArray<SizeT, VertexId>("out_keys",graph_slice_l->frontier_queues[data_slice_l->num_gpus].keys[frontier_attribute->selector].GetPointer(util::DEVICE) + frontier_attribute->queue_offset,frontier_attribute->queue_length, gpu, enactor_stats->iteration); 
+        //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("out_keys",graph_slice_l->frontier_queues[data_slice_l->num_gpus].keys[frontier_attribute->selector].GetPointer(util::DEVICE) + frontier_attribute->queue_offset,frontier_attribute->queue_length, gpu, enactor_stats->iteration); 
         if (enactor_stats->retval = util::GRError(cudaMemcpyAsync(
             data_slice_p  -> keys_in[enactor_stats->iteration%2].GetPointer(util::DEVICE)
                 + graph_slice_p -> in_offset[gpu_],

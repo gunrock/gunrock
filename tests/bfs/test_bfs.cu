@@ -336,12 +336,12 @@ void RunTests(
         if (!g_quick) {
               reference_check_preds = reference_preds;
         }            
-    }
+    } 
 
     // Allocate BFS enactor map
     BFSEnactor<Problem, INSTRUMENT>* bfs_enactor
          = new BFSEnactor<Problem, INSTRUMENT>(g_verbose, num_gpus, gpu_idx);
-
+            
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
     util::GRError(csr_problem->Init(
@@ -476,6 +476,7 @@ void RunTests(
     } else {
         args.GetCmdLineArgument("src", src);
     }
+    printf("src = %d\n",src);
 
     //printf("Display neighbor list of src:\n");
     //graph.DisplayNeighborList(src);
@@ -636,14 +637,33 @@ int cpp_main( int argc, char** argv)
         util::SetDevice(gpu_idx[gpu]);
         for (int i=0;i<num_gpus;i++)
         {
-            util::GRError(cudaStreamCreate(&streams[gpu*num_gpus+i]), "cudaStreamCreate fialed.",__FILE__,__LINE__);
-            context[i+gpu*num_gpus] = mgpu::CreateCudaDeviceAttachStream(gpu_idx[i],streams[gpu*num_gpus+i]);
-            printf("%d, %d ",streams[gpu*num_gpus+i],context[i+gpu*num_gpus][0].Stream());
+            int _i=gpu*num_gpus+i;
+            util::GRError(cudaStreamCreate(&streams[_i]), "cudaStreamCreate fialed.",__FILE__,__LINE__);
+            context[_i] = mgpu::CreateCudaDeviceAttachStream(gpu_idx[gpu],streams[_i]);
+            //streams[i+gpu*num_gpus] = context[i+gpu*num_gpus]->Stream();
+            printf("%d, ",streams[_i]);
             //context[i+gpu*num_gpus] = mgpu::CreateCudaDevice(gpu_idx[i]);
         }
     }
     printf("\n"); fflush(stdout);
- 
+    
+    /*for (int gpu=0;gpu<num_gpus;gpu++)
+    {    
+	util::SetDevice(gpu_idx[gpu]);
+        util::Array1D<int,int> arr;
+        arr.Init(1,util::HOST | util::DEVICE, true, cudaHostAllocMapped | cudaHostAllocPortable);
+	for (int i=0;i<num_gpus;i++)
+	{    
+	    util::cpu_mt::PrintMessage("check point",gpu,i);
+	    int _i=gpu*num_gpus+i;
+            arr[0]=0;
+            util::MemsetKernel<<<1,1,0,streams[_i]>>>(arr.GetPointer(util::DEVICE), 0, 1);
+            cudaStreamSynchronize(streams[_i]);
+            util::GRError("MemsetKernel failed.", __FILE__, __LINE__);
+	}
+        arr.Release(); 
+    } */   
+
     //int dev = 0;
     //args.GetCmdLineArgument("device", dev);
     //ContextPtr context = mgpu::CreateCudaDevice(dev);

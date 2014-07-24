@@ -22,6 +22,7 @@
 #include <pthread.h>
 #endif
 #include <gunrock/util/multithreading.cuh>
+#include <gunrock/util/array_utils.cuh>
 
 namespace gunrock {
 namespace util {
@@ -309,13 +310,32 @@ extern "C" {
     }
 
     template <typename _SizeT, typename _Value>
-    void PrintGPUArray(const char* const name, const _Value* const array, const _SizeT limit, const int gpu=-1, const int iteration=-1, clock_t stime = -1)
+    void PrintGPUArray(
+        const char* const name, 
+              _Value* array, 
+        const _SizeT limit, 
+        const int gpu=-1, 
+        const int iteration=-1, 
+              clock_t stime = -1,
+              cudaStream_t stream = 0)
     {
         if (limit==0) return;
-        _Value* h_array = new _Value[limit];
-        util::GRError(cudaMemcpy(h_array,array,sizeof(_Value) * limit, cudaMemcpyDeviceToHost), "cuaMemcpy failed", __FILE__, __LINE__);
-        PrintCPUArray<_SizeT,_Value>(name,h_array,limit,gpu,iteration, stime);
-        delete[] h_array;h_array=NULL;
+        if (stream == 0)
+        {
+            _Value* h_array = new _Value[limit];
+            util::GRError(cudaMemcpy(h_array,array,sizeof(_Value) * limit, cudaMemcpyDeviceToHost), "cuaMemcpy failed", __FILE__, __LINE__);
+            PrintCPUArray<_SizeT,_Value>(name,h_array,limit,gpu,iteration, stime);
+            delete[] h_array;h_array=NULL;
+        } else {
+            util::Array1D<_SizeT,_Value> arr;
+            arr.SetName("array");
+            arr.Init(limit, util::HOST, true, cudaHostAllocMapped | cudaHostAllocPortable);
+            arr.SetPointer(array,-1, util::DEVICE);
+            arr.Move(util::DEVICE, util::HOST, -1, 0, stream);
+            cudaStreamSynchronize(stream);
+            PrintCPUArray<_SizeT,_Value>(name,arr.GetPointer(util::HOST), limit, gpu, iteration, stime);
+            arr.Release();
+        }
     }
 } //namespace cpu_mt
 } //namespace util

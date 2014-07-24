@@ -126,19 +126,21 @@ namespace bfs {
         typename BFSProblem::DataSlice  *data_slice,
         typename BFSProblem::GraphSlice *graph_slice,
         util::CtaWorkProgressLifetime *work_progress,
-        std::string            check_name = "")
+        std::string            check_name = "",
+        cudaStream_t           stream = 0)
     {
         typedef typename BFSProblem::SizeT    SizeT;
         typedef typename BFSProblem::VertexId VertexId;
         typedef typename BFSProblem::Value    Value;
         SizeT queue_length;
 
+        util::cpu_mt::PrintMessage(check_name.c_str(), thread_num, enactor_stats->iteration);
         //printf("%d \t %d\t \t reset = %d, index = %d\n",thread_num, enactor_stats->iteration, frontier_attribute->queue_reset, frontier_attribute->queue_index);fflush(stdout);
         if (frontier_attribute->queue_reset) queue_length = frontier_attribute->queue_length;
-        else if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, queue_length)) return;
+        else if (enactor_stats->retval = util::GRError(work_progress->GetQueueLength(frontier_attribute->queue_index, queue_length, false, stream), "work_progress failed", __FILE__, __LINE__)) return;
 	util::cpu_mt::PrintCPUArray<SizeT, SizeT>((check_name+" Queue_Length").c_str(), &(queue_length), 1, thread_num, enactor_stats->iteration);
 	//printf("%d \t %d\t \t peer_ = %d, selector = %d, length = %d, p = %p\n",thread_num, enactor_stats->iteration, peer_, frontier_attribute->selector,queue_length,graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE));fflush(stdout);
-        util::cpu_mt::PrintGPUArray<SizeT, VertexId>((check_name+" keys").c_str(), graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE), queue_length, thread_num, enactor_stats->iteration);
+        util::cpu_mt::PrintGPUArray<SizeT, VertexId>((check_name+" keys").c_str(), graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE), queue_length, thread_num, enactor_stats->iteration,-1, stream);
 	//if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
 	//    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu1", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
 	//util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labe1", data_slice[0]->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
@@ -174,11 +176,21 @@ namespace bfs {
         typedef BFSEnactor<BFSProblem, INSTRUMENT> BfsEnactor;
         typedef BFSFunctor<VertexId, SizeT, VertexId, BFSProblem> BfsFunctor;
 
-        if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1,0,false,stream)) return;
+        if (frontier_attribute->queue_reset && frontier_attribute->queue_length ==0) 
+        {
+            work_progress->SetQueueLength(frontier_attribute->queue_index, 0, true, stream);
+            util::cpu_mt::PrintMessage("return-1", thread_num, enactor_stats->iteration);
+            return;
+        }
         if (DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration);
+        if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1,0,true,stream)) 
+        {
+            util::cpu_mt::PrintMessage("return0", thread_num, enactor_stats->iteration);
+            return;
+        }
         int queue_selector = (data_slice->num_gpus>1 && peer_==0 && enactor_stats->iteration>0)?data_slice->num_gpus:peer_;
-        printf("%d\t %d \t \t peer_ = %d, selector = %d, length = %d\n",thread_num, enactor_stats->iteration, peer_, queue_selector,frontier_attribute->queue_length);fflush(stdout);
-        
+        //printf("%d\t %d \t \t peer_ = %d, selector = %d, length = %d, index = %d\n",thread_num, enactor_stats->iteration, peer_, queue_selector,frontier_attribute->queue_length, frontier_attribute->queue_index);fflush(stdout); 
+
         // Edge Map
         gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BFSProblem, BfsFunctor>(
             enactor_stats[0],
@@ -208,16 +220,24 @@ namespace bfs {
         // Only need to reset queue for once
         //if (frontier_attribute->queue_reset)
         frontier_attribute->queue_reset = false;
-        if (DEBUG && (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__))) return;
-        if (DEBUG && (enactor_stats->retval = util::GRError("advance::Kernel failed", __FILE__, __LINE__))) return;
+        if (DEBUG && (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__))) 
+        {
+            util::cpu_mt::PrintMessage("return1", thread_num, enactor_stats->iteration);
+            return;
+        }
+        if (DEBUG && (enactor_stats->retval = util::GRError("advance::Kernel failed", __FILE__, __LINE__))) 
+        {
+            util::cpu_mt::PrintMessage("return2", thread_num, enactor_stats->iteration);
+            return;
+        }
         if (DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration);
         frontier_attribute->queue_index++;
         frontier_attribute->selector ^= 1;
-        if (DEBUG || INSTRUMENT)
+        //if (DEBUG || INSTRUMENT)
         {
-            //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,data_slice[0]->streams[0])) break;
+            if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,stream)) return;
             enactor_stats->total_queued += frontier_attribute->queue_length;
-            if (DEBUG) ShowDebugInfo<BFSProblem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_advance");
+            if (DEBUG) ShowDebugInfo<BFSProblem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_advance", stream);
             if (INSTRUMENT) {
                 if (enactor_stats->retval = enactor_stats->advance_kernel_stats.Accumulate(
                     enactor_stats->advance_grid_size,
@@ -227,7 +247,7 @@ namespace bfs {
             }
         }
 
-        if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1, 0, false, stream)) return; 
+        if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1, 0, true, stream)) return; 
         if (DEBUG) util::cpu_mt::PrintMessage("Filter begin", thread_num, enactor_stats->iteration);
 
         // Filter
@@ -245,7 +265,7 @@ namespace bfs {
             d_data_slice,
             data_slice->visited_mask.GetPointer(util::DEVICE),
             work_progress[0],
-            graph_slice->frontier_elements[peer_][frontier_attribute->selector],           // max_in_queue
+            graph_slice->frontier_elements[peer_][frontier_attribute->selector  ],           // max_in_queue
             graph_slice->frontier_elements[peer_][frontier_attribute->selector^1],         // max_out_queue
             enactor_stats->filter_kernel_stats);
 	    //t_bitmask);
@@ -258,7 +278,7 @@ namespace bfs {
 	if (INSTRUMENT || DEBUG) {
 	    //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
 	    //enactor_stats->total_queued += frontier_attribute->queue_length;
-            if (DEBUG) ShowDebugInfo<BFSProblem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_filter");
+            if (DEBUG) ShowDebugInfo<BFSProblem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_filter", stream);
 	    if (INSTRUMENT) {
 		if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
 		    enactor_stats->filter_grid_size,
@@ -327,10 +347,15 @@ namespace bfs {
         do {
             util::cpu_mt::PrintMessage("BFS Thread begin.",thread_num, enactor_stats[0].iteration);
             if (enactor_stats[0].retval = util::SetDevice(gpu)) break;
-
+                int _i=num_gpus-1;
+                if (enactor_stats[_i].retval = work_progress[_i].SetQueueLength(frontier_attribute[_i].queue_index+2,0,true,data_slice->streams[_i])) break;
+                if (enactor_stats[_i].retval = util::GRError("check point hit", __FILE__, __LINE__)) break;
+                if (enactor_stats[0].iteration==1) break;
+ 
             // Step through BFS iterations
-            while (!All_Done(s_enactor_stats, s_frontier_attribute, num_gpus)) {
-                if (num_gpus>1 && enactor_stats->iteration>0)
+            while (!All_Done(s_enactor_stats, s_frontier_attribute, num_gpus)) 
+            {                
+                if (num_gpus>1 && enactor_stats[0].iteration>0)
                 {
                     frontier_attribute[0].queue_reset  = true;
                     //printf("%d data_slice = %p, %d\n",thread_num,data_slice,frontier_attribute[0].queue_length);
@@ -362,7 +387,7 @@ namespace bfs {
                             data_slice   ->value__associate_orgs.GetPointer(util::DEVICE),
                             data_slice   ->value__associate_outs.GetPointer(util::DEVICE));
                     if (enactor_stats[0].retval = data_slice->out_length.Move(util::DEVICE, util::HOST)) break;
-                    util::cpu_mt::PrintCPUArray<SizeT,SizeT>("out_length",data_slice->out_length.GetPointer(util::HOST),num_gpus,thread_num,enactor_stats[0].iteration);
+                    if (DEBUG) util::cpu_mt::PrintCPUArray<SizeT,SizeT>("out_length",data_slice->out_length.GetPointer(util::HOST),num_gpus,thread_num,enactor_stats[0].iteration);
                     frontier_attribute[0].queue_index++;
                     frontier_attribute[0].selector ^=1;
 
@@ -383,8 +408,8 @@ namespace bfs {
                         enactor_stats     [i].iteration     = enactor_stats     [0].iteration;
                     }
                 } else frontier_attribute[0].queue_offset = 0;
-
-                if (DEBUG) ShowDebugInfo<BFSProblem>(thread_num, 0, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, std::string("pre_advance0"));
+                
+                if (DEBUG) ShowDebugInfo<BFSProblem>(thread_num, 0, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, std::string("pre_advance0"), data_slice->streams[0]);
                 gunrock::oprtr::advance::ComputeOutputLength <AdvanceKernelPolicy, BFSProblem, BfsFunctor>(
                     &(frontier_attribute[0]),
                     graph_slice  ->row_offsets     .GetPointer(util::DEVICE),
@@ -417,6 +442,7 @@ namespace bfs {
                 {
                     for (int peer=0; peer<num_gpus; peer++)
                     {
+                        if (peer==thread_num) continue;
                         int peer_ = peer<thread_num? peer+1: peer;
                         if (BFSProblem::MARK_PREDECESSORS)
                             PushNeibor <SizeT, VertexId, Value, GraphSlice, DataSlice, 2, 0> (
@@ -453,10 +479,23 @@ namespace bfs {
                         if (peer==thread_num) continue;
                         int   peer_   = peer<thread_num ? peer+1: peer ;
                         frontier_attribute[peer_].queue_length = data_slice->in_length[enactor_stats[peer_].iteration%2][peer_];
-                        printf("%d\t %d\t \t %d-> %p+%d l=%d\n",thread_num,enactor_stats[peer_].iteration,peer_,data_slice->keys_in[enactor_stats[peer_].iteration%2].GetPointer(util::DEVICE), graph_slice->in_offset[peer_], frontier_attribute[peer_].queue_length);
-                        util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys_in",data_slice->keys_in[enactor_stats[peer_].iteration%2].GetPointer(util::DEVICE) + graph_slice->in_offset[peer_], frontier_attribute[peer_].queue_length, thread_num, enactor_stats[peer_].iteration);
+                        //printf("%d\t %d\t \t %d-> %p+%d l=%d, stream = %d\n",thread_num,enactor_stats[peer_].iteration,
+                        //    peer_,
+                        //    data_slice->keys_in[enactor_stats[peer_].iteration%2].GetPointer(util::DEVICE), 
+                        //    graph_slice->in_offset[peer_], 
+                        //    frontier_attribute[peer_].queue_length,
+                        //    data_slice->streams[peer_]);
+                        util::cpu_mt::PrintGPUArray<SizeT, VertexId>(
+                            "keys_in",
+                            data_slice->keys_in[enactor_stats[peer_].iteration%2].GetPointer(util::DEVICE) 
+                                + graph_slice->in_offset[peer_], 
+                            frontier_attribute[peer_].queue_length, 
+                            thread_num, enactor_stats[peer_].iteration,
+                            -1,data_slice->streams[peer_]);
                         if (frontier_attribute[peer_].queue_length ==0) continue;
                         int grid_size = frontier_attribute[peer_].queue_length/256+1;
+                        //cudaStreamSynchronize(data_slice->streams[peer_]);
+                        //if (enactor_stats[peer_].retval = util::GRError("cudaStreamSynchronize failed", __FILE__, __LINE__)) break;
                         //if (enactor_stats[0].iteration==2) break;
                         if (BFSProblem::MARK_PREDECESSORS) 
                             Expand_Incoming <VertexId, SizeT, 2>
@@ -488,7 +527,7 @@ namespace bfs {
                             &enactor_stats[peer_], 
                             data_slice, graph_slice, 
                             &work_progress[peer_], 
-                            std::string("pre_advance1"));
+                            std::string("pre_advance1"),data_slice->streams[peer_]);
                         
                         gunrock::oprtr::advance::ComputeOutputLength <AdvanceKernelPolicy, BFSProblem, BfsFunctor>(
                             &(frontier_attribute[peer_]),
@@ -503,6 +542,7 @@ namespace bfs {
                             gunrock::oprtr::advance::V2V);
                     }
 
+                    util::cpu_mt::PrintMessage("Past 1",thread_num,enactor_stats[1].iteration);
                     for (int peer_=1; peer_<num_gpus;peer_++)
                     {
                         BFSCore < INSTRUMENT, AdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(
@@ -517,6 +557,8 @@ namespace bfs {
                             &(work_progress[peer_]),
                             context[peer_],
                             data_slice->streams[peer_]);
+                        //if (enactor_stats[peer_].iteration==1) break;
+                        printf("%d\t %d\t \t peer_ = %d, queue_length = %d\n", thread_num, enactor_stats[peer_].iteration, peer_, frontier_attribute[peer_].queue_length);
                     }
                 }
                 
@@ -556,7 +598,7 @@ namespace bfs {
                         if (peer ==0)
                             util::MemsetKernel<<<128, 128, 0, data_slice->streams[peer]>>>
                                 (data_slice->temp_marker.GetPointer(util::DEVICE), (unsigned char)0, graph_slice->nodes);
-                        printf("Total_length = %d, queue_length = %d\n", Total_Length, frontier_attribute[peer].queue_length);fflush(stdout);
+                        if (DEBUG) printf("%d\t %d\t \t Peer = %d, Total_length = %d, queue_length = %d\n", thread_num, enactor_stats[peer].iteration, peer, Total_Length, frontier_attribute[peer].queue_length);fflush(stdout);
                         if (frontier_attribute[peer].queue_length !=0) util::MemsetCopyVectorKernel<<<128, 128, 0, data_slice->streams[peer]>>>(
                             graph_slice->frontier_queues[num_gpus].keys[frontier_attribute[0].selector].GetPointer(util::DEVICE) + Total_Length, 
                             graph_slice->frontier_queues[peer].keys[frontier_attribute[peer].selector].GetPointer(util::DEVICE), 
@@ -744,6 +786,20 @@ public:
                 printf("Iteration, Edge map queue, Filter queue\n");
                 printf("0");
             }
+
+            /*for (int gpu=0;gpu<num_gpus;gpu++)
+            {
+                util::SetDevice(gpu_idx[gpu]);
+                for (int i=0;i<num_gpus;i++)
+                {
+                    util::cpu_mt::PrintMessage("check point",gpu,i);
+                    int _i=gpu*num_gpus+i;
+                    frontier_attribute[_i].queue_index=0;
+                    if (this->enactor_stats[_i].retval = work_progress[_i].SetQueueLength(frontier_attribute[_i].queue_index+2,0,true,problem->data_slices[gpu]->streams[i])) continue;
+                    if (this->enactor_stats[_i].retval = util::GRError("check point hit", __FILE__, __LINE__)) continue; 
+                }
+            }
+            break;*/
 
             for (int gpu=0;gpu<num_gpus;gpu++)
             {
