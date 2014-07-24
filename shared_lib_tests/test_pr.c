@@ -14,7 +14,7 @@ int main(int argc, char* argv[])
   // define data types
   struct GunrockDataType data_type;
   data_type.VTXID_TYPE = VTXID_INT;
-  data_type.SIZET_TYPE = SIZET_UINT;
+  data_type.SIZET_TYPE = SIZET_INT;
   data_type.VALUE_TYPE = VALUE_FLOAT;
 
   // pr configurations (optional)
@@ -22,9 +22,10 @@ int main(int argc, char* argv[])
   pr_config.device    =     0;
   pr_config.delta     = 0.85f;
   pr_config.error     = 0.01f;
-  pr_config.source    =    -1;
   pr_config.max_iter  =    20;
   pr_config.top_nodes =    10;
+  pr_config.src_node  =    -1;
+  pr_config.src_mode  = manually;
 
   // define graph (undirected graph)
   size_t num_nodes = 4;
@@ -48,15 +49,16 @@ int main(int argc, char* argv[])
 
   // run pr calculations
   gunrock_pr(
-    (struct GunrockGraph*)graph_output,
+    graph_output,
     node_ids,
     page_rank,
-    (const struct GunrockGraph*)graph_input,
+    graph_input,
     pr_config,
     data_type);
 
   // test print
   int i;
+  printf("Demo Outputs:\n");
   if (pr_config.top_nodes > num_nodes) pr_config.top_nodes = num_nodes;
   for (i = 0; i < pr_config.top_nodes; ++i)
   {

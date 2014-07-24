@@ -226,17 +226,141 @@ void run_sssp(
 }
 
 /**
- * @brief run_sssp entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
+ * @brief dispatch function to handle data_types
  *
  * @param[out] ggraph_out GunrockGraph type output
  * @param[out] predecessor return predeessor if mark_pred = true
  * @param[in]  ggraph_in GunrockGraph type input graph
  * @param[in]  sssp specific configurations
  * @param[in]  sssp data_type configurations
+ */
+void dispatch_sssp(
+    GunrockGraph       *ggraph_out,
+    void               *predecessor,
+    const GunrockGraph *ggraph_in,
+    GunrockConfig      sssp_config,
+    GunrockDataType    data_type,
+    CudaContext&       context)
+{
+    switch (data_type.VTXID_TYPE) {
+    case VTXID_INT: {
+        switch (data_type.SIZET_TYPE) {
+        case SIZET_INT: {
+            switch (data_type.VALUE_TYPE) {
+            case VALUE_INT: {
+                // template type = <int, int, int>
+                // not support yet
+                printf("Not Yet Support This DataType Combination.\n");
+                break;
+            }
+            case VALUE_UINT: {
+                // template type = <int, uint, int>
+                // build input csr format graph
+                Csr<int, unsigned int, int> csr_graph(false);
+                csr_graph.nodes          = ggraph_in->num_nodes;
+                csr_graph.edges          = ggraph_in->num_edges;
+                csr_graph.row_offsets    = (int*)ggraph_in->row_offsets;
+                csr_graph.column_indices = (int*)ggraph_in->col_indices;
+                csr_graph.edge_values    = (unsigned int*)ggraph_in->edge_values;
+
+                // sssp configurations
+                bool  mark_pred        = false;
+                int   src_node         = 0; //!< use whatever the specified graph-type's default is
+                int   num_gpus         = 1; //!< number of GPUs for multi-gpu enactor to use
+                int   delta_factor     = 1; //!< default delta_factor = 1
+                int   max_grid_size    = 0; //!< maximum grid size (0: leave it up to the enactor)
+                float max_queue_sizing = 1.0; //!< default maximum queue sizing
+
+                // determine source vertex to start sssp
+                switch (sssp_config.src_mode)
+                {
+                    case randomize:
+                    {
+                        src_node = graphio::RandomNode(csr_graph.nodes);
+                        break;
+                    }
+                    case largest_degree:
+                    {
+                        src_node = csr_graph.GetNodeWithHighestDegree();
+                        break;
+                    }
+                    case manually:
+                    {
+                        src_node = sssp_config.src_node;
+                        break;
+                    }
+                    default:
+                    {
+                        src_node = 0;
+                        break;
+                    }
+                }
+                mark_pred        = sssp_config.mark_pred;
+                delta_factor     = sssp_config.delta_factor;
+                max_queue_sizing = sssp_config.queue_size;
+
+                switch (mark_pred)
+                {
+                case true: {
+                    run_sssp<int, unsigned int, int, true>(
+                        ggraph_out,
+                        (int*)predecessor,
+                        csr_graph,
+                        src_node,
+                        max_grid_size,
+                        max_queue_sizing,
+                        num_gpus,
+                        delta_factor,
+                        context);
+                    break;
+                }
+                case false: {
+                    run_sssp<int, unsigned int, int, false>(
+                        ggraph_out,
+                        (int*)predecessor,
+                        csr_graph,
+                        src_node,
+                        max_grid_size,
+                        max_queue_sizing,
+                        num_gpus,
+                        delta_factor,
+                        context);
+                    break;
+                }
+                }
+                // reset for free memory
+                csr_graph.row_offsets    = NULL;
+                csr_graph.column_indices = NULL;
+                csr_graph.edge_values    = NULL;
+                break;
+            }
+            case VALUE_FLOAT: {
+                // template type = <int, float, int>
+                // not support yet
+                printf("Not Yet Support This DataType Combination.\n");
+                break;
+            }
+            }
+        break;
+        }
+        }
+        break;
+    }
+    }
+}
+
+/**
+ * @brief run_sssp entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[out] ggraph_out  GunrockGraph type output
+ * @param[out] predecessor return predeessor if mark_pred = true
+ * @param[in]  ggraph_in   GunrockGraph type input graph
+ * @param[in]  sssp_config gunrock primitive specific configurations
+ * @param[in]  data_type   data_type configurations
  */
 void gunrock_sssp(
     GunrockGraph       *ggraph_out,
@@ -250,88 +374,14 @@ void gunrock_sssp(
     device = sssp_config.device;
     ContextPtr context = mgpu::CreateCudaDevice(device);
 
-    // build input csr format graph
-    Csr<int, unsigned int, int> csr_graph(false);
-    csr_graph.nodes          = ggraph_in->num_nodes;
-    csr_graph.edges          = ggraph_in->num_edges;
-    csr_graph.row_offsets    = (int*)ggraph_in->row_offsets;
-    csr_graph.column_indices = (int*)ggraph_in->col_indices;
-    csr_graph.edge_values    = (unsigned int*)ggraph_in->edge_values;
-
-    bool  mark_pred        = false;
-    int   source           = 0; //!< use whatever the specified graph-type's default is
-    int   num_gpus         = 1; //!< number of GPUs for multi-gpu enactor to use
-    int   delta_factor     = 1; //!< default delta_factor = 1
-    int   max_grid_size    = 0; //!< maximum grid size (0: leave it up to the enactor)
-    float max_queue_sizing = 1.0; //!< default maximum queue sizing
-
-    // determine source vertex to start sssp
-    switch (sssp_config.src)
-    {
-        case randomize:
-        {
-            source = graphio::RandomNode(csr_graph.nodes);
-            break;
-        }
-        case largest_degree:
-        {
-            source = csr_graph.GetNodeWithHighestDegree();
-            break;
-        }
-        case manually:
-        {
-            source = sssp_config.source;
-            break;
-        }
-        default:
-        {
-            source = 0;
-            break;
-        }
-    }
-
-    mark_pred        = sssp_config.mark_pred;
-    delta_factor     = sssp_config.delta_factor;
-    max_queue_sizing = sssp_config.queue_size;
-
-    switch (mark_pred)
-    {
-        case true:
-        {
-            run_sssp<int, unsigned int, int, true>(
-                ggraph_out,
-                (int*)predecessor,
-                csr_graph,
-                source,
-                max_grid_size,
-                max_queue_sizing,
-                num_gpus,
-                delta_factor,
-                *context);
-            break;
-        }
-        case false:
-        {
-            run_sssp<int, unsigned int, int, false>(
-                ggraph_out,
-                (int*)predecessor,
-                csr_graph,
-                source,
-                max_grid_size,
-                max_queue_sizing,
-                num_gpus,
-                delta_factor,
-                *context);
-            break;
-        }
-    }
-
-    // reset for free memory
-    csr_graph.row_offsets    = NULL;
-    csr_graph.column_indices = NULL;
-    csr_graph.row_offsets    = NULL;
-    csr_graph.column_indices = NULL;
-    csr_graph.edge_values    = NULL;
+    // lunch dispatch function
+    dispatch_sssp(
+        ggraph_out,
+        predecessor,
+        ggraph_in,
+        sssp_config,
+        data_type,
+        *context);
 }
 
 // Leave this at the end of the file

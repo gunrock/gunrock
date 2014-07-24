@@ -14,7 +14,7 @@ int main(int argc, char* argv[])
   // define data types
   struct GunrockDataType data_type;
   data_type.VTXID_TYPE = VTXID_INT;
-  data_type.SIZET_TYPE = SIZET_UINT;
+  data_type.SIZET_TYPE = SIZET_INT;
   data_type.VALUE_TYPE = VALUE_UINT;
 
   // pr configurations (optional)
@@ -23,8 +23,8 @@ int main(int argc, char* argv[])
   sssp_config.mark_pred    = true;
   sssp_config.queue_size   = 1.0f;
   sssp_config.delta_factor =    1;
-  sssp_config.src          = manually;
-  sssp_config.source       =    1;
+  sssp_config.src_mode     = randomize;
+  //sssp_config.src_node     =    1;
 
   // define graph
   size_t num_nodes = 7;
@@ -62,9 +62,9 @@ int main(int argc, char* argv[])
   int *label = (int*)malloc(sizeof(int) * num_nodes);
   label = (int*)graph_output->node_values;
   for (i = 0; i < num_nodes; ++i)
-    {
-      printf("Node ID: %d \t Label: %d \t Predecessor: %d\n", i, label[i], predecessor[i]);
-    }
+  {
+    printf("Node ID [%d] : Label [%d] : Predecessor [%d]\n", i, label[i], predecessor[i]);
+  }
 
   if (predecessor)  { free(predecessor);  }
   if (graph_input)  { free(graph_input);  }

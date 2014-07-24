@@ -25,17 +25,17 @@
  */
 enum VertexIdType
 {
-    VTXID_INT,   //!< integer type
+    VTXID_INT, //!< integer type
 };
 enum SizeTType
 {
-    SIZET_UINT,   //!< unsigned integer type
+    SIZET_INT, //!< unsigned integer type
 };
 enum ValueType
 {
-    VALUE_INT,    //!< integer type
-    VALUE_UINT, //!< unsigned int type
-    VALUE_FLOAT,  //!< float type
+    VALUE_INT,   //!< integer type
+    VALUE_UINT,  //!< unsigned int type
+    VALUE_FLOAT, //!< float type
 };
 
 /**
@@ -75,21 +75,17 @@ enum SrcMode
 };
 struct GunrockConfig
 {
-    bool  undirected;  //!< whether the graph is undirected or not
     bool  mark_pred;   //!< whether to mark predecessor or not
     bool  idempotence; //!< whether or not to enable idempotence
-    enum  SrcMode src; //!< source vertex mode rand/largest_degree
-    int   source;      //!< source vertex define where to start
+    int   src_node;    //!< source vertex define where to start
     int   device;      //!< setting which gpu device to use
     int   max_iter;    //!< maximum mumber of iterations allowed
     int   top_nodes;   //!< k value for topk / page_rank problem
     int   delta_factor; //!< sssp delta-factor parameter
-    float alpha;       //!< betweeness centrality specific value
-    float beta;        //!< betweeness centrality specific value
     float delta;       //!< page rank specific value
     float error;       //!< page rank specific value
     float queue_size;  //!< setting frontier queue size
-    bool  help;        //!< whether to print the help infomation
+    enum  SrcMode src_mode; //!< source vertex mode rand/largest_degree
 };
 
 #ifdef __cplusplus
@@ -134,11 +130,11 @@ void gunrock_pr(
     struct GunrockConfig      configs,
     struct GunrockDataType    data_type);
 
-// TopK Implementation
+// TopK Function Define
 void gunrock_topk(
     struct GunrockGraph       *graph_out,
     void                      *node_ids,
-    void                      *centrality_values,
+    void                      *centrality,
     const struct GunrockGraph *graph_in,
     struct GunrockConfig      configs,
     struct GunrockDataType    data_type);

@@ -14,12 +14,14 @@ int main(int argc, char* argv[])
   // define data types
   struct GunrockDataType data_type;
   data_type.VTXID_TYPE = VTXID_INT;
-  data_type.SIZET_TYPE = SIZET_UINT;
+  data_type.SIZET_TYPE = SIZET_INT;
   data_type.VALUE_TYPE = VALUE_INT;
 
   // bfs configurations (optional)
   struct GunrockConfig bfs_config;
-  bfs_config.source      = 1;     //!< source vertex to begin search
+  bfs_config.device      = 0;
+  bfs_config.src_mode    = randomize;
+  bfs_config.src_node    = 1;     //!< source vertex to begin search
   bfs_config.mark_pred   = false; //!< do not mark predecessors
   bfs_config.idempotence = false;
   bfs_config.queue_size  = 1.0f;
@@ -44,21 +46,20 @@ int main(int argc, char* argv[])
 
   // run bfs calculations
   gunrock_bfs(
-    (struct GunrockGraph*)graph_output,
-    (const struct GunrockGraph*)graph_input,
+    graph_output,
+    graph_input,
     bfs_config,
     data_type);
 
   // test print
   int i;
+  printf("Demo Outputs:\n");
   int *labels = (int*)malloc(sizeof(int) * graph_input->num_nodes);
   labels = (int*)graph_output->node_values;
-  printf("[NodeID:Label] \n[");
   for (i = 0; i < graph_input->num_nodes; ++i)
   {
-    printf("%d:%d ", i, labels[i]);
+    printf("Node_ID [%d] : Label [%d]\n", i, labels[i]);
   }
-  printf("]\n");
 
   if (graph_input)  { free(graph_input);  }
   if (graph_output) { free(graph_output); }

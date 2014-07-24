@@ -14,13 +14,13 @@ int main(int argc, char* argv[])
   // define data types
   struct GunrockDataType data_type;
   data_type.VTXID_TYPE = VTXID_INT;
-  data_type.SIZET_TYPE = SIZET_UINT;
+  data_type.SIZET_TYPE = SIZET_INT;
   data_type.VALUE_TYPE = VALUE_FLOAT;
 
   // bc configurations (optional)
   struct GunrockConfig bc_config;
   bc_config.device      =    0;
-  bc_config.source      =   -1;     //!< source vertex to begin search
+  bc_config.src_node    =   -1;     //!< source vertex to begin search
   bc_config.queue_size  = 1.0f;
 
   // define graph (undirected graph)
@@ -43,31 +43,29 @@ int main(int argc, char* argv[])
 
   // run bc calculations
   gunrock_bc(
-    (struct GunrockGraph*)graph_output,
-    (const struct GunrockGraph*)graph_input,
+    graph_output,
+    graph_input,
     bc_config,
     data_type);
 
   // test print
   int i;
+  printf("Demo Outputs:\n");
   // print per node betweeness centrality values
   float *bc_vals = (float*)malloc(sizeof(float) * graph_input->num_nodes);
   bc_vals = (float*)graph_output->node_values;
-  printf("[NodeID:BC_Value] \n");
   for (i = 0; i < graph_input->num_nodes; ++i)
   {
-    printf("%d:%f ", i, bc_vals[i]);
+    printf("Node_ID [%d] : BC[%f]\n", i, bc_vals[i]);
   }
   printf("\n");
   // print per edge betweeness centrality values
   float *ebc_vals = (float*)malloc(sizeof(float)*graph_input->num_edges);
   ebc_vals = (float*)graph_output->edge_values;
-  printf("[EdgeID:EBC_Value]\n");
   for (i = 0; i < graph_input->num_edges; ++i)
   {
-    printf("%d:%f ", i, ebc_vals[i]);
+    printf("Edge_ID [%d] : EBC[%f]\n", i, ebc_vals[i]);
   }
-  printf("\n");
 
   if (graph_input)  { free(graph_input);  }
   if (graph_output) { free(graph_output); }

@@ -14,7 +14,8 @@ int main(int argc, char* argv[])
   // define data types
   struct GunrockDataType data_type;
   data_type.VTXID_TYPE = VTXID_INT;
-  data_type.SIZET_TYPE = SIZET_UINT;
+  data_type.SIZET_TYPE = SIZET_INT;
+  data_type.VALUE_TYPE = VALUE_INT;
 
   // connected component configurations
   struct GunrockConfig configs;
@@ -40,21 +41,20 @@ int main(int argc, char* argv[])
 
   // run connected component calculations
   gunrock_cc(
-    (struct GunrockGraph*)graph_output,
-    (const struct GunrockGraph*)graph_input,
+    graph_output,
+    graph_input,
     configs,
     data_type);
 
   // test print
   int i;
+  printf("Demo Outputs:\n");
   int *component_ids = (int*)malloc(sizeof(int) * graph_input->num_nodes);
   component_ids = (int*)graph_output->node_values;
-  printf("\n[Node_ID:Component_ID] \n[");
   for (i = 0; i < graph_input->num_nodes; ++i)
   {
-    printf("%d:%d ", i, component_ids[i]);
+    printf("Node_ID [%d] : Component_ID [%d]\n", i, component_ids[i]);
   }
-  printf("]\n");
 
   if (graph_input)  { free(graph_input);  }
   if (graph_output) { free(graph_output); }

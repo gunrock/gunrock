@@ -30,81 +30,12 @@ using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::bc;
 
-
-/******************************************************************************
- * Defines, constants, globals
- ******************************************************************************/
-static bool g_verbose;
-//static bool g_undirected;
-//static bool g_quick;
-static bool g_stream_from_host;
-
-/******************************************************************************
- * Housekeeping Routines
- ******************************************************************************/
-/*
-static void Usage()
-{
-    printf(
-        "\ntest_bc <graph type> <graph type args> [--device=<device_index>] "
-        "[--instrumented] [--source=<source index>] [--quick] [--v]"
-        "[--queue-sizing=<scale factor>] [--ref-file=<reference filename>]\n"
-        "\n"
-        "Graph types and args:\n"
-        "  market [<file>]\n"
-        "    Reads a Matrix-Market coordinate-formatted graph of undirected\n"
-        "    edges from stdin (or from the optionally-specified file).\n"
-        "--device=<device_index>: Set GPU device for running the graph primitive.\n"
-        "--undirected: If set then treat the graph as undirected graph.\n"
-        "--instrumented: If set then kernels keep track of queue-search_depth\n"
-        "and barrier duty (a relative indicator of load imbalance.)\n"
-        "--source=<source index>: When source index is -1, compute BC value for each\n"
-        "node. Otherwise, debug the delta value for one node\n"
-        "--quick: If set will skip the CPU validation code.\n"
-        "--queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
-        "Default is 1.0.\n"
-        "--v: If set, enable verbose output, keep track of the kernel running.\n"
-        "--ref-file: If set, use pre-computed result stored in ref-file to verify.\n"
-        );
-}
-*/
-
-/**
- * @brief Displays the BC result (sigma value and BC value)
- *
- * @param[in] sigmas
- * @param[in] bc_values
- * @param[in] nodes
- */
-template<typename Value, typename SizeT>
-void DisplaySolution(Value *sigmas, Value *bc_values, SizeT nodes)
-{
-    if (nodes < 40)
-    {
-        printf("[");
-        for (SizeT i = 0; i < nodes; ++i)
-        {
-            PrintValue(i);
-            printf(":");
-            PrintValue(sigmas[i]);
-            printf(",");
-            PrintValue(bc_values[i]);
-            printf(" ");
-        }
-        printf("]\n");
-    }
-}
-
-/******************************************************************************
- * BC Testing Routines
- *****************************************************************************/
 /**
  * @brief Run betweenness centrality tests
  *
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
  *
  * @param[in] graph Reference to the CSR graph object defined in main driver
  * @param[in] source
@@ -138,12 +69,12 @@ void run_bc(
     Value *h_ebc_values = (Value*)malloc(sizeof(Value) * graph.edges);
 
     // Allocate BC enactor map
-    BCEnactor<false> bc_enactor(g_verbose);
+    BCEnactor<false> bc_enactor(false);
 
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
     util::GRError(csr_problem->Init(
-        g_stream_from_host,
+        false,
         graph,
         num_gpus),
         "BC Problem Initialization Failed", __FILE__, __LINE__);
@@ -195,14 +126,7 @@ void run_bc(
     // copy h_ebc_values per edge to GunrockGraph output
     ggraph_out->edge_values = (float*)&h_ebc_values[0];
 
-    // Display Solution
-    DisplaySolution(h_sigmas, h_bc_values, graph.nodes);
-
-    printf("GPU BC finished in %lf msec.\n", elapsed);
-    if (avg_duty != 0)
-    {
-        printf("\n avg CTA duty: %.2f%% \n", avg_duty * 100);
-    }
+    printf("GPU Betweeness Centrality finished in %lf msec.\n", elapsed);
 
     // Cleanup
     if (csr_problem) delete csr_problem;
@@ -212,45 +136,110 @@ void run_bc(
     cudaDeviceSynchronize();
 }
 
-/*
-template <
-    typename VertexId,
-    typename Value,
-    typename SizeT>
+/**
+ * @brief dispatch function to handle data_types
+ *
+ * @param[out] ggraph_out GunrockGraph type output
+ * @param[in]  ggraph_in GunrockGraph type input graph
+ * @param[in]  bc specific configurations
+ * @param[in]  bc data_type configurations
+ */
 void dispatch_bc(
-    Csr<VertexId, Value, SizeT> &graph,
-    CommandLineArgs &args,
-    CudaContext& context)
+    GunrockGraph       *ggraph_out,
+    const GunrockGraph *ggraph_in,
+    GunrockConfig      bc_config,
+    GunrockDataType    data_type,
+    CudaContext&       context)
 {
+    switch (data_type.VTXID_TYPE) {
+    case VTXID_INT: {
+        switch (data_type.SIZET_TYPE) {
+        case SIZET_INT: {
+            switch (data_type.VALUE_TYPE) {
+            case VALUE_INT: {
+                // template type = <int, int, int>
+                // not support yet
+                printf("Not Yet Support This DataType Combination.\n");
+                break;
+            }
+            case VALUE_UINT: {
+                // template type = <int, uint, int>
+                // not support yet
+                printf("Not Yet Support This DataType Combination.\n");
+                break;
+            }
+            case VALUE_FLOAT: {
+                // template type = <int, float, int>
+                // build input csr format graph
+                Csr<int, float, int> csr_graph(false);
+                csr_graph.nodes = ggraph_in->num_nodes;
+                csr_graph.edges = ggraph_in->num_edges;
+                csr_graph.row_offsets    = (int*)ggraph_in->row_offsets;
+                csr_graph.column_indices = (int*)ggraph_in->col_indices;
 
-    if (instrumented) {
-        RunTests<VertexId, Value, SizeT, true>(
-            graph,
-            source,
-            max_grid_size,
-            num_gpus,
-            max_queue_sizing,
-            context);
-    } else {
-        RunTests<VertexId, Value, SizeT, false>(
-            graph,
-            source,
-            max_grid_size,
-            num_gpus,
-            max_queue_sizing,
-            context);
+                // bc configurations
+                int   src_node         =  -1; //!< Use whatever the specified graph-type's default is
+                int   max_grid_size    =   0; //!< maximum grid size (0: leave it up to the enactor)
+                int   num_gpus         =   1; //!< Number of GPUs for multi-gpu enactor to use
+                float max_queue_sizing = 1.0; //!< Maximum size scaling factor for work queues
+
+                // determine source vertex to start bc
+                switch (bc_config.src_mode)
+                {
+                    case randomize:
+                    {
+                        src_node = graphio::RandomNode(csr_graph.nodes);
+                        break;
+                    }
+                    case largest_degree:
+                    {
+                        src_node = csr_graph.GetNodeWithHighestDegree();
+                        break;
+                    }
+                    case manually:
+                    {
+                        src_node = bc_config.src_node;
+                        break;
+                    }
+                    default:
+                    {
+                        src_node = 0;
+                        break;
+                    }
+                }
+                max_queue_sizing = bc_config.queue_size;
+
+                // lunch bc function
+                run_bc<int, float, int>(
+                    ggraph_out,
+                    csr_graph,
+                    src_node,
+                    max_grid_size,
+                    num_gpus,
+                    max_queue_sizing,
+                    context);
+
+                // reset for free memory
+                csr_graph.row_offsets    = NULL;
+                csr_graph.column_indices = NULL;
+                break;
+            }
+            }
+        break;
+        }
+        }
+        break;
     }
-
+    }
 }
-*/
 
 /*
 * @brief gunrock_bc function
 *
-* @param[out] output of bc problem
-* @param[in]  input graph need to process on
-* @param[in]  gunrock bc configurations
-* @param[in]  gunrock datatype struct
+* @param[out] ggraph_out output of bc problem
+* @param[in]  ggraph_in  input graph need to process on
+* @param[in]  bc_config  gunrock primitive specific configurations
+* @param[in]  data_type  gunrock datatype struct
 */
 void gunrock_bc(
     GunrockGraph       *ggraph_out,
@@ -263,37 +252,13 @@ void gunrock_bc(
     device = bc_config.device;
     ContextPtr context = mgpu::CreateCudaDevice(device);
 
-    // build input csr format graph
-    Csr<int, float, int> csr_graph(false);
-    csr_graph.nodes = ggraph_in->num_nodes;
-    csr_graph.edges = ggraph_in->num_edges;
-    csr_graph.row_offsets    = (int*)ggraph_in->row_offsets;
-    csr_graph.column_indices = (int*)ggraph_in->col_indices;
-
-    // bc configurations
-    int   source           =   -1; //!< Use whatever the specified graph-type's default is
-    int   max_grid_size    =    0; //!< maximum grid size (0: leave it up to the enactor)
-    int   num_gpus         =    1; //!< Number of GPUs for multi-gpu enactor to use
-    double max_queue_sizing = 1.0; //!< Maximum size scaling factor for work queues
-
-    source           = bc_config.source;
-    max_queue_sizing = bc_config.queue_size;
-
-    // lunch bc dispatch function
-    run_bc<int, float, int>(
+    // lunch dispatch function
+    dispatch_bc(
         ggraph_out,
-        csr_graph,
-        source,
-        max_grid_size,
-        num_gpus,
-        max_queue_sizing,
+        ggraph_in,
+        bc_config,
+        data_type,
         *context);
-
-    // reset for free memory
-    csr_graph.row_offsets    = NULL;
-    csr_graph.column_indices = NULL;
-    csr_graph.row_offsets    = NULL;
-    csr_graph.column_indices = NULL;
 }
 
 // Leave this at the end of the file
