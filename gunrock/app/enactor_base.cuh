@@ -94,7 +94,10 @@ struct FrontierAttribute
     }
 };
 
-bool All_Done(EnactorStats *enactor_stats,FrontierAttribute *frontier_attribute,int num_gpus)
+template <typename SizeT, typename DataSlice>
+bool All_Done(EnactorStats *enactor_stats,
+              FrontierAttribute *frontier_attribute, 
+              util::Array1D<SizeT, DataSlice> *data_slice, int num_gpus)
 {   
     for (int gpu=0;gpu<num_gpus*num_gpus;gpu++)
     if (enactor_stats[gpu].retval!=cudaSuccess)
@@ -109,6 +112,12 @@ bool All_Done(EnactorStats *enactor_stats,FrontierAttribute *frontier_attribute,
         //printf("gpu=%d, queue_length=%d\n",gpu,frontier_attribute[gpu].queue_length);   
         return false;
     }
+
+    for (int gpu=0;gpu<num_gpus;gpu++)
+    for (int peer=1;peer<num_gpus;peer++)
+    for (int i=0;i<2;i++)
+    if (data_slice[gpu]->in_length[i][peer]!=0)
+        return false;
     //printf("all gpu done\n");fflush(stdout);
     return true;
 } 

@@ -32,7 +32,9 @@ cudaError_t GRError(
     bool print = true)
 {
     if (error && print) {
-        fprintf(stderr, "[%s, %d] %s (CUDA error %d: %s)\n", filename, line, message, error, cudaGetErrorString(error));
+        int gpu;
+        cudaGetDevice(&gpu);
+        fprintf(stderr, "[%s, %d @ gpu %d] %s (CUDA error %d: %s)\n", filename, line, gpu, message, error, cudaGetErrorString(error));
         fflush(stderr);
     }
     return error;
@@ -46,7 +48,9 @@ cudaError_t GRError(
     bool print = true)
 {
     if (error && print) {
-        fprintf(stderr, "[%s, %d] %s (CUDA error %d: %s)\n", filename, line, message.c_str(), error, cudaGetErrorString(error));
+        int gpu;
+        cudaGetDevice(&gpu);
+        fprintf(stderr, "[%s, %d @ gpu %d] %s (CUDA error %d: %s)\n", filename, line, gpu, message.c_str(), error, cudaGetErrorString(error));
         fflush(stderr);
     }
     return error;

@@ -183,6 +183,9 @@ enum FrontierType {
             if (retval = vertex_associate_orgs.Allocate(num_vertex_associate, util::HOST | util::DEVICE)) return retval;
             if (retval = value__associate_orgs.Allocate(num_value__associate, util::HOST | util::DEVICE)) return retval;
 
+            for (int gpu=0;gpu<num_gpus;gpu++)
+            for (int i=0;i<2;i++)
+                in_length[i][gpu]=0;
             /*if (num_gpus > 1)
             for (int gpu=0;gpu<num_gpus;gpu++)
             {
@@ -540,7 +543,7 @@ struct ProblemBase
                 switch (frontier_type) {
                     case VERTEX_FRONTIERS :
                         // O(n) ping-pong global vertex frontiers
-                        new_frontier_elements[0] = double(nodes) * queue_sizing;
+                        new_frontier_elements[0] = double(cross_counter[peer]) * queue_sizing;
                         new_frontier_elements[1] = new_frontier_elements[0];
                         break;
 
@@ -552,7 +555,7 @@ struct ProblemBase
 
                     case MIXED_FRONTIERS :
                         // O(n) global vertex frontier, O(m) global edge frontier
-                        new_frontier_elements[0] = double(nodes) * queue_sizing;
+                        new_frontier_elements[0] = double(cross_counter[peer]) * queue_sizing;
                         new_frontier_elements[1] = double(edges) * queue_sizing;
                         break;
                  }    
@@ -770,23 +773,23 @@ struct ProblemBase
                     backward_convertions);
                 cpu_timer.Stop();
                 printf("partition end. (%f ms)\n", cpu_timer.ElapsedMillis());fflush(stdout);
-                graph->DisplayGraph("org_graph");
-                util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);
-                util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion0",convertion_tables[0],graph->nodes);
+                //graph->DisplayGraph("org_graph");
+                //util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);
+                //util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion0",convertion_tables[0],graph->nodes);
                 //util::cpu_mt::PrintCPUArray<SizeT,Value>("edge_value",graph->edge_values,graph->edges);
-                for (int gpu=0;gpu<num_gpus;gpu++)
+                /*for (int gpu=0;gpu<num_gpus;gpu++)
                 {
                     sub_graphs[gpu].DisplayGraph("sub_graph");
                 //    printf("%d\n",gpu);
                     util::cpu_mt::PrintCPUArray<SizeT,int>("partition",partition_tables[gpu+1],sub_graphs[gpu].nodes);
                     util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion",convertion_tables[gpu+1],sub_graphs[gpu].nodes);
-                }
+                }*/
                 for (int gpu=0;gpu<num_gpus;gpu++)
                 {
                     cross_counter[gpu][num_gpus]=0;
                     for (int peer=0;peer<num_gpus;peer++)
                     {
-                        cross_counter[gpu][peer]=out_offsets[gpu][peer];
+                        cross_counter[gpu][peer]=out_offsets[gpu][peer+1]-out_offsets[gpu][peer];
                     }
                     cross_counter[gpu][num_gpus]=in_offsets[gpu][num_gpus];
                 }
