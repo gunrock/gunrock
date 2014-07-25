@@ -452,6 +452,7 @@ void RunTests(
     } else {
         args.GetCmdLineArgument("src", src);
     }
+    args.GetCmdLineArgument("grid-size", max_grid_size);
 
     g_quick = args.CheckCmdLineFlag("quick");
     mark_pred = args.CheckCmdLineFlag("mark-pred");
@@ -462,7 +463,7 @@ void RunTests(
     args.GetCmdLineArgument("beta", g_beta);
 
     if (g_alpha == 0.0f)
-        g_alpha = 6.0f;
+        g_alpha = 12.0f;
     if (g_beta == 0.0f)
         g_beta = 6.0f;
 

@@ -50,7 +50,7 @@ struct PriorityQueue
     NearFarPile             **d_nf_pile; /**< device pointer for near far pile data */
 
     SizeT                   queue_length; /**< current queue length */
-    SizeT                   max_queue_length; /**< upper limit of the queue length */
+    unsigned int            max_queue_length; /**< upper limit of the queue length */
     int                     selector; /**< binary switch for choosing from ping-pong buffers */
 
     PriorityQueue() :

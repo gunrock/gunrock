@@ -462,6 +462,8 @@ void RunTests(
         args.GetCmdLineArgument("src", src);
     }
 
+    args.GetCmdLineArgument("grid-size", max_grid_size);
+
     //printf("Display neighbor list of src:\n");
     //graph.DisplayNeighborList(src);
 

@@ -486,7 +486,7 @@ void RunTests(
 
     mark_pred = args.CheckCmdLineFlag("mark-pred");
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
-    int delta_factor;
+    int delta_factor = 16;
     args.GetCmdLineArgument("delta-factor", delta_factor);
 
     //printf("Display neighbor list of src:\n");
