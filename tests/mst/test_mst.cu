@@ -37,10 +37,10 @@
 #include <gunrock/oprtr/filter/kernel.cuh>
 #include <moderngpu.cuh>
 
-// CPU Prim's mst reference
+// CPU Kruskal's mst reference
 #include <boost/config.hpp>
 #include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/prim_minimum_spanning_tree.hpp>
+#include <boost/graph/kruskal_min_spanning_tree.hpp>
 
 using namespace gunrock;
 using namespace gunrock::util;
@@ -67,12 +67,12 @@ void Usage()
   "\n"
   "Graph types and args:\n"
   "  market [<file>]\n"
-  "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
-  "    edges from stdin (or from the optionally-specified file).\n"
-  "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
+  "    Reads a Matrix-Market coordinate-format graph of directed/undirected\n"
+  "    edges from stdin (or from the optionally-specified file)\n"
+  "  --device=<device_index>  Set GPU device for running the graph primitive\n"
   "  --instrumented If set then kernels keep track of queue-search_depth\n"
-  "  and barrier duty (a relative indicator of load imbalance.)\n"
-  "  --quick If set will skip the CPU validation code.\n");
+  "  and barrier duty (a relative indicator of load imbalance)\n"
+  "  --quick If set will skip the CPU validation code\n");
 }
 
 /**
@@ -86,43 +86,30 @@ template<
 void DisplaySolution(
   const Csr<VertexId, Value, SizeT> &graph, int *mst_output)
 {
-  VertexId *temp_keys = new VertexId[graph.edges];
+  fflush(stdout);
+
+  // find source vertex ids forr display results
+  VertexId *source = new VertexId[graph.edges];
   for (int i = 0; i < graph.nodes; ++i)
   {
     for (int j = graph.row_offsets[i]; j < graph.row_offsets[i+1]; ++j)
     {
-      temp_keys[j] = i;
+      source[j] = i;
     }
   }
 
+  // print src-dst pairs of minimum spanning tree edges
+  printf("src dst\n");
   for (int i = 0; i < graph.edges; ++i)
   {
     if (mst_output[i] == 1)
     {
-      if (graph.column_indices[i] != temp_keys[i])
-      {
-        std::cout << "parent[" << temp_keys[i] << "] = "
-                  << graph.column_indices[i] << std::endl;
-      }
-      else
-      {
-        std::cout << "parent[" << temp_keys[i] << "] = no parent" << std::endl;
-      }
+      printf("%d -- %d\n", source[i], graph.column_indices[i]);
     }
   }
 
-  if (temp_keys) { delete [] temp_keys; }
-}
-
-/**
- * @brief Comparison for the MST result
- *
- */
-int compareResults()
-{
-  // TODO:
-  printf(" Comparing results ...\n");
-  return 0;
+  // clean up if neccessary
+  if (source) { delete [] source; }
 }
 
 /******************************************************************************
@@ -135,30 +122,31 @@ int compareResults()
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] weight value associated with per edge we used for calculation
+ * @param[in] graph reference to the CSR graph we process on
  */
 template<
   typename VertexId,
   typename Value,
   typename SizeT>
-void SimpleReferenceMST(
-  Value *edge_values, const Csr<VertexId, Value, SizeT> &graph)
+long long int SimpleReferenceMST(
+  const Value *edge_values, const Csr<VertexId, Value, SizeT> &graph)
 {
+  // get number of nodes and edges in graph
   const int num_nodes = graph.nodes;
   const int num_edges = graph.edges;
-  printf(" CPU Reference Test: #nodes: %d #edges: %d\n", num_nodes, num_edges);
+  printf("\nREFERENCE TEST: #NODES: %d #EDGES: %d\n", num_nodes, num_edges);
 
-  //Preparation
+  // kruskal_min_spanning_tree preparations
   using namespace boost;
-  typedef adjacency_list <
-    vecS, vecS, undirectedS,
-    property< vertex_distance_t, int >,
-    property < edge_weight_t, int > > Graph;
-
+  typedef adjacency_list < vecS, vecS, undirectedS,
+    no_property, property < edge_weight_t, int > >  Graph;
+  typedef graph_traits < Graph >::edge_descriptor   Edge;
+  typedef graph_traits < Graph >::vertex_descriptor Vertex;
   typedef std::pair<int, int> E;
+
   E *edge_pairs = new E[num_edges];
   int idx = 0;
-
   for (int i = 0; i < num_nodes; ++i)
   {
     for (int j = graph.row_offsets[i]; j < graph.row_offsets[i+1]; ++j)
@@ -168,46 +156,41 @@ void SimpleReferenceMST(
   }
 
   Graph g(edge_pairs, edge_pairs + num_edges, edge_values, num_nodes);
-  property_map<Graph, edge_weight_t>::type weightmap = get(edge_weight, g);
-  std::vector<graph_traits<Graph>::vertex_descriptor> p(num_vertices(g));
+  property_map < Graph, edge_weight_t >::type weight = get(edge_weight, g);
+  std::vector < Edge > spanning_tree;
 
-  typedef graph_traits<Graph>::edge_iterator edge_iterator;
-
-  std::pair<edge_iterator, edge_iterator> ei = edges(g);
-
-  // selected total edge_values
-  int weight_sum = 0;
-  for (int edgeIter = 0; edgeIter < num_edges; ++edgeIter)
-  {
-    weight_sum += edge_values[edgeIter];
-  }
-
-  // Compute MST using CPU
   CpuTimer cpu_timer; // record the kernel running time
-
   cpu_timer.Start();
-  prim_minimum_spanning_tree(g, &p[0]);
+  // compute reference using kruskal_min_spanning_tree algorithm
+  kruskal_minimum_spanning_tree(g, std::back_inserter(spanning_tree));
   cpu_timer.Stop();
-
   float elapsed_cpu = cpu_timer.ElapsedMillis();
 
-  // display graph results
-  for (std::size_t i = 0; i != p.size(); ++i)
+  // analyze reference results
+  SizeT         num_selected_cpu = 0;
+  long long int total_weight_cpu = 0;
+
+  if (graph.nodes <= 100) printf("CPU Minimum Spanning Tree\n");
+  for (std::vector < Edge >::iterator ei = spanning_tree.begin();
+       ei != spanning_tree.end(); ++ei)
   {
-    if (p[i] != i)
+    if (graph.nodes <= 100)
     {
-      std::cout << "parent[" << i << "] = " << p[i] << std::endl;
+      // print the edge pairs in the minimum spanning tree
+      printf("%ld -- %ld\n", source(*ei, g), target(*ei, g));
+      //printf("  with weight of %d\n", weight[*ei]);
     }
-    else
-    {
-      std::cout << "parent[" << i << "] = no parent" << std::endl;
-    }
+    ++num_selected_cpu;
+    total_weight_cpu += weight[*ei];
   }
 
-  printf(" Number of edges in MST: %ld\n", p.size() - 1);
-  //printf(" Selected Total Weights: %d\n", weight_sum);
-  printf(" CPU Minimum Spanning Tree Computation Complete in %lf msec.\n", elapsed_cpu);
+  // clean up if neccessary
+  if (edge_pairs) { delete [] edge_pairs; }
 
+  printf("CPU - Computation Complete in %lf msec.\n", elapsed_cpu);
+  //printf("CPU - Number of Edges in MST: %d\n", num_selected_cpu);
+
+  return total_weight_cpu;
 }
 
 /**
@@ -218,7 +201,7 @@ void SimpleReferenceMST(
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] graph_gpu the CSR graph we process on
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] num_gpus Number of GPUs
  * @param[in] context CudaContext for moderngpu to use
@@ -230,69 +213,97 @@ template <
   typename SizeT,
   bool INSTRUMENT>
 void RunTests(
-  const Csr<VertexId, Value, SizeT> &graph,
+  const Csr<VertexId, Value, SizeT> &graph_gpu,
+  const Csr<VertexId, Value, SizeT> &graph_cpu,
   int max_grid_size,
   int num_gpus,
   mgpu::CudaContext& context)
 {
   // define the problem data structure for graph primitive
   typedef MSTProblem<
-  VertexId,
-  SizeT,
-  Value,
-  true> Problem;
+    VertexId,
+    SizeT,
+    Value,
+    true> Problem;
 
   // INSTRUMENT specifies whether we want to keep such statistical data
   // allocate MST enactor map
   MSTEnactor<INSTRUMENT> mst_enactor(g_verbose);
 
-  // allocate problem on GPU
-  // Create a pointer of the MSTProblem type
+  // allocate problem on GPU create a pointer of the MSTProblem type
   Problem *mst_problem = new Problem;
 
   // malloc host results spaces
-  VertexId *h_mst_output = (VertexId*)malloc(sizeof(VertexId) * graph.edges);
+  VertexId *h_mst_output = new VertexId[graph_gpu.edges];
 
-  // copy data from CPU to GPU
-  // initialize data members in DataSlice
+  // copy data from CPU to GPU initialize data members in DataSlice
   util::GRError(mst_problem->Init(
     g_stream_from_host,
-    graph,
+    graph_gpu,
     num_gpus),
     "Problem MST Initialization Failed",
     __FILE__, __LINE__);
-
-  // perform MST
-  GpuTimer gpu_timer; // Record the kernel running time
 
   // reset values in DataSlice
   util::GRError(mst_problem->Reset(mst_enactor.GetFrontierType()),
     "MST Problem Data Reset Failed", __FILE__, __LINE__);
 
+  // perform MST
+  GpuTimer gpu_timer; // record the kernel running time
   gpu_timer.Start();
-
+  // launch MST enactor
   util::GRError(mst_enactor.template Enact<Problem>(
     context,
     mst_problem,
     max_grid_size),
     "MST Problem Enact Failed", __FILE__, __LINE__);
-
   gpu_timer.Stop();
 
   float elapsed_gpu = gpu_timer.ElapsedMillis();
-  printf(" GPU MST finished in %lf msec.\n", elapsed_gpu);
+  printf("GPU - Computation Complete in %lf msec.\n", elapsed_gpu);
 
-  // Copy results back to CPU from GPU using Extract
-  // TODO: write the extract function
+  // copy results back to CPU from GPU using Extract
   util::GRError(mst_problem->Extract(h_mst_output),
     "MST Problem Data Extraction Failed", __FILE__, __LINE__);
 
-  // Display computed results
-  DisplaySolution(graph, h_mst_output);
+  /*
+  // calculate gpu final number of selected edges
+  int num_selected_gpu = 0;
+  for (int iter = 0; iter < graph_gpu.edges; ++iter)
+  {
+    num_selected_gpu += h_mst_output[iter];
+  }
+  printf("GPU - Number of Edges in MST: %d\n", num_selected_gpu);
+  */
 
-  // Clean up id neccessary
-  if (mst_problem)  { delete mst_problem; }
-  if (h_mst_output) { free(h_mst_output); }
+  // calculate gpu total selected mst weight for validation
+  long long int total_weight_gpu = 0;
+  for (int iter = 0; iter < graph_gpu.edges; ++iter)
+  {
+    total_weight_gpu += h_mst_output[iter] * graph_gpu.edge_values[iter];
+  }
+
+  // validation correctness
+  long long int total_weight_cpu = SimpleReferenceMST(graph_cpu.edge_values, graph_cpu);
+  if (total_weight_cpu == total_weight_gpu)
+  {
+  	printf("\nGPU Minimum Spanning Tree\n");
+    if (graph_gpu.nodes <= 100)
+    {
+      // print the edge pairs in the minimum spanning tree
+      DisplaySolution(graph_gpu, h_mst_output);
+    }
+    printf("\nCORRECT.\n");
+  }
+  else
+  {
+    printf("INCORRECT. \nCPU Computed Total Weight = %lld\n"
+      "GPU Computed Total Weight = %lld\n", total_weight_cpu, total_weight_gpu);
+  }
+
+  // clean up if neccessary
+  if (mst_problem)  { delete    mst_problem;  }
+  if (h_mst_output) { delete [] h_mst_output; }
 
   cudaDeviceSynchronize();
 }
@@ -304,21 +315,24 @@ void RunTests(
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] graph_gpu the CSR graph we process on
+ * @param[in] graph_cpu the CSR graph used for reference
  * @param[in] args Reference to the command line arguments
+ * @param[in] modern gpu cuda context
  */
 template <
   typename VertexId,
   typename Value,
   typename SizeT>
 void RunTests(
-  Csr<VertexId, Value, SizeT> &graph,
-  CommandLineArgs    &args,
-  mgpu::CudaContext& context)
+  const Csr<VertexId, Value, SizeT> &graph_gpu,
+  const Csr<VertexId, Value, SizeT> &graph_cpu,
+  CommandLineArgs                   &args,
+  mgpu::CudaContext&                context)
 {
-  bool instrumented = false; //!< do not collect instrumentation from kernels
-  int  max_grid_size = 0;    //!< maximum grid size (up to the enactor)
-  int  num_gpus = 1;         //!< number of GPUs for multi-gpu enactor to use
+  bool instrumented  = false; //!< do not collect instrumentation from kernels
+  int  max_grid_size = 0;     //!< maximum grid size (up to the enactor)
+  int  num_gpus      = 1;     //!< number of GPUs for multi-gpu enactor to use
 
   instrumented = args.CheckCmdLineFlag("instrumented");
 
@@ -328,7 +342,8 @@ void RunTests(
   if (instrumented)
   {
     RunTests<VertexId, Value, SizeT, true>(
-      graph,
+      graph_gpu,
+      graph_cpu,
       max_grid_size,
       num_gpus,
       context);
@@ -336,7 +351,8 @@ void RunTests(
   else
   {
     RunTests<VertexId, Value, SizeT, false>(
-      graph,
+      graph_gpu,
+      graph_cpu,
       max_grid_size,
       num_gpus,
       context);
@@ -387,7 +403,7 @@ int main(int argc, char** argv)
 
     // Matrix-market coordinate-formatted graph file
 
-    typedef int VertexId; //!< Use as the node identifier type
+    typedef int VertexId; //!< Use as the vertex identifier type
     typedef int Value;    //!< Use as the value type
     typedef int SizeT;    //!< Use as the graph size type
 
@@ -409,29 +425,32 @@ int main(int argc, char** argv)
       g_undirected,
       false) != 0) { return 1; }
 
-    // display graph
-    //csr_gpu.DisplayGraph();
-
-    // run gpu tests
-    RunTests(csr_gpu, args, *context);
-
-    // run cpu reference
-    // build a directed graph required by cpu reference computing
+    // boost mst algorithm requires directed graph input
     Csr<VertexId, Value, SizeT> csr_cpu(false);
     if (graphio::BuildMarketGraph<true>(
       market_filename,
       csr_cpu,
-      g_undirected,
+      !g_undirected,
       false) != 0) { return 1; }
 
-    SimpleReferenceMST(csr_cpu.edge_values, csr_cpu);
+    // display graph
+    //csr_gpu.DisplayGraph();
+    //csr_cpu.DisplayGraph();
 
-    // verify results using compareResults() function
+    /***************************************************************
+    * To make sure two graph have same weight values for each edge *
+    * we have to change ll_value = rand()%64 in market.cuh file to *
+    * some non-random value if the original graph does not contain *
+    * weight per edge.                                             *
+    ***************************************************************/
+
+    // run gpu tests
+    RunTests(csr_gpu, csr_cpu, args, *context);
 
   }
   else
   {
-    // Unknown graph type
+    // unknown graph type
     fprintf(stderr, "Unspecified graph type\n");
     return 1;
   }

@@ -20,7 +20,6 @@
 #include <gunrock/graphio/market.cuh>
 #include <gunrock/app/topk/topk_enactor.cuh>
 #include <gunrock/app/topk/topk_problem.cuh>
-#include <gunrock/util/test_utils.cuh>
 
 using namespace gunrock;
 using namespace gunrock::util;
@@ -61,7 +60,6 @@ int binary_search(
     }
     return -1;
 }
-
 
 /**
  * @brief Build SubGraph Contains Only Top K Nodes
@@ -164,7 +162,7 @@ void build_topk_subgraph(
  *
  * @param[out] output subgraph of topk problem
  * @param[out] node_ids return the top k nodes
- * @param[out] centrality_values return associated centrality
+ * @param[out] centrality return associated centrality
  * @param[in]  original graph to the CSR graph we process on
  * @param[in]  reversed graph to the CSR graph we process on
  * @param[in]  top_nodes k value for topk problem
@@ -177,10 +175,10 @@ template <
 void topk_run(
     GunrockGraph *graph_out,
     VertexId	 *node_ids,
-    Value	 *centrality_values,
+    Value	 	 *centrality,
     const Csr<VertexId, Value, SizeT> &graph_original,
     const Csr<VertexId, Value, SizeT> &graph_reversed,
-    SizeT top_nodes)
+    SizeT 		 top_nodes)
 {
     // preparations
     typedef TOPKProblem<VertexId, SizeT, Value> Problem;
@@ -189,40 +187,40 @@ void topk_run(
 
     // reset top_nodes if necessary
     top_nodes =
-	(top_nodes > graph_original.nodes) ? graph_original.nodes : top_nodes;
+		(top_nodes > graph_original.nodes) ? graph_original.nodes : top_nodes;
 
     // initialization
     util::GRError(topk_problem->Init(
-		      false,
-		      graph_original,
-		      graph_reversed,
-		      1),
-		  "Problem TOPK Initialization Failed", __FILE__, __LINE__);
+		false,
+		graph_original,
+		graph_reversed,
+		1),
+		"Problem TOPK Initialization Failed", __FILE__, __LINE__);
 
     // reset data slices
     util::GRError(topk_problem->Reset(topk_enactor.GetFrontierType()),
-		  "TOPK Problem Data Reset Failed", __FILE__, __LINE__);
+		"TOPK Problem Data Reset Failed", __FILE__, __LINE__);
 
     // launch gpu topk enactor to calculate top k nodes
     util::GRError(topk_enactor.template Enact<Problem>(
-		      topk_problem,
-		      top_nodes),
-		  "TOPK Problem Enact Failed", __FILE__, __LINE__);
+		topk_problem,
+		top_nodes),
+		"TOPK Problem Enact Failed", __FILE__, __LINE__);
 
     // copy out results back to cpu
     util::GRError(topk_problem->Extract(
-		      node_ids,
-		      centrality_values,
-		      top_nodes),
-		  "TOPK Problem Data Extraction Failed", __FILE__, __LINE__);
+		node_ids,
+		centrality,
+		top_nodes),
+		"TOPK Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // build a subgraph contains only top k nodes on cpu
     build_topk_subgraph<VertexId, Value, SizeT>(
-	graph_out,
-	graph_original,
-	graph_reversed,
-	(int*)node_ids,
-	top_nodes);
+		graph_out,
+		graph_original,
+		graph_reversed,
+		(int*)node_ids,
+		top_nodes);
 
     // cleanup if neccessary
     if (topk_problem) { delete topk_problem; }
@@ -230,107 +228,105 @@ void topk_run(
     cudaDeviceSynchronize();
 }
 
+/**
+ * @brief dispatch function to handle data_types
+ *
+ * @param[out] ggraph_out GunrockGraph type output
+ * @param[in]  ggraph_in GunrockGraph type input graph
+ * @param[in]  topk specific configurations
+ * @param[in]  topk data_type configurations
+ */
+void dispatch_topk(
+    GunrockGraph       *ggraph_out,
+    void               *node_ids,
+    void               *centrality,
+    const GunrockGraph *ggraph_in,
+    GunrockConfig      topk_config,
+    GunrockDataType    data_type)
+{
+    switch (data_type.VTXID_TYPE) {
+    case VTXID_INT: {
+        switch (data_type.SIZET_TYPE) {
+        case SIZET_INT: {
+            switch (data_type.VALUE_TYPE) {
+            case VALUE_INT: {
+                // template type = <int, int, int>
+            	// original graph
+				Csr<int, int, int> graph_original(false);
+				graph_original.nodes = ggraph_in->num_nodes;
+				graph_original.edges = ggraph_in->num_edges;
+				graph_original.row_offsets    = (int*)ggraph_in->row_offsets;
+				graph_original.column_indices = (int*)ggraph_in->col_indices;
+
+				// reversed graph
+				Csr<int, int, int> graph_reversed(false);
+				graph_reversed.nodes = ggraph_in->num_nodes;
+				graph_reversed.edges = ggraph_in->num_edges;
+				graph_reversed.row_offsets    = (int*)ggraph_in->col_offsets;
+				graph_reversed.column_indices = (int*)ggraph_in->row_indices;
+
+				//graph_original.DisplayGraph();
+
+				topk_run<int, int, int>(
+					ggraph_out,
+					(int*)node_ids,
+					(int*)centrality,
+					graph_original,
+					graph_reversed,
+					topk_config.top_nodes);
+
+				// reset for free memory
+				graph_original.row_offsets    = NULL;
+				graph_original.column_indices = NULL;
+				graph_reversed.row_offsets    = NULL;
+				graph_reversed.column_indices = NULL;
+                break;
+            }
+            case VALUE_UINT: {
+                // template type = <int, uint, int>
+            	printf("Not Yet Support This DataType Combination.\n");
+                break;
+            }
+            case VALUE_FLOAT: {
+                // template type = <int, float, int>
+            	printf("Not Yet Support This DataType Combination.\n");
+                break;
+            }
+            }
+        break;
+        }
+        }
+        break;
+    }
+    }
+}
+
 /*
  * @brief topk dispatch function base on gunrock data types
  *
- * @param[out] output subgraph of topk problem
- * @param[out] output top k node_ids
- * @param[out] output associated centrality values
- * @param[in]  input graph need to process on
- * @param[in]  k value of topk problem
- * @param[in]  gunrock datatype struct
+ * @param[out] ggraph_out  output subgraph of topk problem
+ * @param[out] node_ids    output top k node_ids
+ * @param[out] centrality  output associated centrality values
+ * @param[in]  ggraph_in   input graph need to process on
+ * @param[in]  topk_config gunrock primitive specific configurations
+ * @param[in]  data_type   gunrock datatype struct
  */
-void topk_dispatch(
-    GunrockGraph       *graph_out,
+void gunrock_topk(
+    GunrockGraph       *ggraph_out,
     void               *node_ids,
-    void               *centrality_values,
-    const GunrockGraph *graph_in,
-    size_t             top_nodes,
+    void               *centrality,
+    const GunrockGraph *ggraph_in,
+    GunrockConfig	   topk_config,
     GunrockDataType    data_type)
 {
-    //TODO: add more supportive datatypes if necessary
-
-    switch (data_type.VTXID_TYPE)
-      {
-      case VTXID_INT:
-	switch(data_type.SIZET_TYPE)
-	{
-	case SIZET_UINT:
-	  switch (data_type.VALUE_TYPE)
-	    {
-	    case VALUE_INT:
-	      {
-		// case that VertexId, SizeT, Value are all have the type int
-
-		// original graph
-		Csr<int, int, int> graph_original(false);
-		graph_original.nodes = graph_in->num_nodes;
-		graph_original.edges = graph_in->num_edges;
-		graph_original.row_offsets    = (int*)graph_in->row_offsets;
-		graph_original.column_indices = (int*)graph_in->col_indices;
-
-		// reversed graph
-		Csr<int, int, int> graph_reversed(false);
-		graph_reversed.nodes = graph_in->num_nodes;
-		graph_reversed.edges = graph_in->num_edges;
-		graph_reversed.row_offsets    = (int*)graph_in->col_offsets;
-		graph_reversed.column_indices = (int*)graph_in->row_indices;
-
-		graph_original.DisplayGraph();
-
-		topk_run<int, int, int>(
-		    graph_out,
-		    (int*)node_ids,
-		    (int*)centrality_values,
-		    graph_original,
-		    graph_reversed,
-		    top_nodes);
-
-		// reset for free memory
-		graph_original.row_offsets    = NULL;
-		graph_original.column_indices = NULL;
-		graph_reversed.row_offsets    = NULL;
-		graph_reversed.column_indices = NULL;
-
-		break;
-	      }
-	    case VALUE_FLOAT:
-	      {
-		// case that VertexId and SizeT have type int, Value is float
-		/*
-		// original graph
-		Csr<int, float, int> graph_original(false);
-		graph_original.nodes = graph_in->num_nodes;
-		graph_original.edges = graph_in->num_edges;
-		graph_original.row_offsets    = (int*)graph_in->row_offsets;
-		graph_original.column_indices = (int*)graph_in->col_indices;
-
-		// reversed graph
-		Csr<int, float, int> graph_reversed(false);
-		graph_reversed.nodes = graph_in->num_nodes;
-		graph_reversed.edges = graph_in->num_edges;
-		graph_reversed.row_offsets    = (int*)graph_in->col_offsets;
-		graph_reversed.column_indices = (int*)graph_in->row_indices;
-
-		topk_run<int, float, int>((int*)node_ids,
-					  (float*)centrality_values,
-					  graph_original,
-					  graph_reversed,
-					  top_nodes);
-
-		// reset for free memory
-		graph_original.row_offsets    = NULL;
-		graph_original.column_indices = NULL;
-		graph_reversed.row_offsets    = NULL;
-		graph_reversed.column_indices = NULL;
-		*/
-		break;
-	      }
-	    }
-	  break;
-	}
-      break;
-    }
+   	// launch topk dispatch function
+   	dispatch_topk(
+   		ggraph_out,
+   		node_ids,
+   		centrality,
+   		ggraph_in,
+   		topk_config,
+   		data_type);
 }
 
 // Leave this at the end of the file

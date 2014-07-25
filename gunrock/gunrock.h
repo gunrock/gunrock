@@ -17,6 +17,7 @@
  */
 
 #include <stdlib.h>
+#include <stdbool.h>
 
 /**
  * @brief Vertex_id datatypes enumerators.
@@ -24,17 +25,17 @@
  */
 enum VertexIdType
 {
-    VTXID_INT,   //!< int type VertexId
+    VTXID_INT, //!< integer type
 };
 enum SizeTType
 {
-    SIZET_UINT,   //!< unsigned int type SizeT
+    SIZET_INT, //!< unsigned integer type
 };
 enum ValueType
 {
-    VALUE_INT,    //!< int    type Value
-    VALUE_FLOAT,  //!< float  type Value
-    //VALUE_DOUBLE, //!< double type Value
+    VALUE_INT,   //!< integer type
+    VALUE_UINT,  //!< unsigned int type
+    VALUE_FLOAT, //!< float type
 };
 
 /**
@@ -53,47 +54,96 @@ struct GunrockDataType
  */
 struct GunrockGraph
 {
-    size_t  num_nodes;
-    size_t  num_edges;
-    void    *row_offsets;
-    void    *col_indices;
-    void    *col_offsets;
-    void    *row_indices;
-    void    *node_values;
-    void    *edge_values;
+    size_t num_nodes;    //!< number of nodes in graph
+    size_t num_edges;    //!< number of edges in graph
+    void   *row_offsets; //!< C.S.R. row offsets
+    void   *col_indices; //!< C.S.R. column indices
+    void   *col_offsets; //!< C.S.C. column offsets
+    void   *row_indices; //!< C.S.C. row indices
+    void   *node_values; //!< associated values per node
+    void   *edge_values; //!< associated values per edge
+};
+
+/**
+ * @brief arguments configuration struct used to specify arguments
+ */
+enum SrcMode
+{
+    manually,
+    randomize,
+    largest_degree,
+};
+struct GunrockConfig
+{
+    bool  mark_pred;   //!< whether to mark predecessor or not
+    bool  idempotence; //!< whether or not to enable idempotence
+    int   src_node;    //!< source vertex define where to start
+    int   device;      //!< setting which gpu device to use
+    int   max_iter;    //!< maximum mumber of iterations allowed
+    int   top_nodes;   //!< k value for topk / page_rank problem
+    int   delta_factor; //!< sssp delta-factor parameter
+    float delta;       //!< page rank specific value
+    float error;       //!< page rank specific value
+    float queue_size;  //!< setting frontier queue size
+    enum  SrcMode src_mode; //!< source vertex mode rand/largest_degree
 };
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void Test();
+// BFS Function Define
+void gunrock_bfs(
+    struct GunrockGraph       *graph_out,
+    const struct GunrockGraph *graph_in,
+    struct GunrockConfig      configs,
+    struct GunrockDataType    data_type);
 
-// topk algorithm
-/*
+// BC Function Define
+void gunrock_bc(
+    struct GunrockGraph       *graph_out,
+    const struct GunrockGraph *graph_in,
+    struct GunrockConfig      configs,
+    struct GunrockDataType    data_type);
+
+// CC Function Define
+void gunrock_cc(
+    struct GunrockGraph       *graph_out,
+    const struct GunrockGraph *graph_in,
+    struct GunrockConfig      configs,
+    struct GunrockDataType    data_type);
+
+// SSSP Function Define
+void gunrock_sssp(
+    struct GunrockGraph       *graph_out,
+    void                      *predecessor,
+    const struct GunrockGraph *graph_in,
+    struct GunrockConfig      congis,
+    struct GunrockDataType    data_type);
+
+// PR Function Define
+void gunrock_pr(
+    struct GunrockGraph       *graph_out,
+    void                      *node_ids,
+    void                      *page_rank,
+    const struct GunrockGraph *graph_in,
+    struct GunrockConfig      configs,
+    struct GunrockDataType    data_type);
+
+// TopK Function Define
 void gunrock_topk(
-  struct GunrockGraph *graph_out,
-  void                *node_ids,
-  void                *centrality_values,
-  size_t              top_nodes,
-  const struct GunrockGraph  *graph_in,
-  struct GunrockDataType     data_type);
-*/
+    struct GunrockGraph       *graph_out,
+    void                      *node_ids,
+    void                      *centrality,
+    const struct GunrockGraph *graph_in,
+    struct GunrockConfig      configs,
+    struct GunrockDataType    data_type);
 
-// topk dispatch function
-void topk_dispatch(
-  struct GunrockGraph       *graph_out,
-  void                      *node_ids,
-  void                      *centrality_values,
-  const struct GunrockGraph *graph_in,
-  size_t                    top_nodes,
-  struct GunrockDataType    data_type);
+// TODO: Add other algorithms
 
 #ifdef __cplusplus
 }
 #endif
-
-// TODO: Add other algorithms
 
 // Leave this at the end of the file
 // Local Variables:

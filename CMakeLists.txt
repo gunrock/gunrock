@@ -199,18 +199,18 @@ if(GUNROCK_BUILD_LIB)
 endif(GUNROCK_BUILD_LIB)
 
 if(GUNROCK_BUILD_APPLICATIONS)
-    add_subdirectory(shared_libtopk)
+    add_subdirectory(shared_lib_tests)
     add_subdirectory(simple_example)
     #add_subdirectory(tests/bc)
-    add_subdirectory(tests/bfs)
+    #add_subdirectory(tests/bfs)
     #add_subdirectory(tests/cc)
-    #add_subdirectory(tests/dc)
+    #add_subdirectory(tests/pr)
+    #add_subdirectory(tests/sssp)
+    #add_subdirectory(tests/mst)
     #add_subdirectory(tests/dobfs)
     #add_subdirectory(tests/hits)
     #add_subdirectory(tests/pbfs)
-    #add_subdirectory(tests/pr)
     #add_subdirectory(tests/salsa)
-    #add_subdirectory(tests/sssp)
     #add_subdirectory(tests/wtf)
 endif(GUNROCK_BUILD_APPLICATIONS)
 
@@ -224,6 +224,6 @@ add_test(NAME SimpleExample COMMAND simple_example market data/simple_example/bi
 set_tests_properties(SimpleExample
     PROPERTIES PASS_REGULAR_EXPRESSION "TEST PASSED")
 
-add_test(NAME TestBFS COMMAND test_bfs market data/simple_example/bips98_606.mtx --src=largestdegree)
-set_tests_properties(TestBFS
-    PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+#add_test(NAME TestBFS COMMAND test_bfs market data/simple_example/bips98_606.mtx --src=largestdegree)
+#set_tests_properties(TestBFS
+#    PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")

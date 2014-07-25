@@ -6,13 +6,16 @@ int main(int argc, char* argv[])
   // define data types
   struct GunrockDataType data_type;
   data_type.VTXID_TYPE = VTXID_INT;
-  data_type.SIZET_TYPE = SIZET_UINT;
+  data_type.SIZET_TYPE = SIZET_INT;
   data_type.VALUE_TYPE = VALUE_INT;
+
+  struct GunrockConfig topk_config;
+  topk_config.device    = 0;
+  topk_config.top_nodes = 3;
 
   // define graph
   size_t num_nodes = 7;
   size_t num_edges = 15;
-  size_t top_nodes = 3;
 
   unsigned int row_offsets[8] = {0,3,6,9,11,14,15,15};
   int col_indices[15] = {1,2,3,0,2,4,3,4,5,5,6,2,5,6,6};
@@ -33,27 +36,27 @@ int main(int argc, char* argv[])
   // malloc output result arrays
   struct GunrockGraph *graph_output =
     (struct GunrockGraph*)malloc(sizeof(struct GunrockGraph));
-  int *node_ids          = (int*)malloc(sizeof(int) * top_nodes);
-  int *centrality_values = (int*)malloc(sizeof(int) * top_nodes);
+  int *node_ids          = (int*)malloc(sizeof(int) * topk_config.top_nodes);
+  int *centrality = (int*)malloc(sizeof(int) * topk_config.top_nodes);
 
   // run topk calculations
-  topk_dispatch(
-    (struct GunrockGraph*)graph_output,
+  gunrock_topk(
+    graph_output,
     node_ids,
-    centrality_values,
-    (const struct GunrockGraph*)graph_input,
-    top_nodes,
+    centrality,
+    graph_input,
+    topk_config,
     data_type);
 
   // print results for check correctness
   int i;
-  for (i = 0; i < top_nodes; ++i)
+  printf("Demo Outputs:\n");
+  for (i = 0; i < topk_config.top_nodes; ++i)
   {
-    printf("Node ID [%d] : CV [%d] \n", node_ids[i], centrality_values[i]);
+    printf("Node ID [%d] : CV [%d] \n", node_ids[i], centrality[i]);
   }
-  printf("\n");
 
-  if (centrality_values) free(centrality_values);
+  if (centrality) free(centrality);
   if (node_ids)          free(node_ids);
   if (graph_input)       free(graph_input);
   if (graph_output)      free(graph_output);

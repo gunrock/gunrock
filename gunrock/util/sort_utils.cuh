@@ -232,44 +232,6 @@ namespace util {
     return retval;
   }
 
-  /*
-   * @brief modern gpu segmented sort from flags
-   * using SegSortKeysFromFlags(), SegSortPairsFromFlags()
-   */
-  template <
-    typename SizeType,
-    typename KeyType,
-    typename ValType>
-  cudaError_t SegSortFromFlags(
-    mgpu::CudaContext  &context,
-    SizeType           num_elements,
-    const unsigned int *d_flag,
-    KeyType            *d_key,
-    ValType            *d_val = NULL)
-  {
-    cudaError_t retval = cudaSuccess;
-
-    if (d_val)
-    {
-      mgpu::SegSortPairsFromFlags(
-	d_key,
-	d_val,
-	num_elements,
-	d_flag,
-	context);
-    }
-    else
-    {
-      mgpu::SegSortKeysFromFlags(
-	d_key,
-	num_elements,
-	d_flag,
-	context);
-     }
-
-    return retval;
-}
-
   /** @} */
 
 } //util

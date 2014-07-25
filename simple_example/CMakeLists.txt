@@ -12,5 +12,6 @@ set (mgpu_SOURCE_FILES ${mgpu_SOURCE_DIRS}/mgpucontext.cu ${mgpu_SOURCE_DIRS}/mg
 
 CUDA_ADD_EXECUTABLE(simple_example
   simple_example.cu cpu_graph_lib.cpp
+  ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
   ${mgpu_SOURCE_FILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
