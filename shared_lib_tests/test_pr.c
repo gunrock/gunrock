@@ -30,7 +30,7 @@ int main(int argc, char* argv[])
   // define graph (undirected graph)
   size_t num_nodes = 4;
   size_t num_edges = 8;
-  unsigned int row_offsets[5] = {0, 3, 5, 6, 8};
+  int row_offsets[5] = {0, 3, 5, 6, 8};
   int col_indices[8] = {1, 2, 3, 2, 3, 0, 0, 2};
 
   // build graph as input
@@ -44,7 +44,7 @@ int main(int argc, char* argv[])
   // malloc output graph
   struct GunrockGraph *graph_output =
     (struct GunrockGraph*)malloc(sizeof(struct GunrockGraph));
-  int   *node_ids  = (int*)malloc(sizeof(int) * pr_config.top_nodes);
+  int   *node_ids  = ( int* )malloc(sizeof( int ) * pr_config.top_nodes);
   float *page_rank = (float*)malloc(sizeof(float) * pr_config.top_nodes);
 
   // run pr calculations

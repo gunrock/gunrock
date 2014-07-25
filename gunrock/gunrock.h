@@ -20,17 +20,25 @@
 #include <stdbool.h>
 
 /**
- * @brief Vertex_id datatypes enumerators.
+ * @brief VertexId data type enumerators.
  * TODO: add more data types
  */
 enum VertexIdType
 {
     VTXID_INT, //!< integer type
 };
+/**
+ * @brief SizeT data type enumerators.
+ * TODO: add more data types
+ */
 enum SizeTType
 {
     SIZET_INT, //!< unsigned integer type
 };
+/**
+ * @brief Value data type enumerators.
+ * TODO: add more data types
+ */
 enum ValueType
 {
     VALUE_INT,   //!< integer type
@@ -40,7 +48,6 @@ enum ValueType
 
 /**
  * @brief datatype configuration struct used to specify datatypes
- *
  */
 struct GunrockDataType
 {
@@ -65,26 +72,29 @@ struct GunrockGraph
 };
 
 /**
- * @brief arguments configuration struct used to specify arguments
+ * @brief Source Vertex Mode enumerators.
  */
 enum SrcMode
 {
-    manually,
-    randomize,
-    largest_degree,
+    manually,       //!< manually set up source node
+    randomize,      //!< random generate source node
+    largest_degree, //!< set to largest-degree node
 };
+/**
+ * @brief arguments configuration struct used to specify arguments
+ */
 struct GunrockConfig
 {
-    bool  mark_pred;   //!< whether to mark predecessor or not
-    bool  idempotence; //!< whether or not to enable idempotence
-    int   src_node;    //!< source vertex define where to start
-    int   device;      //!< setting which gpu device to use
-    int   max_iter;    //!< maximum mumber of iterations allowed
-    int   top_nodes;   //!< k value for topk / page_rank problem
+    bool  mark_pred;    //!< whether to mark predecessor or not
+    bool  idempotence;  //!< whether or not to enable idempotence
+    int   src_node;     //!< source vertex define where to start
+    int   device;       //!< setting which gpu device to use
+    int   max_iter;     //!< maximum mumber of iterations allowed
+    int   top_nodes;    //!< k value for topk / page_rank problem
     int   delta_factor; //!< sssp delta-factor parameter
-    float delta;       //!< page rank specific value
-    float error;       //!< page rank specific value
-    float queue_size;  //!< setting frontier queue size
+    float delta;        //!< page rank specific value
+    float error;        //!< page rank specific value
+    float queue_size;   //!< setting frontier queue size
     enum  SrcMode src_mode; //!< source vertex mode rand/largest_degree
 };
 

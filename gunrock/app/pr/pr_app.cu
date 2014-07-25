@@ -9,7 +9,7 @@
  * @file
  * test_pr.cu
  *
- * @brief Gunrock Computing Pagerank Implementation
+ * @brief Gunrock Computing Page Rank Implementation
  */
 
 #include <stdio.h>
@@ -18,11 +18,12 @@
 // Graph construction utils
 #include <gunrock/graphio/market.cuh>
 
-// BFS includes
+// Page Rank includes
 #include <gunrock/app/pr/pr_enactor.cuh>
 #include <gunrock/app/pr/pr_problem.cuh>
 #include <gunrock/app/pr/pr_functor.cuh>
 
+// Moderngpu include
 #include <moderngpu.cuh>
 
 using namespace gunrock;
@@ -36,11 +37,12 @@ struct RankPair
 {
     VertexId vertex_id;
     Value    page_rank;
-    RankPair(VertexId vertex_id, Value page_rank) : vertex_id(vertex_id), page_rank(page_rank) {}
+    RankPair(VertexId vertex_id, Value page_rank) :
+        vertex_id(vertex_id), page_rank(page_rank) {}
 };
 
 template<typename RankPair>
-__inline__ bool PRCompare(
+inline bool PRCompare(
     RankPair elem1,
     RankPair elem2)
 {
@@ -50,14 +52,17 @@ __inline__ bool PRCompare(
 /**
 * Performance/Evaluation statistics
 */
-struct Stats {
+struct Stats
+{
     const char *name;
     Statistic rate;
     Statistic search_depth;
     Statistic redundant_work;
     Statistic duty;
-    Stats() : name(NULL), rate(), search_depth(), redundant_work(), duty() {}
-    Stats(const char *name) : name(name), rate(), search_depth(), redundant_work(), duty() {}
+    Stats() :
+        name(NULL), rate(), search_depth(), redundant_work(), duty() {}
+    Stats(const char *name) :
+        name(name), rate(), search_depth(), redundant_work(), duty() {}
 };
 
 /**
@@ -67,24 +72,24 @@ struct Stats {
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] stats Reference to the Stats object defined in RunTests
- * @param[in] h_rank Host-side vector stores computed page rank values for validation
+ * @param[in] stats Reference to the Stats object defined in run_page_rank
+ * @param[in] h_rank Host-side vector stores computed page rank values
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] elapsed Total elapsed kernel running time
- * @param[in] total_queued Total element queued in BFS kernel running process
- * @param[in] avg_duty Average duty of the BFS kernels
+ * @param[in] total_queued Total element queued in PR kernel running process
+ * @param[in] avg_duty Average duty of the PR kernels
  */
 template<
     typename VertexId,
     typename Value,
     typename SizeT>
 void DisplayStats(
-    Stats               &stats,
-    Value               *h_rank,
+    const Stats     &stats,
+    const Value     *h_rank,
     const Csr<VertexId, Value, SizeT> &graph,
-    double              elapsed,
-    long long           total_queued,
-    double              avg_duty)
+    const double    elapsed,
+    const long long total_queued,
+    const double    avg_duty)
 {
     fflush(stdout);
     // Display test name
@@ -95,14 +100,14 @@ void DisplayStats(
 }
 
 /**
- * @brief run page rank tests
+ * @brief run page rank
  *
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
  *
  * @param[in] graph Reference to the CSR graph we process on
- * @param[in] delta Delta value for computing PageRank, usually set to .85
+ * @param[in] delta Delta value for computing Page Rank, usually set to .85
  * @param[in] error Error threshold value
  * @param[in] max_iter Max iteration for Page Rank computing
  * @param[in] max_grid_size Maximum CTA occupancy
@@ -114,17 +119,17 @@ template <
     typename Value,
     typename SizeT>
 void run_page_rank(
-    GunrockGraph *ggraph_out,
-    VertexId     *node_ids,
-    Value        *page_rank,
+    GunrockGraph   *ggraph_out,
+    VertexId       *node_ids,
+    Value          *page_rank,
     const Csr<VertexId, Value, SizeT> &graph,
-    VertexId     source,
-    Value        delta,
-    Value        error,
-    SizeT        max_iter,
-    int          max_grid_size,
-    int          num_gpus,
-    CudaContext& context)
+    const VertexId source,
+    const Value    delta,
+    const Value    error,
+    const SizeT    max_iter,
+    const int      max_grid_size,
+    const int      num_gpus,
+    CudaContext&   context)
 {
     typedef PRProblem<
         VertexId,
@@ -136,7 +141,7 @@ void run_page_rank(
     VertexId *h_node_id = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
 
     // Allocate Page Rank enactor map
-    PREnactor<false> pr_enactor(false);
+    PREnactor<false> pr_enactor(true);
 
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
@@ -144,7 +149,7 @@ void run_page_rank(
         false,
         graph,
         num_gpus),
-        "Problem PageRank Initialization Failed", __FILE__, __LINE__);
+        "Page Rank Problem Initialization Failed", __FILE__, __LINE__);
 
     Stats *stats = new Stats("GPU Page Rank");
     long long total_queued = 0;
@@ -155,11 +160,11 @@ void run_page_rank(
 
     util::GRError(csr_problem->Reset(
         source, delta, error, pr_enactor.GetFrontierType()),
-        "PageRank Problem Data Reset Failed", __FILE__, __LINE__);
+        "Page Rank Problem Data Reset Failed", __FILE__, __LINE__);
     gpu_timer.Start();
     util::GRError(pr_enactor.template Enact<Problem>(
         context, csr_problem, max_iter, max_grid_size),
-        "PageRank Problem Enact Failed", __FILE__, __LINE__);
+        "Page Rank Problem Enact Failed", __FILE__, __LINE__);
     gpu_timer.Stop();
 
     float elapsed = gpu_timer.ElapsedMillis();
@@ -168,7 +173,7 @@ void run_page_rank(
 
     // Copy out results
     util::GRError(csr_problem->Extract(h_rank, h_node_id),
-        "PageRank Problem Data Extraction Failed", __FILE__, __LINE__);
+        "Page Rank Problem Data Extraction Failed", __FILE__, __LINE__);
 
     DisplayStats(
         *stats,
@@ -181,7 +186,8 @@ void run_page_rank(
     // Cleanup
     delete stats;
     if (csr_problem) delete csr_problem;
-    if (h_rank) free(h_rank);
+    if (h_node_id)   free(h_node_id);
+    if (h_rank)      free(h_rank);
 
     cudaDeviceSynchronize();
 }
@@ -198,13 +204,13 @@ void run_page_rank(
  * @param[in]  context    moderngpu context
  */
 void dispatch_page_rank(
-    GunrockGraph       *ggraph_out,
-    void               *node_ids,
-    void               *page_rank,
-    const GunrockGraph *ggraph_in,
-    GunrockConfig      pr_config,
-    GunrockDataType    data_type,
-    CudaContext&       context)
+    GunrockGraph          *ggraph_out,
+    void                  *node_ids,
+    void                  *page_rank,
+    const GunrockGraph    *ggraph_in,
+    const GunrockConfig   pr_config,
+    const GunrockDataType data_type,
+    CudaContext&          context)
 {
     switch (data_type.VTXID_TYPE) {
     case VTXID_INT: {
@@ -225,17 +231,17 @@ void dispatch_page_rank(
                 // template type = <int, float, int>
                 // build input csr format graph
                 Csr<int, float, int> csr_graph(false);
-                csr_graph.nodes = ggraph_in->num_nodes;
-                csr_graph.edges = ggraph_in->num_edges;
+                csr_graph.nodes          = ggraph_in->num_nodes;
+                csr_graph.edges          = ggraph_in->num_edges;
                 csr_graph.row_offsets    = (int*)ggraph_in->row_offsets;
                 csr_graph.column_indices = (int*)ggraph_in->col_indices;
 
                 // page rank configurations
-                float delta         = 0.85f; //!< use whatever the specified graph-type's default is
+                float delta         = 0.85f; //!< default delta value
                 float error         = 0.01f; //!< error threshold
                 int   max_iter      = 20;    //!< maximum number of iterations
-                int   max_grid_size = 0;     //!< maximum grid size (0: leave it up to the enactor)
-                int   num_gpus      = 1;     //!< number of GPUs for multi-gpu enactor to use
+                int   max_grid_size = 0;     //!< 0: leave it up to the enactor
+                int   num_gpus      = 1;     //!< for multi-gpu enactor to use
                 int   src_node      = -1;    //!< source node to start
 
                 // determine source vertex to start sssp
@@ -304,12 +310,12 @@ void dispatch_page_rank(
  * @param[in]  data_type  gunrock datatype struct
  */
 void gunrock_pr(
-    GunrockGraph       *ggraph_out,
-    void               *node_ids,
-    void               *page_rank,
-    const GunrockGraph *ggraph_in,
-    GunrockConfig      pr_config,
-    GunrockDataType    data_type)
+    GunrockGraph          *ggraph_out,
+    void                  *node_ids,
+    void                  *page_rank,
+    const GunrockGraph    *ggraph_in,
+    const GunrockConfig   pr_config,
+    const GunrockDataType data_type)
 {
     // moderngpu preparations
     int device = 0;
