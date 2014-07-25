@@ -137,11 +137,11 @@ void run_page_rank(
         Value> Problem;
 
     // Allocate host-side label array for gpu-computed results
-    Value    *h_rank    = (Value*)malloc(sizeof(Value) * graph.nodes);
-    VertexId *h_node_id = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+    //Value    *h_rank    = (Value*)malloc(sizeof(Value) * graph.nodes);
+    //VertexId *h_node_id = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
 
     // Allocate Page Rank enactor map
-    PREnactor<false> pr_enactor(true);
+    PREnactor<false> pr_enactor(false);
 
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
@@ -172,7 +172,7 @@ void run_page_rank(
     pr_enactor.GetStatistics(total_queued, avg_duty);
 
     // Copy out results
-    util::GRError(csr_problem->Extract(h_rank, h_node_id),
+    util::GRError(csr_problem->Extract(page_rank, node_ids),
         "Page Rank Problem Data Extraction Failed", __FILE__, __LINE__);
 
     DisplayStats(
@@ -186,8 +186,8 @@ void run_page_rank(
     // Cleanup
     delete stats;
     if (csr_problem) delete csr_problem;
-    if (h_node_id)   free(h_node_id);
-    if (h_rank)      free(h_rank);
+    //if (h_node_id)   free(h_node_id);
+    //if (h_rank)      free(h_rank);
 
     cudaDeviceSynchronize();
 }

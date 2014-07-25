@@ -13,19 +13,19 @@ int main(int argc, char* argv[])
 {
   // define data types
   struct GunrockDataType data_type;
-  data_type.VTXID_TYPE = VTXID_INT;
-  data_type.SIZET_TYPE = SIZET_INT;
-  data_type.VALUE_TYPE = VALUE_FLOAT;
+  data_type.VTXID_TYPE = VTXID_INT;   //!< integer type vertex_ids
+  data_type.SIZET_TYPE = SIZET_INT;   //!< integer type graph size
+  data_type.VALUE_TYPE = VALUE_FLOAT; //!< float type value for pr
 
   // pr configurations (optional)
   struct GunrockConfig pr_config;
-  pr_config.device    =     0;
-  pr_config.delta     = 0.85f;
-  pr_config.error     = 0.01f;
-  pr_config.max_iter  =    20;
-  pr_config.top_nodes =    10;
-  pr_config.src_node  =    -1;
-  pr_config.src_mode  = manually;
+  pr_config.device    =     0; //!< use device 0
+  pr_config.delta     = 0.85f; //!< default delta value
+  pr_config.error     = 0.01f; //!< default error threshold
+  pr_config.max_iter  =    20; //!< maximum number of iterations
+  pr_config.top_nodes =    10; //!< number of top nodes
+  pr_config.src_node  =    -1; //!< source node to begin page rank
+  pr_config.src_mode  = manually; //!< set source node manually
 
   // define graph (undirected graph)
   size_t num_nodes = 4;
