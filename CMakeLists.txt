@@ -216,6 +216,26 @@ endif(GUNROCK_BUILD_APPLICATIONS)
 
 enable_testing()
 
+add_test(NAME TestBFS COMMAND test_bfs)
+set_tests_properties(TestBFS
+    PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*2.*: Label.*1")
+
+add_test(NAME TestBC COMMAND test_bc)
+set_tests_properties(TestBC
+    PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*0.*: BC.*0.500000")
+
+add_test(NAME TestCC COMMAND test_cc)
+set_tests_properties(TestCC
+    PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*1.*: Component_ID.*0")
+
+add_test(NAME TestSSSP COMMAND test_sssp)
+set_tests_properties(TestSSSP
+    PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*1.*: Label.*39.*: Predecessor.*0")
+
+add_test(NAME TestPR COMMAND test_pr)
+set_tests_properties(TestPR
+    PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*0.*: Page Rank.*1.419649.")
+
 add_test(NAME TestTopK COMMAND test_topk)
 set_tests_properties(TestTopK
     PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*2.*: CV.*6")
