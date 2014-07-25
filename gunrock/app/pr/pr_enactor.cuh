@@ -210,6 +210,8 @@ class PREnactor : public EnactorBase
         cudaError_t retval = cudaSuccess;
 
         do {
+
+            unsigned int *d_scanned_edges = NULL;
             if (DEBUG) {
                 printf("Iteration, Edge map queue, Vertex map queue\n");
                 printf("0");
@@ -229,6 +231,13 @@ class PREnactor : public EnactorBase
             // Single-gpu graph slice
             typename PRProblem::GraphSlice *graph_slice = problem->graph_slices[0];
             typename PRProblem::DataSlice *data_slice = problem->d_data_slices[0];
+
+            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_scanned_edges,
+                                graph_slice->edges * sizeof(unsigned int)),
+                            "SSSPProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
+            }
 
             frontier_attribute.queue_length         = graph_slice->nodes;
             frontier_attribute.queue_index          = 0;        // Work queue index
@@ -254,7 +263,7 @@ class PREnactor : public EnactorBase
                     (VertexId*)NULL,
                     (bool*)NULL,
                     (bool*)NULL,
-                    (unsigned int*)NULL,
+                    d_scanned_edges,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],            // d_out_queue
                     (VertexId*)NULL,
@@ -270,7 +279,11 @@ class PREnactor : public EnactorBase
                     gunrock::oprtr::advance::V2V);
 
               if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
-                      "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break; 
+                      "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+
+            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
+                    if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                }
 
               gunrock::oprtr::filter::Kernel<FilterKernelPolicy, PRProblem, RemoveZeroFunctor>
                 <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
@@ -315,7 +328,7 @@ class PREnactor : public EnactorBase
             // Step through PR iterations 
             while (done[0] < 0) {
 
-                if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, edge_map_queue_len)) break;
+                frontier_attribute.queue_length = edge_map_queue_len;
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, PRProblem, PrFunctor>(
                     d_done,
@@ -325,7 +338,7 @@ class PREnactor : public EnactorBase
                     (VertexId*)NULL,
                     (bool*)NULL,
                     (bool*)NULL,
-                    (unsigned int*)NULL,
+                    d_scanned_edges,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],            // d_out_queue
                     (VertexId*)NULL,
@@ -342,8 +355,6 @@ class PREnactor : public EnactorBase
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates 
-
-                frontier_attribute.queue_index++;
 
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
@@ -366,12 +377,12 @@ class PREnactor : public EnactorBase
                         "PREnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
                 }
 
-                if (frontier_attribute.queue_reset)
-                    frontier_attribute.queue_reset = false;
+                /*if (frontier_attribute.queue_reset)
+                    frontier_attribute.queue_reset = false;*/
 
                 if (done[0] == 0) break; 
                 
-                if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, edge_map_queue_len)) break;
+                frontier_attribute.queue_length = edge_map_queue_len;
 
                 // Vertex Map
                 gunrock::oprtr::filter::Kernel<FilterKernelPolicy, PRProblem, PrFunctor>
@@ -398,8 +409,8 @@ class PREnactor : public EnactorBase
                 enactor_stats.iteration++;
                 frontier_attribute.queue_index++;
 
-
                 if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+
                 //num_elements = queue_length;
 
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_next,
@@ -455,6 +466,9 @@ class PREnactor : public EnactorBase
         if (util::GRError((retval = cudaFree(d_temp_storage)), "sort PR free d_temp_storage failed", __FILE__, __LINE__)) return retval;
         if (util::GRError((retval = cudaFree(node_id)), "sort PR free node_id failed", __FILE__, __LINE__)) return retval;
         if (util::GRError((retval = cudaFree(rank_curr)), "sort PR free rank_curr failed", __FILE__, __LINE__)) return retval;
+
+
+        if (d_scanned_edges) cudaFree(d_scanned_edges);
 
         } while(0); 
 
@@ -516,7 +530,7 @@ class PREnactor : public EnactorBase
                 32,                            // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7,                                  // LOG_SCHEDULE_GRANULARITY
-                gunrock::oprtr::advance::TWC_FORWARD>
+                gunrock::oprtr::advance::LB>
                     AdvanceKernelPolicy;
 
             return EnactPR<AdvanceKernelPolicy, FilterKernelPolicy, PRProblem>(
