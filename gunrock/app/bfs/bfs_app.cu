@@ -231,9 +231,10 @@ void run_bfs(
  * @brief dispatch function to handle data_types
  *
  * @param[out] ggraph_out GunrockGraph type output
- * @param[in]  ggraph_in GunrockGraph type input graph
- * @param[in]  bfs specific configurations
- * @param[in]  bfs data_type configurations
+ * @param[in]  ggraph_in  GunrockGraph type input graph
+ * @param[in]  bfs_config bfs specific configurations
+ * @param[in]  data_type  bfs data_type configurations
+ * @param[in]  context    moderngpu context
  */
 void dispatch_bfs(
   GunrockGraph       *ggraph_out,
@@ -376,7 +377,7 @@ void dispatch_bfs(
 * @param[in]  bfs_config gunrock primitive specific configurations
 * @param[in]  data_type  gunrock datatype struct
 */
-void gunrock_bfs(
+void gunrock_bfs_func(
   GunrockGraph       *ggraph_out,
   const GunrockGraph *ggraph_in,
   GunrockConfig      bfs_config,

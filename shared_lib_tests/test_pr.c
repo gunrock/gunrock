@@ -24,14 +24,14 @@ int main(int argc, char* argv[])
   pr_config.error     = 0.01f; //!< default error threshold
   pr_config.max_iter  =    20; //!< maximum number of iterations
   pr_config.top_nodes =    10; //!< number of top nodes
-  pr_config.src_node  =    -1; //!< source node to begin page rank
+  pr_config.src_node  =     0; //!< source node to begin page rank
   pr_config.src_mode  = manually; //!< set source node manually
 
   // define graph (undirected graph)
-  size_t num_nodes = 4;
-  size_t num_edges = 8;
-  int row_offsets[5] = {0, 3, 5, 6, 8};
-  int col_indices[8] = {1, 2, 3, 2, 3, 0, 0, 2};
+  size_t num_nodes = 7;
+  size_t num_edges = 26;
+  int row_offsets[8] = {0,3,6,11,15,19,23,26};
+  int col_indices[26] = {1,2,3,0,2,4,0,1,3,4,5,0,2,5,6,1,2,5,6,2,3,4,6,3,4,5};
 
   // build graph as input
   struct GunrockGraph *graph_input =
@@ -44,11 +44,11 @@ int main(int argc, char* argv[])
   // malloc output graph
   struct GunrockGraph *graph_output =
     (struct GunrockGraph*)malloc(sizeof(struct GunrockGraph));
-  int   *node_ids  = ( int* )malloc(sizeof( int ) * pr_config.top_nodes);
+  int   *node_ids  = (int*)malloc(sizeof(int) * pr_config.top_nodes);
   float *page_rank = (float*)malloc(sizeof(float) * pr_config.top_nodes);
 
   // run pr calculations
-  gunrock_pr(
+  gunrock_pr_func(
     graph_output,
     node_ids,
     page_rank,

@@ -234,7 +234,7 @@ set_tests_properties(TestSSSP
 
 add_test(NAME TestPR COMMAND test_pr)
 set_tests_properties(TestPR
-    PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*0.*: Page Rank.*1.419649.")
+    PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*2.*: Page Rank.*0.125826.")
 
 add_test(NAME TestTopK COMMAND test_topk)
 set_tests_properties(TestTopK

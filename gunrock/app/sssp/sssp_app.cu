@@ -67,14 +67,14 @@ template<
     typename Value,
     typename SizeT>
 void DisplayStats(
-    Stats               &stats,
-    VertexId            source,
-    unsigned int        *h_labels,
+    const Stats        &stats,
+    const VertexId     source,
+    const unsigned int *h_labels,
     const Csr<VertexId, Value, SizeT> &graph,
-    double              elapsed,
-    VertexId            search_depth,
-    long long           total_queued,
-    double              avg_duty)
+    const double       elapsed,
+    const VertexId     search_depth,
+    const long long    total_queued,
+    const double       avg_duty)
 {
     // Compute nodes and edges visited
     SizeT edges_visited = 0;
@@ -140,14 +140,14 @@ template <
     typename SizeT,
     bool MARK_PREDECESSORS>
 void run_sssp(
-    GunrockGraph *ggraph_out,
-    VertexId     *predecessor,
+    GunrockGraph   *ggraph_out,
+    VertexId       *predecessor,
     const Csr<VertexId, Value, SizeT> &graph,
-    VertexId     source,
-    int          max_grid_size,
-    float        queue_sizing,
-    int          num_gpus,
-    int          delta_factor,
+    const VertexId source,
+    const int      max_grid_size,
+    const float    queue_sizing,
+    const int      num_gpus,
+    const int      delta_factor,
     CudaContext& context)
 {
     // Preparations
@@ -228,19 +228,20 @@ void run_sssp(
 /**
  * @brief dispatch function to handle data_types
  *
- * @param[out] ggraph_out GunrockGraph type output
+ * @param[out] ggraph_out  GunrockGraph type output
  * @param[out] predecessor return predeessor if mark_pred = true
- * @param[in]  ggraph_in GunrockGraph type input graph
- * @param[in]  sssp specific configurations
- * @param[in]  sssp data_type configurations
+ * @param[in]  ggraph_in   GunrockGraph type input graph
+ * @param[in]  sssp_config sssp specific configurations
+ * @param[in]  data_type   sssp data_type configurations
+ * @param[in]  context     moderngpu context
  */
 void dispatch_sssp(
-    GunrockGraph       *ggraph_out,
-    void               *predecessor,
-    const GunrockGraph *ggraph_in,
-    GunrockConfig      sssp_config,
-    GunrockDataType    data_type,
-    CudaContext&       context)
+    GunrockGraph          *ggraph_out,
+    void                  *predecessor,
+    const GunrockGraph    *ggraph_in,
+    const GunrockConfig   sssp_config,
+    const GunrockDataType data_type,
+    CudaContext&          context)
 {
     switch (data_type.VTXID_TYPE) {
     case VTXID_INT: {
@@ -362,12 +363,12 @@ void dispatch_sssp(
  * @param[in]  sssp_config gunrock primitive specific configurations
  * @param[in]  data_type   data_type configurations
  */
-void gunrock_sssp(
-    GunrockGraph       *ggraph_out,
-    void               *predecessor,
-    const GunrockGraph *ggraph_in,
-    GunrockConfig      sssp_config,
-    GunrockDataType    data_type)
+void gunrock_sssp_func(
+    GunrockGraph          *ggraph_out,
+    void                  *predecessor,
+    const GunrockGraph    *ggraph_in,
+    const GunrockConfig   sssp_config,
+    const GunrockDataType data_type)
 {
     // moderngpu preparations
     int device = 0;

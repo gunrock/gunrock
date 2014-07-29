@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
   int *predecessor = (int*)malloc(sizeof(int) * num_nodes);
 
   // run sssp calculations
-  gunrock_sssp(
+  gunrock_sssp_func(
     graph_output,
     predecessor,
     graph_input,

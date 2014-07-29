@@ -127,8 +127,8 @@ template <
 void run_cc(
     GunrockGraph *ggraph_out,
     const Csr<VertexId, Value, SizeT> &csr_graph,
-    int          max_grid_size,
-    int          num_gpus)
+    const int    max_grid_size,
+    const int    num_gpus)
 {
     // Define CCProblem
     typedef CCProblem<
@@ -200,10 +200,10 @@ void run_cc(
  * @param[in]  data_type  data type configurations
  */
 void dispatch_cc(
-    GunrockGraph       *ggraph_out,
-    const GunrockGraph *ggraph_in,
-    GunrockConfig      cc_config,
-    GunrockDataType    data_type)
+    GunrockGraph          *ggraph_out,
+    const GunrockGraph    *ggraph_in,
+    const GunrockConfig   cc_config,
+    const GunrockDataType data_type)
 {
     switch (data_type.VTXID_TYPE) {
     case VTXID_INT: {
@@ -261,11 +261,11 @@ void dispatch_cc(
 * @param[in]  cc_configs primitive specific configurations
 * @param[in]  data_type  gunrock data_type struct
 */
-void gunrock_cc(
-    GunrockGraph       *ggraph_out,
-    const GunrockGraph *ggraph_in,
-    GunrockConfig      cc_configs,
-    GunrockDataType    data_type)
+void gunrock_cc_func(
+    GunrockGraph          *ggraph_out,
+    const GunrockGraph    *ggraph_in,
+    const GunrockConfig   cc_configs,
+    const GunrockDataType data_type)
 {
     // lunch dispatch function
     dispatch_cc(ggraph_out, ggraph_in, cc_configs, data_type);

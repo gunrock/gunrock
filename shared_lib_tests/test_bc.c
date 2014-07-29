@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
   // define graph (undirected graph)
   size_t num_nodes = 7;
   size_t num_edges = 26;
-  unsigned int row_offsets[8] = {0, 3, 6, 11, 15, 19, 23, 26};
+  int row_offsets[8] = {0, 3, 6, 11, 15, 19, 23, 26};
   int col_indices[26] = {1, 2, 3, 0, 2, 4, 0, 1, 3, 4, 5, 0, 2, 5, 6, 1, 2, 5, 6, 2, 3, 4, 6, 3, 4, 5};
 
   // build graph as input
@@ -42,7 +42,7 @@ int main(int argc, char* argv[])
     (struct GunrockGraph*)malloc(sizeof(struct GunrockGraph));
 
   // run bc calculations
-  gunrock_bc(
+  gunrock_bc_func(
     graph_output,
     graph_input,
     bc_config,

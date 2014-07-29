@@ -23,13 +23,13 @@ int main(int argc, char* argv[])
   bfs_config.src_mode    = randomize;
   bfs_config.src_node    = 1;     //!< source vertex to begin search
   bfs_config.mark_pred   = false; //!< do not mark predecessors
-  bfs_config.idempotence = false;
+  bfs_config.idempotence = false; //!< wether enable idempotence
   bfs_config.queue_size  = 1.0f;
 
   // define graph
   size_t num_nodes = 7;
   size_t num_edges = 15;
-  unsigned int row_offsets[8] = {0,3,6,9,11,14,15,15};
+  int row_offsets[8] = {0,3,6,9,11,14,15,15};
   int col_indices[15] = {1,2,3,0,2,4,3,4,5,5,6,2,5,6,6};
 
   // build graph as input
@@ -45,7 +45,7 @@ int main(int argc, char* argv[])
     (struct GunrockGraph*)malloc(sizeof(struct GunrockGraph));
 
   // run bfs calculations
-  gunrock_bfs(
+  gunrock_bfs_func(
     graph_output,
     graph_input,
     bfs_config,
@@ -63,6 +63,7 @@ int main(int argc, char* argv[])
 
   if (graph_input)  { free(graph_input);  }
   if (graph_output) { free(graph_output); }
+  if (labels)       { free(labels);       }
 
   return 0;
 }

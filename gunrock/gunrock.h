@@ -21,23 +21,22 @@
 
 /**
  * @brief VertexId data type enumerators.
- * TODO: add more data types
  */
 enum VertexIdType
 {
     VTXID_INT, //!< integer type
 };
+
 /**
  * @brief SizeT data type enumerators.
- * TODO: add more data types
  */
 enum SizeTType
 {
     SIZET_INT, //!< unsigned integer type
 };
+
 /**
  * @brief Value data type enumerators.
- * TODO: add more data types
  */
 enum ValueType
 {
@@ -80,6 +79,7 @@ enum SrcMode
     randomize,      //!< random generate source node
     largest_degree, //!< set to largest-degree node
 };
+
 /**
  * @brief arguments configuration struct used to specify arguments
  */
@@ -95,7 +95,7 @@ struct GunrockConfig
     float delta;        //!< page rank specific value
     float error;        //!< page rank specific value
     float queue_size;   //!< setting frontier queue size
-    enum  SrcMode src_mode; //!< source vertex mode rand/largest_degree
+    enum  SrcMode src_mode; //!< source mode rand/largest_degree
 };
 
 #ifdef __cplusplus
@@ -103,28 +103,28 @@ extern "C" {
 #endif
 
 // BFS Function Define
-void gunrock_bfs(
+void gunrock_bfs_func(
     struct GunrockGraph       *graph_out,
     const struct GunrockGraph *graph_in,
     struct GunrockConfig      configs,
     struct GunrockDataType    data_type);
 
 // BC Function Define
-void gunrock_bc(
+void gunrock_bc_func(
     struct GunrockGraph       *graph_out,
     const struct GunrockGraph *graph_in,
     struct GunrockConfig      configs,
     struct GunrockDataType    data_type);
 
 // CC Function Define
-void gunrock_cc(
+void gunrock_cc_func(
     struct GunrockGraph       *graph_out,
     const struct GunrockGraph *graph_in,
     struct GunrockConfig      configs,
     struct GunrockDataType    data_type);
 
 // SSSP Function Define
-void gunrock_sssp(
+void gunrock_sssp_func(
     struct GunrockGraph       *graph_out,
     void                      *predecessor,
     const struct GunrockGraph *graph_in,
@@ -132,7 +132,7 @@ void gunrock_sssp(
     struct GunrockDataType    data_type);
 
 // PR Function Define
-void gunrock_pr(
+void gunrock_pr_func(
     struct GunrockGraph       *graph_out,
     void                      *node_ids,
     void                      *page_rank,
@@ -141,7 +141,7 @@ void gunrock_pr(
     struct GunrockDataType    data_type);
 
 // TopK Function Define
-void gunrock_topk(
+void gunrock_topk_func(
     struct GunrockGraph       *graph_out,
     void                      *node_ids,
     void                      *centrality,

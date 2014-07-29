@@ -309,7 +309,7 @@ void dispatch_page_rank(
  * @param[in]  pr_config  gunrock primitive specific configurations
  * @param[in]  data_type  gunrock datatype struct
  */
-void gunrock_pr(
+void gunrock_pr_func(
     GunrockGraph          *ggraph_out,
     void                  *node_ids,
     void                  *page_rank,

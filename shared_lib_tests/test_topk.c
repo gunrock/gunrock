@@ -13,14 +13,14 @@ int main(int argc, char* argv[])
   topk_config.device    = 0;
   topk_config.top_nodes = 3;
 
-  // define graph
+  // define graph (directed, reversed and non-reversed)
   size_t num_nodes = 7;
   size_t num_edges = 15;
 
-  unsigned int row_offsets[8] = {0,3,6,9,11,14,15,15};
+  int row_offsets[8] = {0,3,6,9,11,14,15,15};
   int col_indices[15] = {1,2,3,0,2,4,3,4,5,5,6,2,5,6,6};
 
-  unsigned int col_offsets[8] = {0,1,2,5,7,9,12,15};
+  int col_offsets[8] = {0,1,2,5,7,9,12,15};
   int row_indices[15] = {1,0,0,1,4,0,2,1,2,2,3,4,3,4,5};
 
   // build graph as input
@@ -36,11 +36,11 @@ int main(int argc, char* argv[])
   // malloc output result arrays
   struct GunrockGraph *graph_output =
     (struct GunrockGraph*)malloc(sizeof(struct GunrockGraph));
-  int *node_ids          = (int*)malloc(sizeof(int) * topk_config.top_nodes);
+  int *node_ids   = (int*)malloc(sizeof(int) * topk_config.top_nodes);
   int *centrality = (int*)malloc(sizeof(int) * topk_config.top_nodes);
 
   // run topk calculations
-  gunrock_topk(
+  gunrock_topk_func(
     graph_output,
     node_ids,
     centrality,
@@ -56,9 +56,9 @@ int main(int argc, char* argv[])
     printf("Node ID [%d] : CV [%d] \n", node_ids[i], centrality[i]);
   }
 
-  if (centrality) free(centrality);
-  if (node_ids)          free(node_ids);
-  if (graph_input)       free(graph_input);
-  if (graph_output)      free(graph_output);
+  if (centrality)   free(centrality);
+  if (node_ids)     free(node_ids);
+  if (graph_input)  free(graph_input);
+  if (graph_output) free(graph_output);
   return 0;
 }

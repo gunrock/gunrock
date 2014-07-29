@@ -140,9 +140,10 @@ void run_bc(
  * @brief dispatch function to handle data_types
  *
  * @param[out] ggraph_out GunrockGraph type output
- * @param[in]  ggraph_in GunrockGraph type input graph
- * @param[in]  bc specific configurations
- * @param[in]  bc data_type configurations
+ * @param[in]  ggraph_in  GunrockGraph type input graph
+ * @param[in]  bc_config  bc specific configurations
+ * @param[in]  data_type  bc data_type configurations
+ * @param[in]  context    moderngpu context
  */
 void dispatch_bc(
     GunrockGraph       *ggraph_out,
@@ -241,7 +242,7 @@ void dispatch_bc(
 * @param[in]  bc_config  gunrock primitive specific configurations
 * @param[in]  data_type  gunrock datatype struct
 */
-void gunrock_bc(
+void gunrock_bc_func(
     GunrockGraph       *ggraph_out,
     const GunrockGraph *ggraph_in,
     GunrockConfig      bc_config,

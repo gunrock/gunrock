@@ -24,7 +24,7 @@ int main(int argc, char* argv[])
   // define graph
   size_t num_nodes = 7;
   size_t num_edges = 15;
-  unsigned int row_offsets[8] = {0,3,6,9,11,14,15,15};
+  int row_offsets[8] = {0,3,6,9,11,14,15,15};
   int col_indices[15] = {1,2,3,0,2,4,3,4,5,5,6,2,5,6,6};
 
   // build graph as input
@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
     (struct GunrockGraph*)malloc(sizeof(struct GunrockGraph));
 
   // run connected component calculations
-  gunrock_cc(
+  gunrock_cc_func(
     graph_output,
     graph_input,
     configs,

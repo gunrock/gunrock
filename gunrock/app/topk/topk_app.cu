@@ -50,19 +50,20 @@ int binary_search(
     SizeT    right)
 {
     while (left <= right) {
-	int mid = (left + right) / 2;
-	if (arr[mid] == val)
-	    return arr[mid];
-	else if (arr[mid] > val)
-	    right = mid - 1;
-	else
-	    left = mid + 1;
+		int mid = (left + right) / 2;
+		if (arr[mid] == val) {
+		    return arr[mid];
+		} else if (arr[mid] > val) {
+		    right = mid - 1;
+		} else {
+		    left = mid + 1;
+		}
     }
     return -1;
 }
 
 /**
- * @brief Build SubGraph Contains Only Top K Nodes
+ * @brief Build Sub-Graph Contains Only Top K Nodes
  *
  * @tparam VertexId
  * @tparam SizeT
@@ -90,41 +91,43 @@ void build_topk_subgraph(
 
     // build row_offsets and col_indices of sub-graph
     sub_row_offsets.push_back(0); // start of row_offsets
-    for (int i = 0; i < top_nodes; ++i) {
-	for (int j = 0; j < top_nodes; ++j) {
-	    /*
-	    // debug print
-	    printf("searching %d in column_indices[%d, %d) = [", node_ids[j],
-	    graph_original.row_offsets[node_ids[i]],
-	    graph_original.row_offsets[node_ids[i]+1]);
-	    for (int k = graph_original.row_offsets[node_ids[i]];
-	    k < graph_original.row_offsets[node_ids[i]+1]; ++k)
-	    {
-	    printf(" %d", graph_original.column_indices[k]);
-	    }
-	    printf("]\n");
-	    */
-
-	    search_return = binary_search<VertexId, SizeT>(
-		graph_original.column_indices,
-		node_ids[j],
-		graph_original.row_offsets[node_ids[i]],    // [left
-		graph_original.row_offsets[node_ids[i]+1]); // right)
-	    // filter col_indices
-	    if (search_return != -1) {
-		++search_count;
-		// TODO: improve efficiency
-		search_return = std::find(
-		    node_ids_vec.begin(),
-		    node_ids_vec.end(),
-		    search_return) - node_ids_vec.begin();
-		sub_col_indices.push_back(search_return);
-	    }
-	}
-	// build sub_row_offsets
-	search_count += sub_row_offsets[sub_row_offsets.size()-1];
-	sub_row_offsets.push_back(search_count);
-	search_count = 0;
+    for (int i = 0; i < top_nodes; ++i)
+    {
+		for (int j = 0; j < top_nodes; ++j)
+		{
+		    /*
+		    // debug print
+		    printf("searching %d in column_indices[%d, %d) = [", node_ids[j],
+		    graph_original.row_offsets[node_ids[i]],
+		    graph_original.row_offsets[node_ids[i]+1]);
+		    for (int k = graph_original.row_offsets[node_ids[i]];
+		    k < graph_original.row_offsets[node_ids[i]+1]; ++k)
+		    {
+		    printf(" %d", graph_original.column_indices[k]);
+		    }
+		    printf("]\n");
+		    */
+		    search_return = binary_search<VertexId, SizeT>(
+			graph_original.column_indices,
+			node_ids[j],
+			graph_original.row_offsets[node_ids[i]],    // [left
+			graph_original.row_offsets[node_ids[i]+1]); // right)
+		    // filter col_indices
+		    if (search_return != -1)
+		    {
+				++search_count;
+				// TODO: improve efficiency
+				search_return = std::find(
+				    node_ids_vec.begin(),
+				    node_ids_vec.end(),
+				    search_return) - node_ids_vec.begin();
+				sub_col_indices.push_back(search_return);
+		    }
+		}
+		// build sub_row_offsets
+		search_count += sub_row_offsets[sub_row_offsets.size()-1];
+		sub_row_offsets.push_back(search_count);
+		search_count = 0;
     }
 
     // generate subgraph of top k nodes
@@ -172,13 +175,13 @@ template <
     typename VertexId,
     typename Value,
     typename SizeT>
-void topk_run(
+void run_topk(
     GunrockGraph *graph_out,
     VertexId	 *node_ids,
     Value	 	 *centrality,
     const Csr<VertexId, Value, SizeT> &graph_original,
     const Csr<VertexId, Value, SizeT> &graph_reversed,
-    SizeT 		 top_nodes)
+    SizeT        top_nodes)
 {
     // preparations
     typedef TOPKProblem<VertexId, SizeT, Value> Problem;
@@ -231,18 +234,20 @@ void topk_run(
 /**
  * @brief dispatch function to handle data_types
  *
- * @param[out] ggraph_out GunrockGraph type output
- * @param[in]  ggraph_in GunrockGraph type input graph
- * @param[in]  topk specific configurations
- * @param[in]  topk data_type configurations
+ * @param[out] ggraph_out  GunrockGraph type output
+ * @param[out] node_ids    output top k node ids
+ * @param[out] centrality  output top k centralities
+ * @param[in]  ggraph_in   GunrockGraph type input graph
+ * @param[in]  topk_config topk specific configurations
+ * @param[in]  data_type   topk data_type configurations
  */
 void dispatch_topk(
-    GunrockGraph       *ggraph_out,
-    void               *node_ids,
-    void               *centrality,
-    const GunrockGraph *ggraph_in,
-    GunrockConfig      topk_config,
-    GunrockDataType    data_type)
+    GunrockGraph       	  *ggraph_out,
+    void               	  *node_ids,
+    void               	  *centrality,
+    const GunrockGraph 	  *ggraph_in,
+    const GunrockConfig   topk_config,
+    const GunrockDataType data_type)
 {
     switch (data_type.VTXID_TYPE) {
     case VTXID_INT: {
@@ -267,7 +272,7 @@ void dispatch_topk(
 
 				//graph_original.DisplayGraph();
 
-				topk_run<int, int, int>(
+				run_topk<int, int, int>(
 					ggraph_out,
 					(int*)node_ids,
 					(int*)centrality,
@@ -311,13 +316,13 @@ void dispatch_topk(
  * @param[in]  topk_config gunrock primitive specific configurations
  * @param[in]  data_type   gunrock datatype struct
  */
-void gunrock_topk(
-    GunrockGraph       *ggraph_out,
-    void               *node_ids,
-    void               *centrality,
-    const GunrockGraph *ggraph_in,
-    GunrockConfig	   topk_config,
-    GunrockDataType    data_type)
+void gunrock_topk_func(
+    GunrockGraph      	  *ggraph_out,
+    void              	  *node_ids,
+    void              	  *centrality,
+    const GunrockGraph 	  *ggraph_in,
+    const GunrockConfig	  topk_config,
+    const GunrockDataType data_type)
 {
    	// launch topk dispatch function
    	dispatch_topk(
