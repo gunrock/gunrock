@@ -1,8 +1,8 @@
 # gunrock test rig cmake file
 #include_directories(${gunrock_INCLUDE_DIRS}/gunrock)
 
-add_executable (demo demo.c)
-target_link_libraries(demo gunrock)
+#add_executable (demo demo.c)
+#target_link_libraries(demo gunrock)
 
 add_executable (test_topk test_topk.c)
 target_link_libraries(test_topk gunrock)
