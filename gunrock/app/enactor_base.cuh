@@ -125,23 +125,29 @@ bool All_Done(EnactorStats *enactor_stats,
     template <typename VertexId, typename SizeT>
     __global__ void Copy_Preds (
         const SizeT     num_elements,
+        const SizeT     nodes,
         const VertexId* keys,
         const VertexId* in_preds,
-              VertexId* out_preds)
+              VertexId* out_preds,
+              unsigned char* temp_marker)
     {   
         VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
         if (x>=num_elements) return;
         VertexId t = keys[x];
         out_preds[t]=in_preds[t];
+        //if (in_preds[t] >= nodes || (t==4651 && nodes==219953))
+        //    printf("x=%d, key=%d, p=%d, nodes=%d\n", x, t, in_preds[t], nodes);
     }   
 
     template <typename VertexId, typename SizeT>
     __global__ void Update_Preds (
         const SizeT     num_elements,
+        const SizeT     nodes,
         const VertexId* keys,
         const VertexId* org_vertexs,
         const VertexId* in_preds,
-              VertexId* out_preds)
+              VertexId* out_preds,
+              unsigned char* temp_marker)
     {   
         VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
         /*long long x= blockIdx.y;
@@ -152,7 +158,13 @@ bool All_Done(EnactorStats *enactor_stats,
         if (x>=num_elements) return;
         VertexId t = keys[x];
         VertexId p = in_preds[t];
-        out_preds[t]=org_vertexs[p];
+        temp_marker[t]++;
+        if (p>=nodes) //|| (t==4651 && nodes==219953)) 
+        {
+            //printf("x=%d, key=%d, p=%d, tm=%d, nodes=%d\n", x, t, p, temp_marker[t], nodes);
+        } else {
+            out_preds[t]=org_vertexs[p];
+        }
     }   
 
     template <typename VertexId, typename SizeT>

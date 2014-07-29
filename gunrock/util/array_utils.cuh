@@ -232,12 +232,12 @@ public:
     {
         if (target == HOST  ) 
         {
-            if (ARRAY_DEBUG) {printf("%s \tpointer on HOST   get = %p\n", name.c_str(), h_pointer);fflush(stdout);}
+            //if (ARRAY_DEBUG) {printf("%s \tpointer on HOST   get = %p\n", name.c_str(), h_pointer);fflush(stdout);}
             return h_pointer;
         }
         if (target == DEVICE) 
         {
-            if (ARRAY_DEBUG) {printf("%s \tpointer on DEVICE get = %p\n",name.c_str(), d_pointer);fflush(stdout);}
+            //if (ARRAY_DEBUG) {printf("%s \tpointer on DEVICE get = %p\n",name.c_str(), d_pointer);fflush(stdout);}
             return d_pointer;
         }
         return NULL;
@@ -296,7 +296,7 @@ public:
     cudaError_t Move(unsigned int source, unsigned int target, SizeT size=-1, SizeT offset=0, cudaStream_t stream=0)
     {
         cudaError_t retval = cudaSuccess;
-        if (ARRAY_DEBUG) {printf("%s Moving from %d to %d, size = %d, offset = %d\n", name.c_str(), source, target, size, offset);fflush(stdout);}
+        //if (ARRAY_DEBUG) {printf("%s Moving from %d to %d, size = %d, offset = %d\n", name.c_str(), source, target, size, offset);fflush(stdout);}
         if ((source == HOST || source == DEVICE) && 
             ((source & setted) != source) && ((source & allocated) != source)) 
             return GRError(name+" movment source is not valid", __FILE__, __LINE__);
@@ -379,7 +379,7 @@ public:
         {
             if (h_pointer==NULL) GRError(name+" not defined on HOST",__FILE__, __LINE__);
             if (idx >= size) GRError(name+" access out of bound", __FILE__, __LINE__);
-            printf("%s @ %p [%ld]ed1\n", name.c_str(), h_pointer,idx);fflush(stdout);
+            //printf("%s @ %p [%ld]ed1\n", name.c_str(), h_pointer,idx);fflush(stdout);
         }
         return h_pointer[idx];
     #endif
@@ -394,7 +394,7 @@ public:
         {
             if (h_pointer==NULL) GRError(name+" not defined on HOST", __FILE__, __LINE__);
             if (idx >= size) GRError(name+" access out of bound", __FILE__, __LINE__);
-            printf("%s [%ld]ed2\n", name.c_str(), idx);fflush(stdout);
+            //printf("%s [%ld]ed2\n", name.c_str(), idx);fflush(stdout);
         }
         return const_cast<Value&>(h_pointer[idx]);
     #endif
@@ -408,7 +408,7 @@ public:
         if (ARRAY_DEBUG)
         {
             if (h_pointer==NULL) GRError(name+" not deined on HOST", __FILE__, __LINE__);
-            printf("%s ->ed\n",name.c_str());fflush(stdout);
+            //printf("%s ->ed\n",name.c_str());fflush(stdout);
         }
         return h_pointer;
     #endif
@@ -422,7 +422,7 @@ public:
         if (ARRAY_DEBUG)
         {
             if (h_pointer==NULL) GRError(name+" not deined on HOST", __FILE__, __LINE__);
-            printf("%s ->ed\n",name.c_str());fflush(stdout);
+            //printf("%s ->ed\n",name.c_str());fflush(stdout);
         }
         return h_pointer + offset;       
     #endif

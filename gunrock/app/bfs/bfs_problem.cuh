@@ -475,7 +475,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             // Allocate output labels if necessary
             if (data_slices[gpu]->labels.GetPointer(util::DEVICE)==NULL)
                 if (retval = data_slices[gpu]->labels.Allocate(this->sub_graphs[gpu].nodes,util::DEVICE)) return retval;
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->labels.GetPointer(util::DEVICE), -1, this->sub_graphs[gpu].nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->labels.GetPointer(util::DEVICE), _ENABLE_IDEMPOTENCE?-1:util::MaxValue<Value>(), this->sub_graphs[gpu].nodes);
 
             // Allocate preds if necessary
             if (_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE)

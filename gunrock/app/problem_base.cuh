@@ -48,6 +48,7 @@ enum FrontierType {
     struct DataSliceBase
     {
         int                               num_gpus,num_vertex_associate,num_value__associate,gpu_idx;
+        SizeT                             nodes;
         util::Array1D<SizeT, VertexId  > *vertex_associate_in[2];
         util::Array1D<SizeT, VertexId* >  vertex_associate_ins[2];
         util::Array1D<SizeT, VertexId  > *vertex_associate_out;
@@ -61,6 +62,9 @@ enum FrontierType {
         util::Array1D<SizeT, SizeT     >  out_length    ;   
         util::Array1D<SizeT, SizeT     >  in_length[2]  ;   
         util::Array1D<SizeT, VertexId  >  keys_in  [2]  ;
+        util::Array1D<SizeT, cudaEvent_t> events   [4]  ;
+        util::Array1D<SizeT, bool      >  events_set[4] ;
+        util::Array1D<SizeT, int       >  wait_marker   ;
         util::Array1D<SizeT, cudaStream_t> streams;
 
         DataSliceBase()
@@ -87,6 +91,12 @@ enum FrontierType {
             in_length           [1].SetName("in_length[1]"           );  
             keys_in             [0].SetName("keys_in[0]"             );  
             keys_in             [1].SetName("keys_in[1]"             );
+            wait_marker            .SetName("wait_marker"            );
+            for (int i=0;i<4;i++)
+            {
+                events[i].SetName("events[]");
+                events_set[i].SetName("events_set[]");
+            }
             streams                .SetName("streams"                );
         } // DataSliceBase()
 
@@ -149,10 +159,19 @@ enum FrontierType {
                 value__associate_outs.Release();
             }
 
+            for (int i=0;i<4;i++)
+            {
+                for (int gpu=0;gpu<num_gpus;gpu++)
+                    cudaEventDestroy(events[i][gpu]);
+                events[i].Release();
+                events_set[i].Release();
+            }
             keys_in    [0].Release();
             keys_in    [1].Release();
             in_length  [0].Release();
             in_length  [1].Release();
+            wait_marker   .Release();
+            
             out_length    .Release();
             vertex_associate_orgs.Release();
             value__associate_orgs.Release();
@@ -173,6 +192,7 @@ enum FrontierType {
             cudaError_t retval         = cudaSuccess;
             this->num_gpus             = num_gpus;
             this->gpu_idx              = gpu_idx;
+            this->nodes                = graph->nodes;
             this->num_vertex_associate = num_vertex_associate;
             this->num_value__associate = num_value__associate;
             if (retval = util::SetDevice(gpu_idx))  return retval;
@@ -183,9 +203,23 @@ enum FrontierType {
             if (retval = vertex_associate_orgs.Allocate(num_vertex_associate, util::HOST | util::DEVICE)) return retval;
             if (retval = value__associate_orgs.Allocate(num_value__associate, util::HOST | util::DEVICE)) return retval;
 
+            wait_marker.Allocate(num_gpus);
+            for (int gpu=0;gpu<num_gpus;gpu++) wait_marker[gpu]=0;
+            for (int i=0;i<4;i++) 
+            {
+                events[i].Allocate(num_gpus);
+                events_set[i].Allocate(num_gpus);
+            }
             for (int gpu=0;gpu<num_gpus;gpu++)
-            for (int i=0;i<2;i++)
-                in_length[i][gpu]=0;
+            {
+                for (int i=0;i<2;i++)
+                    in_length[i][gpu]=0;
+                for (int i=0;i<4;i++)
+                {
+                    if (retval = util::GRError(cudaEventCreate(&(events[i][gpu])), "cudaEventCreate failed.", __FILE__, __LINE__)) return retval;
+                    events_set[i][gpu]=false;
+                }
+            }
             /*if (num_gpus > 1)
             for (int gpu=0;gpu<num_gpus;gpu++)
             {
@@ -543,7 +577,7 @@ struct ProblemBase
                 switch (frontier_type) {
                     case VERTEX_FRONTIERS :
                         // O(n) ping-pong global vertex frontiers
-                        new_frontier_elements[0] = double(cross_counter[peer]) * queue_sizing;
+                        new_frontier_elements[0] = double(num_gpus>1?cross_counter[peer]:nodes) * queue_sizing;
                         new_frontier_elements[1] = new_frontier_elements[0];
                         break;
 
@@ -555,7 +589,7 @@ struct ProblemBase
 
                     case MIXED_FRONTIERS :
                         // O(n) global vertex frontier, O(m) global edge frontier
-                        new_frontier_elements[0] = double(cross_counter[peer]) * queue_sizing;
+                        new_frontier_elements[0] = double(num_gpus>1?cross_counter[peer]:nodes) * queue_sizing;
                         new_frontier_elements[1] = double(edges) * queue_sizing;
                         break;
                  }    
@@ -796,8 +830,8 @@ struct ProblemBase
                 for (int gpu=0;gpu<num_gpus;gpu++)
                 for (int peer=0;peer<=num_gpus;peer++)
                 {
-                    in_offsets[gpu][peer]*=queue_sizing;
-                    out_offsets[gpu][peer]*=queue_sizing;
+                    in_offsets[gpu][peer]*=2;
+                    out_offsets[gpu][peer]*=2;
                 }
                 if (retval) break;
             } else {

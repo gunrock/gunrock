@@ -158,7 +158,7 @@ void DisplayStats(
     SizeT edges_visited = 0;
     SizeT nodes_visited = 0;
     for (VertexId i = 0; i < graph.nodes; ++i) {
-        if (h_labels[i] > -1) {
+        if (h_labels[i] < util::MaxValue<VertexId>() && h_labels[i]!=-1) {
             ++nodes_visited;
             edges_visited += graph.row_offsets[i+1] - graph.row_offsets[i];
         }
@@ -219,7 +219,8 @@ template<
     typename VertexId,
     typename Value,
     typename SizeT,
-    bool MARK_PREDECESSORS>
+    bool MARK_PREDECESSORS,
+    bool ENABLE_IDEMPOTENCE>
 void SimpleReferenceBfs(
     const Csr<VertexId, Value, SizeT>       &graph,
     VertexId                                *source_path,
@@ -228,7 +229,7 @@ void SimpleReferenceBfs(
 {
     //initialize distances
     for (VertexId i = 0; i < graph.nodes; ++i) {
-        source_path[i] = -1;
+        source_path[i] = ENABLE_IDEMPOTENCE? -1: util::MaxValue<VertexId>();
         if (MARK_PREDECESSORS)
             predecessor[i] = -1;
     }
@@ -259,7 +260,7 @@ void SimpleReferenceBfs(
         for (int edge = edges_begin; edge < edges_end; ++edge) {
             //Lookup neighbor and enqueue if undiscovered
             VertexId neighbor = graph.column_indices[edge];
-            if (source_path[neighbor] == -1) {
+            if (source_path[neighbor] > neighbor_dist || source_path[neighbor] == -1) {
                 source_path[neighbor] = neighbor_dist;
                 if (MARK_PREDECESSORS)
                     predecessor[neighbor] = dequeued_node;
@@ -359,7 +360,7 @@ void RunTests(
     if (reference_check_label != NULL)
     {
         printf("compute ref value\n");
-        SimpleReferenceBfs<VertexId, Value, SizeT, MARK_PREDECESSORS>(
+        SimpleReferenceBfs<VertexId, Value, SizeT, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE>(
             graph,
             reference_check_label,
             reference_check_preds,

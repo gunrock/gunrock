@@ -708,6 +708,17 @@ bool EnoughDeviceMemory(unsigned int mem_needed)
     return (mem_needed <= free_mem);
 }
 
+template <typename T>
+T MaxValue()
+{
+    return 0;
+}
+
+template <>
+int MaxValue<int>()
+{
+    return INT_MAX;
+}
 
 }// namespace util
 }// namespace gunrock
