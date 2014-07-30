@@ -36,14 +36,16 @@ int main(int argc, char* argv[])
   // malloc output result arrays
   struct GunrockGraph *graph_output =
     (struct GunrockGraph*)malloc(sizeof(struct GunrockGraph));
-  int *node_ids   = (int*)malloc(sizeof(int) * topk_config.top_nodes);
-  int *centrality = (int*)malloc(sizeof(int) * topk_config.top_nodes);
+  int *node_ids    = (int*)malloc(sizeof(int) * topk_config.top_nodes);
+  int *in_degrees  = (int*)malloc(sizeof(int) * topk_config.top_nodes);
+  int *out_degrees = (int*)malloc(sizeof(int) * topk_config.top_nodes);
 
   // run topk calculations
   gunrock_topk_func(
     graph_output,
     node_ids,
-    centrality,
+    in_degrees,
+    out_degrees,
     graph_input,
     topk_config,
     data_type);
@@ -53,10 +55,12 @@ int main(int argc, char* argv[])
   printf("Demo Outputs:\n");
   for (i = 0; i < topk_config.top_nodes; ++i)
   {
-    printf("Node ID [%d] : CV [%d] \n", node_ids[i], centrality[i]);
+    printf("Node ID [%d] : in_degrees [%d] : out_degrees [%d] \n",
+      node_ids[i], in_degrees[i], out_degrees[i]);
   }
 
-  if (centrality)   free(centrality);
+  if (in_degrees)   free(in_degrees);
+  if (out_degrees)  free(out_degrees);
   if (node_ids)     free(node_ids);
   if (graph_input)  free(graph_input);
   if (graph_output) free(graph_output);

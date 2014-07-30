@@ -144,7 +144,8 @@ void gunrock_pr_func(
 void gunrock_topk_func(
     struct GunrockGraph       *graph_out,
     void                      *node_ids,
-    void                      *centrality,
+    void                      *in_degrees,
+    void                      *out_degrees,
     const struct GunrockGraph *graph_in,
     struct GunrockConfig      configs,
     struct GunrockDataType    data_type);

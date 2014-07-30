@@ -165,7 +165,8 @@ void build_topk_subgraph(
  *
  * @param[out] output subgraph of topk problem
  * @param[out] node_ids return the top k nodes
- * @param[out] centrality return associated centrality
+ * @param[out] in_degrees  return associated centrality
+ * @param[out] out_degrees return associated centrality
  * @param[in]  original graph to the CSR graph we process on
  * @param[in]  reversed graph to the CSR graph we process on
  * @param[in]  top_nodes k value for topk problem
@@ -178,7 +179,8 @@ template <
 void run_topk(
     GunrockGraph *graph_out,
     VertexId	 *node_ids,
-    Value	 	 *centrality,
+    Value	 	 *in_degrees,
+    Value        *out_degrees,
     const Csr<VertexId, Value, SizeT> &graph_original,
     const Csr<VertexId, Value, SizeT> &graph_reversed,
     SizeT        top_nodes)
@@ -213,7 +215,8 @@ void run_topk(
     // copy out results back to cpu
     util::GRError(topk_problem->Extract(
 		node_ids,
-		centrality,
+		in_degrees,
+        out_degrees,
 		top_nodes),
 		"TOPK Problem Data Extraction Failed", __FILE__, __LINE__);
 
@@ -236,7 +239,8 @@ void run_topk(
  *
  * @param[out] ggraph_out  GunrockGraph type output
  * @param[out] node_ids    output top k node ids
- * @param[out] centrality  output top k centralities
+ * @param[out] in_degrees  output top k in-degree centralities
+ * @param[out] out_degrees output top k out-degree centralities
  * @param[in]  ggraph_in   GunrockGraph type input graph
  * @param[in]  topk_config topk specific configurations
  * @param[in]  data_type   topk data_type configurations
@@ -244,7 +248,8 @@ void run_topk(
 void dispatch_topk(
     GunrockGraph       	  *ggraph_out,
     void               	  *node_ids,
-    void               	  *centrality,
+    void               	  *in_degrees,
+    void                  *out_degrees,
     const GunrockGraph 	  *ggraph_in,
     const GunrockConfig   topk_config,
     const GunrockDataType data_type)
@@ -275,7 +280,8 @@ void dispatch_topk(
 				run_topk<int, int, int>(
 					ggraph_out,
 					(int*)node_ids,
-					(int*)centrality,
+					(int*)in_degrees,
+                    (int*)out_degrees,
 					graph_original,
 					graph_reversed,
 					topk_config.top_nodes);
@@ -311,7 +317,8 @@ void dispatch_topk(
  *
  * @param[out] ggraph_out  output subgraph of topk problem
  * @param[out] node_ids    output top k node_ids
- * @param[out] centrality  output associated centrality values
+ * @param[out] in_degrees  output associated centrality values
+ * @param[out] out_degrees output associated centrality values
  * @param[in]  ggraph_in   input graph need to process on
  * @param[in]  topk_config gunrock primitive specific configurations
  * @param[in]  data_type   gunrock datatype struct
@@ -319,7 +326,8 @@ void dispatch_topk(
 void gunrock_topk_func(
     GunrockGraph      	  *ggraph_out,
     void              	  *node_ids,
-    void              	  *centrality,
+    void              	  *in_degrees,
+    void                  *out_degrees,
     const GunrockGraph 	  *ggraph_in,
     const GunrockConfig	  topk_config,
     const GunrockDataType data_type)
@@ -328,7 +336,8 @@ void gunrock_topk_func(
    	dispatch_topk(
    		ggraph_out,
    		node_ids,
-   		centrality,
+   		in_degrees,
+        out_degrees,
    		ggraph_in,
    		topk_config,
    		data_type);
