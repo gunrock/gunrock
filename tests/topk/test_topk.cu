@@ -80,22 +80,16 @@ template<
   typename SizeT>
 void DisplaySolution(
   VertexId *h_node_id,
-  Value    *h_degrees,
+  Value    *h_degrees_i,
+  Value    *h_degrees_o,
   SizeT    num_nodes)
 {
-  // at most display the first 100 results
-  if (num_nodes > 100)
-  {
-    num_nodes = 100;
-  }
-  printf("==> top %d centrality nodes:\n", num_nodes);
-  for (SizeT i = 0; i < num_nodes; ++i)
-  {
-    printf("%d %d\n", h_node_id[i], h_degrees[i]);
-  }
-  printf("\n");
-
   fflush(stdout);
+  // at most display the first 100 results
+  if (num_nodes > 100) num_nodes = 100;
+  printf("==> top %d centrality nodes:\n", num_nodes);
+  for (SizeT iter = 0; iter < num_nodes; ++iter)
+    printf("%d %d %d\n", h_node_id[iter], h_degrees_i[iter], h_degrees_o[iter]);
 }
 
 /******************************************************************************
@@ -134,9 +128,9 @@ void SimpleReferenceTopK(
   CpuTimer cpu_timer;
 
   // malloc degree centrality spaces
-  Value    *ref_degrees_original =
+  Value *ref_degrees_original =
     (Value*)malloc(sizeof(Value) * graph_original.nodes);
-  Value    *ref_degrees_reversed =
+  Value *ref_degrees_reversed =
     (Value*)malloc(sizeof(Value) * graph_reversed.nodes);
 
   // store reference output results
@@ -178,7 +172,6 @@ void SimpleReferenceTopK(
   if (ref_degrees_original) { free(ref_degrees_original); }
   if (ref_degrees_reversed) { free(ref_degrees_reversed); }
   results.clear();
-
 }
 
 /**
@@ -229,7 +222,8 @@ void RunTests(
   // malloc host memory
   VertexId *h_node_id   = (VertexId*)malloc(sizeof(VertexId) * top_nodes);
   VertexId *ref_node_id = (VertexId*)malloc(sizeof(VertexId) * top_nodes);
-  Value    *h_degrees   = (Value*)malloc(sizeof(Value) * top_nodes);
+  Value    *h_degrees_i = (Value*)malloc(sizeof(Value) * top_nodes);
+  Value    *h_degrees_o = (Value*)malloc(sizeof(Value) * top_nodes);
   Value    *ref_degrees = (Value*)malloc(sizeof(Value) * top_nodes);
 
   // copy data from CPU to GPU
@@ -241,7 +235,7 @@ void RunTests(
     num_gpus),
     "Problem TOPK Initialization Failed", __FILE__, __LINE__);
 
-  // perform degree centrality
+  // perform topk degree centrality calculations
   GpuTimer gpu_timer; // Record the kernel running time
 
   // reset values in DataSlice for graph
@@ -250,6 +244,7 @@ void RunTests(
     "TOPK Problem Data Reset Failed", __FILE__, __LINE__);
 
   gpu_timer.Start();
+
   // launch topk enactor
   util::GRError(topk_enactor.template Enact<Problem>(
     topk_problem,
@@ -265,7 +260,8 @@ void RunTests(
   // copy out results back to CPU from GPU using Extract
   util::GRError(topk_problem->Extract(
     h_node_id,
-    h_degrees,
+    h_degrees_i,
+    h_degrees_o,
     top_nodes),
     "TOPK Problem Data Extraction Failed",
     __FILE__, __LINE__);
@@ -273,7 +269,8 @@ void RunTests(
   // display solution
   DisplaySolution(
     h_node_id,
-    h_degrees,
+    h_degrees_i,
+    h_degrees_o,
     top_nodes);
 
   // validation
@@ -293,8 +290,9 @@ void RunTests(
 
   // cleanup if neccessary
   if (topk_problem) { delete topk_problem; }
-  if (h_node_id)    { free(h_node_id); }
-  if (h_degrees)    { free(h_degrees); }
+  if (h_node_id)    { free(h_node_id);   }
+  if (h_degrees_i)  { free(h_degrees_i); }
+  if (h_degrees_o)  { free(h_degrees_o); }
 
   cudaDeviceSynchronize();
 }
@@ -437,7 +435,8 @@ int main(int argc, char** argv)
       return 1;
     }
 
-    csr_original.DisplayGraph();
+    //csr_original.DisplayGraph();
+    //csr_reversed.DisplayGraph();
 
     // run gpu tests
     RunTests(csr_original, csr_reversed, args, top_nodes, *context);
@@ -453,4 +452,8 @@ int main(int argc, char** argv)
   return 0;
 }
 
-/* end */
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:
