@@ -47,25 +47,29 @@ enum FrontierType {
         typename Value>
     struct DataSliceBase
     {
-        int                               num_gpus,num_vertex_associate,num_value__associate,gpu_idx;
+        int                               num_gpus,gpu_idx,wait_counter;
+        int                               num_vertex_associate,num_value__associate;
         SizeT                             nodes;
-        util::Array1D<SizeT, VertexId  > *vertex_associate_in[2];
-        util::Array1D<SizeT, VertexId* >  vertex_associate_ins[2];
-        util::Array1D<SizeT, VertexId  > *vertex_associate_out;
-        util::Array1D<SizeT, VertexId* >  vertex_associate_outs;
-        util::Array1D<SizeT, VertexId* >  vertex_associate_orgs;
-        util::Array1D<SizeT, Value     > *value__associate_in[2];
-        util::Array1D<SizeT, Value*    >  value__associate_ins[2];
-        util::Array1D<SizeT, Value     > *value__associate_out;
-        util::Array1D<SizeT, Value*    >  value__associate_outs;
-        util::Array1D<SizeT, Value*    >  value__associate_orgs;
-        util::Array1D<SizeT, SizeT     >  out_length    ;   
-        util::Array1D<SizeT, SizeT     >  in_length[2]  ;   
-        util::Array1D<SizeT, VertexId  >  keys_in  [2]  ;
-        util::Array1D<SizeT, cudaEvent_t> events   [4]  ;
-        util::Array1D<SizeT, bool      >  events_set[4] ;
-        util::Array1D<SizeT, int       >  wait_marker   ;
-        util::Array1D<SizeT, cudaStream_t> streams;
+        util::Array1D<SizeT, VertexId    > *vertex_associate_in  [2];
+        util::Array1D<SizeT, VertexId*   >  vertex_associate_ins [2];
+        util::Array1D<SizeT, VertexId    > *vertex_associate_out    ;
+        util::Array1D<SizeT, VertexId*   >  vertex_associate_outs   ;
+        util::Array1D<SizeT, VertexId*   >  vertex_associate_orgs   ;
+        util::Array1D<SizeT, Value       > *value__associate_in  [2];
+        util::Array1D<SizeT, Value*      >  value__associate_ins [2];
+        util::Array1D<SizeT, Value       > *value__associate_out    ;
+        util::Array1D<SizeT, Value*      >  value__associate_outs   ;
+        util::Array1D<SizeT, Value*      >  value__associate_orgs   ;
+        util::Array1D<SizeT, SizeT       >  out_length    ;   
+        util::Array1D<SizeT, SizeT       >  in_length  [2];   
+        util::Array1D<SizeT, VertexId    >  keys_in    [2];
+        util::Array1D<SizeT, cudaEvent_t >  events     [4];
+        util::Array1D<SizeT, bool        >  events_set [4];
+        util::Array1D<SizeT, int         >  wait_marker   ;
+        util::Array1D<SizeT, cudaStream_t>  streams       ;
+        util::Array1D<SizeT, int         >  stages        ;
+        util::Array1D<SizeT, cudaEvent_t >  local_events  ;
+        util::Array1D<SizeT, bool        >  to_show       ;
 
         DataSliceBase()
         {
@@ -92,6 +96,9 @@ enum FrontierType {
             keys_in             [0].SetName("keys_in[0]"             );  
             keys_in             [1].SetName("keys_in[1]"             );
             wait_marker            .SetName("wait_marker"            );
+            stages                 .SetName("stages"                 );
+            local_events           .SetName("local_events"           );
+            to_show                .SetName("to_show"                );
             for (int i=0;i<4;i++)
             {
                 events[i].SetName("events[]");
@@ -159,6 +166,8 @@ enum FrontierType {
                 value__associate_outs.Release();
             }
 
+            for (int gpu=0;gpu<num_gpus;gpu++)
+                cudaEventDestroy(local_events[gpu]);
             for (int i=0;i<4;i++)
             {
                 for (int gpu=0;gpu<num_gpus;gpu++)
@@ -171,11 +180,13 @@ enum FrontierType {
             in_length  [0].Release();
             in_length  [1].Release();
             wait_marker   .Release();
-            
+            local_events  .Release();
             out_length    .Release();
             vertex_associate_orgs.Release();
             value__associate_orgs.Release();
             streams       .Release();
+            stages        .Release();
+            to_show       .Release();
 
             util::cpu_mt::PrintMessage("~DataSliceBase() end.");
         } // ~DataSliceBase()
@@ -203,8 +214,15 @@ enum FrontierType {
             if (retval = vertex_associate_orgs.Allocate(num_vertex_associate, util::HOST | util::DEVICE)) return retval;
             if (retval = value__associate_orgs.Allocate(num_value__associate, util::HOST | util::DEVICE)) return retval;
 
-            wait_marker.Allocate(num_gpus);
-            for (int gpu=0;gpu<num_gpus;gpu++) wait_marker[gpu]=0;
+            wait_marker .Allocate(num_gpus);
+            stages      .Allocate(num_gpus);
+            local_events.Allocate(num_gpus);
+            to_show     .Allocate(num_gpus);
+            for (int gpu=0;gpu<num_gpus;gpu++)
+            {
+                wait_marker[gpu]=0;
+                if (retval = util::GRError(cudaEventCreate(&(local_events[gpu])), "cudaEventCreate failed", __FILE__, __LINE__)) return retval;
+            }
             for (int i=0;i<4;i++) 
             {
                 events[i].Allocate(num_gpus);

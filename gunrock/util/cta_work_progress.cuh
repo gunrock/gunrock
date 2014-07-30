@@ -316,7 +316,8 @@ public:
         IterationT iteration,
         SizeT &queue_length,
         bool  DEBUG = false,
-        cudaStream_t stream = 0)        // out param
+        cudaStream_t stream = 0,
+        bool  skip_sync = false)        // out param
     {
         cudaError_t retval = cudaSuccess;
 
@@ -338,7 +339,7 @@ public:
                     cudaMemcpyAsync(&queue_length, ((SizeT*)d_counters) + queue_length_idx, sizeof(SizeT), cudaMemcpyDeviceToHost,stream);
                 else if (retval = util::GRError(cudaMemcpyAsync(
                     &queue_length, ((SizeT*)d_counters)+queue_length_idx, sizeof(SizeT),cudaMemcpyDeviceToHost,stream), "CtaWorkProgress cudaMemcpyAsync d_counter failed.", __FILE__, __LINE__)) break;
-                cudaStreamSynchronize(stream);
+                if (!skip_sync) cudaStreamSynchronize(stream);
              }
         } while (0);
 

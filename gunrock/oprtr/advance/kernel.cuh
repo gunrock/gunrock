@@ -43,7 +43,8 @@ void ComputeOutputLength(
                                     typename KernelPolicy::SizeT    max_out,
                                     CudaContext                     &context,
                                     cudaStream_t                    stream,
-                                    TYPE                            ADVANCE_TYPE) {
+                                    TYPE                            ADVANCE_TYPE,
+                                    bool                            express = false) {
 
     typedef typename ProblemData::SizeT         SizeT;
     if (frontier_attribute->queue_length ==0) 
@@ -65,20 +66,20 @@ void ComputeOutputLength(
                 max_in,
                 max_out,
                 ADVANCE_TYPE);
-    util::GRError(cudaStreamSynchronize(stream),"cudaStreamSynchronize failed", __FILE__, __LINE__);
-    util::GRError("GetEdgeCounts failed", __FILE__, __LINE__);
+    //if (!express) util::GRError(cudaStreamSynchronize(stream),"cudaStreamSynchronize failed", __FILE__, __LINE__);
+    //if (!express) util::GRError("GetEdgeCounts failed", __FILE__, __LINE__);
     //return;
     //cudaDeviceSynchronize();
     Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute->queue_length, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
-    util::GRError(cudaStreamSynchronize(stream),"cudaStreamSynchronize failed", __FILE__, __LINE__);
-    util::GRError("Scan failed", __FILE__, __LINE__);
+    //if (!express) util::GRError(cudaStreamSynchronize(stream),"cudaStreamSynchronize failed", __FILE__, __LINE__);
+    //if (!express) util::GRError("Scan failed", __FILE__, __LINE__);
     
     //cudaDeviceSynchronize();
     //SizeT *temp;// = new SizeT[1];
     //cudaHostAlloc((void**)&temp, sizeof(SizeT), cudaHostAllocDefault);
     util::GRError(cudaMemcpyAsync(&(frontier_attribute->output_length),partitioned_scanned_edges+frontier_attribute->queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost,stream), "cudaMemcpyAsync failed", __FILE__, __LINE__);
-    util::GRError(cudaStreamSynchronize(stream),"ComputeOutputLength failed", __FILE__, __LINE__);
+    if (!express) util::GRError(cudaStreamSynchronize(stream),"ComputeOutputLength failed", __FILE__, __LINE__);
     //SizeT ret = temp[0];
     //delete[] temp;
     //cudaFreeHost(temp);
