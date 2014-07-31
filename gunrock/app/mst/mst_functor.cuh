@@ -69,14 +69,16 @@ struct SuccFunctor
     VertexId s_id,  VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id]
-        && (atomicCAS(&problem->d_temp_storage[s_id], -1, s_id) == -1))
+    if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id])
     {
-      //printf(" mark - s_id:%4d d_id:%4d e_id:%4d origin_e_id:%4d\n",
-      //  s_id, d_id, e_id, problem->d_origin_edges[e_id]);
-      problem->d_successors[s_id] = d_id;
+      //problem->d_successors[s_id] = d_id;
       // mark MST output results
-      problem->d_mst_output[problem->d_origin_edges[e_id]] = 1;
+      //problem->d_mst_output[problem->d_origin_edges[e_id]] = 1;
+      if (atomicMin(&problem->d_successors[s_id], d_id) > d_id)
+      {
+       // keep outgoing selected minimum weighted e_ids
+        problem->d_temp_storage[s_id] = problem->d_origin_edges[e_id];
+      }
     }
   }
 
@@ -158,6 +160,9 @@ struct RmCycFunctor
   VertexId s_id, VertexId d_id, DataSlice *problem,
   VertexId e_id = 0, VertexId e_id_in = 0)
   {
+    // mark minimum spanning tree outputs
+    problem->d_mst_output[problem->d_temp_storage[s_id]] = 1;
+    // remove length two cycles
     if (problem->d_successors[s_id] > s_id &&
         problem->d_successors[problem->d_successors[s_id]] == s_id)
     {
@@ -169,7 +174,6 @@ struct RmCycFunctor
     }
   }
 };
-
 
 /**
  * @brief Structure contains device functions for pointer jumping operation.
