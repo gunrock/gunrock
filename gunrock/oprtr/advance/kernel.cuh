@@ -34,22 +34,23 @@ namespace advance {
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 void ComputeOutputLength(
    //                                 int                             num_block,
-                                    gunrock::app::FrontierAttribute *frontier_attribute,
-                                    typename KernelPolicy::SizeT    *d_offsets,
-                                    typename KernelPolicy::VertexId *d_indices,
-                                    typename KernelPolicy::VertexId *d_in_key_queue,
-                                    unsigned int                    *partitioned_scanned_edges,
-                                    typename KernelPolicy::SizeT    max_in,
-                                    typename KernelPolicy::SizeT    max_out,
-                                    CudaContext                     &context,
-                                    cudaStream_t                    stream,
-                                    TYPE                            ADVANCE_TYPE,
-                                    bool                            express = false) {
-
+    gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT> *frontier_attribute,
+    typename KernelPolicy::SizeT    *d_offsets,
+    typename KernelPolicy::VertexId *d_indices,
+    typename KernelPolicy::VertexId *d_in_key_queue,
+    typename KernelPolicy::SizeT    *partitioned_scanned_edges,
+    typename KernelPolicy::SizeT    max_in,
+    typename KernelPolicy::SizeT    max_out,
+    CudaContext                     &context,
+    cudaStream_t                    stream,
+    TYPE                            ADVANCE_TYPE,
+    bool                            express = false) 
+{
     typedef typename ProblemData::SizeT         SizeT;
     if (frontier_attribute->queue_length ==0) 
     {
-        frontier_attribute->output_length =0;
+        //frontier_attribute->output_length[0] = 0;
+        util::MemsetKernel<SizeT><<<1,1>>>(frontier_attribute->output_length.GetPointer(util::DEVICE),0,1);
         return;
     }
 
@@ -78,8 +79,16 @@ void ComputeOutputLength(
     //cudaDeviceSynchronize();
     //SizeT *temp;// = new SizeT[1];
     //cudaHostAlloc((void**)&temp, sizeof(SizeT), cudaHostAllocDefault);
-    util::GRError(cudaMemcpyAsync(&(frontier_attribute->output_length),partitioned_scanned_edges+frontier_attribute->queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost,stream), "cudaMemcpyAsync failed", __FILE__, __LINE__);
-    if (!express) util::GRError(cudaStreamSynchronize(stream),"ComputeOutputLength failed", __FILE__, __LINE__);
+    //util::GRError(cudaMemcpyAsync(
+    //     frontier_attribute->output_length.GetPointer(util::DEVICE),
+    ///     partitioned_scanned_edges+frontier_attribute->queue_length-1, 
+    //     sizeof(SizeT), cudaMemcpyDeviceToDevice, stream), "cudaMemcpyAsync failed", __FILE__, __LINE__);
+    //printf("%p ",frontier_attribute->output_length.GetPointer(util::DEVICE));fflush(stdout);
+    util::MemsetCopyVectorKernel<SizeT><<<1,1>>>
+            (frontier_attribute->output_length.GetPointer(util::DEVICE),
+            partitioned_scanned_edges + frontier_attribute->queue_length -1,
+            1);
+    //if (!express) util::GRError(cudaStreamSynchronize(stream),"ComputeOutputLength failed", __FILE__, __LINE__);
     //SizeT ret = temp[0];
     //delete[] temp;
     //cudaFreeHost(temp);
@@ -92,12 +101,12 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
     void LaunchKernel(
             //volatile int                            *d_done,
             gunrock::app::EnactorStats              &enactor_stats,
-            gunrock::app::FrontierAttribute         &frontier_attribute,
+            gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>         &frontier_attribute,
             typename ProblemData::DataSlice         *data_slice,
             typename ProblemData::VertexId          *backward_index_queue,
             bool                                    *backward_frontier_map_in,
             bool                                    *backward_frontier_map_out,
-            unsigned int                            *partitioned_scanned_edges,
+            typename KernelPolicy::SizeT            *partitioned_scanned_edges,
             typename KernelPolicy::VertexId         *d_in_key_queue,
             typename KernelPolicy::VertexId         *d_out_key_queue,
             typename KernelPolicy::VertexId         *d_in_value_queue,
@@ -209,7 +218,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         backward_frontier_map_out,
                         data_slice,
                         frontier_attribute.queue_length,
-                        frontier_attribute.output_length,
+                        frontier_attribute.output_length.GetPointer(util::DEVICE),
                         max_in,
                         max_out,
                         work_progress,
@@ -233,7 +242,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         backward_frontier_map_in,
                         data_slice,
                         frontier_attribute.queue_length,
-                        frontier_attribute.output_length,
+                        frontier_attribute.output_length.GetPointer(util::DEVICE),
                         max_in,
                         max_out,
                         work_progress,
@@ -289,7 +298,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             //printf("output_queue_len:%d\n", output_queue_len);
             //printf("output_length = %d\n", frontier_attribute.output_length);fflush(stdout);
             //if (frontier_attribute.output_length < LBPOLICY::LIGHT_EDGE_THRESHOLD)
-            if (frontier_attribute.output_length !=0) {
+            //if (frontier_attribute.output_length !=0) {
                 gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(
                         frontier_attribute.queue_reset,
@@ -304,14 +313,14 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         d_out_key_queue,
                         data_slice,
                         frontier_attribute.queue_length,
-                        frontier_attribute.output_length,
+                        frontier_attribute.output_length.GetPointer(util::DEVICE),
                         max_in,
                         max_out,
                         work_progress,
                         enactor_stats.advance_kernel_stats,
                         ADVANCE_TYPE,
                         inverse_graph);
-            }
+            //}
             /*else
             {
                 unsigned int split_val = (frontier_attribute.output_length + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;

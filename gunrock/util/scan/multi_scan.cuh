@@ -438,6 +438,21 @@ template <
     typename Value      = VertexId> // Type of values
 struct MultiScan
 {
+    SizeT *History_Size;
+    SizeT **d_Buffer   ;
+    SizeT *h_Offset1   ;
+    SizeT *d_Offset1   ;
+    SizeT Max_Elements, Max_Rows;
+
+    MultiScan()
+    {
+        Max_Elements = 0;
+        Max_Rows     = 0;
+        History_Size = NULL;
+        d_Buffer     = NULL;
+        h_Offset1    = NULL;
+        d_Offset1    = NULL;
+    }
     
     __host__ void Scan(
         const SizeT           Num_Elements,
@@ -807,6 +822,74 @@ struct MultiScan
         delete[] History_Size; History_Size = NULL;
     } // Scan_with_dKeys
 
+//   template < SizeT            Num_Vertex_Associate,
+//              SizeT            Num_Value__Associate>
+   __host__ void Init(
+        const SizeT            Max_Elements,
+        const SizeT            Max_Rows)
+        //const SizeT            Num_Vertex_Associate,
+        //const SizeT            Num_Value__Associate,
+        //const VertexId*  const d_Keys,
+        //      VertexId*        d_Result,
+        //const int*       const d_Splict,    // Spliction mark
+        //const VertexId*  const d_Convertion,
+        //      SizeT*           d_Length,    // Length of each sub-array
+        //      VertexId**       d_Vertex_Associate_in,
+        //      VertexId**       d_Vertex_Associate_out,
+        //      Value**          d_Value__Associate_in,
+        //      Value**          d_Value__Associate_out)    // The scan result
+    {
+        this->Max_Elements = Max_Elements;
+        this->Max_Rows     = Max_Rows;
+        History_Size = new SizeT[40];
+        d_Buffer    = new SizeT*[40];
+        SizeT Current_Size  = Max_Elements;
+        int   Current_Level = 0;
+        dim3  Block_Size,Grid_Size;
+        h_Offset1    = new SizeT[Max_Rows+1];
+        
+        util::GRError(cudaMalloc((void**)&d_Offset1, sizeof(SizeT)*(Max_Rows+1)), "cudaMalloc d_Offset1 failed", __FILE__, __LINE__);
+
+        for (int i=0;i<40;i++) d_Buffer[i]=NULL;
+        History_Size[0] = Current_Size;
+        History_Size[1] = Current_Size/BLOCK_SIZE;
+        if ((History_Size[0]%BLOCK_SIZE)!=0) History_Size[1]++;
+        util::GRError(cudaMalloc(&(d_Buffer[0]), sizeof(SizeT) * History_Size[0]),
+              "cudaMalloc d_Buffer[0] failed", __FILE__, __LINE__);
+        util::GRError(cudaMalloc(&(d_Buffer[1]), sizeof(SizeT) * History_Size[1] * Max_Rows),
+              "cudaMalloc d_Buffer[1] failed", __FILE__, __LINE__);
+
+        while (Current_Size>1 || Current_Level==0)
+        {
+            Current_Level++;
+            Current_Size = History_Size[Current_Level];
+            if (Current_Size > 1)
+            {
+                History_Size[Current_Level+1] = Current_Size / BLOCK_SIZE;
+                if ((Current_Size % BLOCK_SIZE) != 0) History_Size[Current_Level+1]++;
+                util::GRError(cudaMalloc(&(d_Buffer[Current_Level+1]), 
+                    sizeof(SizeT)*History_Size[Current_Level+1]*Max_Rows),
+                    "cudaMalloc d_Buffer failed", __FILE__, __LINE__);
+            }
+        } // while Current_Size>1
+    }
+
+    void Release()
+    {        
+        for (int i=0;i<40;i++) 
+        if (d_Buffer[i]!=NULL) 
+        {
+            util::GRError(cudaFree(d_Buffer[i]),
+                  "cudaFree d_Buffer failed", __FILE__, __LINE__);
+            d_Buffer[i]=NULL;
+        }
+        util::GRError(cudaFree(d_Offset1),"cudaFree d_Offset1 failed", __FILE__, __LINE__); d_Offset1=NULL;
+        delete[] h_Offset1;    h_Offset1    = NULL;
+        delete[] d_Buffer;     d_Buffer     = NULL;
+        delete[] History_Size; History_Size = NULL;
+    } // Scan_with_dKeys
+
+
    template < SizeT            Num_Vertex_Associate,
               SizeT            Num_Value__Associate>
    __host__ void Scan_with_dKeys2(
@@ -826,27 +909,32 @@ struct MultiScan
     {
         if (Num_Elements <= 0) 
         {
-            util::MemsetKernel<<<128,128>>>(d_Length,0,Num_Rows);
+            util::MemsetKernel<<<128,1>>>(d_Length,0,Num_Rows);
             return;
         }
-        SizeT *History_Size = new SizeT[40];
-        SizeT **d_Buffer    = new SizeT*[40];
+        //SizeT *History_Size = new SizeT[40];
+        //SizeT **d_Buffer    = new SizeT*[40];
         SizeT Current_Size  = Num_Elements;
         int   Current_Level = 0;
         dim3  Block_Size,Grid_Size;
-        SizeT *h_Offset1    = new SizeT[Num_Rows+1];
-        SizeT *d_Offset1;
+        //SizeT *h_Offset1    = new SizeT[Num_Rows+1];
+        //SizeT *d_Offset1;
         
-        util::GRError(cudaMalloc((void**)&d_Offset1, sizeof(SizeT)*(Num_Rows+1)), "cudaMalloc d_Offset1 failed", __FILE__, __LINE__);
+        if (Num_Elements > Max_Elements || Num_Rows > Max_Rows)
+        {
+            Release();
+            Init(Num_Elements, Num_Rows);
+        }        
+        //util::GRError(cudaMalloc((void**)&d_Offset1, sizeof(SizeT)*(Num_Rows+1)), "cudaMalloc d_Offset1 failed", __FILE__, __LINE__);
 
-        for (int i=0;i<40;i++) d_Buffer[i]=NULL;
+        //for (int i=0;i<40;i++) d_Buffer[i]=NULL;
         History_Size[0] = Current_Size;
         History_Size[1] = Current_Size/BLOCK_SIZE;
         if ((History_Size[0]%BLOCK_SIZE)!=0) History_Size[1]++;
-        util::GRError(cudaMalloc(&(d_Buffer[0]), sizeof(SizeT) * History_Size[0]),
-              "cudaMalloc d_Buffer[0] failed", __FILE__, __LINE__);
-        util::GRError(cudaMalloc(&(d_Buffer[1]), sizeof(SizeT) * History_Size[1] * Num_Rows),
-              "cudaMalloc d_Buffer[1] failed", __FILE__, __LINE__);
+        //util::GRError(cudaMalloc(&(d_Buffer[0]), sizeof(SizeT) * History_Size[0]),
+        //      "cudaMalloc d_Buffer[0] failed", __FILE__, __LINE__);
+        //util::GRError(cudaMalloc(&(d_Buffer[1]), sizeof(SizeT) * History_Size[1] * Num_Rows),
+        //      "cudaMalloc d_Buffer[1] failed", __FILE__, __LINE__);
 
         while (Current_Size>1 || Current_Level==0)
         {
@@ -864,8 +952,8 @@ struct MultiScan
                     d_Splict,
                     d_Buffer[0],
                     d_Buffer[1]);
-                cudaDeviceSynchronize();
-                util::GRError("Step0b failed", __FILE__, __LINE__);
+                //cudaDeviceSynchronize();
+                //util::GRError("Step0b failed", __FILE__, __LINE__);
             } else {
                 Grid_Size = dim3(History_Size[Current_Level+1], Num_Rows, 1);
                 Step1 <SizeT, BLOCK_N> 
@@ -873,8 +961,8 @@ struct MultiScan
                     Current_Size,
                     d_Buffer[Current_Level],
                     d_Buffer[Current_Level+1]);
-                cudaDeviceSynchronize();
-                util::GRError("Step1 failed", __FILE__, __LINE__);
+                //cudaDeviceSynchronize();
+                //util::GRError("Step1 failed", __FILE__, __LINE__);
             }
 
             Current_Level++;
@@ -883,9 +971,9 @@ struct MultiScan
             {
                 History_Size[Current_Level+1] = Current_Size / BLOCK_SIZE;
                 if ((Current_Size % BLOCK_SIZE) != 0) History_Size[Current_Level+1]++;
-                util::GRError(cudaMalloc(&(d_Buffer[Current_Level+1]), 
-                    sizeof(SizeT)*History_Size[Current_Level+1]*Num_Rows),
-                    "cudaMalloc d_Buffer failed", __FILE__, __LINE__);
+                //util::GRError(cudaMalloc(&(d_Buffer[Current_Level+1]), 
+                //    sizeof(SizeT)*History_Size[Current_Level+1]*Num_Rows),
+                //    "cudaMalloc d_Buffer failed", __FILE__, __LINE__);
             }
         } // while Current_Size>1
         
@@ -900,8 +988,8 @@ struct MultiScan
                 History_Size[Current_Level-1],
                 d_Buffer[Current_Level],
                 d_Buffer[Current_Level-1]);
-            cudaDeviceSynchronize();
-            util::GRError("Step2 failed", __FILE__, __LINE__);
+            //cudaDeviceSynchronize();
+            //util::GRError("Step2 failed", __FILE__, __LINE__);
             Current_Level--;
         } // while Current_Level>1
 
@@ -933,19 +1021,19 @@ struct MultiScan
             d_Value__Associate_in,
             d_Value__Associate_out);
         cudaDeviceSynchronize();
-        util::GRError("Step3b failed", __FILE__, __LINE__);
+        //util::GRError("Step3b failed", __FILE__, __LINE__);
 
-        for (int i=0;i<40;i++) 
-        if (d_Buffer[i]!=NULL) 
-        {
-            util::GRError(cudaFree(d_Buffer[i]),
-                  "cudaFree d_Buffer failed", __FILE__, __LINE__);
-            d_Buffer[i]=NULL;
-        }
-        util::GRError(cudaFree(d_Offset1),"cudaFree d_Offset1 failed", __FILE__, __LINE__); d_Offset1=NULL;
-        delete[] h_Offset1;    h_Offset1    = NULL;
-        delete[] d_Buffer;     d_Buffer     = NULL;
-        delete[] History_Size; History_Size = NULL;
+        //for (int i=0;i<40;i++) 
+        //if (d_Buffer[i]!=NULL) 
+        //{
+        //    util::GRError(cudaFree(d_Buffer[i]),
+        //          "cudaFree d_Buffer failed", __FILE__, __LINE__);
+        //    d_Buffer[i]=NULL;
+        //}
+        //util::GRError(cudaFree(d_Offset1),"cudaFree d_Offset1 failed", __FILE__, __LINE__); d_Offset1=NULL;
+        //delete[] h_Offset1;    h_Offset1    = NULL;
+        //delete[] d_Buffer;     d_Buffer     = NULL;
+        //delete[] History_Size; History_Size = NULL;
     } // Scan_with_dKeys
 
     template <SizeT Num_Vertex_Associate,

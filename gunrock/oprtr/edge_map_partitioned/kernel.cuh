@@ -62,7 +62,7 @@ struct Dispatch
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
                                 VertexId *&d_queue,
-                                unsigned int *&d_scanned_edges,
+                                SizeT *&d_scanned_edges,
                                 SizeT &num_elements,
                                 SizeT &max_vertex,
                                 SizeT &max_edge,
@@ -77,7 +77,7 @@ struct Dispatch
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
                                 VertexId *&d_inverse_column_indices,
-                                unsigned int *&d_scanned_edges,
+                                SizeT *&d_scanned_edges,
                                 unsigned int *&partition_starts,
                                 unsigned int &num_partitions,
                                 //volatile int *&d_done,
@@ -85,7 +85,7 @@ struct Dispatch
                                 VertexId *&d_out,
                                 DataSlice *&problem,
                                 SizeT &input_queue_len,
-                                SizeT &output_queue_len,
+                                SizeT *output_queue_len,
                                 SizeT &partition_size,
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
@@ -103,13 +103,13 @@ struct Dispatch
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
                                 VertexId *&d_inverse_column_indices,
-                                unsigned int *&d_scanned_edges,
+                                SizeT *&d_scanned_edges,
                                 //volatile int *&d_done,
                                 VertexId *&d_queue,
                                 VertexId *&d_out,
                                 DataSlice *&problem,
                                 SizeT &input_queue_len,
-                                SizeT &output_queue_len,
+                                SizeT *output_queue_len,
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
                                 util::CtaWorkProgress &work_progress,
@@ -148,7 +148,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
                                 VertexId *&d_queue,
-                                unsigned int *&d_scanned_edges,
+                                SizeT *&d_scanned_edges,
                                 SizeT &num_elements,
                                 SizeT &max_vertex,
                                 SizeT &max_edge,
@@ -176,7 +176,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
                                 VertexId *&d_inverse_column_indices,
-                                unsigned int *&d_scanned_edges,
+                                SizeT *&d_scanned_edges,
                                 unsigned int *&partition_starts,
                                 unsigned int &num_partitions,
                                 //volatile int *&d_done,
@@ -184,7 +184,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 VertexId *&d_out,
                                 DataSlice *&problem,
                                 SizeT &input_queue_len,
-                                SizeT &output_queue_len,
+                                SizeT *output_queue_len,
                                 SizeT &partition_size,
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
@@ -224,7 +224,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 //}
             }
 
-            work_progress.Enqueue(output_queue_len, queue_index+1);
+            work_progress.Enqueue(output_queue_len[0], queue_index+1);
 
             // Reset our next outgoing queue counter to zero
             work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
@@ -240,10 +240,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         int my_thread_start, my_thread_end;
 
         my_thread_start = bid * partition_size;
-        my_thread_end = (bid+1)*partition_size < output_queue_len ? (bid+1)*partition_size : output_queue_len;
+        my_thread_end = (bid+1)*partition_size < output_queue_len[0] ? (bid+1)*partition_size : output_queue_len[0];
         //printf("tid:%d, bid:%d, m_thread_start:%d, m_thread_end:%d\n",tid, bid, my_thread_start, my_thread_end); 
 
-        if (my_thread_start >= output_queue_len)
+        if (my_thread_start >= output_queue_len[0])
             return;
 
         int my_start_partition = partition_starts[bid];
@@ -381,13 +381,13 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
                                 VertexId *&d_inverse_column_indices,
-                                unsigned int *&d_scanned_edges,
+                                SizeT *&d_scanned_edges,
                                 //volatile int *&d_done,
                                 VertexId *&d_queue,
                                 VertexId *&d_out,
                                 DataSlice *&problem,
                                 SizeT &input_queue_len,
-                                SizeT &output_queue_len,
+                                SizeT *output_queue_len,
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
                                 util::CtaWorkProgress &work_progress,
@@ -426,7 +426,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 //}
             }
 
-            work_progress.Enqueue(output_queue_len, queue_index+1);
+            work_progress.Enqueue(output_queue_len[0], queue_index+1);
 
             // Reset our next outgoing queue counter to zero
             work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
@@ -574,7 +574,7 @@ void RelaxPartitionedEdges(
         typename KernelPolicy::SizeT            *d_row_offsets,
         typename KernelPolicy::VertexId         *d_column_indices,
         typename KernelPolicy::VertexId         *d_inverse_column_indices,
-        unsigned int                            *d_scanned_edges,
+        typename KernelPolicy::SizeT            *d_scanned_edges,
         unsigned int                            *partition_starts,
         unsigned int                            num_partitions,
         //volatile int                            *d_done,
@@ -582,7 +582,7 @@ void RelaxPartitionedEdges(
         typename KernelPolicy::VertexId         *d_out,
         typename ProblemData::DataSlice         *problem,
         typename KernelPolicy::SizeT            input_queue_len,
-        typename KernelPolicy::SizeT            output_queue_len,
+        typename KernelPolicy::SizeT            *output_queue_len,
         typename KernelPolicy::SizeT            partition_size,
         typename KernelPolicy::SizeT            max_vertices,
         typename KernelPolicy::SizeT            max_edges,
@@ -649,13 +649,13 @@ void RelaxLightEdges(
         typename KernelPolicy::SizeT    *d_row_offsets,
         typename KernelPolicy::VertexId *d_column_indices,
         typename KernelPolicy::VertexId *d_inverse_column_indices,
-        unsigned int    *d_scanned_edges,
+        typename KernelPolicy::SizeT    *d_scanned_edges,
         //volatile int                    *d_done,
         typename KernelPolicy::VertexId *d_queue,
         typename KernelPolicy::VertexId *d_out,
         typename ProblemData::DataSlice *problem,
         typename KernelPolicy::SizeT    input_queue_len,
-        typename KernelPolicy::SizeT    output_queue_len,
+        typename KernelPolicy::SizeT    *output_queue_len,
         typename KernelPolicy::SizeT    max_vertices,
         typename KernelPolicy::SizeT    max_edges,
         util::CtaWorkProgress           work_progress,
@@ -706,7 +706,7 @@ void GetEdgeCounts(
                                 typename KernelPolicy::SizeT *d_row_offsets,
                                 typename KernelPolicy::VertexId *d_column_indices,
                                 typename KernelPolicy::VertexId *d_queue,
-                                unsigned int *d_scanned_edges,
+                                typename KernelPolicy::SizeT *d_scanned_edges,
                                 typename KernelPolicy::SizeT num_elements,
                                 typename KernelPolicy::SizeT max_vertex,
                                 typename KernelPolicy::SizeT max_edge,

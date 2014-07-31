@@ -352,7 +352,8 @@ void RunTests(
         num_gpus,
         gpu_idx,
         partition_method,
-        streams), "Problem BFS Initialization Failed", __FILE__, __LINE__);
+        streams,
+        max_queue_sizing), "Problem BFS Initialization Failed", __FILE__, __LINE__);
     util::GRError(bfs_enactor->Init (csr_problem, max_grid_size), "BFS Enactor init failed", __FILE__, __LINE__);
     //
     // Compute reference CPU BFS solution for source-distance

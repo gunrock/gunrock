@@ -70,12 +70,13 @@ struct EnactorStats
     }
 };
 
+template <typename SizeT>
 struct FrontierAttribute
 {
-    unsigned int        queue_length;
-    unsigned int        output_length;
+    SizeT        queue_length;
+    util::Array1D<SizeT,SizeT>        output_length;
     unsigned int        queue_index;
-    unsigned int        queue_offset;
+    SizeT        queue_offset;
     int                 selector;
     bool                queue_reset;
     int                 current_label;
@@ -85,18 +86,19 @@ struct FrontierAttribute
     FrontierAttribute()
     {
         queue_length  = 0;
-        output_length = 0;
+        //output_length = 0;
         queue_index   = 0;
         queue_offset  = 0;
         selector      = 0;
         queue_reset   = false;
         has_incoming = false;
+        output_length.SetName("output_length");
     }
 };
 
 template <typename SizeT, typename DataSlice>
 bool All_Done(EnactorStats *enactor_stats,
-              FrontierAttribute *frontier_attribute, 
+              FrontierAttribute<SizeT> *frontier_attribute, 
               util::Array1D<SizeT, DataSlice> *data_slice, int num_gpus)
 {   
     for (int gpu=0;gpu<num_gpus*num_gpus;gpu++)
@@ -188,7 +190,7 @@ bool All_Done(EnactorStats *enactor_stats,
     void PushNeibor(
         int gpu,
         int peer,
-        FrontierAttribute *frontier_attribute,
+        FrontierAttribute<SizeT> *frontier_attribute,
         EnactorStats      *enactor_stats,
         DataSlice         *data_slice_l,
         DataSlice         *data_slice_p,
@@ -261,10 +263,10 @@ bool All_Done(EnactorStats *enactor_stats,
         GraphSlice        **s_graph_slice,
         util::Array1D<SizeT,DataSlice> *s_data_slice,
         EnactorStats      *s_enactor_stats,
-        FrontierAttribute *s_frontier_attribute,
+        FrontierAttribute<SizeT> *s_frontier_attribute,
         unsigned char *d_marker = NULL)
     {
-        FrontierAttribute
+        FrontierAttribute<SizeT>
                      *frontier_attribute  = &(s_frontier_attribute [thread_num]);
         EnactorStats *enactor_stats       = &(s_enactor_stats      [thread_num]);
         GraphSlice   *graph_slice         =   s_graph_slice        [thread_num]; 
@@ -383,9 +385,9 @@ bool All_Done(EnactorStats *enactor_stats,
         GraphSlice        **s_graph_slice,
         util::Array1D<SizeT, DataSlice> *s_data_slice,
         EnactorStats      *s_enactor_stats,
-        FrontierAttribute *s_frontier_attribute)
+        FrontierAttribute<SizeT> *s_frontier_attribute)
     {
-        FrontierAttribute
+        FrontierAttribute<SizeT>
                      *frontier_attribute  = &(s_frontier_attribute [thread_num]);
         EnactorStats *enactor_stats       = &(s_enactor_stats      [thread_num]);
         GraphSlice   *graph_slice         =   s_graph_slice        [thread_num] ; 
@@ -474,6 +476,7 @@ bool All_Done(EnactorStats *enactor_stats,
 /**
  * @brief Base class for graph problem enactors.
  */
+template <typename SizeT>
 class EnactorBase
 {
 public:  
@@ -483,22 +486,22 @@ public:
     //Device properties
     //util::CudaProperties            cuda_props;
     //util::CudaProperties            *cuda_props;
-    util::Array1D<int, util::CudaProperties> cuda_props;
+    util::Array1D<SizeT, util::CudaProperties> cuda_props;
 
     // Queue size counters and accompanying functionality
     //util::CtaWorkProgressLifetime   work_progress;
     //util::CtaWorkProgressLifetime   *work_progress;
-    util::Array1D<int, util::CtaWorkProgressLifetime> work_progress;
+    util::Array1D<SizeT, util::CtaWorkProgressLifetime> work_progress;
 
     FrontierType                    frontier_type;
 
     //EnactorStats                    enactor_stats;
     //EnactorStats                    *enactor_stats;
-    util::Array1D<int, EnactorStats> enactor_stats;
+    util::Array1D<SizeT, EnactorStats> enactor_stats;
 
     //FrontierAttribute               frontier_attribute;
     //FrontierAttribute               *frontier_attribute;
-    util::Array1D<int, FrontierAttribute> frontier_attribute;
+    util::Array1D<SizeT, FrontierAttribute<SizeT> > frontier_attribute;
 
     // if DEBUG is set, print details to stdout
     bool DEBUG;
@@ -547,6 +550,7 @@ protected:
                 //enactor_stats[gpu].gpu_idx  = gpu_idx[gpu];
                 enactor_stats[gpu*num_gpus+peer].node_locks    .SetName("node_locks"    );
                 enactor_stats[gpu*num_gpus+peer].node_locks_out.SetName("node_locks_out");
+                frontier_attribute[gpu*num_gpus+peer].output_length.Allocate(1, util::HOST | util::DEVICE);
                 //enactor_stats.d_node_locks = NULL;
                 //enactor_stats.d_node_locks_out = NULL;
             }
@@ -565,6 +569,7 @@ protected:
             {
                 enactor_stats[gpu*num_gpus+peer].node_locks    .Release();
                 enactor_stats[gpu*num_gpus+peer].node_locks_out.Release();
+                frontier_attribute[gpu*num_gpus+peer].output_length.Release();
                 if (work_progress[gpu*num_gpus+peer].HostReset()) return;
             }
             //if (util::GRError(cudaFreeHost((void*)enactor_stats[gpu].done), 
