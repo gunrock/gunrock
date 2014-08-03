@@ -255,7 +255,7 @@ void SimpleReferencePr(
 
      free(pr_list);
 
-    printf("CPU BFS finished in %lf msec.\n", elapsed);
+    printf("CPU PageRank finished in %lf msec.\n", elapsed);
 }
 
 /**
