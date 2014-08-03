@@ -19,9 +19,10 @@ int main(int argc, char* argv[])
 
   // bc configurations (optional)
   struct GunrockConfig bc_config;
-  bc_config.device      =    0;
-  bc_config.src_node    =   -1;     //!< source vertex to begin search
-  bc_config.queue_size  = 1.0f;
+  bc_config.device       =    0;
+  bc_config.src_node     =   -1;     //!< source vertex to begin search
+  bc_config.queue_size   = 1.0f;
+  bc_config.src_mode = manually;
 
   // define graph (undirected graph)
   size_t num_nodes = 7;

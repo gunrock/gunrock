@@ -29,9 +29,9 @@ int main(int argc, char* argv[])
 
   // define graph (undirected graph)
   size_t num_nodes = 7;
-  size_t num_edges = 26;
-  int row_offsets[8] = {0,3,6,11,15,19,23,26};
-  int col_indices[26] = {1,2,3,0,2,4,0,1,3,4,5,0,2,5,6,1,2,5,6,2,3,4,6,3,4,5};
+  size_t num_edges = 15;
+  int row_offsets[8] = {0,3,6,9,11,14,15,15};
+  int col_indices[15] = {1,2,3,0,2,4,3,4,5,5,6,2,5,6,6};
 
   // build graph as input
   struct GunrockGraph *graph_input =

@@ -79,8 +79,6 @@ void run_bc(
         num_gpus),
         "BC Problem Initialization Failed", __FILE__, __LINE__);
 
-    double avg_duty = 0.0;
-
     // Perform BC
     GpuTimer gpu_timer;
 
@@ -115,7 +113,8 @@ void run_bc(
 
     float elapsed = gpu_timer.ElapsedMillis();
 
-    bc_enactor.GetStatistics(avg_duty);
+    //double avg_duty = 0.0;
+    //bc_enactor.GetStatistics(avg_duty);
 
     // Copy out results to Host Device
     util::GRError(csr_problem->Extract(h_sigmas, h_bc_values, h_ebc_values),

@@ -180,10 +180,6 @@ void run_sssp(
 
     Stats *stats = new Stats("Single-Source Shortest Path");
 
-    long long total_queued =   0;
-    VertexId  search_depth =   0;
-    double    avg_duty     = 0.0;
-
     // Perform SSSP
     CpuTimer gpu_timer;
 
@@ -195,9 +191,14 @@ void run_sssp(
         context, csr_problem, source, queue_sizing, max_grid_size),
         "SSSP Problem Enact Failed", __FILE__, __LINE__);
     gpu_timer.Stop();
-
-    sssp_enactor.GetStatistics(total_queued, search_depth, avg_duty);
     float elapsed = gpu_timer.ElapsedMillis();
+
+    /*
+    long long total_queued =   0;
+    VertexId  search_depth =   0;
+    double    avg_duty     = 0.0;
+    sssp_enactor.GetStatistics(total_queued, search_depth, avg_duty);
+    */
 
     // Copy out results
     util::GRError(csr_problem->Extract(h_labels, predecessor),
@@ -206,6 +207,7 @@ void run_sssp(
     // copy label_values per node to GunrockGraph output
     ggraph_out->node_values = (unsigned int*)&h_labels[0];
 
+    /*
     DisplayStats(
         *stats,
         source,
@@ -215,6 +217,7 @@ void run_sssp(
         search_depth,
         total_queued,
         avg_duty);
+    */
 
     // Clean up
     delete stats;
