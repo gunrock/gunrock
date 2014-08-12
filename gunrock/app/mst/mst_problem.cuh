@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <limits>
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/util/memset_kernel.cuh>
 
