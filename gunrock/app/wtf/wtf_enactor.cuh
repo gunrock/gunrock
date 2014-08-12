@@ -271,7 +271,7 @@ class WTFEnactor : public EnactorBase
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_scanned_edges,
                                 graph_slice->edges * sizeof(unsigned int)),
-                            "PBFSProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
+                            "WTFProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
             }
 
             // Step through WTF iterations 
@@ -304,12 +304,10 @@ class WTFEnactor : public EnactorBase
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
 
-                frontier_attribute.queue_index++;
+                //frontier_attribute.queue_index++;
 
-                if (DEBUG) {
-                    if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                    if (DEBUG)
                     printf(", %lld", (long long) frontier_attribute.queue_length);
-                }
 
                 if (INSTRUMENT) {
                     if (retval = enactor_stats.advance_kernel_stats.Accumulate(
@@ -319,10 +317,12 @@ class WTFEnactor : public EnactorBase
                 }
 
 
-                if (frontier_attribute.queue_reset)
-                    frontier_attribute.queue_reset = false;
+                //if (frontier_attribute.queue_reset)
+                //    frontier_attribute.queue_reset = false;
 
                 if (done[0] == 0) break; 
+
+                frontier_attribute.queue_length = edge_map_queue_len;
                 
                 //if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, edge_map_queue_len)) break;
 
@@ -444,7 +444,7 @@ class WTFEnactor : public EnactorBase
         
         while (true) {
 
-            if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+            //if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
 
             // Edge Map
             gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, WTFProblem, AuthFunctor>(
@@ -553,7 +553,7 @@ class WTFEnactor : public EnactorBase
             0,                                  // SATURATION QUIT
             true,                               // DEQUEUE_WTFOBLEM_SIZE
             8,                                  // MIN_CTA_OCCUPANCY
-            6,                                  // LOG_THREADS
+            8,                                  // LOG_THREADS
             1,                                  // LOG_LOAD_VEC_SIZE
             0,                                  // LOG_LOADS_PER_TILE
             5,                                  // LOG_RAKING_THREADS
@@ -561,22 +561,22 @@ class WTFEnactor : public EnactorBase
             8>                                  // LOG_SCHEDULE_GRANULARITY
                 FilterKernelPolicy;
 
-            typedef gunrock::oprtr::advance::KernelPolicy<
-                WTFProblem,                         // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                10,                                  // LOG_THREADS
-                8,
-                32*1024,
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                            // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7,                                  // LOG_SCHEDULE_GRANULARITY
-                gunrock::oprtr::advance::TWC_FORWARD>
-                    AdvanceKernelPolicy;
+                typedef gunrock::oprtr::advance::KernelPolicy<
+                    WTFProblem,                         // Problem data type
+                    300,                                // CUDA_ARCH
+                    INSTRUMENT,                         // INSTRUMENT
+                    8,                                  // MIN_CTA_OCCUPANCY
+                    10,                                  // LOG_THREADS
+                    8,                                  // LOG_BLOCKS
+                    32*128,                                  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+                    1,                                  // LOG_LOAD_VEC_SIZE
+                    0,                                  // LOG_LOADS_PER_TILE
+                    5,                                  // LOG_RAKING_THREADS
+                    32,                            // WARP_GATHER_THRESHOLD
+                    128 * 4,                            // CTA_GATHER_THRESHOLD
+                    7,                                  // LOG_SCHEDULE_GRANULARITY
+                    gunrock::oprtr::advance::LB>
+                        AdvanceKernelPolicy;
 
             return EnactWTF<AdvanceKernelPolicy, FilterKernelPolicy, WTFProblem>(
                     context, src, alpha, problem, max_iteration, max_grid_size);
