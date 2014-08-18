@@ -57,26 +57,26 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
      */
     struct DataSlice
     {
-	SizeT    *d_labels;
+		SizeT    *d_labels;
 
-	// device storage arrays
-	unsigned int *d_flags_array;  //!< flags 1 start of segment, 0 otherwise
-	VertexId     *d_keys_array;   //!< keys array - scan of the flags array
-	Value        *d_reduced_vals; //!< store reduced minimum weights
-	VertexId     *d_reduced_keys; //!< reduced keys array
-	VertexId     *d_successors;   //!< dst vertices that have min weight
-	int          *d_mst_output;   //!< mark selected edges with 1
-	Value        *d_edge_weights; //!< store weights per edge
-	Value        *d_temp_storage; //!< used for storing temp arrays
-	int          *d_vertex_flag;  //!< finish flag for per-vertex kernels
-	VertexId     *d_origin_nodes; //!< used to track origin vertex ids
-	VertexId     *d_origin_edges; //!< origin edge list keep track of eids
-	SizeT        *d_super_vids;   //!< super vertex ids scaned from flags
-	VertexId     *d_super_edges;  //!< super edge list for next iteration
-	VertexId     *d_col_indices;  //!< column indices of csr graph (edges)
-	SizeT        *d_row_offsets;  //!< row offsets of csr graph
-	unsigned int *d_edge_flags;   //!< flags from the output of seg sort
-	Value        *d_tmp_storage; //!< used for storing temp arrays
+		// device storage arrays
+		unsigned int *d_flags_array;  //!< flags 1 start of segment, 0 otherwise
+		VertexId     *d_keys_array;   //!< keys array - scan of the flags array
+		Value        *d_reduced_vals; //!< store reduced minimum weights
+		VertexId     *d_reduced_keys; //!< reduced keys array
+		VertexId     *d_successors;   //!< dst vertices that have min weight
+		int          *d_mst_output;   //!< mark selected edges with 1
+		Value        *d_edge_weights; //!< store weights per edge
+		Value        *d_temp_storage; //!< used for storing temp arrays
+		int          *d_vertex_flag;  //!< finish flag for per-vertex kernels
+		VertexId     *d_origin_nodes; //!< used to track origin vertex ids
+		VertexId     *d_origin_edges; //!< origin edge list keep track of eids
+		SizeT        *d_super_vids;   //!< super vertex ids scaned from flags
+		VertexId     *d_super_edges;  //!< super edge list for next iteration
+		VertexId     *d_col_indices;  //!< column indices of csr graph (edges)
+		SizeT        *d_row_offsets;  //!< row offsets of csr graph
+		unsigned int *d_edge_flags;   //!< flags from the output of seg sort
+		Value        *d_tmp_storage;  //!< used for storing temp arrays
     };
 
     // Members
@@ -136,63 +136,63 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
     ~MSTProblem() {
 	for (int i = 0; i < num_gpus; ++i) {
 	    if (util::GRError(cudaSetDevice(gpu_idx[i]),
-		"~MSTProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
+			"~MSTProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
 
 	    if (data_slices[i]->d_col_indices)
-		util::GRError(cudaFree(data_slices[i]->d_col_indices),
-		"GpuSlice cudaFree d_col_indices failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_col_indices),
+			"GpuSlice cudaFree d_col_indices failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_edge_weights)
-		util::GRError(cudaFree(data_slices[i]->d_edge_weights),
-		"GpuSlice cudaFree d_edge_weights failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_edge_weights),
+			"GpuSlice cudaFree d_edge_weights failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_reduced_vals)
-		util::GRError(cudaFree(data_slices[i]->d_reduced_vals),
-		"GpuSlice cudaFree d_reduced_vals failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_reduced_vals),
+			"GpuSlice cudaFree d_reduced_vals failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_flags_array)
-		util::GRError(cudaFree(data_slices[i]->d_flags_array),
-		"GpuSlice cudaFree d_flags_array failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_flags_array),
+			"GpuSlice cudaFree d_flags_array failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_keys_array)
-		util::GRError(cudaFree(data_slices[i]->d_keys_array),
-		"GpuSlice cudaFree d_keys_array failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_keys_array),
+			"GpuSlice cudaFree d_keys_array failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_temp_storage)
-		util::GRError(cudaFree(data_slices[i]->d_temp_storage),
-		"GpuSlice cudaFree d_temp_storage failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_temp_storage),
+			"GpuSlice cudaFree d_temp_storage failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_reduced_keys)
-		util::GRError(cudaFree(data_slices[i]->d_reduced_keys),
-		"GpuSlice cudaFree d_reduced_keys failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_reduced_keys),
+			"GpuSlice cudaFree d_reduced_keys failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_successors)
-		util::GRError(cudaFree(data_slices[i]->d_successors),
-		"GpuSlice cudaFree d_successors failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_successors),
+			"GpuSlice cudaFree d_successors failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_row_offsets)
-		util::GRError(cudaFree(data_slices[i]->d_row_offsets),
-		"GpuSlice cudaFree d_row_offsets failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_row_offsets),
+			"GpuSlice cudaFree d_row_offsets failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_vertex_flag)
-		util::GRError(cudaFree(data_slices[i]->d_vertex_flag),
-		"GpuSlice cudaFree d_vertex_flag failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_vertex_flag),
+			"GpuSlice cudaFree d_vertex_flag failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_origin_nodes)
-		util::GRError(cudaFree(data_slices[i]->d_origin_nodes),
-		"GpuSlice cudaFree d_origin_nodes failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_origin_nodes),
+			"GpuSlice cudaFree d_origin_nodes failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_super_vids)
-		util::GRError(cudaFree(data_slices[i]->d_super_vids),
-		"GpuSlice cudaFree d_super_vids failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_super_vids),
+			"GpuSlice cudaFree d_super_vids failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_origin_edges)
-		util::GRError(cudaFree(data_slices[i]->d_origin_edges),
-		"GpuSlice cudaFree d_origin_edges failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_origin_edges),
+			"GpuSlice cudaFree d_origin_edges failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_mst_output)
-		util::GRError(cudaFree(data_slices[i]->d_mst_output),
-		"GpuSlice cudaFree d_mst_output failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_mst_output),
+			"GpuSlice cudaFree d_mst_output failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_edge_flags)
-		util::GRError(cudaFree(data_slices[i]->d_edge_flags),
-		"GpuSlice cudaFree d_edge_flags failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_edge_flags),
+			"GpuSlice cudaFree d_edge_flags failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_tmp_storage)
-		util::GRError(cudaFree(data_slices[i]->d_tmp_storage),
-		"GpuSlice cudaFree d_tmp_storage failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_tmp_storage),
+			"GpuSlice cudaFree d_tmp_storage failed", __FILE__, __LINE__);
 	    if (data_slices[i]->d_super_edges)
-		util::GRError(cudaFree(data_slices[i]->d_super_edges),
-		"GpuSlice cudaFree d_super_edges failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(data_slices[i]->d_super_edges),
+			"GpuSlice cudaFree d_super_edges failed", __FILE__, __LINE__);
 
 	    if (d_data_slices[i])
-		util::GRError(cudaFree(d_data_slices[i]),
-		"GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
+			util::GRError(cudaFree(d_data_slices[i]),
+			"GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
 	}
 
 	if (d_data_slices) delete[] d_data_slices;
@@ -208,50 +208,55 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
      * @brief Copy result labels and/or predecessors computed
      * on the GPU back to host-side vectors.
      *
-     * @param[out] h_selector host-side vector to store mst results.
+     * @param[out] h_mst_output host-side vector to store mst results.
      *
      *\return cudaError_t object which indicates the success of
      * all CUDA function calls.
      */
     //TODO: write extract function
-    cudaError_t Extract(SizeT *h_selector) {
-	cudaError_t retval = cudaSuccess;
-	do {
-	    if (num_gpus == 1) {
-		// Set device
-		if (util::GRError(cudaSetDevice(gpu_idx[0]),
-		    "MSTProblem cudaSetDevice failed",
-		    __FILE__, __LINE__)) break;
+    cudaError_t Extract(SizeT *h_mst_output)
+    {
+		cudaError_t retval = cudaSuccess;
+		do
+		{
+		    if (num_gpus == 1)
+		    {
+				// Set device
+				if (util::GRError(cudaSetDevice(gpu_idx[0]),
+				    "MSTProblem cudaSetDevice failed",
+				    __FILE__, __LINE__)) break;
 
-		if (retval = util::GRError(cudaMemcpy(
-		    h_selector,
-		    data_slices[0]->d_mst_output,
-		    sizeof(SizeT) * edges,
-		    cudaMemcpyDeviceToHost),
-		    "MSTProblem cudaMemcpy selector failed",
-		    __FILE__, __LINE__)) break;
-	    }
-	    else {
-		// TODO: multi-GPU extract result
-	    } //end if (data_slices.size() ==1)
-	} while(0);
-	return retval;
+				if (retval = util::GRError(cudaMemcpy(
+				    h_mst_output,
+				    data_slices[0]->d_mst_output,
+				    sizeof(SizeT) * edges,
+				    cudaMemcpyDeviceToHost),
+				    "MSTProblem cudaMemcpy selector failed",
+				    __FILE__, __LINE__)) break;
+		    }
+		    else
+		    {
+				// TODO: multi-GPU extract result
+		    } //end if (data_slices.size() ==1)
+		} while(0);
+		return retval;
     }
 
     /**
      * @brief MSTProblem initialization
      *
      * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on. @see Csr
+     * @param[in] graph Reference to the CSR graph object we process on.
      * @param[in] _num_gpus Number of the GPUs used.
      *
      * \return cudaError_t object which indicates the success of
      * all CUDA function calls.
      */
     cudaError_t Init(
-	bool  stream_from_host,
-	const Csr<VertexId, Value, SizeT> &graph,
-	int   _num_gpus) {
+		bool  stream_from_host,
+		const Csr<VertexId, Value, SizeT> &graph,
+		int   _num_gpus)
+    {
 
 	num_gpus = _num_gpus;
 	nodes = graph.nodes;
