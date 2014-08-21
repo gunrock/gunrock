@@ -311,6 +311,7 @@ void RunTests(
     double max_queue_sizing,
     float alpha,        // Tuning parameter for switching to reverse bfs
     float beta,         // Tuning parameter for switching back to normal bfs
+    int iterations,
     CudaContext& context)
 {
     typedef DOBFSProblem<
@@ -368,14 +369,19 @@ void RunTests(
         // Perform BFS
         GpuTimer gpu_timer;
 
-        util::GRError(csr_problem->Reset(src, dobfs_enactor.GetFrontierType(), max_queue_sizing), "DOBFS Problem Data Reset Failed", __FILE__, __LINE__);
-        gpu_timer.Start();
-        util::GRError(dobfs_enactor.template Enact<Problem>(context, csr_problem, src, max_grid_size), "DOBFS Problem Enact Failed", __FILE__, __LINE__);
-        gpu_timer.Stop();
+        float elapsed = 0.0f;
+
+        for (int iter=0; iter < iterations; ++iter)
+        {
+            util::GRError(csr_problem->Reset(src, dobfs_enactor.GetFrontierType(), max_queue_sizing), "DOBFS Problem Data Reset Failed", __FILE__, __LINE__);
+            gpu_timer.Start();
+            util::GRError(dobfs_enactor.template Enact<Problem>(context, csr_problem, src, max_grid_size), "DOBFS Problem Enact Failed", __FILE__, __LINE__);
+            gpu_timer.Stop();
+            elapsed += gpu_timer.ElapsedMillis();
+        }
+        elapsed /= iterations;
 
         dobfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
-
-        float elapsed = gpu_timer.ElapsedMillis();
 
         // Copy out results
         util::GRError(csr_problem->Extract(h_labels, h_preds), "DOBFS Problem Data Extraction Failed", __FILE__, __LINE__);
@@ -440,6 +446,7 @@ void RunTests(
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
     int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
     double              max_queue_sizing    = 1.0;          // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
+    int                 iterations          = 1;
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("src", src_str);
@@ -452,6 +459,9 @@ void RunTests(
     } else {
         args.GetCmdLineArgument("src", src);
     }
+
+    args.GetCmdLineArgument("iteration-num", iterations);
+
     args.GetCmdLineArgument("grid-size", max_grid_size);
 
     g_quick = args.CheckCmdLineFlag("quick");
@@ -481,6 +491,7 @@ void RunTests(
                         max_queue_sizing,
                         g_alpha,
                         g_beta,
+                        iterations,
                         context);
             } else {
                 RunTests<VertexId, Value, SizeT, true, true, false>(
@@ -492,6 +503,7 @@ void RunTests(
                         max_queue_sizing,
                         g_alpha,
                         g_beta,
+                        iterations,
                         context);
             }
         } else {
@@ -505,6 +517,7 @@ void RunTests(
                         max_queue_sizing,
                         g_alpha,
                         g_beta,
+                        iterations,
                         context);
             } else {
                 RunTests<VertexId, Value, SizeT, true, false, false>(
@@ -516,6 +529,7 @@ void RunTests(
                         max_queue_sizing,
                         g_alpha,
                         g_beta,
+                        iterations,
                         context);
             }
         }
@@ -531,6 +545,7 @@ void RunTests(
                         max_queue_sizing,
                         g_alpha,
                         g_beta,
+                        iterations,
                         context);
             } else {
                 RunTests<VertexId, Value, SizeT, false, true, false>(
@@ -542,6 +557,7 @@ void RunTests(
                         max_queue_sizing,
                         g_alpha,
                         g_beta,
+                        iterations,
                         context);
             }
         } else {
@@ -555,6 +571,7 @@ void RunTests(
                         max_queue_sizing,
                         g_alpha,
                         g_beta,
+                        iterations,
                         context);
             } else {
                 RunTests<VertexId, Value, SizeT, false, false, false>(
@@ -566,6 +583,7 @@ void RunTests(
                         max_queue_sizing,
                         g_alpha,
                         g_beta,
+                        iterations,
                         context);
             }
         }
