@@ -202,6 +202,7 @@ template <
 void RunTests(
     const Csr<VertexId, Value, SizeT> &graph,
     int max_grid_size,
+    int iterations,
     int num_gpus)
 {
     typedef CCProblem<
@@ -243,12 +244,19 @@ void RunTests(
         // Perform CC
         GpuTimer gpu_timer;
 
-        util::GRError(csr_problem->Reset(cc_enactor.GetFrontierType()), "CC Problem Data Reset Failed", __FILE__, __LINE__);
-        gpu_timer.Start();
-        util::GRError(cc_enactor.template Enact<Problem>(csr_problem, max_grid_size), "CC Problem Enact Failed", __FILE__, __LINE__);
-        gpu_timer.Stop();
+        float elapsed = 0.0f;
 
-        float elapsed = gpu_timer.ElapsedMillis();
+        for (int iter = 0; iter < iterations; ++iter)
+        {
+
+            util::GRError(csr_problem->Reset(cc_enactor.GetFrontierType()), "CC Problem Data Reset Failed", __FILE__, __LINE__);
+            gpu_timer.Start();
+            util::GRError(cc_enactor.template Enact<Problem>(csr_problem, max_grid_size), "CC Problem Enact Failed", __FILE__, __LINE__);
+            gpu_timer.Stop();
+
+            elapsed += gpu_timer.ElapsedMillis();
+        }
+        elapsed /= iterations;
 
         // Copy out results
         util::GRError(csr_problem->Extract(h_component_ids), "CC Problem Data Extraction Failed", __FILE__, __LINE__);
@@ -305,21 +313,25 @@ void RunTests(
     bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
     int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
+    int                 iterations          = 1;
 
     instrumented = args.CheckCmdLineFlag("instrumented");
 
     g_quick = args.CheckCmdLineFlag("quick");
     g_verbose = args.CheckCmdLineFlag("v");
+    args.GetCmdLineArgument("iteration-num", iterations);
 
     if (instrumented) {
             RunTests<VertexId, Value, SizeT, true>(
                 graph,
                 max_grid_size,
+                iterations,
                 num_gpus);
     } else {
             RunTests<VertexId, Value, SizeT, false>(
                 graph,
                 max_grid_size,
+                iterations,
                 num_gpus);
     }
 }

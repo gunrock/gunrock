@@ -450,6 +450,7 @@ class SSSPEnactor : public EnactorBase
             
         } while(0);
         if (d_scanned_edges) cudaFree(d_scanned_edges);
+        delete pq;
 
         if (DEBUG) printf("\nGPU SSSP Done.\n");
         return retval;

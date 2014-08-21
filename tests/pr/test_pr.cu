@@ -288,6 +288,7 @@ void RunTests(
     SizeT max_iter,
     int max_grid_size,
     int num_gpus,
+    int iterations,
     CudaContext& context)
 {
     
@@ -321,14 +322,21 @@ void RunTests(
         // Perform BFS
         GpuTimer gpu_timer;
 
-        util::GRError(csr_problem->Reset(src, delta, error, pr_enactor.GetFrontierType()), "pr Problem Data Reset Failed", __FILE__, __LINE__);
-        gpu_timer.Start();
-        util::GRError(pr_enactor.template Enact<Problem>(context, csr_problem, max_iter, max_grid_size), "pr Problem Enact Failed", __FILE__, __LINE__);
-        gpu_timer.Stop();
+        float elapsed = 0.0f;
+
+        for (int iter = 0; iter < iterations; ++iter)
+        {
+            util::GRError(csr_problem->Reset(src, delta, error, pr_enactor.GetFrontierType()), "pr Problem Data Reset Failed", __FILE__, __LINE__);
+            gpu_timer.Start();
+            util::GRError(pr_enactor.template Enact<Problem>(context, csr_problem, max_iter, max_grid_size), "pr Problem Enact Failed", __FILE__, __LINE__);
+            gpu_timer.Stop();
+            elapsed += gpu_timer.ElapsedMillis();
+        }
+        elapsed /= iterations;
+
 
         pr_enactor.GetStatistics(total_queued, avg_duty);
 
-        float elapsed = gpu_timer.ElapsedMillis();
 
         // Copy out results
         util::GRError(csr_problem->Extract(h_rank, h_node_id), "PageRank Problem Data Extraction Failed", __FILE__, __LINE__);
@@ -408,12 +416,14 @@ void RunTests(
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
     int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
     VertexId            src                 = -1;
+    int                 iterations          = 1;
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("delta", delta);
     args.GetCmdLineArgument("error", error);
     args.GetCmdLineArgument("max-iter", max_iter);
     args.GetCmdLineArgument("src", src);
+    args.GetCmdLineArgument("iteration-num", iterations);
 
     g_quick = args.CheckCmdLineFlag("quick");
     g_verbose = args.CheckCmdLineFlag("v");
@@ -427,6 +437,7 @@ void RunTests(
                         max_iter,
                         max_grid_size,
                         num_gpus,
+                        iterations,
                         context);
     } else {
         RunTests<VertexId, Value, SizeT, false>(
@@ -437,6 +448,7 @@ void RunTests(
                         max_iter,
                         max_grid_size,
                         num_gpus,
+                        iterations,
                         context);
     }
 }

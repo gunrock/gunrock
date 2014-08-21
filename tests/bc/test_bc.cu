@@ -347,6 +347,7 @@ void RunTests(
     int max_grid_size,
     int num_gpus,
     double max_queue_sizing,
+    int iterations,
     CudaContext& context)
 {
     typedef BCProblem<
@@ -419,6 +420,12 @@ void RunTests(
         end_src = src+1;
     }
 
+    float elapsed = 0.0f;
+
+    for (int iter = 0; iter < iterations; ++iter)
+    {
+    util::MemsetKernel<<<128, 128>>>
+        (csr_problem->data_slices[0]->d_bc_values, (Value)0.0f, (int)graph.nodes);
 
     gpu_timer.Start();
     for (VertexId i = start_src; i < end_src; ++i)
@@ -430,9 +437,11 @@ void RunTests(
     util::MemsetScaleKernel<<<128, 128>>>
         (csr_problem->data_slices[0]->d_bc_values, (Value)0.5f, (int)graph.nodes);
 
-    gpu_timer.Stop();
+    gpu_timer.Stop(); 
 
-    float elapsed = gpu_timer.ElapsedMillis();
+    elapsed += gpu_timer.ElapsedMillis();
+    }
+    elapsed /= iterations;
 
     bc_enactor.GetStatistics(avg_duty);
 
@@ -499,7 +508,9 @@ void RunTests(
     int         max_grid_size    = 0;     // maximum grid size (0: leave it up to the enactor)
     int         num_gpus         = 1;     // Number of GPUs for multi-gpu enactor to use
     double      max_queue_sizing = 1.0;   // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
+    int         iterations       = 1;
 
+    args.GetCmdLineArgument("iteration-num", iterations);
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("src", src_str);
     args.GetCmdLineArgument("ref-file", ref_filename);
@@ -521,6 +532,7 @@ void RunTests(
             max_grid_size,
             num_gpus,
             max_queue_sizing,
+            iterations,
             context);
     } else {
         RunTests<VertexId, Value, SizeT, false>(
@@ -530,6 +542,7 @@ void RunTests(
             max_grid_size,
             num_gpus,
             max_queue_sizing,
+            iterations,
             context);
     }
 

@@ -337,6 +337,7 @@ void RunTests(
     float queue_sizing,
     int num_gpus,
     int delta_factor,
+    int iterations,
     CudaContext& context)
 {
         typedef SSSPProblem<
@@ -392,14 +393,21 @@ void RunTests(
         // Perform SSSP
         CpuTimer gpu_timer;
 
-        util::GRError(csr_problem->Reset(src, sssp_enactor.GetFrontierType(), queue_sizing), "SSSP Problem Data Reset Failed", __FILE__, __LINE__); 
-        gpu_timer.Start();
-        util::GRError(sssp_enactor.template Enact<Problem>(context, csr_problem, src, queue_sizing, max_grid_size), "SSSP Problem Enact Failed", __FILE__, __LINE__);
-        gpu_timer.Stop();
+        float elapsed = 0.0f;
+
+        for (int iter = 0; iter < iterations; ++iter)
+        { 
+            util::GRError(csr_problem->Reset(src, sssp_enactor.GetFrontierType(), queue_sizing), "SSSP Problem Data Reset Failed", __FILE__, __LINE__); 
+            gpu_timer.Start();
+            util::GRError(sssp_enactor.template Enact<Problem>(context, csr_problem, src, queue_sizing, max_grid_size), "SSSP Problem Enact Failed", __FILE__, __LINE__);
+            gpu_timer.Stop();
+
+            elapsed += gpu_timer.ElapsedMillis();
+        }
+        elapsed /= iterations;
+
 
         sssp_enactor.GetStatistics(total_queued, search_depth, avg_duty);
-
-        float elapsed = gpu_timer.ElapsedMillis();
 
         // Copy out results
         util::GRError(csr_problem->Extract(h_labels, h_preds), "SSSP Problem Data Extraction Failed", __FILE__, __LINE__);
@@ -471,9 +479,11 @@ void RunTests(
     int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
     float               max_queue_sizing    = 1.0;
     bool                mark_pred           = false;
+    int                 iterations          = 1;
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("src", src_str);
+    args.GetCmdLineArgument("iteration-num", iterations);
     if (src_str.empty()) {
         src = 0;
     } else if (src_str.compare("randomize") == 0) {
@@ -504,6 +514,7 @@ void RunTests(
                     max_queue_sizing,
                     num_gpus,
                     delta_factor,
+                    iterations,
                     context);
         } else {
             RunTests<VertexId, Value, SizeT, false, true>(
@@ -513,6 +524,7 @@ void RunTests(
                     max_queue_sizing,
                     num_gpus,
                     delta_factor,
+                    iterations,
                     context);
         }
     } else {
@@ -524,6 +536,7 @@ void RunTests(
                     max_queue_sizing,
                     num_gpus,
                     delta_factor,
+                    iterations,
                     context);
         } else {
             RunTests<VertexId, Value, SizeT, false, false>(
@@ -533,6 +546,7 @@ void RunTests(
                     max_queue_sizing,
                     num_gpus,
                     delta_factor,
+                    iterations,
                     context);
         }
     }
