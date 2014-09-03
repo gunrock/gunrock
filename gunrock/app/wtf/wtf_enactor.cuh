@@ -32,6 +32,7 @@
 #include <cub/cub.cuh>
 
 using namespace mgpu;
+using namespace gunrock::util;
 
 namespace gunrock {
 namespace app {
@@ -238,6 +239,9 @@ class WTFEnactor : public EnactorBase
 
         unsigned int    *d_scanned_edges = NULL; 
         
+        GpuTimer gpu_timer;
+        float elapsed;
+
         do {
             if (DEBUG) {
                 printf("Iteration, Edge map queue, Vertex map queue\n");
@@ -270,10 +274,11 @@ class WTFEnactor : public EnactorBase
             if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_scanned_edges,
-                                graph_slice->edges * sizeof(unsigned int)),
+                                graph_slice->nodes*10 * sizeof(unsigned int)),
                             "WTFProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
             }
 
+            gpu_timer.Start();
             // Step through WTF iterations 
             while (done[0] < 0) {
 
@@ -385,8 +390,14 @@ class WTFEnactor : public EnactorBase
 
             }
 
+            gpu_timer.Stop();
+            elapsed = gpu_timer.ElapsedMillis();
+            printf("PPR Time: %5f\n", elapsed);
+
             if (retval) break;
             enactor_stats.iteration = 0;
+
+            gpu_timer.Start();
 
         util::CUBRadixSort<Value, VertexId>(false, graph_slice->nodes, problem->data_slices[0]->d_rank_curr, problem->data_slices[0]->d_node_ids);
         
@@ -426,6 +437,11 @@ class WTFEnactor : public EnactorBase
                 context,
                 gunrock::oprtr::advance::V2V);
 
+            gpu_timer.Stop();
+            elapsed = gpu_timer.ElapsedMillis();
+            printf("CoT Time: %5f\n", elapsed);
+
+
         util::MemsetKernel<<<128, 128>>>(problem->data_slices[0]->d_rank_next, (Value)0.0, graph_slice->nodes);
         util::MemsetKernel<<<128, 128>>>(problem->data_slices[0]->d_rank_curr, (Value)0.0, graph_slice->nodes);
 
@@ -441,6 +457,9 @@ class WTFEnactor : public EnactorBase
                     "WTFProblem cudaMemcpy d_rank_curr[src] failed", __FILE__, __LINE__)) return retval;
 
         long long max_salsa_iteration = 1/alpha;
+
+
+        gpu_timer.Start();
         
         while (true) {
 
@@ -511,6 +530,10 @@ class WTFEnactor : public EnactorBase
         util::MemsetIdxKernel<<<128, 128>>>(problem->data_slices[0]->d_node_ids, graph_slice->nodes);
 
         util::CUBRadixSort<Value, VertexId>(false, graph_slice->nodes, problem->data_slices[0]->d_refscore_curr, problem->data_slices[0]->d_node_ids); 
+
+            gpu_timer.Stop();
+            elapsed = gpu_timer.ElapsedMillis();
+            printf("WTF Time: %5f\n", elapsed);
 
         } while(0); 
 

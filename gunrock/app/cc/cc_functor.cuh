@@ -87,16 +87,17 @@ struct HookInitFunctor
      */
     static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
-        VertexId from_node;
-        VertexId to_node;
-        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+        VertexId from_node = problem->d_froms[node];
+        VertexId to_node = problem->d_tos[node];
+        /*util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                 from_node, problem->d_froms + node);
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                to_node, problem->d_tos + node);
+                to_node, problem->d_tos + node);*/
         VertexId max_node = from_node > to_node ? from_node:to_node;
         VertexId min_node = from_node + to_node - max_node;
-        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                min_node, problem->d_component_ids + max_node);
+        //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+        //        min_node, problem->d_component_ids + max_node);
+        problem->d_component_ids[max_node] = min_node;
     }
 };
 
@@ -153,8 +154,8 @@ struct HookMinFunctor
                     parent_from, problem->d_component_ids + from_node);
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                     parent_to, problem->d_component_ids + to_node);
-            VertexId max_node = parent_from > parent_to ? parent_from: parent_to;
-            VertexId min_node = parent_from + parent_to - max_node;
+            VertexId min_node = parent_from <= parent_to ? parent_from: parent_to;
+            VertexId max_node = parent_from + parent_to - min_node;
             if (max_node == min_node) {
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         true, problem->d_marks + node);

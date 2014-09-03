@@ -467,7 +467,8 @@ void RunTests(
     } else if (src_str.compare("randomize") == 0) {
         src = graphio::RandomNode(graph.nodes);
     } else if (src_str.compare("largestdegree") == 0) {
-        src = graph.GetNodeWithHighestDegree();
+        int temp;
+        src = graph.GetNodeWithHighestDegree(temp);
     } else {
         args.GetCmdLineArgument("src", src);
     }

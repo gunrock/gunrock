@@ -253,7 +253,16 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             /*else
             {
                 unsigned int split_val = (output_queue_len + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
-                util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.d_node_locks, KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
+                int num_block = (output_queue_len >= 256) ? KernelPolicy::LOAD_BALANCED::BLOCKS : 1;
+                int nb = (num_block + 1 + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
+            gunrock::oprtr::edge_map_partitioned::MarkPartitionSizes<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
+            <<<nb, KernelPolicy::LOAD_BALANCED::THREADS>>>(
+            enactor_stats.d_node_locks,
+            split_val,
+            num_block+1,
+            output_queue_len);
+                //util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.d_node_locks, KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
+
                 SortedSearch<MgpuBoundsLower>(
                 enactor_stats.d_node_locks,
                 KernelPolicy::LOAD_BALANCED::BLOCKS,
@@ -265,7 +274,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                 //util::DisplayDeviceResults(enactor_stats.d_node_locks_out, KernelPolicy::LOAD_BALANCED::BLOCKS);
 
                 gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
-                <<< KernelPolicy::LOAD_BALANCED::BLOCKS, KernelPolicy::LOAD_BALANCED::THREADS >>>(
+                <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
                                         frontier_attribute.queue_reset,
                                         frontier_attribute.queue_index,
                                         enactor_stats.iteration,

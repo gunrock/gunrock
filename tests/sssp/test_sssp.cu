@@ -489,7 +489,8 @@ void RunTests(
     } else if (src_str.compare("randomize") == 0) {
         src = graphio::RandomNode(graph.nodes);
     } else if (src_str.compare("largestdegree") == 0) {
-        src = graph.GetNodeWithHighestDegree();
+        int max_degree = 0;
+        src = graph.GetNodeWithHighestDegree(max_degree);
     } else {
         args.GetCmdLineArgument("src", src);
     }
@@ -617,6 +618,9 @@ int main( int argc, char** argv)
         
         csr.GetAverageEdgeValue();
         csr.GetAverageDegree();
+        int max_degree;
+        csr.GetNodeWithHighestDegree(max_degree);
+        printf("max degree:%d\n", max_degree);
 		
         // Run tests
 		RunTests(csr, args, *context);

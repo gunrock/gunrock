@@ -70,6 +70,14 @@ struct Dispatch
     {
     }
 
+    static __device__ __forceinline__ void MarkPartitionSizes(
+                                unsigned int *&d_needles,
+                                unsigned int &split_val,
+                                SizeT &num_elements,
+                                SizeT &output_queue_len)
+    {
+    }
+
     static __device__ __forceinline__ void RelaxPartitionedEdges(
                                 bool &queue_reset,
                                 VertexId &queue_index,
@@ -164,6 +172,18 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         }
         SizeT num_edges = GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
         d_scanned_edges[my_id] = num_edges;
+    }
+
+    static __device__ __forceinline__ void MarkPartitionSizes(
+                                unsigned int *&d_needles,
+                                unsigned int &split_val,
+                                SizeT &num_elements,
+                                SizeT &output_queue_len)
+    {
+        int my_id = threadIdx.x + blockIdx.x * blockDim.x;
+        if (my_id >= num_elements) return;
+
+        d_needles[my_id] = split_val * my_id > output_queue_len ? output_queue_len : split_val * my_id;
     }
 
     static __device__ __forceinline__ void RelaxPartitionedEdges(
@@ -727,6 +747,22 @@ void GetEdgeCounts(
                                     max_edge,
                                     ADVANCE_TYPE);
 }
+
+template<typename KernelPolicy, typename ProblemData, typename Functor>
+__launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
+    __global__
+void MarkPartitionSizes(
+                                unsigned int *d_needles,
+                                unsigned int split_val,
+                                typename KernelPolicy::SizeT num_elements,
+                                typename KernelPolicy::SizeT output_queue_len)
+    {
+       Dispatch<KernelPolicy, ProblemData, Functor>::MarkPartitionSizes(
+                                d_needles,
+                                split_val,
+                                num_elements,
+                                output_queue_len);
+    }
 
 } //edge_map_partitioned
 } //oprtr

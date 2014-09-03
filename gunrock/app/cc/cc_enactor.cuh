@@ -239,7 +239,7 @@ class CCEnactor : public EnactorBase
 
 
             gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, HookInitFunctor>
-                <<<filter_grid_size, FilterPolicy::THREADS>>>(
+                <<<num_elements/FilterPolicy::THREADS+1, FilterPolicy::THREADS>>>(
                         0,  //iteration, not used in CC
                         queue_reset,
                         queue_index,
@@ -254,7 +254,8 @@ class CCEnactor : public EnactorBase
                         work_progress,
                         graph_slice->frontier_elements[selector],           // max_in_queue
                         graph_slice->frontier_elements[selector^1],         // max_out_queue
-                        this->filter_kernel_stats);
+                        this->filter_kernel_stats,
+                        false);
 
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) break;
 
@@ -310,7 +311,7 @@ class CCEnactor : public EnactorBase
 
 
                 // Check if done
-                if (vertex_flag[0]) break;
+                if (vertex_flag[0]) { printf("first p_jump round. v_f\n"); break;}
             }
 
             queue_index        = 0;        // Work queue index
@@ -358,7 +359,7 @@ class CCEnactor : public EnactorBase
 
                     if (iteration & 3) {
                         gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, HookMinFunctor>
-                            <<<filter_grid_size, FilterPolicy::THREADS>>>(
+                            <<<num_elements/FilterPolicy::THREADS+1, FilterPolicy::THREADS>>>(
                                     0,
                                     queue_reset,
                                     queue_index,
@@ -373,10 +374,11 @@ class CCEnactor : public EnactorBase
                                     work_progress,
                                     graph_slice->frontier_elements[selector],           // max_in_queue
                                     graph_slice->frontier_elements[selector^1],         // max_out_queue
-                                    this->filter_kernel_stats);
+                                    this->filter_kernel_stats,
+                                    false);
                     } else {
                         gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, HookMaxFunctor>
-                            <<<filter_grid_size, FilterPolicy::THREADS>>>(
+                            <<<num_elements/FilterPolicy::THREADS+1, FilterPolicy::THREADS>>>(
                                     0,
                                     queue_reset,
                                     queue_index,
@@ -391,7 +393,8 @@ class CCEnactor : public EnactorBase
                                     work_progress,
                                     graph_slice->frontier_elements[selector],           // max_in_queue
                                     graph_slice->frontier_elements[selector^1],         // max_out_queue
-                                    this->filter_kernel_stats);
+                                    this->filter_kernel_stats,
+                                    false);
                     }
 
                     if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel Hook Min/Max Operation failed", __FILE__, __LINE__))) break;
@@ -407,7 +410,7 @@ class CCEnactor : public EnactorBase
                                     cudaMemcpyDeviceToHost),
                                 "CCProblem cudaMemcpy d_edge_flag to edge_flag failed", __FILE__, __LINE__)) return retval;
                     // Check if done
-                    if (edge_flag[0]) break;
+                    if (edge_flag[0]) {printf("edge flag after hook minmax.\n"); break;}
 
                     ///////////////////////////////////////////
                     // Pointer Jumping 
