@@ -60,6 +60,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
         Value           *d_sigmas;              /**< Accumulated sigma values for each node */
         Value           *d_deltas;              /**< Accumulated delta values for each node */
         VertexId        *d_src_node;            /**< Used to store source node ID */
+        VertexId        *d_forward_output;      /**< Used to store output node IDs by the forward pass */
     };
 
     // Members
@@ -126,6 +127,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
             if (data_slices[i]->d_sigmas)      util::GRError(cudaFree(data_slices[i]->d_sigmas), "GpuSlice cudaFree d_sigmas failed", __FILE__, __LINE__);
             if (data_slices[i]->d_deltas)      util::GRError(cudaFree(data_slices[i]->d_deltas), "GpuSlice cudaFree d_deltas failed", __FILE__, __LINE__);
             if (data_slices[i]->d_src_node)      util::GRError(cudaFree(data_slices[i]->d_src_node), "GpuSlice cudaFree d_deltas failed", __FILE__, __LINE__);
+            if (data_slices[i]->d_forward_output)      util::GRError(cudaFree(data_slices[i]->d_forward_output), "GpuSlice cudaFree d_forward_output failed", __FILE__, __LINE__);
             if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
         }
         if (d_data_slices)  delete[] d_data_slices;
@@ -282,6 +284,13 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
                     "BCProblem cudaMalloc d_sigmas failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_sigmas = d_sigmas;
 
+                VertexId *d_forward_output;
+                    if (retval = util::GRError(cudaMalloc(
+                        (void**)&d_forward_output,
+                        nodes * sizeof(VertexId)),
+                    "BCProblem cudaMalloc d_forward_output failed", __FILE__, __LINE__)) return retval;
+                data_slices[0]->d_forward_output = d_forward_output;
+
                 VertexId   *d_src_node;
                     if (retval = util::GRError(cudaMalloc(
                         (void**)&d_src_node,
@@ -390,6 +399,15 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT,
                                 nodes * sizeof(Value)),
                             "BCProblem cudaMalloc d_sigmas failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_sigmas = d_sigmas;
+            }
+
+            if (!data_slices[gpu]->d_forward_output) {
+                VertexId    *d_forward_output;
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_forward_output,
+                                nodes * sizeof(VertexId)),
+                            "BCProblem cudaMalloc d_forward_output failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->d_forward_output = d_forward_output;
             }
 
             if (!data_slices[gpu]->d_src_node) {
