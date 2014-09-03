@@ -105,9 +105,9 @@ DEPS = 			./Makefile \
 
 test: bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_sssp.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_sssp.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_sssp.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3 -lcuda
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_sssp.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3 -lcuda
 
 #-------------------------------------------------------------------------------
 # Clean
@@ -116,4 +116,3 @@ bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_sssp.cu ../../gunrock/util/t
 clean :
 	rm -f bin/*_$(NVCC_VERSION)_$(ARCH_SUFFIX)* 
 	rm -f *.i* *.cubin *.cu.c *.cudafe* *.fatbin.c *.ptx *.hash *.cu.cpp *.o
-
