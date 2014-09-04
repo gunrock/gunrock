@@ -51,7 +51,8 @@ struct Dispatch
     static __device__ __forceinline__ void MarkVisit(
             VertexId     *&vertex_in,
             DataSlice       *&problem,
-            SizeT &input_queue_length)
+            SizeT &input_queue_length,
+            SizeT &node_num)
             {}
 
     static __device__ __forceinline__ void MarkNF(
@@ -60,7 +61,8 @@ struct Dispatch
             DataSlice       *&problem,
             SizeT &input_queue_length,
             unsigned int &lower_priority_score_limit,
-            unsigned int &upper_priority_score_limit)
+            unsigned int &upper_priority_score_limit,
+            SizeT &node_num)
     {
     }
 
@@ -71,7 +73,8 @@ struct Dispatch
             SizeT           &input_queue_length,
             VertexId        *&vertex_out,
             SizeT           &v_out_offset,
-            SizeT           &far_pile_offset)
+            SizeT           &far_pile_offset,
+            SizeT           &node_num)
     {
     }
 };
@@ -91,7 +94,8 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
     static __device__ __forceinline__ void MarkVisit(
                                             VertexId     *&vertex_in,
                                             DataSlice       *&problem,
-                                            SizeT &input_queue_length)
+                                            SizeT &input_queue_length,
+                                            SizeT &node_num)
     {
         int tid = threadIdx.x;
         int bid = blockIdx.x;
@@ -101,6 +105,7 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
             return;
 
         unsigned int my_vert = vertex_in[my_id];
+        if (my_vert < 0 || my_vert >= node_num) return;
         problem->d_visit_lookup[my_vert] = my_id;
     }
 
@@ -110,7 +115,8 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
                                             DataSlice       *&problem,
                                             SizeT &input_queue_length,
                                             unsigned int &lower_priority_score_limit,
-                                            unsigned int &upper_priority_score_limit)
+                                            unsigned int &upper_priority_score_limit,
+                                            SizeT       &node_num)
     {
         int tid = threadIdx.x;
         int bid = blockIdx.x;
@@ -121,6 +127,7 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
 
         unsigned int bucket_max = UINT_MAX/problem->d_delta[0];
         unsigned int my_vert = vertex_in[my_id];
+        if (my_vert < 0 || my_vert >= node_num) { pq->d_valid_near[my_id] = 0; pq->d_valid_far[my_id] = 0; return; }
         unsigned int bucket_id = Functor::ComputePriorityScore(my_vert, problem);
         bool valid = (my_id == problem->d_visit_lookup[my_vert]);
         //printf(" valid:%d, my_id: %d, my_vert: %d\n", valid, my_id, my_vert, bucket_id);
@@ -136,7 +143,8 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
                                             SizeT           &input_queue_length,
                                             VertexId        *&vertex_out,
                                             SizeT           &v_out_offset,
-                                            SizeT           &far_pile_offset)
+                                            SizeT           &far_pile_offset,
+                                            SizeT           &node_num)
     {
         int tid = threadIdx.x;
         int bid = blockIdx.x;
@@ -145,6 +153,7 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
             return;
 
         unsigned int my_vert = vertex_in[my_id];
+        if (my_vert<0 || my_vert >= node_num) return;
         unsigned int my_valid = pq->d_valid_near[my_id];
 
         if (my_valid == pq->d_valid_near[my_id+1]-1)
@@ -176,12 +185,14 @@ __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::BLOCKS)
 void MarkVisit(
         typename KernelPolicy::VertexId     *vertex_in,
         typename ProblemData::DataSlice     *problem,
-        typename KernelPolicy::SizeT        input_queue_length)
+        typename KernelPolicy::SizeT        input_queue_length,
+        typename KernelPolicy::SizeT        node_num)
 {
     Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor>::MarkVisit(
             vertex_in,
             problem,
-            input_queue_length);
+            input_queue_length,
+            node_num);
 }
 
 /**
@@ -208,7 +219,8 @@ void MarkNF(
         typename ProblemData::DataSlice     *problem,
         typename KernelPolicy::SizeT        input_queue_length,
         unsigned int                        lower_priority_score_limit,
-        unsigned int                        upper_priority_score_limit)
+        unsigned int                        upper_priority_score_limit,
+        typename KernelPolicy::SizeT        node_num)
 {
     Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor>::MarkNF(
             vertex_in,
@@ -216,7 +228,8 @@ void MarkNF(
             problem,
             input_queue_length,
             lower_priority_score_limit,
-            upper_priority_score_limit);
+            upper_priority_score_limit,
+            node_num);
 }
 
 /**
@@ -247,7 +260,8 @@ void Compact(
         typename KernelPolicy::SizeT        input_queue_length,
         typename KernelPolicy::VertexId     *vertex_out,
         typename KernelPolicy::SizeT        v_out_offset,
-        typename KernelPolicy::SizeT        far_pile_offset)
+        typename KernelPolicy::SizeT        far_pile_offset,
+        typename KernelPolicy::SizeT        node_num)
 {
     Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor>::Compact(
         vertex_in,
@@ -256,7 +270,8 @@ void Compact(
         input_queue_length,
         vertex_out,
         v_out_offset,
-        far_pile_offset);
+        far_pile_offset,
+        node_num);
 }
 
 /**
@@ -288,7 +303,8 @@ template <typename KernelPolicy, typename ProblemData, typename PriorityQueue, t
         typename KernelPolicy::SizeT        far_pile_offset,
         unsigned int                        lower_limit,
         unsigned int                        upper_limit,
-        CudaContext                         &context)
+        CudaContext                         &context,
+        typename KernelPolicy::SizeT        node_num)
 {
 
     typedef typename KernelPolicy::VertexId     VertexId;
@@ -302,16 +318,16 @@ template <typename KernelPolicy, typename ProblemData, typename PriorityQueue, t
     far_size[0] = 0;
     if(input_queue_length > 0)
     {
-        MarkVisit<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, problem, input_queue_length);
+        MarkVisit<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, problem, input_queue_length, node_num);
         // MarkNF
-        MarkNF<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, nf_pile, problem, input_queue_length, lower_limit, upper_limit);
+        MarkNF<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, nf_pile, problem, input_queue_length, lower_limit, upper_limit, node_num);
 
         // Scan(near)
         // Scan(far)
         Scan<mgpu::MgpuScanTypeExc>(pq->nf_pile[0]->d_valid_near, input_queue_length+1, 0, mgpu::plus<VertexId>(), (VertexId*)0, (VertexId*)0, pq->nf_pile[0]->d_valid_near, context);
         Scan<mgpu::MgpuScanTypeExc>(pq->nf_pile[0]->d_valid_far, input_queue_length+1, 0, mgpu::plus<VertexId>(), (VertexId*)0, (VertexId*)0, pq->nf_pile[0]->d_valid_far, context);
         // Compact
-        Compact<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, nf_pile, pq->selector, input_queue_length, vertex_out, 0, far_pile_offset);
+        Compact<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, nf_pile, pq->selector, input_queue_length, vertex_out, 0, far_pile_offset, node_num);
         // get output_near_length
         // get output_far_length
         cudaMemcpy(&close_size[0], pq->nf_pile[0]->d_valid_near+input_queue_length, sizeof(VertexId),

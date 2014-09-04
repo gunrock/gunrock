@@ -348,7 +348,7 @@ class SSSPEnactor : public EnactorBase
                 //if (done[0] == 0) break;
 
                 // Vertex Map
-                gunrock::oprtr::filter::Kernel<FilterKernelPolicy, SSSPProblem, SsspFunctor>
+                /*gunrock::oprtr::filter::Kernel<FilterKernelPolicy, SSSPProblem, SsspFunctor>
                 <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
                     enactor_stats.iteration+1,
                     frontier_attribute.queue_reset,
@@ -372,7 +372,7 @@ class SSSPEnactor : public EnactorBase
                 frontier_attribute.queue_index++;
                 frontier_attribute.selector ^= 1;
 
-                if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;*/
 
                 //TODO: split the output queue into near/far pile, put far pile in far queue, put near pile as the input queue
                 //for next round.
@@ -387,7 +387,8 @@ class SSSPEnactor : public EnactorBase
                             pq->queue_length,
                             pq_level,
                             (pq_level+1),
-                            context);
+                            context,
+                            graph_slice->nodes);
                             //printf("out:%d, pq_length:%d\n", out_length, pq->queue_length);
                     if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, out_length)) break;
                 }
@@ -406,7 +407,8 @@ class SSSPEnactor : public EnactorBase
                                 0,
                                 pq_level,
                                 (pq_level+1),
-                                context);
+                                context,
+                                graph_slice->nodes);
                                 //printf("out after p:%d, pq_length:%d\n", out_length, pq->queue_length);
                         if (out_length > 0) {
                             if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, out_length)) break;
