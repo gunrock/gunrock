@@ -614,7 +614,7 @@ int main( int argc, char** argv)
 		}
 
 		csr.PrintHistogram();
-		csr.DisplayGraph(true); //print graph with edge_value
+		//csr.DisplayGraph(true); //print graph with edge_value
         
         csr.GetAverageEdgeValue();
         csr.GetAverageDegree();

@@ -19,6 +19,7 @@
 #include <gunrock/util/kernel_runtime_stats.cuh>
 
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
+#include <gunrock/oprtr/edge_map_backward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_partitioned_backward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
 
@@ -112,7 +113,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     inverse_graph);
             break;
         }
-        case TWC_BACKWARD:
+        case LB_BACKWARD:
         {
             // Load Thread Warp CTA Backward Kernel
             typedef typename ProblemData::SizeT         SizeT;
@@ -195,6 +196,50 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             }
             break;
         }
+        case TWC_BACKWARD:
+        {
+            // Load Thread Warp CTA Backward Kernel
+            if (frontier_attribute.selector == 1) {
+                // Edge Map
+                gunrock::oprtr::edge_map_backward::Kernel<typename KernelPolicy::THREAD_WARP_CTA_BACKWARD, ProblemData, Functor>
+                    <<<enactor_stats.advance_grid_size, KernelPolicy::THREAD_WARP_CTA_BACKWARD::THREADS>>>(
+                            frontier_attribute.queue_reset,
+                            frontier_attribute.queue_index,
+                            enactor_stats.num_gpus,
+                            frontier_attribute.queue_length,
+                            d_done,
+                            d_in_key_queue,              // d_in_queue
+                            backward_index_queue,            // d_in_index_queue
+                            backward_frontier_map_in,
+                            backward_frontier_map_out,
+                            d_column_offsets,
+                            d_row_indices,
+                            data_slice,
+                            work_progress,
+                            enactor_stats.advance_kernel_stats,
+                            ADVANCE_TYPE);
+            } else {
+                // Edge Map
+                gunrock::oprtr::edge_map_backward::Kernel<typename KernelPolicy::THREAD_WARP_CTA_BACKWARD, ProblemData, Functor>
+                    <<<enactor_stats.advance_grid_size, KernelPolicy::THREAD_WARP_CTA_BACKWARD::THREADS>>>(
+                            frontier_attribute.queue_reset,
+                            frontier_attribute.queue_index,
+                            enactor_stats.num_gpus,
+                            frontier_attribute.queue_length,
+                            d_done,
+                            d_in_key_queue,              // d_in_queue
+                            backward_index_queue,            // d_in_index_queue
+                            backward_frontier_map_out,
+                            backward_frontier_map_in,
+                            d_column_offsets,
+                            d_row_indices,
+                            data_slice,
+                            work_progress,
+                            enactor_stats.advance_kernel_stats,
+                            ADVANCE_TYPE);
+            }
+            break;   
+        }
         case LB:
         {
             typedef typename ProblemData::SizeT         SizeT;
@@ -224,7 +269,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
             SizeT output_queue_len = temp[0];
             //printf("input_queue_len:%d\n", frontier_attribute.queue_length);
-            //printf("output_queue_len:%d\n", output_queue_len);
+            //printf("output_queue_len:%d\n", output_queue_len); }
 
             //if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
             {
@@ -255,21 +300,21 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                 unsigned int split_val = (output_queue_len + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
                 int num_block = (output_queue_len >= 256) ? KernelPolicy::LOAD_BALANCED::BLOCKS : 1;
                 int nb = (num_block + 1 + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
-            gunrock::oprtr::edge_map_partitioned::MarkPartitionSizes<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
-            <<<nb, KernelPolicy::LOAD_BALANCED::THREADS>>>(
-            enactor_stats.d_node_locks,
-            split_val,
-            num_block+1,
-            output_queue_len);
+                gunrock::oprtr::edge_map_partitioned::MarkPartitionSizes<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
+                    <<<nb, KernelPolicy::LOAD_BALANCED::THREADS>>>(
+                            enactor_stats.d_node_locks,
+                            split_val,
+                            num_block+1,
+                            output_queue_len);
                 //util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.d_node_locks, KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
 
                 SortedSearch<MgpuBoundsLower>(
-                enactor_stats.d_node_locks,
-                KernelPolicy::LOAD_BALANCED::BLOCKS,
-                partitioned_scanned_edges,
-                frontier_attribute.queue_length,
-                enactor_stats.d_node_locks_out,
-                context);
+                        enactor_stats.d_node_locks,
+                        KernelPolicy::LOAD_BALANCED::BLOCKS,
+                        partitioned_scanned_edges,
+                        frontier_attribute.queue_length,
+                        enactor_stats.d_node_locks_out,
+                        context);
 
                 //util::DisplayDeviceResults(enactor_stats.d_node_locks_out, KernelPolicy::LOAD_BALANCED::BLOCKS);
 

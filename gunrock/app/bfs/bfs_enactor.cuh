@@ -231,7 +231,8 @@ class BFSEnactor : public EnactorBase
             if (retval = EnactorBase::Setup(problem,
                                             max_grid_size,
                                             AdvanceKernelPolicy::CTA_OCCUPANCY, 
-                                            FilterKernelPolicy::CTA_OCCUPANCY)) break;
+                                            FilterKernelPolicy::CTA_OCCUPANCY,
+                                            AdvanceKernelPolicy::LOAD_BALANCED::BLOCKS)) break;
 
 
             // Single-gpu graph slice
@@ -433,7 +434,8 @@ class BFSEnactor : public EnactorBase
         CudaContext                     &context,
         BFSProblem                      *problem,
         typename BFSProblem::VertexId    src,
-        int                             max_grid_size = 0)
+        int                             max_grid_size = 0,
+        int                             traversal_mode = 0)
     {
         if (BFSProblem::ENABLE_IDEMPOTENCE) {
             if (this->cuda_props.device_sm_version >= 300) {
@@ -457,6 +459,23 @@ class BFSEnactor : public EnactorBase
                     300,                                // CUDA_ARCH
                     INSTRUMENT,                         // INSTRUMENT
                     8,                                  // MIN_CTA_OCCUPANCY
+                    7,                                  // LOG_THREADS
+                    8,                                  // LOG_BLOCKS
+                    32*128,                                  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+                    1,                                  // LOG_LOAD_VEC_SIZE
+                    0,                                  // LOG_LOADS_PER_TILE
+                    5,                                  // LOG_RAKING_THREADS
+                    32,                            // WARP_GATHER_THRESHOLD
+                    128 * 4,                            // CTA_GATHER_THRESHOLD
+                    7,                                  // LOG_SCHEDULE_GRANULARITY
+                    gunrock::oprtr::advance::TWC_FORWARD>
+                        ForwardAdvanceKernelPolicy;
+
+                typedef gunrock::oprtr::advance::KernelPolicy<
+                    BFSProblem,                         // Problem data type
+                    300,                                // CUDA_ARCH
+                    INSTRUMENT,                         // INSTRUMENT
+                    8,                                  // MIN_CTA_OCCUPANCY
                     10,                                  // LOG_THREADS
                     8,                                  // LOG_BLOCKS
                     32*128,                                  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
@@ -467,9 +486,13 @@ class BFSEnactor : public EnactorBase
                     128 * 4,                            // CTA_GATHER_THRESHOLD
                     7,                                  // LOG_SCHEDULE_GRANULARITY
                     gunrock::oprtr::advance::LB>
-                        AdvanceKernelPolicy;
+                        LBAdvanceKernelPolicy;
 
-                return EnactBFS<AdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(
+                if (traversal_mode == 0)
+                return EnactBFS<LBAdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(
+                        context, problem, src, max_grid_size);
+                else
+                return EnactBFS<ForwardAdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(
                         context, problem, src, max_grid_size);
             }
         } else {
@@ -493,6 +516,23 @@ class BFSEnactor : public EnactorBase
                     BFSProblem,                         // Problem data type
                     300,                                // CUDA_ARCH
                     INSTRUMENT,                         // INSTRUMENT
+                    1,                                  // MIN_CTA_OCCUPANCY
+                    7,                                  // LOG_THREADS
+                    8,                                  // LOG_BLOCKS
+                    32*128,                                  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+                    1,                                  // LOG_LOAD_VEC_SIZE
+                    0,                                  // LOG_LOADS_PER_TILE
+                    5,                                  // LOG_RAKING_THREADS
+                    32,                            // WARP_GATHER_THRESHOLD
+                    128 * 4,                            // CTA_GATHER_THRESHOLD
+                    7,                                  // LOG_SCHEDULE_GRANULARITY
+                    gunrock::oprtr::advance::TWC_FORWARD>
+                        ForwardAdvanceKernelPolicy;
+
+                typedef gunrock::oprtr::advance::KernelPolicy<
+                    BFSProblem,                         // Problem data type
+                    300,                                // CUDA_ARCH
+                    INSTRUMENT,                         // INSTRUMENT
                     8,                                  // MIN_CTA_OCCUPANCY
                     10,                                  // LOG_THREADS
                     8,                                  // LOG_BLOCKS
@@ -504,9 +544,13 @@ class BFSEnactor : public EnactorBase
                     128 * 4,                            // CTA_GATHER_THRESHOLD
                     7,                                  // LOG_SCHEDULE_GRANULARITY
                     gunrock::oprtr::advance::LB>
-                        AdvanceKernelPolicy;
+                        LBAdvanceKernelPolicy;
 
-                return EnactBFS<AdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(
+                if (traversal_mode == 0)
+                return EnactBFS<LBAdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(
+                        context, problem, src, max_grid_size);
+                else
+                return EnactBFS<ForwardAdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(
                         context, problem, src, max_grid_size);
             }
         }

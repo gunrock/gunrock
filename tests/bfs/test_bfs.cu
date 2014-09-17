@@ -58,7 +58,7 @@ bool g_stream_from_host;
  printf("\ntest_bfs <graph type> <graph type args> [--device=<device_index>] "
         "[--undirected] [--instrumented] [--src=<source index>] [--quick] "
         "[--mark-pred] [--queue-sizing=<scale factor>]\n"
-        "[--v]\n"
+        "[--v] [--iteration-num=<iteration numbers>] [--traversal-mode=<mode>]\n"
         "\n"
         "Graph types and args:\n"
         "  market [<file>]\n"
@@ -77,6 +77,8 @@ bool g_stream_from_host;
         "  --mark-pred If set then keep not only label info but also predecessor info.\n"
         "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
         "  Default is 1.0\n"
+        " --iteration-num sets how many times you want t operform the algorithm on the dataset. Default is 1.\n"
+        " --traversal-mode sets the traversal strategy, default is 0 (load-balanced), 1 for dynamic cooperative method.\n"
         );
  }
 
@@ -311,6 +313,7 @@ void RunTests(
     int num_gpus,
     double max_queue_sizing,
     int iterations,
+    int traversal_mode,
     CudaContext& context)
 {
         typedef BFSProblem<
@@ -376,7 +379,7 @@ void RunTests(
         {
             util::GRError(csr_problem->Reset(src, bfs_enactor.GetFrontierType(), max_queue_sizing), "BFS Problem Data Reset Failed", __FILE__, __LINE__);
             gpu_timer.Start();
-            util::GRError(bfs_enactor.template Enact<Problem>(context, csr_problem, src, max_grid_size), "BFS Problem Enact Failed", __FILE__, __LINE__);
+            util::GRError(bfs_enactor.template Enact<Problem>(context, csr_problem, src, max_grid_size, traversal_mode), "BFS Problem Enact Failed", __FILE__, __LINE__);
             gpu_timer.Stop();
 
             elapsed += gpu_timer.ElapsedMillis();
@@ -459,6 +462,7 @@ void RunTests(
     int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
     double              max_queue_sizing    = 1.0;          // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
     int                 iterations          = 1;
+    int                 traversal_mode      = 0;
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("src", src_str);
@@ -476,6 +480,8 @@ void RunTests(
     args.GetCmdLineArgument("iteration-num", iterations);
 
     args.GetCmdLineArgument("grid-size", max_grid_size);
+
+    args.GetCmdLineArgument("traversal-mode", traversal_mode);
 
     //printf("Display neighbor list of src:\n");
     //graph.DisplayNeighborList(src);
@@ -496,6 +502,7 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         iterations,
+                        traversal_mode,
                         context);
             } else {
                 RunTests<VertexId, Value, SizeT, true, true, false>(
@@ -505,6 +512,7 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         iterations,
+                        traversal_mode,
                         context);
             }
         } else {
@@ -516,6 +524,7 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         iterations,
+                        traversal_mode,
                         context);
             } else {
                 RunTests<VertexId, Value, SizeT, true, false, false>(
@@ -525,6 +534,7 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         iterations,
+                        traversal_mode,
                         context);
             }
         }
@@ -538,6 +548,7 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         iterations,
+                        traversal_mode,
                         context);
             } else {
                 RunTests<VertexId, Value, SizeT, false, true, false>(
@@ -547,6 +558,7 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         iterations,
+                        traversal_mode,
                         context);
             }
         } else {
@@ -558,6 +570,7 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         iterations,
+                        traversal_mode,
                         context);
             } else {
                 RunTests<VertexId, Value, SizeT, false, false, false>(
@@ -567,6 +580,7 @@ void RunTests(
                         num_gpus,
                         max_queue_sizing,
                         iterations,
+                        traversal_mode,
                         context);
             }
         }

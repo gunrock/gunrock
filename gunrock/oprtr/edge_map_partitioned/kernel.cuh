@@ -378,6 +378,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                         }
                     }
                 }
+                if (label == 12) printf("edge:%d, %d\n", u, v);
 
             }
             edges_processed += e_last;

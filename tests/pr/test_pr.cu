@@ -224,6 +224,7 @@ void SimpleReferencePr(
     cpu_timer.Start();
 
     remove_dangling_links(g);
+    printf("finished remove dangling links.\n");
 
     std::vector<Value> ranks(num_vertices(g));
     page_rank(g,

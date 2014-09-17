@@ -506,7 +506,7 @@ class SSSPEnactor : public EnactorBase
                 INSTRUMENT,                         // INSTRUMENT
                 8,                                  // MIN_CTA_OCCUPANCY
                 7,                                  // LOG_THREADS
-                8,                                  // LOG_BLOCKS
+                10,                                  // LOG_BLOCKS
                 32*128,                             // LIGHT_EDGE_THRESHOLD    
                 1,                                  // LOG_LOAD_VEC_SIZE
                 1,                                  // LOG_LOADS_PER_TILE

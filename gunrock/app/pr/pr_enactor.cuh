@@ -325,6 +325,8 @@ class PREnactor : public EnactorBase
             util::MemsetKernel<<<128, 128>>>(problem->data_slices[0]->d_rank_curr,
                 (Value)1.0/edge_map_queue_len, graph_slice->nodes);
 
+            util::CpuTimer cpu_timer;
+            cpu_timer.Start();
             // Step through PR iterations 
             while (done[0] < 0) {
 
@@ -442,6 +444,9 @@ class PREnactor : public EnactorBase
                 if (DEBUG) printf("\n%lld", (long long) enactor_stats.iteration);
 
             }
+            cpu_timer.Stop();
+
+            printf("Actual PR kernel time: %5f\n", cpu_timer.ElapsedMillis());
 
             if (retval) break;
         
