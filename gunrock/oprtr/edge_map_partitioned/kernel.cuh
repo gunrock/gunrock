@@ -94,7 +94,6 @@ struct Dispatch
                                 DataSlice *&problem,
                                 SizeT &input_queue_len,
                                 SizeT &output_queue_len,
-                                SizeT &partition_size,
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
                                 util::CtaWorkProgress &work_progress,
@@ -202,7 +201,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 DataSlice *&problem,
                                 SizeT &input_queue_len,
                                 SizeT &output_queue_len,
-                                SizeT &partition_size,
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
                                 util::CtaWorkProgress &work_progress,
@@ -254,7 +252,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         int tid = threadIdx.x;
         int bid = blockIdx.x;
 
-        int my_thread_start, my_thread_end;
+        /*int my_thread_start, my_thread_end;
 
         my_thread_start = bid * partition_size;
         my_thread_end = (bid+1)*partition_size < output_queue_len ? (bid+1)*partition_size : output_queue_len;
@@ -378,18 +376,72 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                         }
                     }
                 }
-                if (label == 12) printf("edge:%d, %d\n", u, v);
-
             }
             edges_processed += e_last;
             my_start_partition += KernelPolicy::THREADS;
             e_offset = 0;
-        }
+        }*/
+    size_t my_idx = bid*blockDim.x + tid;
+    VertexId source; 
+    VertexId e_id;
 
-        if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
-            kernel_stats.MarkStop();
-            kernel_stats.Flush();
+    if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
+        source = d_queue[d_out[my_idx]];
+        e_id = 0;
+    }
+    if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
+        source = inverse_graph ? d_inverse_column_indices[d_queue[d_out[my_idx]]] : d_column_indices[d_queue[d_out[my_idx]]];
+        e_id = d_queue[d_out[my_idx]];
+    }
+    SizeT lookup = d_row_offsets[source]+(my_idx-d_scanned_edges[d_out[my_idx]]);
+    VertexId dest = d_column_indices[lookup];
+
+    {
+        if (!ProblemData::MARK_PREDECESSORS) {
+            if (Functor::CondEdge(label, dest, problem, lookup, e_id)) {
+                Functor::ApplyEdge(label, dest, problem, lookup, e_id);
+                if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
+                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                            dest,
+                            d_out + my_idx); 
+                } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
+                        ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
+                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                            (VertexId)lookup,
+                            d_out + my_idx);
+                }
+            }
+            else {
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        -1,
+                        d_out + my_idx);
+            }
+        } else {
+            if (Functor::CondEdge(source, dest, problem, lookup, e_id)) {
+                Functor::ApplyEdge(source, dest, problem, lookup, e_id);
+                if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
+                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                            dest,
+                            d_out + my_idx); 
+                } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
+                        ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
+                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                            (VertexId)lookup,
+                            d_out + my_idx);
+                }
+            }
+            else {
+                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                        -1,
+                        d_out + my_idx);
+            }
         }
+    }
+
+    if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
+        kernel_stats.MarkStop();
+        kernel_stats.Flush();
+    }
     }
 
     static __device__ __forceinline__ void RelaxLightEdges(
@@ -604,7 +656,6 @@ void RelaxPartitionedEdges(
         typename ProblemData::DataSlice         *problem,
         typename KernelPolicy::SizeT            input_queue_len,
         typename KernelPolicy::SizeT            output_queue_len,
-        typename KernelPolicy::SizeT            partition_size,
         typename KernelPolicy::SizeT            max_vertices,
         typename KernelPolicy::SizeT            max_edges,
         util::CtaWorkProgress                   work_progress,
@@ -628,7 +679,6 @@ void RelaxPartitionedEdges(
             problem,
             input_queue_len,
             output_queue_len,
-            partition_size,
             max_vertices,
             max_edges,
             work_progress,
