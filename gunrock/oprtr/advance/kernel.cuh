@@ -271,7 +271,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             //printf("input_queue_len:%d\n", frontier_attribute.queue_length);
             //printf("output_queue_len:%d\n", output_queue_len);
 
-            /*if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
+            if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
             {
                 gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
@@ -295,30 +295,31 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         ADVANCE_TYPE,
                         inverse_graph);
             }
-            else*/
+            else
             {
-                /*unsigned int split_val = (output_queue_len + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
-                int num_block = (output_queue_len >= 256) ? KernelPolicy::LOAD_BALANCED::BLOCKS : 1;
-                int nb = (num_block + 1 + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
-                gunrock::oprtr::edge_map_partitioned::MarkPartitionSizes<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
-                    <<<nb, KernelPolicy::LOAD_BALANCED::THREADS>>>(
-                            enactor_stats.d_node_locks,
-                            split_val,
-                            num_block+1,
-                            output_queue_len);
+                //unsigned int split_val = (output_queue_len + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
+                //int num_block = (output_queue_len >= 256) ? KernelPolicy::LOAD_BALANCED::BLOCKS : 1;
+                //int nb = (num_block + 1 + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
+                //gunrock::oprtr::edge_map_partitioned::MarkPartitionSizes<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
+                //    <<<nb, KernelPolicy::LOAD_BALANCED::THREADS>>>(
+                //            enactor_stats.d_node_locks,
+                //            split_val,
+                //            num_block+1,
+                //            output_queue_len);
                 //util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.d_node_locks, KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
 
-                SortedSearch<MgpuBoundsLower>(
-                        enactor_stats.d_node_locks,
-                        KernelPolicy::LOAD_BALANCED::BLOCKS,
-                        partitioned_scanned_edges,
-                        frontier_attribute.queue_length,
-                        enactor_stats.d_node_locks_out,
-                        context);*/
+                //SortedSearch<MgpuBoundsLower>(
+                //        enactor_stats.d_node_locks,
+                //        KernelPolicy::LOAD_BALANCED::BLOCKS,
+                //        partitioned_scanned_edges,
+                //        frontier_attribute.queue_length,
+                //        enactor_stats.d_node_locks_out,
+                //        context);
                 LoadBalanceSearch(output_queue_len, partitioned_scanned_edges, frontier_attribute.queue_length, d_out_key_queue, context);
 
                 //util::DisplayDeviceResults(enactor_stats.d_node_locks_out, KernelPolicy::LOAD_BALANCED::BLOCKS);
                 int num_block = (output_queue_len + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
+                //printf("block num:%d\n", num_block);
 
                 gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
@@ -343,6 +344,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         enactor_stats.advance_kernel_stats,
                                         ADVANCE_TYPE,
                                         inverse_graph);
+
+                //util::DisplayDeviceResults(d_out_key_queue, output_queue_len);
             }
             break;
         }

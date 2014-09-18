@@ -382,6 +382,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             e_offset = 0;
         }*/
     size_t my_idx = bid*blockDim.x + tid;
+    if (my_idx >= output_queue_len) return;
     VertexId source; 
     VertexId e_id;
 
