@@ -170,7 +170,7 @@ void DisplayStats(
 
 
 /******************************************************************************
- * BFS Testing Routines
+ * WTF Testing Routines
  *****************************************************************************/
 
  /**
@@ -186,6 +186,8 @@ void DisplayStats(
   * @param[in] error error threshold
   * @param[in] max_iter max iteration to go
   */
+// TODO: Boost PageRank cannot handle personalized pagerank, so currently the CPU
+// implementation gives incorrect answer. Need to find a CPU PPR implementation
  template<
     typename VertexId,
     typename Value,
@@ -482,7 +484,8 @@ void RunTests(
     args.GetCmdLineArgument("max-iter", max_iter);
     args.GetCmdLineArgument("src", src);
 
-    g_quick = args.CheckCmdLineFlag("quick");
+    //g_quick = args.CheckCmdLineFlag("quick");
+    g_quick = true;
     g_verbose = args.CheckCmdLineFlag("v");
 
     if (instrumented) {

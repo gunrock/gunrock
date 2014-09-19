@@ -255,7 +255,7 @@ class HITSEnactor : public EnactorBase
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
 
 
-                util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next,graph_slice->nodes);
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next,graph_slice->nodes);
                 NormalizeRank<HITSProblem>(problem, context, 1, graph_slice->nodes); 
 
                 if (retval = util::GRError(cudaBindTexture(

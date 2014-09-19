@@ -416,7 +416,7 @@ struct HITSProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_in_degrees, 0, nodes);
             util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_out_degrees, BaseProblem::graph_slices[gpu]->d_row_offsets, &BaseProblem::graph_slices[gpu]->d_row_offsets[1], -1, nodes);
             util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_in_degrees, BaseProblem::graph_slices[gpu]->d_column_offsets, &BaseProblem::graph_slices[gpu]->d_column_offsets[1], -1, nodes);
-            util::DisplayDeviceResults(data_slices[gpu]->d_out_degrees, nodes);
+            //util::DisplayDeviceResults(data_slices[gpu]->d_out_degrees, nodes);
             
             if (retval = util::GRError(cudaMemcpy(
                             d_data_slices[gpu],

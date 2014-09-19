@@ -38,13 +38,14 @@ namespace oprtr {
 namespace advance {
 
 /**
- * @brief Three modes of advance operator
+ * @brief Traversal Modes
  */
 enum MODE {
     TWC_FORWARD,
     TWC_BACKWARD,
     LB_BACKWARD,
-    LB
+    LB,
+    LB2
 };
 
 /**

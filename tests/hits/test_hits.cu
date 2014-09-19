@@ -371,7 +371,8 @@ void RunTests(
     args.GetCmdLineArgument("max-iter", max_iter);
     args.GetCmdLineArgument("src", src);
 
-    g_quick = args.CheckCmdLineFlag("quick");
+    //g_quick = args.CheckCmdLineFlag("quick");
+    g_quick = true;
     g_verbose = args.CheckCmdLineFlag("v");
 
     if (instrumented) {
@@ -469,8 +470,8 @@ int main( int argc, char** argv)
         }
 
 		csr.PrintHistogram();
-        csr.DisplayGraph();
-        inv_csr.DisplayGraph();
+        //csr.DisplayGraph();
+        //inv_csr.DisplayGraph();
 
 		    // Run tests
 		    RunTests(csr, inv_csr, args, *context);
