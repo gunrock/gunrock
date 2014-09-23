@@ -25,6 +25,7 @@ struct UpdateMaskFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -39,6 +40,7 @@ struct UpdateMaskFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      */
     static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
@@ -69,6 +71,7 @@ struct HookInitFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -83,7 +86,7 @@ struct HookInitFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
-     *
+     * @param[in] v auxiliary value
      */
     static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
@@ -118,8 +121,8 @@ struct HookMinFunctor
      * @brief Vertex mapping condition function. The vertex id is always valid.
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     *
+     * @param[in] problem Data slice object 
+     * @param[in] v auxiliary value
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
@@ -133,8 +136,8 @@ struct HookMinFunctor
 
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     *
+     * @param[in] problem Data slice object 
+     * @param[in] v auxiliary value
      */
     static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
@@ -186,7 +189,8 @@ struct HookMaxFunctor
      * @brief Vertex mapping condition function. The vertex id is always valid.
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
+     * @param[in] problem Data slice object 
+     * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -201,8 +205,8 @@ struct HookMaxFunctor
 
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     *
+     * @param[in] problem Data slice object 
+     * @param[in] v auxiliary value
      */
     static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
@@ -255,6 +259,7 @@ struct PtrJumpFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -270,6 +275,7 @@ struct PtrJumpFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      */
     static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
@@ -307,6 +313,7 @@ struct PtrJumpMaskFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -321,6 +328,7 @@ struct PtrJumpMaskFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      */
     static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
@@ -364,7 +372,8 @@ struct PtrJumpUnmaskFunctor
      * @brief Vertex mapping condition function. The vertex id is always valid.
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
+     * @param[in] problem Data slice object 
+     * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -379,6 +388,7 @@ struct PtrJumpUnmaskFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      */
     static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)

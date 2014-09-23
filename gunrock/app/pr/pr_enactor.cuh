@@ -176,7 +176,7 @@ class PREnactor : public EnactorBase
      *
      * @param[in] context CudaContext pointer for moderngpu APIs.
      * @param[in] problem PRProblem object.
-     * @param[in] src Source node for PR.
+     * @param[in] max_iteration Maximum iteration number for PR.
      * @param[in] max_grid_size Max grid size for PR kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -493,7 +493,7 @@ class PREnactor : public EnactorBase
      *
      * @param[in] context CudaContext pointer for moderngpu APIs.
      * @param[in] problem Pointer to PRProblem object.
-     * @param[in] src Source node for PR.
+     * @param[in] max_iteration Max iterations for PR.
      * @param[in] max_grid_size Max grid size for PR kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.

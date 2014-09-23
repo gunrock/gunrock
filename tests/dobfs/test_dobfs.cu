@@ -94,6 +94,7 @@ float g_beta;
   * @param[in] preds Predecessor node id for each node.
   * @param[in] nodes Number of nodes in the graph.
   * @param[in] MARK_PREDECESSORS Whether to show predecessor of each node.
+  * @param[in] ENABLE_IDEMPOTENCE Whether to enable idempotence mode.
   */
  template<typename VertexId, typename SizeT>
  void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes, bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE)
@@ -287,13 +288,17 @@ void SimpleReferenceBfs(
  * @tparam SizeT
  * @tparam INSTRUMENT
  * @tparam MARK_PREDECESSORS
+ * @tparam ENABLE_IDEMPOTENCE
  *
  * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] inv_graph Reference to the inverse CSC graph we process on
  * @param[in] src Source node where BFS starts
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] num_gpus Number of GPUs
  * @param[in] max_queue_sizing Scaling factor used in edge mapping
- *
+ * @param[in] alpha Tuning parameter for switching to reverse bfs
+ * @param[in] beta Tuning parameter for switching back to normal bfs
+ * @param[in] context CudaContext pointer for moderngpu APIs
  */
 template <
     typename VertexId,
@@ -426,7 +431,9 @@ void RunTests(
  * @tparam SizeT
  *
  * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] inv_graph Reference to the CSR graph we process on
  * @param[in] args Reference to the command line arguments
+ * @param[in] context CudaContext pointer for moderngpu APIs
  */
 template <
     typename VertexId,

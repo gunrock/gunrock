@@ -17,8 +17,10 @@ Homepage for Gunrock: <http://gunrock.github.io/>
 
 Getting Started with Gunrock
 ----------------------------
+For Frequently Asked Questions, see [FAQ](http://gunrock.github.io/gunrock/doc/0.1/faq.html).
 
-For information on building Gunrock, see [Building Gunrock](http://gunrock.github.io/gunrock/doc/0.1/building_gunrock.html).
+For information on building Gunrock, see [Building Gunrock](http://gunrock.github.io/gunrock/doc/0.1/building_gunrock.html)
+and refer to [Operating System Support and Requirements](https://github.com/gunrock/gunrock#operating-system-support-and-requirements).
 
 The "tests" subdirectory included with Gunrock has a comprehensive test
 application for all the functionality of Gunrock.
@@ -54,11 +56,14 @@ centrality uses Boost Graph Library v1.53.0.
 CUDA
 ====
 
-Gunrock is implemented in [CUDA C/C++](http://developer.nvidia.com/cuda).
-It requires the CUDA Toolkit. Please see the NVIDIA
-[CUDA](http://developer.nvidia.com/cuda) homepage to download CUDA as well
-as the CUDA Programming Guide and CUDA SDK, which includes many CUDA code
-examples.
+Gunrock is implemented in [CUDA C/C++](http://developer.nvidia.com/cuda).  It
+requires the CUDA Toolkit. Please see the NVIDIA
+[CUDA](http://developer.nvidia.com/cuda-downloads) homepage to download CUDA as
+well as the CUDA Programming Guide and CUDA SDK, which includes many CUDA code
+examples. Please refer to [NVIDIA CUDA Getting Started Guide for
+Linux](http://docs.nvidia.com/cuda/cuda-getting-started-guide-for-linux) for
+detailed information.
+
 
 Design Goals
 ============
@@ -76,13 +81,7 @@ Road Map
    want to find the right set of operators that can abstract most
    graph primitives while delivering high performance.
 
- - Primitives: Our near-term goal is to implement direction-optimal
-   BFS (as described in *Direction-Optimizing Breadth-First Search*
-   ([DOI](http://dx.doi.org/10.1109/SC.2012.50)) by Scott Beamer,
-   Krste Asanovic and David Patterson) using the backward edge-mapping
-   operator in Gunrock. The long-term goal includes other basic graph
-   primitives such as single-source shortest path and minimal spanning
-   tree.
+ - Primitives: Our near-term goal is to implement minimal spanning tree algorithm, build better support for bipartite graph algorithms, and explore community detection algorithms. The long term goal includes algorithms on dynamic graphs, priority queue support, graph partitioning and multi-GPU algorithms.
 
 Credits
 =======
@@ -93,8 +92,15 @@ Gunrock Developers
 - [Yangzihao Wang](http://www.idav.ucdavis.edu/~yzhwang/), University of
   California, Davis
 
+- Yuechao Pan, University of
+  California, Davis
+
+- [Yuduo Wu](http://www.ece.ucdavis.edu/~wyd855/), University of California, Davis
+
+- Andy Riffel, University of California, Davis
+
 - [John Owens](http://www.ece.ucdavis.edu/~jowens/), University of California,
-  Davis [general help]
+  Davis
 
 Acknowledgements
 ----------------

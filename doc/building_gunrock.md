@@ -1,7 +1,10 @@
 Building Gunrock              {#building_gunrock}
 ==============
 
-This release (0.1) has currently been tested on Linux.
+This release (0.1) has currently been tested on Linux and has only been tuned
+for architectures with CUDA compute capability equal to or larger than 3.0. It
+is most likely that we will concentrate our future effort on 3.0+-capability
+devices going forward.
 
 Boost Dependency           {#build_boost}
 =================

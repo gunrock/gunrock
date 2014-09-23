@@ -129,10 +129,11 @@ struct EdgeProperties
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] graph Reference to ...
- * @param[in] bc_values Pointer to ...
- * @param[in] sigmas Pointer to ...
- * @param[in] src VertexId of ...
+ * @param[in] graph Reference to graph we process on
+ * @param[in] bc_values Pointer to node bc value
+ * @param[in] ebc_values Pointer to edge bc value
+ * @param[in] sigmas Pointer to node sigma value
+ * @param[in] src VertexId of source node if there is any
  */
 template<
     typename VertexId,
@@ -334,6 +335,7 @@ void RefCPUBC(
  * @param[in] max_grid_size
  * @param[in] num_gpus
  * @param[in] max_queue_sizing
+ * @param[in] context CudaContext pointer for moderngpu APIs
  */
 template <
     typename VertexId,

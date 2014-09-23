@@ -106,6 +106,8 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
      * @param[in] graph Reference to the CSR graph object we process on.
      * @param[in] inv_graph Reference to the inverse (CSC) graph object we process on.
      * @param[in] num_gpus Number of the GPUs used.
+     * @param[in] alpha Tuning parameter for switching to backward BFS
+     * @param[in] beta Tuning parameter for switching back to normal BFS
      */
     DOBFSProblem(bool        stream_from_host,       // Only meaningful for single-GPU
                  bool        undirected,
@@ -200,10 +202,12 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
      * @brief DOBFSProblem initialization
      *
      * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] undirected Whether the input graph is undirected.
+     * @param[in] _undirected Whether the input graph is undirected.
      * @param[in] graph Reference to the CSR graph object we process on. @see Csr
      * @param[in] inv_graph Reference to the inverse (CSC) graph object we process on.
      * @param[in] _num_gpus Number of the GPUs used.
+     * @param[in] _alpha Tuning parameter for switching to backward BFS
+     * @param[in] _beta Tuning parameter for switching back to normal BFS
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
