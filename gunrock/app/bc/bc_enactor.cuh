@@ -397,7 +397,7 @@ class BCEnactor : public EnactorBase
 
             if (DEBUG) printf("\nStart backward phase\n%lld", (long long) enactor_stats.iteration);
             // Backward BC iteration
-            for (int iter = forward_queue_offsets.size()-2; iter >=0; --iter) {
+            for (int iter = forward_queue_offsets.size()-3; iter >=0; --iter) {
                 frontier_attribute.queue_length = forward_queue_offsets[iter+1]-forward_queue_offsets[iter];  
                 /*frontier_attribute.queue_length        = graph_slice->nodes;
                 // Fill in the frontier_queues
@@ -462,52 +462,52 @@ class BCEnactor : public EnactorBase
                 if (done[0] == 0) break;*/
                 // Edge Map
                 if (iter > 0) {
-                gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BCProblem, BackwardFunctor>(
-                    d_done,
-                    enactor_stats,
-                    frontier_attribute,
-                    data_slice,
-                    (VertexId*)NULL,
-                    (bool*)NULL,
-                    (bool*)NULL,
-                    d_scanned_edges,
-                    &problem->data_slices[0]->d_forward_output[forward_queue_offsets[iter]],              // d_in_queue
-                    graph_slice->frontier_queues.d_keys[0],            // d_out_queue
-                    (VertexId*)NULL,
-                    (VertexId*)NULL,
-                    graph_slice->d_row_offsets,
-                    graph_slice->d_column_indices,
-                    (SizeT*)NULL,
-                    (VertexId*)NULL,
-                    graph_slice->nodes,                 // max_in_queue
-                    graph_slice->edges,                 // max_out_queue
-                    this->work_progress,
-                    context,
-                    gunrock::oprtr::advance::V2V);
-                    } else {
+                    gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BCProblem, BackwardFunctor>(
+                            d_done,
+                            enactor_stats,
+                            frontier_attribute,
+                            data_slice,
+                            (VertexId*)NULL,
+                            (bool*)NULL,
+                            (bool*)NULL,
+                            d_scanned_edges,
+                            &problem->data_slices[0]->d_forward_output[forward_queue_offsets[iter]],              // d_in_queue
+                            graph_slice->frontier_queues.d_keys[0],            // d_out_queue
+                            (VertexId*)NULL,
+                            (VertexId*)NULL,
+                            graph_slice->d_row_offsets,
+                            graph_slice->d_column_indices,
+                            (SizeT*)NULL,
+                            (VertexId*)NULL,
+                            graph_slice->nodes,                 // max_in_queue
+                            graph_slice->edges,                 // max_out_queue
+                            this->work_progress,
+                            context,
+                            gunrock::oprtr::advance::V2V);
+                } else {
                     gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BCProblem, BackwardFunctor2>(
-                    d_done,
-                    enactor_stats,
-                    frontier_attribute,
-                    data_slice,
-                    (VertexId*)NULL,
-                    (bool*)NULL,
-                    (bool*)NULL,
-                    d_scanned_edges,
-                    &problem->data_slices[0]->d_forward_output[forward_queue_offsets[iter]],              // d_in_queue
-                    graph_slice->frontier_queues.d_keys[0],            // d_out_queue
-                    (VertexId*)NULL,
-                    (VertexId*)NULL,
-                    graph_slice->d_row_offsets,
-                    graph_slice->d_column_indices,
-                    (SizeT*)NULL,
-                    (VertexId*)NULL,
-                    graph_slice->nodes,                 // max_in_queue
-                    graph_slice->edges,                 // max_out_queue
-                    this->work_progress,
-                    context,
-                    gunrock::oprtr::advance::V2V);
-                    }
+                            d_done,
+                            enactor_stats,
+                            frontier_attribute,
+                            data_slice,
+                            (VertexId*)NULL,
+                            (bool*)NULL,
+                            (bool*)NULL,
+                            d_scanned_edges,
+                            &problem->data_slices[0]->d_forward_output[forward_queue_offsets[iter]],              // d_in_queue
+                            graph_slice->frontier_queues.d_keys[0],            // d_out_queue
+                            (VertexId*)NULL,
+                            (VertexId*)NULL,
+                            graph_slice->d_row_offsets,
+                            graph_slice->d_column_indices,
+                            (SizeT*)NULL,
+                            (VertexId*)NULL,
+                            graph_slice->nodes,                 // max_in_queue
+                            graph_slice->edges,                 // max_out_queue
+                            this->work_progress,
+                            context,
+                            gunrock::oprtr::advance::V2V);
+                }
 
                 if (/*DEBUG &&*/ (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates

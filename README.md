@@ -40,18 +40,16 @@ directly using [Github](https://github.com/gunrock/gunrock/issues).
 Operating System Support and Requirements
 =========================================
 
-This release (0.1) has only been tested on Linux Mint 15 (64-bit) with
-CUDA 5.5 installed. We expect Gunrock to build and run correctly on
-other 64-bit and 32-bit Linux distributions. The current release (0.1)
-does not support any other platforms.
+This release (0.2) has only been tested on Linux Mint 15 (64-bit) with
+CUDA 6.0 installed. We expect Gunrock to build and run correctly on
+other 64-bit and 32-bit Linux distributions, Mac OS, and Windows.
 
 Requirements
 ------------
 
 Gunrock has not been tested with any CUDA version < 5.5.
 
-The CPU validity code for connected component and betweenness
-centrality uses Boost Graph Library v1.53.0.
+Several graph primitives' CPU validation code uses Boost Graph Library v1.53.0.
 
 CUDA
 ====

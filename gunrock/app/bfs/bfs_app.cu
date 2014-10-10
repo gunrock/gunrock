@@ -275,8 +275,9 @@ void dispatch_bfs(
             }
             case largest_degree:
             {
-              src_node = csr_graph.GetNodeWithHighestDegree();
-              break;
+                int max_deg = 0;
+                src_node = csr_graph.GetNodeWithHighestDegree(max_deg);
+                break;
             }
             case manually:
             {

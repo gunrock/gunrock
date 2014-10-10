@@ -285,7 +285,8 @@ void dispatch_sssp(
                     }
                     case largest_degree:
                     {
-                        src_node = csr_graph.GetNodeWithHighestDegree();
+                        int max_deg = 0;
+                        src_node = csr_graph.GetNodeWithHighestDegree(max_deg);
                         break;
                     }
                     case manually:

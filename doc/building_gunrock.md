@@ -1,7 +1,7 @@
 Building Gunrock              {#building_gunrock}
 ==============
 
-This release (0.1) has currently been tested on Linux and has only been tuned
+This release (0.2) has currently been tested on Linux and has only been tuned
 for architectures with CUDA compute capability equal to or larger than 3.0. It
 is most likely that we will concentrate our future effort on 3.0+-capability
 devices going forward.
@@ -9,8 +9,7 @@ devices going forward.
 Boost Dependency           {#build_boost}
 =================
 
-Gunrock uses the [Boost Graph
-Library](http://www.boost.org/doc/libs/1_53_0/libs/graph/doc/index.html) for
+Gunrock uses the [Boost Graph Library](http://www.boost.org/doc/libs/1_53_0/libs/graph/doc/index.html) for
 the implementation of connected component, betweenness centrality, PageRank,
 and Single-source shortest path CPU reference implementation. You will need to
 download the boost source distribution, install it, and modify the `BOOST_INC`
@@ -51,6 +50,16 @@ To build the tests, go into `tests/primitive_name` and simply type `make`.
 To run the tests for each graph primitive, go into `tests/primitive_name` and
 simply type `sh run.sh`.
 
-The current release (v0.1) has only been tuned for architectures with CUDA
+The current release (v0.2) has only been tuned for architectures with CUDA
 compute capability equal to or larger than 3.0. It is most likely that we will
 concentrate our future effort on 3.0+-capability devices going forward.
+
+Building Shared Library
+======================
+If you wish to build a shared library and load Gunrock`s primitives in your project
+which uses a language has a C-friendly interface, just create a directory to put
+all the build files and then type `cmake -i [directory of Gunrock]`. When asks about
+whether to show advanced options, answer `Yes`. You should be able to specify the
+directory of Boost then. You can then type `make` to build all test files
+and the shared library. The examples of how to call Gunrock APIs are located at
+shared_lib_tests.

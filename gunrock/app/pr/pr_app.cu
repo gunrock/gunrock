@@ -254,7 +254,8 @@ void dispatch_page_rank(
                     }
                     case largest_degree:
                     {
-                        src_node = csr_graph.GetNodeWithHighestDegree();
+                        int max_node = 0;
+                        src_node = csr_graph.GetNodeWithHighestDegree(max_node);
                         break;
                     }
                     case manually:
