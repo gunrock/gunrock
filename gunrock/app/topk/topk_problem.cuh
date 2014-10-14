@@ -95,7 +95,8 @@ struct TOPKProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
    * @brief TOPKProblem constructor
    *
    * @param[in] stream_from_host Whether to stream data from host.
-   * @param[in] graph Reference to the CSR graph object we process on.
+   * @param[in] graph_original Reference to the CSR graph object we process on.
+   * @param[in] graph_reversed Reference to the inversed CSR graph object we process on.
    * @param[in] num_gpus Number of the GPUs used.
    */
   TOPKProblem(
@@ -151,7 +152,10 @@ struct TOPKProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
   /**
    * @brief Copy result computed on the GPU back to host-side vectors.
    *
-   * @param[out] h_rank host-side vector to store page rank values.
+   * @param[out] h_node_id Output node ID array pointer
+   * @param[out] h_degrees_i Output node in-degree array pointer
+   * @param[out] h_degrees_o Output node out-degree array pointer
+   * @param[in] num_nodes Specify the number of nodes
    *
    *\return cudaError_t object which indicates the success of all CUDA function calls.
    */
@@ -203,7 +207,8 @@ struct TOPKProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
    * @brief TOPKProblem initialization
    *
    * @param[in] stream_from_host Whether to stream data from host.
-   * @param[in] graph Reference to the CSR graph object we process on. @see Csr
+   * @param[in] graph_original Reference to the CSR graph object we process on. @see Csr
+   * @param[in] graph_reversed Reference to the inversed CSR graph object we process on. @see Csr
    * @param[in] _num_gpus Number of the GPUs used.
    *
    * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -321,7 +326,6 @@ struct TOPKProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
    *  @brief Performs any initialization work needed for TOPK problem type.
    *  Must be called prior to each TOPK iteration.
    *
-   *  @param[in] src Source node for one TOPK computing pass.
    *  @param[in] frontier_type The f rontier type (i.e., edge/vertex/mixed)
    *
    *  \return cudaError_t object which indicates the success of all CUDA function calls.

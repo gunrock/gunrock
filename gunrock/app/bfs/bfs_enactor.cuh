@@ -427,6 +427,7 @@ class BFSEnactor : public EnactorBase
      * @param[in] problem Pointer to BFSProblem object.
      * @param[in] src Source node for BFS.
      * @param[in] max_grid_size Max grid size for BFS kernel calls.
+     * @param[in] traversal_mode Traversal Mode for advance operator: Load-balanced or Dynamic cooperative
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */

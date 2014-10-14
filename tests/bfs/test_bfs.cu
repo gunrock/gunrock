@@ -299,6 +299,8 @@ void SimpleReferenceBfs(
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] num_gpus Number of GPUs
  * @param[in] max_queue_sizing Scaling factor used in edge mapping
+ * @param[in] iterations Number of iterations for running the test
+ * @param[in] traversal_mode Graph traversal mode: Load-balanced or Dynamic cooperative
  * @param[in] context CudaContext pointer for moderngpu APIs
  *
  */

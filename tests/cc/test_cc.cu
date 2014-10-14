@@ -192,6 +192,7 @@ unsigned int RefCPUCC(SizeT *row_offsets, VertexId *column_indices, int num_node
  *
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] max_grid_size Maximum CTA occupancy for CC kernels
+ * @param[in] iterations Number of iterations for running the test
  * @param[in] num_gpus Number of GPUs
  */
 template <

@@ -91,7 +91,8 @@ bool SALSACompare(
  /**
   * @brief Displays the BFS result (i.e., distance from source)
   *
-  * @param[in] source_path Search depth from the source for each node.
+  * @param[in] hrank Pointer to hub rank score array
+  * @param[in] arank Pointer to authority rank score array
   * @param[in] nodes Number of nodes in the graph.
   */
  template<typename Value, typename SizeT>
@@ -147,10 +148,7 @@ struct Stats {
  * @tparam SizeT
  * 
  * @param[in] stats Reference to the Stats object defined in RunTests
- * @param[in] h_rank Host-side vector stores computed page rank values for validation
- * @param[in] graph Reference to the CSR graph we process on
  * @param[in] elapsed Total elapsed kernel running time
- * @param[in] total_queued Total element queued in BFS kernel running process
  * @param[in] avg_duty Average duty of the BFS kernels
  */
 
@@ -186,9 +184,9 @@ void DisplayStats(
   * @tparam SizeT
   *
   * @param[in] graph Reference to the CSR graph we process on
-  * @param[in] rank Host-side vector to store CPU computed labels for each node
-  * @param[in] delta delta for computing SALSA rank
-  * @param[in] error error threshold
+  * @param[in] inv_graph Reference to the inversed CSR graph we process on
+  * @param[in] hrank Host-side vector to store CPU computed hub ranks for each node
+  * @param[in] arank Host-side vector to store CPU computed authority ranks for each node
   * @param[in] max_iter max iteration to go
   */
  template<
@@ -226,11 +224,11 @@ void SimpleReferenceSALSA(
  * @tparam INSTRUMENT
  *
  * @param[in] graph Reference to the CSR graph we process on
- * @param[in] delta Delta value for computing PageRank, usually set to .85
- * @param[in] error Error threshold value
+ * @param[in] inv_graph Reference to the inversed CSR graph we process on
  * @param[in] max_iter Max iteration for Page Rank computing
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] num_gpus Number of GPUs
+ * @param[in] max_queue_sizing Max queue sizing for frontier
  * @param[in] context CudaContext for moderngpu to use
  *
  */
@@ -344,7 +342,9 @@ void RunTests(
  * @tparam SizeT
  *
  * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] inv_graph Reference to the inversed CSR graph we process on
  * @param[in] args Reference to the command line arguments
+ * @param[in] context CudaContex for moderngpu library
  */
 template <
     typename VertexId,

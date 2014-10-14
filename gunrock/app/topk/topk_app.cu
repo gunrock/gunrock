@@ -68,9 +68,11 @@ int binary_search(
  * @tparam VertexId
  * @tparam SizeT
  *
- * @param[out] output subgraph of topk problem
- * @param[in]  input graph need to process on
- * @param[in]  topk node_ids
+ * @param[out] subgraph output subgraph of topk problem
+ * @param[in]  graph_original input graph need to process on
+ * @param[in]  graph_reversed reversed input graph need to process on
+ * @param[out] node_ids output top-k node_ids
+ * @param[in] top_nodes Number of nodes needed to process on
  */
 template <
     typename VertexId,
@@ -163,12 +165,12 @@ void build_topk_subgraph(
  * @tparam Value
  * @tparam SizeT
  *
- * @param[out] output subgraph of topk problem
+ * @param[out] graph_out output subgraph of topk problem
  * @param[out] node_ids return the top k nodes
  * @param[out] in_degrees  return associated centrality
  * @param[out] out_degrees return associated centrality
- * @param[in]  original graph to the CSR graph we process on
- * @param[in]  reversed graph to the CSR graph we process on
+ * @param[in]  graph_original graph to the CSR graph we process on
+ * @param[in]  graph_reversed graph to the CSR graph we process on
  * @param[in]  top_nodes k value for topk problem
  *
  */

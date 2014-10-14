@@ -60,8 +60,6 @@ class HITSEnactor : public EnactorBase
      * @brief Prepare the enactor for HITS kernel call. Must be called prior to each HITS search.
      *
      * @param[in] problem HITS Problem object which holds the graph data and HITS problem data to compute.
-     * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -152,6 +150,7 @@ class HITSEnactor : public EnactorBase
      * @tparam VertexMapPolicy Kernel policy for vertex mapping.
      * @tparam HITSProblem HITS Problem type.
      *
+     * @param[in] context CudaContext for moderngpu library
      * @param[in] problem HITSProblem object.
      * @param[in] max_iteration Max number of iterations of HITS algorithm
      * @param[in] max_grid_size Max grid size for HITS kernel calls.
@@ -352,8 +351,9 @@ class HITSEnactor : public EnactorBase
      *
      * @tparam HITSProblem HITS Problem type. @see HITSProblem
      *
+     * @param[in] context CudaContext for moderngpu library
      * @param[in] problem Pointer to HITSProblem object.
-     * @param[in] src Source node for HITS.
+     * @param[in] max_iteration Max iteration number for the algorithm
      * @param[in] max_grid_size Max grid size for HITS kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.

@@ -322,6 +322,8 @@ void SimpleReferenceSssp(
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] queue_sizing Scaling factor used in edge mapping
  * @param[in] num_gpus Number of GPUs
+ * @param[in] delta_factor Parameter to specify delta value in delta-stepping SSSP
+ * @param[in] iterations Number of iteration for running the test
  * @param[in] context CudaContext pointer for moderngpu APIs
  */
 template <

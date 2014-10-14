@@ -122,8 +122,10 @@ void DisplaySolution(
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] weight value associated with per edge we used for calculation
+ * @param[in] edge_values weight value associated with per edge we used for calculation
  * @param[in] graph reference to the CSR graph we process on
+ *
+ *  \return long long int variable which indicates the total weight of the graph
  */
 template<
   typename VertexId,
@@ -201,7 +203,8 @@ long long int SimpleReferenceMST(
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] graph_gpu the CSR graph we process on
+ * @param[in] graph_gpu the CSR graph we send to GPU to process
+ * @param[in] graph_cpu the CSR graph we process on CPU
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] num_gpus Number of GPUs
  * @param[in] context CudaContext for moderngpu to use
@@ -318,7 +321,7 @@ void RunTests(
  * @param[in] graph_gpu the CSR graph we process on
  * @param[in] graph_cpu the CSR graph used for reference
  * @param[in] args Reference to the command line arguments
- * @param[in] modern gpu cuda context
+ * @param[in] context modern gpu cuda context
  */
 template <
   typename VertexId,

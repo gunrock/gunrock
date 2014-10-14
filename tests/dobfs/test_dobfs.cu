@@ -298,6 +298,7 @@ void SimpleReferenceBfs(
  * @param[in] max_queue_sizing Scaling factor used in edge mapping
  * @param[in] alpha Tuning parameter for switching to reverse bfs
  * @param[in] beta Tuning parameter for switching back to normal bfs
+ * @param[in] iterations Number of iterations for running the test
  * @param[in] context CudaContext pointer for moderngpu APIs
  */
 template <

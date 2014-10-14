@@ -75,8 +75,6 @@ protected:
    * @brief Prepare the enactor for TOPK kernel call.
    *
    * @param[in] problem TOPK Problem object which holds the data to compute.
-   * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-   * @param[in] filter_grid_size CTA occupancy for filter kernel call.
    *
    * \return cudaError_t object which indicates the success of all CUDA calls.
    */
@@ -208,6 +206,7 @@ public:
    * @tparam TOPKProblem TOPK Problem type.
    *
    * @param[in] problem TOPKProblem object.
+   * @param[in] top_nodes Number of nodes to process for Top-K algorithm
    * @param[in] max_grid_size Max grid size for TOPK kernel calls.
    *
    * \return cudaError_t object which indicates the success of all CUDA calls.
@@ -299,7 +298,7 @@ public:
    * @tparam TOPKProblem TOPK Problem type. @see TOPKProblem
    *
    * @param[in] problem Pointer to TOPKProblem object.
-   * @param[in] src Source node for TOPK.
+   * @param[in] top_nodes Number of nodes to process for Top-K algorithm
    * @param[in] max_grid_size Max grid size for TOPK kernel calls.
    *
    * \return cudaError_t object which indicates the success of all CUDA function calls.

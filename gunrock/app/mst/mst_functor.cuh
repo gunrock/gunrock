@@ -46,6 +46,8 @@ struct SuccFunctor
    * @param[in] s_id Vertex Id of the edge source node
    * @param[in] d_id Vertex Id of the edge destination node
    * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
    *
    * \return Whether to load the apply function for the edge and include
    * the destination node in the next frontier.
@@ -63,6 +65,8 @@ struct SuccFunctor
    * @param[in] s_id Vertex Id of the edge source node
    * @param[in] d_id Vertex Id of the edge destination node
    * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
    */
   static __device__ __forceinline__ void ApplyEdge(
     VertexId s_id,  VertexId d_id, DataSlice *problem,
@@ -107,6 +111,8 @@ struct RmCycFunctor
    * @param[in] s_id Vertex Id of the edge source node
    * @param[in] d_id Vertex Id of the edge destination node
    * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
    *
    * \return Whether to load the apply function for the edge and include
    * the destination node in the next frontier.
@@ -124,6 +130,8 @@ struct RmCycFunctor
    * @param[in] s_id Vertex Id of the edge source node
    * @param[in] d_id Vertex Id of the edge destination node
    * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
    */
   static __device__ __forceinline__ void ApplyEdge(
   VertexId s_id, VertexId d_id, DataSlice *problem,
@@ -166,6 +174,7 @@ struct PtrJumpFunctor
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
+   * @param[in] v Vertex value
    *
    * \return Whether to load the apply function for the node and include
    * it in the outgoing vertex frontier.
@@ -182,6 +191,7 @@ struct PtrJumpFunctor
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
+   * @param[in] v Vertex value
    */
   static __device__ __forceinline__ void ApplyFilter(
     VertexId node, DataSlice *problem, Value v = 0)
@@ -226,6 +236,8 @@ struct EdgeRmFunctor
    * @param[in] s_id Vertex Id of the edge source node
    * @param[in] d_id Vertex Id of the edge destination node
    * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
    *
    * \return Whether to load the apply function for the edge and include
    * the destination node in the next frontier.
@@ -245,6 +257,8 @@ struct EdgeRmFunctor
    * @param[in] s_id Vertex Id of the edge source node
    * @param[in] d_id Vertex Id of the edge destination node
    * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
    */
   static __device__ __forceinline__ void ApplyEdge(
     VertexId s_id, VertexId d_id, DataSlice *problem,
@@ -268,6 +282,7 @@ struct EdgeRmFunctor
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
+   * @param[in] v Vertex value
    *
    * \return Whether to load the apply function for the node and include
    * it in the outgoing vertex frontier.
@@ -284,6 +299,7 @@ struct EdgeRmFunctor
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
+   * @param[in] v Vertex value
    */
   static __device__ __forceinline__ void ApplyFilter(
   VertexId node, DataSlice *problem, Value v = 0)
@@ -319,6 +335,7 @@ struct RowOffsetsFunctor
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
+   * @param[in] v Vertex value
    *
    * \return Whether to load the apply function for the node and include
    * it in the outgoing vertex frontier.
@@ -334,6 +351,7 @@ struct RowOffsetsFunctor
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
+   * @param[in] v Vertex value
    *
    */
   static __device__ __forceinline__ void ApplyFilter(
@@ -369,6 +387,7 @@ struct EdgeOffsetsFunctor
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
+   * @param[in] v node value (if any)
    *
    * \return Whether to load the apply function for the node and include
    * it in the outgoing vertex frontier.
@@ -384,6 +403,7 @@ struct EdgeOffsetsFunctor
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
+   * @param[in] v node value (if any)
    */
   static __device__ __forceinline__ void ApplyFilter(
     VertexId node, DataSlice *problem, Value v = 0)
@@ -418,6 +438,7 @@ struct OrFunctor
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
+   * @param[in] v node value (if any)
    *
    * \return Whether to load the apply function for the node and include
    * it in the outgoing vertex frontier.
@@ -433,6 +454,7 @@ struct OrFunctor
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
+   * @param[in] v node value (if any)
    */
   static __device__ __forceinline__ void ApplyFilter(
     VertexId node, DataSlice *problem, Value v = 0)
@@ -467,6 +489,7 @@ struct SuEdgeRmFunctor
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
+   * @param[in] v node value (if any)
    *
    * \return Whether to load the apply function for the node and include
    * it in the outgoing vertex frontier.
@@ -482,6 +505,7 @@ struct SuEdgeRmFunctor
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
+   * @param[in] v node value (if any)
    */
   static __device__ __forceinline__ void ApplyFilter(
     VertexId node, DataSlice *problem, Value v = 0)

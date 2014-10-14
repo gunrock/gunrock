@@ -173,6 +173,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
      * @param[in] stream_from_host Whether to stream data from host.
      * @param[in] graph Reference to the CSR graph object we process on. @see Csr
      * @param[in] _num_gpus Number of the GPUs used.
+     * @param[in] delta_factor Parameter for delta-stepping SSSP
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */

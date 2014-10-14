@@ -116,6 +116,7 @@ else
  * @tparam Value
  * @tparam SizeT
  *
+ * @param[out] ggraph_out Pointer to output CSR graph
  * @param[in] csr_graph Reference to the CSR graph we process on
  * @param[in] max_grid_size Maximum CTA occupancy for CC kernels
  * @param[in] num_gpus Number of GPUs

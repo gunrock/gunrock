@@ -182,9 +182,13 @@ void SimpleReferenceTopK(
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] graph_original Reference to the CSR graph we process on
+ * @param[in] graph_reversed Reference to the inversed CSR graph we process on
+ * @param[in] args Reference to the command line arguments
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] num_gpus Number of GPUs
+ * @param[in] top_nodes Number of nodes to process for Top-K algorithm
+ * @param[in] context CudaContext for moderngpu library
  *
  */
 template <
@@ -304,8 +308,11 @@ void RunTests(
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] graph_original Reference to the CSR graph we process on
+ * @param[in] graph_reversed Reference to the inversed CSR graph we process on
  * @param[in] args Reference to the command line arguments
+ * @param[in] top_nodes Number of nodes to process for Top-K algorithm
+ * @param[in] context CudaContext for moderngpu library
  */
 template <
   typename VertexId,

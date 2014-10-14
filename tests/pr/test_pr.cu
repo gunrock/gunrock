@@ -276,6 +276,7 @@ void SimpleReferencePr(
  * @param[in] max_iter Max iteration for Page Rank computing
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] num_gpus Number of GPUs
+ * @param[in] iterations Number of iterations for running the test
  * @param[in] context CudaContext for moderngpu to use
  *
  */

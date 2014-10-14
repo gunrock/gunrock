@@ -99,6 +99,7 @@ struct HITSProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
      *
      * @param[in] stream_from_host Whether to stream data from host.
      * @param[in] graph Reference to the CSR graph object we process on.
+     * @param[in] inv_graph Reference to the inversed CSR graph object we process on.
      * @param[in] num_gpus Number of the GPUs used.
      */
     HITSProblem(bool        stream_from_host,       // Only meaningful for single-GPU
@@ -308,7 +309,9 @@ struct HITSProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER 
      *  @brief Performs any initialization work needed for PR problem type. Must be called prior to each PR iteration.
      *
      *  @param[in] src Source node for one PR computing pass.
+     *  @param[in] delta Parameter for PR value distribution equation
      *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
+     *  @param[in] queue_sizing Frontier queue scaling factor
      * 
      *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */

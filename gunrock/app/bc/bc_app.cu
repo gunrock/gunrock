@@ -37,11 +37,13 @@ using namespace gunrock::app::bc;
  * @tparam Value
  * @tparam SizeT
  *
+ * @param[out] ggraph_out Pointer to the output CSR graph object
  * @param[in] graph Reference to the CSR graph object defined in main driver
  * @param[in] source
  * @param[in] max_grid_size
  * @param[in] num_gpus
  * @param[in] max_queue_sizing
+ * @param[in] context Reference to CudaContext used by moderngpu functions
  */
 template <
     typename VertexId,

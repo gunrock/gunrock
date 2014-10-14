@@ -106,7 +106,11 @@ void DisplayStats(
  * @tparam Value
  * @tparam SizeT
  *
+ * @param[out] ggraph_out Pointer to output CSR graph
+ * @param[out] node_ids Pointer to output node IDs
+ * @param[out] page_rank Pointer to output PageRanks
  * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] source Source ID for personalized PageRank (-1 for general PageRank)
  * @param[in] delta Delta value for computing Page Rank, usually set to .85
  * @param[in] error Error threshold value
  * @param[in] max_iter Max iteration for Page Rank computing

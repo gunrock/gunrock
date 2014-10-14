@@ -129,7 +129,7 @@ void DisplayStats(
  * @param[in]  graph Reference to the CSR graph we process on
  * @param[in]  source Source node where SSSP starts
  * @param[in]  max_grid_size Maximum CTA occupancy
- * @param[in]  max_queue_sizing Scaling factor used in edge mapping
+ * @param[in]  queue_sizing Scaling factor used in edge mapping
  * @param[in]  num_gpus Number of GPUs
  * @param[in]  delta_factor user set
  * @param[in]  context moderngpu context

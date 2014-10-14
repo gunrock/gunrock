@@ -128,11 +128,13 @@ void DisplayStats(
 * @tparam MARK_PREDECESSORS
 * @tparam ENABLE_IDEMPOTENCE
 *
-* @param[in] graph Reference to the CSR graph we process on
+* @param[out] ggraph_out Pointer to the output CSR graph 
+* @param[in] ggraph_in Reference to the CSR graph we process on
 * @param[in] src Source node where BFS starts
 * @param[in] max_grid_size Maximum CTA occupancy
 * @param[in] num_gpus Number of GPUs
 * @param[in] max_queue_sizing Scaling factor used in edge mapping
+* @param[in] context Reference to CudaContext used by moderngpu functions
 *
 */
 template <

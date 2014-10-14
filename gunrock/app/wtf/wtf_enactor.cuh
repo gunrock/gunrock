@@ -59,8 +59,6 @@ class WTFEnactor : public EnactorBase
      * @brief Prepare the enactor for WTF kernel call. Must be called prior to each WTF search.
      *
      * @param[in] problem WTF Problem object which holds the graph data and WTF problem data to compute.
-     * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] filter_grid_size CTA occupancy for vertex mapping kernel call.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -189,8 +187,11 @@ class WTFEnactor : public EnactorBase
      * @tparam FilterPolicy Kernel policy for vertex mapping.
      * @tparam WTFProblem WTF Problem type.
      *
+     * @param[in] context CudaContext for moderngpu library
+     * @param[in] src Source node ID for WTF algorithm
+     * @param[in] alpha Parameter to determine iteration number
      * @param[in] problem WTFProblem object.
-     * @param[in] src Source node for WTF.
+     * @param[in] max_iteration Max iteration number
      * @param[in] max_grid_size Max grid size for WTF kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -553,8 +554,11 @@ class WTFEnactor : public EnactorBase
      *
      * @tparam WTFProblem WTF Problem type. @see PRProblem
      *
-     * @param[in] problem Pointer to WTFProblem object.
+     * @param[in] context CudaContext for moderngpu library
      * @param[in] src Source node for WTF.
+     * @param[in] alpha Parameters related to iteration number of WTF algorithm
+     * @param[in] problem Pointer to WTFProblem object.
+     * @param[in] max_iteration Max iteration number of WTF algorithm
      * @param[in] max_grid_size Max grid size for WTF kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.

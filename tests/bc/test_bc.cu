@@ -335,6 +335,7 @@ void RefCPUBC(
  * @param[in] max_grid_size
  * @param[in] num_gpus
  * @param[in] max_queue_sizing
+ * @param[in] iterations Number of iterations for running the test
  * @param[in] context CudaContext pointer for moderngpu APIs
  */
 template <

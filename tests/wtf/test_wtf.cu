@@ -98,7 +98,8 @@ bool PRCompare(
  /**
   * @brief Displays the BFS result (i.e., distance from source)
   *
-  * @param[in] source_path Search depth from the source for each node.
+  * @param[in] node_id Pointer to node ID array
+  * @param[in] rank Pointer to node rank score array
   * @param[in] nodes Number of nodes in the graph.
   */
  template<typename VertexId, typename Value, typename SizeT>
@@ -181,9 +182,11 @@ void DisplayStats(
   * @tparam SizeT
   *
   * @param[in] graph Reference to the CSR graph we process on
+  * @param[in] src Source node ID for WTF algorithm
+  * @param[out] node_id Pointer to store computed output node ID
   * @param[in] rank Host-side vector to store CPU computed labels for each node
-  * @param[in] delta delta for computing PR
-  * @param[in] error error threshold
+  * @param[in] delta Delta value for computing PageRank score
+  * @param[in] alpha Parameter to adjust iteration number
   * @param[in] max_iter max iteration to go
   */
 // TODO: Boost PageRank cannot handle personalized pagerank, so currently the CPU
@@ -332,7 +335,9 @@ void SimpleReferencePr(
  * @tparam INSTRUMENT
  *
  * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] src Source node ID for WTF algorithm
  * @param[in] delta Delta value for computing PageRank, usually set to .85
+ * @param[in] alpha Parameter to adjust iteration number
  * @param[in] error Error threshold value
  * @param[in] max_iter Max iteration for Page Rank computing
  * @param[in] max_grid_size Maximum CTA occupancy
@@ -458,6 +463,7 @@ void RunTests(
  *
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] args Reference to the command line arguments
+ * @param[in] context CudaContex for moderngpu library
  */
 template <
     typename VertexId,

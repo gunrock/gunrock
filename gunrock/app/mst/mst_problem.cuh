@@ -501,7 +501,6 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
      * @brief Performs any initialization work needed for MST problem type.
      * Must be called prior to each MST iteration.
      *
-     * @param[in] src Source node for one MST computing pass.
      * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
      *
      *  \return cudaError_t object which indicates the success of
