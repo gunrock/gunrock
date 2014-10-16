@@ -922,6 +922,7 @@ struct MultiScan
         
         if (Num_Elements > Max_Elements || Num_Rows > Max_Rows)
         {
+            printf("Scanner expended: %d,%d -> %d,%d \n",Max_Elements, Max_Rows, Num_Elements, Num_Rows);fflush(stdout);
             Release();
             Init(Num_Elements, Num_Rows);
         }        

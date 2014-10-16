@@ -50,7 +50,7 @@ void ComputeOutputLength(
     if (frontier_attribute->queue_length ==0) 
     {
         //frontier_attribute->output_length[0] = 0;
-        util::MemsetKernel<SizeT><<<1,1>>>(frontier_attribute->output_length.GetPointer(util::DEVICE),0,1);
+        util::MemsetKernel<SizeT><<<1,1,0,stream>>>(frontier_attribute->output_length.GetPointer(util::DEVICE),0,1);
         return;
     }
 
@@ -71,8 +71,12 @@ void ComputeOutputLength(
     //if (!express) util::GRError("GetEdgeCounts failed", __FILE__, __LINE__);
     //return;
     //cudaDeviceSynchronize();
+    //cudaStreamSynchronize(stream);
+    //util::cpu_mt::PrintGPUArray<SizeT, int>("partitined_scanned_edges", (int*)partitioned_scanned_edges, frontier_attribute->queue_length);
     Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute->queue_length, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
+    //cudaStreamSynchronize(stream);
+    //util::cpu_mt::PrintGPUArray<SizeT, SizeT>("partitioned_scanned_edges2", partitioned_scanned_edges,frontier_attribute->queue_length);
     //if (!express) util::GRError(cudaStreamSynchronize(stream),"cudaStreamSynchronize failed", __FILE__, __LINE__);
     //if (!express) util::GRError("Scan failed", __FILE__, __LINE__);
     
@@ -84,10 +88,12 @@ void ComputeOutputLength(
     ///     partitioned_scanned_edges+frontier_attribute->queue_length-1, 
     //     sizeof(SizeT), cudaMemcpyDeviceToDevice, stream), "cudaMemcpyAsync failed", __FILE__, __LINE__);
     //printf("%p ",frontier_attribute->output_length.GetPointer(util::DEVICE));fflush(stdout);
-    util::MemsetCopyVectorKernel<SizeT><<<1,1>>>
+    util::MemsetCopyVectorKernel<SizeT><<<1,1,0,stream>>>
             (frontier_attribute->output_length.GetPointer(util::DEVICE),
             partitioned_scanned_edges + frontier_attribute->queue_length -1,
             1);
+    //cudaStreamSynchronize(stream);
+    //util::cpu_mt::PrintGPUArray<SizeT, SizeT>("output_length", frontier_attribute->output_length.GetPointer(util::DEVICE),1);
     //if (!express) util::GRError(cudaStreamSynchronize(stream),"ComputeOutputLength failed", __FILE__, __LINE__);
     //SizeT ret = temp[0];
     //delete[] temp;

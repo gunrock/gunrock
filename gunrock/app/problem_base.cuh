@@ -24,6 +24,8 @@
 #include <gunrock/util/io/modified_store.cuh>
 #include <gunrock/util/array_utils.cuh>
 #include <gunrock/app/rp/rp_partitioner.cuh>
+#include <gunrock/app/cp/cp_partitioner.cuh>
+#include <gunrock/app/brp/brp_partitioner.cuh>
 #include <gunrock/app/metisp/metis_partitioner.cuh>
 #include <vector>
 #include <string>
@@ -47,54 +49,61 @@ enum FrontierType {
         typename Value>
     struct DataSliceBase
     {
-        int                               num_gpus,gpu_idx,wait_counter;
+        int                               num_gpus,gpu_idx,wait_counter,gpu_mallocing;
         int                               num_vertex_associate,num_value__associate;
         SizeT                             nodes;
-        util::Array1D<SizeT, VertexId    > *vertex_associate_in  [2];
-        util::Array1D<SizeT, VertexId*   >  vertex_associate_ins [2];
-        util::Array1D<SizeT, VertexId    > *vertex_associate_out    ;
-        util::Array1D<SizeT, VertexId*   >  vertex_associate_outs   ;
-        util::Array1D<SizeT, VertexId*   >  vertex_associate_orgs   ;
-        util::Array1D<SizeT, Value       > *value__associate_in  [2];
-        util::Array1D<SizeT, Value*      >  value__associate_ins [2];
-        util::Array1D<SizeT, Value       > *value__associate_out    ;
-        util::Array1D<SizeT, Value*      >  value__associate_outs   ;
-        util::Array1D<SizeT, Value*      >  value__associate_orgs   ;
-        util::Array1D<SizeT, SizeT       >  out_length    ;   
-        util::Array1D<SizeT, SizeT       >  in_length  [2];   
-        util::Array1D<SizeT, VertexId    >  keys_in    [2];
-        util::Array1D<SizeT, cudaEvent_t >  events     [4];
-        util::Array1D<SizeT, bool        >  events_set [4];
-        util::Array1D<SizeT, int         >  wait_marker   ;
-        util::Array1D<SizeT, cudaStream_t>  streams       ;
-        util::Array1D<SizeT, int         >  stages        ;
-        util::Array1D<SizeT, cudaEvent_t >  local_events  ;
-        util::Array1D<SizeT, bool        >  to_show       ;
+        util::Array1D<SizeT, VertexId    > **vertex_associate_in  [2];
+        util::Array1D<SizeT, VertexId*   >  *vertex_associate_ins [2];
+        util::Array1D<SizeT, VertexId    >  *vertex_associate_out    ;
+        util::Array1D<SizeT, VertexId*   >   vertex_associate_outs   ;
+        util::Array1D<SizeT, VertexId*   >   vertex_associate_orgs   ;
+        util::Array1D<SizeT, Value       > **value__associate_in  [2];
+        util::Array1D<SizeT, Value*      >  *value__associate_ins [2];
+        util::Array1D<SizeT, Value       >  *value__associate_out    ;
+        util::Array1D<SizeT, Value*      >   value__associate_outs   ;
+        util::Array1D<SizeT, Value*      >   value__associate_orgs   ;
+        util::Array1D<SizeT, SizeT       >   out_length    ;   
+        util::Array1D<SizeT, SizeT       >   in_length  [2];   
+        util::Array1D<SizeT, VertexId    >  *keys_in    [2];
+        util::Array1D<SizeT, cudaEvent_t >   events     [4];
+        util::Array1D<SizeT, bool        >   events_set [4];
+        util::Array1D<SizeT, int         >   wait_marker   ;
+        util::Array1D<SizeT, cudaStream_t>   streams       ;
+        util::Array1D<SizeT, int         >   stages        ;
+        util::Array1D<SizeT, cudaEvent_t >   local_events  ;
+        util::Array1D<SizeT, bool        >   to_show       ;
 
         DataSliceBase()
         {
-            num_vertex_associate   = 0;
-            num_value__associate   = 0;
-            gpu_idx                = 0;
-            vertex_associate_in[0] = NULL;
-            vertex_associate_in[1] = NULL;
-            vertex_associate_out   = NULL;
-            value__associate_in[0] = NULL;
-            value__associate_in[1] = NULL;
-            value__associate_out   = NULL;
-            vertex_associate_ins[0].SetName("vertex_associate_ins[0]");
-            vertex_associate_ins[1].SetName("vertex_associate_ins[1]");
+            num_vertex_associate     = 0;
+            num_value__associate     = 0;
+            gpu_idx                  = 0;
+            gpu_mallocing            = 0;
+            keys_in              [0] = NULL;
+            keys_in              [1] = NULL;
+            vertex_associate_in  [0] = NULL;
+            vertex_associate_in  [1] = NULL;
+            vertex_associate_ins [0] = NULL;
+            vertex_associate_ins [1] = NULL;
+            vertex_associate_out     = NULL;
+            value__associate_in  [0] = NULL;
+            value__associate_in  [1] = NULL;
+            value__associate_ins [0] = NULL;
+            value__associate_ins [1] = NULL;
+            value__associate_out     = NULL;
+            //vertex_associate_ins[0].SetName("vertex_associate_ins[0]");
+            //vertex_associate_ins[1].SetName("vertex_associate_ins[1]");
             vertex_associate_outs  .SetName("vertex_associate_outs"  );  
             vertex_associate_orgs  .SetName("vertex_associate_orgs"  );  
-            value__associate_ins[0].SetName("value__associate_ins[0]");
-            value__associate_ins[1].SetName("value__associate_ins[1]");
+            //value__associate_ins[0].SetName("value__associate_ins[0]");
+            //value__associate_ins[1].SetName("value__associate_ins[1]");
             value__associate_outs  .SetName("value__associate_outs"  );  
             value__associate_orgs  .SetName("value__associate_orgs"  );  
             out_length             .SetName("out_length"             );  
             in_length           [0].SetName("in_length[0]"           );  
             in_length           [1].SetName("in_length[1]"           );  
-            keys_in             [0].SetName("keys_in[0]"             );  
-            keys_in             [1].SetName("keys_in[1]"             );
+            //keys_in             [0].SetName("keys_in[0]"             );  
+            //keys_in             [1].SetName("keys_in[1]"             );
             wait_marker            .SetName("wait_marker"            );
             stages                 .SetName("stages"                 );
             local_events           .SetName("local_events"           );
@@ -120,32 +129,71 @@ enum FrontierType {
 
             if (vertex_associate_in[0] != NULL)
             {
-                for (int i=0;i<num_vertex_associate;i++)
+                for (int gpu=0;gpu<num_gpus;gpu++)
                 {
-                    vertex_associate_in[0][i].Release();
-                    vertex_associate_in[1][i].Release();
+                    for (int i=0;i<num_vertex_associate;i++)
+                    {
+                        vertex_associate_in[0][gpu][i].Release();
+                        vertex_associate_in[1][gpu][i].Release();
+                    }
+                    delete[] vertex_associate_in[0][gpu];
+                    delete[] vertex_associate_in[1][gpu];
+                    vertex_associate_in [0][gpu] = NULL;
+                    vertex_associate_in [1][gpu] = NULL;
+                    vertex_associate_ins[0][gpu].Release();
+                    vertex_associate_ins[1][gpu].Release();
                 }
-                delete[] vertex_associate_in[0];
-                delete[] vertex_associate_in[1];
-                vertex_associate_in[0]=NULL;
-                vertex_associate_in[1]=NULL;
-                vertex_associate_ins[0].Release();
-                vertex_associate_ins[1].Release();
+                delete[] vertex_associate_in [0];
+                delete[] vertex_associate_in [1];
+                delete[] vertex_associate_ins[0];
+                delete[] vertex_associate_ins[1];
+                vertex_associate_in [0] = NULL;
+                vertex_associate_in [1] = NULL;
+                vertex_associate_ins[0] = NULL;
+                vertex_associate_ins[1] = NULL;
+                //vertex_associate_ins[0].Release();
+                //vertex_associate_ins[1].Release();
             }
 
             if (value__associate_in[0] != NULL)
             {
-                for (int i=0;i<num_value__associate;i++)
+                for (int gpu=0;gpu<num_gpus;gpu++)
                 {
-                    value__associate_in[0][i].Release();
-                    value__associate_in[1][i].Release();
+                    for (int i=0;i<num_value__associate;i++)
+                    {
+                        value__associate_in[0][gpu][i].Release();
+                        value__associate_in[1][gpu][i].Release();
+                    }
+                    delete[] value__associate_in[0][gpu];
+                    delete[] value__associate_in[1][gpu];
+                    value__associate_in [0][gpu] = NULL;
+                    value__associate_in [1][gpu] = NULL;
+                    value__associate_ins[0][gpu].Release();
+                    value__associate_ins[1][gpu].Release();
                 }
-                delete[] value__associate_in[0];
-                delete[] value__associate_in[1];
-                value__associate_in[0]=NULL;
-                value__associate_in[1]=NULL;
-                value__associate_ins[0].Release();
-                value__associate_ins[1].Release();
+                delete[] value__associate_in [0];
+                delete[] value__associate_in [1];
+                delete[] value__associate_ins[0];
+                delete[] value__associate_ins[1];
+                value__associate_in [0] = NULL;
+                value__associate_in [1] = NULL;
+                value__associate_ins[0] = NULL;
+                value__associate_ins[1] = NULL;
+                //value__associate_ins[0].Release();
+                //value__associate_ins[1].Release();
+            }
+            
+            if (keys_in[0] != NULL)
+            {
+                for (int gpu=0;gpu<num_gpus;gpu++)
+                {
+                    keys_in[0][gpu].Release();
+                    keys_in[1][gpu].Release();
+                }
+                delete[] keys_in[0];
+                delete[] keys_in[1];
+                keys_in[0] = NULL;
+                keys_in[1] = NULL;
             }
 
             if (vertex_associate_out != NULL)
@@ -175,8 +223,8 @@ enum FrontierType {
                 events[i].Release();
                 events_set[i].Release();
             }
-            keys_in    [0].Release();
-            keys_in    [1].Release();
+            //keys_in    [0].Release();
+            //keys_in    [1].Release();
             in_length  [0].Release();
             in_length  [1].Release();
             wait_marker   .Release();
@@ -197,8 +245,9 @@ enum FrontierType {
             int   num_vertex_associate,
             int   num_value__associate,
             Csr<VertexId, Value, SizeT> *graph,
-            SizeT num_in_nodes,
-            SizeT num_out_nodes)
+            SizeT *num_in_nodes,
+            SizeT total_out_nodes,
+            SizeT local_out_nodes)
         {
             cudaError_t retval         = cudaSuccess;
             this->num_gpus             = num_gpus;
@@ -244,36 +293,58 @@ enum FrontierType {
                 if (retval = util::GRError(cudaStreamCreate(&streams[gpu]), "cudaStreamCreate failed.", __FILE__, __LINE__)) return retval;
             }*/
 
+            if (num_gpus==1) return retval;
             // Create incoming buffer on device
-            if (num_in_nodes > 0)
-            for (int t=0;t<2;t++) {
-                vertex_associate_in [t] = new util::Array1D<SizeT,VertexId>[num_vertex_associate];
-                vertex_associate_ins[t].SetName("vertex_associate_ins");
-                if (retval = vertex_associate_ins[t].Allocate(num_vertex_associate, util::DEVICE | util::HOST)) return retval;
+            keys_in             [0] = new util::Array1D<SizeT,VertexId > [num_gpus];
+            keys_in             [1] = new util::Array1D<SizeT,VertexId > [num_gpus];
+            vertex_associate_in [0] = new util::Array1D<SizeT,VertexId >*[num_gpus];
+            vertex_associate_in [1] = new util::Array1D<SizeT,VertexId >*[num_gpus];
+            vertex_associate_ins[0] = new util::Array1D<SizeT,VertexId*> [num_gpus];
+            vertex_associate_ins[1] = new util::Array1D<SizeT,VertexId*> [num_gpus];
+            value__associate_in [0] = new util::Array1D<SizeT,Value    >*[num_gpus];
+            value__associate_in [1] = new util::Array1D<SizeT,Value    >*[num_gpus];
+            value__associate_ins[0] = new util::Array1D<SizeT,Value   *> [num_gpus];
+            value__associate_ins[1] = new util::Array1D<SizeT,Value   *> [num_gpus];
+            for (int gpu=0;gpu<num_gpus;gpu++)
+            for (int t=0;t<2;t++)
+            {
+                //if (num_in_nodes[gpu] <= 0)
+                //{
+                //    vertex_associate_in [t][gpu] = NULL;
+                //    value__associate_in [t][gpu] = NULL;
+                //} else {
+                    vertex_associate_in [t][gpu] = new util::Array1D<SizeT,VertexId>[num_vertex_associate];
+                    for (int i=0;i<num_vertex_associate;i++)
+                    {
+                        vertex_associate_in [t][gpu][i].SetName("vertex_associate_in[]");
+                        if (retval = vertex_associate_in[t][gpu][i].Allocate(num_in_nodes[gpu],util::DEVICE)) return retval;
+                    }
+                    value__associate_in [t][gpu] = new util::Array1D<SizeT,Value   >[num_value__associate];
+                    for (int i=0;i<num_value__associate;i++)
+                    {
+                        value__associate_in[t][gpu][i].SetName("value__associate_ins[]");
+                        if (retval = value__associate_in[t][gpu][i].Allocate(num_in_nodes[gpu],util::DEVICE)) return retval;
+                    }
+                //}
+                    
+                vertex_associate_ins[t][gpu].SetName("vertex_associate_ins");
+                if (retval = vertex_associate_ins[t][gpu].Allocate(num_vertex_associate, util::DEVICE | util::HOST)) return retval;
                 for (int i=0;i<num_vertex_associate;i++)
-                {
-                    vertex_associate_in[t][i].SetName("vertex_associate_ins[]");
-                    if (retval = vertex_associate_in[t][i].Allocate(num_in_nodes,util::DEVICE)) return retval;
-                    vertex_associate_ins[t][i] = vertex_associate_in[t][i].GetPointer(util::DEVICE);
-                }
-                if (retval = vertex_associate_ins[t].Move(util::HOST, util::DEVICE)) return retval;
+                    vertex_associate_ins[t][gpu][i] = vertex_associate_in[t][gpu][i].GetPointer(util::DEVICE);
+                if (retval = vertex_associate_ins[t][gpu].Move(util::HOST, util::DEVICE)) return retval;
 
-                value__associate_in [t] = new util::Array1D<SizeT,Value   >[num_value__associate];
-                value__associate_ins[t].SetName("value__associate_ins");
-                if (retval = value__associate_ins[t].Allocate(num_value__associate, util::DEVICE | util::HOST)) return retval;
+                value__associate_ins[t][gpu].SetName("value__associate_ins");
+                if (retval = value__associate_ins[t][gpu].Allocate(num_value__associate, util::DEVICE | util::HOST)) return retval;
                 for (int i=0;i<num_value__associate;i++)
-                {
-                    value__associate_in[t][i].SetName("value__associate_ins[]");
-                    if (retval = value__associate_in[t][i].Allocate(num_in_nodes,util::DEVICE)) return retval;
-                    value__associate_ins[t][i] = value__associate_in[t][i].GetPointer(util::DEVICE);
-                }
-                if (retval = value__associate_ins[t].Move(util::HOST, util::DEVICE)) return retval;
+                    value__associate_ins[t][gpu][i] = value__associate_in[t][gpu][i].GetPointer(util::DEVICE);
+                if (retval = value__associate_ins[t][gpu].Move(util::HOST, util::DEVICE)) return retval;
 
-                if (retval = keys_in[t].Allocate(num_in_nodes,util::DEVICE)) return retval;
+                keys_in[t][gpu].SetName("keys_in");
+                if (retval = keys_in[t][gpu].Allocate(num_in_nodes[gpu],util::DEVICE)) return retval;
             }
 
             // Create outgoing buffer on device
-            if (num_out_nodes > 0)
+            //if (num_out_nodes > 0)
             {
                 vertex_associate_out = new util::Array1D<SizeT,VertexId>[num_vertex_associate];
                 vertex_associate_outs.SetName("vertex_associate_outs");
@@ -281,7 +352,7 @@ enum FrontierType {
                 for (int i=0;i<num_vertex_associate;i++)
                 {
                     vertex_associate_out[i].SetName("vertex_associate_out[]");
-                    if (retval = vertex_associate_out[i].Allocate(num_out_nodes, util::DEVICE)) return retval;
+                    if (retval = vertex_associate_out[i].Allocate(total_out_nodes, util::DEVICE)) return retval;
                     vertex_associate_outs[i]=vertex_associate_out[i].GetPointer(util::DEVICE);
                 }
                 if (retval = vertex_associate_outs.Move(util::HOST, util::DEVICE)) return retval;
@@ -292,7 +363,7 @@ enum FrontierType {
                 for (int i=0;i<num_value__associate;i++)
                 {
                     value__associate_out[i].SetName("value__associate_out[]");
-                    if (retval = value__associate_out[i].Allocate(num_out_nodes, util::DEVICE)) return retval;
+                    if (retval = value__associate_out[i].Allocate(total_out_nodes, util::DEVICE)) return retval;
                     value__associate_outs[i]=value__associate_out[i].GetPointer(util::DEVICE);
                 }
                 if (retval = value__associate_outs.Move(util::HOST, util::DEVICE)) return retval;
@@ -353,9 +424,10 @@ struct ProblemBase
         util::Array1D<SizeT, int     > partition_table    ; // Partition number for vertexes, local is always 0
         util::Array1D<SizeT, VertexId> convertion_table   ; // Vertex number of vertexes in their hosting partition
         util::Array1D<SizeT, VertexId> original_vertex    ;
-        util::Array1D<SizeT, SizeT   > in_offset          ;
+        //util::Array1D<SizeT, SizeT   > in_offset          ;
+        util::Array1D<SizeT, SizeT   > in_counter         ;
         util::Array1D<SizeT, SizeT   > out_offset         ;
-        util::Array1D<SizeT, SizeT   > cross_counter      ;
+        util::Array1D<SizeT, SizeT   > out_counter        ;
         util::Array1D<SizeT, SizeT   > backward_offset    ;
         util::Array1D<SizeT, int     > backward_partition ;
         util::Array1D<SizeT, VertexId> backward_convertion;
@@ -392,9 +464,10 @@ struct ProblemBase
             partition_table    .SetName("partition_table"    );
             convertion_table   .SetName("convertion_table"   );
             original_vertex    .SetName("original_vertex"    );
-            in_offset          .SetName("in_offset"          );  
+            //in_offset          .SetName("in_offset"          );
+            in_counter         .SetName("in_counter"         );  
             out_offset         .SetName("out_offset"         );
-            cross_counter      .SetName("cross_counter"      );
+            out_counter        .SetName("out_counter"      );
             backward_offset    .SetName("backward_offset"    );
             backward_partition .SetName("backward_partition" );
             backward_convertion.SetName("backward_convertion");
@@ -425,9 +498,10 @@ struct ProblemBase
             partition_table    .Release();
             convertion_table   .Release();
             original_vertex    .Release();
-            in_offset          .Release();
+            //in_offset          .Release();
+            in_counter         .Release();
             out_offset         .Release();
-            cross_counter      .Release();
+            out_counter        .Release();
             backward_offset    .Release();
             backward_partition .Release();
             backward_convertion.Release();
@@ -469,9 +543,10 @@ struct ProblemBase
             int*                       partition_table,
             VertexId*                  convertion_table,
             VertexId*                  original_vertex,
-            SizeT*                     in_offset,
+            //SizeT*                     in_offset,
+            SizeT*                     in_counter,
             SizeT*                     out_offset,
-            SizeT*                     cross_counter,
+            SizeT*                     out_counter,
             SizeT*                     backward_offsets   = NULL,
             int*                       backward_partition = NULL,
             VertexId*                  backward_convertion= NULL)
@@ -485,9 +560,10 @@ struct ProblemBase
             this->partition_table    .SetPointer(partition_table      , nodes     );
             this->convertion_table   .SetPointer(convertion_table     , nodes     );
             this->original_vertex    .SetPointer(original_vertex      , nodes     );
-            this->in_offset          .SetPointer(in_offset            , num_gpus+1);
+            //this->in_offset          .SetPointer(in_offset            , num_gpus+1);
+            this->in_counter         .SetPointer(in_counter           , num_gpus+1);
             this->out_offset         .SetPointer(out_offset           , num_gpus+1);
-            this->cross_counter      .SetPointer(cross_counter        , num_gpus+1);
+            this->out_counter        .SetPointer(out_counter          , num_gpus+1);
             this->row_offsets        .SetPointer(graph->row_offsets   , nodes+1   );
             this->column_indices     .SetPointer(graph->column_indices, edges     );
 
@@ -540,22 +616,22 @@ struct ProblemBase
                     if (retval = this->original_vertex .Move    (util::HOST,util::DEVICE)) break;
                     
                     // Allocate and initalize in_offset
-                    if (retval = this->in_offset       .Allocate(num_gpus+1,util::DEVICE)) break;
-                    if (retval = this->in_offset       .Move    (util::HOST,util::DEVICE)) break;
+                    //if (retval = this->in_offset       .Allocate(num_gpus+1,util::DEVICE)) break;
+                    //if (retval = this->in_offset       .Move    (util::HOST,util::DEVICE)) break;
 
                     if (_ENABLE_BACKWARD)
                     {
-                        this->backward_offset    .SetPointer(backward_offsets     , cross_counter[0]+1);
-                        this->backward_partition .SetPointer(backward_partition   , cross_counter[num_gpus]);
-                        this->backward_convertion.SetPointer(backward_convertion  , cross_counter[num_gpus]);
+                        this->backward_offset    .SetPointer(backward_offsets     , in_counter[0]+1);
+                        this->backward_partition .SetPointer(backward_partition   , in_counter[num_gpus]);
+                        this->backward_convertion.SetPointer(backward_convertion  , in_counter[num_gpus]);
 
-                        if (retval = this->backward_offset    .Allocate(cross_counter[0]+1, util::DEVICE)) break;
+                        if (retval = this->backward_offset    .Allocate(in_counter[0]+1, util::DEVICE)) break;
                         if (retval = this->backward_offset    .Move(util::HOST, util::DEVICE)) break;
                         
-                        if (retval = this->backward_partition .Allocate(cross_counter[num_gpus], util::DEVICE)) break;
+                        if (retval = this->backward_partition .Allocate(in_counter[num_gpus], util::DEVICE)) break;
                         if (retval = this->backward_partition .Move(util::HOST, util::DEVICE)) break;
                         
-                        if (retval = this->backward_convertion.Allocate(cross_counter[num_gpus], util::DEVICE)) break;
+                        if (retval = this->backward_convertion.Allocate(in_counter[num_gpus], util::DEVICE)) break;
                         if (retval = this->backward_convertion.Move(util::HOST, util::DEVICE)) break;
                     }
                 } // end if num_gpu>1
@@ -589,26 +665,28 @@ struct ProblemBase
 
             // Determine frontier queue sizes
             SizeT new_frontier_elements[2] = {0,0};
+            if (num_gpus>1) util::cpu_mt::PrintCPUArray<int, SizeT>("in_counter", in_counter.GetPointer(util::HOST), num_gpus+1, index);
 
-            for (int peer=0;peer<=num_gpus;peer++)
+            for (int peer=0;peer<(num_gpus>1?num_gpus+1:1);peer++)
             {
+                //printf("gpu = %d, peer = %d, cross_counter = %d\n", index, peer, cross_counter[peer]);fflush(stdout);
                 switch (frontier_type) {
                     case VERTEX_FRONTIERS :
                         // O(n) ping-pong global vertex frontiers
-                        new_frontier_elements[0] = double(num_gpus>1?cross_counter[peer]:nodes) * queue_sizing;
-                        new_frontier_elements[1] = new_frontier_elements[0];
+                        new_frontier_elements[0] = double(num_gpus>1?in_counter[peer]:nodes) * queue_sizing +1;
+                        new_frontier_elements[1] = new_frontier_elements[0] +1;
                         break;
 
                     case EDGE_FRONTIERS :
                         // O(m) ping-pong global edge frontiers
-                        new_frontier_elements[0] = double(edges) * queue_sizing;
-                        new_frontier_elements[1] = new_frontier_elements[0];
+                        new_frontier_elements[0] = double(edges) * queue_sizing +1;
+                        new_frontier_elements[1] = new_frontier_elements[0] +1;
                         break;
 
                     case MIXED_FRONTIERS :
                         // O(n) global vertex frontier, O(m) global edge frontier
-                        new_frontier_elements[0] = double(num_gpus>1?cross_counter[peer]:nodes) * queue_sizing;
-                        new_frontier_elements[1] = double(edges) * queue_sizing;
+                        new_frontier_elements[0] = double(num_gpus>1?in_counter[peer]:nodes) * queue_sizing +1;
+                        new_frontier_elements[1] = double(edges) * queue_sizing+1;
                         break;
                  }    
 
@@ -618,7 +696,7 @@ struct ProblemBase
                     // Allocate frontier queue if not big enough
                     //frontier_queues.keys[i].EnsureSize(frontier_elements[i]);
                     //if (_USE_DOUBLE_BUFFER) frontier_queues.values[i].EnsureSize(frontier_elements[i]);
-                    printf("peer = %d, i = %d, [] = %d\n", peer, i, new_frontier_elements[i]);
+                    //printf("peer = %d, i = %d, [] = %d\n", peer, i, new_frontier_elements[i]);
                     if (frontier_elements[peer][i] < new_frontier_elements[i]) {
 
                         // Free if previously allocated
@@ -657,9 +735,10 @@ struct ProblemBase
     int                 **partition_tables    ; // Multi-gpu partition table and convertion table
     VertexId            **convertion_tables   ;
     VertexId            **original_vertexes   ;
-    SizeT               **in_offsets          ; // Offsets for data movement between GPUs
+    //SizeT               **in_offsets          ; // Offsets for data movement between GPUs
+    SizeT               **in_counter          ;
     SizeT               **out_offsets         ;
-    SizeT               **cross_counter       ;
+    SizeT               **out_counter         ;
     SizeT               **backward_offsets    ;
     int                 **backward_partitions ;
     VertexId            **backward_convertions;
@@ -681,9 +760,10 @@ struct ProblemBase
         partition_tables    (NULL),
         convertion_tables   (NULL),
         original_vertexes   (NULL),
-        in_offsets          (NULL),
+        //in_offsets          (NULL),
+        in_counter          (NULL),
         out_offsets         (NULL),
-        cross_counter       (NULL),
+        out_counter         (NULL),
         backward_offsets    (NULL),
         backward_partitions (NULL),
         backward_convertions(NULL)
@@ -809,6 +889,12 @@ struct ProblemBase
                 else if (partition_method=="metis")
                     partitioner=new metisp::MetisPartitioner<VertexId, SizeT, Value, _ENABLE_BACKWARD>
                         (*graph,num_gpus);
+                else if (partition_method=="cluster")
+                    partitioner=new cp::ClusterPartitioner  <VertexId, SizeT, Value, _ENABLE_BACKWARD>
+                        (*graph,num_gpus);
+                else if (partition_method=="biasrandom")
+                    partitioner=new brp::BiasRandomPartitioner <VertexId, SizeT, Value, _ENABLE_BACKWARD>
+                        (*graph,num_gpus);
                 else util::GRError("partition_method invalid", __FILE__,__LINE__);
                 printf("partition begin.\n");fflush(stdout);
                 cpu_timer.Start();
@@ -817,9 +903,10 @@ struct ProblemBase
                     partition_tables,
                     convertion_tables,
                     original_vertexes,
-                    in_offsets,
+                    //in_offsets,
+                    in_counter,
                     out_offsets,
-                    cross_counter,
+                    out_counter,
                     backward_offsets,
                     backward_partitions,
                     backward_convertions);
@@ -836,7 +923,7 @@ struct ProblemBase
                     util::cpu_mt::PrintCPUArray<SizeT,int>("partition",partition_tables[gpu+1],sub_graphs[gpu].nodes);
                     util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion",convertion_tables[gpu+1],sub_graphs[gpu].nodes);
                 }*/
-                for (int gpu=0;gpu<num_gpus;gpu++)
+                /*for (int gpu=0;gpu<num_gpus;gpu++)
                 {
                     cross_counter[gpu][num_gpus]=0;
                     for (int peer=0;peer<num_gpus;peer++)
@@ -844,13 +931,13 @@ struct ProblemBase
                         cross_counter[gpu][peer]=out_offsets[gpu][peer+1]-out_offsets[gpu][peer];
                     }
                     cross_counter[gpu][num_gpus]=in_offsets[gpu][num_gpus];
-                }
-                for (int gpu=0;gpu<num_gpus;gpu++)
+                }*/
+                /*for (int gpu=0;gpu<num_gpus;gpu++)
                 for (int peer=0;peer<=num_gpus;peer++)
                 {
                     in_offsets[gpu][peer]*=2;
                     out_offsets[gpu][peer]*=2;
-                }
+                }*/
                 if (retval) break;
             } else {
                 sub_graphs=graph;
@@ -870,9 +957,10 @@ struct ProblemBase
                             partition_tables    [gpu+1],
                             convertion_tables   [gpu+1],
                             original_vertexes   [gpu],
-                            in_offsets          [gpu],
+                            //in_offsets          [gpu],
+                            in_counter          [gpu],
                             out_offsets         [gpu],
-                            cross_counter       [gpu],
+                            out_counter         [gpu],
                             backward_offsets    [gpu],
                             backward_partitions [gpu],
                             backward_convertions[gpu]);
@@ -885,9 +973,10 @@ struct ProblemBase
                             partition_tables [gpu+1],
                             convertion_tables[gpu+1],
                             original_vertexes[gpu],
-                            in_offsets[gpu],
-                            out_offsets[gpu],
-                            cross_counter[gpu],
+                            //in_offsets[gpu],
+                            in_counter       [gpu],
+                            out_offsets      [gpu],
+                            out_counter      [gpu],
                             NULL,
                             NULL,
                             NULL);
@@ -899,6 +988,7 @@ struct ProblemBase
                         NULL,
                         NULL,
                         NULL,
+                        //NULL,
                         NULL,
                         NULL,
                         NULL,

@@ -229,7 +229,8 @@ void SimpleReferenceBfs(
 {
     //initialize distances
     for (VertexId i = 0; i < graph.nodes; ++i) {
-        source_path[i] = ENABLE_IDEMPOTENCE? -1: util::MaxValue<VertexId>();
+        source_path[i] = ENABLE_IDEMPOTENCE? -1: util::MaxValue<VertexId>()-1;
+        //source_path[i] = -1;
         if (MARK_PREDECESSORS)
             predecessor[i] = -1;
     }
@@ -491,7 +492,7 @@ void RunTests(
     g_verbose   = args.CheckCmdLineFlag("v");
     if (args.CheckCmdLineFlag  ("partition_method")) 
         args.GetCmdLineArgument("partition_method",partition_method);
-    printf("partition_method0=%s\n",partition_method.c_str());
+    //printf("partition_method0=%s\n",partition_method.c_str());
     if (instrumented) {
         if (mark_pred) {
             if (idempotence) {

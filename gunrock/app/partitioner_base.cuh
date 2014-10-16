@@ -59,9 +59,10 @@ public:
     int           **backward_partitions;
     VertexId      **backward_convertions;
     SizeT         **backward_offsets;
-    SizeT         **in_offsets;
+    //SizeT         **in_offsets;
+    SizeT         **in_counter;
     SizeT         **out_offsets;
-    SizeT         **cross_counter;
+    SizeT         **out_counter;
     //Mthods
 
     template <
@@ -84,9 +85,10 @@ public:
         VertexId      **backward_convertions;
         SizeT         **backward_offsets;
         VertexId      **original_vertexes;
-        SizeT         **in_offsets;
+        //SizeT         **in_offsets;
+        SizeT         **in_counter;
         SizeT         **out_offsets;
-        SizeT         **cross_counter;
+        SizeT         **out_counter;
     };
 
     /**
@@ -101,9 +103,10 @@ public:
         partition_tables     = NULL;
         convertion_tables    = NULL;
         original_vertexes    = NULL;
-        in_offsets           = NULL;
+        //in_offsets           = NULL;
+        in_counter           = NULL;
         out_offsets          = NULL;
-        cross_counter        = NULL;
+        out_counter          = NULL;
         backward_partitions  = NULL;
         backward_convertions = NULL;
         backward_offsets     = NULL;
@@ -127,9 +130,10 @@ public:
         partition_tables  = new int*     [num_gpus+1];
         convertion_tables = new VertexId*[num_gpus+1];
         original_vertexes = new VertexId*[num_gpus  ];
-        in_offsets        = new SizeT*   [num_gpus  ];
+        //in_offsets        = new SizeT*   [num_gpus  ];
+        in_counter        = new SizeT*   [num_gpus  ];
         out_offsets       = new SizeT*   [num_gpus  ];
-        cross_counter     = new SizeT*   [num_gpus  ];
+        out_counter       = new SizeT*   [num_gpus  ];
         if (ENABLE_BACKWARD)
         {
             backward_partitions  = new int*      [num_gpus];
@@ -157,12 +161,14 @@ public:
         memset(convertion_tables[0], 0, sizeof(VertexId) * graph.nodes);
         for (int i=0;i<num_gpus;i++)
         {
-            in_offsets   [i] = new SizeT [num_gpus+1];
+            //in_offsets   [i] = new SizeT [num_gpus+1];
+            in_counter   [i] = new SizeT [num_gpus+1];
             out_offsets  [i] = new SizeT [num_gpus+1];
-            cross_counter[i] = new SizeT [num_gpus+1];
-            memset(in_offsets   [i], 0, sizeof(SizeT) * (num_gpus+1));
+            out_counter  [i] = new SizeT [num_gpus+1];
+            //memset(in_offsets   [i], 0, sizeof(SizeT) * (num_gpus+1));
+            memset(in_counter   [i], 0, sizeof(SizeT) * (num_gpus+1));
             memset(out_offsets  [i], 0, sizeof(SizeT) * (num_gpus+1)); 
-            memset(cross_counter[i], 0, sizeof(SizeT) * (num_gpus+1));
+            memset(out_counter  [i], 0, sizeof(SizeT) * (num_gpus+1));
         }
         Status = 1;
 
@@ -179,9 +185,10 @@ public:
             free(partition_tables  [i]); partition_tables  [i] = NULL;
             if (i == num_gpus) continue;
             free(original_vertexes [i]); original_vertexes [i] = NULL;
-            delete[] in_offsets    [i] ; in_offsets        [i] = NULL;
+            //delete[] in_offsets    [i] ; in_offsets        [i] = NULL;
+            delete[] in_counter    [i] ; in_counter        [i] = NULL;
             delete[] out_offsets   [i] ; out_offsets       [i] = NULL;
-            delete[] cross_counter [i] ; cross_counter     [i] = NULL;
+            delete[] out_counter   [i] ; out_counter       [i] = NULL;
             if (ENABLE_BACKWARD)
             {
                 free(backward_partitions [i]); backward_partitions [i] = NULL;
@@ -193,9 +200,10 @@ public:
         delete[] partition_tables ; partition_tables  = NULL;
         delete[] original_vertexes; original_vertexes = NULL;
         if (num_gpus>1) delete[] sub_graphs       ; sub_graphs        = NULL;
-        delete[] in_offsets       ; in_offsets        = NULL;
+        //delete[] in_offsets       ; in_offsets        = NULL;
+        delete[] in_counter       ; in_counter        = NULL;
         delete[] out_offsets      ; out_offsets       = NULL;
-        delete[] cross_counter    ; cross_counter     = NULL;
+        delete[] out_counter      ; out_counter       = NULL;
         if (ENABLE_BACKWARD)
         {
             delete[] backward_convertions; backward_convertions = NULL;
@@ -222,23 +230,24 @@ public:
         VertexId**      backward_convertions  = thread_data->backward_convertions;
         SizeT**         backward_offsets      = thread_data->backward_offsets;
         SizeT**         out_offsets           = thread_data->out_offsets;
-        SizeT**         in_offsets            = thread_data->in_offsets;
-        SizeT*          cross_counter         = thread_data->cross_counter[gpu];
+        //SizeT**         in_offsets            = thread_data->in_offsets;
+        SizeT*          in_counter            = thread_data->in_counter [gpu];
+        SizeT*          out_counter           = thread_data->out_counter[gpu];
         SizeT           num_nodes             = 0, node_counter;
         SizeT           num_edges             = 0, edge_counter;
         int*            marker                = new int[graph->nodes];
         //SizeT*          cross_counter         = new SizeT[num_gpus];
         VertexId*       tconvertion_table     = new VertexId[graph->nodes];
-        SizeT           in_counter            = 0;
+        SizeT           in_counter_           = 0;
 
         memset(marker, 0, sizeof(int)*graph->nodes);
-        memset(cross_counter, 0, sizeof(SizeT) * num_gpus);
+        memset(out_counter, 0, sizeof(SizeT) * (num_gpus+1));
 
         for (SizeT node=0; node<graph->nodes; node++)
         if (partition_table0[node] == gpu)
         {
-            convertion_table0[node] = cross_counter[gpu];
-            tconvertion_table[node] = cross_counter[gpu];
+            convertion_table0[node] = out_counter[gpu];
+            tconvertion_table[node] = out_counter[gpu];
             marker[node] =1;
             for (SizeT edge=graph->row_offsets[node]; edge<graph->row_offsets[node+1]; edge++)
             {
@@ -246,41 +255,43 @@ public:
                 int peer  = partition_table0[neibor];
                 if ((peer != gpu) && (marker[neibor] == 0))
                 {
-                    tconvertion_table[neibor]=cross_counter[peer];
-                    cross_counter[peer]++;
+                    tconvertion_table[neibor]=out_counter[peer];
+                    out_counter[peer]++;
                     marker[neibor]=1;
                     num_nodes++;
                 }
             }
-            cross_counter[gpu]++;
+            out_counter[gpu]++;
             num_nodes++;
             num_edges+= graph->row_offsets[node+1] - graph->row_offsets[node];
         }
         delete[] marker;marker=NULL;
         out_offsets[gpu][0]=0;
-        node_counter=cross_counter[gpu];
+        node_counter=out_counter[gpu];
         for (int peer=0;peer<num_gpus;peer++)
         {
             if (peer==gpu) continue;
             int peer_=peer < gpu? peer+1 : peer;
             out_offsets[gpu][peer_]=node_counter;
-            node_counter+=cross_counter[peer];
+            node_counter+=out_counter[peer];
         }
         out_offsets[gpu][num_gpus]=node_counter;
-        util::cpu_mt::PrintCPUArray<SizeT, SizeT>("cross_counter",cross_counter,num_gpus,gpu);
+        util::cpu_mt::PrintCPUArray<SizeT, SizeT>("out_offsets",out_offsets[gpu],num_gpus+1,gpu);
         util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,gpu);
         
-        in_offsets[gpu][0]=0;
+        //in_offsets[gpu][0]=0;
         node_counter=0;
         for (int peer=0;peer<num_gpus;peer++)
         {
             if (peer==gpu) continue;
             int peer_ = peer < gpu ? peer+1 : peer;
             int gpu_  = gpu  < peer? gpu +1 : gpu ; 
-            in_offsets[gpu][peer_]=node_counter;
-            node_counter+=out_offsets[peer][gpu_+1]-out_offsets[peer][gpu_];
+            //in_offsets[gpu][peer_]=node_counter;
+            in_counter[peer_]=out_offsets[peer][gpu_+1]-out_offsets[peer][gpu_];
+            node_counter+=in_counter[peer_];
         }
-        in_offsets[gpu][num_gpus]=node_counter;
+        //in_offsets[gpu][num_gpus]=node_counter;
+        in_counter[num_gpus]=node_counter;
         
         if      (graph->node_values == NULL && graph->edge_values == NULL) 
              sub_graph->template FromScratch < false , false  >(num_nodes,num_edges);
@@ -301,12 +312,12 @@ public:
             if (backward_partitions [gpu] !=NULL) free(backward_partitions [gpu]);
             if (backward_convertions[gpu] !=NULL) free(backward_convertions[gpu]);
             if (backward_offsets    [gpu] !=NULL) free(backward_offsets    [gpu]);
-            backward_offsets    [gpu] = (SizeT*    ) malloc (sizeof(SizeT     ) * (cross_counter[gpu]+1)   );
-            backward_convertions[gpu] = (VertexId* ) malloc (sizeof(VertexId  ) * in_offsets[gpu][num_gpus]);
-            backward_partitions [gpu] = (int*      ) malloc (sizeof(int       ) * in_offsets[gpu][num_gpus]);
-            marker     = new int[num_gpus*cross_counter[gpu]];
-            memset(marker,0,sizeof(int)*num_gpus*cross_counter[gpu]);
-            in_counter = 0;
+            backward_offsets    [gpu] = (SizeT*    ) malloc (sizeof(SizeT     ) * (out_counter[gpu]+1));
+            backward_convertions[gpu] = (VertexId* ) malloc (sizeof(VertexId  ) * in_counter[num_gpus]);
+            backward_partitions [gpu] = (int*      ) malloc (sizeof(int       ) * in_counter[num_gpus]);
+            marker     = new int[num_gpus*out_counter[gpu]];
+            memset(marker,0,sizeof(int)*num_gpus*out_counter[gpu]);
+            in_counter_ = 0;
             for (SizeT neibor=0; neibor<graph->nodes; neibor++)
             if (partition_table0[neibor] != gpu)
             {
@@ -317,18 +328,18 @@ public:
                     marker[convertion_table0[node]*num_gpus + partition_table0[neibor]]=1;
                 }
             }
-            for (VertexId _node=0;_node<cross_counter[gpu];_node++)
+            for (VertexId _node=0;_node<out_counter[gpu];_node++)
             {
-                backward_offsets[gpu][_node]=in_counter;
+                backward_offsets[gpu][_node]=in_counter_;
                 for (int peer=0;peer<num_gpus;peer++)
                 {
                     if (marker[_node*num_gpus+peer]==0) continue;
                     int  peer_ = peer < gpu ? peer+1 : peer;
-                    backward_partitions[gpu][in_counter]=peer_;
-                    in_counter++;
+                    backward_partitions[gpu][in_counter_]=peer_;
+                    in_counter_++;
                 }
             }
-            backward_offsets[gpu][cross_counter[gpu]]=in_counter;
+            backward_offsets[gpu][out_counter[gpu]]=in_counter_;
             //memset(marker,0,sizeof(int)*num_gpus*cross_counter[gpu]);
             delete[] marker;marker=NULL;
             util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,gpu);
@@ -376,7 +387,23 @@ public:
         }
         sub_graph->row_offsets[num_nodes]=num_edges;
 
+        out_counter[num_gpus]=0;
+        in_counter[num_gpus]=0;
+        for (int peer=0;peer<num_gpus;peer++)
+        {
+            int peer_ = peer < gpu? peer+1:peer;
+            int gpu_  = peer < gpu? gpu: gpu+1;
+            if (peer==gpu) {peer_=0;gpu_=0;}
+            out_counter[peer_]=out_offsets[gpu][peer_+1]-out_offsets[gpu][peer_];
+            //if (out_counter[peer_]==0) out_counter[peer_]=1;
+            out_counter[num_gpus]+=out_counter[peer_];
+            in_counter[peer_]=out_offsets[peer][gpu_+1]-out_offsets[peer][gpu_];
+            //if (in_counter[peer_]==0) in_counter[peer_]=1;
+            in_counter[num_gpus]+=in_counter[peer_];
+        }
         //delete[] cross_counter;     cross_counter     = NULL;
+        util::cpu_mt::PrintCPUArray<SizeT, SizeT>("out_counter",out_counter,num_gpus+1,gpu);
+        util::cpu_mt::PrintCPUArray<SizeT, SizeT>("in_counter ", in_counter,num_gpus+1,gpu);
         delete[] tconvertion_table; tconvertion_table = NULL;
         CUT_THREADEND;
     }
@@ -406,9 +433,10 @@ public:
                 thread_data[gpu].backward_convertions = backward_convertions;
                 thread_data[gpu].backward_offsets     = backward_offsets    ;
             }
-            thread_data[gpu].in_offsets          = in_offsets;
+            //thread_data[gpu].in_offsets          = in_offsets;
+            thread_data[gpu].in_counter          = in_counter;
             thread_data[gpu].out_offsets         = out_offsets;
-            thread_data[gpu].cross_counter       = cross_counter;
+            thread_data[gpu].out_counter         = out_counter;
             thread_data[gpu].thread_Id           = cutStartThread((CUT_THREADROUTINE)&(MakeSubGraph_Thread), (void*)(&(thread_data[gpu])));
             thread_Ids[gpu]=thread_data[gpu].thread_Id;
         }
@@ -433,7 +461,7 @@ public:
         int**      &partition_tables,
         VertexId** &convertion_tables,
         VertexId** &original_vertexes,
-        SizeT**    &in_offsets,
+        //SizeT**    &in_offsets,
         SizeT**    &out_offsets,
         SizeT**    &cross_counter)
     {   
@@ -445,9 +473,10 @@ public:
                    partition_tables,
                    convertion_tables,
                    original_vertexes,
-                   in_offsets,
+                   //in_offsets,
+                   in_counter,
                    out_offsets,
-                   cross_counter,
+                   out_counter,
                    backward_offsets,
                    backward_partitions,
                    backward_convertions);
@@ -458,9 +487,10 @@ public:
         int**      &partition_tables,
         VertexId** &convertion_tables,
         VertexId** &original_vertexes,
-        SizeT**    &in_offsets,
+        //SizeT**    &in_offsets,
+        SizeT**    &in_counter,
         SizeT**    &out_offsets,
-        SizeT**    &cross_counter,
+        SizeT**    &out_counter,
         SizeT**    &backward_offsets,
         int**      &backward_partitions,
         VertexId** &backward_convertions)

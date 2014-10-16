@@ -55,11 +55,21 @@ struct BFSFunctor
             else { 
                 return (atomicCAS( problem->labels + d_id, -1, s_id+1) == -1) ? true : false;
             }*/
-            Value label, new_weight;
-            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                label, problem->labels + s_id);
-            new_weight = label +1;
-            return (new_weight < atomicMin(problem->labels + d_id, new_weight));
+            //Value label, new_weight;
+            //util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+            //    label, problem->labels + s_id);
+            Value new_weight;
+            if (ProblemData::MARK_PREDECESSORS)
+            {
+                Value label;
+                util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                    label, problem->labels + s_id);
+                new_weight = label + 1;
+            }
+            else new_weight = s_id +1;
+            bool result = new_weight < atomicMin(problem->labels + d_id, new_weight);
+            //printf("s=%d d=%d new_weight=%d keep=%d\n", s_id, d_id, new_weight, result?1:0);
+            return result;
         }
     }
 

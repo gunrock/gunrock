@@ -141,6 +141,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         SizeT first = d_vertex_id >= max_vertex ? max_edge : d_row_offsets[d_vertex_id];
         SizeT second = (d_vertex_id + 1) >= max_vertex ? max_edge : d_row_offsets[d_vertex_id+1];
 
+        //printf(" d_vertex_id = %d, max_vertex = %d, max_edge = %d, first = %d, second = %d\n",
+        //       d_vertex_id, max_vertex, max_edge, first, second);
         return (second > first) ? second - first : 0;
     }
 
@@ -159,14 +161,19 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         int my_id = bid*blockDim.x + tid;
         if (my_id >= num_elements || my_id >= max_edge)
+        {
+            //printf("my_id = %d returned\t",my_id);
             return;
+        }
         VertexId v_id = d_queue[my_id];
         if (v_id == -1) {
             d_scanned_edges[my_id] = 0;
+            //printf("my_id = %d ->0\t", my_id);
             return;
         }
         SizeT num_edges = GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
         d_scanned_edges[my_id] = num_edges;
+        //printf("my_id %d assign %d\t", my_id, num_edges);
     }
 
     static __device__ __forceinline__ void RelaxPartitionedEdges(

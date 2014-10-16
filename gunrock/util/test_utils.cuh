@@ -353,7 +353,7 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
             PrintValue<T>(reference[i]);
 
             if (verbose) {
-                printf("\nresult[...");
+                printf("\nresult   [...");
                 for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
                     PrintValue<T>(computed[j]);
                     printf(", ");

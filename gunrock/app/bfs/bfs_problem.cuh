@@ -45,7 +45,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
 
     static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
     static const bool ENABLE_IDEMPOTENCE    = _ENABLE_IDEMPOTENCE;
-
+    static const bool USE_DOUBLE_BUFFER     = _USE_DOUBLE_BUFFER;
     //Helper structures
 
     /**
@@ -153,8 +153,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             int   num_value__associate,
             Csr<VertexId, Value, SizeT> *graph,
             //SizeT num_nodes,
-            SizeT num_in_nodes,
-            SizeT num_out_nodes,
+            SizeT *num_in_nodes,
+            SizeT total_out_nodes,
+            SizeT local_out_nodes,
             float queue_sizing = 2.0)
         {
             //util::cpu_mt::PrintMessage("DataSlice Init() begin.");
@@ -169,7 +170,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 num_value__associate,
                 graph, 
                 num_in_nodes,
-                num_out_nodes)) return retval;
+                total_out_nodes,
+                local_out_nodes)) return retval;
 
             // Create SoA on device
             if (retval = labels       .Allocate(graph->nodes,util::DEVICE)) return retval;
@@ -199,7 +201,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
                 if (retval = temp_marker. Allocate(graph->nodes, util::DEVICE)) return retval;
                 Scaner = new util::scan::MultiScan<VertexId, SizeT, true, 256, 8>;
-                Scaner->Init(graph->nodes * queue_sizing, num_gpus);
+                Scaner->Init(total_out_nodes, num_gpus);
             }
             /*if (num_associate != 0)
             {
@@ -322,7 +324,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         cudaError_t retval = cudaSuccess;
  
         do {
-            printf("num_gpus = %d num_nodes = %d\n", this->num_gpus, this->nodes);
+            printf("num_gpus = %d num_nodes = %d\n", this->num_gpus, this->nodes);fflush(stdout);
             if (this->num_gpus == 1) {
 
                 // Set device
@@ -348,13 +350,23 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                         if (retval = data_slices[gpu]->preds.Move(util::DEVICE,util::HOST)) return retval;
                         th_preds[gpu]=data_slices[gpu]->preds.GetPointer(util::HOST);
                     }
-               } //end for(gpu)
-
+                } //end for(gpu)
+                printf("Transfer done\n");fflush(stdout);
+                
                 for (VertexId node=0;node<this->nodes;node++)
+                if (this-> partition_tables[0][node]>=0 && this-> partition_tables[0][node]<this->num_gpus &&
+                    this->convertion_tables[0][node]>=0 && this->convertion_tables[0][node]<data_slices[this->partition_tables[0][node]]->labels.GetSize())
                     h_labels[node]=th_labels[this->partition_tables[0][node]][this->convertion_tables[0][node]];
+                else {
+                    printf("OutOfBound: node = %d, partition = %d, convertion = %d\n",
+                           node, this->partition_tables[0][node], this->convertion_tables[0][node]); 
+                           //data_slices[this->partition_tables[0][node]]->labels.GetSize());
+                    fflush(stdout);
+                }
                 if (_MARK_PREDECESSORS)
                     for (VertexId node=0;node<this->nodes;node++)
                         h_preds[node]=th_preds[this->partition_tables[0][node]][this->convertion_tables[0][node]];
+                printf("Convertion done\n");fflush(stdout);
                 for (int gpu=0;gpu<this->num_gpus;gpu++)
                 {
                     if (retval = data_slices[gpu]->labels.Release(util::HOST)) return retval;
@@ -421,9 +433,10 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                             2,
                             0,
                             &(this->sub_graphs[gpu]),
-                            this->graph_slices[gpu]->in_offset[this->num_gpus],
-                            this->graph_slices[gpu]->out_offset[this->num_gpus]
-                              - this->graph_slices[gpu]->out_offset[1],
+                            this->graph_slices[gpu]->in_counter.GetPointer(util::HOST),
+                            //this->graph_slices[gpu]->in_offset[this->num_gpus],
+                            this->graph_slices[gpu]->out_counter[this->num_gpus],
+                            this->graph_slices[gpu]->out_counter[0],
                             queue_sizing);
                     else _data_slice->Init(
                             this->num_gpus, 
@@ -431,9 +444,10 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                             1,
                             0,
                             &(this->sub_graphs[gpu]),
-                            this->graph_slices[gpu]->in_offset[this->num_gpus],
-                            this->graph_slices[gpu]->out_offset[this->num_gpus]
-                                - this->graph_slices[gpu]->out_offset[1],
+                            this->graph_slices[gpu]->in_counter.GetPointer(util::HOST),
+                            //this->graph_slices[gpu]->in_offset[this->num_gpus],
+                            this->graph_slices[gpu]->out_counter[this->num_gpus],
+                            this->graph_slices[gpu]->out_counter[0],
                             queue_sizing);
                 } else {
                     _data_slice->Init(
@@ -481,7 +495,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             // Allocate output labels if necessary
             if (data_slices[gpu]->labels.GetPointer(util::DEVICE)==NULL)
                 if (retval = data_slices[gpu]->labels.Allocate(this->sub_graphs[gpu].nodes,util::DEVICE)) return retval;
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->labels.GetPointer(util::DEVICE), _ENABLE_IDEMPOTENCE?-1:util::MaxValue<Value>(), this->sub_graphs[gpu].nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->labels.GetPointer(util::DEVICE), _ENABLE_IDEMPOTENCE?-1:(util::MaxValue<Value>()-1), this->sub_graphs[gpu].nodes);
 
             // Allocate preds if necessary
             if (_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE)
