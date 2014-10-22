@@ -107,10 +107,12 @@ namespace bfs {
                    return;//continue;
                }
             }
-            if (marker[key]==0) 
+            //if (marker[key]==0) 
+            if (atomicCAS(marker+key, 0, 1)==0)
             {
-                marker[key]=1;keys_out[x]=key;}
-            else keys_out[x]=-1;
+                //marker[key]=1;
+                keys_out[x]=key;
+            } else keys_out[x]=-1;
             if (num_associates==2) 
                 associate_org[1][key]=associate_in[1][x];
             /*#pragma unroll
