@@ -225,6 +225,17 @@ namespace scan {
         if (x<N) Buffer[y*N+x] += Sum[y*gridDim.x+blockIdx.x];
     } // Step2
 
+    template <typename _SizeT>
+    __global__ void Step2_5(
+              _SizeT* Length,
+              _SizeT* Offset,
+              _SizeT  Num_Rows)
+    {
+        Offset[0]=0;
+        for (int i=0;i<Num_Rows;i++)
+            Offset[i+1]=Offset[i]+Length[i];
+    }
+
     template <
         typename _VertexId,
         typename _SizeT,
@@ -905,11 +916,13 @@ struct MultiScan
               VertexId**       d_Vertex_Associate_in,
               VertexId**       d_Vertex_Associate_out,
               Value**          d_Value__Associate_in,
-              Value**          d_Value__Associate_out)    // The scan result
+              Value**          d_Value__Associate_out,
+              cudaStream_t     stream = 0)    // The scan result
     {
         if (Num_Elements <= 0) 
         {
-            util::MemsetKernel<<<128,1>>>(d_Length,0,Num_Rows);
+            util::MemsetKernel<<<128,1,0,stream>>>(d_Length,0,Num_Rows);
+            cudaStreamSynchronize(stream);
             return;
         }
         //SizeT *History_Size = new SizeT[40];
@@ -945,7 +958,7 @@ struct MultiScan
                 Grid_Size = dim3(History_Size[1]/32, 32, 1);
                 if ((History_Size[1]%32) !=0) Grid_Size.x++;
                 Step0b <VertexId,SizeT,BLOCK_N> 
-                    <<<Grid_Size,Block_Size, sizeof(SizeT) * BLOCK_SIZE>>> (
+                    <<<Grid_Size,Block_Size, sizeof(SizeT) * BLOCK_SIZE, stream>>> (
                     History_Size[0],
                     Num_Rows,
                     History_Size[1],
@@ -958,7 +971,7 @@ struct MultiScan
             } else {
                 Grid_Size = dim3(History_Size[Current_Level+1], Num_Rows, 1);
                 Step1 <SizeT, BLOCK_N> 
-                <<<Grid_Size,Block_Size, sizeof(SizeT) * BLOCK_SIZE>>> (
+                <<<Grid_Size,Block_Size, sizeof(SizeT) * BLOCK_SIZE, stream>>> (
                     Current_Size,
                     d_Buffer[Current_Level],
                     d_Buffer[Current_Level+1]);
@@ -978,14 +991,16 @@ struct MultiScan
             }
         } // while Current_Size>1
         
-        util::GRError(cudaMemcpy(d_Length, d_Buffer[Current_Level], sizeof(SizeT) * Num_Rows, cudaMemcpyDeviceToDevice),
-              "cudaMemcpy d_Length failed", __FILE__, __LINE__);
+        //util::GRError(cudaMemcpy(d_Length, d_Buffer[Current_Level], sizeof(SizeT) * Num_Rows, cudaMemcpyDeviceToDevice),
+        //      "cudaMemcpy d_Length failed", __FILE__, __LINE__);
+        MemsetCopyVectorKernel<<<128,1,0,stream>>>(d_Length, d_Buffer[Current_Level], Num_Rows);
+
         Current_Level--;
         while (Current_Level>1)
         {
             Block_Size = dim3(BLOCK_SIZE, 1, 1);
             Grid_Size  = dim3(History_Size[Current_Level], Num_Rows, 1);
-            Step2 <SizeT> <<<Grid_Size,Block_Size>>> (
+            Step2 <SizeT> <<<Grid_Size,Block_Size,0,stream>>> (
                 History_Size[Current_Level-1],
                 d_Buffer[Current_Level],
                 d_Buffer[Current_Level-1]);
@@ -994,18 +1009,22 @@ struct MultiScan
             Current_Level--;
         } // while Current_Level>1
 
+
+        Step2_5<<<1,1,0,stream>>>(d_Length, d_Offset1, Num_Rows);
+
         Block_Size = dim3(BLOCK_SIZE, 1, 1);
         Grid_Size  = dim3(History_Size[1] /32, 32, 1);
-        h_Offset1[0]=0;
+        /*h_Offset1[0]=0;
         util::GRError(cudaMemcpy(&(h_Offset1[1]), d_Length, sizeof(SizeT)*Num_Rows, cudaMemcpyDeviceToHost), 
                      "cudaMemcpy h_Offset1 failed", __FILE__, __LINE__);
         for (int i=0;i<Num_Rows;i++) h_Offset1[i+1]+=h_Offset1[i];
         util::GRError(cudaMemcpy(d_Offset1, h_Offset1, sizeof(SizeT)*(Num_Rows+1), cudaMemcpyHostToDevice),
                      "cudaMemcpy d_Offset1 failed", __FILE__, __LINE__);
+        */
 
         if ((History_Size[1]%32)!=0) Grid_Size.x++;
         Step3c <VertexId,SizeT,Value,EXCLUSIVE, Num_Vertex_Associate, Num_Value__Associate> 
-            <<<Grid_Size,Block_Size>>> (
+            <<<Grid_Size,Block_Size,0,stream>>> (
             Num_Elements,
             History_Size[1],
             //Num_Vertex_Associate,
@@ -1021,7 +1040,8 @@ struct MultiScan
             d_Vertex_Associate_out,
             d_Value__Associate_in,
             d_Value__Associate_out);
-        cudaDeviceSynchronize();
+        cudaStreamSynchronize(stream);
+        //cudaDeviceSynchronize();
         //util::GRError("Step3b failed", __FILE__, __LINE__);
 
         //for (int i=0;i<40;i++) 

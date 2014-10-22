@@ -190,7 +190,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
                 // Check if we previously overflowed
                 if (num_elements >= max_in_frontier) {
-                    printf(" num_elements >= max_in_frontier, num_elements = %d, max_in_frontier = %d\n", num_elements, max_in_frontier);
+                    //printf(" num_elements >= max_in_frontier, num_elements = %d, max_in_frontier = %d\n", num_elements, max_in_frontier);
                     num_elements = 0;
                 }
 

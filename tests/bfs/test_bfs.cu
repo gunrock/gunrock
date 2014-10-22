@@ -313,11 +313,15 @@ void RunTests(
     int          max_grid_size,
     int          num_gpus,
     double       max_queue_sizing,
+    double       max_in_sizing,
     ContextPtr   *context,
     std::string  partition_method,
     int          *gpu_idx,
-    cudaStream_t *streams)
+    cudaStream_t *streams,
+    bool         size_check = true)
 {
+    size_t *org_size=new size_t[num_gpus];
+
     typedef BFSProblem<
         VertexId,
         SizeT,
@@ -340,6 +344,12 @@ void RunTests(
         }            
     } 
 
+    for (int gpu=0;gpu<num_gpus;gpu++)
+    {
+        size_t dummy;
+        cudaSetDevice(gpu_idx[gpu]);
+        cudaMemGetInfo(&(org_size[gpu]),&dummy);
+    }
     // Allocate BFS enactor map
     BFSEnactor<Problem, INSTRUMENT>* bfs_enactor
          = new BFSEnactor<Problem, INSTRUMENT>(g_verbose, num_gpus, gpu_idx);
@@ -354,7 +364,8 @@ void RunTests(
         gpu_idx,
         partition_method,
         streams,
-        max_queue_sizing), "Problem BFS Initialization Failed", __FILE__, __LINE__);
+        max_queue_sizing,
+        max_in_sizing), "Problem BFS Initialization Failed", __FILE__, __LINE__);
     util::GRError(bfs_enactor->Init (csr_problem, max_grid_size), "BFS Enactor init failed", __FILE__, __LINE__);
     //
     // Compute reference CPU BFS solution for source-distance
@@ -383,7 +394,7 @@ void RunTests(
 
     util::GRError("Error before Enact", __FILE__, __LINE__);
     cpu_timer.Start();
-    util::GRError(bfs_enactor->Enact(context, csr_problem, src, max_grid_size), "BFS Problem Enact Failed", __FILE__, __LINE__);
+    util::GRError(bfs_enactor->Enact(context, csr_problem, src, max_grid_size, size_check), "BFS Problem Enact Failed", __FILE__, __LINE__);
     cpu_timer.Stop();
 
     bfs_enactor->GetStatistics(total_queued, search_depth, avg_duty);
@@ -423,8 +434,43 @@ void RunTests(
         total_queued,
         avg_duty);
 
+    
+    printf("\n\tMemory Usage(B)\t");
+    for (int gpu=0;gpu<num_gpus;gpu++) 
+    if (num_gpus>1) printf(" #keys%d\t #ins%d\t",gpu,gpu);
+    else printf(" #keys%d", gpu);
+    if (num_gpus>1) printf(" #keys%d",num_gpus);
+    printf("\n");
+    double max_key_sizing=0, max_in_sizing_=0;
+    for (int gpu=0;gpu<num_gpus;gpu++)
+    {
+        size_t gpu_free,dummy;
+        cudaSetDevice(gpu_idx[gpu]);
+        cudaMemGetInfo(&gpu_free,&dummy);
+        printf("GPU_%d\t %ld",gpu_idx[gpu],org_size[gpu]-gpu_free);
+        for (int i=0;i<num_gpus;i++)
+        {
+            SizeT x=csr_problem->graph_slices[gpu]->frontier_queues[i].keys[0].GetSize();
+            printf("\t %d", x);
+            double factor = 1.0*x/(num_gpus>1?csr_problem->graph_slices[gpu]->in_counter[i]:csr_problem->graph_slices[gpu]->nodes);
+            if (factor > max_key_sizing) max_key_sizing=factor;
+            if (num_gpus>1) 
+            {
+                x=csr_problem->data_slices[gpu][0].keys_in[0][i].GetSize();
+                printf("\t %d", x);
+                factor = 1.0*x/csr_problem->graph_slices[gpu]->in_counter[i];
+                if (factor > max_in_sizing_) max_in_sizing_=factor;
+            }
+        }
+        if (num_gpus>1) printf("\t %d",csr_problem->graph_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
+        printf("\n");
+    }
+    printf("\t key_sizing =\t %lf", max_key_sizing);
+    if (num_gpus>1) printf("\t in_sizing =\t %lf", max_in_sizing_);
+    printf("\n");
 
     // Cleanup
+    if (org_size        ) {delete[] org_size        ; org_size         = NULL;}
     if (stats           ) {delete   stats           ; stats            = NULL;}
     if (bfs_enactor     ) {delete   bfs_enactor     ; bfs_enactor      = NULL;}
     if (csr_problem     ) {delete   csr_problem     ; csr_problem      = NULL;}
@@ -465,10 +511,13 @@ void RunTests(
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
     //int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
     double              max_queue_sizing    = 1.0;          // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
+    double              max_in_sizing       = 1.0;
     std::string         partition_method    = "random";
+    bool                disable_size_check  = false;
     //int*                gpu_idx             = NULL;
 
     instrumented = args.CheckCmdLineFlag("instrumented");
+    disable_size_check = args.CheckCmdLineFlag("disable-size-check");
     args.GetCmdLineArgument("src", src_str);
     if (src_str.empty()) {
         src = 0;
@@ -480,7 +529,7 @@ void RunTests(
         args.GetCmdLineArgument("src", src);
     }
     printf("src = %d\n",src);
-
+    printf("size_check = %s\n", disable_size_check?"false":"true");
     //printf("Display neighbor list of src:\n");
     //graph.DisplayNeighborList(src);
 
@@ -488,6 +537,7 @@ void RunTests(
     mark_pred   = args.CheckCmdLineFlag("mark-pred");
     idempotence = args.CheckCmdLineFlag("idempotence");
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
+    args.GetCmdLineArgument("in-sizing", max_in_sizing);
     args.GetCmdLineArgument("grid-size",max_grid_size);
     g_verbose   = args.CheckCmdLineFlag("v");
     if (args.CheckCmdLineFlag  ("partition_method")) 
@@ -502,10 +552,12 @@ void RunTests(
                         max_grid_size,
                         num_gpus,
                         max_queue_sizing,
+                        max_in_sizing,
                         context,
                         partition_method,
                         gpu_idx,
-                        streams);
+                        streams,
+                        !disable_size_check);
             } else {
                 RunTests<VertexId, Value, SizeT, true, true, false>(
                         graph,
@@ -513,10 +565,12 @@ void RunTests(
                         max_grid_size,
                         num_gpus,
                         max_queue_sizing,
+                        max_in_sizing,
                         context,
                         partition_method,
                         gpu_idx,
-                        streams);
+                        streams,
+                        !disable_size_check);
             }
         } else {
             if (idempotence) {
@@ -526,10 +580,12 @@ void RunTests(
                         max_grid_size,
                         num_gpus,
                         max_queue_sizing,
+                        max_in_sizing,
                         context,
                         partition_method,
                         gpu_idx,
-                        streams);
+                        streams,
+                        !disable_size_check);
             } else {
                 RunTests<VertexId, Value, SizeT, true, false, false>(
                         graph,
@@ -537,10 +593,12 @@ void RunTests(
                         max_grid_size,
                         num_gpus,
                         max_queue_sizing,
+                        max_in_sizing,
                         context,
                         partition_method,
                         gpu_idx,
-                        streams);
+                        streams,
+                        !disable_size_check);
             }
         }
     } else {
@@ -552,10 +610,12 @@ void RunTests(
                         max_grid_size,
                         num_gpus,
                         max_queue_sizing,
+                        max_in_sizing,
                         context,
                         partition_method,
                         gpu_idx,
-                        streams);
+                        streams,
+                        !disable_size_check);
             } else {
                 RunTests<VertexId, Value, SizeT, false, true, false>(
                         graph,
@@ -563,10 +623,12 @@ void RunTests(
                         max_grid_size,
                         num_gpus,
                         max_queue_sizing,
+                        max_in_sizing,
                         context,
                         partition_method,
                         gpu_idx,
-                        streams);
+                        streams,
+                        !disable_size_check);
             }
         } else {
             if (idempotence) {
@@ -576,10 +638,12 @@ void RunTests(
                         max_grid_size,
                         num_gpus,
                         max_queue_sizing,
+                        max_in_sizing,
                         context,
                         partition_method,
                         gpu_idx,
-                        streams);
+                        streams,
+                        !disable_size_check);
             } else {
                 RunTests<VertexId, Value, SizeT, false, false, false>(
                         graph,
@@ -587,10 +651,12 @@ void RunTests(
                         max_grid_size,
                         num_gpus,
                         max_queue_sizing,
+                        max_in_sizing,
                         context,
                         partition_method,
                         gpu_idx,
-                        streams);
+                        streams,
+                        !disable_size_check);
             }
         }
     }

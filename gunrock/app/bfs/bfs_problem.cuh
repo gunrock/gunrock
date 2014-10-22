@@ -156,7 +156,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             SizeT *num_in_nodes,
             SizeT total_out_nodes,
             SizeT local_out_nodes,
-            float queue_sizing = 2.0)
+            float queue_sizing = 2.0,
+            float in_sizing = 1.0)
         {
             //util::cpu_mt::PrintMessage("DataSlice Init() begin.");
             cudaError_t retval = cudaSuccess;
@@ -171,7 +172,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 graph, 
                 num_in_nodes,
                 total_out_nodes,
-                local_out_nodes)) return retval;
+                local_out_nodes,
+                in_sizing)) return retval;
 
             // Create SoA on device
             if (retval = labels       .Allocate(graph->nodes,util::DEVICE)) return retval;
@@ -397,7 +399,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             int*        gpu_idx  = NULL,
             std::string partition_method ="random",
             cudaStream_t* streams = NULL,
-            float       queue_sizing = 2.0)
+            float       queue_sizing = 2.0,
+            float       in_sizing = 1.0)
     {
         util::cpu_mt::PrintMessage("BFSProblem Init() begin.");
         ProblemBase<VertexId, SizeT,Value,_USE_DOUBLE_BUFFER>::Init(
@@ -437,7 +440,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                             //this->graph_slices[gpu]->in_offset[this->num_gpus],
                             this->graph_slices[gpu]->out_counter[this->num_gpus],
                             this->graph_slices[gpu]->out_counter[0],
-                            queue_sizing);
+                            queue_sizing,
+                            in_sizing);
                     else _data_slice->Init(
                             this->num_gpus, 
                             this->gpu_idx[gpu], 
@@ -448,7 +452,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                             //this->graph_slices[gpu]->in_offset[this->num_gpus],
                             this->graph_slices[gpu]->out_counter[this->num_gpus],
                             this->graph_slices[gpu]->out_counter[0],
-                            queue_sizing);
+                            queue_sizing,
+                            in_sizing);
                 } else {
                     _data_slice->Init(
                         this->num_gpus, 
@@ -458,7 +463,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                         &(this->sub_graphs[gpu]), 
                         0, 
                         0,
-                        queue_sizing);
+                        queue_sizing,
+                        in_sizing);
                 }
             } //end for(gpu)
         } while (0);

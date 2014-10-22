@@ -180,6 +180,7 @@ bool All_Done(EnactorStats *enactor_stats,
     }
 
     template <
+        bool     SIZE_CHECK,
         typename SizeT, 
         typename VertexId,
         typename Value,
@@ -218,34 +219,38 @@ bool All_Done(EnactorStats *enactor_stats,
         
         //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("out_keys",graph_slice_l->frontier_queues[data_slice_l->num_gpus].keys[frontier_attribute->selector].GetPointer(util::DEVICE) + frontier_attribute->queue_offset,frontier_attribute->queue_length, gpu, enactor_stats->iteration); 
         //printf("q = %d, l = %d\n", data_slice_p -> keys_in[enactor_stats->iteration%2][gpu_].GetSize(), frontier_attribute->queue_length);fflush(stdout);
-        if (data_slice_p -> keys_in[t][gpu_].GetSize() < frontier_attribute->queue_length)
+        if (SIZE_CHECK)
         {
-            printf("%d\t %lld\t %d\t keys_in oversize : %d -> %d \n", 
-                gpu, enactor_stats->iteration, peer, 
-                data_slice_p->keys_in[t][gpu_].GetSize(), frontier_attribute->queue_length); 
-            fflush(stdout);
-            util::SetDevice(data_slice_p->gpu_idx);
-            //while (data_slice_p->gpu_mallocing!=0) ;
-            //data_slice_p->gpu_mallocing = 1;
-            //enactor_stats->retval =  cudaDeviceSynchronize();
-            data_slice_p->keys_in[t][gpu_].EnsureSize(frontier_attribute->queue_length);
-            for (int i=0;i<num_vertex_associate;i++)
+            if (data_slice_p -> keys_in[t][gpu_].GetSize() < frontier_attribute->queue_length)
             {
-                if (enactor_stats->retval = data_slice_p->vertex_associate_in [t][gpu_][i].EnsureSize(frontier_attribute->queue_length)) return;
-                data_slice_p->vertex_associate_ins[t][gpu_][i] = data_slice_p->vertex_associate_in[t][gpu_][i].GetPointer(util::DEVICE);
+                printf("%d\t %lld\t %d\t keys_in oversize : %d -> %d \n", 
+                    gpu, enactor_stats->iteration, peer, 
+                    data_slice_p->keys_in[t][gpu_].GetSize(), frontier_attribute->queue_length); 
+                fflush(stdout);
+            
+                util::SetDevice(data_slice_p->gpu_idx);
+                //while (data_slice_p->gpu_mallocing!=0) ;
+                //data_slice_p->gpu_mallocing = 1;
+                //enactor_stats->retval =  cudaDeviceSynchronize();
+                data_slice_p->keys_in[t][gpu_].EnsureSize(frontier_attribute->queue_length);
+                for (int i=0;i<num_vertex_associate;i++)
+                {
+                    if (enactor_stats->retval = data_slice_p->vertex_associate_in [t][gpu_][i].EnsureSize(frontier_attribute->queue_length)) return;
+                    data_slice_p->vertex_associate_ins[t][gpu_][i] = data_slice_p->vertex_associate_in[t][gpu_][i].GetPointer(util::DEVICE);
+                }
+                if (enactor_stats->retval = data_slice_p->vertex_associate_ins[t][gpu_].Move(util::HOST, util::DEVICE)) return;
+                for (int i=0;i<num_value__associate;i++)
+                {
+                    if (enactor_stats->retval = data_slice_p->value__associate_in [t][gpu_][i].EnsureSize(frontier_attribute->queue_length)) return;
+                    data_slice_p->value__associate_ins[t][gpu_][i] = data_slice_p->value__associate_in[t][gpu_][i].GetPointer(util::DEVICE);
+                }
+                if (enactor_stats->retval = data_slice_p->value__associate_ins[t][gpu_].Move(util::HOST, util::DEVICE)) return;
+                //enactor_stats->retval = cudaDeviceSynchronize();
+                //printf("Expand keys_in[%d][%d] @ GPU %d : Done\n", t, gpu_, data_slice_p->gpu_idx);fflush(stdout);
+                //data_slice_p->gpu_mallocing = 0;
+                //util::cpu_mt::sleep_millisecs(0.1);
+                util::SetDevice(data_slice_l->gpu_idx);
             }
-            if (enactor_stats->retval = data_slice_p->vertex_associate_ins[t][gpu_].Move(util::HOST, util::DEVICE)) return;
-            for (int i=0;i<num_value__associate;i++)
-            {
-                if (enactor_stats->retval = data_slice_p->value__associate_in [t][gpu_][i].EnsureSize(frontier_attribute->queue_length)) return;
-                data_slice_p->value__associate_ins[t][gpu_][i] = data_slice_p->value__associate_in[t][gpu_][i].GetPointer(util::DEVICE);
-            }
-            if (enactor_stats->retval = data_slice_p->value__associate_ins[t][gpu_].Move(util::HOST, util::DEVICE)) return;
-            //enactor_stats->retval = cudaDeviceSynchronize();
-            //printf("Expand keys_in[%d][%d] @ GPU %d : Done\n", t, gpu_, data_slice_p->gpu_idx);fflush(stdout);
-            //data_slice_p->gpu_mallocing = 0;
-            //util::cpu_mt::sleep_millisecs(0.1);
-            util::SetDevice(data_slice_l->gpu_idx);
         }
         //while (data_slice_p->gpu_mallocing!=0) ;
         if (enactor_stats->retval = util::GRError(cudaMemcpyAsync(
@@ -279,7 +284,7 @@ bool All_Done(EnactorStats *enactor_stats,
         for (int i=0;i<num_value__associate;i++)
         {   
             if (enactor_stats->retval = util::GRError(cudaMemcpyAsync(
-                data_slice_p->value__associate_ins[enactor_stats->iteration%2][gpu_][i],
+                data_slice_p->value__associate_in[t][gpu_][i].GetPointer(util::DEVICE),
                     //+ graph_slice_p->in_offset[gpu_],
                 data_slice_l->value__associate_outs[i]
                     + (frontier_attribute->queue_offset - data_slice_l->out_length[0]),

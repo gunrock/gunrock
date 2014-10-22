@@ -247,7 +247,8 @@ enum FrontierType {
             Csr<VertexId, Value, SizeT> *graph,
             SizeT *num_in_nodes,
             SizeT total_out_nodes,
-            SizeT local_out_nodes)
+            SizeT local_out_nodes,
+            float in_sizing = 1.0)
         {
             cudaError_t retval         = cudaSuccess;
             this->num_gpus             = num_gpus;
@@ -308,6 +309,7 @@ enum FrontierType {
             for (int gpu=0;gpu<num_gpus;gpu++)
             for (int t=0;t<2;t++)
             {
+                SizeT num_in_node = num_in_nodes[gpu] * in_sizing;
                 //if (num_in_nodes[gpu] <= 0)
                 //{
                 //    vertex_associate_in [t][gpu] = NULL;
@@ -317,13 +319,13 @@ enum FrontierType {
                     for (int i=0;i<num_vertex_associate;i++)
                     {
                         vertex_associate_in [t][gpu][i].SetName("vertex_associate_in[]");
-                        if (retval = vertex_associate_in[t][gpu][i].Allocate(num_in_nodes[gpu],util::DEVICE)) return retval;
+                        if (retval = vertex_associate_in[t][gpu][i].Allocate(num_in_node,util::DEVICE)) return retval;
                     }
                     value__associate_in [t][gpu] = new util::Array1D<SizeT,Value   >[num_value__associate];
                     for (int i=0;i<num_value__associate;i++)
                     {
                         value__associate_in[t][gpu][i].SetName("value__associate_ins[]");
-                        if (retval = value__associate_in[t][gpu][i].Allocate(num_in_nodes[gpu],util::DEVICE)) return retval;
+                        if (retval = value__associate_in[t][gpu][i].Allocate(num_in_node,util::DEVICE)) return retval;
                     }
                 //}
                     
@@ -340,7 +342,7 @@ enum FrontierType {
                 if (retval = value__associate_ins[t][gpu].Move(util::HOST, util::DEVICE)) return retval;
 
                 keys_in[t][gpu].SetName("keys_in");
-                if (retval = keys_in[t][gpu].Allocate(num_in_nodes[gpu],util::DEVICE)) return retval;
+                if (gpu!=0) if (retval = keys_in[t][gpu].Allocate(num_in_node,util::DEVICE)) return retval;
             }
 
             // Create outgoing buffer on device
@@ -434,7 +436,7 @@ struct ProblemBase
 
         //Frontier queues. Used to track working frontier.
         util::DoubleBuffer<SizeT, VertexId, VertexId>  *frontier_queues;
-        SizeT                                          **frontier_elements;
+        //SizeT                                          **frontier_elements;
 
         /**
          * @brief GraphSlice Constructor
@@ -446,7 +448,7 @@ struct ProblemBase
             index(index),
             graph(NULL),
             num_gpus(0),
-            frontier_elements(NULL),
+            //frontier_elements(NULL),
             frontier_queues(NULL),
             //d_row_offsets(NULL),
             //d_column_indices(NULL),
@@ -508,13 +510,13 @@ struct ProblemBase
 
             for (int gpu = 0; gpu<=num_gpus; gpu++)
             {
-                delete[] frontier_elements[gpu];frontier_elements[gpu]=NULL;
+                //delete[] frontier_elements[gpu];frontier_elements[gpu]=NULL;
                 for (int i = 0; i < 2; ++i) {
                     frontier_queues[gpu].keys  [i].Release();
                     frontier_queues[gpu].values[i].Release();
                 }
             }
-            delete[] frontier_elements; frontier_elements=NULL;
+            //delete[] frontier_elements; frontier_elements=NULL;
             delete[] frontier_queues; frontier_queues=NULL;
 
             // Destroy stream
@@ -577,13 +579,13 @@ struct ProblemBase
                 if (retval = this->column_indices.Allocate(edges     ,util::DEVICE)) break;
                 if (retval = this->column_indices.Move    (util::HOST,util::DEVICE)) break;
                 frontier_queues   = new util::DoubleBuffer<SizeT, VertexId, VertexId>[num_gpus+1]; 
-                frontier_elements = new SizeT*[num_gpus+1];
-                for (int gpu=0;gpu<=num_gpus;gpu++)
-                { 
-                    frontier_elements[gpu] = new SizeT[2];
-                    frontier_elements[gpu][0]=0;
-                    frontier_elements[gpu][1]=0;
-                }
+                //frontier_elements = new SizeT*[num_gpus+1];
+                //for (int gpu=0;gpu<=num_gpus;gpu++)
+                //{ 
+                //    frontier_elements[gpu] = new SizeT[2];
+                //    frontier_elements[gpu][0]=0;
+                //    frontier_elements[gpu][1]=0;
+                //}
                 /*if (graph->column_offsets !=NULL)
                 {
                     // Allocate and initalize column_offsets
@@ -697,7 +699,7 @@ struct ProblemBase
                     //frontier_queues.keys[i].EnsureSize(frontier_elements[i]);
                     //if (_USE_DOUBLE_BUFFER) frontier_queues.values[i].EnsureSize(frontier_elements[i]);
                     //printf("peer = %d, i = %d, [] = %d\n", peer, i, new_frontier_elements[i]);
-                    if (frontier_elements[peer][i] < new_frontier_elements[i]) {
+                    if (frontier_queues[peer].keys[i].GetSize() < new_frontier_elements[i]) {
 
                         // Free if previously allocated
                         if (retval = frontier_queues[peer].keys[i].Release()) return retval;
@@ -707,11 +709,11 @@ struct ProblemBase
                             if (retval = frontier_queues[peer].values[i].Release()) return retval;
                         }
 
-                        frontier_elements[peer][i] = new_frontier_elements[i];
+                        //frontier_elements[peer][i] = new_frontier_elements[i];
 
-                        if (retval = frontier_queues[peer].keys[i].Allocate(frontier_elements[peer][i],util::DEVICE)) return retval;
+                        if (retval = frontier_queues[peer].keys[i].Allocate(new_frontier_elements[i],util::DEVICE)) return retval;
                         if (_USE_DOUBLE_BUFFER) {
-                            if (retval = frontier_queues[peer].values[i].Allocate(frontier_elements[peer][i],util::DEVICE)) return retval;
+                            if (retval = frontier_queues[peer].values[i].Allocate(new_frontier_elements[i],util::DEVICE)) return retval;
                         }
                     } //end if
                 } // end for i<2
