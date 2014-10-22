@@ -131,7 +131,7 @@ bool All_Done(EnactorStats *enactor_stats,
         const VertexId* keys,
         const VertexId* in_preds,
               VertexId* out_preds,
-              unsigned char* temp_marker)
+              unsigned int* temp_marker)
     {   
         VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
         if (x>=num_elements) return;
@@ -149,7 +149,7 @@ bool All_Done(EnactorStats *enactor_stats,
         const VertexId* org_vertexs,
         const VertexId* in_preds,
               VertexId* out_preds,
-              unsigned char* temp_marker)
+              unsigned int* temp_marker)
     {   
         VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
         /*long long x= blockIdx.y;
@@ -173,7 +173,7 @@ bool All_Done(EnactorStats *enactor_stats,
     __global__ void Mark_Queue (
         const SizeT     num_elements,
         const VertexId* keys,
-              unsigned char* marker)
+              unsigned int* marker)
     {
         VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
         if (x< num_elements) marker[keys[x]]=1;

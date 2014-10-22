@@ -57,7 +57,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, VertexId      > labels        ;   
         util::Array1D<SizeT, VertexId      > preds         ;   
         util::Array1D<SizeT, unsigned char > visited_mask  ;
-        util::Array1D<SizeT, unsigned char > temp_marker   ;
+        util::Array1D<SizeT, unsigned int  > temp_marker   ;
         util::Array1D<SizeT, VertexId      > temp_preds    ;
         util::Array1D<SizeT, SizeT         > *scanned_edges ;
         util::scan::MultiScan<VertexId, SizeT, true, 256, 8>*

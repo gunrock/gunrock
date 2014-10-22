@@ -72,7 +72,7 @@ namespace bfs {
         //const SizeT            incoming_offset,
         const VertexId*  const keys_in,
               VertexId*        keys_out,
-              unsigned char*   marker,
+              unsigned int*   marker,
               VertexId**       associate_in,
               VertexId**       associate_org)
     {
@@ -746,7 +746,7 @@ namespace bfs {
                                 First_Stage4=false;
                                 util::MemsetKernel<<<128, 128, 0, data_slice->streams[peer_]>>>
                                     (data_slice->temp_marker.GetPointer(util::DEVICE), 
-                                    (unsigned char)0, graph_slice->nodes);
+                                    (unsigned int)0, graph_slice->nodes);
                             }
                             break;
 
@@ -825,7 +825,7 @@ namespace bfs {
                         }
                         util::MemsetKernel<<<128, 128>>>
                             (data_slice->temp_marker.GetPointer(util::DEVICE), 
-                            (unsigned char)0, graph_slice->nodes);
+                            (unsigned int)0, graph_slice->nodes);
                     }
                          
                     //for (int peer_=0;peer_<num_gpus;peer_++) 
