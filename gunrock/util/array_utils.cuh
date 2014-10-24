@@ -160,7 +160,7 @@ public:
                 if (retval = util::GRError(cudaHostRegister(h_pointer, sizeof(Value)*size, flag), 
                                 name+" cudaHostRegister failed.", __FILE__, __LINE__)) return retval;
             } allocated = allocated | HOST;    
-            //if (ARRAY_DEBUG) 
+            if (ARRAY_DEBUG) 
                 {printf("%s\t allocated on HOST, length =\t %d, size =\t %ld bytes, pointer =\t %p\n",name.c_str(),size,size*sizeof(Value), h_pointer);fflush(stdout);}
         }
         //}
@@ -175,7 +175,7 @@ public:
             if (retval = GRError(cudaMalloc((void**)&(d_pointer), sizeof(Value) * size),
                           name+" cudaMalloc failed", __FILE__, __LINE__)) return retval;
             allocated = allocated | DEVICE;
-            //if (ARRAY_DEBUG) 
+            if (ARRAY_DEBUG) 
                 {printf("%s\t allocated on DEVICE, length =\t %d, size =\t %ld bytes, pointer =\t %p\n",name.c_str(),size, size*sizeof(Value), d_pointer);fflush(stdout);}
         }
         //}
@@ -205,7 +205,7 @@ public:
                 delete[] h_pointer;
                 h_pointer = NULL;
                 allocated = allocated - HOST + TARGETBASE;
-                //if (ARRAY_DEBUG) 
+                if (ARRAY_DEBUG) 
                     {printf("%s\t released on HOST, length =\t %d\n", name.c_str(), size);fflush(stdout);}
             } else if ((target & HOST)==HOST && (setted & HOST) == HOST) {
                 UnSetPointer(HOST);
@@ -217,7 +217,7 @@ public:
             if (retval = GRError(cudaFree(d_pointer),name+" cudaFree failed", __FILE__, __LINE__)) return retval;
             d_pointer = NULL;
             allocated = allocated - DEVICE + TARGETBASE; 
-            //if (ARRAY_DEBUG) 
+            if (ARRAY_DEBUG) 
                 {printf("%s\t released on DEVICE, length =\t %d\n", name.c_str(),size);fflush(stdout);}
         } else if ((target & DEVICE) == DEVICE && (setted & DEVICE) == DEVICE) {
             UnSetPointer(DEVICE);

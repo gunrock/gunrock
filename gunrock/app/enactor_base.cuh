@@ -202,6 +202,7 @@ bool All_Done(EnactorStats *enactor_stats,
         if (peer == gpu) return;
         //int peer_ = peer<gpu? peer+1     : peer;
         int gpu_  = peer<gpu? gpu : gpu+1;
+        int peer_ = peer<gpu? peer+1 : peer;
         data_slice_p->in_length[enactor_stats->iteration%2][gpu_]
                       = frontier_attribute->queue_length;
         if (frontier_attribute->queue_length == 0) return;
@@ -256,8 +257,8 @@ bool All_Done(EnactorStats *enactor_stats,
         if (enactor_stats->retval = util::GRError(cudaMemcpyAsync(
             data_slice_p  -> keys_in[t][gpu_].GetPointer(util::DEVICE),
                 //+ graph_slice_p -> in_offset[gpu_],
-            graph_slice_l -> frontier_queues[data_slice_l->num_gpus].keys[frontier_attribute->selector].GetPointer(util::DEVICE)
-                + frontier_attribute->queue_offset,
+            graph_slice_l -> frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE),
+                //+ frontier_attribute->queue_offset,
             sizeof(VertexId) * frontier_attribute->queue_length, cudaMemcpyDefault, stream),
             "cudaMemcpyPeer d_keys failed", __FILE__, __LINE__)) return;
                 
@@ -273,10 +274,10 @@ bool All_Done(EnactorStats *enactor_stats,
             //        frontier_attribute->queue_offset - data_slice_l->out_length[0]);
             //fflush(stdout);   
             if (enactor_stats->retval = util::GRError(cudaMemcpyAsync(
-                data_slice_p->vertex_associate_in[t][gpu_][i].GetPointer(util::DEVICE),
+                data_slice_p->vertex_associate_ins[t][gpu_][i],
                     //+ graph_slice_p->in_offset[gpu_],
-                data_slice_l->vertex_associate_out[i].GetPointer(util::DEVICE)
-                    + (frontier_attribute->queue_offset - data_slice_l->out_length[0]),
+                data_slice_l->vertex_associate_outs[peer_][i],
+                    //+ (frontier_attribute->queue_offset - data_slice_l->out_length[0]),
                 sizeof(VertexId) * frontier_attribute->queue_length, cudaMemcpyDefault, stream),
                 "cudaMemcpyPeer vertex_associate_out failed", __FILE__, __LINE__)) return;
         }
@@ -284,10 +285,10 @@ bool All_Done(EnactorStats *enactor_stats,
         for (int i=0;i<num_value__associate;i++)
         {   
             if (enactor_stats->retval = util::GRError(cudaMemcpyAsync(
-                data_slice_p->value__associate_in[t][gpu_][i].GetPointer(util::DEVICE),
+                data_slice_p->value__associate_ins[t][gpu_][i],
                     //+ graph_slice_p->in_offset[gpu_],
-                data_slice_l->value__associate_outs[i]
-                    + (frontier_attribute->queue_offset - data_slice_l->out_length[0]),
+                data_slice_l->value__associate_outs[peer_][i],
+                    //+ (frontier_attribute->queue_offset - data_slice_l->out_length[0]),
                 sizeof(Value) * frontier_attribute->queue_length, cudaMemcpyDefault, stream),
                     "cudaMemcpyPeer value__associate_out failed", __FILE__, __LINE__)) return;
         }

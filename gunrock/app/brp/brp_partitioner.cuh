@@ -132,7 +132,7 @@ struct BiasRandomPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKW
         SizeT       n1 = 1;//, n2 = 1;
         SizeT       target_level = n1;
         SizeT       *level_tail = new SizeT[target_level+1];
-        float       f1 = 1;//1.0/this->num_gpus;
+        float       f1 = 0.5;//1.0/this->num_gpus;
         float       *gpu_percentage=new float[this->num_gpus+1];
         SizeT       *current_count = new SizeT[this->num_gpus];
         VertexId    StartId, EndId;

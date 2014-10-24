@@ -233,7 +233,7 @@ public:
             } else {
                 if (retval = util::GRError(cudaMemcpyAsync(h_stat, d_stat, stat_bytes, cudaMemcpyDeviceToHost, stream),
                     "KernelRuntimeStatsLifetime d_stat failed", __FILE__, __LINE__)) break;
-                cudaStreamSynchronize(stream);
+                //cudaStreamSynchronize(stream);
             }
 
             if (check_gpu)

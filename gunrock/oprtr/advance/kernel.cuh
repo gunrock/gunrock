@@ -83,15 +83,15 @@ void ComputeOutputLength(
     //cudaDeviceSynchronize();
     //SizeT *temp;// = new SizeT[1];
     //cudaHostAlloc((void**)&temp, sizeof(SizeT), cudaHostAllocDefault);
-    //util::GRError(cudaMemcpyAsync(
-    //     frontier_attribute->output_length.GetPointer(util::DEVICE),
-    ///     partitioned_scanned_edges+frontier_attribute->queue_length-1, 
-    //     sizeof(SizeT), cudaMemcpyDeviceToDevice, stream), "cudaMemcpyAsync failed", __FILE__, __LINE__);
+    util::GRError(cudaMemcpyAsync(
+         frontier_attribute->output_length.GetPointer(util::DEVICE),
+         partitioned_scanned_edges + frontier_attribute->queue_length - 1, 
+         sizeof(SizeT), cudaMemcpyDeviceToDevice, stream), "cudaMemcpyAsync failed", __FILE__, __LINE__);
     //printf("%p ",frontier_attribute->output_length.GetPointer(util::DEVICE));fflush(stdout);
-    util::MemsetCopyVectorKernel<SizeT><<<1,1,0,stream>>>
-            (frontier_attribute->output_length.GetPointer(util::DEVICE),
-            partitioned_scanned_edges + frontier_attribute->queue_length -1,
-            1);
+    //util::MemsetCopyVectorKernel<SizeT><<<1,1,0,stream>>>
+    //        (frontier_attribute->output_length.GetPointer(util::DEVICE),
+    //        partitioned_scanned_edges + frontier_attribute->queue_length -1,
+    //        1);
     //cudaStreamSynchronize(stream);
     //util::cpu_mt::PrintGPUArray<SizeT, SizeT>("output_length", frontier_attribute->output_length.GetPointer(util::DEVICE),1);
     //if (!express) util::GRError(cudaStreamSynchronize(stream),"ComputeOutputLength failed", __FILE__, __LINE__);

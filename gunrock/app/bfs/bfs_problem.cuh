@@ -154,8 +154,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             Csr<VertexId, Value, SizeT> *graph,
             //SizeT num_nodes,
             SizeT *num_in_nodes,
-            SizeT total_out_nodes,
-            SizeT local_out_nodes,
+            SizeT *num_out_nodes,
             float queue_sizing = 2.0,
             float in_sizing = 1.0)
         {
@@ -171,8 +170,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 num_value__associate,
                 graph, 
                 num_in_nodes,
-                total_out_nodes,
-                local_out_nodes,
+                num_out_nodes,
                 in_sizing)) return retval;
 
             // Create SoA on device
@@ -202,8 +200,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                     this->vertex_associate_orgs[1] = preds.GetPointer(util::DEVICE);
                 if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
                 if (retval = temp_marker. Allocate(graph->nodes, util::DEVICE)) return retval;
-                Scaner = new util::scan::MultiScan<VertexId, SizeT, true, 256, 8>;
-                Scaner->Init(total_out_nodes, num_gpus);
+                //Scaner = new util::scan::MultiScan<VertexId, SizeT, true, 256, 8>;
+                //Scaner->Init(total_out_nodes, num_gpus);
             }
             /*if (num_associate != 0)
             {
@@ -438,8 +436,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                             &(this->sub_graphs[gpu]),
                             this->graph_slices[gpu]->in_counter.GetPointer(util::HOST),
                             //this->graph_slices[gpu]->in_offset[this->num_gpus],
-                            this->graph_slices[gpu]->out_counter[this->num_gpus],
-                            this->graph_slices[gpu]->out_counter[0],
+                            this->graph_slices[gpu]->out_counter.GetPointer(util::HOST),
+                            //this->graph_slices[gpu]->out_counter[0],
                             queue_sizing,
                             in_sizing);
                     else _data_slice->Init(
@@ -450,8 +448,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                             &(this->sub_graphs[gpu]),
                             this->graph_slices[gpu]->in_counter.GetPointer(util::HOST),
                             //this->graph_slices[gpu]->in_offset[this->num_gpus],
-                            this->graph_slices[gpu]->out_counter[this->num_gpus],
-                            this->graph_slices[gpu]->out_counter[0],
+                            this->graph_slices[gpu]->out_counter.GetPointer(util::HOST),
+                            //this->graph_slices[gpu]->out_counter[0],
                             queue_sizing,
                             in_sizing);
                 } else {
@@ -461,8 +459,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                         0,
                         0,
                         &(this->sub_graphs[gpu]), 
-                        0, 
-                        0,
+                        NULL, 
+                        NULL,
                         queue_sizing,
                         in_sizing);
                 }

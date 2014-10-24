@@ -370,8 +370,8 @@ public:
                     "CtaWorkProgress cudaMemcpy d_counters failed", __FILE__, __LINE__)) break;
             } else {
                // printf("gpu = %d, queue_idx = %d, d_counters = %p, stream = %d, queue_length = %d\n",gpu, queue_length_idx, d_counters, stream, queue_length);fflush(stdout);
-                util::MemsetKernel<<<1,1,0,stream>>>(((SizeT*) d_counters) + queue_length_idx, queue_length, 1);
-                //cudaMemcpyAsync(((SizeT*) d_counters) + queue_length_idx, &queue_length, sizeof(SizeT), cudaMemcpyHostToDevice,stream);
+                //util::MemsetKernel<<<1,1,0,stream>>>(((SizeT*) d_counters) + queue_length_idx, queue_length, 1);
+                cudaMemcpyAsync(((SizeT*) d_counters) + queue_length_idx, &queue_length, sizeof(SizeT), cudaMemcpyHostToDevice,stream);
                 if (DEBUG) 
                 {
                     cudaStreamSynchronize(stream);
