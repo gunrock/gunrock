@@ -368,7 +368,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             //printf("input_queue_len:%d\n", frontier_attribute.queue_length);
             //printf("output_queue_len:%d\n", output_queue_len);
 
-            if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
+            //if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
             {
                 gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
@@ -392,7 +392,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         ADVANCE_TYPE,
                         inverse_graph);
             }
-            else
+            /*else
             {
                 LoadBalanceSearch(output_queue_len, partitioned_scanned_edges, frontier_attribute.queue_length, d_out_key_queue, context);
 
@@ -425,7 +425,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         inverse_graph);
 
                 //util::DisplayDeviceResults(d_out_key_queue, output_queue_len);
-            }
+            }*/
             break;
         }
     }
