@@ -1,7 +1,5 @@
 // Problem struct is inherited from ProblemBase struct, which stores graph
-// topology data in CSR format. Each problem struct stores per-node or per-edge
-// arrays and global variables (if any). It provides Init and Reset method as
-// well as Extract method to get results from GPU to CPU.
+// topology data in CSR format and frontier buffers.
 
 template<
          typename VertexId,
@@ -13,12 +11,17 @@ template<
          struct BFSProblem : public ProblemBase<VertexId, SizeT, _USE_DOUBLE_BUFFER>
 {
 
+    // MARK_PREDECESSOR would be true when algorithm needs to know the predecessor node IDs
+    // for a newly formed frontier during a certain step.
     static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
+    // ENABLE_IDEMPOTENCE would be true when the operation performed in parallel
+    // for all neighbor nodes/edges is idempotent, meaning data race is benign.
     static const bool ENABLE_IDEMPOTENCE    = _ENABLE_IDEMPOTENCE;
 
+    // DataSlice sturct stores per-node or per-edge arrays and global variables (if any).
     struct DataSlice
     {
-        VertexId *d_labels; // Distance from source node labels
+        VertexId *d_labels; // BFS depth value
         VertexId *d_preds; // Predecessor IDs
     };
 
@@ -37,6 +40,9 @@ template<
         return retval;
     }
 
+    // Init function takes a CSR graph stored on CPU, and initialize graph
+    // topology data (by loading ProblemBase::Init(graph)) and DataSlice on
+    // GPU.
     cudaError_t Init(
             const Csr<VertexId, Value, SizeT> &graph)
     {
@@ -47,14 +53,18 @@ template<
         return retval;  
     }
 
+    // Reset function will be loaded before each BFS to reset problem related data.
     cudaError_t Reset(
             const Csr<VertexId, Value, SizeT> &graph, VertexId src)
     {
         cudaError_t retval = cudaSuccess;
         if (retval = util::GRError(ProblemBase::Reset(graph))) break;
-        util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_labels, -1, nodes);
-        util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_preds, -2, nodes);
-        if (retval = util::GRError(CopyGPU2CPU(data_slices[0]->d_labels+src, 0, 1)));  
+        // Reset depth values and predecessor values to invalid. Only set source node's depth value to 0.
+        util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_labels, INVALID_NODE_VALUE, nodes);
+        util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_preds, INVALID_PREDECESSOR_ID, nodes);
+        if (retval = util::GRError(CopyGPU2CPU(data_slices[0]->d_labels+src, 0, 1)));
+        // Put source node ID into the initial frontier
+        if (retval = util::GRError(CopyGPU2CPU(g_slices[0]->ping_pong_working_queue, src, 1)));
         return retval;  
     }
 };

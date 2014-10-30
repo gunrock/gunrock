@@ -28,10 +28,15 @@ class BFSEnactor : public EnactorBase {
         typename BFSProblem::GraphSlice *g_slice = problem->d_graph_slices;
         typename BFSProblem::DataSlice *d_slice = problem->d_data_slices;
 
-        SizeT queue_length = 1; // initialize queue length to 1
-        int selector = 0; //ping pong frontier queue selector
+        // queue length is initialized to 1 and get updated within each operator.
+        SizeT queue_length = 1;
+        //ping pong frontier queue selector
+        int selector = 0; 
 
-        // continue advance and filter until no elements in the queue
+        // Taks source node as the first frontier, visit all neighbors using
+        // Advance, set depth of those that haven't been set using BFSFunctor,
+        // and filter out the invalid nodes to form a new frontier using Filter.
+        // Until the frontier is empty.
         while (queue_length > 0) {
             gunrock::oprtr::advance::Kernel
                 <AdvancePolicy, BFSProblem, BFSFunctor>
