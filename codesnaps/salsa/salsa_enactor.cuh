@@ -1,8 +1,11 @@
+// The enactor defines how a graph primitive runs. It calls traversal
+// (advance and filter operators) and computation (functors).
+
 class SalsaEnactor : public EnactorBase {
 
-    // Constructor, Destructor, and Setup functions are ignored
+    // For SALSA, Constructor, Destructor, and Setup functions are ignored
 
-    // This is a user defined function to swap current and next rank pointers
+    // This user-defined function swaps current and next rank pointers
     template <typename ProblemData>
         void SwapRank(ProblemData *problem, int is_hub, int nodes)
         {
@@ -17,11 +20,12 @@ class SalsaEnactor : public EnactorBase {
                 rank_next = problem->data_slices[0]->d_hrank_next;
             }
 
-            //swap rank_curr and rank_next
-            util::MemsetCopyVectorKernel<<<128, 128>>>(rank_curr, rank_next, nodes); 
+            // copy next to curr and reset next
+            util::MemsetCopyVectorKernel<<<128, 128>>>(rank_curr, rank_next, nodes);
             util::MemsetKernel<<<128, 128>>>(rank_next, (Value)0.0, nodes);
         }
 
+    // This enactor defines the SALSA high-level algorithm.
     template<
         typename AdvancePolicy,
         typename FilterPolicy,
@@ -35,7 +39,7 @@ class SalsaEnactor : public EnactorBase {
                          typedef typename SALSAProblem::SizeT SizeT;
                          typedef typename SALSAProblem::Value Value;
 
-                         //Define SALSA Functors
+                         // Define SALSA functors.
                          typedef HFORWARDFunctor<
                              VertexId,
                              SizeT,
@@ -60,25 +64,27 @@ class SalsaEnactor : public EnactorBase {
                              Value,
                              SALSAProblem> ABackwardFunctor;
 
-                         //Load Setup function
+                         // Load the Setup function.
                          cudaError_t retval = cudaSuccess;
                          if (retval = EnactorBase::Setup(problem)) break;
 
-                        //Define graph topology data pointer (g_slice) and
-                        //problem specific data pointer (d_slice)
+                        // Define the graph topology data pointer (g_slice) and
+                        // the problem-specific data pointer (d_slice).
                          typename SALSAProblem::GraphSlice *g_slice = problem->d_graph_slices;
                          typename SALSAProblem::DataSlice *d_slice = problem->d_data_slices;
 
-                         //Prepare to do advance for each node. The purpose is to get information
-                         //about predecessor node ID for each edge in both graphs.
+                         // Now let's do some computation.
                          SizeT queue_length = g_slice->nodes;
                          int selector = 0;
                          {
-                             // Fill the frontier with all node IDs
+                             // First we'll do some initialization
+                             // code that runs just once. Start by
+                             // initializing the frontier with all
+                             // node IDs.
                              util::MemsetIdxKernel<<<BLOCK, THREAD>>>(g_slice->ping_pong_working_queue[selector], g_slice->nodes);
 
-                             // Advance use HForwardFunctor to set predecessor
-                             // node for each edge in original graph
+                             // Set predecessor nodes for each edge in
+                             // the original graph.
                              gunrock::oprtr::advance::Kernel
                                  <AdvancePolicy, SALSAProblem, HForwardFunctor>
                                  <<<advance_grid_size, AdvancePolicy::THREADS>>>(
@@ -90,8 +96,8 @@ class SalsaEnactor : public EnactorBase {
                                          d_slice
                                          context,
                                          gunrock::oprtr::advance::V2E);
-                            // Advance use AForwardFunctor to set predecessor
-                            // node for each edge in reverse graph
+                            // And set the predecessor nodes for each
+                            // edge in the reverse graph.
                              gunrock::oprtr::advance::Kernel
                                  <AdvancePolicy, SALSAProblem, AForwardFunctor>
                                  <<<advance_grid_size, AdvancePolicy::THREADS>>>(
@@ -105,13 +111,16 @@ class SalsaEnactor : public EnactorBase {
                                          gunrock::oprtr::advance::V2E);
                          }
 
-                         //Update hub rank and authority ranks using two Advance operators until reach
-                         //maximum iteration number
+                         // Now we iterate between two Advance
+                         // operators, which update (1) the hub rank
+                         // and (2) the authority rank. We loop until
+                         // we've reached the maximum iteration count.
                          int iteration = 0;
                          while (true) {
                              util::MemsetIdxKernel<<<BLOCK, THREAD>>>(g_slice->ping_pong_working_queue[selector], g_slice->edges);
                              SizeT queue_length = g_slice->edges;
 
+                             // This Advance operator updates the hub rank ...
                              gunrock::oprtr::advance::Kernel
                                  <AdvancePolicy, SALSAProblem, ABackwardFunctor>
                                  <<<advance_grid_size, AdvancePolicy::THREADS>>>(
@@ -126,6 +135,7 @@ class SalsaEnactor : public EnactorBase {
 
                              SwapRank<SALSAProblem>(problem, 0, g_slice->nodes);
 
+                             // and here, the authority rank.
                              gunrock::oprtr::advance::Kernel
                                  <AdvancePolicy, SALSAProblem, ABackwardFunctor>
                                  <<<advance_grid_size, AdvancePolicy::THREADS>>>(
@@ -147,14 +157,15 @@ class SalsaEnactor : public EnactorBase {
                          return retval;
                      }
 
-    // Kernel entry point to be loaded in the driver code. Details please refer
-    // to annotations for bfs_enactor.cuh
+    // The entry point in the driver code to SALSA is this Enact call.
     template <typename SALSAProblem>
         cudaError_t Enact(
                 CudaContext &context,
                 SALSAProblem *problem,
                 typename SALSAProblem::SizeT max_iteration)
         {
+            // Gunrock provides recommended settings here for kernel
+            // parameters, but they can be changed by end-users.
             typedef gunrock::oprtr::filter::KernelPolicy<
                 SALSAProblem,
                 300, //CUDA_ARCH
