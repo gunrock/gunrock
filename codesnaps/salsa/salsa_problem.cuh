@@ -1,5 +1,7 @@
-// Problem struct is inherited from ProblemBase struct, which stores graph
-// topology data in CSR format and frontier buffers.
+// This data structure (the "Problem" struct) stores the graph
+// topology in CSR format and the frontier. All Problem structs
+// inherit from the ProblemBase struct. Algorithm-specific data is
+// stored in a "DataSlice".
 
 template<
 typename VertexId,
@@ -8,8 +10,8 @@ typename Value>
 struct SALSAProblem : public ProblemBase
 {
 
-    static const bool MARK_PREDECESSORS     = true; // for SALSA algorithm, we need to track predecessor in advance so we set it to true.
-    static const bool ENABLE_IDEMPOTENCE    = false; // In SALSA data race during advance is not allowed.
+    static const bool MARK_PREDECESSORS     = true; // for SALSA algorithm, we need to track predecessors in Advance
+    static const bool ENABLE_IDEMPOTENCE    = false; // In SALSA, data races during Advance are not allowed.
 
     struct DataSlice
     {
@@ -25,13 +27,15 @@ struct SALSAProblem : public ProblemBase
 
     SizeT nodes; // node number of the graph
     SizeT edges; // edge number of the graph
-    SizeT out_nodes; // number of nodes which have outgoing edges
-    SizeT in_nodes; // number of nodes which have incoming edges
+    SizeT out_nodes; // number of nodes that have outgoing edges
+    SizeT in_nodes; // number of nodes that have incoming edges
     DataSlice *d_data_slices;
 
-    //Constructor, Destructor ignored here
+    // The constructor and destructor are ignored here.
 
-    // Extract final hub rank scores and authority rank scores back to CPU
+    // "Extract" copies final hub rank scores and authority rank
+    // scores back to the CPU.
+
     cudaError_t Extract(VertexId *h_hrank, VertexId *h_arank)
     {
         cudaError_t retval = cudaSuccess;
@@ -40,9 +44,11 @@ struct SALSAProblem : public ProblemBase
         return retval;
     }
 
-    // Since SALSA is an algorithm for bipartite graph, Init function takes two CSR graphs (hub graph,
-    // the original graph, and auth graph, the reverse graph) stored on CPU, and initialize graph topology
-    // data (by loading ProblemBase::Init(hub_graph, auth_graph)) and DataSlice on GPU.
+    // SALSA is an algorithm for bipartite graphs. So the Init
+    // function takes two CSR graphs---the hub (original) graph and
+    // the auth (reverse) graph stored on the CPU, and uses them to
+    // initialize the graph topology data and the SALSA-specific
+    // DataSlice on the GPU.
     cudaError_t Init(
             const Csr<VertexId, Value, SizeT> &hub_graph,
             const Csr<VertexId, Value, SizeT> &auth_graph)
@@ -57,31 +63,32 @@ struct SALSAProblem : public ProblemBase
         if (retval = util::GRError(GPUMalloc(data_slices[0]->d_out_degrees, nodes))) break;
         if (retval = util::GRError(GPUMalloc(data_slices[0]->d_hub_predecessors, edges))) break;
         if (retval = util::GRError(GPUMalloc(data_slices[0]->d_auth_predecessors, edges))) break;
-        return retval;  
+        return retval;
     }
 
-    // Reset function will be loaded before each run of SALSA to reset problem related data.
+    // The Reset function primes the graph data structure to an
+    // initial state, which includes ...
     cudaError_t Reset(const Csr<VertexId, Value, SizeT> &graph)
     {
         cudaError_t retval = cudaSuccess;
         if (retval = util::GRError(ProblemBase::Reset(graph))) break;
 
-        // Initialize hub and authority rank scores
+        // ... initializing the hub and authority rank scores ...
         util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_hrank_curr, (Value)1.0/out_nodes, nodes);
         util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_arank_curr, (Value)1.0/in_nodes, nodes);
         util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_hrank_next, 0, nodes);
         util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_arank_next, 0, nodes);
 
-        // Compute in and out degrees for each node
+        // ... accurate in and out degrees for each node ...
         util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_out_degrees, 0, nodes);
         util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_in_degrees, 0, nodes);
         util::MemsetMadVectorKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_out_degrees, BaseProblem::graph_slices[gpu]->d_row_offsets, &BaseProblem::graph_slices[gpu]->d_row_offsets[1], -1, nodes);
         util::MemsetMadVectorKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_in_degrees, BaseProblem::graph_slices[gpu]->d_column_offsets, &BaseProblem::graph_slices[gpu]->d_column_offsets[1], -1, nodes);
 
-        // Initialize predecessors to INVALID_PREDECESSOR_ID
+        // ... and initializing predecessors with an INVALID_PREDECESSOR_ID.
         util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_hub_predecessors, INVALID_PREDECESSOR_ID, edges);
         util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_auth_predecessors, INVALID_PREDECESSOR_ID, edges);
 
-        return retval;  
+        return retval;
     }
 };
