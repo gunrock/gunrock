@@ -93,10 +93,7 @@ data pointer (d_slice)</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre>        <span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">::</span><span class="n">GraphSlice</span> <span class="o">*</span><span class="n">g_slice</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_graph_slices</span><span class="p">;</span>
-        <span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">::</span><span class="n">DataSlice</span> <span class="o">*</span><span class="n">d_slice</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_data_slices</span><span class="p">;</span>
-
-        <span class="n">SizeT</span> <span class="n">queue_length</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span> <span class="c1">// initialize queue length to 1</span>
-        <span class="kt">int</span> <span class="n">selector</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="c1">//ping pong frontier queue selector</span></pre></div>
+        <span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">::</span><span class="n">DataSlice</span> <span class="o">*</span><span class="n">d_slice</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_data_slices</span><span class="p">;</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -105,7 +102,34 @@ data pointer (d_slice)</p>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-6'>#</a>
       </div>
-      <p>continue advance and filter until no elements in the queue</p>
+      <p>queue length is initialized to 1 and get updated within each operator.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">SizeT</span> <span class="n">queue_length</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <p>ping pong frontier queue selector</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="kt">int</span> <span class="n">selector</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>Taks source node as the first frontier, visit all neighbors using
+Advance, set depth of those that haven't been set using BFSFunctor,
+and filter out the invalid nodes to form a new frontier using Filter.
+Until the frontier is empty.</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre>        <span class="k">while</span> <span class="p">(</span><span class="n">queue_length</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
@@ -134,10 +158,10 @@ data pointer (d_slice)</p>
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-7'>
+  <div class='section' id='section-9'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-7'>#</a>
+        <a class='octothorpe' href='#section-9'>#</a>
       </div>
       <p>Kernel entry point to be loaded in the driver code</p>
     </div>
@@ -151,10 +175,10 @@ data pointer (d_slice)</p>
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-8'>
+  <div class='section' id='section-10'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-8'>#</a>
+        <a class='octothorpe' href='#section-10'>#</a>
       </div>
       <p>Gunrock provide a recommend setting for running kernel to users
 here. This can be changed by users too.</p>
