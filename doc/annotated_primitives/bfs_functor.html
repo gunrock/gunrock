@@ -53,7 +53,7 @@ in the next frontier.</p>
 Both atomic operations here guarantee one edge being visited once</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>            <span class="k">return</span> <span class="p">(</span><span class="n">atomicCAS</span><span class="p">(</span><span class="o">&amp;</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">d_preds</span><span class="p">[</span><span class="n">d_id</span><span class="p">],</span> <span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">s_id</span><span class="p">)</span> <span class="o">==</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+      <div class="highlight"><pre>            <span class="k">return</span> <span class="p">(</span><span class="n">atomicCAS</span><span class="p">(</span><span class="o">&amp;</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">d_preds</span><span class="p">[</span><span class="n">d_id</span><span class="p">],</span> <span class="n">INVALID_PREDECESSOR_ID</span><span class="p">,</span> <span class="n">s_id</span><span class="p">)</span> <span class="o">==</span> <span class="n">INVALID_PREDECESSOR_ID</span><span class="p">)</span>
                 <span class="o">?</span> <span class="nb">true</span> <span class="o">:</span> <span class="nb">false</span><span class="p">;</span>
         <span class="k">else</span></pre></div>
     </div>
@@ -68,7 +68,7 @@ Both atomic operations here guarantee one edge being visited once</p>
 to be current depth value plus one.</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>            <span class="k">return</span> <span class="p">(</span><span class="n">atomicCAS</span><span class="p">(</span><span class="o">&amp;</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">[</span><span class="n">d_id</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">s_id</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+      <div class="highlight"><pre>            <span class="k">return</span> <span class="p">(</span><span class="n">atomicCAS</span><span class="p">(</span><span class="o">&amp;</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">[</span><span class="n">d_id</span><span class="p">],</span> <span class="n">INVALID_NODE_VALUE</span><span class="p">,</span> <span class="n">s_id</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">==</span> <span class="n">INVALID_NODE_VALUE</span><span class="p">)</span>
                 <span class="o">?</span> <span class="nb">true</span> <span class="o">:</span> <span class="nb">false</span><span class="p">;</span>
     <span class="p">}</span></pre></div>
     </div>
