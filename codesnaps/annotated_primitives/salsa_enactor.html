@@ -17,10 +17,11 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-0'>#</a>
       </div>
-      
+      <p>The enactor defines how a graph primitive runs. It calls traversal
+(advance and filter operators) and computation (functors).</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre><span class="n">class</span> <span class="nl">SalsaEnactor</span> <span class="p">:</span> <span class="n">public</span> <span class="n">EnactorBase</span> <span class="p">{</span></pre></div>
+      <div class="highlight"><pre></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -29,10 +30,10 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-1'>#</a>
       </div>
-      <p>Constructor, Destructor, and Setup functions are ignored</p>
+      
     </div>
     <div class='code'>
-      <div class="highlight"><pre></pre></div>
+      <div class="highlight"><pre><span class="n">class</span> <span class="nl">SalsaEnactor</span> <span class="p">:</span> <span class="n">public</span> <span class="n">EnactorBase</span> <span class="p">{</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -41,7 +42,19 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-2'>#</a>
       </div>
-      <p>This is a user defined function to swap current and next rank pointers</p>
+      <p>For SALSA, Constructor, Destructor, and Setup functions are ignored</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>This user-defined function swaps current and next rank pointers</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre>    <span class="n">template</span> <span class="o">&lt;</span><span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">&gt;</span>
@@ -60,19 +73,29 @@
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-3'>
+  <div class='section' id='section-4'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-3'>#</a>
+        <a class='octothorpe' href='#section-4'>#</a>
       </div>
-      <p>swap rank_curr and rank_next</p>
+      <p>copy next to curr and reset next</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>            <span class="n">util</span><span class="o">::</span><span class="n">MemsetCopyVectorKernel</span><span class="o">&lt;&lt;&lt;</span><span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">rank_curr</span><span class="p">,</span> <span class="n">rank_next</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span> 
+      <div class="highlight"><pre>            <span class="n">util</span><span class="o">::</span><span class="n">MemsetCopyVectorKernel</span><span class="o">&lt;&lt;&lt;</span><span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">rank_curr</span><span class="p">,</span> <span class="n">rank_next</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span>
             <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">rank_next</span><span class="p">,</span> <span class="p">(</span><span class="n">Value</span><span class="p">)</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span>
-        <span class="p">}</span>
-
-    <span class="n">template</span><span class="o">&lt;</span>
+        <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>This enactor defines the SALSA high-level algorithm.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">template</span><span class="o">&lt;</span>
         <span class="kr">typename</span> <span class="n">AdvancePolicy</span><span class="p">,</span>
         <span class="kr">typename</span> <span class="n">FilterPolicy</span><span class="p">,</span>
         <span class="kr">typename</span> <span class="n">SALSAProblem</span><span class="o">&gt;</span>
@@ -87,12 +110,12 @@
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-4'>
+  <div class='section' id='section-6'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-4'>#</a>
+        <a class='octothorpe' href='#section-6'>#</a>
       </div>
-      <p>Define SALSA Functors</p>
+      <p>Define SALSA functors.</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre>                         <span class="k">typedef</span> <span class="n">HFORWARDFunctor</span><span class="o">&lt;</span>
@@ -121,45 +144,16 @@
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-5'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-5'>#</a>
-      </div>
-      <p>Load Setup function</p>
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre>                         <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
-                         <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">EnactorBase</span><span class="o">::</span><span class="n">Setup</span><span class="p">(</span><span class="n">problem</span><span class="p">))</span> <span class="k">break</span><span class="p">;</span></pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
-  <div class='section' id='section-6'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-6'>#</a>
-      </div>
-      <p>Define graph topology data pointer (g_slice) and
-problem specific data pointer (d_slice)</p>
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre>                         <span class="kr">typename</span> <span class="n">SALSAProblem</span><span class="o">::</span><span class="n">GraphSlice</span> <span class="o">*</span><span class="n">g_slice</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_graph_slices</span><span class="p">;</span>
-                         <span class="kr">typename</span> <span class="n">SALSAProblem</span><span class="o">::</span><span class="n">DataSlice</span> <span class="o">*</span><span class="n">d_slice</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_data_slices</span><span class="p">;</span></pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
   <div class='section' id='section-7'>
     <div class='docs'>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-7'>#</a>
       </div>
-      <p>Prepare to do advance for each node. The purpose is to get information
-about predecessor node ID for each edge in both graphs.</p>
+      <p>Load the Setup function.</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>                         <span class="n">SizeT</span> <span class="n">queue_length</span> <span class="o">=</span> <span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">nodes</span><span class="p">;</span>
-                         <span class="kt">int</span> <span class="n">selector</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-                         <span class="p">{</span></pre></div>
+      <div class="highlight"><pre>                         <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
+                         <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">EnactorBase</span><span class="o">::</span><span class="n">Setup</span><span class="p">(</span><span class="n">problem</span><span class="p">))</span> <span class="k">break</span><span class="p">;</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -168,10 +162,12 @@ about predecessor node ID for each edge in both graphs.</p>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-8'>#</a>
       </div>
-      <p>Fill the frontier with all node IDs</p>
+      <p>Define the graph topology data pointer (g_slice) and
+the problem-specific data pointer (d_slice).</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>                             <span class="n">util</span><span class="o">::</span><span class="n">MemsetIdxKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">ping_pong_working_queue</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">nodes</span><span class="p">);</span></pre></div>
+      <div class="highlight"><pre>                         <span class="kr">typename</span> <span class="n">SALSAProblem</span><span class="o">::</span><span class="n">GraphSlice</span> <span class="o">*</span><span class="n">g_slice</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_graph_slices</span><span class="p">;</span>
+                         <span class="kr">typename</span> <span class="n">SALSAProblem</span><span class="o">::</span><span class="n">DataSlice</span> <span class="o">*</span><span class="n">d_slice</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_data_slices</span><span class="p">;</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -180,8 +176,37 @@ about predecessor node ID for each edge in both graphs.</p>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-9'>#</a>
       </div>
-      <p>Advance use HForwardFunctor to set predecessor
-node for each edge in original graph</p>
+      <p>Now let's do some computation.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                         <span class="n">SizeT</span> <span class="n">queue_length</span> <span class="o">=</span> <span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">nodes</span><span class="p">;</span>
+                         <span class="kt">int</span> <span class="n">selector</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+                         <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      <p>First we'll do some initialization
+code that runs just once. Start by
+initializing the frontier with all
+node IDs.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                             <span class="n">util</span><span class="o">::</span><span class="n">MemsetIdxKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">ping_pong_working_queue</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">nodes</span><span class="p">);</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      <p>Set predecessor nodes for each edge in
+the original graph.</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre>                             <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">advance</span><span class="o">::</span><span class="n">Kernel</span>
@@ -198,13 +223,13 @@ node for each edge in original graph</p>
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-10'>
+  <div class='section' id='section-12'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-10'>#</a>
+        <a class='octothorpe' href='#section-12'>#</a>
       </div>
-      <p>Advance use AForwardFunctor to set predecessor
-node for each edge in reverse graph</p>
+      <p>And set the predecessor nodes for each
+edge in the reverse graph.</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre>                             <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">advance</span><span class="o">::</span><span class="n">Kernel</span>
@@ -222,21 +247,33 @@ node for each edge in reverse graph</p>
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-11'>
+  <div class='section' id='section-13'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-11'>#</a>
+        <a class='octothorpe' href='#section-13'>#</a>
       </div>
-      <p>Update hub rank and authority ranks using two Advance operators until reach
-maximum iteration number</p>
+      <p>Now we iterate between two Advance
+operators, which update (1) the hub rank
+and (2) the authority rank. We loop until
+we've reached the maximum iteration count.</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre>                         <span class="kt">int</span> <span class="n">iteration</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
                          <span class="k">while</span> <span class="p">(</span><span class="nb">true</span><span class="p">)</span> <span class="p">{</span>
                              <span class="n">util</span><span class="o">::</span><span class="n">MemsetIdxKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">ping_pong_working_queue</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">edges</span><span class="p">);</span>
-                             <span class="n">SizeT</span> <span class="n">queue_length</span> <span class="o">=</span> <span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">edges</span><span class="p">;</span>
-
-                             <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">advance</span><span class="o">::</span><span class="n">Kernel</span>
+                             <span class="n">SizeT</span> <span class="n">queue_length</span> <span class="o">=</span> <span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">edges</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      <p>This Advance operator updates the hub rank ...</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                             <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">advance</span><span class="o">::</span><span class="n">Kernel</span>
                                  <span class="o">&lt;</span><span class="n">AdvancePolicy</span><span class="p">,</span> <span class="n">SALSAProblem</span><span class="p">,</span> <span class="n">ABackwardFunctor</span><span class="o">&gt;</span>
                                  <span class="o">&lt;&lt;&lt;</span><span class="n">advance_grid_size</span><span class="p">,</span> <span class="n">AdvancePolicy</span><span class="o">::</span><span class="n">THREADS</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span>
                                          <span class="n">queue_length</span><span class="p">,</span>
@@ -248,9 +285,19 @@ maximum iteration number</p>
                                          <span class="n">context</span><span class="p">,</span>
                                          <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">advance</span><span class="o">::</span><span class="n">E2V</span><span class="p">);</span>
 
-                             <span class="n">SwapRank</span><span class="o">&lt;</span><span class="n">SALSAProblem</span><span class="o">&gt;</span><span class="p">(</span><span class="n">problem</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">nodes</span><span class="p">);</span>
-
-                             <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">advance</span><span class="o">::</span><span class="n">Kernel</span>
+                             <span class="n">SwapRank</span><span class="o">&lt;</span><span class="n">SALSAProblem</span><span class="o">&gt;</span><span class="p">(</span><span class="n">problem</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">nodes</span><span class="p">);</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      <p>and here, the authority rank.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                             <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">advance</span><span class="o">::</span><span class="n">Kernel</span>
                                  <span class="o">&lt;</span><span class="n">AdvancePolicy</span><span class="p">,</span> <span class="n">SALSAProblem</span><span class="p">,</span> <span class="n">ABackwardFunctor</span><span class="o">&gt;</span>
                                  <span class="o">&lt;&lt;&lt;</span><span class="n">advance_grid_size</span><span class="p">,</span> <span class="n">AdvancePolicy</span><span class="o">::</span><span class="n">THREADS</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span>
                                          <span class="n">queue_length</span><span class="p">,</span>
@@ -273,13 +320,12 @@ maximum iteration number</p>
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-12'>
+  <div class='section' id='section-16'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-12'>#</a>
+        <a class='octothorpe' href='#section-16'>#</a>
       </div>
-      <p>Kernel entry point to be loaded in the driver code. Details please refer
-to annotations for bfs_enactor.cuh</p>
+      <p>The entry point in the driver code to SALSA is this Enact call.</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre>    <span class="n">template</span> <span class="o">&lt;</span><span class="kr">typename</span> <span class="n">SALSAProblem</span><span class="o">&gt;</span>
@@ -287,8 +333,20 @@ to annotations for bfs_enactor.cuh</p>
                 <span class="n">CudaContext</span> <span class="o">&amp;</span><span class="n">context</span><span class="p">,</span>
                 <span class="n">SALSAProblem</span> <span class="o">*</span><span class="n">problem</span><span class="p">,</span>
                 <span class="kr">typename</span> <span class="n">SALSAProblem</span><span class="o">::</span><span class="n">SizeT</span> <span class="n">max_iteration</span><span class="p">)</span>
-        <span class="p">{</span>
-            <span class="k">typedef</span> <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">filter</span><span class="o">::</span><span class="n">KernelPolicy</span><span class="o">&lt;</span>
+        <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      <p>Gunrock provides recommended settings here for kernel
+parameters, but they can be changed by end-users.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">typedef</span> <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">filter</span><span class="o">::</span><span class="n">KernelPolicy</span><span class="o">&lt;</span>
                 <span class="n">SALSAProblem</span><span class="p">,</span>
                 <span class="mi">300</span><span class="p">,</span> <span class="c1">//CUDA_ARCH</span>
                 <span class="mi">8</span><span class="p">,</span> <span class="c1">//MIN_CTA_OCCUPANCY</span>
