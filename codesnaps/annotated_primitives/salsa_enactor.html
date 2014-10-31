@@ -153,7 +153,8 @@ problem specific data pointer (d_slice)</p>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-7'>#</a>
       </div>
-      <p>Prepare to do advance for each node</p>
+      <p>Prepare to do advance for each node. The purpose is to get information
+about predecessor node ID for each edge in both graphs.</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre>                         <span class="n">SizeT</span> <span class="n">queue_length</span> <span class="o">=</span> <span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">nodes</span><span class="p">;</span>
@@ -226,7 +227,7 @@ node for each edge in reverse graph</p>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-11'>#</a>
       </div>
-      <p>Update hub rank and authority ranks until reach
+      <p>Update hub rank and authority ranks using two Advance operators until reach
 maximum iteration number</p>
     </div>
     <div class='code'>

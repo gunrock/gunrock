@@ -18,15 +18,13 @@
         <a class='octothorpe' href='#section-0'>#</a>
       </div>
       <p>Functor defines user-specific computations with per-edge functors: CondEdge
-and ApplyEdge; and per-node functors: CondVertex and ApplyVertex.</p>
+and ApplyEdge, which will be used in Advance operator; and per-node
+functors: CondVertex and ApplyVertex, which will be used in Filter operator.</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre><span class="n">template</span><span class="o">&lt;</span><span class="kr">typename</span> <span class="n">VertexId</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">SizeT</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">Value</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">&gt;</span>
 <span class="k">struct</span> <span class="n">BFSFunctor</span> <span class="p">{</span>
-    <span class="k">typedef</span> <span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">::</span><span class="n">DataSlice</span> <span class="n">DataSlice</span><span class="p">;</span>
-    <span class="n">__device__</span> <span class="kt">bool</span> <span class="nf">CondEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
-    <span class="p">{</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">ProblemData</span><span class="o">::</span><span class="n">MARK_PREDECESSORS</span><span class="p">)</span></pre></div>
+    <span class="k">typedef</span> <span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">::</span><span class="n">DataSlice</span> <span class="n">DataSlice</span><span class="p">;</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -35,12 +33,14 @@ and ApplyEdge; and per-node functors: CondVertex and ApplyVertex.</p>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-1'>#</a>
       </div>
-      <p>atomically set predecessor for each destination node.</p>
+      <p>CondEdge takes edge information (source ID, destination ID) and DataSlice
+as input. It returns a boolean value suggesting whether the edge is valid
+in the next frontier.</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>            <span class="k">return</span> <span class="p">(</span><span class="n">atomicCAS</span><span class="p">(</span><span class="o">&amp;</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">d_preds</span><span class="p">[</span><span class="n">d_id</span><span class="p">],</span> <span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">s_id</span><span class="p">)</span> <span class="o">==</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span>
-                <span class="o">?</span> <span class="nb">true</span> <span class="o">:</span> <span class="nb">false</span><span class="p">;</span>
-        <span class="k">else</span></pre></div>
+      <div class="highlight"><pre>    <span class="n">__device__</span> <span class="kt">bool</span> <span class="nf">CondEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">ProblemData</span><span class="o">::</span><span class="n">MARK_PREDECESSORS</span><span class="p">)</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -49,17 +49,13 @@ and ApplyEdge; and per-node functors: CondVertex and ApplyVertex.</p>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-2'>#</a>
       </div>
-      <p>source id sent in as label value, set destination label
-to be current label value plus one.</p>
+      <p>Set predecessor for each destination node.
+Both atomic operations here guarantee one edge being visited once</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>            <span class="k">return</span> <span class="p">(</span><span class="n">atomicCAS</span><span class="p">(</span><span class="o">&amp;</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">[</span><span class="n">d_id</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">s_id</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+      <div class="highlight"><pre>            <span class="k">return</span> <span class="p">(</span><span class="n">atomicCAS</span><span class="p">(</span><span class="o">&amp;</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">d_preds</span><span class="p">[</span><span class="n">d_id</span><span class="p">],</span> <span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">s_id</span><span class="p">)</span> <span class="o">==</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span>
                 <span class="o">?</span> <span class="nb">true</span> <span class="o">:</span> <span class="nb">false</span><span class="p">;</span>
-    <span class="p">}</span>
-
-    <span class="n">__device__</span> <span class="kt">void</span> <span class="nf">ApplyEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
-    <span class="p">{</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">ProblemData</span><span class="o">::</span><span class="n">MARK_PREDECESSORS</span><span class="p">)</span></pre></div>
+        <span class="k">else</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -68,15 +64,13 @@ to be current label value plus one.</p>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-3'>#</a>
       </div>
-      <p>When MARK_PREDECESSORS flag is set,
-update label value here.</p>
+      <p>source ID sent in as depth value, set destination depth
+to be current depth value plus one.</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>            <span class="n">p</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">[</span><span class="n">d_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">[</span><span class="n">s_id</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
-    <span class="p">}</span>
-
-    <span class="n">__device__</span> <span class="kt">void</span> <span class="nf">CondVertex</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">node</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
-    <span class="p">{</span></pre></div>
+      <div class="highlight"><pre>            <span class="k">return</span> <span class="p">(</span><span class="n">atomicCAS</span><span class="p">(</span><span class="o">&amp;</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">[</span><span class="n">d_id</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">s_id</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+                <span class="o">?</span> <span class="nb">true</span> <span class="o">:</span> <span class="nb">false</span><span class="p">;</span>
+    <span class="p">}</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -85,14 +79,68 @@ update label value here.</p>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-4'>#</a>
       </div>
-      <p>This will remove the nodes with -1 ID from the output
+      <p>ApplyEdge takes edge information (source ID, destination ID) and DataSlice
+as input. It performs user-defined per-edge computations.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">__device__</span> <span class="kt">void</span> <span class="nf">ApplyEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">ProblemData</span><span class="o">::</span><span class="n">MARK_PREDECESSORS</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>When MARK_PREDECESSORS flag is set,
+we need to update depth value here.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">p</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">[</span><span class="n">d_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">[</span><span class="n">s_id</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>CondVertex takes node ID and DataSlice as input. It returns a boolean value
+suggesting whether the node is valid in the next frontier.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">__device__</span> <span class="kt">void</span> <span class="nf">CondVertex</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">node</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
+    <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <p>This will remove the invalid nodes from the output
 frontier.</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>        <span class="k">return</span> <span class="n">node</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span>
-    <span class="p">}</span>
-
-    <span class="n">__device__</span> <span class="kt">void</span> <span class="nf">ApplyVertex</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">node</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="n">node</span> <span class="o">!=</span> <span class="n">INVALID_NODE_ID</span><span class="p">;</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>ApplyVertex takes node ID and DataSlice as input. It performs user-defined
+per-node computations.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">__device__</span> <span class="kt">void</span> <span class="nf">ApplyVertex</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">node</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
     <span class="p">{</span>
     <span class="p">}</span>
 <span class="p">};</span>

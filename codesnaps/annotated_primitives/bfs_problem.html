@@ -18,9 +18,7 @@
         <a class='octothorpe' href='#section-0'>#</a>
       </div>
       <p>Problem struct is inherited from ProblemBase struct, which stores graph
-topology data in CSR format. Each problem struct stores per-node or per-edge
-arrays and global variables (if any). It provides Init and Reset method as
-well as Extract method to get results from GPU to CPU.</p>
+topology data in CSR format and frontier buffers.</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre><span class="n">template</span><span class="o">&lt;</span>
@@ -31,14 +29,47 @@ well as Extract method to get results from GPU to CPU.</p>
          <span class="kt">bool</span> <span class="n">_ENABLE_IDEMPOTENCE</span><span class="p">,</span> <span class="c1">// Whether to enable idempotence when advance</span>
          <span class="kt">bool</span> <span class="n">_USE_DOUBLE_BUFFER</span><span class="o">&gt;</span>
          <span class="k">struct</span> <span class="nl">BFSProblem</span> <span class="p">:</span> <span class="n">public</span> <span class="n">ProblemBase</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">SizeT</span><span class="p">,</span> <span class="n">_USE_DOUBLE_BUFFER</span><span class="o">&gt;</span>
-<span class="p">{</span>
-
-    <span class="k">static</span> <span class="k">const</span> <span class="kt">bool</span> <span class="n">MARK_PREDECESSORS</span>     <span class="o">=</span> <span class="n">_MARK_PREDECESSORS</span><span class="p">;</span>
-    <span class="k">static</span> <span class="k">const</span> <span class="kt">bool</span> <span class="n">ENABLE_IDEMPOTENCE</span>    <span class="o">=</span> <span class="n">_ENABLE_IDEMPOTENCE</span><span class="p">;</span>
-
-    <span class="k">struct</span> <span class="n">DataSlice</span>
+<span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>MARK_PREDECESSOR would be true when algorithm needs to know the predecessor node IDs
+for a newly formed frontier during a certain step.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">static</span> <span class="k">const</span> <span class="kt">bool</span> <span class="n">MARK_PREDECESSORS</span>     <span class="o">=</span> <span class="n">_MARK_PREDECESSORS</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>ENABLE_IDEMPOTENCE would be true when the operation performed in parallel
+for all neighbor nodes/edges is idempotent, meaning data race is benign.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">static</span> <span class="k">const</span> <span class="kt">bool</span> <span class="n">ENABLE_IDEMPOTENCE</span>    <span class="o">=</span> <span class="n">_ENABLE_IDEMPOTENCE</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>DataSlice sturct stores per-node or per-edge arrays and global variables (if any).</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">struct</span> <span class="n">DataSlice</span>
     <span class="p">{</span>
-        <span class="n">VertexId</span> <span class="o">*</span><span class="n">d_labels</span><span class="p">;</span> <span class="c1">// Distance from source node labels</span>
+        <span class="n">VertexId</span> <span class="o">*</span><span class="n">d_labels</span><span class="p">;</span> <span class="c1">// BFS depth value</span>
         <span class="n">VertexId</span> <span class="o">*</span><span class="n">d_preds</span><span class="p">;</span> <span class="c1">// Predecessor IDs</span>
     <span class="p">};</span>
 
@@ -48,10 +79,10 @@ well as Extract method to get results from GPU to CPU.</p>
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-1'>
+  <div class='section' id='section-4'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-1'>#</a>
+        <a class='octothorpe' href='#section-4'>#</a>
       </div>
       <p>Constructor, Destructor ignored here</p>
     </div>
@@ -60,10 +91,10 @@ well as Extract method to get results from GPU to CPU.</p>
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-2'>
+  <div class='section' id='section-5'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-2'>#</a>
+        <a class='octothorpe' href='#section-5'>#</a>
       </div>
       <p>Extract labels and predecessors back to CPU</p>
     </div>
@@ -74,9 +105,21 @@ well as Extract method to get results from GPU to CPU.</p>
         <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">CopyGPU2CPU</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">,</span> <span class="n">h_labels</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">CopyGPU2CPU</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_preds</span><span class="p">,</span> <span class="n">h_preds</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
         <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
-    <span class="p">}</span>
-
-    <span class="n">cudaError_t</span> <span class="nf">Init</span><span class="p">(</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>Init function takes a CSR graph stored on CPU, and initialize graph
+topology data (by loading ProblemBase::Init(graph)) and DataSlice on
+GPU.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">cudaError_t</span> <span class="nf">Init</span><span class="p">(</span>
             <span class="k">const</span> <span class="n">Csr</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">Value</span><span class="p">,</span> <span class="n">SizeT</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">graph</span><span class="p">)</span>
     <span class="p">{</span>
         <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
@@ -84,16 +127,49 @@ well as Extract method to get results from GPU to CPU.</p>
         <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">GPUMalloc</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">GPUMalloc</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_preds</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
         <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>  
-    <span class="p">}</span>
-
-    <span class="n">cudaError_t</span> <span class="nf">Reset</span><span class="p">(</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <p>Reset function will be loaded before each BFS to reset problem related data.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">cudaError_t</span> <span class="nf">Reset</span><span class="p">(</span>
             <span class="k">const</span> <span class="n">Csr</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">Value</span><span class="p">,</span> <span class="n">SizeT</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">graph</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">src</span><span class="p">)</span>
     <span class="p">{</span>
         <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">ProblemBase</span><span class="o">::</span><span class="n">Reset</span><span class="p">(</span><span class="n">graph</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
-        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span>
-        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_preds</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">CopyGPU2CPU</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="o">+</span><span class="n">src</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)));</span>  
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">ProblemBase</span><span class="o">::</span><span class="n">Reset</span><span class="p">(</span><span class="n">graph</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>Reset depth values and predecessor values to invalid. Only set source node's depth value to 0.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">,</span> <span class="n">INVALID_NODE_VALUE</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span>
+        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_preds</span><span class="p">,</span> <span class="n">INVALID_PREDECESSOR_ID</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">CopyGPU2CPU</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="o">+</span><span class="n">src</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)));</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>Put source node ID into the initial frontier</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">CopyGPU2CPU</span><span class="p">(</span><span class="n">g_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ping_pong_working_queue</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="mi">1</span><span class="p">)));</span>
         <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>  
     <span class="p">}</span>
 <span class="p">};</span>

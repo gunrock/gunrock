@@ -18,9 +18,7 @@
         <a class='octothorpe' href='#section-0'>#</a>
       </div>
       <p>Problem struct is inherited from ProblemBase struct, which stores graph
-topology data in CSR format. Each problem struct stores per-node or per-edge
-arrays and global variables (if any). It provides Init and Reset method as
-well as Extract method to get results from GPU to CPU.</p>
+topology data in CSR format and frontier buffers.</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre><span class="n">template</span><span class="o">&lt;</span>
@@ -30,7 +28,7 @@ well as Extract method to get results from GPU to CPU.</p>
 <span class="k">struct</span> <span class="nl">SALSAProblem</span> <span class="p">:</span> <span class="n">public</span> <span class="n">ProblemBase</span>
 <span class="p">{</span>
 
-    <span class="k">static</span> <span class="k">const</span> <span class="kt">bool</span> <span class="n">MARK_PREDECESSORS</span>     <span class="o">=</span> <span class="nb">true</span><span class="p">;</span> <span class="c1">// We know in SALSA we need to track predecessor in advance.</span>
+    <span class="k">static</span> <span class="k">const</span> <span class="kt">bool</span> <span class="n">MARK_PREDECESSORS</span>     <span class="o">=</span> <span class="nb">true</span><span class="p">;</span> <span class="c1">// for SALSA algorithm, we need to track predecessor in advance so we set it to true.</span>
     <span class="k">static</span> <span class="k">const</span> <span class="kt">bool</span> <span class="n">ENABLE_IDEMPOTENCE</span>    <span class="o">=</span> <span class="nb">false</span><span class="p">;</span> <span class="c1">// In SALSA data race during advance is not allowed.</span>
 
     <span class="k">struct</span> <span class="n">DataSlice</span>
@@ -43,7 +41,6 @@ well as Extract method to get results from GPU to CPU.</p>
         <span class="n">VertexId</span> <span class="o">*</span><span class="n">d_out_degrees</span><span class="p">;</span> <span class="c1">// out degrees for each node</span>
         <span class="n">VertexId</span> <span class="o">*</span><span class="n">d_hub_predecessors</span><span class="p">;</span> <span class="c1">// hub graph predecessors (original graph)</span>
         <span class="n">VertexId</span> <span class="o">*</span><span class="n">d_auth_predecessors</span><span class="p">;</span> <span class="c1">// authority graph predecessors (reverse graph)</span>
-        <span class="n">SizeT</span> <span class="o">*</span><span class="n">d_labels</span><span class="p">;</span> <span class="c1">// label value for each node</span>
     <span class="p">};</span>
 
     <span class="n">SizeT</span> <span class="n">nodes</span><span class="p">;</span> <span class="c1">// node number of the graph</span>
@@ -80,9 +77,21 @@ well as Extract method to get results from GPU to CPU.</p>
         <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">CopyGPU2CPU</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_hrank_curr</span><span class="p">,</span> <span class="n">h_hrank</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">CopyGPU2CPU</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_arank_curr</span><span class="p">,</span> <span class="n">h_arank</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
         <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
-    <span class="p">}</span>
-
-    <span class="n">cudaError_t</span> <span class="nf">Init</span><span class="p">(</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>Since SALSA is an algorithm for bipartite graph, Init function takes two CSR graphs (hub graph,
+the original graph, and auth graph, the reverse graph) stored on CPU, and initialize graph topology
+data (by loading ProblemBase::Init(hub_graph, auth_graph)) and DataSlice on GPU.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">cudaError_t</span> <span class="nf">Init</span><span class="p">(</span>
             <span class="k">const</span> <span class="n">Csr</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">Value</span><span class="p">,</span> <span class="n">SizeT</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">hub_graph</span><span class="p">,</span>
             <span class="k">const</span> <span class="n">Csr</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">Value</span><span class="p">,</span> <span class="n">SizeT</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">auth_graph</span><span class="p">)</span>
     <span class="p">{</span>
@@ -96,21 +105,30 @@ well as Extract method to get results from GPU to CPU.</p>
         <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">GPUMalloc</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_out_degrees</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">GPUMalloc</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_hub_predecessors</span><span class="p">,</span> <span class="n">edges</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">GPUMalloc</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_auth_predecessors</span><span class="p">,</span> <span class="n">edges</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
-        <span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_labels</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
         <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>  
-    <span class="p">}</span>
-
-    <span class="n">cudaError_t</span> <span class="nf">Reset</span><span class="p">(</span><span class="k">const</span> <span class="n">Csr</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">Value</span><span class="p">,</span> <span class="n">SizeT</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">graph</span><span class="p">)</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>Reset function will be loaded before each run of SALSA to reset problem related data.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">cudaError_t</span> <span class="nf">Reset</span><span class="p">(</span><span class="k">const</span> <span class="n">Csr</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">Value</span><span class="p">,</span> <span class="n">SizeT</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">graph</span><span class="p">)</span>
     <span class="p">{</span>
         <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">ProblemBase</span><span class="o">::</span><span class="n">Reset</span><span class="p">(</span><span class="n">graph</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-3'>
+  <div class='section' id='section-5'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-3'>#</a>
+        <a class='octothorpe' href='#section-5'>#</a>
       </div>
       <p>Initialize hub and authority rank scores</p>
     </div>
@@ -122,10 +140,10 @@ well as Extract method to get results from GPU to CPU.</p>
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-4'>
+  <div class='section' id='section-6'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-4'>#</a>
+        <a class='octothorpe' href='#section-6'>#</a>
       </div>
       <p>Compute in and out degrees for each node</p>
     </div>
@@ -137,16 +155,16 @@ well as Extract method to get results from GPU to CPU.</p>
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-5'>
+  <div class='section' id='section-7'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-5'>#</a>
+        <a class='octothorpe' href='#section-7'>#</a>
       </div>
-      <p>Initialize predecessors to -1</p>
+      <p>Initialize predecessors to INVALID_PREDECESSOR_ID</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_hub_predecessors</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">edges</span><span class="p">);</span>
-        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_auth_predecessors</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">edges</span><span class="p">);</span>
+      <div class="highlight"><pre>        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_hub_predecessors</span><span class="p">,</span> <span class="n">INVALID_PREDECESSOR_ID</span><span class="p">,</span> <span class="n">edges</span><span class="p">);</span>
+        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_auth_predecessors</span><span class="p">,</span> <span class="n">INVALID_PREDECESSOR_ID</span><span class="p">,</span> <span class="n">edges</span><span class="p">);</span>
 
         <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>  
     <span class="p">}</span>
