@@ -17,8 +17,8 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-0'>#</a>
       </div>
-      <p>Enactor defines the running process of a graph primitive using traversal
-(advance and filter operator) and computation (functors).</p>
+      <p>The enactor defines how a graph primitive runs. It calls traversal
+(advance and filter operators) and computation (functors).</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre></pre></div>
@@ -42,7 +42,7 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-2'>#</a>
       </div>
-      <p>Constructor, Destructor, and Setup functions are ignored</p>
+      <p>For BFS, Constructor, Destructor, and Setup functions are ignored</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre>    <span class="n">template</span><span class="o">&lt;</span>
@@ -50,7 +50,13 @@
     <span class="kr">typename</span> <span class="n">FilterPolicy</span><span class="p">,</span>
     <span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">&gt;</span>
     <span class="n">cudaError_t</span> <span class="n">EnactBFS</span><span class="p">(</span><span class="n">CudaContext</span> <span class="o">&amp;</span><span class="n">context</span><span class="p">,</span><span class="n">BFSProblem</span> <span class="o">*</span><span class="n">problem</span><span class="p">,</span><span class="n">VertexId</span>   <span class="n">src</span><span class="p">)</span>
-    <span class="p">{</span></pre></div>
+    <span class="p">{</span>
+
+        <span class="k">typedef</span> <span class="n">BFSFunctor</span><span class="o">&lt;</span>
+        <span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">::</span><span class="n">VertexId</span><span class="p">,</span>
+        <span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">::</span><span class="n">SizeT</span><span class="p">,</span>
+        <span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">::</span><span class="n">VertexId</span><span class="p">,</span>
+        <span class="n">BFSProblem</span><span class="o">&gt;</span> <span class="n">BfsFunctor</span><span class="p">;</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -59,14 +65,11 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-3'>#</a>
       </div>
-      <p>Define BFSFunctor</p>
+      <p>Start with the Setup function to initialize kernel running parameters</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>        <span class="k">typedef</span> <span class="n">BFSFunctor</span><span class="o">&lt;</span>
-        <span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">::</span><span class="n">VertexId</span><span class="p">,</span>
-        <span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">::</span><span class="n">SizeT</span><span class="p">,</span>
-        <span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">::</span><span class="n">VertexId</span><span class="p">,</span>
-        <span class="n">BFSProblem</span><span class="o">&gt;</span> <span class="n">BfsFunctor</span><span class="p">;</span></pre></div>
+      <div class="highlight"><pre>        <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">EnactorBase</span><span class="o">::</span><span class="n">Setup</span><span class="p">(</span><span class="n">problem</span><span class="p">))</span> <span class="k">break</span><span class="p">;</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -75,11 +78,12 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-4'>#</a>
       </div>
-      <p>Load Setup function to initialize kernel running parameters</p>
+      <p>Define the graph topology data pointer (g_slice) and
+the problem-specific data pointer (d_slice)</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>        <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">EnactorBase</span><span class="o">::</span><span class="n">Setup</span><span class="p">(</span><span class="n">problem</span><span class="p">))</span> <span class="k">break</span><span class="p">;</span></pre></div>
+      <div class="highlight"><pre>        <span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">::</span><span class="n">GraphSlice</span> <span class="o">*</span><span class="n">g_slice</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_graph_slices</span><span class="p">;</span>
+        <span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">::</span><span class="n">DataSlice</span> <span class="o">*</span><span class="n">d_slice</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_data_slices</span><span class="p">;</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -88,12 +92,10 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-5'>#</a>
       </div>
-      <p>Define graph topology data pointer (g_slice) and problem specific
-data pointer (d_slice)</p>
+      <p>Initialize the queue length (frontier size) to 1.</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>        <span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">::</span><span class="n">GraphSlice</span> <span class="o">*</span><span class="n">g_slice</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_graph_slices</span><span class="p">;</span>
-        <span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">::</span><span class="n">DataSlice</span> <span class="o">*</span><span class="n">d_slice</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_data_slices</span><span class="p">;</span></pre></div>
+      <div class="highlight"><pre>        <span class="n">SizeT</span> <span class="n">queue_length</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -102,10 +104,11 @@ data pointer (d_slice)</p>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-6'>#</a>
       </div>
-      <p>queue length is initialized to 1 and get updated within each operator.</p>
+      <p>We ping-pong between old and new frontiers; "selector"
+picks which one is the current destination.</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>        <span class="n">SizeT</span> <span class="n">queue_length</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span></pre></div>
+      <div class="highlight"><pre>        <span class="kt">int</span> <span class="n">selector</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -114,22 +117,11 @@ data pointer (d_slice)</p>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-7'>#</a>
       </div>
-      <p>ping pong frontier queue selector</p>
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre>        <span class="kt">int</span> <span class="n">selector</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span></pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
-  <div class='section' id='section-8'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-8'>#</a>
-      </div>
-      <p>Taks source node as the first frontier, visit all neighbors using
-Advance, set depth of those that haven't been set using BFSFunctor,
-and filter out the invalid nodes to form a new frontier using Filter.
-Until the frontier is empty.</p>
+      <p>Here we sequence our operators and functors. For BFS, we
+alternate between advancing to a new frontier
+(vertex-to-vertex), calling the BFS functor to set depths
+along the way, and then filtering out invalid nodes from
+the new frontier. We repeat until the frontier is empty.</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre>        <span class="k">while</span> <span class="p">(</span><span class="n">queue_length</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
@@ -140,10 +132,21 @@ Until the frontier is empty.</p>
                         <span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">ping_pong_working_queue</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span>
                         <span class="n">g_slice</span><span class="o">-&gt;</span><span class="n">ping_pong_working_queue</span><span class="p">[</span><span class="n">selector</span><span class="o">^</span><span class="mi">1</span><span class="p">],</span>
                         <span class="n">d_slice</span><span class="p">,</span>
-                        <span class="n">context</span><span class="p">,</span> 
-                        <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">advance</span><span class="o">::</span><span class="n">V2V</span><span class="p">);</span> <span class="c1">//This is a vertex to vertex advance</span>
+                        <span class="n">context</span><span class="p">,</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>This advance is vertex-to-vertex</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                        <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">advance</span><span class="o">::</span><span class="n">V2V</span><span class="p">);</span>
 
-            <span class="n">selector</span> <span class="o">^=</span> <span class="mi">1</span><span class="p">;</span> <span class="c1">//Swap selector </span>
+            <span class="n">selector</span> <span class="o">^=</span> <span class="mi">1</span><span class="p">;</span> <span class="c1">// Swap selector</span>
 
             <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">filter</span><span class="o">::</span><span class="n">Kernel</span>
                 <span class="o">&lt;</span><span class="n">FilterPolicy</span><span class="p">,</span> <span class="n">BFSProblem</span><span class="p">,</span> <span class="n">BFSFunctor</span><span class="o">&gt;</span>
@@ -163,7 +166,7 @@ Until the frontier is empty.</p>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-9'>#</a>
       </div>
-      <p>Kernel entry point to be loaded in the driver code</p>
+      <p>The entry point in the driver code to BFS is this Enact call.</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre>    <span class="n">template</span> <span class="o">&lt;</span><span class="kr">typename</span> <span class="n">BFSProblem</span><span class="o">&gt;</span>
@@ -180,8 +183,8 @@ Until the frontier is empty.</p>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-10'>#</a>
       </div>
-      <p>Gunrock provide a recommend setting for running kernel to users
-here. This can be changed by users too.</p>
+      <p>Gunrock provides recommended settings here for kernel
+parameters, but they can be changed by end-users.</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre>            <span class="k">typedef</span> <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">filter</span><span class="o">::</span><span class="n">KernelPolicy</span><span class="o">&lt;</span>
