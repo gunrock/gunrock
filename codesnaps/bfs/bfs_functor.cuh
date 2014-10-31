@@ -14,12 +14,12 @@ struct BFSFunctor {
         if (ProblemData::MARK_PREDECESSORS)
             // Set predecessor for each destination node.
             // Both atomic operations here guarantee one edge being visited once
-            return (atomicCAS(&p->d_preds[d_id], -2, s_id) == -2)
+            return (atomicCAS(&p->d_preds[d_id], INVALID_PREDECESSOR_ID, s_id) == INVALID_PREDECESSOR_ID)
                 ? true : false;
         else
             // source ID sent in as depth value, set destination depth
             // to be current depth value plus one.
-            return (atomicCAS(&p->d_labels[d_id], -1, s_id+1) == -1)
+            return (atomicCAS(&p->d_labels[d_id], INVALID_NODE_VALUE, s_id+1) == INVALID_NODE_VALUE)
                 ? true : false;
     }
 
