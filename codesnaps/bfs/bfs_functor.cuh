@@ -1,5 +1,6 @@
 // Functor defines user-specific computations with per-edge functors: CondEdge
-// and ApplyEdge; and per-node functors: CondVertex and ApplyVertex.
+// and ApplyEdge, which will be used in Advance operator; and per-node
+// functors: CondVertex and ApplyVertex, which will be used in Filter operator.
 
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct BFSFunctor {

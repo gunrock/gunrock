@@ -1,7 +1,5 @@
 // Problem struct is inherited from ProblemBase struct, which stores graph
-// topology data in CSR format. Each problem struct stores per-node or per-edge
-// arrays and global variables (if any). It provides Init and Reset method as
-// well as Extract method to get results from GPU to CPU.
+// topology data in CSR format and frontier buffers.
 
 template<
 typename VertexId,
@@ -10,7 +8,7 @@ typename Value>
 struct SALSAProblem : public ProblemBase
 {
 
-    static const bool MARK_PREDECESSORS     = true; // We know in SALSA we need to track predecessor in advance.
+    static const bool MARK_PREDECESSORS     = true; // for SALSA algorithm, we need to track predecessor in advance so we set it to true.
     static const bool ENABLE_IDEMPOTENCE    = false; // In SALSA data race during advance is not allowed.
 
     struct DataSlice
@@ -23,7 +21,6 @@ struct SALSAProblem : public ProblemBase
         VertexId *d_out_degrees; // out degrees for each node
         VertexId *d_hub_predecessors; // hub graph predecessors (original graph)
         VertexId *d_auth_predecessors; // authority graph predecessors (reverse graph)
-        SizeT *d_labels; // label value for each node
     };
 
     SizeT nodes; // node number of the graph
@@ -43,6 +40,9 @@ struct SALSAProblem : public ProblemBase
         return retval;
     }
 
+    // Since SALSA is an algorithm for bipartite graph, Init function takes two CSR graphs (hub graph,
+    // the original graph, and auth graph, the reverse graph) stored on CPU, and initialize graph topology
+    // data (by loading ProblemBase::Init(hub_graph, auth_graph)) and DataSlice on GPU.
     cudaError_t Init(
             const Csr<VertexId, Value, SizeT> &hub_graph,
             const Csr<VertexId, Value, SizeT> &auth_graph)
@@ -57,10 +57,10 @@ struct SALSAProblem : public ProblemBase
         if (retval = util::GRError(GPUMalloc(data_slices[0]->d_out_degrees, nodes))) break;
         if (retval = util::GRError(GPUMalloc(data_slices[0]->d_hub_predecessors, edges))) break;
         if (retval = util::GRError(GPUMalloc(data_slices[0]->d_auth_predecessors, edges))) break;
-        data_slices[0]->d_labels = NULL;
         return retval;  
     }
 
+    // Reset function will be loaded before each run of SALSA to reset problem related data.
     cudaError_t Reset(const Csr<VertexId, Value, SizeT> &graph)
     {
         cudaError_t retval = cudaSuccess;
@@ -78,9 +78,9 @@ struct SALSAProblem : public ProblemBase
         util::MemsetMadVectorKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_out_degrees, BaseProblem::graph_slices[gpu]->d_row_offsets, &BaseProblem::graph_slices[gpu]->d_row_offsets[1], -1, nodes);
         util::MemsetMadVectorKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_in_degrees, BaseProblem::graph_slices[gpu]->d_column_offsets, &BaseProblem::graph_slices[gpu]->d_column_offsets[1], -1, nodes);
 
-        // Initialize predecessors to -1
-        util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_hub_predecessors, -1, edges);
-        util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_auth_predecessors, -1, edges);
+        // Initialize predecessors to INVALID_PREDECESSOR_ID
+        util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_hub_predecessors, INVALID_PREDECESSOR_ID, edges);
+        util::MemsetKernel<<<BLOCK, THREAD>>>(data_slices[0]->d_auth_predecessors, INVALID_PREDECESSOR_ID, edges);
 
         return retval;  
     }

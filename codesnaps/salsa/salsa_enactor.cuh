@@ -69,7 +69,8 @@ class SalsaEnactor : public EnactorBase {
                          typename SALSAProblem::GraphSlice *g_slice = problem->d_graph_slices;
                          typename SALSAProblem::DataSlice *d_slice = problem->d_data_slices;
 
-                         //Prepare to do advance for each node
+                         //Prepare to do advance for each node. The purpose is to get information
+                         //about predecessor node ID for each edge in both graphs.
                          SizeT queue_length = g_slice->nodes;
                          int selector = 0;
                          {
@@ -104,7 +105,7 @@ class SalsaEnactor : public EnactorBase {
                                          gunrock::oprtr::advance::V2E);
                          }
 
-                         //Update hub rank and authority ranks until reach
+                         //Update hub rank and authority ranks using two Advance operators until reach
                          //maximum iteration number
                          int iteration = 0;
                          while (true) {
