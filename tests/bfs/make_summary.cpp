@@ -6,14 +6,21 @@ using namespace std;
 
 int main()
 {
-    string dir_name="eval/ubuntu12.04.k40cx4/";
-    string fil_name=".ubuntu12.04.k40cx4";
-    string flags[]={".idempotence",".undir.idempotence",
+    string dir_name="eval/CentOS6.4_k40cx1_dsize/";
+    string fil_name=".CentOS6.4_k40cx1_dsize";
+    string flags[]={"",".undir",".idempotence",".undir.idempotence",
                      ".mark_pred",".mark_pred.undir",".mark_pred.idempotence",".mark_pred.undir.idempotence"};
-    string data_names[]={"ak2010", "belgium_osm", "coAuthorsDBLP", "delaunay_n13", 
-                         "delaunay_n21", "soc-LiveJournal1", "kron_g500-logn21", "webbase-1M"};
-    int num_flags = 4;
-    int num_datas = 8;
+    string data_names[]={"ak2010",  
+                     "delaunay_n10", "delaunay_n11", "delaunay_n12", "delaunay_n13", "delaunay_n14", 
+                     "delaunay_n15", "delaunay_n16", "delaunay_n17", "delaunay_n18", "delaunay_n19", 
+                     "delaunay_n20", "delaunay_n21", "delaunay_n22", "delaunay_n23", "delaunay_n24",
+                     "kron_g500-logn16", "kron_g500-logn17", "kron_g500-logn18", "kron_g500-logn19", "kron_g500-logn20", "kron_g500-logn21",  
+                     "coAuthorsDBLP","coAuthorsCiteseer","coPapersDBLP","coPapersCiteseer","citationCiteseer",
+                     "preferentialAttachment","soc-LiveJournal1", "roadNet-CA", "belgium_osm","netherlands_osm",
+                     "italy_osm","luxembourg_osm", "great-britain_osm","germany_osm","asia_osm","europe_osm",
+                     "road_usa","road_central", "webbase-1M","tweets","bitcoin","caidaRouterLevel"};
+    int num_flags = 6;
+    int num_datas = 40;
     string file_name="";
     ifstream Fin;
     ofstream Fout;

@@ -155,7 +155,7 @@ struct BiasRandomPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKW
         std::sort(sort_vector.begin(),sort_vector.end());
 
         //printf("1");fflush(stdout);
-        for (SizeT pos=0;pos<=nodes;pos++)
+        for (SizeT pos=0;pos<nodes;pos++)
         {
             VertexId node = sort_vector[pos].posit;
             if (tpartition_table[node]!=this->num_gpus) continue;

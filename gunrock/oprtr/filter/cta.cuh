@@ -527,7 +527,7 @@ struct Cta
         
         // Check updated queue offset for overflow due to redundant expansion
         if (new_queue_offset >= max_out_frontier) {
-            printf(" new_queue_offset >= max_out_frontier, new_queue_offset = %d, max_out_frontier = %d\n", new_queue_offset, max_out_frontier);
+            //printf(" new_queue_offset >= max_out_frontier, new_queue_offset = %d, max_out_frontier = %d\n", new_queue_offset, max_out_frontier);
             work_progress.SetOverflow<SizeT>();
             util::ThreadExit();
         }

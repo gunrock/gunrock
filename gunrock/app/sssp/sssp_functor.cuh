@@ -41,6 +41,8 @@ struct SSSPFunctor
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id output edge id
+     * @param[in] e_id_in input edge id
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
@@ -53,12 +55,9 @@ struct SSSPFunctor
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                         weight, problem->weights + e_id);
         Value new_weight = weight + label;
-        //Value old_weight = problem->labels[d_id];
-        //bool temp =  (new_weight < atomicMin(problem->labels + d_id, new_weight));
-        //printf("\t n=%d,la=%d,w=%d,ow=%d,nw=%d,co=%s",d_id,label,weight,old_weight,new_weight,temp?"true":"false");
+        
         // Check if the destination node has been claimed as someone's child
         return (new_weight < atomicMin(problem->labels + d_id, new_weight));
-        //return temp;
     }
 
     /**

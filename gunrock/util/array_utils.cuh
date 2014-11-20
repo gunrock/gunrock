@@ -248,7 +248,7 @@ public:
                 if ((allocated & HOST) == HOST)
                     memcpy(temp_array.GetPointer(HOST), h_pointer, sizeof(Value) * this->size);
                 if ((allocated & DEVICE) == DEVICE)
-                    MemsetCopyVectorKernel<<<128,128,0,stream>>>(
+                    MemsetCopyVectorKernel<<<256,256,0,stream>>>(
                         temp_array.GetPointer(DEVICE), d_pointer, this->size);
                 if (retval = Release(HOST  )) return retval;
                 if (retval = Release(DEVICE)) return retval;

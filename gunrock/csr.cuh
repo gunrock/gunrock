@@ -487,7 +487,7 @@ struct Csr
     /**
      * @brief Find node with largest neighbor list
      */
-    int GetNodeWithHighestDegree()
+    int GetNodeWithHighestDegree(int& max_degree)
     {
         int degree = 0;
         int src = 0;
@@ -498,6 +498,7 @@ struct Csr
                 src = node;
             }
         }
+        max_degree = degree;
         return src;
     }
 

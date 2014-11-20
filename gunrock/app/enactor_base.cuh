@@ -34,9 +34,6 @@ namespace app {
 struct EnactorStats
 {
     long long           iteration;
-//    int                 num_gpus;
-//    int                 gpu_idx;
-
     unsigned long long  total_lifetimes;
     unsigned long long  total_runtimes;
     unsigned long long  total_queued;
@@ -47,14 +44,9 @@ struct EnactorStats
     util::KernelRuntimeStatsLifetime advance_kernel_stats;
     util::KernelRuntimeStatsLifetime filter_kernel_stats;
 
-    //unsigned int        *d_node_locks;
-    //unsigned int        *d_node_locks_out;
     util::Array1D<int, unsigned int> node_locks;
     util::Array1D<int, unsigned int> node_locks_out;
 
-//    volatile int       *done;
-//    int                *d_done;
-    //cudaEvent_t        throttle_event;
     cudaError_t        retval;
     clock_t            start_time;
 
@@ -121,22 +113,35 @@ bool All_Done(EnactorStats *enactor_stats,
     if (data_slice[gpu]->in_length[i][peer]!=0)
         return false;
     //printf("all gpu done\n");fflush(stdout);
+
+    for (int gpu=0;gpu<num_gpus;gpu++)
+    for (int peer=1;peer<num_gpus;peer++)
+    if (data_slice[gpu]->out_length[peer]!=0)
+        return false;
+
     return true;
 } 
 
     template <typename VertexId, typename SizeT>
     __global__ void Copy_Preds (
         const SizeT     num_elements,
-        const SizeT     nodes,
+        //const SizeT     nodes,
         const VertexId* keys,
         const VertexId* in_preds,
-              VertexId* out_preds,
-              unsigned int* temp_marker)
-    {   
-        VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
-        if (x>=num_elements) return;
-        VertexId t = keys[x];
-        out_preds[t]=in_preds[t];
+              VertexId* out_preds)//,
+              //unsigned int* temp_marker)
+    {
+        const SizeT STRIDE = gridDim.x * blockDim.x;   
+        VertexId x = blockIdx.x*blockDim.x+threadIdx.x;
+        VertexId t;
+
+        //if (x>=num_elements) return;
+        while (x<num_elements)
+        {
+            t = keys[x];
+            out_preds[t] = in_preds[t];
+            x+= STRIDE;
+        }
         //if (in_preds[t] >= nodes || (t==4651 && nodes==219953))
         //    printf("x=%d, key=%d, p=%d, nodes=%d\n", x, t, in_preds[t], nodes);
     }   
@@ -148,26 +153,135 @@ bool All_Done(EnactorStats *enactor_stats,
         const VertexId* keys,
         const VertexId* org_vertexs,
         const VertexId* in_preds,
-              VertexId* out_preds,
-              unsigned int* temp_marker)
-    {   
-        VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
+              VertexId* out_preds)//,
+              //unsigned int* temp_marker)
+    {
+        const SizeT STRIDE = gridDim.x * blockDim.x;   
+        VertexId x = blockIdx.x*blockDim.x+threadIdx.x;
+        VertexId t, p;
         /*long long x= blockIdx.y;
         x = x*gridDim.x+blockIdx.x;
         x = x*blockDim.y+threadIdx.y;
         x = x*blockDim.x+threadIdx.x;*/
 
-        if (x>=num_elements) return;
-        VertexId t = keys[x];
-        VertexId p = in_preds[t];
-        temp_marker[t]++;
-        if (p>=nodes) //|| (t==4651 && nodes==219953)) 
+        //if (x>=num_elements) return;
+        while (x<num_elements)
         {
-            //printf("x=%d, key=%d, p=%d, tm=%d, nodes=%d\n", x, t, p, temp_marker[t], nodes);
-        } else {
-            out_preds[t]=org_vertexs[p];
+            t = keys[x];
+            p = in_preds[t];
+            //temp_marker[t]++;
+            //if (p>=nodes) //|| (t==4651 && nodes==219953)) 
+            //{
+                //printf("x=%d, key=%d, p=%d, tm=%d, nodes=%d\n", x, t, p, temp_marker[t], nodes);
+            //} else {
+            if (p<nodes) out_preds[t] = org_vertexs[p];
+            //}
+            x+= STRIDE;
         }
     }   
+
+    template <typename VertexId, typename SizeT>
+    __global__ void Assign_Marker(
+        const SizeT            num_elements,
+        const int              num_gpus,
+        const VertexId* const  keys_in,
+        const int*      const  partition_table,
+              SizeT**          marker)//,
+              //unsigned int*    temp_marker)
+    {
+        VertexId key;
+        int gpu;
+        extern __shared__ SizeT* s_marker[];
+        const SizeT STRIDE = gridDim.x * blockDim.x;
+        SizeT x= blockIdx.x * blockDim.x + threadIdx.x;
+        if (threadIdx.x < num_gpus)
+            s_marker[threadIdx.x]=marker[threadIdx.x];
+        __syncthreads();
+        //if (x>=num_elements) return;
+        //VertexId key = keys_in[x];
+        //marker[x] = (partition_table[keys_in[x]] == target)?1:0;
+
+        while (x < num_elements)
+        {
+            key = keys_in[x];
+            //gpu = num_gpus;
+            //if (temp_marker[key]==0)
+            {
+                //temp_marker[key]=1;
+                gpu = partition_table[key];
+            }
+            for (int i=0;i<num_gpus;i++)
+                s_marker[i][x]=(i==gpu)?1:0;
+            x+=STRIDE;
+        }
+    }
+
+    template <typename VertexId, typename SizeT, typename Value,
+              SizeT num_vertex_associates, SizeT num_value__associates>
+    __global__ void Make_Out(
+       const  SizeT             num_elements,
+       const  int               num_gpus,
+       const  VertexId*   const keys_in,
+       const  int*        const partition_table,
+       const  VertexId*   const convertion_table,
+       const  size_t            array_size,
+              char*             array)
+       /*       SizeT**           marker,
+              VertexId**        vertex_associate_orgs,
+              Value**           value__associate_orgs,
+              VertexId**        keys_outs,
+              VertexId***       vertex_associate_outss,
+              Value***          value__associate_outss)*/
+    {
+        extern __shared__ char s_array[];
+        const SizeT STRIDE = gridDim.x * blockDim.x;
+        size_t     offset                  = 0;
+        SizeT**    s_marker                = (SizeT**   )&(s_array[offset]);
+        offset+=sizeof(SizeT*   )*num_gpus;
+        VertexId** s_keys_outs             = (VertexId**)&(s_array[offset]);
+        offset+=sizeof(VertexId*)*num_gpus;
+        VertexId** s_vertex_associate_orgs = (VertexId**)&(s_array[offset]);
+        offset+=sizeof(VertexId*)*num_vertex_associates;
+        Value**    s_value__associate_orgs = (Value**   )&(s_array[offset]);
+        offset+=sizeof(Value*   )*num_value__associates;
+        VertexId** s_vertex_associate_outss= (VertexId**)&(s_array[offset]);
+        offset+=sizeof(VertexId*)*num_gpus*num_vertex_associates;
+        Value**    s_value__associate_outss= (Value**   )&(s_array[offset]);
+        SizeT x= threadIdx.x;
+        while (x<array_size)
+        {
+            s_array[x]=array[x];
+            x+=blockDim.x;
+        }
+        __syncthreads();
+
+        x= blockIdx.x * blockDim.x + threadIdx.x;
+
+        //if (x>=num_elements) return;
+        while (x<num_elements)
+        {
+            VertexId key    = keys_in [x];
+            int      target = partition_table[key];
+            SizeT    pos    = s_marker[target][x]-1;
+
+            //printf("x=%d, key=%d, pos=%d, target=%d\t", x, key, pos, target);
+            if (target==0)
+            {
+                s_keys_outs[0][pos]=key;
+            } else {
+                s_keys_outs[target][pos]=convertion_table[key];
+                #pragma unrool
+                for (int i=0;i<num_vertex_associates;i++)
+                    s_vertex_associate_outss[target*num_vertex_associates+i][pos]
+                        =s_vertex_associate_orgs[i][key];
+                #pragma unrool
+                for (int i=0;i<num_value__associates;i++)
+                    s_value__associate_outss[target*num_value__associates+i][pos]
+                        =s_value__associate_orgs[i][key];
+            }
+            x+=STRIDE;
+        }
+    }
 
     template <typename VertexId, typename SizeT>
     __global__ void Mark_Queue (
@@ -191,7 +305,8 @@ bool All_Done(EnactorStats *enactor_stats,
     void PushNeibor(
         int gpu,
         int peer,
-        FrontierAttribute<SizeT> *frontier_attribute,
+        //FrontierAttribute<SizeT> *frontier_attribute,
+        SizeT             queue_length,
         EnactorStats      *enactor_stats,
         DataSlice         *data_slice_l,
         DataSlice         *data_slice_p,
@@ -204,8 +319,8 @@ bool All_Done(EnactorStats *enactor_stats,
         int gpu_  = peer<gpu? gpu : gpu+1;
         int peer_ = peer<gpu? peer+1 : peer;
         data_slice_p->in_length[enactor_stats->iteration%2][gpu_]
-                      = frontier_attribute->queue_length;
-        if (frontier_attribute->queue_length == 0) return;
+                      = queue_length;
+        if (queue_length == 0) return;
         int t=enactor_stats->iteration%2;
         //s_enactor_stats[peer].done[0]=-1;
         //printf("%d\t %d\t %p+%d <== %p+%d @ %d,%d\n", 
@@ -222,27 +337,27 @@ bool All_Done(EnactorStats *enactor_stats,
         //printf("q = %d, l = %d\n", data_slice_p -> keys_in[enactor_stats->iteration%2][gpu_].GetSize(), frontier_attribute->queue_length);fflush(stdout);
         if (SIZE_CHECK)
         {
-            if (data_slice_p -> keys_in[t][gpu_].GetSize() < frontier_attribute->queue_length)
+            if (data_slice_p -> keys_in[t][gpu_].GetSize() < queue_length)
             {
                 printf("%d\t %lld\t %d\t keys_in oversize : %d -> %d \n", 
                     gpu, enactor_stats->iteration, peer, 
-                    data_slice_p->keys_in[t][gpu_].GetSize(), frontier_attribute->queue_length); 
+                    data_slice_p->keys_in[t][gpu_].GetSize(), queue_length); 
                 fflush(stdout);
             
                 util::SetDevice(data_slice_p->gpu_idx);
                 //while (data_slice_p->gpu_mallocing!=0) ;
                 //data_slice_p->gpu_mallocing = 1;
                 //enactor_stats->retval =  cudaDeviceSynchronize();
-                data_slice_p->keys_in[t][gpu_].EnsureSize(frontier_attribute->queue_length);
+                data_slice_p->keys_in[t][gpu_].EnsureSize(queue_length);
                 for (int i=0;i<num_vertex_associate;i++)
                 {
-                    if (enactor_stats->retval = data_slice_p->vertex_associate_in [t][gpu_][i].EnsureSize(frontier_attribute->queue_length)) return;
+                    if (enactor_stats->retval = data_slice_p->vertex_associate_in [t][gpu_][i].EnsureSize(queue_length)) return;
                     data_slice_p->vertex_associate_ins[t][gpu_][i] = data_slice_p->vertex_associate_in[t][gpu_][i].GetPointer(util::DEVICE);
                 }
                 if (enactor_stats->retval = data_slice_p->vertex_associate_ins[t][gpu_].Move(util::HOST, util::DEVICE)) return;
                 for (int i=0;i<num_value__associate;i++)
                 {
-                    if (enactor_stats->retval = data_slice_p->value__associate_in [t][gpu_][i].EnsureSize(frontier_attribute->queue_length)) return;
+                    if (enactor_stats->retval = data_slice_p->value__associate_in [t][gpu_][i].EnsureSize(queue_length)) return;
                     data_slice_p->value__associate_ins[t][gpu_][i] = data_slice_p->value__associate_in[t][gpu_][i].GetPointer(util::DEVICE);
                 }
                 if (enactor_stats->retval = data_slice_p->value__associate_ins[t][gpu_].Move(util::HOST, util::DEVICE)) return;
@@ -257,9 +372,9 @@ bool All_Done(EnactorStats *enactor_stats,
         if (enactor_stats->retval = util::GRError(cudaMemcpyAsync(
             data_slice_p  -> keys_in[t][gpu_].GetPointer(util::DEVICE),
                 //+ graph_slice_p -> in_offset[gpu_],
-            graph_slice_l -> frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE),
+            data_slice_l -> keys_out[peer_].GetPointer(util::DEVICE),
                 //+ frontier_attribute->queue_offset,
-            sizeof(VertexId) * frontier_attribute->queue_length, cudaMemcpyDefault, stream),
+            sizeof(VertexId) * queue_length, cudaMemcpyDefault, stream),
             "cudaMemcpyPeer d_keys failed", __FILE__, __LINE__)) return;
                 
         for (int i=0;i<num_vertex_associate;i++)
@@ -278,7 +393,7 @@ bool All_Done(EnactorStats *enactor_stats,
                     //+ graph_slice_p->in_offset[gpu_],
                 data_slice_l->vertex_associate_outs[peer_][i],
                     //+ (frontier_attribute->queue_offset - data_slice_l->out_length[0]),
-                sizeof(VertexId) * frontier_attribute->queue_length, cudaMemcpyDefault, stream),
+                sizeof(VertexId) * queue_length, cudaMemcpyDefault, stream),
                 "cudaMemcpyPeer vertex_associate_out failed", __FILE__, __LINE__)) return;
         }
 
@@ -289,12 +404,12 @@ bool All_Done(EnactorStats *enactor_stats,
                     //+ graph_slice_p->in_offset[gpu_],
                 data_slice_l->value__associate_outs[peer_][i],
                     //+ (frontier_attribute->queue_offset - data_slice_l->out_length[0]),
-                sizeof(Value) * frontier_attribute->queue_length, cudaMemcpyDefault, stream),
+                sizeof(Value) * queue_length, cudaMemcpyDefault, stream),
                     "cudaMemcpyPeer value__associate_out failed", __FILE__, __LINE__)) return;
         }
     }
  
-    template <
+/*    template <
         typename SizeT, 
         typename VertexId,
         typename Value,
@@ -306,7 +421,7 @@ bool All_Done(EnactorStats *enactor_stats,
         SizeT        num_elements,
         int          num_gpus,
         int          thread_num,
-        util::scan::MultiScan<VertexId, SizeT, true, 256, 8, Value>* Scaner,
+        //util::scan::MultiScan<VertexId, SizeT, true, 256, 8, Value>* Scaner,
         GraphSlice        **s_graph_slice,
         util::Array1D<SizeT,DataSlice> *s_data_slice,
         EnactorStats      *s_enactor_stats,
@@ -428,7 +543,7 @@ bool All_Done(EnactorStats *enactor_stats,
         SizeT        num_elements,
         int          num_gpus,
         int          thread_num,
-        util::scan::MultiScan<VertexId, SizeT, true, 256, 8, Value>* Scaner,
+        //util::scan::MultiScan<VertexId, SizeT, true, 256, 8, Value>* Scaner,
         GraphSlice        **s_graph_slice,
         util::Array1D<SizeT, DataSlice> *s_data_slice,
         EnactorStats      *s_enactor_stats,
@@ -520,6 +635,8 @@ bool All_Done(EnactorStats *enactor_stats,
         }
         delete[] out_offset;out_offset=NULL;
     }
+*/
+
 /**
  * @brief Base class for graph problem enactors.
  */

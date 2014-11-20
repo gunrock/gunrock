@@ -57,7 +57,9 @@ bool g_stream_from_host;
  {
  printf("\ntest_bfs <graph type> <graph type args> [--device=<device_index>] "
         "[--undirected] [--instrumented] [--src=<source index>] [--quick] "
-        "[--mark-pred] [--queue-sizing=<scale factor>]\n"
+        "[--mark-pred] [--queue-sizing=<scale factor>] "
+        "[--in-sizing=<in/out queue scale factor>] [--disable-size-check] "
+        "[--grid-size=<grid size>] [partition_method=random / biasrandom / clustered / metis]\n"
         "[--v]\n"
         "\n"
         "Graph types and args:\n"
@@ -112,14 +114,14 @@ void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes, bool M
   */ 
 
 struct Stats {
-    char *name;
+    const char *name;
     Statistic rate;
     Statistic search_depth;
     Statistic redundant_work;
     Statistic duty;
 
     Stats() : name(NULL), rate(), search_depth(), redundant_work(), duty() {}
-    Stats(char *name) : name(name), rate(), search_depth(), redundant_work(), duty() {}
+    Stats(const char *name) : name(name), rate(), search_depth(), redundant_work(), duty() {}
 };
 
 /**
@@ -196,8 +198,6 @@ void DisplayStats(
     }
     
 }
-
-
 
 
 /******************************************************************************
@@ -338,7 +338,7 @@ void RunTests(
     VertexId    *reference_check_preds  = NULL;
     VertexId    *h_preds                = NULL;
     if (MARK_PREDECESSORS) {
-        h_preds = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+        h_preds = new VertexId[graph.nodes];
         if (!g_quick) {
               reference_check_preds = reference_preds;
         }            
@@ -366,7 +366,7 @@ void RunTests(
         streams,
         max_queue_sizing,
         max_in_sizing), "Problem BFS Initialization Failed", __FILE__, __LINE__);
-    util::GRError(bfs_enactor->Init (csr_problem, max_grid_size), "BFS Enactor init failed", __FILE__, __LINE__);
+    util::GRError(bfs_enactor->Init (context, csr_problem, max_grid_size, size_check), "BFS Enactor init failed", __FILE__, __LINE__);
     //
     // Compute reference CPU BFS solution for source-distance
     //
@@ -394,7 +394,7 @@ void RunTests(
 
     util::GRError("Error before Enact", __FILE__, __LINE__);
     cpu_timer.Start();
-    util::GRError(bfs_enactor->Enact(context, csr_problem, src, max_grid_size, size_check), "BFS Problem Enact Failed", __FILE__, __LINE__);
+    util::GRError(bfs_enactor->Enact(src), "BFS Problem Enact Failed", __FILE__, __LINE__);
     cpu_timer.Stop();
 
     bfs_enactor->GetStatistics(total_queued, search_depth, avg_duty);
@@ -524,7 +524,8 @@ void RunTests(
     } else if (src_str.compare("randomize") == 0) {
         src = graphio::RandomNode(graph.nodes);
     } else if (src_str.compare("largestdegree") == 0) {
-        src = graph.GetNodeWithHighestDegree();
+        int temp;
+        src = graph.GetNodeWithHighestDegree(temp);
     } else {
         args.GetCmdLineArgument("src", src);
     }
@@ -533,13 +534,13 @@ void RunTests(
     //printf("Display neighbor list of src:\n");
     //graph.DisplayNeighborList(src);
 
+    g_verbose   = args.CheckCmdLineFlag("v");
     g_quick     = args.CheckCmdLineFlag("quick");
     mark_pred   = args.CheckCmdLineFlag("mark-pred");
     idempotence = args.CheckCmdLineFlag("idempotence");
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
     args.GetCmdLineArgument("in-sizing", max_in_sizing);
     args.GetCmdLineArgument("grid-size",max_grid_size);
-    g_verbose   = args.CheckCmdLineFlag("v");
     if (args.CheckCmdLineFlag  ("partition_method")) 
         args.GetCmdLineArgument("partition_method",partition_method);
     //printf("partition_method0=%s\n",partition_method.c_str());
@@ -682,8 +683,6 @@ int cpp_main( int argc, char** argv)
         return 1;
     }
 
-    //DeviceInit(args);
-    //cudaSetDeviceFlags(cudaDeviceMapHost);
     if (args.CheckCmdLineFlag  ("device"))
     {   
         std::vector<int> gpus;
@@ -697,21 +696,18 @@ int cpp_main( int argc, char** argv)
         gpu_idx    = new int[num_gpus];
         gpu_idx[0] = 0;
     }
-    streams  = new cudaStream_t[num_gpus * num_gpus];
+    streams  = new cudaStream_t[num_gpus * num_gpus *2];
     context  = new ContextPtr  [num_gpus * num_gpus];
     printf("Using %d gpus: ", num_gpus);
     for (int gpu=0;gpu<num_gpus;gpu++) 
     {
         printf(" %d ", gpu_idx[gpu]);
         util::SetDevice(gpu_idx[gpu]);
-        for (int i=0;i<num_gpus;i++)
+        for (int i=0;i<num_gpus*2;i++)
         {
-            int _i=gpu*num_gpus+i;
+            int _i=gpu*num_gpus*2+i;
             util::GRError(cudaStreamCreate(&streams[_i]), "cudaStreamCreate fialed.",__FILE__,__LINE__);
-            context[_i] = mgpu::CreateCudaDeviceAttachStream(gpu_idx[gpu],streams[_i]);
-            //streams[i+gpu*num_gpus] = context[i+gpu*num_gpus]->Stream();
-            //printf("%d, ",streams[_i]);
-            //context[i+gpu*num_gpus] = mgpu::CreateCudaDevice(gpu_idx[i]);
+            if (i<num_gpus) context[gpu*num_gpus+i] = mgpu::CreateCudaDeviceAttachStream(gpu_idx[gpu],streams[_i]);
         }
     }
     printf("\n"); fflush(stdout);
@@ -732,13 +728,6 @@ int cpp_main( int argc, char** argv)
 	}
         arr.Release(); 
     } */   
-
-    //int dev = 0;
-    //args.GetCmdLineArgument("device", dev);
-    //ContextPtr context = mgpu::CreateCudaDevice(dev);
-
-    //srand(0);									// Presently deterministic
-    //srand(time(NULL));
 
     // Parse graph-contruction params
     g_undirected = args.CheckCmdLineFlag("undirected");

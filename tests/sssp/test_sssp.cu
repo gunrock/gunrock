@@ -7,9 +7,9 @@
 
 /**
  * @file
- * test_bfs.cu
+ * test_sssp.cu
  *
- * @brief Simple test driver program for breadth-first search.
+ * @brief Simple test driver program for single source shorest path.
  */
 
 #include <stdio.h> 
@@ -65,7 +65,9 @@ bool g_stream_from_host;
  {
  printf("\ntest_sssp <graph type> <graph type args> [--device=<device_index>] "
         "[--undirected] [--instrumented] [--src=<source index>] [--quick]\n"
-        "[--v] [mark-pred] [--queue-sizing=<scale factor>]\n"
+        "[--v] [mark-pred] [--queue-sizing=<scale factor>] "
+        "[--in-sizing=<in/out queue scale factor>] [--disable-size-check] "
+        "[--grid-size=<grid size>] [partition_method=random / biasrandom / clustered / metis]\n"
         "\n"
         "Graph types and args:\n"
         "  market [<file>]\n"
@@ -114,14 +116,14 @@ bool g_stream_from_host;
   */ 
 
 struct Stats {
-    char *name;
+    const char *name;
     Statistic rate;
     Statistic search_depth;
     Statistic redundant_work;
     Statistic duty;
 
     Stats() : name(NULL), rate(), search_depth(), redundant_work(), duty() {}
-    Stats(char *name) : name(name), rate(), search_depth(), redundant_work(), duty() {}
+    Stats(const char *name) : name(name), rate(), search_depth(), redundant_work(), duty() {}
 };
 
 /**
@@ -159,7 +161,7 @@ void DisplayStats(
     SizeT edges_visited = 0;
     SizeT nodes_visited = 0;
     for (VertexId i = 0; i < graph.nodes; ++i) {
-        if (h_labels[i] < UINT_MAX) {
+        if (h_labels[i] < util::MaxValue<VertexId>()) {
             ++nodes_visited;
             edges_visited += graph.row_offsets[i+1] - graph.row_offsets[i];
         }
@@ -207,33 +209,35 @@ void DisplayStats(
   * @tparam VertexId
   * @tparam Value
   * @tparam SizeT
+  * @tparam MARK_PREDECESSORS
   *
   * @param[in] graph Reference to the CSR graph we process on
-  * @param[in] source_path Host-side vector to store CPU computed labels for each node
+  * @param[in] node_values Host-side vector to store CPU computed labels for each node
+  * @param[in] node_preds Host-side vector to store CPU computed predecessors for each node
   * @param[in] src Source node where SSSP starts
   */
- template<
+template<
     typename VertexId,
     typename Value,
     typename SizeT,
     bool     MARK_PREDECESSORS>
 void SimpleReferenceSssp(
     const Csr<VertexId, Value, SizeT>       &graph,
-    Value    *node_values,
-    VertexId *node_preds,
-    VertexId src)
+    Value                                   *node_values,
+    VertexId                                *node_preds,
+    VertexId                                src)
 {
     using namespace boost; 
     // Prepare Boost Datatype and Data structure
     typedef adjacency_list<vecS, vecS, directedS,
-            no_property, property <edge_weight_t, int> > Graph;
+            no_property, property <edge_weight_t, unsigned int> > Graph;
     typedef graph_traits<Graph>::vertex_descriptor vertex_descriptor;
     typedef graph_traits<Graph>::edge_descriptor edge_descriptor;
 
-    typedef std::pair<VertexId, VertexId> Edge;
+    typedef std::pair<unsigned int, unsigned int> Edge;
 
     Edge* edges = (Edge*)malloc(sizeof(Edge)*graph.edges);
-    Value *weight = (Value*)malloc(sizeof(Value)*graph.edges);
+    unsigned int *weight = (unsigned int*)malloc(sizeof(unsigned int)*graph.edges);
 
     for (int i = 0; i < graph.nodes; ++i)
     {
@@ -246,7 +250,7 @@ void SimpleReferenceSssp(
 
     Graph g(edges, edges + graph.edges, weight, graph.nodes);
 
-    std::vector<Value> d(graph.nodes);
+    std::vector<unsigned int> d(graph.nodes);
     std::vector<vertex_descriptor> p(graph.nodes);
     vertex_descriptor s = vertex(src, g);
 
@@ -308,6 +312,7 @@ void SimpleReferenceSssp(
     if (MARK_PREDECESSORS) free(sort_pred);
 }
 
+
 /**
  * @brief Run SSSP tests
  *
@@ -332,14 +337,21 @@ template <
     bool MARK_PREDECESSORS>
 void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
-    VertexId    src,
-    int         max_grid_size,
-    int         num_gpus,
-    float       queue_sizing,
-    ContextPtr  *context,
-    std::string partition_method,
-    int         *gpu_idx)
+    VertexId     src,
+    int          max_grid_size,
+    float        max_queue_sizing,
+    float        max_in_sizing,
+    int          num_gpus,
+    int          delta_factor,
+    int          iterations,
+    ContextPtr   *context,
+    std::string  partition_method,
+    int          *gpu_idx,
+    cudaStream_t *streams,
+    bool         size_check = true)
 {
+        size_t *org_size = new size_t[num_gpus];
+
         typedef SSSPProblem<
             VertexId,
             SizeT,
@@ -359,6 +371,13 @@ void RunTests(
             h_preds               = new VertexId[graph.nodes];
             reference_check_pred  = (g_quick) ? NULL : reference_preds;
         }
+    
+        for (int gpu=0;gpu<num_gpus;gpu++)
+        {
+            size_t dummy;
+            cudaSetDevice(gpu_idx[gpu]);
+            cudaMemGetInfo(&(org_size[gpu]),&dummy);
+        }
             
         // Allocate SSSP enactor map
         SSSPEnactor<Problem, INSTRUMENT>* sssp_enactor
@@ -373,8 +392,11 @@ void RunTests(
             num_gpus,
             gpu_idx,
             partition_method,
-            queue_sizing), "Problem SSSP Initialization Failed", __FILE__, __LINE__);
-
+            streams,
+            delta_factor,
+            max_queue_sizing,
+            max_in_sizing), "Problem SSSP Initialization Failed", __FILE__, __LINE__);
+        util::GRError(sssp_enactor->Init (context, csr_problem, max_grid_size, size_check), "SSSP Enactor init failed", __FILE__, __LINE__);
         //
         // Compute reference CPU SSSP solution for source-distance
         //
@@ -393,26 +415,37 @@ void RunTests(
         long long  total_queued = 0;
         VertexId   search_depth = 0;
         double     avg_duty     = 0.0;
+        float      elapsed      = 0.0f;
 
         // Perform SSSP
         CpuTimer cpu_timer;
 
-        util::GRError(csr_problem->Reset(src, sssp_enactor->GetFrontierType(), queue_sizing), "SSSP Problem Data Reset Failed", __FILE__, __LINE__); 
-        cpu_timer.Start();
-        util::GRError(sssp_enactor->Enact(context, csr_problem, src, queue_sizing, max_grid_size), "SSSP Problem Enact Failed", __FILE__, __LINE__);
-        cpu_timer.Stop();
+        for (int iter = 0; iter < iterations; ++iter)
+        {
+            util::GRError(csr_problem->Reset(src, sssp_enactor->GetFrontierType(), max_queue_sizing), "SSSP Problem Data Reset Failed", __FILE__, __LINE__); 
+            util::GRError(sssp_enactor->Reset(), "SSSP Enactor Reset failed", __FILE__, __LINE__);
+
+            cpu_timer.Start();
+            util::GRError(sssp_enactor->Enact(src), "SSSP Problem Enact Failed", __FILE__, __LINE__);
+            cpu_timer.Stop();
+            elapsed += cpu_timer.ElapsedMillis();
+        }
+        elapsed /= iterations;
 
         sssp_enactor->GetStatistics(total_queued, search_depth, avg_duty);
-
-        float elapsed = cpu_timer.ElapsedMillis();
 
         // Copy out results
         util::GRError(csr_problem->Extract(h_labels, h_preds), "SSSP Problem Data Extraction Failed", __FILE__, __LINE__);
 
+        for (SizeT i=0; i<graph.nodes;i++)
+        if (reference_check_label[i]==-1) reference_check_label[i]=util::MaxValue<Value>();
+
         // Verify the result
         if (reference_check_label != NULL) {
             printf("Label Validity: ");
-            CompareResults(h_labels, reference_check_label, graph.nodes, true);
+            int error_num = CompareResults(h_labels, reference_check_label, graph.nodes, true);
+            if (error_num > 0)
+                printf("%d errors occurred.\n", error_num);
         }
         
         // Display Solution
@@ -438,15 +471,50 @@ void RunTests(
             total_queued,
             avg_duty);
 
+        printf("\n\tMemory Usage(B)\t");
+        for (int gpu=0;gpu<num_gpus;gpu++)
+        if (num_gpus>1) {if (gpu!=0) printf(" #keys%d\t #ins%d,0\t #ins%d,1",gpu,gpu,gpu); else printf(" $keys%d", gpu);}
+        else printf(" #keys%d", gpu);
+        if (num_gpus>1) printf(" #keys%d",num_gpus);
+        printf("\n");
+        double max_key_sizing=0, max_in_sizing_=0;
+        for (int gpu=0;gpu<num_gpus;gpu++)
+        {
+            size_t gpu_free,dummy;
+            cudaSetDevice(gpu_idx[gpu]);
+            cudaMemGetInfo(&gpu_free,&dummy);
+            printf("GPU_%d\t %ld",gpu_idx[gpu],org_size[gpu]-gpu_free);
+            for (int i=0;i<num_gpus;i++)
+            {
+                SizeT x=csr_problem->graph_slices[gpu]->frontier_queues[i].keys[0].GetSize();
+                printf("\t %d", x);
+                double factor = 1.0*x/(num_gpus>1?csr_problem->graph_slices[gpu]->in_counter[i]:csr_problem->graph_slices[gpu]->nodes);
+                if (factor > max_key_sizing) max_key_sizing=factor;
+                if (num_gpus>1 && i!=0 )
+                for (int t=0;t<2;t++)
+                {
+                    x=csr_problem->data_slices[gpu][0].keys_in[t][i].GetSize();
+                    printf("\t %d", x);
+                    factor = 1.0*x/csr_problem->graph_slices[gpu]->in_counter[i];
+                    if (factor > max_in_sizing_) max_in_sizing_=factor;
+                }
+            }
+            if (num_gpus>1) printf("\t %d",csr_problem->graph_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
+            printf("\n");
+        }
+        printf("\t key_sizing =\t %lf", max_key_sizing);
+        if (num_gpus>1) printf("\t in_sizing =\t %lf", max_in_sizing_);
+        printf("\n");
 
         // Cleanup
-        if (stats           ) {delete stats           ; stats            = NULL;}
-        if (sssp_enactor    ) {delete sssp_enactor    ; sssp_enactor     = NULL;}
-        if (csr_problem     ) {delete csr_problem     ; csr_problem      = NULL;}
-        if (reference_labels) {delete reference_labels; reference_labels = NULL;}
-        if (h_labels        ) {delete h_labels        ; h_labels         = NULL;}
-        if (reference_preds ) {delete reference_preds ; reference_preds  = NULL;}
-        if (h_preds         ) {delete h_preds         ; h_preds          = NULL;}
+        if (org_size        ) {delete[] org_size        ; org_size         = NULL;}
+        if (stats           ) {delete   stats           ; stats            = NULL;}
+        if (sssp_enactor    ) {delete   sssp_enactor    ; sssp_enactor     = NULL;}
+        if (csr_problem     ) {delete   csr_problem     ; csr_problem      = NULL;}
+        if (reference_labels) {delete[] reference_labels; reference_labels = NULL;}
+        if (h_labels        ) {delete[] h_labels        ; h_labels         = NULL;}
+        if (reference_preds ) {delete[] reference_preds ; reference_preds  = NULL;}
+        if (h_preds         ) {delete[] h_preds         ; h_preds          = NULL;}
 
         //cudaDeviceSynchronize();
 }
@@ -470,7 +538,8 @@ void RunTests(
     CommandLineArgs             &args,
     int                         num_gpus,
     ContextPtr                  *context,
-    int                         *gpu_idx)
+    int                         *gpu_idx,
+    cudaStream_t                *streams)
 {
     VertexId            src                 = -1;           // Use whatever the specified graph-type's default is
     std::string         src_str;
@@ -478,32 +547,37 @@ void RunTests(
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
     //int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
     float               max_queue_sizing    = 1.0;
+    float               max_in_sizing       = 1.0;
     bool                mark_pred           = false;
     std::string         partition_method    = "random";
+    int                 iterations          = 1;
+    bool                disable_size_check  = false;
+    int                 delta_factor        = 16;
 
     instrumented = args.CheckCmdLineFlag("instrumented");
+    disable_size_check = args.CheckCmdLineFlag("disable-size-check");
     args.GetCmdLineArgument("src", src_str);
     if (src_str.empty()) {
         src = 0;
     } else if (src_str.compare("randomize") == 0) {
         src = graphio::RandomNode(graph.nodes);
     } else if (src_str.compare("largestdegree") == 0) {
-        src = graph.GetNodeWithHighestDegree();
+        int temp;
+        src = graph.GetNodeWithHighestDegree(temp);
     } else {
         args.GetCmdLineArgument("src", src);
     }
 
+    g_verbose = args.CheckCmdLineFlag("v"        );
+    g_quick   = args.CheckCmdLineFlag("quick"    );
     mark_pred = args.CheckCmdLineFlag("mark-pred");
-    args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
-
-    //printf("Display neighbor list of src:\n");
-    //graph.DisplayNeighborList(src);
-
-    g_quick = args.CheckCmdLineFlag("quick");
-    g_verbose = args.CheckCmdLineFlag("v");
+    args.GetCmdLineArgument("iteration-num", iterations      );
+    args.GetCmdLineArgument("queue-sizing",  max_queue_sizing);
+    args.GetCmdLineArgument("in-sizing",     max_in_sizing   );
+    args.GetCmdLineArgument("grid-size",     max_grid_size   );
+    args.GetCmdLineArgument("delta-factor",  delta_factor    );
     if (args.CheckCmdLineFlag  ("partition_method")) 
         args.GetCmdLineArgument("partition_method",partition_method);
-
 
     if (mark_pred) {
         if (instrumented) {
@@ -511,21 +585,31 @@ void RunTests(
                     graph,
                     src,
                     max_grid_size,
-                    num_gpus,
                     max_queue_sizing,
+                    max_in_sizing,
+                    num_gpus,
+                    delta_factor,
+                    iterations,
                     context,
                     partition_method,
-                    gpu_idx);
+                    gpu_idx,
+                    streams,
+                    !disable_size_check);
         } else {
             RunTests<VertexId, Value, SizeT, false, true>(
                     graph,
                     src,
                     max_grid_size,
-                    num_gpus,
                     max_queue_sizing,
+                    max_in_sizing,
+                    num_gpus,
+                    delta_factor,
+                    iterations,
                     context,
                     partition_method,
-                    gpu_idx);
+                    gpu_idx,
+                    streams,
+                    !disable_size_check);
         }
     } else {
         if (instrumented) {
@@ -533,21 +617,31 @@ void RunTests(
                     graph,
                     src,
                     max_grid_size,
-                    num_gpus,
                     max_queue_sizing,
+                    max_in_sizing,
+                    num_gpus,
+                    delta_factor,
+                    iterations,
                     context,
                     partition_method,
-                    gpu_idx);
+                    gpu_idx,
+                    streams,
+                    !disable_size_check);
         } else {
             RunTests<VertexId, Value, SizeT, false, false>(
                     graph,
                     src,
                     max_grid_size,
-                    num_gpus,
                     max_queue_sizing,
+                    max_in_sizing,
+                    num_gpus,
+                    delta_factor,
+                    iterations,
                     context,
                     partition_method,
-                    gpu_idx);
+                    gpu_idx,
+                    streams,
+                    !disable_size_check);
         }
     }
 
@@ -559,20 +653,19 @@ void RunTests(
 * Main
 ******************************************************************************/
 
-int main( int argc, char** argv)
+int cpp_main( int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
-    int        num_gpus = 0;
-    int        *gpu_idx = NULL;
-    ContextPtr *context = NULL;
+    int          num_gpus = 0;
+    int          *gpu_idx = NULL;
+    ContextPtr   *context = NULL;
+    cudaStream_t *streams = NULL;
 
     if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
         Usage();
         return 1;
     }
 
-    //DeviceInit(args);
-    //cudaSetDeviceFlags(cudaDeviceMapHost);
     if (args.CheckCmdLineFlag  ("device"))
     {
         std::vector<int> gpus;
@@ -586,18 +679,22 @@ int main( int argc, char** argv)
         gpu_idx    = new int[num_gpus];
         gpu_idx[0] = 0;
     }
-    context  = new ContextPtr[num_gpus];
+    streams  = new cudaStream_t[num_gpus * num_gpus *2];
+    context  = new ContextPtr  [num_gpus * num_gpus];
     printf("Using %d gpus: ", num_gpus);
-    for (int i=0;i<num_gpus;i++)
+    for (int gpu=0;gpu<num_gpus;gpu++)
     {
-        printf(" %d ", gpu_idx[i]);
-        context[i] = mgpu::CreateCudaDevice(gpu_idx[i]);
+        printf(" %d ", gpu_idx[gpu]);
+        util::SetDevice(gpu_idx[gpu]);
+        for (int i=0;i<num_gpus*2;i++)
+        {
+            int _i=gpu*num_gpus*2+i;
+            util::GRError(cudaStreamCreate(&streams[_i]), "cudaStreamCreate fialed.",__FILE__,__LINE__);
+            if (i<num_gpus) context[gpu*num_gpus+i] = mgpu::CreateCudaDeviceAttachStream(gpu_idx[gpu],streams[_i]);
+        }
     }
     printf("\n"); fflush(stdout);
     
-    //srand(0);									// Presently deterministic
-    //srand(time(NULL));
-
     // Parse graph-contruction params
     g_undirected = args.CheckCmdLineFlag("undirected");
     std::string graph_type = argv[1];
@@ -637,9 +734,12 @@ int main( int argc, char** argv)
         
         csr.GetAverageEdgeValue();
         csr.GetAverageDegree();
-		
+        int max_degree;
+        csr.GetNodeWithHighestDegree(max_degree);
+        printf("max degree:%d\n", max_degree);
+	
         // Run tests
-        RunTests(csr, args, num_gpus, context, gpu_idx);
+        RunTests(csr, args, num_gpus, context, gpu_idx, streams);
 
     } else {
         // Unknown graph type
