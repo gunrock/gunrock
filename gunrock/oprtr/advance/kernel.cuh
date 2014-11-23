@@ -32,7 +32,7 @@ namespace oprtr {
 namespace advance {
 
 template <typename KernelPolicy, typename ProblemData, typename Functor>
-void ComputeOutputLength(
+cudaError_t ComputeOutputLength(
    //                                 int                             num_block,
     gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT> *frontier_attribute,
     typename KernelPolicy::SizeT    *d_offsets,
@@ -51,7 +51,7 @@ void ComputeOutputLength(
     {
         //frontier_attribute->output_length[0] = 0;
         util::MemsetKernel<SizeT><<<1,1,0,stream>>>(frontier_attribute->output_length.GetPointer(util::DEVICE),0,1);
-        return;
+        return cudaSuccess;
     }
 
     int num_block = (frontier_attribute->queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
@@ -83,7 +83,7 @@ void ComputeOutputLength(
     //cudaDeviceSynchronize();
     //SizeT *temp;// = new SizeT[1];
     //cudaHostAlloc((void**)&temp, sizeof(SizeT), cudaHostAllocDefault);
-    util::GRError(cudaMemcpyAsync(
+    return util::GRError(cudaMemcpyAsync(
          frontier_attribute->output_length.GetPointer(util::DEVICE),
          partitioned_scanned_edges + frontier_attribute->queue_length - 1, 
          sizeof(SizeT), cudaMemcpyDeviceToDevice, stream), "cudaMemcpyAsync failed", __FILE__, __LINE__);

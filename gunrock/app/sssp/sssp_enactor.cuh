@@ -467,7 +467,7 @@ namespace sssp {
 
                 while (data_slice->wait_counter <num_gpus*2 
                        && (!All_Done(s_enactor_stats, s_frontier_attribute, s_data_slice, num_gpus)))
-                {    
+                {   
                     for (int peer__=0;peer__<num_gpus*2;peer__++)
                     {    
                         //if (peer__==num_gpus) continue;
@@ -546,20 +546,23 @@ namespace sssp {
                                     stages[peer__]=3;break;
                                 }
 
-                                if (SIZE_CHECK)
+                                if (frontier_attribute_->queue_length > frontier_queue_->keys[selector^1].GetSize())
                                 {
-                                    if (frontier_attribute_->queue_length > frontier_queue_->keys[selector^1].GetSize())
+                                    printf("%d\t %d\t %d\t queue1 oversize : %d -> %d\n",
+                                        thread_num, iteration, peer_,
+                                        frontier_queue_->keys[selector^1].GetSize(),
+                                        frontier_attribute_->queue_length);
+                                    fflush(stdout);
+                                    if (SIZE_CHECK)
                                     {
-                                        printf("%d\t %d\t %d\t queue1 oversize : %d -> %d\n",
-                                            thread_num, iteration, peer_,
-                                            frontier_queue_->keys[selector^1].GetSize(),
-                                            frontier_attribute_->queue_length);
-                                        fflush(stdout);
                                         if (enactor_stats_->retval = frontier_queue_->keys[selector^1].EnsureSize(frontier_attribute_->queue_length)) break;
                                         if (SSSPProblem::USE_DOUBLE_BUFFER)
                                         {
                                             if (enactor_stats_->retval = frontier_queue_->values[selector^1].EnsureSize(frontier_attribute_->queue_length)) break;
                                         }
+                                    } else {
+                                        enactor_stats_->retval = util::GRError(cudaErrorLaunchOutOfResources, "queue1 oversize", __FILE__, __LINE__);
+                                        break;
                                     }
                                 }
 
@@ -618,7 +621,7 @@ namespace sssp {
                             break;
 
                         case 1: //Comp Length                           
-                            gunrock::oprtr::advance::ComputeOutputLength
+                            enactor_stats_->retval = gunrock::oprtr::advance::ComputeOutputLength
                                 <AdvanceKernelPolicy, SSSPProblem, SsspFunctor>(
                                 frontier_attribute_,
                                 graph_slice ->row_offsets     .GetPointer(util::DEVICE),
@@ -728,7 +731,7 @@ namespace sssp {
                                 fflush(stdout);
                             }*/
 
-                            /*if (!SIZE_CHECK)     
+                            if (!SIZE_CHECK)     
                             {
                                 //printf("output_length = %d, queue_size = %d\n", frontier_attribute[peer_].output_length[0], graph_slice->frontier_queues[peer_].keys[frontier_attribute[peer_].selector^1].GetSize());fflush(stdout);
                                 if (frontier_attribute[peer_].output_length[0] > graph_slice->frontier_queues[peer_].keys[frontier_attribute[peer_].selector^1].GetSize())  
@@ -737,8 +740,10 @@ namespace sssp {
                                         thread_num, enactor_stats[peer_].iteration, peer_,
                                         graph_slice->frontier_queues[peer_].keys[frontier_attribute[peer_].selector^1].GetSize(), 
                                         frontier_attribute[peer_].output_length[0]);fflush(stdout);
+                                    enactor_stats_->retval = util::GRError(cudaErrorLaunchOutOfResources, "queue3 oversize", __FILE__, __LINE__);
+                                    break;
                                 }
-                            }*/
+                            }
                             if (frontier_attribute_->queue_length!=0)
                             {
                                 /*if (frontier_attribute[peer_].queue_length > 
@@ -749,19 +754,23 @@ namespace sssp {
                                        frontier_attribute[peer_].queue_length, graph_slice->frontier_queues[peer_].keys[frontier_attribute[peer_].selector].GetSize());
                                    fflush(stdout);
                                 }*/
-                                if (SIZE_CHECK)
+                                
+                                if (Total_Length + frontier_attribute_->queue_length > graph_slice->frontier_queues[num_gpus].keys[0].GetSize())
                                 {
-                                    if (Total_Length + frontier_attribute_->queue_length > graph_slice->frontier_queues[num_gpus].keys[0].GetSize())
+                                    printf("%d\t %d\t %d\t total_queue oversize : %d -> %d \n",
+                                       thread_num, iteration, peer_,
+                                       Total_Length + frontier_attribute_->queue_length,
+                                       graph_slice->frontier_queues[num_gpus].keys[0].GetSize());fflush(stdout);
+                                    if (SIZE_CHECK)
                                     {
-                                        printf("%d\t %d\t %d\t total_queue oversize : %d -> %d \n",
-                                           thread_num, iteration, peer_,
-                                           Total_Length + frontier_attribute_->queue_length,
-                                           graph_slice->frontier_queues[num_gpus].keys[0].GetSize());fflush(stdout);
                                         if (enactor_stats_->retval = graph_slice->frontier_queues[num_gpus].keys[0].EnsureSize(Total_Length+frontier_attribute_->queue_length, true)) break;
                                         if (SSSPProblem::USE_DOUBLE_BUFFER)
                                         {
                                             if (enactor_stats_->retval = graph_slice->frontier_queues[num_gpus].values[0].EnsureSize(Total_Length + frontier_attribute_->queue_length, true)) break;
                                         }
+                                    } else {
+                                        enactor_stats_ -> retval = util::GRError(cudaErrorLaunchOutOfResources, "total_queue oversize", __FILE__, __LINE__);
+                                        break;
                                     }
                                 }
                                 util::MemsetCopyVectorKernel<<<256,256, 0, streams[peer_]>>>(
@@ -796,7 +805,7 @@ namespace sssp {
                             to_show[peer__]=false;
                         }
 
-                        if (DEBUG)
+                        if (DEBUG && !enactor_stats_->retval)
                         {
                             mssg="stage 0 @ gpu 0, peer_ 0 failed";
                             mssg[6]=char(pre_stage+'0');
@@ -807,6 +816,7 @@ namespace sssp {
                             //sleep(1);
                         }
                         stages[peer__]++;
+                        if (enactor_stats_->retval) break;
                         //if (All_Done(s_enactor_stats, s_frontier_attribute, s_data_slice, num_gpus)) break;
                     }
                     /*to_wait=true;
@@ -819,7 +829,8 @@ namespace sssp {
                     if (to_wait) sleep(0);*/
                 }
 
-                if (num_gpus>1)
+                if (num_gpus>1 &&
+                        !All_Done<SizeT, DataSlice>(s_enactor_stats, s_frontier_attribute, s_data_slice, num_gpus))
                 {
                     /*if (First_Stage4)
                     {
@@ -854,6 +865,7 @@ namespace sssp {
                             }
                         }
                     }
+                    
                     //printf("%d\t %lld\t past StreamSynchronize\n", thread_num, enactor_stats[0].iteration);
                     /*if (SIZE_CHECK)
                     {
@@ -893,17 +905,24 @@ namespace sssp {
                                 data_slice->preds.GetPointer(util::DEVICE));//,
                         }
 
-                        if (SIZE_CHECK && data_slice->keys_marker[0].GetSize() < Total_Length)
+                        if (data_slice->keys_marker[0].GetSize() < Total_Length)
                         {    
                             printf("%d\t %lld\t \t keys_marker oversize : %d -> %d \n",
                                     thread_num, enactor_stats[0].iteration,
                                     data_slice->keys_marker[0].GetSize(), Total_Length);fflush(stdout);     
-                            for (int peer_=0;peer_<num_gpus;peer_++)
-                            {    
-                                data_slice->keys_marker[peer_].EnsureSize(Total_Length);
-                                data_slice->keys_markers[peer_]=data_slice->keys_marker[peer_].GetPointer(util::DEVICE);
-                            }    
-                            data_slice->keys_markers.Move(util::HOST, util::DEVICE, num_gpus, 0, streams[0]);
+                            if (SIZE_CHECK)
+                            {
+                                for (int peer_=0;peer_<num_gpus;peer_++)
+                                {    
+                                    if (enactor_stats[0].retval = data_slice->keys_marker[peer_].EnsureSize(Total_Length)) break;
+                                    data_slice->keys_markers[peer_]=data_slice->keys_marker[peer_].GetPointer(util::DEVICE);
+                                }
+                                if (enactor_stats[0].retval) break;    
+                                data_slice->keys_markers.Move(util::HOST, util::DEVICE, num_gpus, 0, streams[0]);
+                            } else {
+                                enactor_stats[0].retval = util::GRError(cudaErrorLaunchOutOfResources, "keys_makrer oversize", __FILE__, __LINE__);
+                                break;
+                            }
                         }    
                         
                         Assign_Marker<VertexId, SizeT>
@@ -924,25 +943,25 @@ namespace sssp {
                                 context[0][0]);
                         }
 
-                        if (SIZE_CHECK)
+                        for (int peer_=0; peer_<num_gpus;peer_++)
                         {
-                            for (int peer_=0; peer_<num_gpus;peer_++)
-                            {
-                                cudaMemcpyAsync(&(data_slice->out_length[peer_]),
-                                    data_slice->keys_marker[peer_].GetPointer(util::DEVICE)
-                                        + (Total_Length -1),
-                                    sizeof(SizeT), cudaMemcpyDeviceToHost, streams[0]);
-                            }
-                            cudaStreamSynchronize(streams[0]);
+                            cudaMemcpyAsync(&(data_slice->out_length[peer_]),
+                                data_slice->keys_marker[peer_].GetPointer(util::DEVICE)
+                                    + (Total_Length -1),
+                                sizeof(SizeT), cudaMemcpyDeviceToHost, streams[0]);
+                        }
+                        cudaStreamSynchronize(streams[0]);
 
-                            for (int peer_=0; peer_<num_gpus;peer_++)
+                        for (int peer_=0; peer_<num_gpus;peer_++)
+                        {
+                            SizeT org_size = (peer_==0? graph_slice->frontier_queues[0].keys[frontier_attribute[0].selector^1].GetSize() : data_slice->keys_out[peer_].GetSize());
+                            if (data_slice->out_length[peer_] > org_size)
                             {
-                                SizeT org_size = (peer_==0? graph_slice->frontier_queues[0].keys[frontier_attribute[0].selector^1].GetSize() : data_slice->keys_out[peer_].GetSize());
-                                if (data_slice->out_length[peer_] > org_size)
+                                printf("%d\t %lld\t %d\t keys_out oversize : %d -> %d\n",
+                                       thread_num, enactor_stats[0].iteration, peer_,
+                                       org_size, data_slice->out_length[peer_]);fflush(stdout);
+                                if (SIZE_CHECK)
                                 {
-                                    printf("%d\t %lld\t %d\t keys_out oversize : %d -> %d\n",
-                                           thread_num, enactor_stats[0].iteration, peer_,
-                                           org_size, data_slice->out_length[peer_]);fflush(stdout);
                                     if (peer_==0)
                                     {
                                         graph_slice->frontier_queues[0].keys[frontier_attribute[0].selector^1].EnsureSize(data_slice->out_length[0]);
@@ -963,9 +982,13 @@ namespace sssp {
                                         }
                                         data_slice->value__associate_outs[peer_].Move(util::HOST, util::DEVICE, num_gpus, 0, streams[0]);
                                     }
+                                } else {
+                                    enactor_stats[0].retval = util::GRError(cudaErrorLaunchOutOfResources, "keys_out oversize", __FILE__, __LINE__);
+                                    break;
                                 }
                             }
                         }
+                        if (enactor_stats[0].retval) break;
  
                         for (int peer_=0;peer_<num_gpus;peer_++)
                             if (peer_==0) data_slice -> keys_outs[peer_] = graph_slice->frontier_queues[peer_].keys[frontier_attribute[0].selector^1].GetPointer(util::DEVICE);
@@ -1023,14 +1046,14 @@ namespace sssp {
                             data_slice -> value__associate_outss .GetPointer(util::DEVICE));
                             */
                         //if (enactor_stats[0].retval = util::GRError(cudaStreamSynchronize(streams[0]), "Make_Out error", __FILE__, __LINE__)) break;
-                        if (!SIZE_CHECK)
+                        /*if (!SIZE_CHECK)
                         {
                             for (int peer_=0;peer_<num_gpus;peer_++)
                                 cudaMemcpyAsync(&(data_slice->out_length[peer_]),
                                     data_slice->keys_marker[peer_].GetPointer(util::DEVICE)
                                         + (Total_Length -1),
                                     sizeof(SizeT), cudaMemcpyDeviceToHost, streams[0]);
-                        }
+                        }*/
 
                        cudaStreamSynchronize(streams[0]);
                        frontier_attribute[0].selector^=1;
@@ -1042,7 +1065,7 @@ namespace sssp {
                     for (int peer_=0;peer_<num_gpus;peer_++)
                         frontier_attribute[peer_].queue_length = data_slice->out_length[peer_];
 
-                } else {
+                } else if (!All_Done<SizeT, DataSlice>(s_enactor_stats, s_frontier_attribute, s_data_slice, num_gpus)) {
                     if (enactor_stats[0].retval = work_progress[0].GetQueueLength(frontier_attribute[0].queue_index, frontier_attribute[0].queue_length, false, data_slice->streams[0])) break;
                 }
 
