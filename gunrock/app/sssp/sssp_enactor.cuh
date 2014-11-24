@@ -548,7 +548,7 @@ namespace sssp {
 
                                 if (frontier_attribute_->queue_length > frontier_queue_->keys[selector^1].GetSize())
                                 {
-                                    printf("%d\t %d\t %d\t queue1 oversize : %d -> %d\n",
+                                    printf("%d\t %d\t %d\t queue1  \t oversize :\t %d ->\t %d\n",
                                         thread_num, iteration, peer_,
                                         frontier_queue_->keys[selector^1].GetSize(),
                                         frontier_attribute_->queue_length);
@@ -659,7 +659,7 @@ namespace sssp {
                                 //frontier_attribute_->output_length[0]+=1;
                                 if (frontier_attribute_->output_length[0]+2 > frontier_queue_->keys[selector^1].GetSize())
                                 {
-                                    printf("%d\t %d\t %d\t queue3 oversize :\t %d ->\t %d\n",
+                                    printf("%d\t %d\t %d\t queue3  \t oversize :\t %d ->\t %d\n",
                                         thread_num, iteration, peer_,
                                         frontier_queue_->keys[selector^1].GetSize(),
                                         frontier_attribute_->output_length[0]+2);fflush(stdout);
@@ -736,7 +736,7 @@ namespace sssp {
                                 //printf("output_length = %d, queue_size = %d\n", frontier_attribute[peer_].output_length[0], graph_slice->frontier_queues[peer_].keys[frontier_attribute[peer_].selector^1].GetSize());fflush(stdout);
                                 if (frontier_attribute[peer_].output_length[0] > graph_slice->frontier_queues[peer_].keys[frontier_attribute[peer_].selector^1].GetSize())  
                                 {
-                                    printf("%d\t %lld\t %d\t queue3 oversize :\t %d ->\t %d\n",
+                                    printf("%d\t %lld\t %d\t queue3  \t oversize :\t %d ->\t %d\n",
                                         thread_num, enactor_stats[peer_].iteration, peer_,
                                         graph_slice->frontier_queues[peer_].keys[frontier_attribute[peer_].selector^1].GetSize(), 
                                         frontier_attribute[peer_].output_length[0]);fflush(stdout);
@@ -757,7 +757,7 @@ namespace sssp {
                                 
                                 if (Total_Length + frontier_attribute_->queue_length > graph_slice->frontier_queues[num_gpus].keys[0].GetSize())
                                 {
-                                    printf("%d\t %d\t %d\t total_queue oversize : %d -> %d \n",
+                                    printf("%d\t %d\t %d\t total_queue\t oversize :\t %d ->\t %d \n",
                                        thread_num, iteration, peer_,
                                        Total_Length + frontier_attribute_->queue_length,
                                        graph_slice->frontier_queues[num_gpus].keys[0].GetSize());fflush(stdout);
@@ -907,7 +907,7 @@ namespace sssp {
 
                         if (data_slice->keys_marker[0].GetSize() < Total_Length)
                         {    
-                            printf("%d\t %lld\t \t keys_marker oversize : %d -> %d \n",
+                            printf("%d\t %lld\t \t keys_marker\t oversize :\t %d ->\t %d \n",
                                     thread_num, enactor_stats[0].iteration,
                                     data_slice->keys_marker[0].GetSize(), Total_Length);fflush(stdout);     
                             if (SIZE_CHECK)
@@ -957,7 +957,7 @@ namespace sssp {
                             SizeT org_size = (peer_==0? graph_slice->frontier_queues[0].keys[frontier_attribute[0].selector^1].GetSize() : data_slice->keys_out[peer_].GetSize());
                             if (data_slice->out_length[peer_] > org_size)
                             {
-                                printf("%d\t %lld\t %d\t keys_out oversize : %d -> %d\n",
+                                printf("%d\t %lld\t %d\t keys_out\t oversize :\t %d ->\t %d\n",
                                        thread_num, enactor_stats[0].iteration, peer_,
                                        org_size, data_slice->out_length[peer_]);fflush(stdout);
                                 if (SIZE_CHECK)

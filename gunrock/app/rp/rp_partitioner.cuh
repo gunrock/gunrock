@@ -120,17 +120,21 @@ struct RandomPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD>
         SizeT**    &out_counter,
         SizeT**    &backward_offsets,
         int**      &backward_partitions,
-        VertexId** &backward_convertions)
+        VertexId** &backward_convertions,
+        float      factor = -1,
+        int        seed   = -1)
     {
         cudaError_t retval = cudaSuccess;
         int*        tpartition_table=this->partition_tables[0];
-        time_t      t = time(NULL);
+        //time_t      t = time(NULL);
         SizeT       nodes  = this->graph->nodes;
         sort_node<SizeT> *sort_list = new sort_node<SizeT>[nodes];
 
-        printf("Partition begin. seed=%ld\n", t);fflush(stdout);
+        if (seed < 0) this->seed = time(NULL);
+        else this->seed = seed;
+        printf("Partition begin. seed=%d\n", seed);fflush(stdout);
 
-        srand(t);
+        srand(seed);
         for (SizeT node=0;node<nodes;node++)
         {
             sort_list[node].value=rand();
@@ -154,7 +158,7 @@ struct RandomPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD>
         //in_offsets          = this->in_offsets;
         in_counter          = this->in_counter;
         out_offsets         = this->out_offsets;
-        out_counter       = this->out_counter;
+        out_counter         = this->out_counter;
         backward_offsets    = this->backward_offsets;
         backward_partitions = this->backward_partitions;
         backward_convertions= this->backward_convertions;

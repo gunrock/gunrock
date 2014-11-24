@@ -52,13 +52,13 @@ struct EnactorStats
 
     EnactorStats()
     {
-         util::cpu_mt::PrintMessage("EnactorStats() begin.");
+         //util::cpu_mt::PrintMessage("EnactorStats() begin.");
          iteration       = 0;
          total_lifetimes = 0;
          total_queued    = 0;
          total_runtimes  = 0;
          retval          = cudaSuccess;
-         util::cpu_mt::PrintMessage("EnactorStats() end.");
+         //util::cpu_mt::PrintMessage("EnactorStats() end.");
     }
 };
 
@@ -339,7 +339,7 @@ bool All_Done(EnactorStats *enactor_stats,
         {
             if (data_slice_p -> keys_in[t][gpu_].GetSize() < queue_length)
             {
-                printf("%d\t %lld\t %d\t keys_in oversize : %d -> %d \n", 
+                printf("%d\t %lld\t %d\t keys_in   \t oversize :\t %d ->\t %d \n", 
                     gpu, enactor_stats->iteration, peer, 
                     data_slice_p->keys_in[t][gpu_].GetSize(), queue_length); 
                 fflush(stdout);
@@ -685,7 +685,7 @@ protected:
         frontier_type(frontier_type),
         DEBUG(DEBUG)
     {
-        util::cpu_mt::PrintMessage("EnactorBase() begin.");
+        //util::cpu_mt::PrintMessage("EnactorBase() begin.");
         this->num_gpus     = num_gpus;
         this->gpu_idx      = gpu_idx;
         cuda_props        .SetName("cuda_props"        );
@@ -719,13 +719,13 @@ protected:
                 //enactor_stats.d_node_locks_out = NULL;
             }
         }
-        util::cpu_mt::PrintMessage("EnactorBase() end.");
+        //util::cpu_mt::PrintMessage("EnactorBase() end.");
     }
 
 
     virtual ~EnactorBase()
     {
-        util::cpu_mt::PrintMessage("~EnactorBase() begin.");
+        //util::cpu_mt::PrintMessage("~EnactorBase() begin.");
         for (int gpu=0;gpu<num_gpus;gpu++)
         {
             if (util::SetDevice(gpu_idx[gpu])) return;
@@ -751,7 +751,7 @@ protected:
         //delete[] cuda_props        ; cuda_props         = NULL;
         //delete[] enactor_stats     ; enactor_stats      = NULL;
         //delete[] frontier_attribute; frontier_attribute = NULL;
-        util::cpu_mt::PrintMessage("~EnactorBase() end.");
+        //util::cpu_mt::PrintMessage("~EnactorBase() end.");
     }
 
     template <typename ProblemData>
@@ -762,7 +762,7 @@ protected:
         int filter_occupancy,
         int node_lock_size = 256)
     { 
-        util::cpu_mt::PrintMessage("EnactorBase Init() begin.");
+        //util::cpu_mt::PrintMessage("EnactorBase Init() begin.");
         cudaError_t retval = cudaSuccess;
 
         for (int gpu=0;gpu<num_gpus;gpu++)
@@ -813,7 +813,7 @@ protected:
                 if (retval = enactor_stats[gpu*num_gpus+peer].node_locks_out.Allocate(node_lock_size, util::DEVICE)) return retval;
             }
         }
-        util::cpu_mt::PrintMessage("EnactorBase Setup() end.");
+        //util::cpu_mt::PrintMessage("EnactorBase Setup() end.");
         return retval;
     }
 
@@ -825,7 +825,7 @@ protected:
         //int filter_occupancy,
         //int node_lock_size = 256)
     {
-        util::cpu_mt::PrintMessage("EnactorBase Reset() begin.");
+        //util::cpu_mt::PrintMessage("EnactorBase Reset() begin.");
         cudaError_t retval = cudaSuccess;
 
         for (int gpu=0;gpu<num_gpus*num_gpus;gpu++)
@@ -874,7 +874,7 @@ protected:
             //            "EnactorBase cudaMalloc d_node_locks_out failed", __FILE__, __LINE__)) return retval;
             //if (retval = enactor_stats[gpu].node_locks_out.Allocate(node_lock_size, util::DEVICE)) return retval;
         }
-        util::cpu_mt::PrintMessage("EnactorBase Reset() end.");
+        //util::cpu_mt::PrintMessage("EnactorBase Reset() end.");
         return retval;
     }
 

@@ -281,7 +281,9 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
             cudaStream_t* streams = NULL,
             int           delta_factor = 16,
             float         queue_sizing = 2.0,
-            float         in_sizing = 1.0)
+            float         in_sizing = 1.0,
+            float         partition_factor = -1.0,
+            int           partition_seed   = -1)
     {
         //printf("Problem in_sizing=%f\n", in_sizing);fflush(stdout);
         ProblemBase<VertexId, SizeT, Value, false>::Init(
@@ -291,7 +293,9 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
             num_gpus,
             gpu_idx,
             partition_method,
-            queue_sizing);
+            queue_sizing,
+            partition_factor,
+            partition_seed);
 
         // No data in DataSlice needs to be copied from host
 

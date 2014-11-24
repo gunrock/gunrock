@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OPTION[0]="--src=largestdegree --device=2,3 --partition_method=biasrandom --grid-size=768"
+OPTION[0]="--src=largestdegree --device=2,3 --partition-method=biasrandom --grid-size=768"
 #OPTION[0]="" #directed and do not mark-pred"
 OPTION[1]=${OPTION[0]}" --undirected" #undirected and do not mark-pred"
 OPTION[2]=${OPTION[0]}" --mark-path"  #directed and mark-pred"
@@ -11,20 +11,17 @@ OPTION[3]=${OPTION[1]}" --mark-path" #undirected and mark-pred"
 #OPTION[7]=${OPTION[3]}" --idempotence"
 
 MARK[0]=""
-MARK[1]=${MARK[0]}".undir"
-MARK[2]=${MARK[0]}".mark_path"
-MARK[3]=${MARK[1]}".mark_path"
+MARK[1]=${MARK[0]}"_undir"
+MARK[2]=${MARK[0]}"_markpath"
+MARK[3]=${MARK[1]}"_markpath"
 #MARK[4]=${MARK[0]}".idempotence"
 #MARK[5]=${MARK[1]}".idempotence"
 #MARK[6]=${MARK[2]}".idempotence"
 #MARK[7]=${MARK[3]}".idempotence"
 
 #put OS and Device type here
-SUFFIX="ubuntu12.04.k40cx2_brp0.5"
 EXCUTION="./bin/test_sssp_6.5_x86_64"
 DATADIR="/data/gunrock_dataset/large"
-
-mkdir -p eval/$SUFFIX
 
 NAME[ 0]="ak2010"            && Q_SIZE_DIR[ 0]="0.05" && I_SIZE_DIR[ 0]="0.02" && Q_SIZE_UDIR[ 0]="3.00" && I_SIZE_UDIR[ 0]="1.00"
 
@@ -76,21 +73,30 @@ NAME[41]="tweets"            && Q_SIZE_DIR[41]="10.0" && I_SIZE_DIR[41]="2.00" &
 NAME[42]="bitcoin"           && Q_SIZE_DIR[42]="5.00" && I_SIZE_DIR[42]="2.00" && Q_SIZE_UDIR[42]="10.0" && I_SIZE_UDIR[42]="2.00" 
 NAME[43]="caidaRouterLevel"  && Q_SIZE_DIR[43]="1.50" && I_SIZE_DIR[43]="0.50" && Q_SIZE_UDIR[43]="12.0" && I_SIZE_UDIR[43]="1.20" 
 
-for i in  {0..43} 
+F[0]="0.0" && F[1]="0.1" && F[2]="0.2" && F[3]="0.3" && F[4]="0.4" && F[5]="0.5" && F[6]="0.6" && F[7]="0.7" && F[8]="0.8" && F[9]="0.9"
+F[10]="1.0"
+ 
+for k in {0..10}
 do
-    for j in {0..3}
+    SUFFIX="ubuntu12.04_k40cx2_brp${F[$k]}"
+    mkdir -p eval/$SUFFIX
+
+    for i in  {0..1} 
     do
-        if [ "$j" -eq "0" ] || [ "$j" -eq "2" ] ; then
-            #echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_DIR[$i]} --in-sizing=${I_SIZE_DIR[$i]} "> eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt"
-            #$EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_DIR[$i]} --in-sizing=${I_SIZE_DIR[$i]} > eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt
-            echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 "> eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt"
-            $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 > eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt
-        else
-            #echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_UDIR[$i]} --in-sizing=${I_SIZE_UDIR[$i]} "> eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt"
-            #$EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_UDIR[$i]} --in-sizing=${I_SIZE_UDIR[$i]} > eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt
-            echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 "> eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt"
-            $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 > eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt
-       fi
-        sleep 1
+        for j in {0..3}
+        do
+            if [ "$j" -eq "0" ] || [ "$j" -eq "2" ] ; then
+                #echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_DIR[$i]} --in-sizing=${I_SIZE_DIR[$i]} "> eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt"
+                #$EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_DIR[$i]} --in-sizing=${I_SIZE_DIR[$i]} > eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt
+                echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 --partition-factor=${F[$k]} "> eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt"
+                $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 --partition-factor=${F[$k]} > eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt
+            else
+                #echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_UDIR[$i]} --in-sizing=${I_SIZE_UDIR[$i]} "> eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt"
+                #$EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_UDIR[$i]} --in-sizing=${I_SIZE_UDIR[$i]} > eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt
+                echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 --partition-factor=${F[$k]} "> eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt"
+                $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 --partition-factor=${F[$k]} > eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt
+            fi
+            sleep 1
+        done
     done
 done

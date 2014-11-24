@@ -119,7 +119,9 @@ struct ClusterPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD
         SizeT**    &out_counter,
         SizeT**    &backward_offsets,
         int**      &backward_partitions,
-        VertexId** &backward_convertions)
+        VertexId** &backward_convertions,
+        float      factor = -1,
+        int        seed = -1)
     {
         cudaError_t retval = cudaSuccess;
         int*        tpartition_table=this->partition_tables[0];
@@ -131,11 +133,15 @@ struct ClusterPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD
         SizeT       *counter = new SizeT[this->num_gpus+1];
         SizeT       n1 = 1, n2 = 1;
         SizeT       *level_tail = new SizeT[(n1<n2? n2:n1)+1];
-        float       f1 = 1.0/this->num_gpus;
+        //float       f1 = 1.0/this->num_gpus;
         SizeT       *current_count = new SizeT[this->num_gpus];
         VertexId    StartId, EndId;
         VertexId    *row_offsets=this->graph->row_offsets;
         VertexId    *column_indices=this->graph->column_indices;
+
+        if (factor < 0) this->factor = 1.0/this->num_gpus;
+        else this->factor = factor;
+        printf("partition_factor = %f\n", this->factor);
 
         target_level = (n1<n2? n2:n1);
         for (SizeT node=0;node<nodes;node++)
@@ -212,7 +218,7 @@ struct ClusterPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD
                 Max_GPU  =i;
             }
             //printf("Max_Count = %d, total_count = %d",Max_Count,total_count);
-            if (Max_GPU != -1 && 1.0*Max_Count/total_count > f1 
+            if (Max_GPU != -1 && 1.0*Max_Count/total_count > this->factor 
             && current_count[Max_GPU]+counter[this->num_gpus] <= nodes*weitage[Max_GPU])
                 Set_GPU = Max_GPU;
             else {

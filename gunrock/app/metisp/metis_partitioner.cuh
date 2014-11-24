@@ -82,7 +82,9 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value, ENABLE_BACKWARD>
         SizeT**    &out_counter,
         SizeT**    &backward_offsets,
         int**      &backward_partitions,
-        VertexId** &backward_convertions)
+        VertexId** &backward_convertions,
+        float      factor = -1,
+        int        seed   = -1)
     {
         cudaError_t retval = cudaSuccess;
         idx_t       nodes  = this->graph->nodes;

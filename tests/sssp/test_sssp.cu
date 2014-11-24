@@ -348,7 +348,9 @@ void RunTests(
     std::string  partition_method,
     int          *gpu_idx,
     cudaStream_t *streams,
-    bool         size_check = true)
+    bool         size_check = true,
+    float        partition_factor = -1,
+    int          partition_seed   = -1)
 {
         size_t *org_size = new size_t[num_gpus];
 
@@ -395,7 +397,9 @@ void RunTests(
             streams,
             delta_factor,
             max_queue_sizing,
-            max_in_sizing), "Problem SSSP Initialization Failed", __FILE__, __LINE__);
+            max_in_sizing,
+            partition_factor,
+            partition_seed), "Problem SSSP Initialization Failed", __FILE__, __LINE__);
         util::GRError(sssp_enactor->Init (context, csr_problem, max_grid_size, size_check), "SSSP Enactor init failed", __FILE__, __LINE__);
         //
         // Compute reference CPU SSSP solution for source-distance
@@ -553,6 +557,8 @@ void RunTests(
     int                 iterations          = 1;
     bool                disable_size_check  = false;
     int                 delta_factor        = 16;
+    float               partition_factor    = -1;
+    int                 partition_seed      = -1;
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     disable_size_check = args.CheckCmdLineFlag("disable-size-check");
@@ -571,13 +577,15 @@ void RunTests(
     g_verbose = args.CheckCmdLineFlag("v"        );
     g_quick   = args.CheckCmdLineFlag("quick"    );
     mark_pred = args.CheckCmdLineFlag("mark-pred");
-    args.GetCmdLineArgument("iteration-num", iterations      );
-    args.GetCmdLineArgument("queue-sizing",  max_queue_sizing);
-    args.GetCmdLineArgument("in-sizing",     max_in_sizing   );
-    args.GetCmdLineArgument("grid-size",     max_grid_size   );
-    args.GetCmdLineArgument("delta-factor",  delta_factor    );
-    if (args.CheckCmdLineFlag  ("partition_method")) 
-        args.GetCmdLineArgument("partition_method",partition_method);
+    args.GetCmdLineArgument("iteration-num"   , iterations      );
+    args.GetCmdLineArgument("queue-sizing"    , max_queue_sizing);
+    args.GetCmdLineArgument("in-sizing"       , max_in_sizing   );
+    args.GetCmdLineArgument("grid-size"       , max_grid_size   );
+    args.GetCmdLineArgument("delta-factor"    , delta_factor    );
+    args.GetCmdLineArgument("partition-factor", partition_factor);
+    args.GetCmdLineArgument("partition-seed"  , partition_seed  );
+    if (args.CheckCmdLineFlag  ("partition-method")) 
+        args.GetCmdLineArgument("partition-method",partition_method);
 
     if (mark_pred) {
         if (instrumented) {
@@ -594,7 +602,9 @@ void RunTests(
                     partition_method,
                     gpu_idx,
                     streams,
-                    !disable_size_check);
+                    !disable_size_check,
+                    partition_factor,
+                    partition_seed);
         } else {
             RunTests<VertexId, Value, SizeT, false, true>(
                     graph,
@@ -609,7 +619,9 @@ void RunTests(
                     partition_method,
                     gpu_idx,
                     streams,
-                    !disable_size_check);
+                    !disable_size_check,
+                    partition_factor,
+                    partition_seed);
         }
     } else {
         if (instrumented) {
@@ -626,7 +638,9 @@ void RunTests(
                     partition_method,
                     gpu_idx,
                     streams,
-                    !disable_size_check);
+                    !disable_size_check,
+                    partition_factor,
+                    partition_seed);
         } else {
             RunTests<VertexId, Value, SizeT, false, false>(
                     graph,
@@ -641,7 +655,9 @@ void RunTests(
                     partition_method,
                     gpu_idx,
                     streams,
-                    !disable_size_check);
+                    !disable_size_check,
+                    partition_factor,
+                    partition_seed);
         }
     }
 

@@ -119,7 +119,9 @@ struct BiasRandomPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKW
         SizeT**    &out_counter,
         SizeT**    &backward_offsets,
         int**      &backward_partitions,
-        VertexId** &backward_convertions)
+        VertexId** &backward_convertions,
+        float      factor = -1,
+        int        seed = -1)
     {
         cudaError_t retval = cudaSuccess;
         int*        tpartition_table=this->partition_tables[0];
@@ -132,16 +134,23 @@ struct BiasRandomPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKW
         SizeT       n1 = 1;//, n2 = 1;
         SizeT       target_level = n1;
         SizeT       *level_tail = new SizeT[target_level+1];
-        float       f1 = 0.5;//1.0/this->num_gpus;
+        //float       f1 = 0.5;//1.0/this->num_gpus;
         float       *gpu_percentage=new float[this->num_gpus+1];
         SizeT       *current_count = new SizeT[this->num_gpus];
         VertexId    StartId, EndId;
         VertexId    *row_offsets=this->graph->row_offsets;
         VertexId    *column_indices=this->graph->column_indices;
-        int         seed = time(NULL);
+        //int         seed = time(NULL);
 
-        srand(seed);
-        printf("seed = %d\n",seed);fflush(stdout);
+        if (seed < 0) this->seed = time(NULL);
+        else this->seed = seed;
+        srand(this->seed);
+        printf("partition_seed = %d\n",this->seed);fflush(stdout);
+
+        if (factor < 0) this->factor = 0.5;
+        else this->factor = factor;
+        printf("partition_factor = %f\n", this->factor);fflush(stdout); 
+
         target_level = n1;//(n1<n2? n2:n1);
         for (SizeT node=0;node<nodes;node++)
         {
@@ -217,7 +226,7 @@ struct BiasRandomPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKW
             }
             for (int i=0;i<this->num_gpus;i++) 
             {
-                gpu_percentage[i]=(total_count==0?0:(f1*counter[i]/total_count));
+                gpu_percentage[i]=(total_count==0?0:(this->factor*counter[i]/total_count));
                 //printf("g%d = %f ",i,gpu_percentage[i]);
             }
             total_count=0;
@@ -229,7 +238,7 @@ struct BiasRandomPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKW
             for (int i=0;i<this->num_gpus;i++)
             {
                 SizeT e=nodes*weitage[i]-current_count[i];
-                gpu_percentage[i]+=(e>0?((1-f1)*e/total_count):0);
+                gpu_percentage[i]+=(e>0?((1-this->factor)*e/total_count):0);
                 //printf("e%d = %d ",i,e);
             }
             float total_percentage=0;

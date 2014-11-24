@@ -46,6 +46,8 @@ public:
     // Number of GPUs to be partitioned
     int        num_gpus;
     int        Status;
+    float      factor;
+    int        seed;
 
     // Original graph
     const GraphT *graph;
@@ -63,6 +65,7 @@ public:
     SizeT         **in_counter;
     SizeT         **out_offsets;
     SizeT         **out_counter;
+
     //Mthods
 
     template <
@@ -463,7 +466,9 @@ public:
         VertexId** &original_vertexes,
         //SizeT**    &in_offsets,
         SizeT**    &out_offsets,
-        SizeT**    &cross_counter)
+        SizeT**    &cross_counter,
+        float      factor = -1,
+        int        seed = -1)
     {   
         SizeT**    backward_offsets     = NULL;
         int**      backward_partitions  = NULL;
@@ -479,7 +484,9 @@ public:
                    out_counter,
                    backward_offsets,
                    backward_partitions,
-                   backward_convertions);
+                   backward_convertions,
+                   factor,
+                   seed);
     }   
 
     virtual cudaError_t Partition(
@@ -493,7 +500,9 @@ public:
         SizeT**    &out_counter,
         SizeT**    &backward_offsets,
         int**      &backward_partitions,
-        VertexId** &backward_convertions)
+        VertexId** &backward_convertions,
+        float      factor = -1,
+        int        seed = -1)
     {
         return util::GRError("PartitionBase::Partition is undefined", __FILE__, __LINE__);
     }
