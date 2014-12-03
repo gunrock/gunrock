@@ -349,7 +349,7 @@ class SSSPEnactor : public EnactorBase
                 //if (done[0] == 0) break;
 
                 // Vertex Map
-                /*gunrock::oprtr::filter::Kernel<FilterKernelPolicy, SSSPProblem, SsspFunctor>
+                gunrock::oprtr::filter::Kernel<FilterKernelPolicy, SSSPProblem, SsspFunctor>
                 <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
                     enactor_stats.iteration+1,
                     frontier_attribute.queue_reset,
@@ -373,7 +373,7 @@ class SSSPEnactor : public EnactorBase
                 frontier_attribute.queue_index++;
                 frontier_attribute.selector ^= 1;
 
-                if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;*/
+                if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
 
                 //TODO: split the output queue into near/far pile, put far pile in far queue, put near pile as the input queue
                 //for next round.
@@ -523,10 +523,10 @@ class SSSPEnactor : public EnactorBase
                 SSSPProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
+                1,                                  // MIN_CTA_OCCUPANCY
                 10,                                  // LOG_THREADS
                 8,                                  // LOG_BLOCKS
-                32*128,                             // LIGHT_EDGE_THRESHOLD    
+                32*1024,                             // LIGHT_EDGE_THRESHOLD    
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS

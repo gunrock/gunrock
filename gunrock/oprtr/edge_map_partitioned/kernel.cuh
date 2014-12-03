@@ -345,12 +345,12 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                             {
                                                 v_index = BinarySearch<KernelPolicy::THREADS>(i, s_edges);
                                                 if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
-                                                    v = d_queue[v_index];
+                                                    v = s_vertices[v_index];
                                                     e_id = 0;
                                                 }
                                                 if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
-                                                    v = inverse_graph ? d_inverse_column_indices[d_queue[v_index]] : d_column_indices[d_queue[v_index]];
-                                                    e_id = d_queue[v_index];
+                                                    v = inverse_graph ? d_inverse_column_indices[s_vertices[v_index]] : d_column_indices[s_vertices[v_index]];
+                                                    e_id = s_vertices[v_index];
                                                 }
                                                 end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_edges);
                                                 internal_offset = v_index > 0 ? s_edges[v_index-1] : 0;
