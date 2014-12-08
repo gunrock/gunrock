@@ -173,7 +173,7 @@ class SSSPEnactor : public EnactorBase
         cudaThreadSynchronize();
 
         total_queued = this->total_queued;
-        search_depth = this->iteration;
+        search_depth = enactor_stats.iteration;
 
         avg_duty = (total_lifetimes >0) ?
             double(total_runtimes) / total_lifetimes : 0.0;
