@@ -1,9 +1,9 @@
-// ----------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
-// ----------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ----------------------------------------------------------------
+// -----------------------------------------------------------------------------
 
 /**
  * @file
@@ -24,7 +24,7 @@ namespace mst {
 ////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief Structure contains device functions in MST graph traverse.
- * find the successor of each vertex and add to mst outputs
+ * find the successor of each vertex and add to MST outputs
  *
  * @tparam VertexId    Type of signed integer use as vertex id
  * @tparam SizeT       Type of unsigned integer for array indexing
@@ -72,17 +72,35 @@ struct SuccFunctor
     VertexId s_id,  VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
+    /*
+    if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id])
+      printf("s_id: %d, d_id: %d, e_id: %d, origin_e_id: %d, "
+        "reduced_weight: %d, edge_weight: %d, successors[s_id]: %d\n",
+	     s_id, d_id, e_id, problem->d_origin_edges[e_id],
+	     problem->d_reduced_vals[s_id],
+	     problem->d_edge_weights[e_id],
+	     problem->d_successors[s_id]);
+    */
     if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id])
     {
-      //problem->d_successors[s_id] = d_id;
+      atomicMin(&problem->d_successors[s_id], d_id);
+      atomicMin(&problem->d_temp_storage[s_id], problem->d_origin_edges[e_id]);
+    }
+
+    /*
+    if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id])
+    {
+      // problem->d_successors[s_id] = d_id;
       // mark MST output results
-      //problem->d_mst_output[problem->d_origin_edges[e_id]] = 1;
+      // problem->d_mst_output[problem->d_origin_edges[e_id]] = 1;
       if (atomicMin(&problem->d_successors[s_id], d_id) > d_id)
       {
-       // keep outgoing selected minimum weighted e_ids
+        // keep outgoing selected minimum weighted e_ids
         problem->d_temp_storage[s_id] = problem->d_origin_edges[e_id];
       }
     }
+    */
+
   }
 };
 
@@ -100,13 +118,13 @@ template<
   typename SizeT,
   typename Value,
   typename ProblemData>
-struct RmCycFunctor
+struct CyRmFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
 
   /**
    * @brief Forward Edge Mapping condition function.
-   * Used for finding Vetex Id that have minimum weight value.
+   * Used for finding Vertex Id that have minimum weight value.
    *
    * @param[in] s_id Vertex Id of the edge source node
    * @param[in] d_id Vertex Id of the edge destination node
@@ -137,16 +155,27 @@ struct RmCycFunctor
   VertexId s_id, VertexId d_id, DataSlice *problem,
   VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    // mark minimum spanning tree outputs
+    // mark minimum spanning tree output edges
     problem->d_mst_output[problem->d_temp_storage[s_id]] = 1;
+    __syncthreads(); // make sure finish mark 1 process
+
+    /*
+    if (s_id == 0 && problem->d_successors[problem->d_successors[s_id]] == s_id)
+    {
+      printf(" remove-s_id:%4d d_id:%4d e_id:%4d origin_e_id:%4d "
+        "suc[s_id]: %4d suc[suc[s_id]: %4d\n",
+        s_id, d_id, e_id, problem->d_origin_edges[e_id],
+        problem->d_successors[s_id],
+        problem->d_successors[problem->d_successors[s_id]]);
+    }
+    */
+
     // remove length two cycles
     if (problem->d_successors[s_id] > s_id &&
         problem->d_successors[problem->d_successors[s_id]] == s_id)
     {
-      //printf(" remove-s_id:%4d d_id:%4d e_id:%4d origin_e_id:%4d\n",
-      //  s_id, d_id, e_id, problem->d_origin_edges[e_id]);
       problem->d_successors[s_id] = s_id;
-      // remove edges in the mst output results
+      // remove some edges in the MST output result
       problem->d_mst_output[problem->d_origin_edges[e_id]] = 0;
     }
   }
@@ -165,7 +194,7 @@ template<
   typename SizeT,
   typename Value,
   typename ProblemData>
-struct PtrJumpFunctor
+struct PJmpFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
 
@@ -215,7 +244,7 @@ struct PtrJumpFunctor
 ////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief Structure contains device functions in MST graph traverse.
- * used for remove redundent edges in one supervertex
+ * used for remove redundant edges in one super-vertex
  *
  * @tparam VertexId    Type of signed integer to use as vertex id
  * @tparam SizeT       Type of unsigned integer to use for array indexing
@@ -226,7 +255,7 @@ template<
   typename SizeT,
   typename Value,
   typename ProblemData>
-struct EdgeRmFunctor
+struct EgRmFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
 
@@ -251,7 +280,7 @@ struct EdgeRmFunctor
 
   /**
    * @brief Forward Edge Mapping apply function.
-   * Each edge looks at the supervertex id of both endpoints
+   * Each edge looks at the super-vertex id of both endpoints
    * and mark -1 (to be removed) if the id is the same
    *
    * @param[in] s_id Vertex Id of the edge source node
@@ -295,7 +324,7 @@ struct EdgeRmFunctor
 
   /**
    * @brief Vertex mapping apply function.
-   * removing edges belonging to the same supervertex
+   * removing edges belonging to the same super-vertex
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
@@ -305,9 +334,9 @@ struct EdgeRmFunctor
   VertexId node, DataSlice *problem, Value v = 0)
   {
     problem->d_keys_array[node]  =
-      problem->d_super_vids[problem->d_keys_array[node]];
+      problem->d_supervtx_ids[problem->d_keys_array[node]];
     problem->d_col_indices[node] =
-      problem->d_super_vids[problem->d_col_indices[node]];
+      problem->d_supervtx_ids[problem->d_col_indices[node]];
   }
 };
 
@@ -326,7 +355,7 @@ template<
   typename SizeT,
   typename Value,
   typename ProblemData>
-struct RowOffsetsFunctor
+struct RIdxFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
 
@@ -378,7 +407,7 @@ template<
   typename SizeT,
   typename Value,
   typename ProblemData>
-struct EdgeOffsetsFunctor
+struct EIdxFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
 
@@ -467,7 +496,7 @@ struct OrFunctor
 ////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief Structure contains device functions in MST graph traverse.
- * used for remove duplicated edges between supervertices
+ * used for remove duplicated edges between super-vertices
  *
  * @tparam VertexId    Type of signed integer to use as vertex id
  * @tparam SizeT       Type of unsigned integer to use for array indexing
@@ -479,7 +508,7 @@ template<
   typename SizeT,
   typename Value,
   typename ProblemData>
-struct SuEdgeRmFunctor
+struct SuRmFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
 
