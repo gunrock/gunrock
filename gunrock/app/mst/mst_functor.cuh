@@ -76,31 +76,81 @@ struct SuccFunctor
     if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id])
       printf("s_id: %d, d_id: %d, e_id: %d, origin_e_id: %d, "
         "reduced_weight: %d, edge_weight: %d, successors[s_id]: %d\n",
-	     s_id, d_id, e_id, problem->d_origin_edges[e_id],
-	     problem->d_reduced_vals[s_id],
-	     problem->d_edge_weights[e_id],
-	     problem->d_successors[s_id]);
+         s_id, d_id, e_id, problem->d_origin_edges[e_id],
+         problem->d_reduced_vals[s_id],
+         problem->d_edge_weights[e_id],
+         problem->d_successors[s_id]);
     */
     if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id])
     {
-      atomicMin(&problem->d_successors[s_id], d_id);
-      atomicMin(&problem->d_temp_storage[s_id], problem->d_origin_edges[e_id]);
-    }
-
-    /*
-    if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id])
-    {
       // problem->d_successors[s_id] = d_id;
-      // mark MST output results
       // problem->d_mst_output[problem->d_origin_edges[e_id]] = 1;
       if (atomicMin(&problem->d_successors[s_id], d_id) > d_id)
       {
         // keep outgoing selected minimum weighted e_ids
-        problem->d_temp_storage[s_id] = problem->d_origin_edges[e_id];
+        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+          problem->d_origin_edges[e_id], problem->d_temp_storage + s_id);
+        // problem->d_temp_storage[s_id] = problem->d_origin_edges[e_id];
       }
     }
-    */
+  }
+};
 
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief Structure contains device functions in MST graph traverse.
+ * used for removing cycles in successors
+ *
+ * @tparam VertexId    Type of signed integer to use as vertex id
+ * @tparam SizeT       Type of unsigned integer to use for array indexing
+ * @tparam ProblemData Problem data type contains data slice for MST problem
+ */
+template<
+  typename VertexId,
+  typename SizeT,
+  typename Value,
+  typename ProblemData>
+struct MarkFunctor
+{
+  typedef typename ProblemData::DataSlice DataSlice;
+
+  /**
+   * @brief Forward Edge Mapping condition function.
+   * Used for finding Vertex Id that have minimum weight value.
+   *
+   * @param[in] s_id Vertex Id of the edge source node
+   * @param[in] d_id Vertex Id of the edge destination node
+   * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
+   *
+   * \return Whether to load the apply function for the edge and include
+   * the destination node in the next frontier.
+   */
+  static __device__ __forceinline__ bool CondEdge(
+    VertexId s_id, VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+  {
+    return true;
+  }
+
+  /**
+   * @brief Forward Edge Mapping apply function.
+   *
+   * @param[in] s_id Vertex Id of the edge source node
+   * @param[in] d_id Vertex Id of the edge destination node
+   * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
+   */
+  static __device__ __forceinline__ void ApplyEdge(
+  VertexId s_id, VertexId d_id, DataSlice *problem,
+  VertexId e_id = 0, VertexId e_id_in = 0)
+  {
+    // mark minimum spanning tree output edges
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      1, problem->d_mst_output + problem->d_temp_storage[s_id]);
+    // problem->d_mst_output[problem->d_temp_storage[s_id]] = 1;
   }
 };
 
@@ -155,28 +205,28 @@ struct CyRmFunctor
   VertexId s_id, VertexId d_id, DataSlice *problem,
   VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    // mark minimum spanning tree output edges
-    problem->d_mst_output[problem->d_temp_storage[s_id]] = 1;
-    __syncthreads(); // make sure finish mark 1 process
-
     /*
-    if (s_id == 0 && problem->d_successors[problem->d_successors[s_id]] == s_id)
-    {
-      printf(" remove-s_id:%4d d_id:%4d e_id:%4d origin_e_id:%4d "
-        "suc[s_id]: %4d suc[suc[s_id]: %4d\n",
-        s_id, d_id, e_id, problem->d_origin_edges[e_id],
-        problem->d_successors[s_id],
-        problem->d_successors[problem->d_successors[s_id]]);
-    }
+    // mark minimum spanning tree output edges
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      1, problem->d_mst_output + problem->d_temp_storage[s_id]);
+    // problem->d_mst_output[problem->d_temp_storage[s_id]] = 1;
+    __syncthreads(); // make sure finish mark 1 process
     */
 
     // remove length two cycles
     if (problem->d_successors[s_id] > s_id &&
         problem->d_successors[problem->d_successors[s_id]] == s_id)
     {
-      problem->d_successors[s_id] = s_id;
+      // remove cycles by assigning successor to its s_id
+      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+        s_id, problem->d_successors + s_id);
+      // problem->d_successors[s_id] = s_id;
+
       // remove some edges in the MST output result
-      problem->d_mst_output[problem->d_origin_edges[e_id]] = 0;
+      // printf("remove edge: %d\n", problem->d_temp_storage[s_id]);
+      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+        0, problem->d_mst_output + problem->d_temp_storage[s_id]);
+      // problem->d_mst_output[problem->d_temp_storage[s_id]] = 0;
     }
   }
 };
@@ -333,10 +383,12 @@ struct EgRmFunctor
   static __device__ __forceinline__ void ApplyFilter(
   VertexId node, DataSlice *problem, Value v = 0)
   {
-    problem->d_keys_array[node]  =
-      problem->d_supervtx_ids[problem->d_keys_array[node]];
-    problem->d_col_indices[node] =
-      problem->d_supervtx_ids[problem->d_col_indices[node]];
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      problem->d_supervtx_ids[problem->d_keys_array[node]],
+      problem->d_keys_array + node);
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      problem->d_supervtx_ids[problem->d_col_indices[node]],
+      problem->d_col_indices + node);
   }
 };
 
@@ -388,7 +440,8 @@ struct RIdxFunctor
   {
     if (problem->d_flags_array[node] == 1)
     {
-      problem->d_row_offsets[problem->d_keys_array[node]] = node;
+      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+        node, problem->d_row_offsets + problem->d_keys_array[node]);
     }
   }
 };
@@ -439,7 +492,8 @@ struct EIdxFunctor
   {
     if (problem->d_edge_flags[node] == 1)
     {
-      problem->d_row_offsets[problem->d_temp_storage[node]] = node;
+      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+        node, problem->d_row_offsets + problem->d_temp_storage[node]);
     }
   }
 };
@@ -488,8 +542,9 @@ struct OrFunctor
   static __device__ __forceinline__ void ApplyFilter(
     VertexId node, DataSlice *problem, Value v = 0)
   {
-    problem->d_edge_flags[node] =
-      problem->d_edge_flags[node] | problem->d_flags_array[node];
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      problem->d_edge_flags[node] | problem->d_flags_array[node],
+      problem->d_edge_flags + node);
   }
 };
 

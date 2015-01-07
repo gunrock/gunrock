@@ -124,10 +124,7 @@ template<typename VertexId, typename Value, typename SizeT>
 long long int SimpleReferenceMST(
   const Value *edge_values, const Csr<VertexId, Value, SizeT> &graph)
 {
-  // get number of nodes and edges in graph
-  const int num_nodes = graph.nodes;
-  const int num_edges = graph.edges;
-  printf("CPU REFERENCE TEST: #NODES: %d #EDGES: %d\n", num_nodes, num_edges);
+  printf("REFERENCE TEST - #NODES: %d #EDGES: %d\n", graph.nodes, graph.edges);
 
   // Kruskal minimum spanning tree preparations
   using namespace boost;
@@ -137,9 +134,9 @@ long long int SimpleReferenceMST(
   typedef graph_traits < Graph >::vertex_descriptor Vertex;
   typedef std::pair<int, int> E;
 
-  E *edge_pairs = new E[num_edges];
+  E *edge_pairs = new E[graph.edges];
   int idx = 0;
-  for (int i = 0; i < num_nodes; ++i)
+  for (int i = 0; i < graph.nodes; ++i)
   {
     for (int j = graph.row_offsets[i]; j < graph.row_offsets[i+1]; ++j)
     {
@@ -147,7 +144,7 @@ long long int SimpleReferenceMST(
     }
   }
 
-  Graph g(edge_pairs, edge_pairs + num_edges, edge_values, num_nodes);
+  Graph g(edge_pairs, edge_pairs + graph.edges, edge_values, graph.nodes);
   property_map < Graph, edge_weight_t >::type weight = get(edge_weight, g);
   std::vector < Edge > spanning_tree;
 
@@ -209,11 +206,8 @@ void RunTests(
   int num_gpus,
   mgpu::CudaContext& context)
 {
-  // get number of nodes and edges in graph
-  const int num_nodes = graph_gpu.nodes;
-  const int num_edges = graph_gpu.edges;
-  printf("\nGPU MINIMUM SPANNING TREE TEST: #NODES: %d #EDGES: %d\n",
-    num_nodes, num_edges);
+  printf("\nMINIMUM SPANNING TREE TEST - #NODES: %d #EDGES: %d\n",
+    graph_gpu.nodes, graph_gpu.edges);
 
   // define the problem data structure for graph primitive
   typedef MSTProblem<VertexId, SizeT, Value, true> Problem;
@@ -263,7 +257,7 @@ void RunTests(
     //printf("%d ", h_mst_output[iter]);
     //printf("edge_%d: %d \n", iter,  h_mst_output[iter]);
   }
-  //printf("\nGPU - Number of Edges in MST: %d\n", num_selected_gpu);
+  // printf("\nGPU - Number of Edges in MST: %d\n", num_selected_gpu);
 
   // calculate GPU total selected MST weights for validation
   long long int total_weight_gpu = 0;

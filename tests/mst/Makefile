@@ -1,9 +1,9 @@
-# ----------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Gunrock -- Fast and Efficient GPU Graph Library
-# ----------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # This source code is distributed under the terms of LICENSE.TXT
 # in the root directory of this source distribution.
-# ----------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
 # Build script for project
@@ -11,7 +11,7 @@
 
 force64 = 1
 NVCC = "$(shell which nvcc)"
-#NVCC = "/usr/local/cuda-6.0/bin/nvcc"
+#NVCC = "/usr/local/cuda-6.5/bin/nvcc"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
 KERNELS =
@@ -110,9 +110,9 @@ DEPS =			./Makefile \
 
 test: bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_mst.cu ../../gunrock/util/error_utils.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_mst.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_mst.cu ../../gunrock/util/error_utils.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_mst.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean
