@@ -70,7 +70,14 @@ void Usage()
     "  --device=<device_index> Set GPU device for running the graph primitive\n"
     "  --instrumented If set then kernels keep track of queue-search_depth\n"
     "  and barrier duty (a relative indicator of load imbalance)\n"
-    "  --quick If set will skip the CPU validation code\n");
+    "  --quick If set will skip the CPU validation code\n"
+    "  --v If set will enable DEBUG mode\n\n"
+    " --------------------------------------------------------------\n"
+    "  To make sure two graphs have same weight value for each edge \n"
+    "  we have to change ll_value = rand()%%64 in market.cuh file to \n"
+    "  some NON-RANDOM value if the original graph does NOT contain \n"
+    "  weight per edge. Note it only support FULLY-CONNECTED graphs \n"
+    " --------------------------------------------------------------\n");
 }
 
 /**
@@ -177,7 +184,7 @@ long long int SimpleReferenceMST(
   if (edge_pairs) { delete [] edge_pairs; }
 
   printf("CPU - Computation Complete in %lf msec.\n", elapsed_cpu);
-  //printf("CPU - Number of Edges in MST: %d\n", num_selected_cpu);
+  printf("CPU - Number of Edges in MST: %d\n", num_selected_cpu);
 
   return total_weight_cpu;
 }
@@ -257,7 +264,7 @@ void RunTests(
     //printf("%d ", h_mst_output[iter]);
     //printf("edge_%d: %d \n", iter,  h_mst_output[iter]);
   }
-  // printf("\nGPU - Number of Edges in MST: %d\n", num_selected_gpu);
+  printf("\nGPU - Number of Edges in MST: %d\n", num_selected_gpu);
 
   // calculate GPU total selected MST weights for validation
   long long int total_weight_gpu = 0;
@@ -281,9 +288,10 @@ void RunTests(
   }
   else
   {
-    printf("INCORRECT. \nCPU Computed Total Weight = %lld\n"
-           "GPU Computed Total Weight = %lld\n",
-           total_weight_cpu, total_weight_gpu);
+    printf("INCORRECT. \n"
+      "CPU Computed Total Weight = %lld\n"
+      "GPU Computed Total Weight = %lld\n",
+      total_weight_cpu, total_weight_gpu);
   }
 
   // clean up if necessary

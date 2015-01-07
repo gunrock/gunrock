@@ -375,6 +375,17 @@ public:
 
         if (DEBUG) printf("  * finished min weighted edges >> successors.\n");
 
+        /*
+        if (enactor_stats.iteration == 5)
+        {
+          util::DisplayDeviceResults(problem->data_slices[0]->d_temp_storage,
+            graph_slice->nodes);
+          printf("before marking\n");
+          util::DisplayDeviceResults(problem->data_slices[0]->d_mst_output,
+            num_edges_origin);
+        }
+        */
+
         ////////////////////////////////////////////////////////////////////////
         // mark MST output edges
         frontier_attribute.queue_index  = 0;
@@ -415,6 +426,15 @@ public:
             problem->data_slices[0]->d_mst_output, num_edges_origin, context);
           printf("  * after marking MST edges: %d.\n", tmp_select);
         }
+
+        /*
+        if (enactor_stats.iteration == 5)
+        {
+          printf("after marking\n");
+          util::DisplayDeviceResults(problem->data_slices[0]->d_mst_output,
+            num_edges_origin);
+        }
+        */
 
         ////////////////////////////////////////////////////////////////////////
         // remove cycles - vertices with S(S(u)) = u forms cycles
@@ -604,7 +624,7 @@ public:
         // terminate the loop if there is only one super-vertex left
         if (graph_slice->nodes == 1)
         {
-          if (DEBUG) printf("TERMINATE THE MST ALGORITHM ENACTOR.\n\n");
+          if (DEBUG) printf("\nTERMINATE THE MST ALGORITHM ENACTOR.\n\n");
           break; // break the MST recursive loop
         }
 

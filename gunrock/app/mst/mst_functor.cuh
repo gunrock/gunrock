@@ -75,22 +75,22 @@ struct SuccFunctor
     /*
     if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id])
       printf("s_id: %d, d_id: %d, e_id: %d, origin_e_id: %d, "
-        "reduced_weight: %d, edge_weight: %d, successors[s_id]: %d\n",
+        "reduced_weight: %d, edge_weight: %d, successors[s_id]: %d \n",
          s_id, d_id, e_id, problem->d_origin_edges[e_id],
          problem->d_reduced_vals[s_id],
          problem->d_edge_weights[e_id],
          problem->d_successors[s_id]);
     */
+
+    // find successors that contribute to the reduced weight value
     if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id])
     {
-      // problem->d_successors[s_id] = d_id;
-      // problem->d_mst_output[problem->d_origin_edges[e_id]] = 1;
-      if (atomicMin(&problem->d_successors[s_id], d_id) > d_id)
+      // select one successor with minimum vertex id
+      if (atomicMin(&problem->d_successors[s_id], d_id) > d_id) // update min
       {
-        // keep outgoing selected minimum weighted e_ids
+        // select one MST edge connected to the successor
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
           problem->d_origin_edges[e_id], problem->d_temp_storage + s_id);
-        // problem->d_temp_storage[s_id] = problem->d_origin_edges[e_id];
       }
     }
   }
