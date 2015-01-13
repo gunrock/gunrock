@@ -17,6 +17,7 @@
 #include <math.h>
 #include <time.h>
 #include <stdio.h>
+#include <libgen.h>
 #include <iostream>
 
 #include <gunrock/graphio/utils.cuh>
@@ -65,10 +66,10 @@ int ReadMarketStream(
     SizeT edges_read = -1;
     SizeT nodes = 0;
     SizeT edges = 0;
-    EdgeTupleType *coo = NULL;          // read in COO format
+    EdgeTupleType *coo = NULL; // read in COO format
 
     time_t mark0 = time(NULL);
-    printf("  Parsing MARKET COO format ");
+    printf("  Parsing MARKET COO format");
     fflush(stdout);
 
     char line[1024];
@@ -89,13 +90,17 @@ int ReadMarketStream(
 
             // Problem description
             long long ll_nodes_x, ll_nodes_y, ll_edges;
-            if (sscanf(line, "%lld %lld %lld", &ll_nodes_x, &ll_nodes_y, &ll_edges) != 3) {
-                fprintf(stderr, "Error parsing MARKET graph: invalid problem description\n");
+            if (sscanf(line, "%lld %lld %lld",
+                       &ll_nodes_x, &ll_nodes_y, &ll_edges) != 3) {
+                fprintf(stderr, "Error parsing MARKET graph:"
+                        " invalid problem description.\n");
                 return -1;
             }
 
             if (ll_nodes_x != ll_nodes_y) {
-                fprintf(stderr, "Error parsing MARKET graph: not square (%lld, %lld)\n", ll_nodes_x, ll_nodes_y);
+                fprintf(stderr,
+                        "Error parsing MARKET graph: not square (%lld, %lld)\n",
+                        ll_nodes_x, ll_nodes_y);
                 return -1;
             }
 
@@ -103,7 +108,8 @@ int ReadMarketStream(
             edges = (undirected) ? ll_edges * 2 : ll_edges;
 
             printf(" (%lld nodes, %lld directed edges)... ",
-                   (unsigned long long) ll_nodes_x, (unsigned long long) ll_edges);
+                   (unsigned long long) ll_nodes_x,
+                   (unsigned long long) ll_edges);
             fflush(stdout);
 
             // Allocate coo graph
@@ -119,27 +125,32 @@ int ReadMarketStream(
                 return -1;
             }
             if (edges_read >= edges) {
-                fprintf(stderr, "Error parsing MARKET graph: encountered more than %d edges\n", edges);
-                if (coo) free(coo);
-                return -1;
+              fprintf(stderr,
+                      "Error parsing MARKET graph:"
+                      "encountered more than %d edges\n",
+                      edges);
+              if (coo) free(coo);
+              return -1;
             }
 
             long long ll_row, ll_col, ll_value;
             int num_input;
             if (LOAD_VALUES) {
-                if ((num_input = sscanf(line, "%lld %lld %lld", &ll_col, &ll_row, &ll_value)) <2) {
+                if ((num_input = sscanf(
+                         line, "%lld %lld %lld",
+                         &ll_col, &ll_row, &ll_value)) < 2) {
                     fprintf(stderr,
                             "Error parsing MARKET graph: badly formed edge\n");
-                        if (coo) free(coo);
+                    if (coo) free(coo);
                     return -1;
                 } else if (num_input == 2) {
-		    ll_value = 1;
+                    ll_value = 1;
                 }
             } else {
                 if (sscanf(line, "%lld %lld", &ll_col, &ll_row) != 2) {
                     fprintf(stderr,
                             "Error parsing MARKET graph: badly formed edge\n");
-                        if (coo) free(coo);
+                    if (coo) free(coo);
                     return -1;
                 }
             }
@@ -180,7 +191,9 @@ int ReadMarketStream(
     }
 
     if (edges_read != edges) {
-        fprintf(stderr, "Error parsing MARKET graph: only %d/%d edges read\n", edges_read, edges);
+        fprintf(stderr,
+                "Error parsing MARKET graph: only %d/%d edges read\n",
+                edges_read, edges);
         if (coo) free(coo);
         return -1;
     }
@@ -202,17 +215,18 @@ int ReadMarketStream(
 }
 
 /**
- * @read csr arrays directly instead of transfer from coo format
+ * @brief Read csr arrays directly instead of transfer from coo format
  *
  */
 template <bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
-int ReadCsrArrays(char *f_in,
-                  Csr<VertexId, Value, SizeT> &csr_graph,
-                  bool undirected,
-                  bool reversed)
+int ReadCsrArrays(
+    char *f_in,
+    Csr<VertexId, Value, SizeT> &csr_graph,
+    bool undirected,
+    bool reversed)
 {
-  csr_graph.template FromCsr<LOAD_VALUES>(f_in, undirected, reversed);
-  return 0;
+    csr_graph.template FromCsr<LOAD_VALUES>(f_in, undirected, reversed);
+    return 0;
 }
 
 
@@ -224,7 +238,7 @@ int ReadCsrArrays(char *f_in,
 /**
  * @brief Loads a MARKET-formatted CSR graph from the specified file.
  *
- * @param[in] mm_filename Graph file name, if empty, then it is loaded from stdin.
+ * @param[in] mm_filename Graph file name, if empty, it is loaded from stdin.
  * @param[in] output_file Output file to store the computed graph topology info.
  * @param[in] csr_graph Reference to CSR graph object. @see Csr
  * @param[in] undirected Is the graph undirected or not?
@@ -233,45 +247,50 @@ int ReadCsrArrays(char *f_in,
  * \return If there is any File I/O error along the way. 0 for no error.
  */
 template<bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
-int BuildMarketGraph(char *mm_filename,
-		     char *output_file,
-		     Csr<VertexId, Value, SizeT> &csr_graph,
-		     bool undirected,
-		     bool reversed)
+int BuildMarketGraph(
+    char *mm_filename,
+    char *output_file,
+    Csr<VertexId, Value, SizeT> &csr_graph,
+    bool undirected,
+    bool reversed)
 {
-  FILE *_file = fopen(output_file, "r");
-  if (_file)
-  {
-    fclose(_file);
-    if (ReadCsrArrays<LOAD_VALUES>(output_file, csr_graph, undirected, reversed) != 0) {
-      return -1;
-    }
-  }
-  else {
-    if (mm_filename == NULL) {
-      // Read from stdin
-      printf("Reading from stdin:\n");
-      if (ReadMarketStream<LOAD_VALUES>(stdin, output_file, csr_graph, undirected, reversed) != 0) {
-	return -1;
-      }
+    FILE *_file = fopen(output_file, "r");
+    if (_file)
+    {
+        fclose(_file);
+        if (ReadCsrArrays<LOAD_VALUES>(
+                output_file, csr_graph, undirected, reversed) != 0) {
+            return -1;
+        }
     }
     else {
-      // Read from file
-      FILE *f_in = fopen(mm_filename, "r");
-      if (f_in) {
-	printf("Reading from %s:\n", mm_filename);
-	if (ReadMarketStream<LOAD_VALUES>(f_in, output_file, csr_graph, undirected, reversed) != 0) {
-	  fclose(f_in);
-	  return -1;
-	}
-	fclose(f_in);
-      } else  {
-	perror("Unable to open file");
-	return -1;
-      }
+        if (mm_filename == NULL) {
+            // Read from stdin
+            printf("Reading from stdin:\n");
+            if (ReadMarketStream<LOAD_VALUES>(
+                    stdin, output_file, csr_graph, undirected, reversed) != 0) {
+                return -1;
+            }
+        }
+        else {
+            // Read from file
+            FILE *f_in = fopen(mm_filename, "r");
+            if (f_in) {
+                printf("Reading from %s:\n", mm_filename);
+                if (ReadMarketStream<LOAD_VALUES>(
+                        f_in, output_file, csr_graph,
+                        undirected, reversed) != 0) {
+                    fclose(f_in);
+                    return -1;
+                }
+                fclose(f_in);
+            } else  {
+                perror("Unable to open file");
+                return -1;
+            }
+        }
     }
-  }
-  return 0;
+    return 0;
 }
 
 /**
@@ -279,39 +298,44 @@ int BuildMarketGraph(char *mm_filename,
  *
  */
 template <bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
-int BuildMarketGraph(char *file_in,
-		     Csr<VertexId, Value, SizeT> &graph,
-		     bool undirected,
-		     bool reversed)
+int BuildMarketGraph(
+    char *file_in,
+    Csr<VertexId, Value, SizeT> &graph,
+    bool undirected,
+    bool reversed)
 {
-  // length of file name plus suffix
-  unsigned int size = strlen(file_in) + 4;
+    // seperate the graph path and the file name
+    char *temp1 = strdup(file_in);
+    char *temp2 = strdup(file_in);
+    char *file_path = dirname (temp1);
+    char *file_name = basename(temp2);
 
-  if (undirected)
-  {
-    char ud[size];
-    sprintf(ud, "%s_ud", file_in);
-    if (BuildMarketGraph<true>(file_in, ud, graph, true, false) != 0) { return 1; }
-  }
-  else if (!undirected && reversed)
-  {
-    char rv[size];
-    sprintf(rv, "%s_rv", file_in);
-    if (BuildMarketGraph<true>(file_in, rv, graph, false, true) != 0) { return 1; }
-  }
-  else if (!undirected && !reversed)
-  {
-    char nr[size];
-    sprintf(nr, "%s_nr", file_in);
-    if (BuildMarketGraph<true>(file_in, nr, graph, false, false) != 0) { return 1; }
-  }
-  else
-  {
-    fprintf(stderr, "Unspecified Graph Type.\n");
-  }
-
-  return 0;
-
+    if (undirected)
+    {
+        char ud[256];
+        sprintf(ud, "%s/.%s_undirected_csr", file_path, file_name);
+        if (BuildMarketGraph<true>(file_in, ud, graph, true, false) != 0)
+            return 1;
+    }
+    else if (!undirected && reversed)
+    {
+        char rv[256];
+        sprintf(rv, "%s/.%s_reversed_csr", file_path, file_name);
+        if (BuildMarketGraph<true>(file_in, rv, graph, false, true) != 0)
+            return 1;
+    }
+    else if (!undirected && !reversed)
+    {
+        char nr[256];
+        sprintf(nr, "%s/.%s_nonreversed_csr", file_path, file_name);
+        if (BuildMarketGraph<true>(file_in, nr, graph, false, false) != 0)
+            return 1;
+    }
+    else
+    {
+        fprintf(stderr, "Unspecified Graph Type.\n");
+    }
+    return 0;
 }
 
 /**@}*/
