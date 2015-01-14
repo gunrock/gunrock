@@ -131,7 +131,7 @@ template<typename VertexId, typename Value, typename SizeT>
 long long int SimpleReferenceMST(
   const Value *edge_values, const Csr<VertexId, Value, SizeT> &graph)
 {
-  printf("REFERENCE TEST");
+  printf("\nREFERENCE TEST\n");
 
   // Kruskal minimum spanning tree preparations
   using namespace boost;
