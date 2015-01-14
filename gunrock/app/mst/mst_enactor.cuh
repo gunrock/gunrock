@@ -207,6 +207,7 @@ public:
     typedef typename MSTProblem::Value    Value;
 
     typedef SuccFunctor <VertexId, SizeT, VertexId, MSTProblem> SuccFunctor;
+    typedef EdgeFunctor <VertexId, SizeT, VertexId, MSTProblem> EdgeFunctor;
     typedef CyRmFunctor <VertexId, SizeT, VertexId, MSTProblem> CyRmFunctor;
     typedef PJmpFunctor <VertexId, SizeT, VertexId, MSTProblem> PJmpFunctor;
     typedef EgRmFunctor <VertexId, SizeT, VertexId, MSTProblem> EgRmFunctor;
@@ -242,9 +243,9 @@ public:
       }
 
       // debug configurations
-      SizeT num_edges_origin = graph_slice->edges;
+      //SizeT num_edges_origin = graph_slice->edges;
       bool debug_info = 0; // used for debug purpose
-      int tmp_select  = 0; // used for debug purpose
+      //int tmp_select  = 0; // used for debug purpose
       //int tmp_length  = 0; // used for debug purpose
       unsigned int *num_selected = new unsigned int; // used in cub select
 
@@ -375,16 +376,39 @@ public:
 
         if (DEBUG) printf("  * finished min weighted edges >> successors.\n");
 
-        /*
-        if (enactor_stats.iteration == 5)
-        {
-          util::DisplayDeviceResults(problem->data_slices[0]->d_temp_storage,
-            graph_slice->nodes);
-          printf("before marking\n");
-          util::DisplayDeviceResults(problem->data_slices[0]->d_mst_output,
-            num_edges_origin);
-        }
-        */
+        ////////////////////////////////////////////////////////////////////////
+        // finding original edge ids with the corresponding d_id
+        frontier_attribute.queue_index  = 0;
+        frontier_attribute.selector     = 0;
+        frontier_attribute.queue_length = graph_slice->nodes;
+        frontier_attribute.queue_reset  = true;
+
+        gunrock::oprtr::advance::LaunchKernel
+          <AdvanceKernelPolicy, MSTProblem, EdgeFunctor>(
+          d_done,
+          enactor_stats,
+          frontier_attribute,
+          data_slice,
+          (VertexId*)NULL,
+          (bool*)NULL,
+          (bool*)NULL,
+          d_scanned_edges,
+          graph_slice->frontier_queues.d_keys[frontier_attribute.selector],
+          graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],
+          (VertexId*)NULL,
+          (VertexId*)NULL,
+          graph_slice->d_row_offsets,
+          graph_slice->d_column_indices,
+          (SizeT*)NULL,
+          (VertexId*)NULL,
+          graph_slice->frontier_elements[frontier_attribute.selector],
+          graph_slice->frontier_elements[frontier_attribute.selector^1],
+          this->work_progress,
+          context,
+          gunrock::oprtr::advance::V2V);
+
+        if (DEBUG && (retval = util::GRError(cudaDeviceSynchronize(),
+          "advance::Kernel failed", __FILE__, __LINE__))) break;
 
         ////////////////////////////////////////////////////////////////////////
         // mark MST output edges
@@ -419,22 +443,6 @@ public:
 
         if (DEBUG && (retval = util::GRError(cudaDeviceSynchronize(),
           "advance::Kernel failed", __FILE__, __LINE__))) break;
-
-        if (DEBUG)
-        {
-          tmp_select = Reduce(
-            problem->data_slices[0]->d_mst_output, num_edges_origin, context);
-          printf("  * after marking MST edges: %d.\n", tmp_select);
-        }
-
-        /*
-        if (enactor_stats.iteration == 5)
-        {
-          printf("after marking\n");
-          util::DisplayDeviceResults(problem->data_slices[0]->d_mst_output,
-            num_edges_origin);
-        }
-        */
 
         ////////////////////////////////////////////////////////////////////////
         // remove cycles - vertices with S(S(u)) = u forms cycles
@@ -1144,14 +1152,6 @@ public:
         if (DEBUG)
           printf("END OF ITERATION: %lld #NODES LEFT: %d #EDGES LEFT: %d\n",
             enactor_stats.iteration+1, graph_slice->nodes, graph_slice->edges);
-
-        /*
-        // number of selected edges current iteration
-        tmp_select = tmp_length;
-        tmp_length = Reduce(
-          problem->data_slices[0]->d_mst_output, num_edges_origin, context);
-        printf("#Selected Current Iteration: %d\n", (tmp_length - tmp_select));
-        */
 
         enactor_stats.iteration++;
 

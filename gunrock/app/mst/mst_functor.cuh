@@ -56,7 +56,8 @@ struct SuccFunctor
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    return true;
+    // find successors that contribute to the reduced weight value
+    return problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id];
   }
 
   /**
@@ -72,26 +73,67 @@ struct SuccFunctor
     VertexId s_id,  VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    /*
-    if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id])
-      printf("s_id: %d, d_id: %d, e_id: %d, origin_e_id: %d, "
-        "reduced_weight: %d, edge_weight: %d, successors[s_id]: %d \n",
-         s_id, d_id, e_id, problem->d_origin_edges[e_id],
-         problem->d_reduced_vals[s_id],
-         problem->d_edge_weights[e_id],
-         problem->d_successors[s_id]);
-    */
+    // select one successor with minimum vertex id
+    atomicMin(&problem->d_successors[s_id], d_id);
+  }
+};
 
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief Structure contains device functions in MST graph traverse.
+ * find the successor of each vertex and add to MST outputs
+ *
+ * @tparam VertexId    Type of signed integer use as vertex id
+ * @tparam SizeT       Type of unsigned integer for array indexing
+ * @tparam ProblemData Problem data type contains data slice for MST problem
+ */
+template<
+  typename VertexId,
+  typename SizeT,
+  typename Value,
+  typename ProblemData>
+struct EdgeFunctor
+{
+  typedef typename ProblemData::DataSlice DataSlice;
+
+  /**
+   * @brief Forward Edge Mapping condition function.
+   * Used for generating successor array
+   *
+   * @param[in] s_id Vertex Id of the edge source node
+   * @param[in] d_id Vertex Id of the edge destination node
+   * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
+   *
+   * \return Whether to load the apply function for the edge and include
+   * the destination node in the next frontier.
+   */
+  static __device__ __forceinline__ bool CondEdge(
+    VertexId s_id, VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+  {
     // find successors that contribute to the reduced weight value
-    if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id])
+    return problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id];
+  }
+
+  /**
+   * @brief Forward Edge Mapping apply function.
+   *
+   * @param[in] s_id Vertex Id of the edge source node
+   * @param[in] d_id Vertex Id of the edge destination node
+   * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
+   */
+  static __device__ __forceinline__ void ApplyEdge(
+    VertexId s_id,  VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+  {
+    if (problem->d_successors[s_id] == d_id)
     {
-      // select one successor with minimum vertex id
-      if (atomicMin(&problem->d_successors[s_id], d_id) > d_id) // update min
-      {
-        // select one MST edge connected to the successor
-        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-          problem->d_origin_edges[e_id], problem->d_temp_storage + s_id);
-      }
+      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+        problem->d_origin_edges[e_id], problem->d_temp_storage + s_id);
     }
   }
 };
@@ -205,14 +247,6 @@ struct CyRmFunctor
   VertexId s_id, VertexId d_id, DataSlice *problem,
   VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    /*
-    // mark minimum spanning tree output edges
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      1, problem->d_mst_output + problem->d_temp_storage[s_id]);
-    // problem->d_mst_output[problem->d_temp_storage[s_id]] = 1;
-    __syncthreads(); // make sure finish mark 1 process
-    */
-
     // remove length two cycles
     if (problem->d_successors[s_id] > s_id &&
         problem->d_successors[problem->d_successors[s_id]] == s_id)
@@ -223,7 +257,6 @@ struct CyRmFunctor
       // problem->d_successors[s_id] = s_id;
 
       // remove some edges in the MST output result
-      // printf("remove edge: %d\n", problem->d_temp_storage[s_id]);
       util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
         0, problem->d_mst_output + problem->d_temp_storage[s_id]);
       // problem->d_mst_output[problem->d_temp_storage[s_id]] = 0;
