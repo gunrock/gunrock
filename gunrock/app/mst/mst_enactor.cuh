@@ -182,8 +182,8 @@ public:
   /**
    * @brief Enacts a MST computing on the specified graph.
    *
-   * @tparam Advance Kernel policy for forward advance.
-   * @tparam Filter Kernel policy for vertex mapping.
+   * @tparam Advance Kernel policy for forward advance kernel.
+   * @tparam Filter Kernel policy for filter kernel.
    * @tparam MSTProblem MST Problem type.
    *
    * @param[in] context CudaContext for moderngpu library
@@ -331,7 +331,7 @@ public:
         if (DEBUG) printf(" (b). Finding and Removing Cycles.\n");
 
         ////////////////////////////////////////////////////////////////////////
-        // generate successor array using SuccFunctor - edge mapping
+        // generate successor array using SuccFunctor - advance
         // successor array holds the outgoing v for each u
         frontier_attribute.queue_index  = 0;
         frontier_attribute.selector     = 0;
@@ -494,7 +494,7 @@ public:
         // Then, we combine vertices to form a super-vertex by employing
         // pointer doubling to achieve this result, iteratively setting
         // S(u) = S(S(u)) until no further change occurs in S
-        // using vertex mapping: PJmpFunctor
+        // using filter kernel: PJmpFunctor
         frontier_attribute.queue_index  = 0;
         frontier_attribute.selector     = 0;
         frontier_attribute.queue_length = graph_slice->nodes;
@@ -640,7 +640,7 @@ public:
 
         ////////////////////////////////////////////////////////////////////////
         // shorten the edge list by removing self edges in the new graph
-        // advance edge mapping remove edges belonging to the same super-vertex
+        // advance kernel remove edges belonging to the same super-vertex
         // each edge examines the super-vertex id of both end vertices and
         // removes itself if the id is the same
         frontier_attribute.queue_index  = 0;
@@ -1150,7 +1150,7 @@ public:
         }
 
         if (DEBUG)
-          printf("END OF ITERATION: %lld #NODES LEFT: %d #EDGES LEFT: %d\n",
+          printf("END ITERATION: %lld #NODES LEFT: %d #EDGES LEFT: %d\n",
             enactor_stats.iteration+1, graph_slice->nodes, graph_slice->edges);
 
         enactor_stats.iteration++;
