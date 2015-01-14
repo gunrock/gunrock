@@ -197,8 +197,7 @@ long long int SimpleReferenceMST(
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] graph_gpu the CSR graph we send to GPU to process
- * @param[in] graph_cpu the CSR graph we process on CPU
+ * @param[in] graph the CSR graph we send to GPU to process
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] num_gpus Number of GPUs
  * @param[in] context CudaContext for moderngpu to use
