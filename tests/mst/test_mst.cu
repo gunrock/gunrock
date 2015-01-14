@@ -253,40 +253,43 @@ void RunTests(
   util::GRError(mst_problem->Extract(h_mst_output),
     "MST Problem Data Extraction Failed", __FILE__, __LINE__);
 
-  // calculate GPU final number of selected edges
-  int num_selected_gpu = 0;
-  for (int iter = 0; iter < graph.edges; ++iter)
+  if (!g_quick) // run CPU reference test
   {
-    num_selected_gpu += h_mst_output[iter];
-  }
-  // printf("\nGPU - Number of Edges in MST: %d\n", num_selected_gpu);
-
-  // calculate GPU total selected MST weights for validation
-  long long int total_weight_gpu = 0;
-  for (int iter = 0; iter < graph.edges; ++iter)
-  {
-    total_weight_gpu += h_mst_output[iter] * graph.edge_values[iter];
-  }
-
-  // correctness validation
-  long long int total_weight_cpu =
-    SimpleReferenceMST(graph.edge_values, graph);
-  if (total_weight_cpu == total_weight_gpu)
-  {
-    if (graph.nodes <= 50)
+    // calculate GPU final number of selected edges
+    int num_selected_gpu = 0;
+    for (int iter = 0; iter < graph.edges; ++iter)
     {
-      printf("GPU Minimum Spanning Tree\n");
-      // print the edge pairs in the minimum spanning tree
-      DisplaySolution(graph, h_mst_output);
+      num_selected_gpu += h_mst_output[iter];
     }
-    printf("\nCORRECT.\n");
-  }
-  else
-  {
-    printf("INCORRECT. \n"
-      "CPU Computed Total Weight = %lld\n"
-      "GPU Computed Total Weight = %lld\n",
-      total_weight_cpu, total_weight_gpu);
+    // printf("\nGPU - Number of Edges in MST: %d\n", num_selected_gpu);
+
+    // calculate GPU total selected MST weights for validation
+    long long int total_weight_gpu = 0;
+    for (int iter = 0; iter < graph.edges; ++iter)
+    {
+      total_weight_gpu += h_mst_output[iter] * graph.edge_values[iter];
+    }
+
+    // correctness validation
+    long long int total_weight_cpu =
+      SimpleReferenceMST(graph.edge_values, graph);
+    if (total_weight_cpu == total_weight_gpu)
+    {
+      if (graph.nodes <= 50)
+      {
+        printf("GPU Minimum Spanning Tree\n");
+        // print the edge pairs in the minimum spanning tree
+        DisplaySolution(graph, h_mst_output);
+      }
+      printf("\nCORRECT.\n");
+    }
+    else
+    {
+      printf("INCORRECT. \n"
+        "CPU Computed Total Weight = %lld\n"
+        "GPU Computed Total Weight = %lld\n",
+        total_weight_cpu, total_weight_gpu);
+    }
   }
 
   // clean up if necessary
