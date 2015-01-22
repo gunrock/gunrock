@@ -264,7 +264,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
             SizeT output_queue_len = temp[0];
 
-            //if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
+            if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
             {
                 gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
@@ -288,7 +288,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         ADVANCE_TYPE,
                         inverse_graph);
             }
-            /*else
+            else
             {
                 unsigned int split_val = (output_queue_len + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
                 int num_block = KernelPolicy::LOAD_BALANCED::BLOCKS;
@@ -335,7 +335,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         inverse_graph);
 
                 //util::DisplayDeviceResults(d_out_key_queue, output_queue_len);
-            }*/
+            }
             break;
         }
         /*case LB:
