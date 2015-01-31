@@ -194,8 +194,9 @@ struct BackwardFunctor
         //Accumulate delta value
 
         //Accumulate bc value
-        atomicAdd(problem->ebc_values + e_id, result);
+        //atomicAdd(problem->ebc_values + e_id, result);
 
+        //printf("%d->%d : %f = %f / %f * (1.0 + %f)\n", s_id, d_id, result, from_sigma, to_sigma, to_delta);
         if (s_id != problem->src_node[0]) {
             atomicAdd(problem->deltas + s_id, result); 
             atomicAdd(problem->bc_values + s_id, result);
@@ -289,12 +290,12 @@ struct BackwardFunctor2
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
             to_delta, problem->deltas + d_id);
 
-        Value result = from_sigma / to_sigma * (1.0 + to_delta);
+        //Value result = from_sigma / to_sigma * (1.0 + to_delta);
 
         //Accumulate delta value
 
         //Accumulate bc value
-        atomicAdd(problem->ebc_values + e_id, result);
+        //atomicAdd(problem->ebc_values + e_id, result);
         
         /*if (s_id != problem->d_src_node[0]) {
             atomicAdd(&problem->d_deltas[s_id], result); 

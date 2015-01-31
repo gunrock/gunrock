@@ -35,40 +35,8 @@ namespace gunrock {
 namespace app {
 namespace bfs {
 
-    template <typename BFSProblem, bool INSTRUMENT> class BFSEnactor;
+    template <typename BfsProblem, bool INSTRUMENT, bool DEBUG, bool SIZE_CHECK> class BFSEnactor;
         
-    class ThreadSlice
-    {
-    public:
-        int           thread_num;
-        int           init_size;
-        CUTThread     thread_Id;
-        int           stats;
-        //util::cpu_mt::CPUBarrier* cpu_barrier;
-        void*         problem;
-        void*         enactor;
-        ContextPtr*   context;
-
-        ThreadSlice()
-        {
-            //cpu_barrier = NULL;
-            problem     = NULL;
-            enactor     = NULL;
-            context     = NULL;
-            thread_num  = 0;
-            init_size   = 0;
-            stats       = -2;
-        }
-
-        virtual ~ThreadSlice()
-        {
-            //cpu_barrier = NULL;
-            problem     = NULL;
-            enactor     = NULL;
-            context     = NULL;
-        }
-    };
-
     template <typename VertexId, typename SizeT, SizeT num_associates>
     __global__ void Expand_Incoming (
         const SizeT            num_elements,
@@ -127,21 +95,21 @@ namespace bfs {
         }
     }
 
-    template <typename BFSProblem>
+/*    template <typename BfsProblem>
     void ShowDebugInfo(
         int                    thread_num,
         int                    peer_,
-        FrontierAttribute<typename BFSProblem::SizeT>      *frontier_attribute,
+        FrontierAttribute<typename BfsProblem::SizeT>      *frontier_attribute,
         EnactorStats           *enactor_stats,
-        typename BFSProblem::DataSlice  *data_slice,
-        typename BFSProblem::GraphSlice *graph_slice,
+        typename BfsProblem::DataSlice  *data_slice,
+        typename BfsProblem::GraphSlice *graph_slice,
         util::CtaWorkProgressLifetime *work_progress,
         std::string            check_name = "",
         cudaStream_t           stream = 0)
     {
-        typedef typename BFSProblem::SizeT    SizeT;
-        typedef typename BFSProblem::VertexId VertexId;
-        typedef typename BFSProblem::Value    Value;
+        typedef typename BfsProblem::SizeT    SizeT;
+        typedef typename BfsProblem::VertexId VertexId;
+        typedef typename BfsProblem::Value    Value;
         SizeT queue_length;
 
         //util::cpu_mt::PrintMessage(check_name.c_str(), thread_num, enactor_stats->iteration);
@@ -160,33 +128,35 @@ namespace bfs {
 	//    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("pred1", data_slice[0]->preds.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
 	//if (BFSProblem::ENABLE_IDEMPOTENCE)
 	//    util::cpu_mt::PrintGPUArray<SizeT, unsigned char>("mask1", data_slice[0]->visited_mask.GetPointer(util::DEVICE), (graph_slice->nodes+7)/8, thread_num, enactor_stats->iteration);
-    }
+    }*/
      
     template<
-        bool     INSTRUMENT,
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy,
-        typename BFSProblem>
+        typename BfsEnactor>
     void BFSCore(
-        bool                   DEBUG,
-        int                    thread_num,
-        int                    peer_,
-        FrontierAttribute<typename BFSProblem::SizeT>      *frontier_attribute,
-        EnactorStats           *enactor_stats,
-        typename BFSProblem::DataSlice  *data_slice,
-        typename BFSProblem::DataSlice  *d_data_slice,
-        typename BFSProblem::GraphSlice *graph_slice,
-        util::CtaWorkProgressLifetime *work_progress,
-        ContextPtr             context,
-        cudaStream_t           stream)
+        int                              thread_num,
+        int                              peer_,
+        FrontierAttribute<typename BfsEnactor::SizeT>      
+                                        *frontier_attribute,
+        EnactorStats                    *enactor_stats,
+        typename BfsEnactor::BfsProblem::DataSlice  *data_slice,
+        typename BfsEnactor::BfsProblem::DataSlice  *d_data_slice,
+        typename BfsEnactor::BfsProblem::GraphSlice *graph_slice,
+        util::CtaWorkProgressLifetime   *work_progress,
+        ContextPtr                       context,
+        cudaStream_t                     stream)
     {
-        typedef typename BFSProblem::SizeT      SizeT;
-        typedef typename BFSProblem::VertexId   VertexId;
-        typedef typename BFSProblem::Value      Value;
-        typedef typename BFSProblem::DataSlice  DataSlice;
-        typedef typename BFSProblem::GraphSlice GraphSlice;
-        typedef BFSEnactor<BFSProblem, INSTRUMENT> BfsEnactor;
-        typedef BFSFunctor<VertexId, SizeT, VertexId, BFSProblem> BfsFunctor;
+        typedef typename BfsEnactor::BfsProblem BfsProblem;
+        typedef typename BfsEnactor::SizeT      SizeT;
+        typedef typename BfsEnactor::VertexId   VertexId;
+        typedef typename BfsEnactor::Value      Value;
+        typedef typename BfsProblem::DataSlice  DataSlice;
+        typedef typename BfsProblem::GraphSlice GraphSlice;
+        //typedef BFSEnactor<BFSProblem, INSTRUMENT> BfsEnactor;
+        typedef BFSFunctor<VertexId, SizeT, VertexId, BfsProblem> BfsFunctor;
+        static const bool DEBUG      = BfsEnactor::DEBUG;
+        static const bool INSTRUMENT = BfsEnactor::INSTRUMENT;
 
         if (frontier_attribute->queue_reset && frontier_attribute->queue_length ==0) 
         {
@@ -204,7 +174,7 @@ namespace bfs {
         //printf("%d\t %d \t \t peer_ = %d, selector = %d, length = %d, index = %d\n",thread_num, enactor_stats->iteration, peer_, queue_selector,frontier_attribute->queue_length, frontier_attribute->queue_index);fflush(stdout); 
 
         // Edge Map
-        gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BFSProblem, BfsFunctor>(
+        gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BfsProblem, BfsFunctor>(
             enactor_stats[0],
             frontier_attribute[0],
             d_data_slice,
@@ -250,7 +220,7 @@ namespace bfs {
         {
             if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,stream)) return;
             enactor_stats->total_queued += frontier_attribute->queue_length;
-            if (DEBUG) ShowDebugInfo<BFSProblem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_advance", stream);
+            if (DEBUG) ShowDebugInfo<BfsProblem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_advance", stream);
             if (INSTRUMENT) {
                 if (enactor_stats->retval = enactor_stats->advance_kernel_stats.Accumulate(
                     enactor_stats->advance_grid_size,
@@ -264,7 +234,7 @@ namespace bfs {
         if (DEBUG) util::cpu_mt::PrintMessage("Filter begin", thread_num, enactor_stats->iteration);
 
         // Filter
-        gunrock::oprtr::filter::Kernel<FilterKernelPolicy, BFSProblem, BfsFunctor>
+        gunrock::oprtr::filter::Kernel<FilterKernelPolicy, BfsProblem, BfsFunctor>
         <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
             enactor_stats->iteration+1,
             frontier_attribute->queue_reset,
@@ -294,7 +264,7 @@ namespace bfs {
 	if (false) {//(INSTRUMENT || DEBUG) {
 	    //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
 	    //enactor_stats->total_queued += frontier_attribute->queue_length;
-            if (DEBUG) ShowDebugInfo<BFSProblem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_filter", stream);
+            if (DEBUG) ShowDebugInfo<BfsProblem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_filter", stream);
 	    if (INSTRUMENT) {
 		if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
 		    enactor_stats->filter_grid_size,
@@ -306,29 +276,31 @@ namespace bfs {
     }
 
     template<
-        bool     INSTRUMENT,
-        bool     SIZE_CHECK,
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy,
-        typename BFSProblem>
+        //typename BFSProblem,
+        typename BfsEnactor>
     static CUT_THREADPROC BFSThread(
         void * thread_data_)
     {
-        typedef typename BFSProblem::SizeT      SizeT;
-        typedef typename BFSProblem::VertexId   VertexId;
-        typedef typename BFSProblem::Value      Value;
-        typedef typename BFSProblem::DataSlice  DataSlice;
-        typedef typename BFSProblem::GraphSlice GraphSlice;
-        typedef BFSEnactor<BFSProblem, INSTRUMENT> BfsEnactor;
-        typedef BFSFunctor<VertexId, SizeT, VertexId, BFSProblem> BfsFunctor;
+        typedef typename BfsEnactor::BfsProblem BfsProblem;
+        typedef typename BfsEnactor::SizeT      SizeT     ;
+        typedef typename BfsEnactor::VertexId   VertexId  ;
+        typedef typename BfsEnactor::Value      Value     ;
+        typedef typename BfsProblem::DataSlice  DataSlice ;
+        typedef typename BfsProblem::GraphSlice GraphSlice;
+        //typedef BFSEnactor<BFSProblem, INSTRUMENT, DEBUG, SIZE_CHECK> BfsEnactor;
+        typedef BFSFunctor<VertexId, SizeT, VertexId, BfsProblem> BfsFunctor;
+        //static const bool INSTRUMENT = BfsEnactor::INSTRUMENT;
+        static const bool DEBUG      = BfsEnactor::DEBUG     ;
+        static const bool SIZE_CHECK = BfsEnactor::SIZE_CHECK;
 
         ThreadSlice  *thread_data          = (ThreadSlice *) thread_data_;
-        BFSProblem   *problem              = (BFSProblem*) thread_data->problem;
-        BFSEnactor<BFSProblem, INSTRUMENT>
-                     *enactor              = (BFSEnactor<BFSProblem, INSTRUMENT>*) thread_data->enactor;
+        BfsProblem   *problem              = (BfsProblem*) thread_data->problem;
+        BfsEnactor   *enactor              = (BfsEnactor*) thread_data->enactor;
         int          num_gpus              =   problem     -> num_gpus;
         int          thread_num            =   thread_data -> thread_num;
-        int          gpu                   =   problem     -> gpu_idx           [thread_num];
+        int          gpu_idx               =   problem     -> gpu_idx           [thread_num];
         DataSlice    *data_slice           =   problem     -> data_slices       [thread_num].GetPointer(util::HOST);
         util::Array1D<SizeT, DataSlice>
                      *s_data_slice         =   problem     -> data_slices;
@@ -343,7 +315,6 @@ namespace bfs {
         util::CtaWorkProgressLifetime
                      *work_progress        = &(enactor     -> work_progress     [thread_num*num_gpus]);
         ContextPtr*  context               =   thread_data -> context;
-        bool         DEBUG                 =   enactor     -> DEBUG;
         int*         stages                =   data_slice  -> stages .GetPointer(util::HOST);
         bool*        to_show               =   data_slice  -> to_show.GetPointer(util::HOST);
         cudaStream_t* streams              =   data_slice  -> streams.GetPointer(util::HOST);
@@ -353,10 +324,13 @@ namespace bfs {
         int          grid_size             = 0;
         std::string  mssg                  = "";
         int          pre_stage             = 0;
+        size_t       offset                = 0;
+        int          num_vertex_associate  = BfsProblem::MARK_PREDECESSORS? 2:1;
+        int          num_value__associate  = 0;  
  
         do {
             //util::cpu_mt::PrintMessage("BFS Thread begin.",thread_num, enactor_stats[0].iteration);
-            if (enactor_stats[0].retval = util::SetDevice(gpu)) break;
+            if (enactor_stats[0].retval = util::SetDevice(gpu_idx)) break;
             thread_data->stats = 1;
             while (thread_data->stats != 2) sleep(0);
             thread_data->stats=3;
@@ -427,7 +401,7 @@ namespace bfs {
                             //mssg="pre_stage0";
                             //mssg[9]=char(stages[peer_]+'0');
                             mssg="";
-                            ShowDebugInfo<BFSProblem>(
+                            ShowDebugInfo<BfsProblem>(
                                 thread_num, 
                                 peer__, 
                                 &frontier_attribute[peer_], 
@@ -493,20 +467,23 @@ namespace bfs {
                                     stages[peer__]=3;break;                                
                                 }
 
-                                if (SIZE_CHECK)
+                                if (frontier_attribute_->queue_length > frontier_queue_->keys[selector^1].GetSize())
                                 {
-                                    if (frontier_attribute_->queue_length > frontier_queue_->keys[selector^1].GetSize())
-                                    {
-                                        printf("%d\t %d\t %d\t queue1 oversize : %d -> %d\n", 
-                                            thread_num, iteration, peer_, 
-                                            frontier_queue_->keys[selector^1].GetSize(),
-                                            frontier_attribute_->queue_length);
+                                    printf("%d\t %d\t %d\t queue1   \t oversize :\t %d ->\t %d\n", 
+                                        thread_num, iteration, peer_, 
+                                        frontier_queue_->keys[selector^1].GetSize(),
+                                        frontier_attribute_->queue_length);
                                         fflush(stdout);
+                                    if (SIZE_CHECK)
+                                    {
                                         if (enactor_stats_->retval = frontier_queue_->keys[selector^1].EnsureSize(frontier_attribute_->queue_length)) break;
-                                        if (BFSProblem::USE_DOUBLE_BUFFER)
+                                        if (BfsProblem::USE_DOUBLE_BUFFER)
                                         {
                                             if (enactor_stats_->retval = frontier_queue_->values[selector^1].EnsureSize(frontier_attribute_->queue_length)) break;
                                         }
+                                    } else {
+                                        enactor_stats_->retval = util::GRError(cudaErrorLaunchOutOfResources, "queue1 oversize", __FILE__, __LINE__);
+                                        break;
                                     }
                                 }
 
@@ -517,7 +494,7 @@ namespace bfs {
                                 //if (enactor_stats[0].iteration==2) break;
                                 cudaStreamWaitEvent(streams[peer_], 
                                     s_data_slice[peer]->events[iteration_][gpu_][0], 0);
-                                Expand_Incoming <VertexId, SizeT, BFSProblem::MARK_PREDECESSORS?2:1>
+                                Expand_Incoming <VertexId, SizeT, BfsProblem::MARK_PREDECESSORS?2:1>
                                     <<<grid_size,256,0,streams[peer_]>>> (
                                     frontier_attribute_->queue_length,
                                     //graph_slice ->in_offset[peer_],
@@ -531,7 +508,7 @@ namespace bfs {
  
                             } else { //Push Neibor
                                 PushNeibor <SIZE_CHECK, SizeT, VertexId, Value, GraphSlice, DataSlice, 
-                                        BFSProblem::MARK_PREDECESSORS?2:1, 0> (
+                                        BfsProblem::MARK_PREDECESSORS?2:1, 0> (
                                     thread_num,
                                     peer, 
                                     data_slice->out_length[peer_],
@@ -549,7 +526,7 @@ namespace bfs {
  
                         case 1: //Comp Length                           
                             gunrock::oprtr::advance::ComputeOutputLength 
-                                <AdvanceKernelPolicy, BFSProblem, BfsFunctor>(
+                                <AdvanceKernelPolicy, BfsProblem, BfsFunctor>(
                                 frontier_attribute_,
                                 graph_slice ->row_offsets     .GetPointer(util::DEVICE),
                                 graph_slice ->column_indices  .GetPointer(util::DEVICE),
@@ -586,14 +563,14 @@ namespace bfs {
                                 //frontier_attribute_->output_length[0]+=1;
                                 if (frontier_attribute_->output_length[0]+1 > frontier_queue_->keys[selector^1].GetSize())  
                                 {
-                                    printf("%d\t %d\t %d\t queue3 oversize :\t %d ->\t %d\n",
+                                    printf("%d\t %d\t %d\t queue3   \t oversize :\t %d ->\t %d\n",
                                         thread_num, iteration, peer_,
                                         frontier_queue_->keys[selector^1].GetSize(), 
                                         frontier_attribute_->output_length[0]+1);fflush(stdout);
                                     if (enactor_stats_->retval = frontier_queue_->keys[selector  ].EnsureSize(frontier_attribute_->output_length[0]+1, true)) break;
                                     if (enactor_stats_->retval = frontier_queue_->keys[selector^1].EnsureSize(frontier_attribute_->output_length[0]+1)) break;
                                  
-                                    if (BFSProblem::USE_DOUBLE_BUFFER) {
+                                    if (BfsProblem::USE_DOUBLE_BUFFER) {
                                         if (enactor_stats_->retval = frontier_queue_->values[selector  ].EnsureSize(frontier_attribute_->output_length[0]+1,true)) break;
                                         if (enactor_stats_->retval = frontier_queue_->values[selector^1].EnsureSize(frontier_attribute_->output_length[0]+1)) break;
                                    cudaStreamSynchronize(0); 
@@ -602,8 +579,7 @@ namespace bfs {
                                 }
                             }
       
-                            BFSCore < INSTRUMENT, AdvanceKernelPolicy, FilterKernelPolicy, BFSProblem>(
-                                DEBUG,
+                            BFSCore <AdvanceKernelPolicy, FilterKernelPolicy, BfsEnactor>(
                                 thread_num,
                                 peer_,
                                 frontier_attribute_,
@@ -680,26 +656,29 @@ namespace bfs {
                                        frontier_attribute[peer_].queue_length, graph_slice->frontier_queues[peer_].keys[frontier_attribute[peer_].selector].GetSize());
                                    fflush(stdout);
                                 }*/
-                                if (SIZE_CHECK)
+                                if (Total_Length + frontier_attribute_->queue_length > graph_slice->frontier_queues[num_gpus].keys[0].GetSize())
                                 {
-                                    if (Total_Length + frontier_attribute_->queue_length > graph_slice->frontier_queues[num_gpus].keys[0].GetSize())
+                                    printf("%d\t %d\t %d\t total_queue\t oversize :\t %d ->\t %d \n",
+                                       thread_num, iteration, peer_,
+                                       Total_Length + frontier_attribute_->queue_length,
+                                       graph_slice->frontier_queues[num_gpus].keys[0].GetSize());fflush(stdout);
+                                    if (SIZE_CHECK)
                                     {
-                                        printf("%d\t %d\t %d\t total_queue oversize : %d -> %d \n",
-                                           thread_num, iteration, peer_,
-                                           Total_Length + frontier_attribute_->queue_length,
-                                           graph_slice->frontier_queues[num_gpus].keys[0].GetSize());fflush(stdout);
                                         if (enactor_stats_->retval = graph_slice->frontier_queues[num_gpus].keys[0].EnsureSize(Total_Length+frontier_attribute_->queue_length, true)) break;
-                                        if (BFSProblem::USE_DOUBLE_BUFFER)
+                                        if (BfsProblem::USE_DOUBLE_BUFFER)
                                         {
                                             if (enactor_stats_->retval = graph_slice->frontier_queues[num_gpus].values[0].EnsureSize(Total_Length + frontier_attribute_->queue_length, true)) break;
                                         }
+                                    } else {
+                                        enactor_stats_->retval = util::GRError(cudaErrorLaunchOutOfResources, "total_queue oversize", __FILE__, __LINE__);
+                                        break;
                                     }
                                 }
                                 util::MemsetCopyVectorKernel<<<256,256, 0, streams[peer_]>>>(
                                     graph_slice->frontier_queues[num_gpus].keys[0].GetPointer(util::DEVICE) + Total_Length, 
                                     frontier_queue_->keys[selector].GetPointer(util::DEVICE), 
                                     frontier_attribute_->queue_length);
-                                if (BFSProblem::USE_DOUBLE_BUFFER)
+                                if (BfsProblem::USE_DOUBLE_BUFFER)
                                     util::MemsetCopyVectorKernel<<<256,256,0,streams[peer_]>>>(
                                         graph_slice->frontier_queues[num_gpus].values[0].GetPointer(util::DEVICE) + Total_Length,
                                         frontier_queue_->values[selector].GetPointer(util::DEVICE),
@@ -727,7 +706,7 @@ namespace bfs {
                             to_show[peer__]=false;
                         }
                         
-                        if (DEBUG)
+                        if (DEBUG && !enactor_stats_->retval)
                         {
                             mssg="stage 0 @ gpu 0, peer_ 0 failed";
                             mssg[6]=char(pre_stage+'0');
@@ -738,6 +717,7 @@ namespace bfs {
                             //sleep(1);
                         }
                         stages[peer__]++;
+                        if (enactor_stats_->retval) break;
                         //if (All_Done(s_enactor_stats, s_frontier_attribute, s_data_slice, num_gpus)) break;
                     }
                     /*to_wait=true;
@@ -750,7 +730,7 @@ namespace bfs {
                     if (to_wait) sleep(0);*/
                 }
               
-                if (num_gpus>1)
+                if (num_gpus>1 && !All_Done<SizeT, DataSlice>(s_enactor_stats, s_frontier_attribute, s_data_slice, num_gpus))
                 {
                     /*if (First_Stage4)
                     {
@@ -808,7 +788,7 @@ namespace bfs {
                         grid_size = Total_Length/256+1;
                         if (grid_size > 512) grid_size = 512;
 
-                        if (BFSProblem::MARK_PREDECESSORS)
+                        if (BfsProblem::MARK_PREDECESSORS)
                         {
                             Copy_Preds<VertexId, SizeT> <<<grid_size,256,0, streams[0]>>>(
                                 Total_Length,
@@ -825,17 +805,23 @@ namespace bfs {
                                 data_slice  -> preds          .GetPointer(util::DEVICE));
                         }
 
-                        if (SIZE_CHECK && data_slice->keys_marker[0].GetSize() < Total_Length)
+                        if (data_slice->keys_marker[0].GetSize() < Total_Length)
                         {
-                            printf("%d\t %lld\t \t keys_marker oversize : %d -> %d \n",
+                            printf("%d\t %lld\t \t keys_marker\t oversize :\t %d ->\t %d \n",
                                     thread_num, enactor_stats[0].iteration,
                                     data_slice->keys_marker[0].GetSize(), Total_Length);fflush(stdout);       
-                            for (int peer_=0;peer_<num_gpus;peer_++)
+                            if (SIZE_CHECK)
                             {
-                                data_slice->keys_marker[peer_].EnsureSize(Total_Length);
-                                data_slice->keys_markers[peer_]=data_slice->keys_marker[peer_].GetPointer(util::DEVICE);
+                                for (int peer_=0;peer_<num_gpus;peer_++)
+                                {
+                                    data_slice->keys_marker[peer_].EnsureSize(Total_Length);
+                                    data_slice->keys_markers[peer_]=data_slice->keys_marker[peer_].GetPointer(util::DEVICE);
+                                }
+                                data_slice->keys_markers.Move(util::HOST, util::DEVICE, num_gpus, 0, streams[0]);
+                            } else {
+                                enactor_stats[0].retval = util::GRError(cudaErrorLaunchOutOfResources, "keys_marker oversize", __FILE__, __LINE__);
+                                break;
                             }
-                            data_slice->keys_markers.Move(util::HOST, util::DEVICE, num_gpus, 0, streams[0]);
                         }
 
                         Assign_Marker<VertexId, SizeT>
@@ -856,27 +842,25 @@ namespace bfs {
                                 context[0][0]);
                         }
                             
-                        int num_vertex_associate = BFSProblem::MARK_PREDECESSORS? 2:1;
-                        int num_value__associate = 0;  
-                        if (SIZE_CHECK)
+                        for (int peer_=0; peer_<num_gpus;peer_++)
                         {
-                            for (int peer_=0; peer_<num_gpus;peer_++)
-                            {
-                                cudaMemcpyAsync(&(data_slice->out_length[peer_]), 
-                                    data_slice->keys_marker[peer_].GetPointer(util::DEVICE) 
-                                        + (Total_Length -1), 
-                                    sizeof(SizeT), cudaMemcpyDeviceToHost, streams[0]);
-                            }
-                            cudaStreamSynchronize(streams[0]);
+                            cudaMemcpyAsync(&(data_slice->out_length[peer_]), 
+                                data_slice->keys_marker[peer_].GetPointer(util::DEVICE) 
+                                     + (Total_Length -1), 
+                                sizeof(SizeT), cudaMemcpyDeviceToHost, streams[0]);
+                        }
+                        cudaStreamSynchronize(streams[0]);
                             
-                            for (int peer_=0; peer_<num_gpus;peer_++)
+                        for (int peer_=0; peer_<num_gpus;peer_++)
+                        {
+                            SizeT org_size = (peer_==0? graph_slice->frontier_queues[0].keys[frontier_attribute[0].selector^1].GetSize() : data_slice->keys_out[peer_].GetSize());
+                            if (data_slice->out_length[peer_] > org_size)
                             {
-                                SizeT org_size = (peer_==0? graph_slice->frontier_queues[0].keys[frontier_attribute[0].selector^1].GetSize() : data_slice->keys_out[peer_].GetSize());
-                                if (data_slice->out_length[peer_] > org_size)
+                                printf("%d\t %lld\t %d\t keys_out   \t oversize :\t %d ->\t %d\n",
+                                       thread_num, enactor_stats[0].iteration, peer_,
+                                       org_size, data_slice->out_length[peer_]);fflush(stdout);
+                                if (SIZE_CHECK)
                                 {
-                                    printf("%d\t %lld\t %d\t keys_out oversize : %d -> %d\n",
-                                           thread_num, enactor_stats[0].iteration, peer_,
-                                           org_size, data_slice->out_length[peer_]);fflush(stdout);
                                     if (peer_==0) 
                                     {
                                         graph_slice->frontier_queues[0].keys[frontier_attribute[0].selector^1].EnsureSize(data_slice->out_length[0]);
@@ -897,16 +881,20 @@ namespace bfs {
                                         }
                                         data_slice->value__associate_outs[peer_].Move(util::HOST, util::DEVICE, num_gpus, 0, streams[0]);
                                     }
+                                } else {
+                                    enactor_stats[0].retval = util::GRError(cudaErrorLaunchOutOfResources, "keys_out oversize", __FILE__, __LINE__);
+                                    break;
                                 }
                             }
                         }
+                        if (enactor_stats[0].retval) break;
                     
                         for (int peer_=0;peer_<num_gpus;peer_++)
                             if (peer_==0) data_slice -> keys_outs[peer_] = graph_slice->frontier_queues[peer_].keys[frontier_attribute[0].selector^1].GetPointer(util::DEVICE);
                             else data_slice -> keys_outs[peer_] = data_slice -> keys_out[peer_].GetPointer(util::DEVICE);
                         data_slice->keys_outs.Move(util::HOST, util::DEVICE, num_gpus, 0, streams[0]);
                     
-                        size_t offset = 0; 
+                        offset = 0; 
                         memcpy(&(data_slice -> make_out_array[offset]), 
                                  data_slice -> keys_markers         .GetPointer(util::HOST), 
                                   sizeof(SizeT*   ) * num_gpus);
@@ -939,7 +927,7 @@ namespace bfs {
                         }                  
                         data_slice->make_out_array.Move(util::HOST, util::DEVICE, data_slice->make_out_array.GetSize(), 0, streams[0]);
 
-                        Make_Out<VertexId, SizeT, Value, BFSProblem::MARK_PREDECESSORS?2:1, 0>
+                        Make_Out<VertexId, SizeT, Value, BfsProblem::MARK_PREDECESSORS?2:1, 0>
                             <<<grid_size, 256, sizeof(char)*data_slice->make_out_array.GetSize(), streams[0]>>> (
                             Total_Length,
                             num_gpus,
@@ -956,14 +944,14 @@ namespace bfs {
                             data_slice -> value__associate_outss .GetPointer(util::DEVICE));
                             */
                         //if (enactor_stats[0].retval = util::GRError(cudaStreamSynchronize(streams[0]), "Make_Out error", __FILE__, __LINE__)) break;
-                        if (!SIZE_CHECK) 
+                        /*if (!SIZE_CHECK) 
                         {
                             for (int peer_=0;peer_<num_gpus;peer_++)
                             cudaMemcpyAsync(&(data_slice->out_length[peer_]), 
                                 data_slice->keys_marker[peer_].GetPointer(util::DEVICE) 
                                     + (Total_Length -1), 
                                 sizeof(SizeT), cudaMemcpyDeviceToHost, streams[0]);
-                        }
+                        }*/
  
                         cudaStreamSynchronize(streams[0]);
                         frontier_attribute[0].selector^=1;
@@ -975,7 +963,7 @@ namespace bfs {
                     for (int peer_=0;peer_<num_gpus;peer_++)
                         frontier_attribute[peer_].queue_length = data_slice->out_length[peer_];
 
-                } else {
+                } else if (!All_Done<SizeT, DataSlice>(s_enactor_stats, s_frontier_attribute, s_data_slice, num_gpus)) {
                     if (enactor_stats[0].retval = work_progress[0].GetQueueLength(frontier_attribute[0].queue_index, frontier_attribute[0].queue_length, false, data_slice->streams[0])) break; 
                 }
                 enactor_stats[0].iteration++;
@@ -1002,7 +990,7 @@ namespace bfs {
                 util::cpu_mt::ReleaseBarrier(cpu_barrier,thread_num);
             }
         }*/
-        util::cpu_mt::PrintMessage("GPU BFS thread finished.", thread_num, enactor_stats->iteration);
+        //util::cpu_mt::PrintMessage("GPU BFS thread finished.", thread_num, enactor_stats->iteration);
         thread_data->stats=4;
         CUT_THREADEND;
     }
@@ -1012,26 +1000,29 @@ namespace bfs {
  *
  * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA clock-count statistics
  */
-template <typename BFSProblem, bool INSTRUMENT>
-class BFSEnactor : public EnactorBase<typename BFSProblem::SizeT>
-{
-    typedef typename BFSProblem::SizeT    SizeT   ;
-    typedef typename BFSProblem::VertexId VertexId;
-    typedef typename BFSProblem::Value    Value   ;
+template <typename _BfsProblem, bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK>
+class BFSEnactor : public EnactorBase<typename _BfsProblem::SizeT, _DEBUG, _SIZE_CHECK>
+{   
+    _BfsProblem  *problem      ;
+    ThreadSlice  *thread_slices;// = new ThreadSlice [this->num_gpus];
+    CUTThread    *thread_Ids   ;// = new CUTThread   [this->num_gpus];
 
-    BFSProblem  *problem      ;
-    ThreadSlice *thread_slices;// = new ThreadSlice [this->num_gpus];
-    CUTThread   *thread_Ids   ;// = new CUTThread   [this->num_gpus];
-
+public:
+    typedef _BfsProblem          BfsProblem;
+    typedef typename BfsProblem::SizeT    SizeT   ;
+    typedef typename BfsProblem::VertexId VertexId;
+    typedef typename BfsProblem::Value    Value   ;
+    static const bool INSTRUMENT = _INSTRUMENT;
+    static const bool DEBUG      = _DEBUG;
+    static const bool SIZE_CHECK = _SIZE_CHECK;
 
     // Methods
-public:
 
     /**
      * @brief BFSEnactor constructor
      */
-    BFSEnactor(bool DEBUG = false, int num_gpus = 1, int* gpu_idx = NULL) :
-        EnactorBase<SizeT>(VERTEX_FRONTIERS, DEBUG, num_gpus, gpu_idx)//,
+    BFSEnactor(int num_gpus = 1, int* gpu_idx = NULL) :
+        EnactorBase<SizeT, _DEBUG, _SIZE_CHECK>(VERTEX_FRONTIERS, num_gpus, gpu_idx)//,
     {
         //util::cpu_mt::PrintMessage("BFSEnactor() begin.");
         thread_slices = NULL;
@@ -1049,7 +1040,7 @@ public:
         for (int gpu=0;gpu<this->num_gpus;gpu++)
         {
             util::SetDevice(this->gpu_idx[gpu]);
-            if (BFSProblem::ENABLE_IDEMPOTENCE)
+            if (BfsProblem::ENABLE_IDEMPOTENCE)
             {
                 cudaUnbindTexture(gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref);
             }
@@ -1105,14 +1096,14 @@ public:
         typename FilterKernelPolicy>
     cudaError_t InitBFS(
         ContextPtr *context,
-        BFSProblem *problem,
+        BfsProblem *problem,
         int        max_grid_size = 0,
         bool       size_check    = true)
     {   
         cudaError_t retval = cudaSuccess;
 
         // Lazy initialization
-        if (retval = EnactorBase<SizeT>::Init(problem,
+        if (retval = EnactorBase<SizeT, DEBUG, SIZE_CHECK>::Init(problem,
                                        max_grid_size,
                                        AdvanceKernelPolicy::CTA_OCCUPANCY, 
                                        FilterKernelPolicy::CTA_OCCUPANCY)) return retval;
@@ -1124,7 +1115,7 @@ public:
         for (int gpu=0;gpu<this->num_gpus;gpu++)
         {
             if (retval = util::SetDevice(this->gpu_idx[gpu])) break;
-            if (BFSProblem::ENABLE_IDEMPOTENCE) {
+            if (BfsProblem::ENABLE_IDEMPOTENCE) {
                 int bytes = (problem->graph_slices[gpu]->nodes + 8 - 1) / 8;
                 cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
                 gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
@@ -1142,16 +1133,12 @@ public:
             thread_slices[gpu].thread_num    = gpu;
             thread_slices[gpu].problem       = (void*)problem;
             thread_slices[gpu].enactor       = (void*)this;
-            //thread_slices[gpu].cpu_barrier   = &cpu_barrier;
             thread_slices[gpu].context       = &(context[gpu*this->num_gpus]);
             thread_slices[gpu].stats         = -1;
-            //this->enactor_stats[gpu].start_time    = start_time;
-            if (size_check)
-                thread_slices[gpu].thread_Id = cutStartThread(
-                    (CUT_THREADROUTINE)&(BFSThread<INSTRUMENT, true, AdvanceKernelPolicy,FilterKernelPolicy,BFSProblem>),
-                    (void*)&(thread_slices[gpu]));
-            else thread_slices[gpu].thread_Id = cutStartThread(
-                    (CUT_THREADROUTINE)&(BFSThread<INSTRUMENT, false, AdvanceKernelPolicy,FilterKernelPolicy,BFSProblem>),
+            thread_slices[gpu].thread_Id = cutStartThread(
+                (CUT_THREADROUTINE)&(BFSThread<
+                    AdvanceKernelPolicy,FilterKernelPolicy, 
+                    BFSEnactor<BfsProblem, INSTRUMENT, DEBUG, SIZE_CHECK> >),
                     (void*)&(thread_slices[gpu]));
             thread_Ids[gpu] = thread_slices[gpu].thread_Id;
         }
@@ -1161,7 +1148,7 @@ public:
 
     cudaError_t Reset()
     {
-        return EnactorBase<SizeT>::Reset();
+        return EnactorBase<SizeT, DEBUG, SIZE_CHECK>::Reset();
     }
 
     /** @} */
@@ -1244,11 +1231,11 @@ public:
             if (min_sm_version == -1 || this->cuda_props[i].device_sm_version < min_sm_version)
                 min_sm_version = this->cuda_props[i].device_sm_version;
 
-        if (BFSProblem::ENABLE_IDEMPOTENCE) {
+        if (BfsProblem::ENABLE_IDEMPOTENCE) {
             //if (this->cuda_props.device_sm_version >= 300) {
             if (min_sm_version >= 300) {
                 typedef gunrock::oprtr::filter::KernelPolicy<
-                BFSProblem,                         // Problem data type
+                BfsProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 0,                                  // SATURATION QUIT
@@ -1263,7 +1250,7 @@ public:
                     FilterKernelPolicy;
 
                 typedef gunrock::oprtr::advance::KernelPolicy<
-                    BFSProblem,                         // Problem data type
+                    BfsProblem,                         // Problem data type
                     300,                                // CUDA_ARCH
                     INSTRUMENT,                         // INSTRUMENT
                     8,                                  // MIN_CTA_OCCUPANCY
@@ -1287,7 +1274,7 @@ public:
                 //if (this->cuda_props.device_sm_version >= 300) {
                 if (min_sm_version >= 300) {
                 typedef gunrock::oprtr::filter::KernelPolicy<
-                    BFSProblem,                         // Problem data type
+                    BfsProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 0,                                  // SATURATION QUIT
@@ -1302,7 +1289,7 @@ public:
                     FilterKernelPolicy;
 
                 typedef gunrock::oprtr::advance::KernelPolicy<
-                    BFSProblem,                         // Problem data type
+                    BfsProblem,                         // Problem data type
                     300,                                // CUDA_ARCH
                     INSTRUMENT,                         // INSTRUMENT
                     8,                                  // MIN_CTA_OCCUPANCY
@@ -1349,7 +1336,7 @@ public:
      */
     cudaError_t Init(
         ContextPtr  *context,
-        BFSProblem  *problem,
+        BfsProblem  *problem,
         //VertexId    src,
         int         max_grid_size = 0,
         bool        size_check = true)
@@ -1360,11 +1347,11 @@ public:
             if (min_sm_version == -1 || this->cuda_props[i].device_sm_version < min_sm_version)
                 min_sm_version = this->cuda_props[i].device_sm_version;
 
-        if (BFSProblem::ENABLE_IDEMPOTENCE) {
+        if (BfsProblem::ENABLE_IDEMPOTENCE) {
             //if (this->cuda_props.device_sm_version >= 300) {
             if (min_sm_version >= 300) {
                 typedef gunrock::oprtr::filter::KernelPolicy<
-                BFSProblem,                         // Problem data type
+                BfsProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 0,                                  // SATURATION QUIT
@@ -1379,7 +1366,7 @@ public:
                     FilterKernelPolicy;
 
                 typedef gunrock::oprtr::advance::KernelPolicy<
-                    BFSProblem,                         // Problem data type
+                    BfsProblem,                         // Problem data type
                     300,                                // CUDA_ARCH
                     INSTRUMENT,                         // INSTRUMENT
                     8,                                  // MIN_CTA_OCCUPANCY
@@ -1402,7 +1389,7 @@ public:
                 //if (this->cuda_props.device_sm_version >= 300) {
                 if (min_sm_version >= 300) {
                 typedef gunrock::oprtr::filter::KernelPolicy<
-                    BFSProblem,                         // Problem data type
+                    BfsProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 0,                                  // SATURATION QUIT
@@ -1417,7 +1404,7 @@ public:
                     FilterKernelPolicy;
 
                 typedef gunrock::oprtr::advance::KernelPolicy<
-                    BFSProblem,                         // Problem data type
+                    BfsProblem,                         // Problem data type
                     300,                                // CUDA_ARCH
                     INSTRUMENT,                         // INSTRUMENT
                     8,                                  // MIN_CTA_OCCUPANCY

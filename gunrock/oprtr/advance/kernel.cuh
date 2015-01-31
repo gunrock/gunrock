@@ -31,33 +31,34 @@ namespace gunrock {
 namespace oprtr {
 namespace advance {
 
-template <typename KernelPolicy, typename ProblemData, typename Functor>
+template <typename KernelPolicy, typename Problem, typename Functor>
 cudaError_t ComputeOutputLength(
-   //                                 int                             num_block,
-    gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT> *frontier_attribute,
-    typename KernelPolicy::SizeT    *d_offsets,
-    typename KernelPolicy::VertexId *d_indices,
-    typename KernelPolicy::VertexId *d_in_key_queue,
-    typename KernelPolicy::SizeT    *partitioned_scanned_edges,
-    typename KernelPolicy::SizeT    max_in,
-    typename KernelPolicy::SizeT    max_out,
+    //                                 int                             num_block,
+    gunrock::app::FrontierAttribute<typename Problem::SizeT> *frontier_attribute,
+    typename Problem::SizeT    *d_offsets,
+    typename Problem::VertexId *d_indices,
+    typename Problem::VertexId *d_in_key_queue,
+    typename Problem::SizeT    *partitioned_scanned_edges,
+    typename Problem::SizeT    max_in,
+    typename Problem::SizeT    max_out,
     CudaContext                     &context,
     cudaStream_t                    stream,
     TYPE                            ADVANCE_TYPE,
     bool                            express = false) 
 {
-    typedef typename ProblemData::SizeT         SizeT;
+    typedef typename Problem::SizeT         SizeT;
     if (frontier_attribute->queue_length ==0) 
     {
         //frontier_attribute->output_length[0] = 0;
         util::MemsetKernel<SizeT><<<1,1,0,stream>>>(frontier_attribute->output_length.GetPointer(util::DEVICE),0,1);
+        //frontier_attribute->output_length[0]=0;
         return cudaSuccess;
     }
 
     int num_block = (frontier_attribute->queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
     //printf("%p, %p, %p, %p, %d, %d, %d, %d, %d\n",d_offsets, d_indices, d_in_key_queue, partitioned_scanned_edges, frontier_attribute->queue_length, max_in, max_out, num_block, stream); 
     //fflush(stdout);
-    gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
+    gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, Problem, Functor>
         <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS,0,stream>>>(
                 d_offsets,
                 d_indices,
@@ -75,7 +76,7 @@ cudaError_t ComputeOutputLength(
     //util::cpu_mt::PrintGPUArray<SizeT, int>("partitined_scanned_edges", (int*)partitioned_scanned_edges, frontier_attribute->queue_length);
     Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute->queue_length, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
-    //cudaStreamSynchronize(stream);
+    cudaStreamSynchronize(stream);
     //util::cpu_mt::PrintGPUArray<SizeT, SizeT>("partitioned_scanned_edges2", partitioned_scanned_edges,frontier_attribute->queue_length);
     //if (!express) util::GRError(cudaStreamSynchronize(stream),"cudaStreamSynchronize failed", __FILE__, __LINE__);
     //if (!express) util::GRError("Scan failed", __FILE__, __LINE__);

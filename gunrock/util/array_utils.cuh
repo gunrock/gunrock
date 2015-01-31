@@ -70,9 +70,9 @@ public:
         Init(0,NONE,false,flag);
     } // Array1D()
 
-    /*Array1D(char* name)
+    /*Array1D(const std::string name)
     {
-        this->name= std::string(name);
+        this->name= name;
         file_name = "";
         h_pointer = NULL;
         d_pointer = NULL;
@@ -81,7 +81,7 @@ public:
         flag      = cudaHostAllocDefault;
         use_cuda_alloc = false;
         Init(0,NONE,false,NONE);
-    }*/
+    }
 
     Array1D(SizeT size, std::string name = "", unsigned int target = HOST, bool use_cuda_alloc = false, unsigned int flag = cudaHostAllocDefault)
     {
@@ -92,7 +92,7 @@ public:
         setted    = NONE;
         allocated = NONE;
         Init(size,target,use_cuda_alloc,flag);
-    } // Array1D(...)
+    } // Array1D(...)*/
 
     virtual ~Array1D()
     {

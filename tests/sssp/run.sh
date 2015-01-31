@@ -81,7 +81,7 @@ do
     SUFFIX="ubuntu12.04_k40cx2_brp${F[$k]}"
     mkdir -p eval/$SUFFIX
 
-    for i in  {0..1} 
+    for i in  {0..43} 
     do
         for j in {0..3}
         do

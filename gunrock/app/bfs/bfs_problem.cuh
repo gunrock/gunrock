@@ -40,12 +40,12 @@ template <
     bool        _ENABLE_IDEMPOTENCE,
     bool        _USE_DOUBLE_BUFFER>
 struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
-                                _USE_DOUBLE_BUFFER>
+                                _MARK_PREDECESSORS, _ENABLE_IDEMPOTENCE, _USE_DOUBLE_BUFFER, false>
 {
 
-    static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
-    static const bool ENABLE_IDEMPOTENCE    = _ENABLE_IDEMPOTENCE;
-    static const bool USE_DOUBLE_BUFFER     = _USE_DOUBLE_BUFFER;
+    //static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
+    //static const bool ENABLE_IDEMPOTENCE    = _ENABLE_IDEMPOTENCE;
+    //static const bool USE_DOUBLE_BUFFER     = _USE_DOUBLE_BUFFER;
     //Helper structures
 
     /**
@@ -69,7 +69,6 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             visited_mask    .SetName("visited_mask"    );
             temp_preds      .SetName("temp_preds"      );
             temp_marker     .SetName("temp_marker"     );
-            //Scaner          = NULL;
             scanned_edges   = NULL;
             //util::cpu_mt::PrintMessage("DataSlice() end.");
         }
@@ -85,7 +84,6 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 scanned_edges[gpu].Release();
             temp_preds    .Release();
             temp_marker   .Release();
-            //delete Scaner; Scaner=NULL;
             delete[] scanned_edges;scanned_edges=NULL;
             //util::cpu_mt::PrintMessage("~DataSlice() end.");
         }
@@ -96,7 +94,6 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             int   num_vertex_associate,
             int   num_value__associate,
             Csr<VertexId, Value, SizeT> *graph,
-            //SizeT num_nodes,
             SizeT *num_in_nodes,
             SizeT *num_out_nodes,
             float queue_sizing = 2.0,
@@ -141,8 +138,6 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                     this->vertex_associate_orgs[1] = preds.GetPointer(util::DEVICE);
                 if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
                 if (retval = temp_marker. Allocate(graph->nodes, util::DEVICE)) return retval;
-                //Scaner = new util::scan::MultiScan<VertexId, SizeT, true, 256, 8>;
-                //Scaner->Init(total_out_nodes, num_gpus);
             }
             //util::cpu_mt::PrintMessage("DataSlice Init() end.");
             return retval;
@@ -267,24 +262,28 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
      */
     cudaError_t Init(
             bool        stream_from_host,       // Only meaningful for single-GPU
-            Csr<VertexId, Value, SizeT> &graph,
+            Csr<VertexId, Value, SizeT> *graph,
             Csr<VertexId, Value, SizeT> *inversgraph = NULL,
-            int         num_gpus = 1,
-            int*        gpu_idx  = NULL,
+            int         num_gpus         = 1,
+            int*        gpu_idx          = NULL,
             std::string partition_method ="random",
-            cudaStream_t* streams = NULL,
-            float       queue_sizing = 2.0,
-            float       in_sizing = 1.0)
+            cudaStream_t* streams        = NULL,
+            float       queue_sizing     = 2.0,
+            float       in_sizing        = 1.0,
+            float       partition_factor = -1.0,
+            int         partition_seed   = -1)
     {
         //util::cpu_mt::PrintMessage("BFSProblem Init() begin.");
-        ProblemBase<VertexId, SizeT,Value,_USE_DOUBLE_BUFFER>::Init(
+        ProblemBase<VertexId, SizeT,Value,_MARK_PREDECESSORS, _ENABLE_IDEMPOTENCE, _USE_DOUBLE_BUFFER, false>::Init(
             stream_from_host,
-            &graph,
+            graph,
             NULL,
             num_gpus,
             gpu_idx,
             partition_method,
-            queue_sizing);
+            queue_sizing,
+            partition_factor,
+            partition_seed);
 
         // No data in DataSlice needs to be copied from host
 
@@ -356,7 +355,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
     {
         //util::cpu_mt::PrintMessage("BFSProblem Reset() begin.");
-        typedef ProblemBase<VertexId, SizeT, Value, _USE_DOUBLE_BUFFER> BaseProblem;
+        typedef ProblemBase<VertexId, SizeT, Value, _MARK_PREDECESSORS, _ENABLE_IDEMPOTENCE, _USE_DOUBLE_BUFFER, false> BaseProblem;
         //load ProblemBase Reset
         BaseProblem::Reset(frontier_type, queue_sizing);
 

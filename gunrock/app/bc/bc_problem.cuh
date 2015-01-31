@@ -16,6 +16,7 @@
 
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/util/memset_kernel.cuh>
+#include <gunrock/util/array_utils.cuh>
 
 namespace gunrock {
 namespace app {
@@ -30,22 +31,22 @@ namespace bc {
  * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer
  */
 template <
-    typename    _VertexId,                      
-    typename    _SizeT,                        
-    typename    _Value,                       
+    typename    VertexId,                      
+    typename    SizeT,                        
+    typename    Value,                       
     bool        _MARK_PREDECESSORS,
     bool        _USE_DOUBLE_BUFFER>
-struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
-                                _USE_DOUBLE_BUFFER,true>
+struct BCProblem : ProblemBase<VertexId, SizeT, Value,
+                                _MARK_PREDECESSORS, false, _USE_DOUBLE_BUFFER, true>
 {
-    typedef _VertexId       VertexId;
-    typedef _SizeT          SizeT;
-    typedef _Value          Value;
+    //typedef _VertexId       VertexId;
+    //typedef _SizeT          SizeT;
+    //typedef _Value          Value;
     //typedef ProblemBase<VertexId, SizeT, Value, _USE_DOUBLE_BUFFER, true>::DataSliceBase DataSliceBase;
 
-    static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
-    static const bool ENABLE_IDEMPOTENCE    = false;
-    
+    //static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
+    //static const bool ENABLE_IDEMPOTENCE    = false;
+    //static const bool USE_DOUBLE_BUFFER     = _USE_DOUBLE_BUFFER;
     //Helper structures
     
     /** 
@@ -56,26 +57,15 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
         // device storage arrays
         util::Array1D<SizeT, VertexId  >  labels;              /**< Used for source distance */
         util::Array1D<SizeT, VertexId  >  preds;               /**< Used for predecessor */
+        util::Array1D<SizeT, VertexId  >  temp_preds;          /**< Used for tempoary predecessor */
         util::Array1D<SizeT, Value     >  bc_values;           /**< Used to store final BC values for each node */
         util::Array1D<SizeT, Value     >  ebc_values;          /**< Used to store final BC values for each edge */
         util::Array1D<SizeT, Value     >  sigmas;              /**< Accumulated sigma values for each node */
         util::Array1D<SizeT, Value     >  deltas;              /**< Accumulated delta values for each node */
         util::Array1D<SizeT, VertexId  >  src_node;            /**< Used to store source node ID */
-
-        /*int                               num_vertex_associate,num_value__associate,gpu_idx;
-        util::Array1D<SizeT, VertexId  > *vertex_associate_in[2];
-        util::Array1D<SizeT, VertexId* >  vertex_associate_ins[2];
-        util::Array1D<SizeT, VertexId  > *vertex_associate_out;
-        util::Array1D<SizeT, VertexId* >  vertex_associate_outs;
-        util::Array1D<SizeT, VertexId* >  vertex_associate_orgs;
-        util::Array1D<SizeT, Value     > *value__associate_in[2];
-        util::Array1D<SizeT, Value*    >  value__associate_ins[2];
-        util::Array1D<SizeT, Value     > *value__associate_out;
-        util::Array1D<SizeT, Value*    >  value__associate_outs;
-        util::Array1D<SizeT, Value*    >  value__associate_orgs;
-        util::Array1D<SizeT, SizeT     >  out_length    ;   
-        util::Array1D<SizeT, SizeT     >  in_length[2]  ;   
-        util::Array1D<SizeT, VertexId  >  keys_in  [2]  ;*/
+        util::Array1D<SizeT, VertexId  >  *forward_output;      /**< Used to store output noe IDs by the forward pass */
+        std::vector<SizeT>                *forward_queue_offsets;
+        util::Array1D<SizeT, SizeT     >  *scanned_edges;
 
         DataSlice()
         {   
@@ -85,101 +75,34 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
             ebc_values  .SetName("ebc_values"  );
             sigmas      .SetName("sigmas"      );
             deltas      .SetName("deltas"      );
-            src_node    .SetName("src_node"    );  
-
-            /*num_vertex_associate   = 0;
-            num_value__associate   = 0;
-            gpu_idx                = 0;
-            vertex_associate_in[0] = NULL;
-            vertex_associate_in[1] = NULL;
-            vertex_associate_out   = NULL;
-            value__associate_in[0] = NULL;
-            value__associate_in[1] = NULL;
-            value__associate_out   = NULL;
-            vertex_associate_ins[0].SetName("vertex_associate_ins[0]");
-            vertex_associate_ins[1].SetName("vertex_associate_ins[1]");
-            vertex_associate_outs  .SetName("vertex_associate_outs"  );
-            vertex_associate_orgs  .SetName("vertex_associate_orgs"  );
-            value__associate_ins[0].SetName("value__associate_ins[0]");
-            value__associate_ins[1].SetName("value__associate_ins[1]");
-            value__associate_outs  .SetName("value__associate_outs"  );
-            value__associate_orgs  .SetName("value__associate_orgs"  );
-            out_length             .SetName("out_length"             );
-            in_length           [0].SetName("in_length[0]"           );
-            in_length           [1].SetName("in_length[1]"           );
-            keys_in             [0].SetName("keys_in[0]"             );
-            keys_in             [1].SetName("keys_in[1]"             );*/
+            src_node    .SetName("src_node"    );
+            forward_output        = NULL;
+            forward_queue_offsets = NULL;
+            scanned_edges         = NULL;
         }
 
         ~DataSlice()
         {
-            util::cpu_mt::PrintMessage("~DataSlice() begin.");
+            //util::cpu_mt::PrintMessage("~DataSlice() begin.");
             if (util::SetDevice(this->gpu_idx)) return;
             labels        .Release();
             preds         .Release();
+            temp_preds    .Release();
             bc_values     .Release();
             ebc_values    .Release();
             sigmas        .Release();
             deltas        .Release();
             src_node      .Release();
-/*
-            if (vertex_associate_in[0] != NULL)
+            for (int gpu=0;gpu<this->num_gpus;gpu++)
             {
-                for (int i=0;i<num_vertex_associate;i++)
-                {
-                    vertex_associate_in[0][i].Release();
-                    vertex_associate_in[1][i].Release();
-                }
-                delete[] vertex_associate_in[0];
-                delete[] vertex_associate_in[1];
-                vertex_associate_in[0]=NULL;
-                vertex_associate_in[1]=NULL;
-                vertex_associate_ins[0].Release();
-                vertex_associate_ins[1].Release();
+                scanned_edges        [gpu].Release();
+                forward_output       [gpu].Release();
+                forward_queue_offsets[gpu].resize(0);
             }
-
-            if (value__associate_in[0] != NULL)
-            {
-                for (int i=0;i<num_value__associate;i++)
-                {
-                    value__associate_in[0][i].Release();
-                    value__associate_in[1][i].Release();
-                }
-                delete[] value__associate_in[0];
-                delete[] value__associate_in[1];
-                value__associate_in[0]=NULL;
-                value__associate_in[1]=NULL;
-                value__associate_ins[0].Release();
-                value__associate_ins[1].Release();
-            }
-
-            if (vertex_associate_out != NULL)
-            {
-                for (int i=0;i<num_vertex_associate;i++)
-                    vertex_associate_out[i].Release();
-                delete[] vertex_associate_out;
-                vertex_associate_out=NULL;
-                vertex_associate_outs.Release();
-            }
-
-            if (value__associate_out != NULL)
-            {
-                for (int i=0;i<num_value__associate;i++)
-                    value__associate_out[i].Release();
-                delete[] value__associate_out;
-                value__associate_out=NULL;
-                value__associate_outs.Release();
-            }
-            
-            keys_in    [0].Release();
-            keys_in    [1].Release();
-            in_length  [0].Release();
-            in_length  [1].Release();
-            out_length    .Release();
-            vertex_associate_orgs.Release();
-            value__associate_orgs.Release();
-*/
-            util::cpu_mt::PrintMessage("~DataSlice() end.");
+            delete[] scanned_edges        ; scanned_edges         = NULL;
+            delete[] forward_output       ; forward_output        = NULL;
+            delete[] forward_queue_offsets; forward_queue_offsets = NULL;
+            //util::cpu_mt::PrintMessage("~DataSlice() end.");
         }
 
         cudaError_t Init(
@@ -188,8 +111,10 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
             int   num_vertex_associate,
             int   num_value__associate,
             Csr<VertexId, Value, SizeT> *graph,
-            SizeT num_in_nodes,
-            SizeT num_out_nodes)
+            SizeT *num_in_nodes,
+            SizeT *num_out_nodes,
+            float queue_sizing = 2.0,
+            float in_sizing    = 1.0)
         {
             cudaError_t retval         = cudaSuccess;
             if (retval = DataSliceBase<SizeT, VertexId, Value>::Init(
@@ -199,92 +124,32 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
                 num_value__associate,
                 graph,
                 num_in_nodes,
-                num_out_nodes)) return retval;
-            /*this->gpu_idx              = gpu_idx;
-            this->num_vertex_associate = num_vertex_associate;
-            this->num_value__associate = num_value__associate;
-            if (retval = util::SetDevice(gpu_idx))  return retval;
-            if (retval = in_length[0].Allocate(num_gpus,util::HOST)) return retval;
-            if (retval = in_length[1].Allocate(num_gpus,util::HOST)) return retval;
-            if (retval = out_length  .Allocate(num_gpus,util::HOST | util::DEVICE)) return retval;
-            if (retval = vertex_associate_orgs.Allocate(num_vertex_associate, util::HOST | util::DEVICE)) return retval;
-
-            // Create incoming buffer on device
-            if (num_in_nodes > 0)
-            for (int t=0;t<2;t++) {
-                vertex_associate_in [t] = new util::Array1D<SizeT,VertexId>[num_vertex_associate];
-                vertex_associate_ins[t].SetName("vertex_associate_ins");
-                if (retval = vertex_associate_ins[t].Allocate(num_vertex_associate, util::DEVICE | util::HOST)) return retval;
-                for (int i=0;i<num_vertex_associate;i++)
-                {
-                    vertex_associate_in[t][i].SetName("vertex_associate_ins[]");
-                    if (retval = vertex_associate_in[t][i].Allocate(num_in_nodes,util::DEVICE)) return retval;
-                    vertex_associate_ins[t][i] = vertex_associate_in[t][i].GetPointer(util::DEVICE);
-                }
-                if (retval = vertex_associate_ins[t].Move(util::HOST, util::DEVICE)) return retval;
-
-                value__associate_in [t] = new util::Array1D<SizeT,Value   >[num_value__associate];
-                value__associate_ins[t].SetName("value__associate_ins");
-                if (retval = value__associate_ins[t].Allocate(num_value__associate, util::DEVICE | util::HOST)) return retval;
-                for (int i=0;i<num_value__associate;i++)
-                {
-                    value__associate_in[t][i].SetName("value__associate_ins[]");
-                    if (retval = value__associate_in[t][i].Allocate(num_in_nodes,util::DEVICE)) return retval;
-                    value__associate_ins[t][i] = value__associate_in[t][i].GetPointer(util::DEVICE);
-                }
-                if (retval = value__associate_ins[t].Move(util::HOST, util::DEVICE)) return retval;
-                
-                if (retval = keys_in[t].Allocate(num_in_nodes,util::DEVICE)) return retval;
-            }
-
-            // Create outgoing buffer on device
-            if (num_out_nodes > 0)
-            {
-                vertex_associate_out = new util::Array1D<SizeT,VertexId>[num_vertex_associate];
-                vertex_associate_outs.SetName("vertex_associate_outs");
-                if (retval = vertex_associate_outs.Allocate(num_vertex_associate, util::HOST | util::DEVICE)) return retval;
-                for (int i=0;i<num_vertex_associate;i++)
-                {
-                    vertex_associate_out[i].SetName("vertex_associate_out[]");
-                    if (retval = vertex_associate_out[i].Allocate(num_out_nodes, util::DEVICE)) return retval;
-                    vertex_associate_outs[i]=vertex_associate_out[i].GetPointer(util::DEVICE);
-                }
-                if (retval = vertex_associate_outs.Move(util::HOST, util::DEVICE)) return retval;
-                
-                value__associate_out = new util::Array1D<SizeT,Value>[num_value__associate];
-                value__associate_outs.SetName("value__associate_outs");
-                if (retval = value__associate_outs.Allocate(num_value__associate, util::HOST | util::DEVICE)) return retval;
-                for (int i=0;i<num_value__associate;i++)
-                {
-                    value__associate_out[i].SetName("value__associate_out[]");
-                    if (retval = value__associate_out[i].Allocate(num_out_nodes, util::DEVICE)) return retval;
-                    value__associate_outs[i]=value__associate_out[i].GetPointer(util::DEVICE);
-                }
-                if (retval = value__associate_outs.Move(util::HOST, util::DEVICE)) return retval;
-            }*/
-            
+                num_out_nodes,
+                in_sizing)) return retval;
+           
             // Create SoA on device
-            if (retval = labels    .Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = labels    .Allocate(graph->nodes, util::DEVICE | util::HOST)) return retval;
             if (retval = preds     .Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = temp_preds.Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = bc_values .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = ebc_values.Allocate(graph->edges, util::DEVICE)) return retval;
-            if (retval = sigmas    .Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = sigmas    .Allocate(graph->nodes, util::DEVICE | util::HOST)) return retval;
             if (retval = deltas    .Allocate(graph->nodes, util::DEVICE)) return retval;
+            //if (retval = forward_output.Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = src_node  .Allocate(1           , util::DEVICE)) return retval; 
             util::MemsetKernel<<<128, 128>>>( bc_values.GetPointer(util::DEVICE), (Value)0.0f, graph->nodes);
             util::MemsetKernel<<<128, 128>>>(ebc_values.GetPointer(util::DEVICE), (Value)0.0f, graph->edges);
 
-            if (num_gpus > 1)
+            scanned_edges = new util::Array1D<SizeT, SizeT>[num_gpus];
+            forward_queue_offsets = new std::vector<SizeT>[num_gpus];
+            forward_output = new util::Array1D<SizeT, VertexId>[num_gpus];
+            for (int gpu=0;gpu<num_gpus;gpu++)
             {
-                this->vertex_associate_orgs[0] = labels    .GetPointer(util::DEVICE);
-                this->vertex_associate_orgs[1] = preds     .GetPointer(util::DEVICE);
-                this->value__associate_orgs[0] = bc_values .GetPointer(util::DEVICE);
-                this->value__associate_orgs[1] = sigmas    .GetPointer(util::DEVICE);
-                this->value__associate_orgs[2] = deltas    .GetPointer(util::DEVICE);
-                if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
-                if (retval = this->value__associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
+                forward_queue_offsets[gpu].reserve(graph->nodes);
+                forward_queue_offsets[gpu].push_back(0);
+                if (retval = forward_output[gpu].Allocate(graph->nodes, util::DEVICE)) return retval;
+                if (retval = scanned_edges[gpu].Allocate(graph->edges, util::DEVICE)) return retval;
             }
-
             return retval;
         } // Init
 
@@ -292,51 +157,18 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
 
     // Members
 
-    // Number of GPUs to be sliced over
-    //int                 num_gpus;
-
-    // Size of the graph
-    //SizeT               nodes;
-    //SizeT               edges;
-
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice>  *data_slices;
-   
-    // Nasty method for putting struct on device
-    // while keeping the SoA structure
-    //DataSlice           **d_data_slices;
-
-    // Device indices for each data slice
-    //int                 *gpu_idx;
 
     // Methods
 
     /**
      * @brief BCProblem default constructor
      */
-
     BCProblem()
     {
         data_slices = NULL;
     }
-
-    /**
-     * @brief BCProblem constructor
-     *
-     * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on.
-     * @param[in] num_gpus Number of the GPUs used.
-     */
-    /*BCProblem(bool        stream_from_host,       // Only meaningful for single-GPU
-              const Csr<VertexId, Value, SizeT> &graph,
-              int         num_gpus) :
-        num_gpus(num_gpus)
-    {
-        Init(
-            stream_from_host,
-            graph,
-            num_gpus);
-    }*/
 
     /**
      * @brief BCProblem default destructor
@@ -455,33 +287,30 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
      */
     cudaError_t Init(
             bool        stream_from_host,       // Only meaningful for single-GPU
-            Csr<VertexId, Value, SizeT> &graph,
+            Csr<VertexId, Value, SizeT> *graph,
             Csr<VertexId, Value, SizeT> *inversgraph = NULL,
-            int         num_gpus = 1,
-            int*        gpu_idx   = NULL,
-            std::string partition_method = "random")
+            int           num_gpus         = 1,
+            int*          gpu_idx          = NULL,
+            std::string   partition_method = "random",
+            cudaStream_t* streams          = NULL,
+            float         queue_sizing     = 2.0f,
+            float         in_sizing        = 1.0f,
+            float         partition_factor = -1.0f,
+            int           partition_seed   = -1)
     {
-        /*num_gpus = _num_gpus;
-        nodes = graph.nodes;
-        edges = graph.edges;
-        VertexId *h_row_offsets = graph.row_offsets;
-        VertexId *h_column_indices = graph.column_indices;*/
-        ProblemBase<VertexId, SizeT, Value, _USE_DOUBLE_BUFFER, true>::Init(
+        ProblemBase<VertexId, SizeT, Value, _MARK_PREDECESSORS, false, _USE_DOUBLE_BUFFER, true>::Init(
             stream_from_host,
-            &graph,
+            graph,
             inversgraph,
             num_gpus,
             gpu_idx,
-            partition_method);
+            partition_method,
+            queue_sizing,
+            partition_factor,
+            partition_seed);
 
         // No data in DataSlice needs to be copied from host
-
-        /**
-         * Allocate output labels/preds
-         */
         cudaError_t retval = cudaSuccess;
-        //data_slices = new DataSlice*[num_gpus];
-        //d_data_slices = new DataSlice*[num_gpus];
         data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
         do {
@@ -493,25 +322,32 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
                 //printf("%p ",&(this->sub_graphs[gpu])); fflush(stdout);
                 //printf("%d ",this->gpu_idx[gpu]); fflush(stdout);
                 //printf("%d ",this->graph_slices[gpu]->in_offset[this->num_gpus]);fflush(stdout);
-                //printf("%d ",this->graph_slices[gpu]->out_offset[this->num_gpus]);fflush(stdout); 
+                //printf("%d ",this->graph_slices[gpu]->out_offset[this->num_gpus]);fflush(stdout);
+                DataSlice* _data_slice = data_slices[gpu].GetPointer(util::HOST);
+                _data_slice->streams.SetPointer(&streams[gpu*num_gpus*2],num_gpus*2);
+
                 if (this->num_gpus > 1)
-                    retval = data_slices[gpu]->Init(
+                    retval = _data_slice->Init(
                         this->num_gpus,
                         this->gpu_idx[gpu],
                         2,
-                        3,
+                        2,
                         &(this->sub_graphs[gpu]),
-                        this->graph_slices[gpu]-> in_offset[this->num_gpus],
-                        this->graph_slices[gpu]->out_offset[this->num_gpus]
-                            - this->graph_slices[gpu]->out_offset[1]); 
-                else retval = data_slices[gpu]->Init(
+                        this->graph_slices[gpu]-> in_counter.GetPointer(util::HOST),
+                        this->graph_slices[gpu]->out_counter.GetPointer(util::HOST),
+                        queue_sizing,
+                        in_sizing);
+                else retval = _data_slice->Init(
                         this->num_gpus,
                         this->gpu_idx[gpu],
                         0,
                         0,
                         &(this->sub_graphs[gpu]),
-                        0,
-                        0);
+                        NULL,
+                        NULL,
+                        queue_sizing,
+                        in_sizing);
+                
                 if (retval) return retval;
           }
         } while (0);
@@ -533,7 +369,7 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
             FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
             double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
     {
-        typedef ProblemBase<VertexId, SizeT, Value, _USE_DOUBLE_BUFFER,true> BaseProblem;
+        typedef ProblemBase<VertexId, SizeT, Value, _MARK_PREDECESSORS, false, _USE_DOUBLE_BUFFER,true> BaseProblem;
         //load ProblemBase Reset
         BaseProblem::Reset(frontier_type, queue_sizing);
 
@@ -579,6 +415,12 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
                 data_slices[gpu]->src_node.GetPointer(util::DEVICE), &tsrc,
                 sizeof(VertexId), cudaMemcpyHostToDevice), "BCProblem cudaMemcpy src_node failed", __FILE__, __LINE__)) return retval;
 
+            for (int i=0;i<this->num_gpus;i++)
+            {
+                if (data_slices[gpu]->forward_output[i].GetPointer(util::DEVICE) == NULL)
+                    if (retval = data_slices[gpu]->forward_output[i].Allocate(nodes, util::DEVICE)) return retval;
+            }
+
             if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;
         }
         
@@ -591,11 +433,12 @@ struct BCProblem : ProblemBase<_VertexId, _SizeT, _Value,
         } else {
             gpu = this->partition_tables [0][src];
             tsrc= this->convertion_tables[0][src];
+            printf("gpu = %d tsrc = %d\n", gpu, tsrc);
         }
         if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
 
         if (retval = util::GRError(cudaMemcpy(
-                        BaseProblem::graph_slices[gpu]->frontier_queues.keys[0].GetPointer(util::DEVICE),
+                        BaseProblem::graph_slices[gpu]->frontier_queues[0].keys[0].GetPointer(util::DEVICE),
                         &tsrc,
                         sizeof(VertexId),
                         cudaMemcpyHostToDevice),

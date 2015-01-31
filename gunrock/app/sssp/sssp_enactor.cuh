@@ -38,7 +38,7 @@ namespace sssp {
 
     template <typename SSSPProblem, bool INSTRUMENT> class SSSPEnactor;
 
-    struct ThreadSlice
+/*    struct ThreadSlice
     {
     public:
         int         thread_num;
@@ -69,6 +69,7 @@ namespace sssp {
             context     = NULL;
         }
     };
+*/
 
     template <typename VertexId, typename SizeT, typename Value, SizeT num_vertex_associates, SizeT num_value__associates>
     __global__ void Expand_Incoming (
@@ -188,7 +189,7 @@ namespace sssp {
         typename SSSPProblem::DataSlice  *d_data_slice,
         typename SSSPProblem::GraphSlice *graph_slice,
         util::CtaWorkProgressLifetime    *work_progress,
-        ContextPtr                         context,
+        ContextPtr                        context,
         cudaStream_t                      stream)
     {
         typedef typename SSSPProblem::SizeT      SizeT;
@@ -353,48 +354,38 @@ namespace sssp {
         typedef SSSPEnactor<SSSPProblem, INSTRUMENT> SsspEnactor;
         typedef SSSPFunctor<VertexId, SizeT, Value, SSSPProblem> SsspFunctor;
 
-        ThreadSlice  *thread_data         = (ThreadSlice*) thread_data_;
-        SSSPProblem  *problem             = (SSSPProblem*) thread_data->problem;
-        SsspEnactor  *enactor             = (SsspEnactor*) thread_data->enactor;
-        int          num_gpus             =   problem     -> num_gpus;
-        int          thread_num           =   thread_data -> thread_num;
-        int          gpu_idx              =   problem     -> gpu_idx            [thread_num] ;
-        DataSlice    *data_slice          =   problem     -> data_slices        [thread_num].GetPointer(util::HOST);
+        ThreadSlice  *thread_data          =  (ThreadSlice*) thread_data_;
+        SSSPProblem  *problem              =  (SSSPProblem*) thread_data->problem;
+        SsspEnactor  *enactor              =  (SsspEnactor*) thread_data->enactor;
+        int          num_gpus              =   problem     -> num_gpus;
+        int          thread_num            =   thread_data -> thread_num;
+        int          gpu_idx               =   problem     -> gpu_idx            [thread_num] ;
+        DataSlice    *data_slice           =   problem     -> data_slices        [thread_num].GetPointer(util::HOST);
         util::Array1D<SizeT, DataSlice>
-                     *s_data_slice        =   problem     -> data_slices;
-        GraphSlice   *graph_slice         =   problem     -> graph_slices       [thread_num] ;
-        GraphSlice   **s_graph_slice      =   problem     -> graph_slices;
+                     *s_data_slice         =   problem     -> data_slices;
+        GraphSlice   *graph_slice          =   problem     -> graph_slices       [thread_num] ;
+        GraphSlice   **s_graph_slice       =   problem     -> graph_slices;
         FrontierAttribute<SizeT>
-                     *frontier_attribute  = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
+                     *frontier_attribute   = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
         FrontierAttribute<SizeT>
-                     *s_frontier_attribute= &(enactor     -> frontier_attribute [0         ]);
-        EnactorStats *enactor_stats       = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
-        EnactorStats *s_enactor_stats     = &(enactor     -> enactor_stats      [0         ]);
+                     *s_frontier_attribute = &(enactor     -> frontier_attribute [0         ]);
+        EnactorStats *enactor_stats        = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
+        EnactorStats *s_enactor_stats      = &(enactor     -> enactor_stats      [0         ]);
         util::CtaWorkProgressLifetime
-                     *work_progress       = &(enactor     -> work_progress      [thread_num * num_gpus]);
-        ContextPtr   *context             =   thread_data -> context;
-        bool         DEBUG                =   enactor     -> DEBUG;
-        int*         stages               =   data_slice  -> stages .GetPointer(util::HOST);
-        bool*        to_show              =   data_slice  -> to_show.GetPointer(util::HOST);
-        cudaStream_t* streams             =   data_slice  -> streams.GetPointer(util::HOST);
-        //util::cpu_mt::CPUBarrier
-        //             *cpu_barrier         =   thread_data -> cpu_barrier;
-        //util::scan::MultiScan<VertexId,SizeT,true,256,8>*
-        //             Scaner               = NULL;
-        //bool         break_clean          = true;
-        //SizeT*       out_offset           = NULL;
-        //char*        message              = new char [1024];
-        //util::Array1D<SizeT, unsigned int>  scanned_edges;
-        //util::Array1D<SizeT, VertexId    >  temp_preds;
-        SizeT        Total_Length          = 0; 
-        //bool         First_Stage4          = true; 
-        cudaError_t  tretval               = cudaSuccess;
-        int          grid_size             = 0;
-        std::string  mssg                  = "";
-        int          pre_stage             = 0; 
-        size_t       offset                = 0;
-        int          num_vertex_associate  = SSSPProblem::MARK_PATHS?1:0;
-        int          num_value__associate  = 1;
+                     *work_progress        = &(enactor     -> work_progress      [thread_num * num_gpus]);
+        ContextPtr   *context              =   thread_data -> context;
+        bool         DEBUG                 =   enactor     -> DEBUG;
+        int*         stages                =   data_slice  -> stages .GetPointer(util::HOST);
+        bool*        to_show               =   data_slice  -> to_show.GetPointer(util::HOST);
+        cudaStream_t* streams              =   data_slice  -> streams.GetPointer(util::HOST);
+        SizeT        Total_Length          =   0; 
+        cudaError_t  tretval               =   cudaSuccess;
+        int          grid_size             =   0;
+        std::string  mssg                  =   "";
+        int          pre_stage             =   0; 
+        size_t       offset                =   0;
+        int          num_vertex_associate  =   SSSPProblem::MARK_PATHS?1:0;
+        int          num_value__associate  =   1;
         
         do {
             if (enactor_stats[0].retval = util::SetDevice(gpu_idx)) break;
@@ -411,20 +402,6 @@ namespace sssp {
                 enactor_stats     [peer_].iteration    = 0;
             }
 
-            /*if (enactor_stats->retval = util::SetDevice(gpu)) break;
-            if (num_gpus > 1)
-            {
-                Scaner = new util::scan::MultiScan<VertexId, SizeT, true, 256, 8>;
-                out_offset = new SizeT[num_gpus +1];
-            }
-            scanned_edges.SetName("scanned_edges");
-            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
-                if (enactor_stats->retval = scanned_edges.Allocate(graph_slice->edges*2, util::DEVICE)) break; 
-            }
-            temp_preds.SetName("temp_preds");
-            if (SSSPProblem::MARK_PATHS) 
-                if (enactor_stats->retval = temp_preds.Allocate(graph_slice->nodes, util::DEVICE)) break;
-            */
             //unsigned int pq_level = 0; 
             //unsigned int out_length = 0;
 
@@ -652,7 +629,9 @@ namespace sssp {
                                 {   to_show[peer_]=false;stages[peer_]--; break;}
                                 else if (tretval !=cudaSuccess) {enactor_stats_->retval=tretval; break;}
 
-                                if (DEBUG) {printf("%d\t %d\t %d\t queue_length = %d, output_length = %d\n",
+                                if (DEBUG) 
+                                {
+                                    printf("%d\t %d\t %d\t queue_length = %d, output_length = %d\n",
                                         thread_num, iteration, peer_,
                                         frontier_queue_->keys[selector^1].GetSize(),
                                         frontier_attribute_->output_length[0]);fflush(stdout);}
@@ -743,35 +722,16 @@ namespace sssp {
                                     enactor_stats_->retval = util::GRError(cudaErrorLaunchOutOfResources, "queue3 oversize", __FILE__, __LINE__);
                                     break;
                                 }
-                            }
-                            if (frontier_attribute_->queue_length!=0)
-                            {
-                                /*if (frontier_attribute[peer_].queue_length > 
-                                    graph_slice->frontier_queues[peer_].keys[frontier_attribute[peer_].selector].GetSize())
-                                {
-                                   printf("%d\t %lld\t %d\t sub_queue oversize : queue_length = %d, queue_size = %d\n",
-                                       thread_num, enactor_stats[peer_].iteration, peer_,
-                                       frontier_attribute[peer_].queue_length, graph_slice->frontier_queues[peer_].keys[frontier_attribute[peer_].selector].GetSize());
-                                   fflush(stdout);
-                                }*/
-                                
+                                if (frontier_attribute_->queue_length ==0) break;
+
                                 if (Total_Length + frontier_attribute_->queue_length > graph_slice->frontier_queues[num_gpus].keys[0].GetSize())
-                                {
+                                {     
                                     printf("%d\t %d\t %d\t total_queue\t oversize :\t %d ->\t %d \n",
-                                       thread_num, iteration, peer_,
-                                       Total_Length + frontier_attribute_->queue_length,
-                                       graph_slice->frontier_queues[num_gpus].keys[0].GetSize());fflush(stdout);
-                                    if (SIZE_CHECK)
-                                    {
-                                        if (enactor_stats_->retval = graph_slice->frontier_queues[num_gpus].keys[0].EnsureSize(Total_Length+frontier_attribute_->queue_length, true)) break;
-                                        if (SSSPProblem::USE_DOUBLE_BUFFER)
-                                        {
-                                            if (enactor_stats_->retval = graph_slice->frontier_queues[num_gpus].values[0].EnsureSize(Total_Length + frontier_attribute_->queue_length, true)) break;
-                                        }
-                                    } else {
-                                        enactor_stats_ -> retval = util::GRError(cudaErrorLaunchOutOfResources, "total_queue oversize", __FILE__, __LINE__);
-                                        break;
-                                    }
+                                        thread_num, iteration, peer_,
+                                        graph_slice->frontier_queues[num_gpus].keys[0].GetSize(),
+                                        Total_Length + frontier_attribute_->queue_length);fflush(stdout);
+                                    enactor_stats_ -> retval = util::GRError(cudaErrorLaunchOutOfResources, "total_queue oversize", __FILE__, __LINE__);
+                                    break;
                                 }
                                 util::MemsetCopyVectorKernel<<<256,256, 0, streams[peer_]>>>(
                                     graph_slice->frontier_queues[num_gpus].keys[0].GetPointer(util::DEVICE) + Total_Length,
@@ -782,8 +742,10 @@ namespace sssp {
                                         graph_slice->frontier_queues[num_gpus].values[0].GetPointer(util::DEVICE) + Total_Length,
                                         frontier_queue_->values[selector].GetPointer(util::DEVICE),
                                         frontier_attribute_->queue_length);
-                                Total_Length+=frontier_attribute_->queue_length;
                             }
+                           
+                            Total_Length += frontier_attribute_->queue_length;
+                            
                             /*if (First_Stage4)
                             {
                                 First_Stage4=false;
@@ -882,11 +844,40 @@ namespace sssp {
                         }
                     }*/
                     
-                    frontier_attribute[0].queue_length = Total_Length;
                     if (Total_Length>0)
                     {
                         grid_size = Total_Length/256+1;
                         if (grid_size > 512) grid_size = 512;
+
+                        if (SIZE_CHECK)
+                        {
+                            if (graph_slice->frontier_queues[num_gpus].keys[0].GetSize()<Total_Length)
+                            {
+                                printf("%d\t %lld\t \t total_queue\t oversize :\t %d ->\t %d \n",
+                                    thread_num, enactor_stats[0].iteration,
+                                    graph_slice->frontier_queues[num_gpus].keys[0].GetSize(),
+                                    Total_Length);fflush(stdout);
+                                if (enactor_stats[0].retval = graph_slice->frontier_queues[num_gpus].keys[0].EnsureSize(Total_Length)) break;
+                                if (SSSPProblem::USE_DOUBLE_BUFFER)
+                                    if (enactor_stats[0].retval = graph_slice->frontier_queues[num_gpus].values[0].EnsureSize(Total_Length)) break;
+                            }
+
+                            offset=0;
+                            for (int peer_=0;peer_<num_gpus;peer_++)
+                            if (frontier_attribute[peer_].queue_length !=0) {     
+                                util::MemsetCopyVectorKernel<<<256,256, 0, streams[0]>>>(
+                                    graph_slice->frontier_queues[num_gpus].keys[0].GetPointer(util::DEVICE) + offset,
+                                    graph_slice->frontier_queues[peer_   ].keys[frontier_attribute[peer_].selector].GetPointer(util::DEVICE),
+                                    frontier_attribute[peer_].queue_length);
+                                if (SSSPProblem::USE_DOUBLE_BUFFER)
+                                    util::MemsetCopyVectorKernel<<<256,256,0,streams[0]>>>(
+                                        graph_slice->frontier_queues[num_gpus].values[0].GetPointer(util::DEVICE) + offset,
+                                        graph_slice->frontier_queues[peer_   ].values[frontier_attribute[peer_].selector].GetPointer(util::DEVICE),
+                                        frontier_attribute[peer_].queue_length);
+                                offset+=frontier_attribute[peer_].queue_length;
+                            }
+                        }
+                        frontier_attribute[0].queue_length = Total_Length;
                         
                         if (SSSPProblem::MARK_PATHS)
                         {
@@ -1077,17 +1068,6 @@ namespace sssp {
             if (All_Done<SizeT, DataSlice>(s_enactor_stats, s_frontier_attribute, s_data_slice, num_gpus)) break;
         } while(0);
 
-        /*if (num_gpus >1)
-        {
-            if (break_clean)
-            {
-                util::cpu_mt::ReleaseBarrier(cpu_barrier);
-            }
-            delete Scaner; Scaner=NULL;
-        }
-        delete[] message;message=NULL;
-        */
-
         thread_data->stats=4;
         CUT_THREADEND;
     }
@@ -1130,15 +1110,6 @@ public:
     virtual ~SSSPEnactor()
     {
         //util::cpu_mt::PrintMessage("~SSSPEnactor() begin.");
-        //for (int gpu=0;gpu<this->num_gpus;gpu++)
-        //{
-        //    util::SetDevice(this->gpu_idx[gpu]);
-        //    if (BFSProblem::ENABLE_IDEMPOTENCE)
-        //    {
-        //        cudaUnbindTexture(gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref);
-        //    }
-        //}
-
         cutWaitForThreads(thread_Ids, this->num_gpus);
         delete[] thread_Ids   ; thread_Ids    = NULL;
         delete[] thread_slices; thread_slices = NULL;

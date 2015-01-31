@@ -406,7 +406,7 @@ int CompareResults(float* computed, float* reference, SizeT len, bool verbose = 
         // Use relative error rate here.
         bool is_right = true;
         if (fabs(computed[i] - 0.0) < 0.01f) {
-            if ((computed[i] - reference[i]) > THRESHOLD)
+            if (fabs(computed[i] - reference[i]) > THRESHOLD)
                 is_right = false;
         } else {
             if (fabs((computed[i] - reference[i])/reference[i]) > THRESHOLD)

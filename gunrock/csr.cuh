@@ -415,8 +415,9 @@ struct Csr
         SizeT displayed_node_num = (nodes > limit) ? limit: nodes;
         printf("%s : #nodes = ",name); util::PrintValue(nodes);
         printf(", #edges = "); util::PrintValue(edges);
-        printf("\n  row_offsets = ");
-        for (SizeT i=0;i<=displayed_node_num;i++) 
+        //printf("\n  row_offsets = ");
+        printf("\n");
+        /*for (SizeT i=0;i<=displayed_node_num;i++) 
         {   
             if (i!=0) printf(", ");
             util::PrintValue(row_offsets[i]);
@@ -430,21 +431,34 @@ struct Csr
                 if (i!=0) printf(", ");
                 util::PrintValue(node_values[i]); 
             }   
-        }   
+        }*/   
  
-        printf("\n  edges = ");
+        //printf("\n  edges = ");
         for (SizeT i=0;i<displayed_node_num;i++)
-        {   
-            printf("(");
+        {  
+            util::PrintValue(i);
+            printf(",");
+            util::PrintValue(row_offsets[i]);
+            if (node_values != NULL)
+            {
+                printf(",");
+                util::PrintValue(node_values[i]);
+            }
+            printf(" (");
             for (SizeT j=row_offsets[i];j<row_offsets[i+1];j++)
             {   
-                if (j!=row_offsets[i]) printf(", ");
+                if (j!=row_offsets[i]) printf(" , ");
                 util::PrintValue(column_indices[j]);
+                if (edge_values != NULL)
+                {
+                    printf(",");
+                    util::PrintValue(edge_values[j]);
+                }
             }   
-            printf(") ");
+            printf(")\n");
         }   
     
-        if (edge_values != NULL)
+        /*if (edge_values != NULL)
         {   
             printf("\n edge_values = ");
             for (SizeT i=0;i<displayed_node_num;i++)
@@ -457,7 +471,7 @@ struct Csr
                 }   
                 printf(") ");
             }   
-        }   
+        }*/   
 
         printf("\n");
     }   

@@ -132,9 +132,9 @@ struct RandomPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD>
 
         if (seed < 0) this->seed = time(NULL);
         else this->seed = seed;
-        printf("Partition begin. seed=%d\n", seed);fflush(stdout);
+        printf("Partition begin. seed=%d\n", this->seed);fflush(stdout);
 
-        srand(seed);
+        srand(this->seed);
         for (SizeT node=0;node<nodes;node++)
         {
             sort_list[node].value=rand();

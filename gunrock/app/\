@@ -175,7 +175,7 @@ public:
         if (enactor_stats->iteration > 0) 
         {
             SizeT cur_offset = data_slice->forward_queue_offsets[peer_].back();
-            //printf("thread_num:%d, peer_:%d, offset:%d, current length:%d\n", thread_num, peer_, cur_offset, frontier_attribute->queue_length);
+            printf("thread_num:%d, peer_:%d, offset:%d, current length:%d\n", thread_num, peer_, cur_offset, frontier_attribute->queue_length);
             util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
                 data_slice ->forward_output[peer_].GetPointer(util::DEVICE) + cur_offset, 
                 graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
@@ -366,17 +366,16 @@ public:
         SizeT pre_pos = data_slice->forward_queue_offsets[peer_].back();
         frontier_attribute->queue_reset  = true;
         frontier_attribute->selector     = 0;
-        if (enactor_stats->iteration>0 && cur_pos - pre_pos >0)
+        if (cur_pos - pre_pos >0)
         {
             frontier_attribute->queue_length = cur_pos - pre_pos;
             util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
                 graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
                 data_slice ->forward_output[peer_].GetPointer(util::DEVICE) + pre_pos, 
                 frontier_attribute->queue_length);
-        }
         else frontier_attribute->queue_length = 0;
 
-        //if (DEBUG) {printf("%d\t%lld\t%d\t FG queue_length = %d\n",thread_num,enactor_stats->iteration,peer_,frontier_attribute->queue_length);fflush(stdout);}
+        if (DEBUG) {printf("%d\t%lld\t%d\t FG queue_length = %d\n",thread_num,enactor_stats->iteration,peer_,frontier_attribute->queue_length);fflush(stdout);}
     }
  
     static void FullQueue_Core(
@@ -684,7 +683,6 @@ public:
             if (num_gpus>1)
             {
                 data_slice->sigmas.Move(util::DEVICE, util::HOST);
-                data_slice->labels.Move(util::DEVICE, util::HOST);
                 //CPU_Barrier;
                 util::cpu_mt::IncrementnWaitBarrier(&cpu_barrier[0],thread_num);
                 long max_iteration=0;
@@ -693,7 +691,7 @@ public:
                     if (s_enactor_stats[gpu*num_gpus].iteration>max_iteration)
                         max_iteration=s_enactor_stats[gpu*num_gpus].iteration;
                 }
-                //printf("thread_num = %d, iteration = %d, max_iteration = %d\n", thread_num, enactor_stats[0].iteration, max_iteration);fflush(stdout);
+                printf("thread_num = %d, iteration = %d, max_iteration = %d\n", thread_num, enactor_stats[0].iteration, max_iteration);fflush(stdout);
                 while (data_slice->forward_queue_offsets[0].size()<max_iteration)
                 {
                     data_slice->forward_queue_offsets[0].push_back(data_slice->forward_queue_offsets[0].back());
@@ -704,34 +702,22 @@ public:
                 {
                     for (SizeT i=graph_slice->backward_offset[node];i<graph_slice->backward_offset[node+1];i++)
                     {
-                        int peer = graph_slice->backward_partition[i];
-                        if (peer<=thread_num) peer--;
-                        int _node = graph_slice->backward_convertion[i];
-                        //printf("%d,%d -> %d,%d : %d,%f -> %d,%f\n", thread_num, node, peer, _node, s_data_slice[peer]->sigmas[_node], s_data_slice[peer]->labels[_node], data_slice->sigmas[node], data_slice->labels[node]);fflush(stdout);
-                        s_data_slice[peer]->sigmas[_node]=data_slice->sigmas[node];
-                        s_data_slice[peer]->labels[_node]=data_slice->labels[node];
+                        s_data_slice[graph_slice->backward_partition[i]]->sigmas[graph_slice->backward_convertion[i]]=data_slice->sigmas[node];
                     }
                 }
                 //CPU_Barrier;
                 util::cpu_mt::IncrementnWaitBarrier(&cpu_barrier[1],thread_num);
-                //util::cpu_mt::PrintCPUArray<SizeT, Value>("sigmas", data_slice->sigmas.GetPointer(util::HOST), graph_slice->nodes, thread_num);
-                //util::cpu_mt::PrintCPUArray<SizeT, VertexId>("labels", data_slice->labels.GetPointer(util::HOST), graph_slice->nodes, thread_num);
-                for (int i=0;i<num_gpus;i++)
-                for (int j=0;j<4;j++)
-                for (int k=0;k<4;k++)
-                    data_slice->events_set[j][i][k]=false;
                 data_slice->sigmas.Move(util::HOST, util::DEVICE);
-                data_slice->labels.Move(util::HOST, util::DEVICE);
                 data_slice->value__associate_orgs[0]=data_slice->deltas.GetPointer(util::DEVICE);
                 data_slice->value__associate_orgs[1]=data_slice->bc_values.GetPointer(util::DEVICE);
                 data_slice->value__associate_orgs.Move(util::HOST, util::DEVICE);
             }
 
             
-            //printf("thread_num = %d, size = %d: ", thread_num, data_slice->forward_queue_offsets[0].size());//fflush(stdout);
-            //for (int i=0;i<data_slice->forward_queue_offsets[0].size();i++)
-            //    printf(", %d",data_slice ->forward_queue_offsets[0].at(i));
-            //printf("\n");fflush(stdout);
+            printf("thread_num = %d, size = %d: ", thread_num, data_slice->forward_queue_offsets[0].size());//fflush(stdout);
+            for (int i=0;i<data_slice->forward_queue_offsets[0].size();i++)
+                printf(", %d",data_slice ->forward_queue_offsets[0].at(i));
+            printf("\n");fflush(stdout);
 
             gunrock::app::Iteration_Loop
                 <0, 2, BcEnactor, BcBFunctor, Backward_Iteration<AdvanceKernelPolicy, FilterKernelPolicy, BcEnactor> > (thread_data);
