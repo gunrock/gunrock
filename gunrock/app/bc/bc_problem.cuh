@@ -48,7 +48,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
     //static const bool ENABLE_IDEMPOTENCE    = false;
     //static const bool USE_DOUBLE_BUFFER     = _USE_DOUBLE_BUFFER;
     //Helper structures
-    
+
     /** 
      * @brief Data slice structure which contains BC problem specific data.
      */
@@ -369,9 +369,9 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
             double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
     {
-        typedef ProblemBase<VertexId, SizeT, Value, _MARK_PREDECESSORS, false, _USE_DOUBLE_BUFFER,true> BaseProblem;
+        //typedef ProblemBase<VertexId, SizeT, Value, _MARK_PREDECESSORS, false, _USE_DOUBLE_BUFFER,true> BaseProblem;
         //load ProblemBase Reset
-        BaseProblem::Reset(frontier_type, queue_sizing);
+        //BaseProblem::Reset(frontier_type, queue_sizing);
 
         cudaError_t retval = cudaSuccess;
 
@@ -381,6 +381,8 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             SizeT edges = this->sub_graphs[gpu].edges;
             // Set device
             if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
+
+            if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, _USE_DOUBLE_BUFFER)) return retval;
 
             // Allocate output labels if necessary
             if (data_slices[gpu]->labels    .GetPointer(util::DEVICE) == NULL)
@@ -438,7 +440,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
         if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
 
         if (retval = util::GRError(cudaMemcpy(
-                        BaseProblem::graph_slices[gpu]->frontier_queues[0].keys[0].GetPointer(util::DEVICE),
+                        data_slices[gpu]->frontier_queues[0].keys[0].GetPointer(util::DEVICE),
                         &tsrc,
                         sizeof(VertexId),
                         cudaMemcpyHostToDevice),

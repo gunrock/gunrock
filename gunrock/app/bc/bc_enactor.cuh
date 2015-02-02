@@ -145,7 +145,7 @@ public:
     typedef typename Enactor::VertexId   VertexId  ;
     typedef typename Enactor::Problem    Problem ;
     typedef typename Problem::DataSlice  DataSlice ;
-    typedef typename Problem::GraphSlice GraphSlice;
+    typedef GraphSlice<SizeT, VertexId, Value> GraphSlice;
     typedef ForwardFunctor<
             VertexId,
             SizeT,
@@ -178,7 +178,7 @@ public:
             //printf("thread_num:%d, peer_:%d, offset:%d, current length:%d\n", thread_num, peer_, cur_offset, frontier_attribute->queue_length);
             util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
                 data_slice ->forward_output[peer_].GetPointer(util::DEVICE) + cur_offset, 
-                graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
+                data_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
                 frontier_attribute->queue_length);
             //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
                     //util::DisplayDeviceResults(&problem->data_slices[0]->d_forward_output[cur_offset], frontier_attribute.queue_length);
@@ -201,8 +201,8 @@ public:
             (bool*)    NULL,
             (bool*)    NULL,
             data_slice ->scanned_edges  [peer_]                                     .GetPointer(util::DEVICE),
-            graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),// d_in_queue
-            graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
+            data_slice ->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),// d_in_queue
+            data_slice ->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
             (VertexId*)NULL,
             (VertexId*)   NULL,
             graph_slice->row_offsets   .GetPointer(util::DEVICE),
@@ -243,14 +243,14 @@ public:
             frontier_attribute->queue_reset,
             frontier_attribute->queue_index,
             frontier_attribute->queue_length,
-            graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),// d_in_queue
+            data_slice ->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),// d_in_queue
             NULL,
-            graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
+            data_slice ->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
             d_data_slice,
             NULL,
             work_progress[0],
-            graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetSize(),// max_in_queue
-            graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetSize(),// max_out_queue
+            data_slice->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetSize(),// max_in_queue
+            data_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetSize(),// max_out_queue
             enactor_stats->filter_kernel_stats);
 
         if (DEBUG && (enactor_stats->retval = util::GRError("filter_forward::Kernel failed", __FILE__, __LINE__))) return;
@@ -332,7 +332,7 @@ public:
     typedef typename Enactor::VertexId   VertexId  ;
     typedef typename Enactor::Problem    Problem ;
     typedef typename Problem::DataSlice  DataSlice ;
-    typedef typename Problem::GraphSlice GraphSlice;
+    typedef GraphSlice<SizeT, VertexId, Value> GraphSlice;
     typedef BackwardFunctor<
             VertexId,
             SizeT,
@@ -370,7 +370,7 @@ public:
         {
             frontier_attribute->queue_length = cur_pos - pre_pos;
             util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
-                graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
+                data_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
                 data_slice ->forward_output[peer_].GetPointer(util::DEVICE) + pre_pos, 
                 frontier_attribute->queue_length);
         }
@@ -456,8 +456,8 @@ public:
                 (bool*)NULL,
                 (bool*)NULL,
                 data_slice ->scanned_edges  [peer_]        .GetPointer(util::DEVICE),
-                graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),              // d_in_queue
-                graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
+                data_slice->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),              // d_in_queue
+                data_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
                 (VertexId*)NULL,
                 (VertexId*)NULL,
                 graph_slice->row_offsets   .GetPointer(util::DEVICE),
@@ -482,8 +482,8 @@ public:
                 (bool*)NULL,
                 (bool*)NULL,
                 data_slice ->scanned_edges  [peer_].GetPointer(util::DEVICE),
-                graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),              // d_in_queue
-                graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
+                data_slice->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),              // d_in_queue
+                data_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
                 (VertexId*)NULL,
                 (VertexId*)NULL,
                 graph_slice->row_offsets   .GetPointer(util::DEVICE),
@@ -615,7 +615,7 @@ public:
         typedef typename BcEnactor::VertexId   VertexId;
         typedef typename BcEnactor::Value      Value;
         typedef typename Problem::DataSlice  DataSlice;
-        typedef typename Problem::GraphSlice GraphSlice;
+        typedef GraphSlice<SizeT, VertexId, Value> GraphSlice;
         typedef ForwardFunctor<VertexId, SizeT, Value, Problem> BcFFunctor;
         typedef BackwardFunctor<VertexId, SizeT, Value, Problem> BcBFunctor;
         
