@@ -163,6 +163,9 @@ public:
     static void FullQueue_Core(
         int                            thread_num,
         int                            peer_,
+        util::DoubleBuffer<SizeT, VertexId, Value>
+                                      *frontier_queue,
+        util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
         EnactorStats                  *enactor_stats,
         DataSlice                     *data_slice,
@@ -178,7 +181,7 @@ public:
             //printf("thread_num:%d, peer_:%d, offset:%d, current length:%d\n", thread_num, peer_, cur_offset, frontier_attribute->queue_length);
             util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
                 data_slice ->forward_output[peer_].GetPointer(util::DEVICE) + cur_offset, 
-                data_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
+                frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
                 frontier_attribute->queue_length);
             //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
                     //util::DisplayDeviceResults(&problem->data_slices[0]->d_forward_output[cur_offset], frontier_attribute.queue_length);
@@ -200,9 +203,9 @@ public:
             (VertexId*)NULL,
             (bool*)    NULL,
             (bool*)    NULL,
-            data_slice ->scanned_edges  [peer_]                                     .GetPointer(util::DEVICE),
-            data_slice ->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),// d_in_queue
-            data_slice ->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
+            scanned_edges->GetPointer(util::DEVICE),
+            frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),// d_in_queue
+            frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
             (VertexId*)NULL,
             (VertexId*)   NULL,
             graph_slice->row_offsets   .GetPointer(util::DEVICE),
@@ -243,14 +246,14 @@ public:
             frontier_attribute->queue_reset,
             frontier_attribute->queue_index,
             frontier_attribute->queue_length,
-            data_slice ->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),// d_in_queue
+            frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),// d_in_queue
             NULL,
-            data_slice ->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
+            frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
             d_data_slice,
             NULL,
             work_progress[0],
-            data_slice->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetSize(),// max_in_queue
-            data_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetSize(),// max_out_queue
+            frontier_queue->keys[frontier_attribute->selector  ].GetSize(),// max_in_queue
+            frontier_queue->keys[frontier_attribute->selector^1].GetSize(),// max_out_queue
             enactor_stats->filter_kernel_stats);
 
         if (DEBUG && (enactor_stats->retval = util::GRError("filter_forward::Kernel failed", __FILE__, __LINE__))) return;
@@ -355,6 +358,8 @@ public:
     static void FullQueue_Gather(
         int                            thread_num,
         int                            peer_,
+        util::DoubleBuffer<SizeT, VertexId, Value>
+                                      *frontier_queue,
         FrontierAttribute<SizeT>      *frontier_attribute,
         EnactorStats                  *enactor_stats,
         DataSlice                     *data_slice,
@@ -370,18 +375,19 @@ public:
         {
             frontier_attribute->queue_length = cur_pos - pre_pos;
             util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
-                data_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
+                frontier_queue->keys[0].GetPointer(util::DEVICE), 
                 data_slice ->forward_output[peer_].GetPointer(util::DEVICE) + pre_pos, 
                 frontier_attribute->queue_length);
         }
         else frontier_attribute->queue_length = 0;
-
-        //if (DEBUG) {printf("%d\t%lld\t%d\t FG queue_length = %d\n",thread_num,enactor_stats->iteration,peer_,frontier_attribute->queue_length);fflush(stdout);}
     }
  
     static void FullQueue_Core(
         int                            thread_num,
         int                            peer_,
+        util::DoubleBuffer<SizeT, VertexId, Value>
+                                      *frontier_queue,
+        util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
         EnactorStats                  *enactor_stats,
         DataSlice                     *data_slice,
@@ -455,9 +461,9 @@ public:
                 (VertexId*)NULL,
                 (bool*)NULL,
                 (bool*)NULL,
-                data_slice ->scanned_edges  [peer_]        .GetPointer(util::DEVICE),
-                data_slice->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),              // d_in_queue
-                data_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
+                scanned_edges->GetPointer(util::DEVICE),
+                frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),              // d_in_queue
+                frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
                 (VertexId*)NULL,
                 (VertexId*)NULL,
                 graph_slice->row_offsets   .GetPointer(util::DEVICE),
@@ -481,9 +487,9 @@ public:
                 (VertexId*)NULL,
                 (bool*)NULL,
                 (bool*)NULL,
-                data_slice ->scanned_edges  [peer_].GetPointer(util::DEVICE),
-                data_slice->frontier_queues[peer_].keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),              // d_in_queue
-                data_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
+                scanned_edges->GetPointer(util::DEVICE),
+                frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),              // d_in_queue
+                frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
                 (VertexId*)NULL,
                 (VertexId*)NULL,
                 graph_slice->row_offsets   .GetPointer(util::DEVICE),

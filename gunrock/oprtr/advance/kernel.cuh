@@ -76,7 +76,7 @@ cudaError_t ComputeOutputLength(
     //util::cpu_mt::PrintGPUArray<SizeT, int>("partitined_scanned_edges", (int*)partitioned_scanned_edges, frontier_attribute->queue_length);
     Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute->queue_length, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
-    cudaStreamSynchronize(stream);
+    //cudaStreamSynchronize(stream);
     //util::cpu_mt::PrintGPUArray<SizeT, SizeT>("partitioned_scanned_edges2", partitioned_scanned_edges,frontier_attribute->queue_length);
     //if (!express) util::GRError(cudaStreamSynchronize(stream),"cudaStreamSynchronize failed", __FILE__, __LINE__);
     //if (!express) util::GRError("Scan failed", __FILE__, __LINE__);

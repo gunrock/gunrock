@@ -65,7 +65,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, VertexId  >  src_node;            /**< Used to store source node ID */
         util::Array1D<SizeT, VertexId  >  *forward_output;      /**< Used to store output noe IDs by the forward pass */
         std::vector<SizeT>                *forward_queue_offsets;
-        util::Array1D<SizeT, SizeT     >  *scanned_edges;
+        //util::Array1D<SizeT, SizeT     >  *scanned_edges;
 
         DataSlice()
         {   
@@ -78,7 +78,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             src_node    .SetName("src_node"    );
             forward_output        = NULL;
             forward_queue_offsets = NULL;
-            scanned_edges         = NULL;
+            //scanned_edges         = NULL;
         }
 
         ~DataSlice()
@@ -95,11 +95,11 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             src_node      .Release();
             for (int gpu=0;gpu<this->num_gpus;gpu++)
             {
-                scanned_edges        [gpu].Release();
+                //scanned_edges        [gpu].Release();
                 forward_output       [gpu].Release();
                 forward_queue_offsets[gpu].resize(0);
             }
-            delete[] scanned_edges        ; scanned_edges         = NULL;
+            //delete[] scanned_edges        ; scanned_edges         = NULL;
             delete[] forward_output       ; forward_output        = NULL;
             delete[] forward_queue_offsets; forward_queue_offsets = NULL;
             //util::cpu_mt::PrintMessage("~DataSlice() end.");
@@ -140,7 +140,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             util::MemsetKernel<<<128, 128>>>( bc_values.GetPointer(util::DEVICE), (Value)0.0f, graph->nodes);
             util::MemsetKernel<<<128, 128>>>(ebc_values.GetPointer(util::DEVICE), (Value)0.0f, graph->edges);
 
-            scanned_edges = new util::Array1D<SizeT, SizeT>[num_gpus];
+            //scanned_edges = new util::Array1D<SizeT, SizeT>[num_gpus];
             forward_queue_offsets = new std::vector<SizeT>[num_gpus];
             forward_output = new util::Array1D<SizeT, VertexId>[num_gpus];
             for (int gpu=0;gpu<num_gpus;gpu++)
@@ -148,7 +148,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                 forward_queue_offsets[gpu].reserve(graph->nodes);
                 forward_queue_offsets[gpu].push_back(0);
                 if (retval = forward_output[gpu].Allocate(graph->nodes, util::DEVICE)) return retval;
-                if (retval = scanned_edges[gpu].Allocate(graph->edges, util::DEVICE)) return retval;
+                //if (retval = scanned_edges[gpu].Allocate(graph->edges, util::DEVICE)) return retval;
             }
             return retval;
         } // Init

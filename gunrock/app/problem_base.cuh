@@ -319,7 +319,8 @@ struct DataSliceBase
     util::Array1D<SizeT, char        >   *expand_incoming_array;
     
     //Frontier queues. Used to track working frontier.
-    util::DoubleBuffer<SizeT, VertexId, VertexId>  *frontier_queues;
+    util::DoubleBuffer<SizeT, VertexId, Value>  *frontier_queues;
+    util::Array1D<SizeT, SizeT       >   *scanned_edges;
     //SizeT                                          **frontier_elements;
 
 
@@ -347,6 +348,7 @@ struct DataSliceBase
         value__associate_out     = NULL;
         value__associate_outs    = NULL;
         frontier_queues          = NULL;
+        scanned_edges            = NULL;
         //vertex_associate_ins[0].SetName("vertex_associate_ins[0]");
         //vertex_associate_ins[1].SetName("vertex_associate_ins[1]");
         vertex_associate_outss .SetName("vertex_associate_outss" );  
@@ -538,7 +540,16 @@ struct DataSliceBase
             //delete[] frontier_elements; frontier_elements=NULL;
             delete[] frontier_queues; frontier_queues=NULL;
         }
- 
+
+        if (scanned_edges != NULL)
+        {
+            for (int gpu=0;gpu<=num_gpus;gpu++)
+                scanned_edges          [gpu].Release();
+            delete[] scanned_edges;
+            scanned_edges           = NULL;
+        }
+
+
         //keys_in    [0].Release();
         //keys_in    [1].Release();
         keys_outs     .Release();
@@ -576,7 +587,8 @@ struct DataSliceBase
         this->nodes                = graph->nodes;
         this->num_vertex_associate = num_vertex_associate;
         this->num_value__associate = num_value__associate;
-        this->frontier_queues      = new util::DoubleBuffer<SizeT, VertexId, VertexId>[num_gpus+1]; 
+        this->frontier_queues      = new util::DoubleBuffer<SizeT, VertexId, Value>[num_gpus+1]; 
+        scanned_edges              = new util::Array1D<SizeT, SizeT>[num_gpus+1];
         if (retval = util::SetDevice(gpu_idx))  return retval;
         if (retval = in_length[0].Allocate(num_gpus,util::HOST)) return retval;
         if (retval = in_length[1].Allocate(num_gpus,util::HOST)) return retval;
@@ -812,7 +824,7 @@ struct DataSliceBase
 
             // Iterate through global frontier queue setups
             for (int i = 0; i < 2; i++) {
-                if (peer == num_gpus && i==1) continue;
+                //if (peer == num_gpus && i==1) continue;
                 //frontier_elements[i] = new_frontier_elements[i];
                 // Allocate frontier queue if not big enough
                 //frontier_queues.keys[i].EnsureSize(frontier_elements[i]);
@@ -836,6 +848,15 @@ struct DataSliceBase
                     }
                 } //end if
             } // end for i<2
+
+            //if (peer == num_gpu) continue;
+            SizeT max_elements = new_frontier_elements[0];
+            if (new_frontier_elements[1] > max_elements) max_elements=new_frontier_elements[1];
+            if (scanned_edges[peer].GetSize() < max_elements)
+            {
+                if (retval = scanned_edges[peer].Release()) return retval;
+                if (retval = scanned_edges[peer].Allocate(max_elements, util::DEVICE)) return retval;
+            }
         }
         //util::cpu_mt::PrintMessage("GraphSlice Reset() end.");
         return retval;
