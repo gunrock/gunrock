@@ -46,6 +46,7 @@ struct Dispatch
 {
     typedef typename KernelPolicy::VertexId VertexId;
     typedef typename KernelPolicy::SizeT    SizeT;
+    typedef typename KernelPolicy::Value    Value;
     typedef typename ProblemData::DataSlice DataSlice;
 
     static __device__ __forceinline__ SizeT GetNeighborListLength(
@@ -100,7 +101,10 @@ struct Dispatch
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
-                                bool &inverse_graph)
+                                bool &inverse_graph, 
+                                gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
+                                Value *&d_value_to_reduce,
+                                Value *&d_reduce_frontier)
     {
     }
 
@@ -148,7 +152,10 @@ struct Dispatch
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
-                                bool &inverse_graph)
+                                bool &inverse_graph, 
+                                gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
+                                Value *&d_value_to_reduce,
+                                Value *&d_reduce_frontier)
     {
     }
 
@@ -158,6 +165,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 {
     typedef typename KernelPolicy::VertexId         VertexId;
     typedef typename KernelPolicy::SizeT            SizeT;
+    typedef typename KernelPolicy::Value            Value;
     typedef typename ProblemData::DataSlice         DataSlice;
 
     static __device__ __forceinline__ SizeT GetNeighborListLength(
@@ -233,7 +241,11 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
-                                bool &inverse_graph)
+                                bool &inverse_graph, 
+                                gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
+                                Value *&d_value_to_reduce,
+                                Value *&d_reduce_frontier)
+
                                 {
                                     if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0 && blockIdx.x == 0)) {
                                         kernel_stats.MarkStart();
@@ -363,6 +375,20 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                             SizeT out_index = out_offset+edges_processed+(i-e_offset);
 
                                             {
+                                                if (d_value_to_reduce != NULL) {
+                                                    if (R_TYPE == gunrock::oprtr::advance::VERTEX) {
+                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                    d_value_to_reduce[u],
+                                                                    d_reduce_frontier + out_index);
+                                                                } else if (R_TYPE == gunrock::oprtr::advance::EDGE) {
+                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                    d_value_to_reduce[lookup],
+                                                                    d_reduce_frontier + out_index);
+                                                                }
+                                                }
+                                                else if (R_TYPE != gunrock::oprtr::advance::EMPTY) { 
+                                                    // use user-specified function to generate value to reduce
+                                                }
                                                 if (!ProblemData::MARK_PREDECESSORS) {
                                                     if (Functor::CondEdge(label, u, problem, lookup, e_id)) {
                                                         Functor::ApplyEdge(label, u, problem, lookup, e_id);
@@ -565,7 +591,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
-                                bool inverse_graph)
+                                bool inverse_graph, 
+                                gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
+                                Value *&d_value_to_reduce,
+                                Value *&d_reduce_frontier)
     {
         if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
             kernel_stats.MarkStart();
@@ -843,7 +872,10 @@ void RelaxPartitionedEdges2(
         util::CtaWorkProgress                   work_progress,
         util::KernelRuntimeStats                kernel_stats,
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
-        bool                                    inverse_graph = false)
+        bool                                    inverse_graph = false,
+        gunrock::oprtr::advance::REDUCE_TYPE R_TYPE = gunrock::oprtr::advance::EMPTY,
+        typename KernelPolicy::Value            d_value_to_reduce = NULL,
+        typename KernelPolicy::Value            d_reduce_frontier = NULL)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::RelaxPartitionedEdges2(
             queue_reset,
@@ -867,7 +899,10 @@ void RelaxPartitionedEdges2(
             work_progress,
             kernel_stats,
             ADVANCE_TYPE,
-            inverse_graph);
+            inverse_graph,
+            R_TYPE,
+            d_value_to_reduce,
+            d_reduce_frontier);
 }
 
 /**
@@ -916,7 +951,10 @@ void RelaxLightEdges(
         util::CtaWorkProgress           work_progress,
         util::KernelRuntimeStats        kernel_stats,
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
-        bool                            inverse_graph = false)
+        bool                            inverse_graph = false, 
+        gunrock::oprtr::advance::REDUCE_TYPE R_TYPE = gunrock::oprtr::advance::EMPTY,
+        typename KernelPolicy::Value    *d_value_to_reduce = NULL,
+        typename KernelPolicy::Value    *d_reduce_frontier = NULL)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::RelaxLightEdges(
                                 queue_reset,
@@ -937,7 +975,10 @@ void RelaxLightEdges(
                                 work_progress,
                                 kernel_stats,
                                 ADVANCE_TYPE,
-                                inverse_graph);
+                                inverse_graph,
+                                R_TYPE,
+                                d_value_to_reduce,
+                                d_reduce_frontier);
 }
 
 /**

@@ -37,6 +37,7 @@ namespace advance {
  * @tparam KernelPolicy Kernel policy type for advance operator.
  * @tparam ProblemData Problem data type for advance operator.
  * @tparam Functor Functor type for the specific problem type.
+ * @tparam Op Operation for gather reduce. mgpu::plus<int> by default.
  *
  * @param[in] d_done                    Pointer of volatile int to the flag to set when we detect incoming frontier is empty
  * @param[in] enactor_stats             EnactorStats object to store enactor related variables and stast
@@ -60,7 +61,14 @@ namespace advance {
  * @param[in] context                   CudaContext pointer for moderngpu APIs
  * @param[in] ADVANCE_TYPE              enumerator of advance type: V2V, V2E, E2V, or E2E
  * @param[in] inverse_graph             whether this iteration of advance operation is in the opposite direction to the previous iteration (false by default)
+ * @param[in] REDUCE_OP                 enumerator of available reduce operations: plus, multiplies, bit_or, bit_and, bit_xor, maximum, minimum. none by default.
+ * @param[in] d_value_to_reduce         array to store values to reduce
+ * @param[out] d_reduce_frontier        neighbor list values for nodes in the output frontier
+ * @param[out] d_reduced_value          array to store reduced values
  */
+
+//TODO: Reduce by neighbor list now only supports LB advance mode.
+
 template <typename KernelPolicy, typename ProblemData, typename Functor>
     void LaunchKernel(
             volatile int                            *d_done,
@@ -84,7 +92,13 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             util::CtaWorkProgress                   work_progress,
             CudaContext                             &context,
             TYPE                                    ADVANCE_TYPE,
-            bool                                    inverse_graph = false)
+            bool                                    inverse_graph = false,
+            OP                                      REDUCE_OP = KernelPolicy::OP::NONE,
+            REDUCE_TYPE                             R_TYPE = KernelPolicy::REDUCE_TYPE::NONE,
+            typename KernelPolicy::Value            *d_value_to_reduce = NULL,
+            typename KernelPolicy::Value            *d_reduce_frontier = NULL,
+            typename KernelPolicy::Value            *d_reduced_value = NULL)
+
 {
     switch (KernelPolicy::ADVANCE_MODE)
     {
@@ -286,7 +300,10 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         work_progress,
                         enactor_stats.advance_kernel_stats,
                         ADVANCE_TYPE,
-                        inverse_graph);
+                        inverse_graph,
+                        R_TYPE,
+                        d_value_to_reduce,
+                        d_reduce_frontier);
             }
             else
             {
@@ -332,10 +349,19 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         work_progress,
                                         enactor_stats.advance_kernel_stats,
                                         ADVANCE_TYPE,
-                                        inverse_graph);
+                                        inverse_graph,
+                                        R_TYPE,
+                                        d_value_to_reduce,
+                                        d_reduce_frontier);
 
                 //util::DisplayDeviceResults(d_out_key_queue, output_queue_len);
             }
+
+            // TODO:
+            // Transfer d_scanned_edges into exclusive scan result
+            // Do segreduction using d_scanned_edges and d_reduce_frontier
+            // save the result to d_reduced_value
+            //
             break;
         }
         /*case LB:

@@ -59,6 +59,28 @@ enum TYPE {
 };
 
 /**
+ * @brief opeartion to use for mgpu primitives
+ */
+enum OP {
+    NONE,
+    PLUS,
+    MINUS,
+    MULTIPLIES,
+    MODULUS,
+    BIT_OR,
+    BIT_AND,
+    BIT_XOR,
+    MAXIMUM,
+    MINIMUM
+};
+
+enum REDUCE_TYPE {
+    EMPTY,
+    VERTEX,
+    EDGE
+};
+
+/**
  * @brief Kernel configuration policy for all three advance kernels (forward, backward, and load balanced).
  *
  * Parameterizations of this type encapsulate our kernel-tuning parameters

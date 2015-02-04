@@ -479,6 +479,7 @@ void RunTests(
     } else if (src_str.compare("largestdegree") == 0) {
         int temp;
         src = graph.GetNodeWithHighestDegree(temp);
+        printf("highest degree:%d\n", temp);
     } else {
         args.GetCmdLineArgument("src", src);
     }
@@ -658,8 +659,10 @@ int main( int argc, char** argv)
 		csr.PrintHistogram();
 
 		// Run tests
-		RunTests(csr, args, *context);
-
+		//RunTests(csr, args, *context);
+    int temp;
+    int src = csr.GetNodeWithHighestDegree(temp);
+    printf("highest degree:%d\n", temp);
     } else {
 
 		// Unknown graph type
@@ -667,5 +670,6 @@ int main( int argc, char** argv)
 		return 1;
 
 	}
+    
 	return 0;
 }
