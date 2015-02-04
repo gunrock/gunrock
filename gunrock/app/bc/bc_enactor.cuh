@@ -160,6 +160,33 @@ public:
     static const bool BACKWARD   = false;
     static const bool UPDATE_PREDECESSORS = true;
 
+    static void FullQueue_Gather(
+        int                            thread_num,
+        int                            peer_,
+        util::DoubleBuffer<SizeT, VertexId, Value>
+                                      *frontier_queue,
+        FrontierAttribute<SizeT>      *frontier_attribute,
+        EnactorStats                  *enactor_stats,
+        DataSlice                     *data_slice,
+        GraphSlice                    *graph_slice,
+        cudaStream_t                   stream)
+    {
+        if (enactor_stats->iteration <= 0) return; 
+
+        SizeT cur_offset = data_slice->forward_queue_offsets[peer_].back();
+        bool oversized = false;
+        //printf("%d\t %lld\t %d\t offset = %d current length = %d resulted_length = %d size = %d\n", thread_num, enactor_stats->iteration, peer_, cur_offset, frontier_attribute->queue_length, cur_offset+frontier_attribute->queue_length, data_slice->forward_output[peer_].GetSize());fflush(stdout);
+        if (enactor_stats->retval = 
+            Check_Size<Enactor::SIZE_CHECK, SizeT, VertexId> ("forward_output", cur_offset + frontier_attribute->queue_length, &data_slice->forward_output[peer_], oversized, thread_num, enactor_stats->iteration, peer_)) return;
+        util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
+            data_slice ->forward_output[peer_].GetPointer(util::DEVICE) + cur_offset, 
+            frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
+            frontier_attribute->queue_length);
+        //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
+                //util::DisplayDeviceResults(&problem->data_slices[0]->d_forward_output[cur_offset], frontier_attribute.queue_length);
+        data_slice->forward_queue_offsets[peer_].push_back(frontier_attribute->queue_length+cur_offset); 
+    }
+ 
     static void FullQueue_Core(
         int                            thread_num,
         int                            peer_,
@@ -175,19 +202,7 @@ public:
         ContextPtr                     context,
         cudaStream_t                   stream)
     {
-        if (enactor_stats->iteration > 0) 
-        {
-            SizeT cur_offset = data_slice->forward_queue_offsets[peer_].back();
-            //printf("thread_num:%d, peer_:%d, offset:%d, current length:%d\n", thread_num, peer_, cur_offset, frontier_attribute->queue_length);
-            util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
-                data_slice ->forward_output[peer_].GetPointer(util::DEVICE) + cur_offset, 
-                frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
-                frontier_attribute->queue_length);
-            //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
-                    //util::DisplayDeviceResults(&problem->data_slices[0]->d_forward_output[cur_offset], frontier_attribute.queue_length);
-            data_slice->forward_queue_offsets[peer_].push_back(frontier_attribute->queue_length+cur_offset);
-        }
-        if (frontier_attribute->queue_reset && frontier_attribute->queue_length ==0)
+       if (frontier_attribute->queue_reset && frontier_attribute->queue_length ==0)
         {
             work_progress->SetQueueLength(frontier_attribute->queue_index, 0, false, stream);
             if (DEBUG) util::cpu_mt::PrintMessage("return-1", thread_num, enactor_stats->iteration);
@@ -369,12 +384,13 @@ public:
         SizeT cur_pos = data_slice->forward_queue_offsets[peer_].back();
         data_slice->forward_queue_offsets[peer_].pop_back();
         SizeT pre_pos = data_slice->forward_queue_offsets[peer_].back();
+        //printf("%d\t %lld\t %d\t offset = %d current length = %d resulted_length = %d size = %d\n", thread_num, enactor_stats->iteration, peer_, pre_pos, cur_pos-pre_pos, cur_pos, data_slice->forward_output[peer_].GetSize());fflush(stdout);
         frontier_attribute->queue_reset  = true;
         frontier_attribute->selector     = 0;
         if (enactor_stats->iteration>0 && cur_pos - pre_pos >0)
         {
             frontier_attribute->queue_length = cur_pos - pre_pos;
-            util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
+            util::MemsetCopyVectorKernel<<<256, 256, 0, stream>>>(
                 frontier_queue->keys[0].GetPointer(util::DEVICE), 
                 data_slice ->forward_output[peer_].GetPointer(util::DEVICE) + pre_pos, 
                 frontier_attribute->queue_length);

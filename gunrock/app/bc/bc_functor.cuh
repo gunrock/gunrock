@@ -49,7 +49,7 @@ struct ForwardFunctor
     {
         // Check if the destination node has been claimed as someone's child
         bool child_available = (atomicCAS(problem->preds + d_id, -2, s_id) == -2) ? true : false;
-        
+       
         if (!child_available)
         {
             //Two conditions will lead the code here.
@@ -196,7 +196,6 @@ struct BackwardFunctor
         //Accumulate bc value
         //atomicAdd(problem->ebc_values + e_id, result);
 
-        //printf("%d->%d : %f = %f / %f * (1.0 + %f)\n", s_id, d_id, result, from_sigma, to_sigma, to_delta);
         if (s_id != problem->src_node[0]) {
             atomicAdd(problem->deltas + s_id, result); 
             atomicAdd(problem->bc_values + s_id, result);

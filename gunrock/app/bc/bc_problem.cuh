@@ -199,7 +199,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
      *
      *\return cudaError_t object which indicates the success of all CUDA function calls.
      */
-    cudaError_t Extract(Value *h_sigmas, Value *h_bc_values, Value *h_ebc_values)
+    cudaError_t Extract(Value *h_sigmas, Value *h_bc_values, Value *h_ebc_values, VertexId *h_labels)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -222,11 +222,16 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                     if (retval = data_slices[0]->sigmas.Move(util::DEVICE, util::HOST)) return retval;
                 }
 
+                if (h_labels) {
+                    data_slices[0]->labels.SetPointer(h_labels);
+                    if (retval = data_slices[0]->labels.Move(util::DEVICE, util::HOST)) return retval;
+                }
             } else {
                 Value **th_bc_values  = new Value*[this->num_gpus];
                 Value **th_ebc_values = new Value*[this->num_gpus];
                 Value **th_sigmas     = new Value*[this->num_gpus];
                 SizeT **th_row_offsets= new SizeT*[this->num_gpus];
+                VertexId **th_labels  = new VertexId*[this->num_gpus];
                 
                 for (int gpu=0; gpu< this->num_gpus; gpu++)
                 {
@@ -242,14 +247,19 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                         if (retval = data_slices[gpu]->sigmas.Move(util::DEVICE, util::HOST)) return retval;
                         th_sigmas[gpu] = data_slices[gpu]->sigmas.GetPointer(util::HOST);
                     }
+                    if (h_labels) {
+                        if (retval = data_slices[gpu]->labels.Move(util::DEVICE, util::HOST)) return retval;
+                        th_labels[gpu] = data_slices[gpu]->labels.GetPointer(util::HOST);
+                    }
                 } // end for(gpu)
 
                 for (VertexId node=0;node<this->nodes;node++)
                 {
                     int      gpu   = this->partition_tables [0][node];
                     VertexId _node = this->convertion_tables[0][node];
-                    h_bc_values[node] = th_bc_values[gpu][_node];
-                    if (h_sigmas) h_sigmas[node] = th_sigmas[gpu][_node];
+                    if (h_bc_values) h_bc_values[node] = th_bc_values[gpu][_node];
+                    if (h_sigmas   ) h_sigmas   [node] = th_sigmas   [gpu][_node];
+                    if (h_labels   ) h_labels   [node] = th_labels   [gpu][_node];
                     if (h_ebc_values) {
                         SizeT n_edges=this->org_graph->row_offsets[node+1] - this->org_graph->row_offsets[node];
                         for (SizeT _edge=0;_edge<n_edges;_edge++)
@@ -265,11 +275,13 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                     if (retval = data_slices[gpu]->bc_values .Release(util::HOST)) return retval;
                     if (retval = data_slices[gpu]->ebc_values.Release(util::HOST)) return retval;
                     if (retval = data_slices[gpu]->sigmas    .Release(util::HOST)) return retval;
+                    if (retval = data_slices[gpu]->labels    .Release(util::HOST)) return retval;
                 }
                 delete[] th_row_offsets; th_row_offsets = NULL;
                 delete[] th_bc_values  ; th_bc_values   = NULL;
                 delete[] th_ebc_values ; th_ebc_values  = NULL;
                 delete[] th_sigmas     ; th_sigmas      = NULL;
+                delete[] th_labels     ; th_labels      = NULL;
             } //end if
         } while(0);
 

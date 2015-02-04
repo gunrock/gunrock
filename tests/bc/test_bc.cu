@@ -16,6 +16,7 @@
 #include <string>
 #include <deque>
 #include <vector>
+#include <queue>
 #include <iostream>
 #include <fstream>
 #include <algorithm>
@@ -160,11 +161,12 @@ template<
     typename Value,
     typename SizeT>
 void RefCPUBC(
-    const Csr<VertexId, Value, SizeT>       &graph,
-    Value                                   *bc_values,
-    Value                                   *ebc_values,
-    Value                                   *sigmas,
-    VertexId                                src)
+    const Csr<VertexId, Value, SizeT> &graph,
+    Value                             *bc_values,
+    Value                             *ebc_values,
+    Value                             *sigmas,
+    VertexId                          *source_path,
+    VertexId                           src)
 {
     typedef Coo<VertexId, Value> EdgeTupleType;
     EdgeTupleType *coo = (EdgeTupleType*) malloc(sizeof(EdgeTupleType) * graph.edges);
@@ -252,7 +254,7 @@ void RefCPUBC(
     }
     else {
         //Simple BFS pass to get single pass BC
-        VertexId *source_path = new VertexId[graph.nodes];
+        //VertexId *source_path = new VertexId[graph.nodes];
 
         //initialize distances
         for (VertexId i = 0; i < graph.nodes; ++i) {
@@ -336,7 +338,7 @@ void RefCPUBC(
         printf("CPU BFS finished in %lf msec. Search depth is:%d\n",
                elapsed, search_depth);
 
-        delete[] source_path;
+        //delete[] source_path;
     }
     free(coo);
 }
@@ -398,15 +400,18 @@ void RunTests(Test_Parameter *parameter)
     int           iterations            = parameter -> iterations;
     size_t       *org_size              = new size_t  [num_gpus];
     // Allocate host-side array (for both reference and gpu-computed results)
-    Value        *reference_bc_values        = new Value[graph->nodes];
-    Value        *reference_ebc_values       = new Value[graph->edges];
-    Value        *reference_sigmas           = new Value[graph->nodes];
-    Value        *h_sigmas                   = new Value[graph->nodes];
-    Value        *h_bc_values                = new Value[graph->nodes];
-    Value        *h_ebc_values               = new Value[graph->edges];
+    Value        *reference_bc_values        = new Value   [graph->nodes];
+    Value        *reference_ebc_values       = new Value   [graph->edges];
+    Value        *reference_sigmas           = new Value   [graph->nodes];
+    VertexId     *reference_labels           = new VertexId[graph->nodes];
+    Value        *h_sigmas                   = new Value   [graph->nodes];
+    Value        *h_bc_values                = new Value   [graph->nodes];
+    Value        *h_ebc_values               = new Value   [graph->edges];
+    VertexId     *h_labels                   = new VertexId[graph->nodes];
     Value        *reference_check_bc_values  = (g_quick)                ? NULL : reference_bc_values;
     Value        *reference_check_ebc_values = (g_quick || (src != -1)) ? NULL : reference_ebc_values;
     Value        *reference_check_sigmas     = (g_quick || (src == -1)) ? NULL : reference_sigmas;
+    VertexId     *reference_check_labels     = (g_quick || (src == -1)) ? NULL : reference_labels;
 
     for (int gpu=0;gpu<num_gpus;gpu++)
     {
@@ -445,6 +450,7 @@ void RunTests(Test_Parameter *parameter)
                     reference_check_bc_values,
                     reference_check_ebc_values,
                     reference_check_sigmas,
+                    reference_check_labels,
                     src);
             printf("\n");
         } else {
@@ -505,12 +511,65 @@ void RunTests(Test_Parameter *parameter)
     enactor->GetStatistics(avg_duty);
 
     // Copy out results
-    util::GRError(problem->Extract(h_sigmas, h_bc_values, h_ebc_values), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
+    util::GRError(problem->Extract(h_sigmas, h_bc_values, h_ebc_values, h_labels), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
     /*printf("edge bc values: %d\n", graph.edges);
     for (int i = 0; i < graph.edges; ++i) {
         printf("%5f, %5f\n", h_ebc_values[i], reference_check_ebc_values[i]);
     }
     printf("edge bc values end\n");*/
+
+    /*std::queue<VertexId> temp_queue;
+    int *temp_marker=new int[graph->nodes];
+    memset(temp_marker, 0, sizeof(int)*graph->nodes);
+    temp_queue.push(41107);
+    temp_queue.push(41109);
+    cout<<"parent\tchild\tlabel\tsigma\tbc_value\t\tlabel\tsigma\tbc_value"<<endl;
+    while (!temp_queue.empty())
+    {
+        VertexId parent = temp_queue.front();
+        temp_queue.pop();
+        temp_marker[parent]=1;
+        int      gpu     = problem->partition_tables[0][parent];
+        VertexId parent_ = problem->convertion_tables[0][parent];
+        util::SetDevice(gpu_idx[gpu]);
+        for (int i=graph->row_offsets[parent];i<graph->row_offsets[parent+1];i++)
+        {
+            VertexId child = graph->column_indices[i];
+            VertexId child_ = 0;
+
+            for (int j=problem->graph_slices[gpu]->row_offsets[parent_];
+                     j<problem->graph_slices[gpu]->row_offsets[parent_+1];j++)
+            {
+                VertexId c=problem->graph_slices[gpu]->column_indices[j];
+                if (problem->graph_slices[gpu]->original_vertex[c] == child)
+                {
+                    child_=c;break;
+                }
+            }
+            //if (h_labels[child] != h_labels[parent]+1) continue;
+            cout<<parent<<"\t "<<child<<"\t "<<h_labels[child]<<"\t "<<h_sigmas[child]<<"\t "<<h_bc_values[child]<<"\t";
+            if (reference_check_labels[child] != h_labels[child] ||
+                reference_check_sigmas[child] != h_sigmas[child] ||
+                reference_check_bc_values[child] != h_bc_values[child])
+            {
+                cout<<"*";
+                if (h_labels[child]==h_labels[parent]+1 && temp_marker[child]!=1) temp_queue.push(child);
+            }
+            cout<<"\t "<<reference_check_labels[child]<<"\t "<<reference_check_sigmas[child]<<"\t "<<reference_check_bc_values[child];
+            cout<<"\t "<<gpu<<"\t "<<parent_<<"\t "<<child_;
+            VertexId temp_label;
+            Value    temp_sigma, temp_bc;
+            cudaMemcpy((void*)&temp_label, problem->data_slices[gpu]->labels.GetPointer(util::DEVICE)+child_, sizeof(VertexId), cudaMemcpyDeviceToHost);
+            cudaMemcpy((void*)&temp_sigma, problem->data_slices[gpu]->sigmas.GetPointer(util::DEVICE)+child_, sizeof(Value   ), cudaMemcpyDeviceToHost);
+            cudaMemcpy((void*)&temp_bc, problem->data_slices[gpu]->bc_values.GetPointer(util::DEVICE)+child_, sizeof(Value), cudaMemcpyDeviceToHost);
+            cout<<"\t "<<temp_label<<"\t "<<temp_sigma<<"\t "<<temp_bc;
+
+            cudaMemcpy((void*)&temp_label, problem->data_slices[gpu]->labels.GetPointer(util::DEVICE)+parent_, sizeof(VertexId), cudaMemcpyDeviceToHost);
+            cudaMemcpy((void*)&temp_sigma, problem->data_slices[gpu]->sigmas.GetPointer(util::DEVICE)+parent_, sizeof(Value   ), cudaMemcpyDeviceToHost);
+            cudaMemcpy((void*)&temp_bc, problem->data_slices[gpu]->bc_values.GetPointer(util::DEVICE)+parent_, sizeof(Value), cudaMemcpyDeviceToHost);
+            cout<<"\t "<<temp_label<<"\t "<<temp_sigma<<"\t "<<temp_bc<<endl;
+        }
+    }*/
 
     // Verify the result
     if (reference_check_bc_values != NULL) {
@@ -525,13 +584,24 @@ void RunTests(Test_Parameter *parameter)
     }
     if (reference_check_ebc_values != NULL) {
         printf("Validity Edge BC Value: ");
-        CompareResults(h_ebc_values, reference_check_ebc_values, graph->edges,
+        int num_error = CompareResults(h_ebc_values, reference_check_ebc_values, graph->edges,
                        true);
+        if (num_error > 0)
+            printf("Number of errors occurred: %d\n", num_error);
         printf("\n");
     }
     if (reference_check_sigmas != NULL) {
         printf("Validity Sigma: ");
-        CompareResults(h_sigmas, reference_check_sigmas, graph->nodes, true);
+        int num_error = CompareResults(h_sigmas, reference_check_sigmas, graph->nodes, true);
+        if (num_error > 0)
+            printf("Number of errors occurred: %d\n", num_error);
+        printf("\n");
+    }
+    if (reference_check_labels != NULL) {
+        printf("Validity labels: ");
+        int num_error = CompareResults(h_labels, reference_check_labels, graph->nodes, true);
+        if (num_error > 0)
+            printf("Number of errors occurred: %d\n", num_error);
         printf("\n");
     }
 
@@ -588,9 +658,11 @@ void RunTests(Test_Parameter *parameter)
     if (reference_sigmas    ) {delete[] reference_sigmas    ; reference_sigmas     = NULL;}
     if (reference_bc_values ) {delete[] reference_bc_values ; reference_bc_values  = NULL;}
     if (reference_ebc_values) {delete[] reference_ebc_values; reference_ebc_values = NULL;}
+    if (reference_labels    ) {delete[] reference_labels    ; reference_labels     = NULL;}
     if (h_sigmas            ) {delete[] h_sigmas            ; h_sigmas             = NULL;}
     if (h_bc_values         ) {delete[] h_bc_values         ; h_bc_values          = NULL;}
     if (h_ebc_values        ) {delete[] h_ebc_values        ; h_ebc_values         = NULL;}
+    if (h_labels            ) {delete[] h_labels            ; h_labels             = NULL;}
 
     //cudaDeviceSynchronize();
 }
