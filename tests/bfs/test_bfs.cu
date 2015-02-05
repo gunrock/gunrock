@@ -659,11 +659,8 @@ int main( int argc, char** argv)
 		csr.PrintHistogram();
 
 		// Run tests
-		//RunTests(csr, args, *context);
-    int temp;
-    int src = csr.GetNodeWithHighestDegree(temp);
-    printf("highest degree:%d\n", temp);
-    } else {
+		RunTests(csr, args, *context);
+        } else {
 
 		// Unknown graph type
 		fprintf(stderr, "Unspecified graph type\n");

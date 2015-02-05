@@ -93,8 +93,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             CudaContext                             &context,
             TYPE                                    ADVANCE_TYPE,
             bool                                    inverse_graph = false,
-            OP                                      REDUCE_OP = KernelPolicy::OP::NONE,
-            REDUCE_TYPE                             R_TYPE = KernelPolicy::REDUCE_TYPE::NONE,
+            OP                                      REDUCE_OP = gunrock::oprtr::advance::NONE,
+            REDUCE_TYPE                             R_TYPE = gunrock::oprtr::advance::EMPTY,
             typename KernelPolicy::Value            *d_value_to_reduce = NULL,
             typename KernelPolicy::Value            *d_reduce_frontier = NULL,
             typename KernelPolicy::Value            *d_reduced_value = NULL)
@@ -146,16 +146,16 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         d_row_indices,
                                         d_in_key_queue,
                                         partitioned_scanned_edges,
-                                        frontier_attribute.queue_length,
+                                        frontier_attribute.queue_length+1,
                                         max_in,
                                         max_out,
                                         ADVANCE_TYPE);
 
-            Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length, (int)0, mgpu::plus<int>(),
+            Scan<mgpu::MgpuScanTypeExc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length+1, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
 
             SizeT *temp = new SizeT[1];
-            cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
+            cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length, sizeof(SizeT), cudaMemcpyDeviceToHost);
             SizeT output_queue_len = temp[0];
             //printf("input queue:%d, output_queue:%d\n", frontier_attribute.queue_length, output_queue_len);
 
@@ -169,7 +169,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         d_column_offsets,
                         d_row_indices,
                         (VertexId*)NULL,
-                        partitioned_scanned_edges,
+                        &partitioned_scanned_edges[1],
                         d_done,
                         d_in_key_queue,
                         backward_frontier_map_in,
@@ -193,7 +193,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         d_column_offsets,
                         d_row_indices,
                         (VertexId*)NULL,
-                        partitioned_scanned_edges,
+                        &partitioned_scanned_edges[1],
                         d_done,
                         d_in_key_queue,
                         backward_frontier_map_out,
@@ -266,16 +266,16 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         d_column_indices,
                                         d_in_key_queue,
                                         partitioned_scanned_edges,
-                                        frontier_attribute.queue_length,
+                                        frontier_attribute.queue_length+1,
                                         max_in,
                                         max_out,
                                         ADVANCE_TYPE);
 
-            Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length, (int)0, mgpu::plus<int>(),
+            Scan<mgpu::MgpuScanTypeExc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length+1, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
 
             SizeT *temp = new SizeT[1];
-            cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
+            cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length, sizeof(SizeT), cudaMemcpyDeviceToHost);
             SizeT output_queue_len = temp[0];
 
             if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
@@ -288,7 +288,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         d_row_offsets,
                         d_column_indices,
                         d_row_indices,
-                        partitioned_scanned_edges,
+                        &partitioned_scanned_edges[1],
                         d_done,
                         d_in_key_queue,
                         d_out_key_queue,
@@ -321,7 +321,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                 SortedSearch<MgpuBoundsLower>(
                         enactor_stats.d_node_locks,
                         KernelPolicy::LOAD_BALANCED::BLOCKS,
-                        partitioned_scanned_edges,
+                        &partitioned_scanned_edges[1],
                         frontier_attribute.queue_length,
                         enactor_stats.d_node_locks_out,
                         context);
@@ -334,7 +334,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         d_row_offsets,
                                         d_column_indices,
                                         d_row_indices,
-                                        partitioned_scanned_edges,
+                                        &partitioned_scanned_edges[1],
                                         enactor_stats.d_node_locks_out,
                                         KernelPolicy::LOAD_BALANCED::BLOCKS,
                                         d_done,

@@ -196,14 +196,15 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         int bid = blockIdx.x;
 
         int my_id = bid*blockDim.x + tid;
-        if (my_id >= num_elements || my_id >= max_edge)
+        if (my_id > num_elements || my_id >= max_edge)
             return;
         VertexId v_id = d_queue[my_id];
         if (v_id == -1) {
             d_scanned_edges[my_id] = 0;
             return;
         }
-        SizeT num_edges = GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
+        // add a zero length neighbor list to the end (this for getting both exclusive and inclusive scan in one array)
+        SizeT num_edges = (my_id == num_elements) ? 0 : GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
         d_scanned_edges[my_id] = num_edges;
     }
 
@@ -591,7 +592,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
-                                bool inverse_graph, 
+                                bool &inverse_graph, 
                                 gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
                                 Value *&d_value_to_reduce,
                                 Value *&d_reduce_frontier)
@@ -874,8 +875,8 @@ void RelaxPartitionedEdges2(
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
         bool                                    inverse_graph = false,
         gunrock::oprtr::advance::REDUCE_TYPE R_TYPE = gunrock::oprtr::advance::EMPTY,
-        typename KernelPolicy::Value            d_value_to_reduce = NULL,
-        typename KernelPolicy::Value            d_reduce_frontier = NULL)
+        typename KernelPolicy::Value            *d_value_to_reduce = NULL,
+        typename KernelPolicy::Value            *d_reduce_frontier = NULL)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::RelaxPartitionedEdges2(
             queue_reset,

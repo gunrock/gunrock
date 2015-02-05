@@ -132,6 +132,7 @@ struct KernelPolicy {
     typedef _ProblemData                    ProblemData;
     typedef typename ProblemData::VertexId  VertexId;
     typedef typename ProblemData::SizeT     SizeT;
+    typedef typename ProblemData::Value     Value;
 
     static const MODE   ADVANCE_MODE = _ADVANCE_MODE;
     static const int    CTA_OCCUPANCY = _MIN_CTA_OCCUPANCY;
