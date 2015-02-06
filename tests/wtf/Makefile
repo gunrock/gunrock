@@ -38,9 +38,9 @@ SM_TARGETS = $(GEN_SM35)
 #-------------------------------------------------------------------------------
 
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
-MGPU_INC = "../../../moderngpu/include"
+MGPU_INC = "../../externals/moderngpu/include"
 BOOST_INC = "../../../boost_1_53_0"
-CUB_INC = "../../../cub"
+CUB_INC = "../../externals/cub"
 INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(BOOST_INC) -I$(CUB_INC) -I.. -I../..
 
 #-------------------------------------------------------------------------------
@@ -103,9 +103,9 @@ DEPS = 			./Makefile \
 
 test: bin/test_wtf_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_wtf_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_wtf.cu ../../gunrock/util/error_utils.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/test_wtf_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_wtf.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_wtf_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_wtf.cu ../../gunrock/util/error_utils.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_wtf_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_wtf.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean

@@ -1,4 +1,4 @@
-# CMake file for SSSP test
+# CMake file for Stochastic Approach for Link-Structure Analysis test
 
 # set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -g;-G)
 
@@ -8,12 +8,10 @@ else()
   message(SEND_ERROR "Modern GPU include directory not set.")
 endif()
 
-set (mgpu_SOURCE_FILES
-  ${mgpu_SOURCE_DIRS}/mgpucontext.cu
-  ${mgpu_SOURCE_DIRS}/mgpuutil.cpp)
+set (mgpu_SOURCE_FILES ${mgpu_SOURCE_DIRS}/mgpucontext.cu ${mgpu_SOURCE_DIRS}/mgpuutil.cpp)
 
-CUDA_ADD_EXECUTABLE(single_source_shortest_path
-  test_sssp.cu
+CUDA_ADD_EXECUTABLE(SALSA
+  test_salsa.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/test_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
   ${mgpu_SOURCE_FILES}

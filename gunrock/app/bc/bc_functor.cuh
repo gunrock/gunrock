@@ -51,7 +51,7 @@ struct ForwardFunctor
     {
         // Check if the destination node has been claimed as someone's child
         bool child_available = (atomicCAS(&problem->d_preds[d_id], -2, s_id) == -2) ? true : false;
-        
+
         if (!child_available)
         {
             //Two conditions will lead the code here.
@@ -95,7 +95,7 @@ struct ForwardFunctor
      *
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-    { 
+    {
             // Succeeded in claiming child, safe to set label to child
             VertexId label;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -103,7 +103,7 @@ struct ForwardFunctor
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                     label+1, problem->d_labels + d_id);
             atomicAdd(&problem->d_sigmas[d_id], problem->d_sigmas[s_id]);
-        
+
     }
 
     /**
@@ -162,7 +162,7 @@ struct BackwardFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        
+
         VertexId s_label;
         VertexId d_label;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -207,7 +207,7 @@ struct BackwardFunctor
         //atomicAdd(&problem->d_ebc_values[e_id], result);
 
         if (s_id != problem->d_src_node[0]) {
-            atomicAdd(&problem->d_deltas[s_id], result); 
+            atomicAdd(&problem->d_deltas[s_id], result);
             atomicAdd(&problem->d_bc_values[s_id], result);
         }
     }
@@ -268,7 +268,7 @@ struct BackwardFunctor2
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        
+
         VertexId s_label;
         VertexId d_label;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -305,15 +305,15 @@ struct BackwardFunctor2
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
             to_delta, problem->d_deltas + d_id);
 
-        Value result = from_sigma / to_sigma * (1.0 + to_delta);
+        //Value result = from_sigma / to_sigma * (1.0 + to_delta);
 
         //Accumulate delta value
 
         //Accumulate bc value
         //atomicAdd(&problem->d_ebc_values[e_id], result);
-        
+
         /*if (s_id != problem->d_src_node[0]) {
-            atomicAdd(&problem->d_deltas[s_id], result); 
+            atomicAdd(&problem->d_deltas[s_id], result);
             atomicAdd(&problem->d_bc_values[s_id], result);
         }*/
     }

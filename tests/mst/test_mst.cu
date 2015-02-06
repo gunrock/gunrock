@@ -89,6 +89,12 @@ template<typename VertexId, typename Value, typename SizeT>
 void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph, int *mst_output)
 {
   fflush(stdout);
+  int count = 0;
+  int print_limit = graph.nodes;
+  if (print_limit > 10)
+  {
+      print_limit = 10;
+  }
 
   // find source vertex ids for display results
   VertexId *source = new VertexId[graph.edges];
@@ -101,12 +107,14 @@ void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph, int *mst_output)
   }
 
   // print source-destination pairs of minimum spanning tree edges
+  printf("GPU Minimum Spanning Tree [First %d edges]\n", print_limit);
   printf("src dst\n");
   for (int i = 0; i < graph.edges; ++i)
   {
-    if (mst_output[i] == 1)
+    if (mst_output[i] == 1 && count <= print_limit)
     {
       printf("%d %d\n", source[i], graph.column_indices[i]);
+      ++count;
     }
   }
 
@@ -275,20 +283,16 @@ void RunTests(
       SimpleReferenceMST(graph.edge_values, graph);
     if (total_weight_cpu == total_weight_gpu)
     {
-      if (graph.nodes <= 50)
-      {
-        printf("GPU Minimum Spanning Tree\n");
-        // print the edge pairs in the minimum spanning tree
-        DisplaySolution(graph, h_mst_output);
-      }
+      // print the edge pairs in the minimum spanning tree
+      DisplaySolution(graph, h_mst_output);
       printf("\nCORRECT.\n");
     }
     else
     {
       printf("INCORRECT. \n"
-        "CPU Computed Total Weight = %lld\n"
-        "GPU Computed Total Weight = %lld\n",
-        total_weight_cpu, total_weight_gpu);
+             "CPU Computed Total Weight = %lld\n"
+             "GPU Computed Total Weight = %lld\n",
+             total_weight_cpu, total_weight_gpu);
     }
   }
 
@@ -412,7 +416,6 @@ int main(int argc, char** argv)
   }
   else
   {
-    // unknown graph type
     fprintf(stderr, "Unspecified graph type\n");
     return 1;
   }

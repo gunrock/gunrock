@@ -1,4 +1,4 @@
-# CMake file for SSSP test
+# CMake file for Direction-Optimizing BFS test
 
 # set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -g;-G)
 
@@ -12,8 +12,14 @@ set (mgpu_SOURCE_FILES
   ${mgpu_SOURCE_DIRS}/mgpucontext.cu
   ${mgpu_SOURCE_DIRS}/mgpuutil.cpp)
 
-CUDA_ADD_EXECUTABLE(single_source_shortest_path
-  test_sssp.cu
+if (cub_INCLUDE_DIRS)
+  include_directories(${cub_INCLUDE_DIRS})
+else()
+  message(SEND_ERROR "CUB include directory not set.")
+endif()
+
+CUDA_ADD_EXECUTABLE(direction-optimizing-bfs
+  test_dobfs.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/test_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
   ${mgpu_SOURCE_FILES}

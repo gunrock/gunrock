@@ -76,7 +76,7 @@ class SSSPEnactor : public EnactorBase
     {
         typedef typename ProblemData::SizeT         SizeT;
         typedef typename ProblemData::VertexId      VertexId;
-        
+
         cudaError_t retval = cudaSuccess;
 
         do {
@@ -121,7 +121,7 @@ class SSSPEnactor : public EnactorBase
                             graph_slice->edges * sizeof(VertexId)),
                         "SSSPEnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;*/
         } while (0);
-        
+
         return retval;
     }
 
@@ -202,8 +202,8 @@ class SSSPEnactor : public EnactorBase
         typename SSSPProblem>
     cudaError_t EnactSSSP(
     CudaContext                         &context,
-    SSSPProblem                          *problem,
-    typename SSSPProblem::VertexId       src,
+    SSSPProblem                         *problem,
+    typename SSSPProblem::VertexId      src,
     double                              queue_sizing,
     int                                 max_grid_size = 0)
     {
@@ -225,15 +225,17 @@ class SSSPEnactor : public EnactorBase
             SizeT> NearFarPriorityQueue;
 
         typedef gunrock::priority_queue::KernelPolicy<
-                SSSPProblem,                         // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                10>                                  // LOG_THREADS
+            SSSPProblem,                        // Problem data type
+            300,                                // CUDA_ARCH
+            INSTRUMENT,                         // INSTRUMENT
+            8,                                  // MIN_CTA_OCCUPANCY
+            10>                                 // LOG_THREADS
             PriorityQueueKernelPolicy;
 
         NearFarPriorityQueue *pq = new NearFarPriorityQueue;
-        util::GRError(pq->Init(problem->graph_slices[0]->edges, queue_sizing), "Priority Queue SSSP Initialization Failed", __FILE__, __LINE__);
+        util::GRError(
+            pq->Init(problem->graph_slices[0]->edges, queue_sizing),
+            "Priority Queue SSSP Initialization Failed", __FILE__, __LINE__);
 
         cudaError_t retval = cudaSuccess;
 
@@ -250,7 +252,8 @@ class SSSPEnactor : public EnactorBase
             // Lazy initialization
             if (retval = EnactorBase::Setup(problem, max_grid_size,
                                             AdvanceKernelPolicy::CTA_OCCUPANCY,
-                                            FilterKernelPolicy::CTA_OCCUPANCY)) break;
+                                            FilterKernelPolicy::CTA_OCCUPANCY))
+                break;
 
             // Single-gpu graph slice
             typename SSSPProblem::GraphSlice *graph_slice = problem->graph_slices[0];
@@ -260,10 +263,10 @@ class SSSPEnactor : public EnactorBase
             // Step through SSSP iterations
 
             //for (int iter = 0; iter < graph_slice->nodes; ++iter) {
-            
-            frontier_attribute.queue_length          = 1;
-            frontier_attribute.queue_index        = 0;        // Work queue index
-            frontier_attribute.selector                = 0;
+
+            frontier_attribute.queue_length = 1;
+            frontier_attribute.queue_index  = 0;        // Work queue index
+            frontier_attribute.selector     = 0;
 
             frontier_attribute.queue_reset = true;
             done[0] = -1;
@@ -275,13 +278,12 @@ class SSSPEnactor : public EnactorBase
                             "SSSPProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
             }
 
-
-            unsigned int pq_level = 0; 
+            unsigned int pq_level = 0;
             unsigned int out_length = 0;
 
             while (out_length > 0 || pq->queue_length > 0 || frontier_attribute.queue_length > 0) {
 
-                // Edge Map
+                // Traversal::Advance
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SSSPProblem, SsspFunctor>
                 (
                     d_done,
@@ -320,7 +322,7 @@ class SSSPEnactor : public EnactorBase
                 if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
                 }
-    
+
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
                     printf(", %lld", (long long) frontier_attribute.queue_length);
@@ -450,7 +452,7 @@ class SSSPEnactor : public EnactorBase
                 retval = util::GRError(cudaErrorInvalidConfiguration, "Frontier queue overflow. Please increase queue-sizing factor.",__FILE__, __LINE__);
                 break;
             }*/
-            
+
         } while(0);
         if (d_scanned_edges) cudaFree(d_scanned_edges);
         delete pq;
@@ -485,58 +487,58 @@ class SSSPEnactor : public EnactorBase
         double                          queue_sizing,
         int                             max_grid_size = 0)
     {
-        
         if (this->cuda_props.device_sm_version >= 300) {
             typedef gunrock::oprtr::filter::KernelPolicy<
-                SSSPProblem,                         // Problem data type
-            300,                                // CUDA_ARCH
-            INSTRUMENT,                         // INSTRUMENT
-            0,                                  // SATURATION QUIT
-            true,                               // DEQUEUE_PROBLEM_SIZE
-            8,                                  // MIN_CTA_OCCUPANCY
-            8,                                  // LOG_THREADS
-            1,                                  // LOG_LOAD_VEC_SIZE
-            0,                                  // LOG_LOADS_PER_TILE
-            5,                                  // LOG_RAKING_THREADS
-            5,                                  // END_BITMASK_CULL
-            8>                                  // LOG_SCHEDULE_GRANULARITY
+                SSSPProblem,                        // Problem data type
+                300,                                // CUDA_ARCH
+                INSTRUMENT,                         // INSTRUMENT
+                0,                                  // SATURATION QUIT
+                true,                               // DEQUEUE_PROBLEM_SIZE
+                8,                                  // MIN_CTA_OCCUPANCY
+                8,                                  // LOG_THREADS
+                1,                                  // LOG_LOAD_VEC_SIZE
+                0,                                  // LOG_LOADS_PER_TILE
+                5,                                  // LOG_RAKING_THREADS
+                5,                                  // END_BITMASK_CULL
+                8>                                  // LOG_SCHEDULE_GRANULARITY
                 FilterKernelPolicy;
 
             /*typedef gunrock::oprtr::advance::KernelPolicy<
-                SSSPProblem,                         // Problem data type
+                SSSPProblem,                        // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 8,                                  // MIN_CTA_OCCUPANCY
                 7,                                  // LOG_THREADS
-                10,                                  // LOG_BLOCKS
-                32*128,                             // LIGHT_EDGE_THRESHOLD    
+                10,                                 // LOG_BLOCKS
+                32*128,                             // LIGHT_EDGE_THRESHOLD
                 1,                                  // LOG_LOAD_VEC_SIZE
                 1,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
-                32,                            // WARP_GATHER_THRESHOLD
+                32,                                 // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7,                                  // LOG_SCHEDULE_GRANULARITY
                 gunrock::oprtr::advance::TWC_FORWARD>
-                    AdvanceKernelPolicy;*/
+                AdvanceKernelPolicy;*/
 
             typedef gunrock::oprtr::advance::KernelPolicy<
-                SSSPProblem,                         // Problem data type
+                SSSPProblem,                        // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 1,                                  // MIN_CTA_OCCUPANCY
-                10,                                  // LOG_THREADS
+                10,                                 // LOG_THREADS
                 8,                                  // LOG_BLOCKS
-                32*1024,                             // LIGHT_EDGE_THRESHOLD    
+                32*1024,                            // LIGHT_EDGE_THRESHOLD
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
-                32,                            // WARP_GATHER_THRESHOLD
+                32,                                 // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7,                                  // LOG_SCHEDULE_GRANULARITY
                 gunrock::oprtr::advance::LB>
-                    AdvanceKernelPolicy;
+                AdvanceKernelPolicy;
 
-            return EnactSSSP<AdvanceKernelPolicy, FilterKernelPolicy, SSSPProblem>(
+            return EnactSSSP<
+                AdvanceKernelPolicy, FilterKernelPolicy, SSSPProblem>(
                     context, problem, src, queue_sizing, max_grid_size);
         }
 

@@ -13,7 +13,7 @@ force64 = 1
 NVCC = "$(shell which nvcc)"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
-KERNELS = 
+KERNELS =
 
 # detect OS
 OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
@@ -22,13 +22,13 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 # Gen targets
 #-------------------------------------------------------------------------------
 
-GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\" 
-GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" 
-GEN_SM20 = -gencode=arch=compute_20,code=\"sm_20,compute_20\" 
-GEN_SM13 = -gencode=arch=compute_13,code=\"sm_13,compute_13\" 
-GEN_SM10 = -gencode=arch=compute_10,code=\"sm_10,compute_10\" 
-SM_TARGETS = $(GEN_SM35) 
-#$(GEN_SM30) $(GEN_SM20) $(GEN_SM13) $(GEN_SM10) 
+GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
+GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
+GEN_SM20 = -gencode=arch=compute_20,code=\"sm_20,compute_20\"
+GEN_SM13 = -gencode=arch=compute_13,code=\"sm_13,compute_13\"
+GEN_SM10 = -gencode=arch=compute_10,code=\"sm_10,compute_10\"
+SM_TARGETS = $(GEN_SM35)
+#$(GEN_SM30) $(GEN_SM20) $(GEN_SM13) $(GEN_SM10)
 
 #-------------------------------------------------------------------------------
 # Tune arch
@@ -36,17 +36,17 @@ SM_TARGETS = $(GEN_SM35)
 
 ifdef tunearch
     TUNE_ARCH = $(tunearch)
-else 
+else
 	TUNE_ARCH = 200
 endif
 
-ifeq ($(TUNE_ARCH), 200) 
+ifeq ($(TUNE_ARCH), 200)
 	TUNE_SM_TARGETS = $(GEN_SM20)
 endif
-ifeq ($(TUNE_ARCH), 130) 
+ifeq ($(TUNE_ARCH), 130)
 	TUNE_SM_TARGETS = $(GEN_SM13)
 endif
-ifeq ($(TUNE_ARCH), 100) 
+ifeq ($(TUNE_ARCH), 100)
 	TUNE_SM_TARGETS = $(GEN_SM10)
 endif
 
@@ -56,7 +56,7 @@ endif
 
 ifdef tunesize
     TUNE_SIZE = $(tunesize)
-else 
+else
 	TUNE_SIZE = 4
 endif
 
@@ -71,7 +71,7 @@ endif
 #-------------------------------------------------------------------------------
 
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
-MGPU_INC = "../../moderngpu/include"
+MGPU_INC = "../externals/moderngpu/include"
 BOOST_INC = "../../boost_1_53_0"
 INC = -I$(CUDA_INC) -I$(BOOST_INC) -I$(MGPU_INC) -I.. -I../..
 
@@ -79,7 +79,7 @@ INC = -I$(CUDA_INC) -I$(BOOST_INC) -I$(MGPU_INC) -I.. -I../..
 # Defines
 #-------------------------------------------------------------------------------
 
-DEFINES = 
+DEFINES =
 
 #-------------------------------------------------------------------------------
 # Compiler Flags
@@ -123,7 +123,7 @@ endif
 # Dependency Lists
 #-------------------------------------------------------------------------------
 
-DEPS = 			./Makefile \
+DEPS =			./Makefile \
 				$(wildcard ../gunrock/util/*.cuh) \
 				$(wildcard ../gunrock/util/**/*.cuh) \
 				$(wildcard ../gunrock/*.cuh) \
@@ -132,9 +132,6 @@ DEPS = 			./Makefile \
 				$(wildcard ../gunrock/oprtr/**/*.cuh) \
 				$(wildcard ../gunrock/app/*.cuh) \
 				$(wildcard ../gunrock/app/**/*.cuh)
-				 
-
-
 
 #-------------------------------------------------------------------------------
 # (make simple) Simple example driver for three primitives: CC, BFS and BC
@@ -142,15 +139,14 @@ DEPS = 			./Makefile \
 
 simple: bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX) : simple_example.cu ../../moderngpu/src/mgpucontext.cu ../../moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX) : simple_example.cu ../externals/moderngpu/src/mgpucontext.cu ../externals/moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX) simple_example.cu ../../moderngpu/src/mgpucontext.cu ../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -lcuda -O3  
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX) simple_example.cu ../externals/moderngpu/src/mgpucontext.cu ../externals/moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -lcuda -O3
 
 #-------------------------------------------------------------------------------
 # Clean
 #-------------------------------------------------------------------------------
 
 clean :
-	rm -f bin/*_$(NVCC_VERSION)_$(ARCH_SUFFIX)* 
+	rm -f bin/*_$(NVCC_VERSION)_$(ARCH_SUFFIX)*
 	rm -f *.i* *.cubin *.cu.c *.cudafe* *.fatbin.c *.ptx *.hash *.cu.cpp *.o
-

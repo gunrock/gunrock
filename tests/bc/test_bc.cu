@@ -331,7 +331,7 @@ void RefCPUBC(
  *
  * @param[in] graph Reference to the CSR graph object defined in main driver
  * @param[in] src
- * @param[in] ref_filename 
+ * @param[in] ref_filename
  * @param[in] max_grid_size
  * @param[in] num_gpus
  * @param[in] max_queue_sizing
@@ -373,7 +373,7 @@ void RunTests(
 
     // Allocate BC enactor map
     BCEnactor<INSTRUMENT> bc_enactor(g_verbose);
-    
+
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
     util::GRError(csr_problem->Init(
@@ -386,7 +386,7 @@ void RunTests(
     //
     if (reference_check_bc_values != NULL) {
         if (ref_filename.empty()) {
-            printf("compute ref value\n");
+            printf("Computing reference value ...\n");
             RefCPUBC(
                     graph,
                     reference_check_bc_values,
@@ -440,7 +440,7 @@ void RunTests(
     util::MemsetScaleKernel<<<128, 128>>>
         (csr_problem->data_slices[0]->d_bc_values, (Value)0.5f, (int)graph.nodes);
 
-    gpu_timer.Stop(); 
+    gpu_timer.Stop();
 
     elapsed += gpu_timer.ElapsedMillis();
     }
@@ -483,7 +483,7 @@ void RunTests(
     printf("GPU BC finished in %lf msec.\n", elapsed);
     if (avg_duty != 0)
         printf("\n avg CTA duty: %.2f%% \n", avg_duty * 100);
-    
+
     // Cleanup
     if (csr_problem) delete csr_problem;
     if (reference_sigmas) free(reference_sigmas);
