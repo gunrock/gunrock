@@ -198,7 +198,8 @@ void SimpleReferencePr(
     Value                                   *rank,
     Value                                   delta,
     Value                                   error,
-    SizeT                                   max_iter) 
+    SizeT                                   max_iter,
+    bool                                    directed) 
 {
     using namespace boost;
 
@@ -225,8 +226,10 @@ void SimpleReferencePr(
     CpuTimer cpu_timer;
     cpu_timer.Start();
 
-    remove_dangling_links(g);
-    printf("finished remove dangling links.\n");
+    if (!directed) {
+        remove_dangling_links(g);
+        printf("finished remove dangling links.\n");
+    }
 
     std::vector<Value> ranks(num_vertices(g));
     page_rank(g,
@@ -364,7 +367,8 @@ void RunTests(
                     reference_check,
                     delta,
                     error,
-                    max_iter);
+                    max_iter,
+                    !g_undirected);
             printf("\n");
         }
 

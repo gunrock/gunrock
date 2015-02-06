@@ -345,6 +345,7 @@ void RunTests(
         typedef SSSPProblem<
             VertexId,
             SizeT,
+            Value,
             MARK_PREDECESSORS> Problem;
 
         // Allocate host-side label array (for both reference and gpu-computed results)
