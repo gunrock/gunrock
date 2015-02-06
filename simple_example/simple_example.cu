@@ -86,16 +86,17 @@ bool CCCompare(
  ******************************************************************************/
 void Usage()
 {
-    printf("\nsimple_example <graph type> <graph type args> [--device=<device_index>] "
-           "[--instrumented] [--quick]\n"
-           "\n"
-           "Graph types and args:\n"
-           "  market [<file>]\n"
-           "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
-           "    edges from stdin (or from the optionally-specified file).\n"
-           "--instrumentd: If include then show detailed kernel running stats.\n"
-           "--quick: If include then do not perform CPU validity code.\n"
-           );
+    printf(
+        "\nsimple_example <graph type> <graph type args> [--device=<device_index>] "
+        "[--instrumented] [--quick]\n"
+        "\n"
+        "Graph types and args:\n"
+        "  market [<file>]\n"
+        "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
+        "    edges from stdin (or from the optionally-specified file).\n"
+        "--instrumentd: If include then show detailed kernel running stats.\n"
+        "--quick: If include then do not perform CPU validity code.\n"
+        );
 }
 
 /**
@@ -241,7 +242,8 @@ void DisplayBFSStats(
     double redundant_work = 0.0;
     if (total_queued > 0) {
         // measure duplicate edges put through queue
-        redundant_work = ((double) total_queued - edges_visited) / edges_visited;
+        redundant_work =
+            ((double) total_queued - edges_visited) / edges_visited;
     }
     redundant_work *= 100;
 
@@ -392,37 +394,44 @@ void RunTests(
     // Allocate problem on GPU
     CCProblem_T *cc_problem = new CCProblem_T;
     util::GRError(cc_problem->Init(
-            g_stream_from_host,
-            graph,
-            num_gpus), "CC Problem Initialization Failed", __FILE__, __LINE__);
+                      g_stream_from_host,
+                      graph,
+                      num_gpus),
+                  "CC Problem Initialization Failed", __FILE__, __LINE__);
 
     //
     // Compute reference CPU CC solution for source-distance
     //
     if (reference_check != NULL)
-    {
-        printf("compute ref value\n");
-        ref_num_components = RefCPUCC(
-            graph.row_offsets,
-            graph.column_indices,
-            graph.nodes,
-            reference_check);
-        printf("\n");
-    }
+        {
+            printf("compute ref value\n");
+            ref_num_components = RefCPUCC(
+                graph.row_offsets,
+                graph.column_indices,
+                graph.nodes,
+                reference_check);
+            printf("\n");
+        }
 
     // Perform CC
     GpuTimer gpu_timer;
 
-    util::GRError(cc_problem->Reset(cc_enactor.GetFrontierType()), "CC Problem Data Reset Failed", __FILE__, __LINE__);
+    util::GRError(
+        cc_problem->Reset(cc_enactor.GetFrontierType()),
+        "CC Problem Data Reset Failed", __FILE__, __LINE__);
     gpu_timer.Start();
-    util::GRError(cc_enactor.Enact(cc_problem, max_grid_size), "CC Problem Enact Failed", __FILE__, __LINE__);
+    util::GRError(
+        cc_enactor.Enact(cc_problem, max_grid_size),
+        "CC Problem Enact Failed", __FILE__, __LINE__);
     gpu_timer.Stop();
 
     float elapsed = gpu_timer.ElapsedMillis();
 
     // Copy out results
-    util::GRError(cc_problem->Extract(h_component_ids), "CC Problem Data Extraction Failed", __FILE__, __LINE__);
-    
+    util::GRError(
+        cc_problem->Extract(h_component_ids),
+        "CC Problem Data Extraction Failed", __FILE__, __LINE__);
+
     int num_errors = 0;
     // Validity
     if (ref_num_components == cc_problem->num_components)
@@ -450,21 +459,21 @@ void RunTests(
     //sort the components by size
     CcListType *cclist =
         (CcListType*)malloc(sizeof(CcListType) * ref_num_components);
-    for (int i = 0; i < ref_num_components; ++i)
-    {
+    for (int i = 0; i < ref_num_components; ++i) {
         cclist[i].root = h_roots[i];
         cclist[i].histogram = h_histograms[i];
     }
-    std::stable_sort(cclist, cclist + ref_num_components, CCCompare<CcListType>);
+    std::stable_sort(
+        cclist, cclist + ref_num_components, CCCompare<CcListType>);
 
     // Print out at most top 10 largest components
     int top = (ref_num_components < 10) ? ref_num_components : 10;
     printf("Top %d largest components:\n", top);
     for (int i = 0; i < top; ++i)
-    {
-        printf("CC ID: %d, CC Root: %d, CC Size: %d\n",
-               i, cclist[i].root, cclist[i].histogram);
-    }
+        {
+            printf("CC ID: %d, CC Root: %d, CC Size: %d\n",
+                   i, cclist[i].root, cclist[i].histogram);
+        }
 
     printf("GPU Connected Component finished in %lf msec.\n", elapsed);
 
@@ -485,8 +494,8 @@ void RunTests(
         VertexId,
         SizeT,
         Value,
-        true,                // Set MARK_PREDECESSORS flag true
-        false,                // Set to enable idempotent operation
+        false,               // Set MARK_PREDECESSORS flag true
+        true,                // Set to enable idempotent operation
         false> BFSProblem_T; // does not use double buffer
 
     // Allocate host-side label array (for both reference and
@@ -507,22 +516,23 @@ void RunTests(
     // Allocate problem on GPU
     BFSProblem_T *bfs_problem = new BFSProblem_T;
     util::GRError(bfs_problem->Init(
-            g_stream_from_host,
-            graph,
-            num_gpus), "BFS Problem Initialization Failed", __FILE__, __LINE__);
+                      g_stream_from_host,
+                      graph,
+                      num_gpus),
+                  "BFS Problem Initialization Failed", __FILE__, __LINE__);
 
     //
     // Compute reference CPU BFS solution for source-distance
     //
     if (reference_check != NULL)
-    {
-        printf("compute ref value\n");
-        SimpleReferenceBfs(
-            graph,
-            reference_check,
-            src);
-        printf("\n");
-    }
+        {
+            printf("compute ref value\n");
+            SimpleReferenceBfs(
+                graph,
+                reference_check,
+                src);
+            printf("\n");
+        }
 
     Stats *stats = new Stats("GPU BFS");
 
@@ -532,10 +542,13 @@ void RunTests(
 
     // Perform BFS
 
-    util::GRError(bfs_problem->Reset(src, bfs_enactor.GetFrontierType(),
-                                    max_queue_sizing), "BFS Problem Data Reset Failed", __FILE__, __LINE__);
+    util::GRError(
+        bfs_problem->Reset(src,bfs_enactor.GetFrontierType(), max_queue_sizing),
+        "BFS Problem Data Reset Failed", __FILE__, __LINE__);
     gpu_timer.Start();
-    util::GRError(bfs_enactor.Enact(context, bfs_problem, src, max_grid_size), "BFS Problem Enact Failed", __FILE__, __LINE__);
+    util::GRError(
+        bfs_enactor.Enact(context, bfs_problem, src, max_grid_size),
+        "BFS Problem Enact Failed", __FILE__, __LINE__);
     gpu_timer.Stop();
 
     bfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
@@ -543,7 +556,9 @@ void RunTests(
     elapsed = gpu_timer.ElapsedMillis();
 
     // Copy out results
-    util::GRError(bfs_problem->Extract(h_labels, h_preds), "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
+    util::GRError(
+        bfs_problem->Extract(h_labels, h_preds),
+        "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // Verify the result
     if (reference_check != NULL) {
@@ -596,24 +611,25 @@ void RunTests(
     // Allocate problem on GPU
     BCProblem_T *bc_problem = new BCProblem_T;
     util::GRError(bc_problem->Init(
-            g_stream_from_host,
-            graph,
-            num_gpus), "BC Problem Initialization Failed", __FILE__, __LINE__);
+                      g_stream_from_host,
+                      graph,
+                      num_gpus),
+                  "BC Problem Initialization Failed", __FILE__, __LINE__);
 
     //
     // Compute reference CPU BC solution for source-distance
     //
     if (reference_check_bc_values != NULL)
-    {
-        printf("compute ref value\n");
-        RefCPUBC(
-            graph.row_offsets,
-            graph.column_indices,
-            reference_check_bc_values,
-            graph.nodes,
-            src);
-        printf("\n");
-    }
+        {
+            printf("compute ref value\n");
+            RefCPUBC(
+                graph.row_offsets,
+                graph.column_indices,
+                reference_check_bc_values,
+                graph.nodes,
+                src);
+            printf("\n");
+        }
 
     avg_duty = 0.0;
 
@@ -623,15 +639,18 @@ void RunTests(
 
     gpu_timer.Start();
     for (VertexId i = start_src; i < end_src; ++i)
-    {
-        util::GRError(bc_problem->Reset(i, bc_enactor.GetFrontierType(),
-                                       max_queue_sizing), "BC Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(bc_enactor.Enact(context, bc_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
-    }
+        {
+            util::GRError(
+                bc_problem->Reset(i, bc_enactor.GetFrontierType(), max_queue_sizing),
+                "BC Problem Data Reset Failed", __FILE__, __LINE__);
+            util::GRError(
+                bc_enactor.Enact(context, bc_problem, i, max_grid_size),
+                "BC Problem Enact Failed", __FILE__, __LINE__);
+        }
 
     // Normalize BC value
     util::MemsetScaleKernel<<<128, 128>>>
-    (bc_problem->data_slices[0]->d_bc_values, 0.5f, graph.nodes);
+        (bc_problem->data_slices[0]->d_bc_values, 0.5f, graph.nodes);
 
     gpu_timer.Stop();
 
@@ -640,13 +659,15 @@ void RunTests(
     bc_enactor.GetStatistics(avg_duty);
 
     // Copy out results
-    util::GRError(bc_problem->Extract(NULL, h_bc_values, NULL), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
+    util::GRError(
+        bc_problem->Extract(NULL, h_bc_values, NULL),
+        "BC Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // Verify the result
     if (reference_check_bc_values != NULL) {
         printf("Validity BC Value: ");
-        num_errors += CompareResults(h_bc_values, reference_check_bc_values, graph.nodes,
-                       true);
+        num_errors += CompareResults(
+            h_bc_values, reference_check_bc_values, graph.nodes, true);
         printf("\n");
     }
 
@@ -773,7 +794,7 @@ int main( int argc, char** argv)
             return 1;
         }
 
-        csr.DisplayGraph();
+        // csr.DisplayGraph();
         fflush(stdout);
 
         // Run tests

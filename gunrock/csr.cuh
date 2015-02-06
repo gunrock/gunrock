@@ -147,7 +147,7 @@ struct Csr
         VertexId *col_indices,
         Value *edge_values = NULL)
     {
-        printf("==> Writing file: %s\n", file_name);
+        // printf("==> Writing file: %s\n", file_name);
         time_t mark1 = time(NULL);
         std::ofstream output(file_name);
 
@@ -167,11 +167,11 @@ struct Csr
         }
         else
         {
-            std::cout << "Cannot Open The File." << std::endl;
+            // std::cout << "Cannot Open The File." << std::endl;
         }
 
         time_t mark2 = time(NULL);
-        printf("Finished writing in %ds.\n", (int)(mark2 - mark1));
+        // printf("Finished writing in %ds.\n", (int)(mark2 - mark1));
     }
 
     /**
