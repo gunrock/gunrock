@@ -168,9 +168,6 @@ void DisplayStats(
     printf("\n");
 }
 
-
-
-
 /******************************************************************************
  * PageRank Testing Routines
  *****************************************************************************/
@@ -354,9 +351,7 @@ void RunTests(
     }
     elapsed /= iterations;
 
-
     pr_enactor.GetStatistics(total_queued, avg_duty);
-
 
     // Copy out results
     util::GRError(
@@ -374,7 +369,7 @@ void RunTests(
     //
     if (reference_check != NULL && total_pr > 0)
     {
-        printf("compute ref value\n");
+        printf("Computing reference value ...\n");
         SimpleReferencePr(
             graph,
             reference_node_id,
