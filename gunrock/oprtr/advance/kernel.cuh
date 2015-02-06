@@ -357,9 +357,11 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                 //util::DisplayDeviceResults(d_out_key_queue, output_queue_len);
             }
 
-            // TODO:
-            // Transfer d_scanned_edges into exclusive scan result
+            // TODO: switch R_TYPE for different reduce operators
             // Do segreduction using d_scanned_edges and d_reduce_frontier
+            SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+            false, d_reduced_value, (int)0, mgpu::plus<typename KernelPolicy::Value>(), context);
+
             // save the result to d_reduced_value
             //
             break;
