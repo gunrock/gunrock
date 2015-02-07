@@ -357,41 +357,41 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                 //util::DisplayDeviceResults(d_out_key_queue, output_queue_len);
             }
 
-            // TODO: switch R_TYPE for different reduce operators
+            // TODO: switch REDUCE_OP for different reduce operators
             // Do segreduction using d_scanned_edges and d_reduce_frontier
             if (R_TYPE != gunrock::oprtr::advance::EMPTY && d_value_to_reduce && d_reduce_frontier) {
               switch (REDUCE_OP) {
-                case: gunrock::oprtr::advance::PLUS {
+                case gunrock::oprtr::advance::PLUS: {
                     SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
                       false, d_reduced_value, (int)0, mgpu::plus<typename KernelPolicy::Value>(), context);
                       break;
                 }
-                case: gunrock::oprtr::advance::MULTIPLIES {
+                case gunrock::oprtr::advance::MULTIPLIES: {
                     SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
                       false, d_reduced_value, (int)0, mgpu::multiplies<typename KernelPolicy::Value>(), context);
                       break;
                 }
-                case: gunrock::oprtr::advance::MAXIMUM {
+                case gunrock::oprtr::advance::MAXIMUM: {
                     SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
                       false, d_reduced_value, (int)0, mgpu::maximum<typename KernelPolicy::Value>(), context);
                       break;
                 }
-                case: gunrock::oprtr::advance::MINIMUM {
+                case gunrock::oprtr::advance::MINIMUM: {
                     SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
                       false, d_reduced_value, (int)0, mgpu::minimum<typename KernelPolicy::Value>(), context);
                       break;
                 }
-                case: gunrock::oprtr::advance::BIT_OR {
+                case gunrock::oprtr::advance::BIT_OR: {
                     SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
                       false, d_reduced_value, (int)0, mgpu::bit_or<typename KernelPolicy::Value>(), context);
                       break;
                 }
-                case: gunrock::oprtr::advance::BIT_AND {
+                case gunrock::oprtr::advance::BIT_AND: {
                     SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
                       false, d_reduced_value, (int)0, mgpu::bit_and<typename KernelPolicy::Value>(), context);
                       break;
                 }
-                case: gunrock::oprtr::advance::BIT_XOR {
+                case gunrock::oprtr::advance::BIT_XOR: {
                     SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
                       false, d_reduced_value, (int)0, mgpu::bit_xor<typename KernelPolicy::Value>(), context);
                       break;
