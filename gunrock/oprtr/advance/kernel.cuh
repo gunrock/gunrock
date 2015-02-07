@@ -10,7 +10,6 @@
 #include <gunrock/util/operators.cuh>
 
 #include <gunrock/util/test_utils.cuh>
-
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/app/enactor_base.cuh>
 
@@ -51,7 +50,7 @@ namespace advance {
  * @param[in] d_out_key_queue           Device pointer of output key array to the outgoing frontier queue
  * @param[in] d_in_value_queue          Device pointer of input value array to the incoming frontier queue
  * @param[in] d_out_value_queue         Device pointer of output value array to the outgoing frontier queue
- * @param[in] d_row_offsets             Device pointer of SizeT to the row offsets queue  
+ * @param[in] d_row_offsets             Device pointer of SizeT to the row offsets queue
  * @param[in] d_column_indices          Device pointer of VertexId to the column indices queue
  * @param[in] d_column_offsets          Device pointer of SizeT to the row offsets queue for inverse graph
  * @param[in] d_row_indices             Device pointer of VertexId to the column indices queue for inverse graph
@@ -62,6 +61,7 @@ namespace advance {
  * @param[in] ADVANCE_TYPE              enumerator of advance type: V2V, V2E, E2V, or E2E
  * @param[in] inverse_graph             whether this iteration of advance operation is in the opposite direction to the previous iteration (false by default)
  * @param[in] REDUCE_OP                 enumerator of available reduce operations: plus, multiplies, bit_or, bit_and, bit_xor, maximum, minimum. none by default.
+ * @param[in] REDUCE_TYPE               enumerator of available reduce types: EMPTY(do not do reduce) VERTEX(extract value from |V| array) EDGE(extract value from |E| array)
  * @param[in] d_value_to_reduce         array to store values to reduce
  * @param[out] d_reduce_frontier        neighbor list values for nodes in the output frontier
  * @param[out] d_reduced_value          array to store reduced values
@@ -252,7 +252,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                             enactor_stats.advance_kernel_stats,
                             ADVANCE_TYPE);
             }
-            break;   
+            break;
         }
         case LB:
         {
@@ -325,7 +325,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         frontier_attribute.queue_length,
                         enactor_stats.d_node_locks_out,
                         context);
-                
+
                 gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges2<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
                                         frontier_attribute.queue_reset,
@@ -359,11 +359,50 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
 
             // TODO: switch R_TYPE for different reduce operators
             // Do segreduction using d_scanned_edges and d_reduce_frontier
-            SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
-            false, d_reduced_value, (int)0, mgpu::plus<typename KernelPolicy::Value>(), context);
-
-            // save the result to d_reduced_value
-            //
+            if (R_TYPE != gunrock::oprtr::advance::EMPTY && d_value_to_reduce && d_reduce_frontier) {
+              switch (REDUCE_OP) {
+                case: gunrock::oprtr::advance::PLUS {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (int)0, mgpu::plus<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                case: gunrock::oprtr::advance::MULTIPLIES {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (int)0, mgpu::multiplies<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                case: gunrock::oprtr::advance::MAXIMUM {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (int)0, mgpu::maximum<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                case: gunrock::oprtr::advance::MINIMUM {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (int)0, mgpu::minimum<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                case: gunrock::oprtr::advance::BIT_OR {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (int)0, mgpu::bit_or<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                case: gunrock::oprtr::advance::BIT_AND {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (int)0, mgpu::bit_and<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                case: gunrock::oprtr::advance::BIT_XOR {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (int)0, mgpu::bit_xor<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                default:
+                    //default operator is plus
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (int)0, mgpu::plus<typename KernelPolicy::Value>(), context);
+                      break;
+              }
+            }
             break;
         }
         /*case LB:
