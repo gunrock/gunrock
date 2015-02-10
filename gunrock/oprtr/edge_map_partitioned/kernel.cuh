@@ -103,6 +103,7 @@ struct Dispatch
                                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
                                 bool &inverse_graph, 
                                 gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
+                                gunrock::oprtr::advance::REDUCE_OP R_OP,
                                 Value *&d_value_to_reduce,
                                 Value *&d_reduce_frontier)
     {
@@ -154,6 +155,7 @@ struct Dispatch
                                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
                                 bool &inverse_graph, 
                                 gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
+                                gunrock::oprtr::advance::REDUCE_OP R_OP,
                                 Value *&d_value_to_reduce,
                                 Value *&d_reduce_frontier)
     {
@@ -244,6 +246,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
                                 bool &inverse_graph, 
                                 gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
+                                gunrock::oprtr::advance::REDUCE_OP R_OP,
                                 Value *&d_value_to_reduce,
                                 Value *&d_reduce_frontier)
 
@@ -375,21 +378,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                             VertexId u = d_column_indices[lookup];
                                             SizeT out_index = out_offset+edges_processed+(i-e_offset);
 
-                                            {
-                                                if (d_value_to_reduce != NULL) {
-                                                    if (R_TYPE == gunrock::oprtr::advance::VERTEX) {
-                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                                    d_value_to_reduce[u],
-                                                                    d_reduce_frontier + out_index);
-                                                                } else if (R_TYPE == gunrock::oprtr::advance::EDGE) {
-                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                                    d_value_to_reduce[lookup],
-                                                                    d_reduce_frontier + out_index);
-                                                                }
-                                                }
-                                                else if (R_TYPE != gunrock::oprtr::advance::EMPTY) { 
-                                                    // use user-specified function to generate value to reduce
-                                                }
+                                            { 
+
                                                 if (!ProblemData::MARK_PREDECESSORS) {
                                                     if (Functor::CondEdge(label, u, problem, lookup, e_id)) {
                                                         Functor::ApplyEdge(label, u, problem, lookup, e_id);
@@ -403,11 +393,70 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                                                     (VertexId)lookup,
                                                                     d_out + out_index);
                                                         }
+
+                                                        if (d_value_to_reduce != NULL) {
+                                                            if (R_TYPE == gunrock::oprtr::advance::VERTEX) {
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        d_value_to_reduce[u],
+                                                                        d_reduce_frontier + out_index);
+                                                            } else if (R_TYPE == gunrock::oprtr::advance::EDGE) {
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        d_value_to_reduce[lookup],
+                                                                        d_reduce_frontier + out_index);
+                                                            }
+                                                        } else if (R_TYPE != gunrock::oprtr::advance::EMPTY) { 
+                                                            // use user-specified function to generate value to reduce
+                                                        }
                                                     }
                                                     else {
                                                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                                 -1,
                                                                 d_out + out_index);
+
+                                                        if (d_value_to_reduce != NULL) {
+                                                            switch (R_OP) {
+                                                                case gunrock::oprtr::advance::PLUS :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::MULTIPLIES :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)1,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::MAXIMUM :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)INT_MIN,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::MINIMUM :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)INT_MAX,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::BIT_OR :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::BIT_AND :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0xffffffff,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::BIT_XOR :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                                default:
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                            }
+                                                        }
                                                     }
                                                 } else {
                                                     if (Functor::CondEdge(v, u, problem, lookup, e_id)) {
@@ -422,11 +471,67 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                                                     (VertexId)lookup,
                                                                     d_out + out_index);
                                                         }
+                                                        if (d_value_to_reduce != NULL) {
+                                                            if (R_TYPE == gunrock::oprtr::advance::VERTEX) {
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        d_value_to_reduce[u],
+                                                                        d_reduce_frontier + out_index);
+                                                            } else if (R_TYPE == gunrock::oprtr::advance::EDGE) {
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        d_value_to_reduce[lookup],
+                                                                        d_reduce_frontier + out_index);
+                                                            }
+                                                        }
                                                     }
                                                     else {
                                                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                                 -1,
                                                                 d_out + out_index);
+
+                                                        if (d_value_to_reduce != NULL) {
+                                                            switch (R_OP) {
+                                                                case gunrock::oprtr::advance::PLUS :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::MULTIPLIES :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)1,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::MAXIMUM :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)INT_MIN,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::MINIMUM :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)INT_MAX,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::BIT_OR :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::BIT_AND :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0xffffffff,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::BIT_XOR :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                                default:
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            d_reduce_frontier + out_index);
+                                                                    break;
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -594,6 +699,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
                                 bool &inverse_graph, 
                                 gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
+                                gunrock::oprtr::advance::REDUCE_OP R_OP,
                                 Value *&d_value_to_reduce,
                                 Value *&d_reduce_frontier)
     {
@@ -704,11 +810,68 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 (VertexId)lookup,
                                 d_out + offset+i);
                     }
+                    if (d_value_to_reduce != NULL) {
+                        if (R_TYPE == gunrock::oprtr::advance::VERTEX) {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    d_value_to_reduce[u],
+                                    d_reduce_frontier + offset + i);
+                        } else if (R_TYPE == gunrock::oprtr::advance::EDGE) {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    d_value_to_reduce[lookup],
+                                    d_reduce_frontier + offset + i);
+                        }
+                    } else if (R_TYPE != gunrock::oprtr::advance::EMPTY) { 
+                        // use user-specified function to generate value to reduce
+                    }
                 }
                 else {
                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                             -1,
                             d_out + offset+i);
+                    if (d_value_to_reduce != NULL) {
+                        switch (R_OP) {
+                            case gunrock::oprtr::advance::PLUS :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::MULTIPLIES :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)1,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::MAXIMUM :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)INT_MIN,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::MINIMUM :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)INT_MAX,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::BIT_OR :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::BIT_AND :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0xffffffff,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::BIT_XOR :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            default:
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                        }
+                    }
                 }
             } else {
                 //v:pre, u:neighbor, outoffset:offset+i
@@ -724,11 +887,70 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 (VertexId)lookup,
                                 d_out + offset+i);
                     }
+
+                    if (d_value_to_reduce != NULL) {
+                        if (R_TYPE == gunrock::oprtr::advance::VERTEX) {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    d_value_to_reduce[u],
+                                    d_reduce_frontier + offset+i);
+                        } else if (R_TYPE == gunrock::oprtr::advance::EDGE) {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    d_value_to_reduce[lookup],
+                                    d_reduce_frontier + offset+i);
+                        }
+                    } else if (R_TYPE != gunrock::oprtr::advance::EMPTY) { 
+                        // use user-specified function to generate value to reduce
+                    }
                 }
                 else {
                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                             -1,
                             d_out + offset+i);
+                    
+                    if (d_value_to_reduce != NULL) {
+                        switch (R_OP) {
+                            case gunrock::oprtr::advance::PLUS :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::MULTIPLIES :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)1,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::MAXIMUM :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)INT_MIN,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::MINIMUM :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)INT_MAX,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::BIT_OR :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::BIT_AND :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0xffffffff,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::BIT_XOR :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            default:
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                        }
+                    }
                 }
             }
         }
@@ -875,6 +1097,7 @@ void RelaxPartitionedEdges2(
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
         bool                                    inverse_graph = false,
         gunrock::oprtr::advance::REDUCE_TYPE R_TYPE = gunrock::oprtr::advance::EMPTY,
+        gunrock::oprtr::advance::REDUCE_OP R_OP = gunrock::oprtr::advance::NONE,
         typename KernelPolicy::Value            *d_value_to_reduce = NULL,
         typename KernelPolicy::Value            *d_reduce_frontier = NULL)
 {
@@ -902,6 +1125,7 @@ void RelaxPartitionedEdges2(
             ADVANCE_TYPE,
             inverse_graph,
             R_TYPE,
+            R_OP,
             d_value_to_reduce,
             d_reduce_frontier);
 }
@@ -954,6 +1178,7 @@ void RelaxLightEdges(
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
         bool                            inverse_graph = false, 
         gunrock::oprtr::advance::REDUCE_TYPE R_TYPE = gunrock::oprtr::advance::EMPTY,
+        gunrock::oprtr::advance::REDUCE_OP R_OP = gunrock::oprtr::advance::NONE,
         typename KernelPolicy::Value    *d_value_to_reduce = NULL,
         typename KernelPolicy::Value    *d_reduce_frontier = NULL)
 {
@@ -978,6 +1203,7 @@ void RelaxLightEdges(
                                 ADVANCE_TYPE,
                                 inverse_graph,
                                 R_TYPE,
+                                R_OP,
                                 d_value_to_reduce,
                                 d_reduce_frontier);
 }

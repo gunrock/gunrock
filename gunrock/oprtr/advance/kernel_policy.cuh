@@ -61,7 +61,7 @@ enum TYPE {
 /**
  * @brief opeartion to use for mgpu primitives
  */
-enum OP {
+enum REDUCE_OP {
     NONE,
     PLUS,
     MINUS,

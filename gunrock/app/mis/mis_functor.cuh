@@ -11,9 +11,6 @@
  * @brief Device functions for MIS problem.
  */
 
-// How to generate reduce data should be defined inside each functor by users.
-// TODO: change the interface of edge_map_partitioned
-// TODO: add global identifier for INVALID_VALUE, INVALID_VERTEXID.
 
 #pragma once
 
