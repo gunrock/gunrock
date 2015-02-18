@@ -22,7 +22,7 @@ namespace app {
 namespace mis {
 
 /**
- * @brief Structure contains device functions in PR graph traverse.
+ * @brief Structure contains device functions in MIS graph traverse.
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
@@ -36,7 +36,7 @@ struct MISFunctor
     typedef typename ProblemData::DataSlice DataSlice;
 };
 
-} // pr
+} // mis
 } // app
 } // gunrock
 

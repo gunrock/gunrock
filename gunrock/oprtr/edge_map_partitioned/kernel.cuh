@@ -510,21 +510,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                                                             (Value)INT_MAX,
                                                                             d_reduce_frontier + out_index);
                                                                     break;
-                                                                case gunrock::oprtr::advance::BIT_OR :
-                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                                            (Value)0,
-                                                                            d_reduce_frontier + out_index);
-                                                                    break;
-                                                                case gunrock::oprtr::advance::BIT_AND :
-                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                                            (Value)0xffffffff,
-                                                                            d_reduce_frontier + out_index);
-                                                                    break;
-                                                                case gunrock::oprtr::advance::BIT_XOR :
-                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                                            (Value)0,
-                                                                            d_reduce_frontier + out_index);
-                                                                    break;
                                                                 default:
                                                                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                                             (Value)0,

@@ -301,7 +301,7 @@ struct MISProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                                 (void**)&d_vtr,
                                 edges * sizeof(SizeT)),
                             "MISProblem cudaMalloc d_values_to_reduce failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_values_to_reduce = d_vtc;
+                data_slices[gpu]->d_values_to_reduce = d_vtr;
             }
 
             if (!data_slices[gpu]->d_reduced_values) {
@@ -317,9 +317,18 @@ struct MISProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
 
         // Fillin the initial input_queue for MIS problem, this needs to be modified
         // in multi-GPU scene
-
-        // TODO:
-        // Generate random number in d_labels (do we need to implement our own random generator?)
+        SizeT *h_rand = (SizeT*)malloc(nodes * sizeof(SizeT));
+        for (int i = 0; i < nodes; ++i) {
+            h_rand[i] = rand()%nodes;
+            printf("%d\n", h_rand[i]);
+        }
+        if (retval = util::GRError(cudaMemcpy(
+                                data_slices[0]->d_labels,
+                                h_rand,
+                                sizeof(Value) * nodes,
+                                cudaMemcpyDeviceToHost),
+                            "MISProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) return retval;
+        if (h_rand) free(h_rand);
 
         // Put every vertex in there
         util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], nodes);
