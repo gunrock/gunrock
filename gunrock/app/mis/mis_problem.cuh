@@ -39,8 +39,8 @@ struct MISProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
 	typedef _SizeT			    SizeT;
 	typedef _Value              Value;
 
-    static const bool MARK_PREDECESSORS     = true;
-    static const bool ENABLE_IDEMPOTENCE    = true;
+    static const bool MARK_PREDECESSORS     = false;
+    static const bool ENABLE_IDEMPOTENCE    = false;
 
     //Helper structures
 
@@ -50,10 +50,10 @@ struct MISProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
     struct DataSlice
     {
         // device storage arrays
-        SizeT   *d_labels;  /**< for MinMax method, d_labels store generated random numbers, for hash method, d_labels stores the hash_func(node_id)*/
+        Value   *d_labels;  /**< for MinMax method, d_labels store generated random numbers, for hash method, d_labels stores the hash_func(node_id)*/
         Value   *d_mis_ids; /**< Store the MIS IDs (or you can imagine it as graph coloring*/
-        SizeT   *d_values_to_reduce; /**< Store values to reduce, length=|E|*/
-        SizeT   *d_reduced_values; /**< Store reduced values, length=|V|*/
+        Value   *d_values_to_reduce; /**< Store values to reduce, length=|E|*/
+        Value   *d_reduced_values; /**< Store reduced values, length=|V|*/
     };
 
     // Members
@@ -217,10 +217,10 @@ struct MISProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                             "MISProblem cudaMalloc d_data_slices failed", __FILE__, __LINE__)) return retval;
 
                 // Create SoA on device
-                SizeT    *d_random_labels;
+                Value *d_random_labels;
                 if (retval = util::GRError(cudaMalloc(
                         (void**)&d_random_labels,
-                        nodes * sizeof(SizeT)),
+                        nodes * sizeof(Value)),
                     "MISProblem cudaMalloc d_random_labels failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_labels = d_random_labels;
 
@@ -231,17 +231,17 @@ struct MISProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                     "MISProblem cudaMalloc d_mis_ids failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_mis_ids = d_mis_ids;
 
-                SizeT   *d_values_to_reduce;
+                Value *d_values_to_reduce;
                     if (retval = util::GRError(cudaMalloc(
                         (void**)&d_values_to_reduce,
-                        edges * sizeof(SizeT)),
+                        edges * sizeof(Value)),
                     "MISProblem cudaMalloc d_values_to_reduce failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_values_to_reduce = d_values_to_reduce;
 
-                SizeT   *d_reduced_values;
+                Value *d_reduced_values;
                     if (retval = util::GRError(cudaMalloc(
                         (void**)&d_reduced_values,
-                        nodes * sizeof(SizeT)),
+                        nodes * sizeof(Value)),
                     "MISProblem cudaMalloc d_reduced_values failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_reduced_values = d_reduced_values;
 
@@ -278,10 +278,10 @@ struct MISProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
 
             // Allocate output page ranks if necessary
             if (!data_slices[gpu]->d_labels) {
-                SizeT    *d_labels;
+                Value *d_labels;
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_labels,
-                                nodes * sizeof(SizeT)),
+                                nodes * sizeof(Value)),
                             "MISProblem cudaMalloc d_labels failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_labels = d_labels;
             }
@@ -296,37 +296,39 @@ struct MISProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
             }
 
             if (!data_slices[gpu]->d_values_to_reduce) {
-                SizeT    *d_vtr;
+                Value *d_vtr;
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_vtr,
-                                edges * sizeof(SizeT)),
+                                edges * sizeof(Value)),
                             "MISProblem cudaMalloc d_values_to_reduce failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_values_to_reduce = d_vtr;
             }
 
             if (!data_slices[gpu]->d_reduced_values) {
-                SizeT    *d_rv;
+                Value *d_rv;
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_rv,
-                                nodes * sizeof(SizeT)),
+                                nodes * sizeof(Value)),
                             "MISProblem cudaMalloc d_reduced_values failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_reduced_values = d_rv;
             }
 
+
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_mis_ids, -1, nodes);
+            util::DisplayDeviceResults(data_slices[gpu]->d_mis_ids, nodes);
         }
 
         // Fillin the initial input_queue for MIS problem, this needs to be modified
         // in multi-GPU scene
-        SizeT *h_rand = (SizeT*)malloc(nodes * sizeof(SizeT));
+        Value *h_rand = (Value*)malloc(nodes * sizeof(Value));
         for (int i = 0; i < nodes; ++i) {
             h_rand[i] = rand()%nodes;
-            printf("%d\n", h_rand[i]);
         }
         if (retval = util::GRError(cudaMemcpy(
                                 data_slices[0]->d_labels,
                                 h_rand,
                                 sizeof(Value) * nodes,
-                                cudaMemcpyDeviceToHost),
+                                cudaMemcpyHostToDevice),
                             "MISProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) return retval;
         if (h_rand) free(h_rand);
 

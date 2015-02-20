@@ -188,7 +188,7 @@ void RunTests(
     {
         util::GRError(
             csr_problem->Reset(mis_enactor.GetFrontierType()),
-            "pr Problem Data Reset Failed", __FILE__, __LINE__);
+            "MIS Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
         util::GRError(
             mis_enactor.template Enact<Problem>(
@@ -338,7 +338,7 @@ int main( int argc, char** argv)
         // Matrix-market coordinate-formatted graph file
 
         typedef int VertexId;                   // Use as the node identifier
-        typedef float Value;                    // Use as the value type
+        typedef int Value;                    // Use as the value type
         typedef int SizeT;                      // Use as the graph size type
         Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
 

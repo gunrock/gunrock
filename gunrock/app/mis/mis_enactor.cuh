@@ -225,6 +225,128 @@ class MISEnactor : public EnactorBase
             frontier_attribute.selector             = 0;
             frontier_attribute.queue_reset          = true;
 
+            fflush(stdout);
+
+            while (done[0] < 0) {
+
+            //Advance with GatherReduce
+            gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, MISProblem, MisFunctor>(
+                d_done,
+                enactor_stats,
+                frontier_attribute,
+                data_slice,
+                (VertexId*)NULL,
+                (bool*)NULL,
+                (bool*)NULL,
+                d_scanned_edges,
+                graph_slice->frontier_queues.d_keys[frontier_attribute.selector],   //d_in_queue
+                graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1], //d_out_queue
+                (VertexId*)NULL,    // d_pred_in_queue
+                graph_slice->frontier_queues.d_values[frontier_attribute.selector^1],
+                graph_slice->d_row_offsets,
+                graph_slice->d_column_indices,
+                (SizeT*)NULL,
+                (VertexId*)NULL,
+                graph_slice->frontier_elements[frontier_attribute.selector],
+                graph_slice->frontier_elements[frontier_attribute.selector^1],
+                this->work_progress,
+                context,
+                gunrock::oprtr::advance::V2V);
+                /*false, //not inverse_graph
+                gunrock::oprtr::advance::MAXIMUM,   //REDUCE_OP
+                gunrock::oprtr::advance::VERTEX,    //REDUCE_TYPE (get reduced value from a |V| array
+                problem->data_slices[enactor_stats.gpu_id]->d_labels,
+                problem->data_slices[enactor_stats.gpu_id]->d_values_to_reduce,
+                problem->data_slices[enactor_stats.gpu_id]->d_reduced_values);*/
+
+                if (frontier_attribute.queue_reset)
+                    frontier_attribute.queue_reset = false;
+
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "advance::Kernel failed", __FILE__, __LINE__))) break;
+                cudaEventQuery(throttle_event);
+
+                frontier_attribute.queue_index++;
+                frontier_attribute.selector ^= 1;
+
+                if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
+                    if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                }
+
+                if (DEBUG) {
+                    if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                    printf(", %lld", (long long) frontier_attribute.queue_length);
+                }
+
+                if (INSTRUMENT) {
+                    if (retval = enactor_stats.advance_kernel_stats.Accumulate(
+                        enactor_stats.advance_grid_size,
+                        enactor_stats.total_runtimes,
+                        enactor_stats.total_lifetimes)) break;
+                }
+
+                // Throttle
+                if (enactor_stats.iteration & 1) {
+                    if (retval = util::GRError(cudaEventRecord(throttle_event),
+                        "MISEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
+                } else {
+                    if (retval = util::GRError(cudaEventSynchronize(throttle_event),
+                        "MISEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
+                }
+
+                // Check if done
+                if (done[0] == 0) break;
+
+                //Filter
+                gunrock::oprtr::filter::Kernel<FilterKernelPolicy, MISProblem, MisFunctor>
+                <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
+                    enactor_stats.iteration+1,
+                    frontier_attribute.queue_reset,
+                    frontier_attribute.queue_index,
+                    enactor_stats.num_gpus,
+                    frontier_attribute.queue_length,
+                    d_done,
+                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector],      // d_in_queue
+                    NULL,
+                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],    // d_out_queue
+                    data_slice,
+                    NULL,
+                    work_progress,
+                    graph_slice->frontier_elements[frontier_attribute.selector],           // max_in_queue
+                    graph_slice->frontier_elements[frontier_attribute.selector^1],         // max_out_queue
+                    enactor_stats.filter_kernel_stats);
+
+                break;
+
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel failed", __FILE__, __LINE__))) break;
+                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
+
+
+                frontier_attribute.queue_index++;
+                frontier_attribute.selector ^= 1;
+
+                if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
+                    if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                }
+
+                if (INSTRUMENT || DEBUG) {
+                    if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
+                    enactor_stats.total_queued += frontier_attribute.queue_length;
+                    if (DEBUG) printf(", %lld", (long long) frontier_attribute.queue_length);
+                    if (INSTRUMENT) {
+                        if (retval = enactor_stats.filter_kernel_stats.Accumulate(
+                            enactor_stats.filter_grid_size,
+                            enactor_stats.total_runtimes,
+                            enactor_stats.total_lifetimes)) break;
+                    }
+                }
+                // Check if done
+                if (done[0] == 0) break;
+
+                enactor_stats.iteration++;
+
+                if (DEBUG) printf("\n%lld", (long long) enactor_stats.iteration);
+
+            }
             
             if (retval) break;
 
