@@ -52,7 +52,7 @@ struct MISFunctor
         //else the advance operator will assign an identity value for reduce
         //printf("%d\n", d_id);
         //printf("%d\n", problem->d_mis_ids[0]);
-        return problem->d_mis_ids[d_id] != -1;
+        return problem->d_mis_ids[d_id] == -1;
     }
 
     /**
@@ -81,10 +81,10 @@ struct MISFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         //!IDEMPOTENCE && !MARK_PREDECESSOR, so v is iteration number, each iteration will get unique color id.
-        problem->d_mis_ids[node] = (problem->d_labels[node] > problem->d_reduced_values[node]) ? problem->d_mis_ids[node] : v;
+        problem->d_mis_ids[node] = (problem->d_labels[node] >= problem->d_reduced_values[nid]) ? v : -1;
         return problem->d_mis_ids[node] == -1;
     }
 
@@ -96,7 +96,7 @@ struct MISFunctor
      * @param[in] v auxiliary value
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         return;
     }

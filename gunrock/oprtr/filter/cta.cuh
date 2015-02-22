@@ -133,6 +133,7 @@ struct Cta
         // Global scatter offsets
         SizeT       ranks[LOADS_PER_TILE][LOAD_VEC_SIZE];
 
+
         //---------------------------------------------------------------------
         // Helper Structures
         //---------------------------------------------------------------------
@@ -238,10 +239,10 @@ struct Cta
                     if (tile->element_id[LOAD][VEC] >= 0) {
                         // Row index on our GPU (for multi-gpu, element ids are striped across GPUs)
                         VertexId row_id = (tile->element_id[LOAD][VEC]) / cta->num_gpus;
-
-                        if (Functor::CondFilter(row_id, cta->problem)) {
+                        printf("tid: %d, bidL%d, row_id: %d, load vec:%d %d, %d %d\n", threadIdx.x, blockIdx.x, row_id, LOAD, VEC, LOADS_PER_TILE, LOAD_VEC_SIZE);
+                        if (Functor::CondFilter(row_id, cta->problem, cta->iteration, threadIdx.x * LOADS_PER_TILE*LOAD_VEC_SIZE + LOAD*LOAD_VEC_SIZE+VEC)) {
                             // ApplyFilter(row_id)
-                            Functor::ApplyFilter(row_id, cta->problem);
+                            Functor::ApplyFilter(row_id, cta->problem, cta->iteration, threadIdx.x * LOADS_PER_TILE*LOAD_VEC_SIZE + LOAD*LOAD_VEC_SIZE+VEC);
                         }
                         else tile->element_id[LOAD][VEC] = -1;
                     }
@@ -498,7 +499,6 @@ struct Cta
         if (ProblemData::ENABLE_IDEMPOTENCE && bitmask_cull && d_visited_mask != NULL) {
             tile.BitmaskCull(this);
         }
-        
         tile.VertexCull(this);          // using vertex visitation status (update discovered vertices)
         
         if (ProblemData::ENABLE_IDEMPOTENCE && iteration != -1) {

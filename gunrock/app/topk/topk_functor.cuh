@@ -77,7 +77,7 @@ struct TOPKFunctor
    *
    * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
    */
-  static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+  static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     return true;
   }
@@ -90,7 +90,7 @@ struct TOPKFunctor
    * @param[in] v Vertex value
    *
    */
-  static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+  static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {}
 };
   

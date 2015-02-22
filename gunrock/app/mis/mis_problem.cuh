@@ -313,9 +313,15 @@ struct MISProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
                 data_slices[gpu]->d_reduced_values = d_rv;
             }
 
+            if (retval = util::GRError(cudaMemcpy(
+                            d_data_slices[gpu],
+                            data_slices[gpu],
+                            sizeof(DataSlice),
+                            cudaMemcpyHostToDevice),
+                            "MISProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
+
 
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_mis_ids, -1, nodes);
-            util::DisplayDeviceResults(data_slices[gpu]->d_mis_ids, nodes);
         }
 
         // Fillin the initial input_queue for MIS problem, this needs to be modified

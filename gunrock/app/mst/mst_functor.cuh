@@ -278,7 +278,7 @@ struct PJmpFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     return true;
   }
@@ -292,7 +292,7 @@ struct PJmpFunctor
    * @param[in] v Vertex value
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     VertexId parent;
     util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -383,7 +383,7 @@ struct EgRmFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     return true;
   }
@@ -397,7 +397,7 @@ struct EgRmFunctor
    * @param[in] v Vertex value
    */
   static __device__ __forceinline__ void ApplyFilter(
-  VertexId node, DataSlice *problem, Value v = 0)
+  VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
       problem->d_supervtx_ids[problem->d_keys_array[node]],
@@ -439,7 +439,7 @@ struct RIdxFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     return problem->d_flags_array[node] == 1;
   }
@@ -453,7 +453,7 @@ struct RIdxFunctor
    *
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
       node, problem->d_row_offsets + problem->d_keys_array[node]);
@@ -489,7 +489,7 @@ struct EIdxFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     return problem->d_edge_flags[node] == 1;
   }
@@ -502,7 +502,7 @@ struct EIdxFunctor
    * @param[in] v node value (if any)
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
       node, problem->d_row_offsets + problem->d_temp_storage[node]);
@@ -538,7 +538,7 @@ struct OrFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     return true;
   }
@@ -551,7 +551,7 @@ struct OrFunctor
    * @param[in] v node value (if any)
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
       problem->d_edge_flags[node] | problem->d_flags_array[node],
@@ -590,7 +590,7 @@ struct SuRmFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     return problem->d_edge_flags[node] == 0;
   }
@@ -603,7 +603,7 @@ struct SuRmFunctor
    * @param[in] v node value (if any)
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
       -1, problem->d_keys_array + node);

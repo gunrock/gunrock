@@ -79,6 +79,26 @@ void Usage()
         );
 }
 
+/**
+ * @brief Displays the MIS ID result (i.e., graph coloring ID)
+ *
+ * @param[in] mis_ids maximal independent ids
+ * @param[in] nodes number of nodes in graph
+ */
+template<typename Value, typename SizeT>
+void DisplaySolution( Value *mis_ids, SizeT nodes)
+{
+    if (nodes > 40)
+        nodes = 40;
+    printf("[");
+    for (SizeT i = 0; i < nodes; ++i) {
+        PrintValue(i);
+        printf(":");
+        PrintValue(mis_ids[i]);
+        printf(" ");
+    }
+    printf("]\n");
+}
 
 /**
  * Performance/Evaluation statistics
@@ -225,7 +245,9 @@ void RunTests(
         printf("Validity: ");
         CompareResults(h_misid, reference_check, graph.nodes, true);
     }
-    printf("\nFirst 40 labels of the GPU result.");
+
+DisplaySolution(h_misid, graph.nodes);
+    printf("\nFirst 40 labels of the GPU result.\n");
 
 
     // Cleanup

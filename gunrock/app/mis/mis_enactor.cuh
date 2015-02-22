@@ -213,6 +213,9 @@ class MISEnactor : public EnactorBase
             typename MISProblem::GraphSlice *graph_slice = problem->graph_slices[0];
             typename MISProblem::DataSlice *data_slice = problem->d_data_slices[0];
 
+
+            util::DisplayDeviceResults(problem->data_slices[0]->d_labels, graph_slice->nodes);
+
             if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_scanned_edges,
@@ -227,7 +230,7 @@ class MISEnactor : public EnactorBase
 
             fflush(stdout);
 
-            while (done[0] < 0) {
+            while (done[0] < 0 && frontier_attribute.queue_length > 0) {
 
             //Advance with GatherReduce
             gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, MISProblem, MisFunctor>(
@@ -251,26 +254,16 @@ class MISEnactor : public EnactorBase
                 graph_slice->frontier_elements[frontier_attribute.selector^1],
                 this->work_progress,
                 context,
-                gunrock::oprtr::advance::V2V);
-                /*false, //not inverse_graph
+                gunrock::oprtr::advance::V2V,
+                false, //not inverse_graph
                 gunrock::oprtr::advance::MAXIMUM,   //REDUCE_OP
                 gunrock::oprtr::advance::VERTEX,    //REDUCE_TYPE (get reduced value from a |V| array
                 problem->data_slices[enactor_stats.gpu_id]->d_labels,
                 problem->data_slices[enactor_stats.gpu_id]->d_values_to_reduce,
-                problem->data_slices[enactor_stats.gpu_id]->d_reduced_values);*/
-
-                if (frontier_attribute.queue_reset)
-                    frontier_attribute.queue_reset = false;
+                problem->data_slices[enactor_stats.gpu_id]->d_reduced_values);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "advance::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event);
-
-                frontier_attribute.queue_index++;
-                frontier_attribute.selector ^= 1;
-
-                if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
-                    if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
-                }
 
                 if (DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
@@ -296,6 +289,13 @@ class MISEnactor : public EnactorBase
                 // Check if done
                 if (done[0] == 0) break;
 
+                util::DisplayDeviceResults(problem->data_slices[0]->d_reduced_values, frontier_attribute.queue_length);
+                util::DisplayDeviceResults(problem->data_slices[0]->d_values_to_reduce, graph_slice->edges);
+
+                printf("queuelength before filter%d\n", frontier_attribute.queue_length);
+                util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
+
+
                 //Filter
                 gunrock::oprtr::filter::Kernel<FilterKernelPolicy, MISProblem, MisFunctor>
                 <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
@@ -315,8 +315,6 @@ class MISEnactor : public EnactorBase
                     graph_slice->frontier_elements[frontier_attribute.selector^1],         // max_out_queue
                     enactor_stats.filter_kernel_stats);
 
-                break;
-
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
@@ -326,7 +324,12 @@ class MISEnactor : public EnactorBase
 
                 if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
-                }
+                    printf("queuelength after filter%d\n", frontier_attribute.queue_length);
+
+                    util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
+                    }
+
+                util::DisplayDeviceResults(problem->data_slices[0]->d_mis_ids, graph_slice->nodes);
 
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;

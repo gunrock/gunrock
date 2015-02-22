@@ -121,10 +121,8 @@ void DisplaySolution(Value *hrank, Value *arank, SizeT nodes)
     printf("Top %d Page Ranks:\n", top);
     for (int i = 0; i < top; ++i)
     {
-        printf("Vertex ID: %d, Hub Rank: %5f\n", h
-               r_list[i].vertex_id, hr_list[i].page_rank);
-        printf("Vertex ID: %d, Authority Rank: %5f\n",
-               ar_list[i].vertex_id, ar_list[i].page_rank);
+        printf("Vertex ID: %d, Hub Rank: %5f\n", hr_list[i].vertex_id, hr_list[i].page_rank);
+        printf("Vertex ID: %d, Authority Rank: %5f\n", ar_list[i].vertex_id, ar_list[i].page_rank);
     }
 
     free(hr_list);
