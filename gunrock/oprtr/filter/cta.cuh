@@ -239,10 +239,10 @@ struct Cta
                     if (tile->element_id[LOAD][VEC] >= 0) {
                         // Row index on our GPU (for multi-gpu, element ids are striped across GPUs)
                         VertexId row_id = (tile->element_id[LOAD][VEC]) / cta->num_gpus;
-                        printf("tid: %d, bidL%d, row_id: %d, load vec:%d %d, %d %d\n", threadIdx.x, blockIdx.x, row_id, LOAD, VEC, LOADS_PER_TILE, LOAD_VEC_SIZE);
-                        if (Functor::CondFilter(row_id, cta->problem, cta->iteration, threadIdx.x * LOADS_PER_TILE*LOAD_VEC_SIZE + LOAD*LOAD_VEC_SIZE+VEC)) {
+                        SizeT node_id = threadIdx.x * LOADS_PER_TILE*LOAD_VEC_SIZE + LOAD*LOAD_VEC_SIZE+VEC;
+                        if (Functor::CondFilter(row_id, cta->problem, cta->iteration, node_id)) {
                             // ApplyFilter(row_id)
-                            Functor::ApplyFilter(row_id, cta->problem, cta->iteration, threadIdx.x * LOADS_PER_TILE*LOAD_VEC_SIZE + LOAD*LOAD_VEC_SIZE+VEC);
+                            Functor::ApplyFilter(row_id, cta->problem, cta->iteration, node_id);
                         }
                         else tile->element_id[LOAD][VEC] = -1;
                     }

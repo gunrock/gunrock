@@ -201,12 +201,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         if (my_id > num_elements || my_id >= max_edge)
             return;
         VertexId v_id = d_queue[my_id];
-        if (v_id == -1) {
+        if (v_id < 0 || v_id > max_vertex) {
             d_scanned_edges[my_id] = 0;
             return;
         }
+
         // add a zero length neighbor list to the end (this for getting both exclusive and inclusive scan in one array)
-        SizeT num_edges = (my_id == num_elements) ? 0 : GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
+        SizeT ncount = GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
+        SizeT num_edges = (my_id == num_elements) ? 0 : ncount;
         d_scanned_edges[my_id] = num_edges;
     }
 

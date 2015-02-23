@@ -214,7 +214,7 @@ class MISEnactor : public EnactorBase
             typename MISProblem::DataSlice *data_slice = problem->d_data_slices[0];
 
 
-            util::DisplayDeviceResults(problem->data_slices[0]->d_labels, graph_slice->nodes);
+            //util::DisplayDeviceResults(problem->data_slices[0]->d_labels, graph_slice->nodes);
 
             if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
                 if (retval = util::GRError(cudaMalloc(
@@ -250,8 +250,8 @@ class MISEnactor : public EnactorBase
                 graph_slice->d_column_indices,
                 (SizeT*)NULL,
                 (VertexId*)NULL,
-                graph_slice->frontier_elements[frontier_attribute.selector],
-                graph_slice->frontier_elements[frontier_attribute.selector^1],
+                graph_slice->nodes,
+                graph_slice->edges,
                 this->work_progress,
                 context,
                 gunrock::oprtr::advance::V2V,
@@ -289,11 +289,11 @@ class MISEnactor : public EnactorBase
                 // Check if done
                 if (done[0] == 0) break;
 
-                util::DisplayDeviceResults(problem->data_slices[0]->d_reduced_values, frontier_attribute.queue_length);
-                util::DisplayDeviceResults(problem->data_slices[0]->d_values_to_reduce, graph_slice->edges);
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_reduced_values, frontier_attribute.queue_length);
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_values_to_reduce, graph_slice->edges);
 
-                printf("queuelength before filter%d\n", frontier_attribute.queue_length);
-                util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
+                //printf("queuelength before filter%d\n", frontier_attribute.queue_length);
+                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
 
 
                 //Filter
@@ -324,12 +324,12 @@ class MISEnactor : public EnactorBase
 
                 if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
-                    printf("queuelength after filter%d\n", frontier_attribute.queue_length);
+                    //printf("queuelength after filter%d\n", frontier_attribute.queue_length);
 
-                    util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
+                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
                     }
 
-                util::DisplayDeviceResults(problem->data_slices[0]->d_mis_ids, graph_slice->nodes);
+                //util::DisplayDeviceResults(problem->data_slices[0]->d_mis_ids, graph_slice->nodes);
 
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
@@ -405,18 +405,19 @@ class MISEnactor : public EnactorBase
                 MISProblem,                          // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                8,                                  // LOG_THREADS
+                1,                                  // MIN_CTA_OCCUPANCY
+                10,                                  // LOG_THREADS
+                8,                                  // LOG_BLOCKS
+                32*128,                                  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
-                0,
-                0,
                 5,                                  // LOG_RAKING_THREADS
-                32,                                 // WARP_GATHER_THRESHOLD
+                32,                            // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7,                                  // LOG_SCHEDULE_GRANULARITY
                 gunrock::oprtr::advance::LB>
                 AdvanceKernelPolicy;
+
 
             return EnactMIS<AdvanceKernelPolicy, FilterKernelPolicy, MISProblem>(
                 context, problem, max_iteration, max_grid_size);
