@@ -17,6 +17,9 @@
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/util/memset_kernel.cuh>
 
+#include <algorithm>
+#include <vector>
+
 namespace gunrock {
 namespace app {
 namespace mis {
@@ -326,17 +329,21 @@ struct MISProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER =
 
         // Fillin the initial input_queue for MIS problem, this needs to be modified
         // in multi-GPU scene
-        Value *h_rand = (Value*)malloc(nodes * sizeof(Value));
+        std::vector<Value> rand_vec;
+
+        // Use random_shuffle now, limited to less than 4 billion nodes though.
+        // TODO: when use CUDA 7, switch to shuffle()
         for (int i = 0; i < nodes; ++i) {
-            h_rand[i] = rand()%nodes;
+            rand_vec.push_back(i);
         }
+        std::random_shuffle(rand_vec.begin(), rand_vec.end());
+
         if (retval = util::GRError(cudaMemcpy(
                                 data_slices[0]->d_labels,
-                                h_rand,
+                                &rand_vec[0],
                                 sizeof(Value) * nodes,
                                 cudaMemcpyHostToDevice),
                             "MISProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) return retval;
-        if (h_rand) free(h_rand);
 
         // Put every vertex in there
         util::MemsetIdxKernel<<<128, 128>>>(BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], nodes);
