@@ -10,7 +10,7 @@ files=(./bin/*)
 #split file names into arr
 arr=$(echo $files | tr " " "\n")
 max_ver_num="$"
-exe_file=""
+exe_file=${arr[0]}
 #iterate over all file names to get the largest version number
 for x in $arr
 do
