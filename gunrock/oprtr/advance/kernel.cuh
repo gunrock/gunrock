@@ -68,6 +68,7 @@ namespace advance {
  */
 
 //TODO: Reduce by neighbor list now only supports LB advance mode.
+//TODO: Add a switch to enable advance+filter (like in BFS), pissibly moving idempotent ops from filter to advance?
 
 template <typename KernelPolicy, typename ProblemData, typename Functor>
     void LaunchKernel(

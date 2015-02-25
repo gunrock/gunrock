@@ -20,6 +20,10 @@
 namespace gunrock { namespace app {
 namespace sssp {
 
+// TODO: 1) no atomics when in-degree is 1
+// 2) if out-degree is 0 (1 in undirected graph), no enqueue and relaxation
+// 3) first iteration no relaxation
+
 /**
  * @brief Structure contains device functions in SSSP graph traverse.
  *
