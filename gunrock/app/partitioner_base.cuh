@@ -33,7 +33,9 @@ template <
     typename   _VertexId,
     typename   _SizeT,
     typename   _Value,
-    bool       ENABLE_BACKWARD = false>
+    bool       ENABLE_BACKWARD = false,
+    bool       KEEP_ORDER      = false,
+    bool       KEEP_NODE_NUM   = false>
 struct PartitionerBase
 {
     typedef _VertexId  VertexId;
@@ -77,6 +79,7 @@ public:
     public:
         const GraphT  *graph;
         GraphT        *sub_graph;
+        GraphT        *sub_graphs;
         int           thread_num,num_gpus;
         util::cpu_mt::CPUBarrier* cpu_barrier;
         CUTThread     thread_Id;
@@ -84,6 +87,7 @@ public:
         int           **partition_table1;
         VertexId      *convertion_table0;
         VertexId      **convertion_table1;
+        VertexId      **convertion_tables;
         int           **backward_partitions;
         VertexId      **backward_convertions;
         SizeT         **backward_offsets;
@@ -221,12 +225,14 @@ public:
         ThreadSlice<VertexId,SizeT,Value> *thread_data = (ThreadSlice<VertexId,SizeT,Value> *) thread_data_;
         const GraphT*   graph                 = thread_data->graph;
         GraphT*         sub_graph             = thread_data->sub_graph;
+        GraphT*         sub_graphs            = thread_data->sub_graphs;
         int             gpu                   = thread_data->thread_num;
         util::cpu_mt::CPUBarrier* cpu_barrier = thread_data->cpu_barrier;
         int             num_gpus              = thread_data->num_gpus;
         int*            partition_table0      = thread_data->partition_table0;
         VertexId*       convertion_table0     = thread_data->convertion_table0;
         int**           partition_table1      = thread_data->partition_table1;
+        VertexId**      convertion_tables     = thread_data->convertion_tables;
         VertexId**      convertion_table1     = thread_data->convertion_table1;
         VertexId**      original_vertexes     = thread_data->original_vertexes;
         int**           backward_partitions   = thread_data->backward_partitions;
@@ -238,7 +244,7 @@ public:
         SizeT*          out_counter           = thread_data->out_counter[gpu];
         SizeT           num_nodes             = 0, node_counter;
         SizeT           num_edges             = 0, edge_counter;
-        int*            marker                = new int[graph->nodes];
+        VertexId*       marker                = new int[graph->nodes];
         //SizeT*          cross_counter         = new SizeT[num_gpus];
         VertexId*       tconvertion_table     = new VertexId[graph->nodes];
         SizeT           in_counter_           = 0;
@@ -249,8 +255,8 @@ public:
         for (SizeT node=0; node<graph->nodes; node++)
         if (partition_table0[node] == gpu)
         {
-            convertion_table0[node] = out_counter[gpu];
-            tconvertion_table[node] = out_counter[gpu];
+            convertion_table0[node] = KEEP_NODE_NUM ? node : out_counter[gpu];
+            tconvertion_table[node] = KEEP_NODE_NUM ? node : out_counter[gpu];
             marker[node] =1;
             for (SizeT edge=graph->row_offsets[node]; edge<graph->row_offsets[node+1]; edge++)
             {
@@ -258,7 +264,7 @@ public:
                 int peer  = partition_table0[neibor];
                 if ((peer != gpu) && (marker[neibor] == 0))
                 {
-                    tconvertion_table[neibor]=out_counter[peer];
+                    tconvertion_table[neibor] = KEEP_NODE_NUM ? neibor : out_counter[peer];
                     out_counter[peer]++;
                     marker[neibor]=1;
                     num_nodes++;
@@ -295,7 +301,8 @@ public:
         }
         //in_offsets[gpu][num_gpus]=node_counter;
         in_counter[num_gpus]=node_counter;
-        
+
+        if (KEEP_NODE_NUM) num_nodes = graph->nodes; 
         if      (graph->node_values == NULL && graph->edge_values == NULL) 
              sub_graph->template FromScratch < false , false  >(num_nodes,num_edges);
         else if (graph->node_values != NULL && graph->edge_values == NULL) 
@@ -315,12 +322,17 @@ public:
             if (backward_partitions [gpu] !=NULL) free(backward_partitions [gpu]);
             if (backward_convertions[gpu] !=NULL) free(backward_convertions[gpu]);
             if (backward_offsets    [gpu] !=NULL) free(backward_offsets    [gpu]);
-            backward_offsets    [gpu] = (SizeT*    ) malloc (sizeof(SizeT     ) * (out_counter[gpu]+1));
+            backward_offsets    [gpu] = (SizeT*    ) malloc (sizeof(SizeT     ) * (num_nodes+1));
             backward_convertions[gpu] = (VertexId* ) malloc (sizeof(VertexId  ) * in_counter[num_gpus]);
             backward_partitions [gpu] = (int*      ) malloc (sizeof(int       ) * in_counter[num_gpus]);
-            marker     = new int[num_gpus*out_counter[gpu]];
-            memset(marker,0,sizeof(int)*num_gpus*out_counter[gpu]);
-            in_counter_ = 0;
+            if (KEEP_NODE_NUM)
+            {
+                marker     = new VertexId[num_gpus * graph->nodes];
+                memset(marker, 0, sizeof(VertexId) * num_gpus * graph->nodes);
+            } else {
+                marker     = new VertexId[num_gpus*out_counter[gpu]];
+                memset(marker,0,sizeof(VertexId)*num_gpus*out_counter[gpu]);
+            }
             for (SizeT neibor=0; neibor<graph->nodes; neibor++)
             if (partition_table0[neibor] != gpu)
             {
@@ -328,24 +340,10 @@ public:
                 {
                     VertexId node = graph->column_indices[edge];
                     if (partition_table0[node]!=gpu) continue;
-                    marker[convertion_table0[node]*num_gpus + partition_table0[neibor]]=1;
+                    marker[convertion_table0[node]*num_gpus + partition_table0[neibor]]=1+neibor;
+                    //printf("%d -> %d @ %d,%d\t", neibor, node, convertion_table0[node]*num_gpus + partition_table0[neibor], gpu); fflush(stdout);
                 }
             }
-            for (VertexId _node=0;_node<out_counter[gpu];_node++)
-            {
-                backward_offsets[gpu][_node]=in_counter_;
-                for (int peer=0;peer<num_gpus;peer++)
-                {
-                    if (marker[_node*num_gpus+peer]==0) continue;
-                    int  peer_ = peer < gpu ? peer+1 : peer;
-                    backward_partitions[gpu][in_counter_]=peer_;
-                    in_counter_++;
-                }
-            }
-            backward_offsets[gpu][out_counter[gpu]]=in_counter_;
-            //memset(marker,0,sizeof(int)*num_gpus*cross_counter[gpu]);
-            delete[] marker;marker=NULL;
-            util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,gpu);
         }
         edge_counter=0;
         for (SizeT node=0; node<graph->nodes; node++)
@@ -363,7 +361,7 @@ public:
                 int      peer    = partition_table0[neibor];
                 int      peer_   = peer < gpu ? peer+1 : peer;
                 if (peer == gpu) peer_ = 0;
-                VertexId neibor_ = tconvertion_table[neibor] + out_offsets[gpu][peer_];
+                VertexId neibor_ = KEEP_NODE_NUM ? neibor : tconvertion_table[neibor] + out_offsets[gpu][peer_];
                 
                 sub_graph->column_indices[edge_counter] = neibor_;
                 if (graph->edge_values !=NULL) sub_graph->edge_values[edge_counter]=graph->edge_values[edge];
@@ -373,7 +371,7 @@ public:
                     partition_table1 [0][neibor_] = peer_;
                     convertion_table1[0][neibor_] = convertion_table0[neibor];
                     original_vertexes[0][neibor_] = neibor;
-                    if (ENABLE_BACKWARD)
+                    /*if (ENABLE_BACKWARD)
                     {
                         SizeT _neibor = convertion_table0[neibor];
                         int   _gpu    = gpu < peer? gpu+1: gpu; 
@@ -383,13 +381,70 @@ public:
                             backward_convertions[peer][i]=neibor_;
                             break;
                         }
-                    }
+                    }*/
                 }
                 edge_counter++;
             }   
+        } else if (KEEP_NODE_NUM) {
+            sub_graph->row_offsets[node] = edge_counter;
+            partition_table1 [0][node] = partition_table0 [node] < gpu? partition_table0[node]+1: partition_table0[node];
+            convertion_table1[0][node] = convertion_table0[node];
+            original_vertexes[0][node] = node;
         }
         sub_graph->row_offsets[num_nodes]=num_edges;
 
+        if (ENABLE_BACKWARD)
+        {
+            in_counter_ = 0;
+            util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,gpu);
+            //for (VertexId _node=0;_node<out_counter[gpu];_node++)
+            for (VertexId node_=0; node_<num_nodes; node_++)
+            {
+                backward_offsets[gpu][node_]=in_counter_;
+                if (partition_table1[0][node_]!=0) 
+                {
+                    //printf("%d@%dx\t", node_, gpu);fflush(stdout);
+                    continue;
+                }
+                for (int peer=0;peer<num_gpus;peer++)
+                {
+                    if (marker[node_*num_gpus+peer]==0) continue;
+                    int  peer_ = peer < gpu ? peer+1 : peer;
+                    VertexId neibor = marker[node_*num_gpus+peer]-1;
+                    VertexId neibor_ = convertion_table0[neibor];
+                    //VertexId node   = original_vertexes[0][node_];
+                    //printf("%d, %d: %d->%d\t", node_*num_gpus+peer, gpu, neibor, node);fflush(stdout);
+                    //printf("%d,%d\t", peer, neibor_);fflush(stdout);
+                    for (SizeT edge=sub_graphs[peer].row_offsets[neibor_]; edge<sub_graphs[peer].row_offsets[neibor_+1];edge++)
+                    {
+                        VertexId _node = sub_graphs[peer].column_indices[edge];
+                        if (convertion_tables[peer+1][_node] == node_)
+                        {
+                            backward_convertions[gpu][in_counter_]= _node;
+                            break;
+                        }
+                    }
+                    backward_partitions[gpu][in_counter_]=peer_;
+                    in_counter_++;
+                }
+            }
+            backward_offsets[gpu][num_nodes]=in_counter_;
+            //memset(marker,0,sizeof(int)*num_gpus*cross_counter[gpu]);
+            delete[] marker;marker=NULL;
+
+            delete[] backward_partitions[gpu];backward_partitions[gpu] = new int[num_nodes * (num_gpus-1)];
+            delete[] backward_convertions[gpu];backward_convertions[gpu] = new VertexId[num_nodes * (num_gpus-1)];
+            for (VertexId node=0; node<num_nodes; node++)
+            {
+                backward_offsets[gpu][node]=node*(num_gpus-1);
+                for (int peer=1;peer<num_gpus;peer++)
+                {
+                    backward_convertions[gpu][node*(num_gpus-1)+peer-1]=node;
+                    backward_partitions [gpu][node*(num_gpus-1)+peer-1]=peer;
+                }
+            }
+            backward_offsets[gpu][num_nodes]=num_nodes*(num_gpus-1);
+        } 
         out_counter[num_gpus]=0;
         in_counter[num_gpus]=0;
         for (int peer=0;peer<num_gpus;peer++)
@@ -423,6 +478,7 @@ public:
         {
             thread_data[gpu].graph               = graph;
             thread_data[gpu].sub_graph           = &(sub_graphs[gpu]);
+            thread_data[gpu].sub_graphs          = sub_graphs;
             thread_data[gpu].thread_num          = gpu;
             thread_data[gpu].cpu_barrier         = &cpu_barrier;
             thread_data[gpu].num_gpus            = num_gpus;
@@ -431,6 +487,7 @@ public:
             thread_data[gpu].partition_table1    = &(partition_tables[gpu+1]);
             thread_data[gpu].convertion_table1   = &(convertion_tables[gpu+1]);
             thread_data[gpu].original_vertexes   = &(original_vertexes[gpu]);
+            thread_data[gpu].convertion_tables   = convertion_tables;
             if (ENABLE_BACKWARD) {
                 thread_data[gpu].backward_partitions  = backward_partitions ;
                 thread_data[gpu].backward_convertions = backward_convertions;

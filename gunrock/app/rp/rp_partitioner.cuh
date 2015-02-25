@@ -63,8 +63,10 @@ template <
     typename VertexId,
     typename SizeT,
     typename Value,
-    bool     ENABLE_BACKWARD = false>
-struct RandomPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD>
+    bool     ENABLE_BACKWARD = false,
+    bool     KEEP_ORDER      = false,
+    bool     KEEP_NODE_NUM   = false>
+struct RandomPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD,KEEP_ORDER,KEEP_NODE_NUM>
 {
     typedef Csr<VertexId,Value,SizeT> GraphT;
 

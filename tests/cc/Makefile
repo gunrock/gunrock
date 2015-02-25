@@ -37,9 +37,10 @@ SM_TARGETS = $(GEN_SM35)
 #-------------------------------------------------------------------------------
 
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
-BOOST_INC = "../../../boost_1_53_0"
 MGPU_INC = "../../../moderngpu/include"
-INC = -I$(CUDA_INC) -I$(BOOST_INC) -I$(MGPU_INC) -I.. -I../..
+BOOST_DIR = "../../../boost_1_53_0"
+BOOST_DEPS = -Xlinker $(BOOST_DIR)/bin.v2/libs/timer/build/gcc-4.6/release/link-static/threading-multi/cpu_timer.o -Xlinker $(BOOST_DIR)/bin.v2/libs/chrono/build/gcc-4.6/release/link-static/threading-multi/chrono.o -Xlinker $(BOOST_DIR)/bin.v2/libs/system/build/gcc-4.6/release/link-static/threading-multi/libboost_system.a -Xlinker -lrt
+INC = -I$(CUDA_INC) -I$(BOOST_DIR) -I$(MGPU_INC) $(BOOST_DEPS) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -60,18 +61,18 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -Xptxas -v -Xcudafe -\#
+NVCCFLAGS = -lineinfo -Xcompiler -rdynamic -Xptxas -v -Xcudafe -\#
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
 endif
 
-ifeq (,$(findstring 3.0, $(NVCC_VERSION)))
-ifneq ($(abi), 1)
+#ifeq (,$(findstring 3.0, $(NVCC_VERSION)))
+#ifneq ($(abi), 1)
 	# Disable the ABI by default for 3.1+
-	NVCCFLAGS += -Xptxas -abi=no
-endif
-endif
+#	NVCCFLAGS += -Xptxas -abi=no
+#endif
+#endif
 
 ifeq ($(verbose), 1)
     NVCCFLAGS += -v
@@ -108,9 +109,9 @@ DEPS = 			./Makefile \
 
 test: bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_cc.cu $(DEPS)
+bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_cc.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_cc.cu $(NVCCFLAGS) $(ARCH) $(INC) -O3  
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_cc.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdio.h>
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/app/cc/cc_problem.cuh>
 
@@ -7,6 +8,16 @@ namespace gunrock {
 namespace app {
 namespace cc {
 
+    template <typename VertexId>
+    static __device__ bool to_track(VertexId node)
+    {
+        const int num_to_track = 4;
+        const VertexId node_to_track[] = {39852, 60160, 60161, 60162};
+        for (int i=0; i<num_to_track; i++)
+            if (node == node_to_track[i]) return true;
+        return false;
+    }
+ 
 /**
  * @brief Structure contains device functions for doing mask update.
  *
@@ -20,7 +31,7 @@ struct UpdateMaskFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
-    /**
+   /**
      * @brief Vertex mapping condition function. The vertex id is always valid.
      *
      * @param[in] node Vertex Id
@@ -45,10 +56,12 @@ struct UpdateMaskFunctor
     {
         VertexId parent;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                parent, problem->d_component_ids + node);
+                parent, problem->component_ids + node);
+        //if (to_track(node)) 
+        //    printf("UpdateMask [%d]: %d->%d\n", node, problem->masks[node], (parent == node)?0:1);
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                (parent == node)?0:1, problem->d_masks + node);
-    }
+                (parent == node)?0:1, problem->masks + node);
+   }
 };
 
 /**
@@ -90,13 +103,15 @@ struct HookInitFunctor
         VertexId from_node;
         VertexId to_node;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                from_node, problem->d_froms + node);
+                from_node, problem->froms + node);
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                to_node, problem->d_tos + node);
+                to_node, problem->tos + node);
         VertexId max_node = from_node > to_node ? from_node:to_node;
         VertexId min_node = from_node + to_node - max_node;
+        //if (to_track(max_node) || to_track(min_node))
+        //    printf("HookInit [%d]: ->%d\n", max_node, min_node);
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                min_node, problem->d_component_ids + max_node);
+                min_node, problem->component_ids + max_node);
     }
 };
 
@@ -139,30 +154,30 @@ struct HookMinFunctor
     {
         bool mark;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                mark, problem->d_marks + node);
+                mark, problem->marks + node);
         if (!mark) {
             VertexId from_node;
             VertexId to_node;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    from_node, problem->d_froms + node);
+                    from_node, problem->froms + node);
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    to_node, problem->d_tos + node);
+                    to_node, problem->tos + node);
             VertexId parent_from;
             VertexId parent_to;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    parent_from, problem->d_component_ids + from_node);
+                    parent_from, problem->component_ids + from_node);
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    parent_to, problem->d_component_ids + to_node);
+                    parent_to, problem->component_ids + to_node);
             VertexId max_node = parent_from > parent_to ? parent_from: parent_to;
             VertexId min_node = parent_from + parent_to - max_node;
             if (max_node == min_node) {
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        true, problem->d_marks + node);
+                        true, problem->marks + node);
             } else {
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        max_node, problem->d_component_ids + min_node);
+                        max_node, problem->component_ids + min_node);
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        0, problem->d_edge_flag);
+                        0, problem->edge_flag +0);
             }
         }
     }
@@ -207,30 +222,36 @@ struct HookMaxFunctor
     {
         bool mark;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                mark, problem->d_marks + node);
-        if (!mark) {
+                mark, problem->marks + node);
+        if (!mark) 
+        {
             VertexId from_node;
             VertexId to_node;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    from_node, problem->d_froms + node);
+                    from_node, problem->froms + node);
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    to_node, problem->d_tos + node);
+                    to_node, problem->tos + node);
             VertexId parent_from;
             VertexId parent_to;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    parent_from, problem->d_component_ids + from_node);
+                    parent_from, problem->component_ids + from_node);
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    parent_to, problem->d_component_ids + to_node);
+                    parent_to, problem->component_ids + to_node);
             VertexId max_node = parent_from > parent_to ? parent_from: parent_to;
             VertexId min_node = parent_from + parent_to - max_node;
             if (max_node == min_node) {
+                //if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node)) 
+                //    printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d==\n", node, from_node, to_node, parent_from, parent_to, max_node, min_node); 
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        true, problem->d_marks + node);
-            } else {
+                        true, problem->marks + node);
+            } else //if (problem->component_ids[max_node] > min_node) 
+            {
+                //if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node)) 
+                //    printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d->%d\n", node, from_node, to_node, parent_from, parent_to, max_node, problem->component_ids[max_node], min_node); 
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        min_node, problem->d_component_ids + max_node);
+                        min_node, problem->component_ids + max_node);
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        0, problem->d_edge_flag);
+                        0, problem->edge_flag + 0);
             }
         }
     }
@@ -275,15 +296,17 @@ struct PtrJumpFunctor
     {
         VertexId parent;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                parent, problem->d_component_ids + node);
+                parent, problem->component_ids + node);
         VertexId grand_parent;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                grand_parent, problem->d_component_ids + parent);
+                grand_parent, problem->component_ids + parent);
         if (parent != grand_parent) {
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        0, problem->d_vertex_flag);
+                        0, problem->vertex_flag + 0);
+            //if (to_track(node)) 
+            //    printf("PtrJump [%d]: %d->%d\n", node, problem->component_ids[node], grand_parent);
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        grand_parent, problem->d_component_ids + node);
+                        grand_parent, problem->component_ids + node);
         }
     }
 };
@@ -326,23 +349,28 @@ struct PtrJumpMaskFunctor
     {
         VertexId mask;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                mask, problem->d_masks + node);
+                mask, problem->masks + node);
         if (mask == 0) {
             VertexId parent;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    parent, problem->d_component_ids + node);
+                    parent, problem->component_ids + node);
             VertexId grand_parent;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    grand_parent, problem->d_component_ids + parent);
+                    grand_parent, problem->component_ids + parent);
             if (parent != grand_parent) {
-                problem->d_vertex_flag[0] = 0;
+                problem->vertex_flag[0] = 0;
+                //if (to_track(node)) 
+                //    printf("PtrJumpMask [%d]: %d->%d\n", node, problem->component_ids[node], grand_parent);
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        grand_parent, problem->d_component_ids + node);
+                        grand_parent, problem->component_ids + node);
             } else {
+                //if (to_track(node)) 
+                //    printf("PtrJumpMask mask[%d]: %d->%d\n", node, problem->masks[node], -1);
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        -1, problem->d_masks + node);
+                        -1, problem->masks + node);
             }
-        }
+        } //else if (to_track(node)) 
+        //printf("PtrJumpMask mask[%d] = %d\n", node, mask);
     }
 };
 
@@ -384,16 +412,18 @@ struct PtrJumpUnmaskFunctor
     {
         VertexId mask;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                mask, problem->d_masks + node);
+                mask, problem->masks + node);
         if (mask == 1) {
             VertexId parent;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    parent, problem->d_component_ids + node);
+                    parent, problem->component_ids + node);
             VertexId grand_parent;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    grand_parent, problem->d_component_ids + parent);
+                    grand_parent, problem->component_ids + parent);
+            //if (to_track(node)) 
+            //    printf("PtrJumpUnMask [%d]: %d->%d\t", node, parent, grand_parent);
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    grand_parent, problem->d_component_ids + node);
+                    grand_parent, problem->component_ids + node);
         }
     }
 };

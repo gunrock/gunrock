@@ -251,23 +251,16 @@ struct GraphSlice
                 if (backward_offsets!=NULL)
                 {
                     //util::cpu_mt::PrintCPUArray<SizeT, VertexId>("backward_offsets",backward_offsets, in_counter[0]+1);
-                    this->backward_offset    .SetPointer(backward_offsets     , in_counter[0]+1);
-                    //util::cpu_mt::PrintCPUArray<SizeT, VertexId>("backward_partition",backward_partition, backward_offsets[in_counter[0]]);
-                    this->backward_partition .SetPointer(backward_partition   , backward_offsets[in_counter[0]]);
-                    //util::cpu_mt::PrintCPUArray<SizeT, VertexId>("backward_convertion",backward_convertion, backward_offsets[in_counter[0]]);
-                    this->backward_convertion.SetPointer(backward_convertion  , backward_offsets[in_counter[0]]);
-
+                    this->backward_offset    .SetPointer(backward_offsets     , nodes+1);//in_counter[0]+1);
                     if (retval = this->backward_offset    .Allocate(nodes+1, util::DEVICE)) break;
-                    if (retval = this->backward_offset    .Move(util::HOST, util::DEVICE, in_counter[0]+1)) break;
-                    util::MemsetKernel
-                        <<<128, 128>>>(
-                        this->backward_offset.GetPointer(util::DEVICE) + in_counter[0], 
-                        backward_offsets[in_counter[0]], nodes - in_counter[0]);
-                    
-                    if (retval = this->backward_partition .Allocate(backward_offsets[in_counter[0]], util::DEVICE)) break;
+                    if (retval = this->backward_offset    .Move(util::HOST, util::DEVICE)) break;
+                    //util::cpu_mt::PrintCPUArray<SizeT, VertexId>("backward_partition",backward_partition, backward_offsets[in_counter[0]]);
+                    this->backward_partition .SetPointer(backward_partition   , backward_offsets[nodes]);
+                    if (retval = this->backward_partition .Allocate(backward_offsets[nodes], util::DEVICE)) break;
                     if (retval = this->backward_partition .Move(util::HOST, util::DEVICE)) break;
-                    
-                    if (retval = this->backward_convertion.Allocate(backward_offsets[in_counter[0]], util::DEVICE)) break;
+                    //util::cpu_mt::PrintCPUArray<SizeT, VertexId>("backward_convertion",backward_convertion, backward_offsets[in_counter[0]]);
+                    this->backward_convertion.SetPointer(backward_convertion  , backward_offsets[nodes]);
+                    if (retval = this->backward_convertion.Allocate(backward_offsets[nodes], util::DEVICE)) break;
                     if (retval = this->backward_convertion.Move(util::HOST, util::DEVICE)) break;
                 }
             } // end if num_gpu>1
@@ -734,10 +727,21 @@ struct DataSliceBase
             }
             
             //size_t offset = 0;
-            if (retval = make_out_array.Allocate(sizeof(SizeT*)*num_gpus + sizeof(VertexId*)*num_gpus + sizeof(VertexId*)*num_vertex_associate + sizeof(Value*)*num_value__associate + sizeof(VertexId*)*num_vertex_associate*num_gpus + sizeof(Value*)*num_value__associate*num_gpus, util::HOST | util::DEVICE)) return retval;
+            if (retval = make_out_array.Allocate(
+                sizeof(SizeT*   ) * num_gpus + 
+                sizeof(VertexId*) * num_gpus + 
+                sizeof(VertexId*) * num_vertex_associate + 
+                sizeof(Value*   ) * num_value__associate + 
+                sizeof(VertexId*) * num_vertex_associate * num_gpus + 
+                sizeof(Value*   ) * num_value__associate * num_gpus +
+                sizeof(SizeT    ) * num_gpus, 
+                util::HOST | util::DEVICE)) return retval;
             expand_incoming_array = new util::Array1D<SizeT, char>[num_gpus];
             for (int i=0;i<num_gpus;i++)
-                if (retval = expand_incoming_array[i].Allocate(sizeof(Value*)*num_value__associate*2 + sizeof(VertexId*)*num_vertex_associate*2, util::HOST | util::DEVICE)) return retval;
+            if (retval = expand_incoming_array[i].Allocate(
+                sizeof(Value*   ) * num_value__associate * 2 + 
+                sizeof(VertexId*) * num_vertex_associate * 2, 
+                util::HOST | util::DEVICE)) return retval;
             /*memcpy(&make_out_array[offset], keys_markers.GetPointer(util::HOST), 
                       sizeof(SizeT*   ) * num_gpus);
             offset += sizeof(SizeT*   ) * num_gpus ;
@@ -785,7 +789,7 @@ struct DataSliceBase
         double queue_sizing = 2.0,
         bool _USE_DOUBLE_BUFFER = false)            // Size scaling factor for work queue allocation
     {   
-        //util::cpu_mt::PrintMessage("GraphSlice Reset() begin.");
+        util::cpu_mt::PrintMessage("GraphSlice Reset() begin.");
         cudaError_t retval = cudaSuccess;
 
         // Set device
@@ -805,20 +809,20 @@ struct DataSliceBase
             switch (frontier_type) {
                 case VERTEX_FRONTIERS :
                     // O(n) ping-pong global vertex frontiers
-                    new_frontier_elements[0] = double(num_gpus>1? graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +1;
-                    new_frontier_elements[1] = new_frontier_elements[0] +1;
+                    new_frontier_elements[0] = double(num_gpus>1? graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +2;
+                    new_frontier_elements[1] = new_frontier_elements[0] +2;
                     break;
 
                 case EDGE_FRONTIERS :
                     // O(m) ping-pong global edge frontiers
-                    new_frontier_elements[0] = double(graph_slice->edges) * queue_sizing +1;
-                    new_frontier_elements[1] = new_frontier_elements[0] +1;
+                    new_frontier_elements[0] = double(graph_slice->edges) * queue_sizing +2;
+                    new_frontier_elements[1] = new_frontier_elements[0] +2;
                     break;
 
                 case MIXED_FRONTIERS :
                     // O(n) global vertex frontier, O(m) global edge frontier
-                    new_frontier_elements[0] = double(num_gpus>1?graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +1;
-                    new_frontier_elements[1] = double(graph_slice->edges) * queue_sizing+1;
+                    new_frontier_elements[0] = double(num_gpus>1?graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +2;
+                    new_frontier_elements[1] = double(graph_slice->edges) * queue_sizing+2;
                     break;
              }    
 
@@ -955,7 +959,9 @@ template <
     bool        _MARK_PREDECESSORS,
     bool        _ENABLE_IDEMPOTENCE,
     bool        _USE_DOUBLE_BUFFER,
-    bool        _ENABLE_BACKWARD = false>
+    bool        _ENABLE_BACKWARD = false,
+    bool        _KEEP_ORDER      = false,
+    bool        _KEEP_NODE_NUM   = false>
 struct ProblemBase
 {
     typedef _VertexId           VertexId;
@@ -985,7 +991,7 @@ struct ProblemBase
                         **graph_slices        ; // Set of graph slices (one for each GPU)
     Csr<VertexId,Value,SizeT> *sub_graphs     ; // Subgraphs for multi-gpu implementation
     Csr<VertexId,Value,SizeT> *org_graph      ; // Original graph
-    PartitionerBase<VertexId,SizeT,Value,_ENABLE_BACKWARD>
+    PartitionerBase<VertexId,SizeT,Value,_ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                         *partitioner          ; // Partitioner
     int                 **partition_tables    ; // Multi-gpu partition table and convertion table
     VertexId            **convertion_tables   ;
@@ -1141,16 +1147,16 @@ struct ProblemBase
 
                 printf("partition_method = %s\n", partition_method.c_str());
                 if (partition_method=="random")
-                    partitioner=new rp::RandomPartitioner   <VertexId, SizeT, Value, _ENABLE_BACKWARD>
+                    partitioner=new rp::RandomPartitioner   <VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                         (*graph,num_gpus);
                // else if (partition_method=="metis")
-               //     partitioner=new metisp::MetisPartitioner<VertexId, SizeT, Value, _ENABLE_BACKWARD>
+               //     partitioner=new metisp::MetisPartitioner<VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                //         (*graph,num_gpus);
                 else if (partition_method=="cluster")
-                    partitioner=new cp::ClusterPartitioner  <VertexId, SizeT, Value, _ENABLE_BACKWARD>
+                    partitioner=new cp::ClusterPartitioner  <VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                         (*graph,num_gpus);
                 else if (partition_method=="biasrandom")
-                    partitioner=new brp::BiasRandomPartitioner <VertexId, SizeT, Value, _ENABLE_BACKWARD>
+                    partitioner=new brp::BiasRandomPartitioner <VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                         (*graph,num_gpus);
                 else util::GRError("partition_method invalid", __FILE__,__LINE__);
                 //printf("partition begin.\n");fflush(stdout);
@@ -1172,17 +1178,20 @@ struct ProblemBase
                 cpu_timer.Stop();
                 printf("partition end. (%f ms)\n", cpu_timer.ElapsedMillis());fflush(stdout);
                 
-                //graph->DisplayGraph("org_graph",graph->nodes);
-                //util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);
-                //util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion0",convertion_tables[0],graph->nodes);
+                /*graph->DisplayGraph("org_graph",graph->nodes);
+                util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);
+                util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion0",convertion_tables[0],graph->nodes);
                 //util::cpu_mt::PrintCPUArray<SizeT,Value>("edge_value",graph->edge_values,graph->edges);
-                //for (int gpu=0;gpu<num_gpus;gpu++)
-                //{
-                //    sub_graphs[gpu].DisplayGraph("sub_graph",sub_graphs[gpu].nodes);
-                //    printf("%d\n",gpu);
-                //    util::cpu_mt::PrintCPUArray<SizeT,int>("partition",partition_tables[gpu+1],sub_graphs[gpu].nodes);
-                //    util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion",convertion_tables[gpu+1],sub_graphs[gpu].nodes);
-                //}
+                for (int gpu=0;gpu<num_gpus;gpu++)
+                {
+                    sub_graphs[gpu].DisplayGraph("sub_graph",sub_graphs[gpu].nodes);
+                    printf("%d\n",gpu);
+                    util::cpu_mt::PrintCPUArray<SizeT,int     >("partition"           , partition_tables    [gpu+1], sub_graphs[gpu].nodes);
+                    util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion"          , convertion_tables   [gpu+1], sub_graphs[gpu].nodes);
+                    util::cpu_mt::PrintCPUArray<SizeT,SizeT   >("backward_offsets"    , backward_offsets    [gpu], sub_graphs[gpu].nodes);
+                    util::cpu_mt::PrintCPUArray<SizeT,int     >("backward_partitions" , backward_partitions [gpu], backward_offsets[gpu][sub_graphs[gpu].nodes]);
+                    util::cpu_mt::PrintCPUArray<SizeT,VertexId>("backward_convertions", backward_convertions[gpu], backward_offsets[gpu][sub_graphs[gpu].nodes]);
+                }*/
                 /*for (int gpu=0;gpu<num_gpus;gpu++)
                 {
                     cross_counter[gpu][num_gpus]=0;

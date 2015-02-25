@@ -61,7 +61,7 @@ namespace bc {
         offset+=sizeof(VertexId*) * NUM_VERTEX_ASSOCIATES;
         Value**    s_value__associate_org = (Value**   )&(s_array[offset]);
         SizeT x = threadIdx.x;
-        if (x < array_size)
+        while (x < array_size)
         {    
             s_array[x]=array[x];
             x+=blockDim.x; 
@@ -653,28 +653,10 @@ public:
         util::Array1D<SizeT, DataSlice>
                      *s_data_slice        =   problem     -> data_slices;
         GraphSlice   *graph_slice         =   problem     -> graph_slices       [thread_num] ;
-        //GraphSlice   **s_graph_slice      =   problem     -> graph_slices;
         FrontierAttribute<SizeT>
                      *frontier_attribute  = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
-        //FrontierAttribute<SizeT>
-        //             *s_frontier_attribute= &(enactor     -> frontier_attribute [0                    ]);
         EnactorStats *enactor_stats       = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
         EnactorStats *s_enactor_stats     = &(enactor     -> enactor_stats      [0                    ]);
-        //util::CtaWorkProgressLifetime
-        //             *work_progress       = &(enactor     -> work_progress      [thread_num * num_gpus]);
-        //ContextPtr   *context             =   thread_data -> context;
-        //bool         DEBUG                =   enactor     -> DEBUG;
-        //int*         stages               =   data_slice  -> stages .GetPointer(util::HOST);
-        //bool*        to_show              =   data_slice  -> to_show.GetPointer(util::HOST);
-        //cudaStream_t* streams             =   data_slice  -> streams.GetPointer(util::HOST);
-        //SizeT        Total_Length         = 0;
-        //cudaError_t  tretval              = cudaSuccess;
-        //int          grid_size            = 0;
-        //std::string  mssg                 = "";
-        //int          pre_stage            = 0;
-        //size_t       offset               = 0;
-        //int          num_vertex_associate = 1;
-        //int          num_value__associate = 4;
 
         do {
             if (enactor_stats[0].retval = util::SetDevice(gpu_idx)) break;

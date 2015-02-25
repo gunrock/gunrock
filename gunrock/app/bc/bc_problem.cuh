@@ -209,8 +209,9 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                 // Set device
                 if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
 
-                data_slices[0]->bc_values.SetPointer(h_bc_values);
-                if (retval = data_slices[0]->bc_values.Move(util::DEVICE, util::HOST)) return retval;
+                if (h_bc_values) {
+                    data_slices[0]->bc_values.SetPointer(h_bc_values);
+                    if (retval = data_slices[0]->bc_values.Move(util::DEVICE, util::HOST)) return retval;                }
 
                 if (h_ebc_values) {
                     data_slices[0]->ebc_values.SetPointer(h_ebc_values);
@@ -236,8 +237,12 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                 for (int gpu=0; gpu< this->num_gpus; gpu++)
                 {
                     if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-                    if (retval = data_slices[gpu]->bc_values.Move(util::DEVICE,util::HOST)) return retval;
-                    th_bc_values[gpu] = data_slices[gpu]->bc_values.GetPointer(util::HOST);
+
+                    if (h_bc_values) {
+                        if (retval = data_slices[gpu]->bc_values.Move(util::DEVICE,util::HOST)) return retval;
+                        th_bc_values[gpu] = data_slices[gpu]->bc_values.GetPointer(util::HOST);
+                    }
+
                     if (h_ebc_values) {
                         if (retval = data_slices[gpu]->ebc_values.Move(util::DEVICE,util::HOST)) return retval;
                         th_ebc_values [gpu] = data_slices [gpu]->ebc_values .GetPointer(util::HOST);
@@ -298,17 +303,19 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Init(
-            bool        stream_from_host,       // Only meaningful for single-GPU
-            Csr<VertexId, Value, SizeT> *graph,
-            Csr<VertexId, Value, SizeT> *inversgraph = NULL,
-            int           num_gpus         = 1,
-            int*          gpu_idx          = NULL,
-            std::string   partition_method = "random",
-            cudaStream_t* streams          = NULL,
-            float         queue_sizing     = 2.0f,
-            float         in_sizing        = 1.0f,
-            float         partition_factor = -1.0f,
-            int           partition_seed   = -1)
+        bool          stream_from_host,       // Only meaningful for single-GPU
+        Csr<VertexId, Value, SizeT> 
+                     *graph,
+        Csr<VertexId, Value, SizeT> 
+                     *inversgraph      = NULL,
+        int           num_gpus         = 1,
+        int          *gpu_idx          = NULL,
+        std::string   partition_method = "random",
+        cudaStream_t *streams          = NULL,
+        float         queue_sizing     = 2.0f,
+        float         in_sizing        = 1.0f,
+        float         partition_factor = -1.0f,
+        int           partition_seed   = -1)
     {
         ProblemBase<VertexId, SizeT, Value, _MARK_PREDECESSORS, false, _USE_DOUBLE_BUFFER, true>::Init(
             stream_from_host,
@@ -377,9 +384,9 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
      *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Reset(
-            VertexId    src,
-            FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
-            double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
+        VertexId     src,
+        FrontierType frontier_type,    // The frontier type (i.e., edge/vertex/mixed)
+        double       queue_sizing)     // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
     {
         //typedef ProblemBase<VertexId, SizeT, Value, _MARK_PREDECESSORS, false, _USE_DOUBLE_BUFFER,true> BaseProblem;
         //load ProblemBase Reset

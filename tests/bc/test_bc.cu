@@ -665,6 +665,7 @@ void RunTests(Test_Parameter *parameter)
     if (h_labels            ) {delete[] h_labels            ; h_labels             = NULL;}
 
     //cudaDeviceSynchronize();
+
 }
 
 template <

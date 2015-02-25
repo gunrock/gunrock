@@ -175,7 +175,7 @@ public:
             if (retval = GRError(cudaMalloc((void**)&(d_pointer), sizeof(Value) * size),
                           name+" cudaMalloc failed", __FILE__, __LINE__)) return retval;
             allocated = allocated | DEVICE;
-            if (ARRAY_DEBUG) 
+            //if (ARRAY_DEBUG) 
                 {printf("%s\t allocated on DEVICE, length =\t %d, size =\t %ld bytes, pointer =\t %p\n",name.c_str(),size, size*sizeof(Value), d_pointer);fflush(stdout);}
         }
         //}
