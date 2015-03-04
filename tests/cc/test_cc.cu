@@ -117,7 +117,7 @@ public:
  void DisplaySolution(VertexId *comp_ids, SizeT nodes, unsigned int num_components, VertexId *roots, unsigned int *histogram)
  {
     typedef CcList<VertexId> CcListType;
-    printf("Number of components: %d\n", num_components);
+    //printf("Number of components: %d\n", num_components);
 
     if (nodes <= 40) {
         printf("[");
@@ -281,6 +281,13 @@ void RunTests(Test_Parameter *parameter)
     VertexId    *reference_check        = (g_quick) ? NULL : reference_component_ids;
     unsigned int ref_num_components     = 0;
 
+    //printf("0: node %d: %d -> %d, node %d: %d -> %d\n", 131070, graph->row_offsets[131070], graph->row_offsets[131071], 131071, graph->row_offsets[131071], graph->row_offsets[131072]);
+    //for (int edge = 0; edge < graph->edges; edge ++)
+    //{
+    //    if (graph->column_indices[edge] == 131070 || graph->column_indices[edge] == 131071)
+    //    printf("edge %d: -> %d\n", edge, graph->column_indices[edge]);
+    //}
+ 
     for (int gpu=0; gpu<num_gpus; gpu++)
     {
         size_t dummy;
@@ -354,9 +361,9 @@ void RunTests(Test_Parameter *parameter)
         VertexId        *h_roots            = new VertexId    [problem->num_components];
         unsigned int    *h_histograms       = new unsigned int[problem->num_components];
 
-        printf("num_components = %d\n", problem->num_components);
+        //printf("num_components = %d\n", problem->num_components);
         problem->ComputeCCHistogram(h_component_ids, h_roots, h_histograms);
-        printf("num_components = %d\n", problem->num_components);
+        //printf("num_components = %d\n", problem->num_components);
 
         // Display Solution
         DisplaySolution(h_component_ids, graph->nodes, problem->num_components, h_roots, h_histograms);

@@ -476,6 +476,7 @@ void PushNeibor(
     
     data_slice_p->in_length[enactor_stats->iteration%2][gpu_]
                   = queue_length;
+    //printf("data_slice[%d]->in_length[%d][%d] <- %d\n", peer, enactor_stats->iteration%2, gpu_, queue_length);fflush(stdout);
     if (queue_length == 0) return;
    
     if (data_slice_p -> keys_in[t][gpu_].GetSize() < queue_length) to_reallocate=true;
@@ -766,6 +767,7 @@ void Iteration_Loop(
                     } else if ((iteration==0 || data_slice->out_length[peer_]==0) && peer__>num_gpus) {
                         Set_Record(data_slice, iteration, peer_, 0, streams[peer__]);
                         stages[peer__]=3;
+                        //printf("%d\t %d\t %d\t jump 1\n", thread_num, iteration, peer_);fflush(stdout);
                         break;
                     }
 
@@ -777,6 +779,7 @@ void Iteration_Loop(
                         s_data_slice[peer]->events_set[iteration_][gpu_][0]=false;
                         frontier_attribute_->queue_length = data_slice->in_length[iteration%2][peer_];
                         data_slice->in_length[iteration%2][peer_]=0;
+                        //printf("data_slice[%d]->in_length[%d][%d] <- 0.\n", thread_num, iteration%2, peer_);fflush(stdout);
                         if (frontier_attribute_->queue_length ==0)
                         {   stages[peer__]=3;break;}
 

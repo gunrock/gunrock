@@ -71,8 +71,8 @@ namespace cc {
             //atomicMin(s_vertex_associate_org[0]+key, s_vertex_associate_in[0][x]);
             if (s_vertex_associate_in[0][x] < s_vertex_associate_org[0][key])
             {
-                //if (to_track(key))
-                //    printf("Expand_Incoming [%d]: %d->%d\n", key, s_vertex_associate_org[0][key], s_vertex_associate_in[0][x]);
+                if (to_track(key))
+                    printf("Expand_Incoming [%d]: %d->%d\n", key, s_vertex_associate_org[0][key], s_vertex_associate_in[0][x]);
                 s_vertex_associate_org[0][key] = s_vertex_associate_in[0][x]; 
             }
             //keys_out[x]=-1;
@@ -492,6 +492,7 @@ public:
         //util::cpu_mt::PrintGPUArray("6_cid", data_slice->component_ids.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, data_slice->turn, enactor_stats->iteration, stream);
         //util::cpu_mt::PrintMessage("Loop finished", thread_num, data_slice->turn, enactor_stats->iteration);
 
+        enactor_stats->iteration = data_slice->turn;
         if (data_slice->num_gpus > 1)
         {
        } 
@@ -555,16 +556,29 @@ public:
         if (num_gpus < 2 && data_slice[0]->turn>0) return true;
         
         for (int gpu=0; gpu<num_gpus; gpu++)
-            if (data_slice[gpu]->turn==0) return false;
+            if (data_slice[gpu]->turn==0)
+        {
+            //printf("data_slice[%d]->turn==0\n", gpu);fflush(stdout);
+            return false;
+        }
         
         for (int gpu=0; gpu<num_gpus; gpu++)
         for (int peer=1; peer<num_gpus; peer++)
         for (int i=0; i<2; i++)
-            if (data_slice[gpu]->in_length[i][peer]!=0) return false;
+        if (data_slice[gpu]->in_length[i][peer]!=0)
+        {
+            //printf("data_slice[%d]->in_length[%d][%d] = %d\n", gpu, i, peer, data_slice[gpu]->in_length[i][peer]);fflush(stdout);
+            return false;
+        }
 
         for (int gpu=0; gpu<num_gpus; gpu++)
         for (int peer=0; peer<num_gpus; peer++)
-            if (data_slice[gpu]->out_length[peer]!=0) return false;
+        if (data_slice[gpu]->out_length[peer]!=0) 
+        {
+            //printf("data_slice[%d]->out_length[%d] = %d\n", gpu, peer, data_slice[gpu]->out_length[peer]); fflush(stdout);
+            return false;
+        }
+        //printf("CC to stop\n");fflush(stdout);
         return true;
     }
 
@@ -591,7 +605,7 @@ public:
         if ((num_elements % block_size)!=0) grid_size ++;
         if (grid_size > 512) grid_size = 512;
         for (peer_ = 0; peer_<num_gpus; peer_++)
-            data_slice->out_length[peer_] = 0;
+            data_slice->out_length[peer_] = 1;
 
         Mark_Difference_Queue<VertexId, SizeT>
             <<<grid_size, block_size, 0, stream>>> (
@@ -633,7 +647,6 @@ public:
         {
             data_slice -> has_change = true;
         } else data_slice -> has_change = false;
-        enactor_stats->iteration = data_slice->turn;
         //printf("%d\t %d\t \t has_change = %s\n", thread_num, data_slice->turn, data_slice -> has_change? "true" : "false"); fflush(stdout);
         //util::cpu_mt::PrintGPUArray("change keys", frontier_queue->keys[0].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration);
         //util::cpu_mt::PrintGPUArray("c_id", data_slice->component_ids.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);

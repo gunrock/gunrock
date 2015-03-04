@@ -142,16 +142,21 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = this->vertex_associate_outs[peer_].Move(util::HOST, util::DEVICE)) return retval;
             }
 
+            //printf("@ gpu %d: nodes = %d, edges = %d\n", gpu_idx, nodes, edges);
             // Create a single data slice for the currently-set gpu
             if (retval = froms .Allocate(edges, util::HOST | util::DEVICE)) return retval;
             if (retval = tos   .Allocate(edges, util::HOST | util::DEVICE)) return retval;
             // Construct coo from/to edge list from row_offsets and column_indices
             for (int node=0; node<graph->nodes; node++)
             {
+                //if (node == 131070 || node == 131071) 
+                //    printf("node %d @ gpu %d : %d -> %d\n", node, gpu_idx, graph->row_offsets[node], graph->row_offsets[node+1]);
                 for (int edge = graph->row_offsets[node]; edge < graph->row_offsets[node+1]; ++edge)
                 {
-                    froms[edge] = num_gpus<2 ? node : original_vertex[node];
-                    tos  [edge] = num_gpus<2 ? graph->column_indices[edge] : original_vertex[graph->column_indices[edge]];
+                    froms[edge] = node;
+                    tos  [edge] = graph->column_indices[edge];
+                    //if (froms[edge]==131070 || froms[edge]==131071 || tos[edge]==131070 || tos[edge]==131071)
+                    //    printf("edge %d @ gpu %d : %d -> %d\n", edge, gpu_idx, froms[edge], tos[edge]); 
                 }
             }
             if (retval = froms.Move(util::HOST, util::DEVICE)) return retval;

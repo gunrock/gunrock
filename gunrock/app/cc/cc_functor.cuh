@@ -11,8 +11,8 @@ namespace cc {
     template <typename VertexId>
     static __device__ bool to_track(VertexId node)
     {
-        const int num_to_track = 4;
-        const VertexId node_to_track[] = {39852, 60160, 60161, 60162};
+        const int num_to_track = 2;
+        const VertexId node_to_track[] = {131070, 131071, 60161, 60162};
         for (int i=0; i<num_to_track; i++)
             if (node == node_to_track[i]) return true;
         return false;
@@ -420,8 +420,8 @@ struct PtrJumpUnmaskFunctor
             VertexId grand_parent;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                     grand_parent, problem->component_ids + parent);
-            //if (to_track(node)) 
-            //    printf("PtrJumpUnMask [%d]: %d->%d\t", node, parent, grand_parent);
+            if (to_track(node)) 
+                printf("PtrJumpUnMask [%d]: %d->%d\t", node, parent, grand_parent);
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                     grand_parent, problem->component_ids + node);
         }
