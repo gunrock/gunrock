@@ -71,8 +71,8 @@ namespace cc {
             //atomicMin(s_vertex_associate_org[0]+key, s_vertex_associate_in[0][x]);
             if (s_vertex_associate_in[0][x] < s_vertex_associate_org[0][key])
             {
-                if (to_track(key))
-                    printf("Expand_Incoming [%d]: %d->%d\n", key, s_vertex_associate_org[0][key], s_vertex_associate_in[0][x]);
+                //if (to_track(key))
+                //    printf("Expand_Incoming [%d]: %d->%d\n", key, s_vertex_associate_org[0][key], s_vertex_associate_in[0][x]);
                 s_vertex_associate_org[0][key] = s_vertex_associate_in[0][x]; 
             }
             //keys_out[x]=-1;
@@ -493,9 +493,6 @@ public:
         //util::cpu_mt::PrintMessage("Loop finished", thread_num, data_slice->turn, enactor_stats->iteration);
 
         enactor_stats->iteration = data_slice->turn;
-        if (data_slice->num_gpus > 1)
-        {
-       } 
     }
 
     static cudaError_t Compute_OutputLength(

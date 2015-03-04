@@ -365,7 +365,7 @@ public:
                 
                 sub_graph->column_indices[edge_counter] = neibor_;
                 if (graph->edge_values !=NULL) sub_graph->edge_values[edge_counter]=graph->edge_values[edge];
-                if (peer != gpu)
+                if (peer != gpu && !KEEP_NODE_NUM)
                 {
                     sub_graph->row_offsets[neibor_]=num_edges;
                     partition_table1 [0][neibor_] = peer_;

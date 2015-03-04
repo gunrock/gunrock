@@ -420,8 +420,8 @@ struct PtrJumpUnmaskFunctor
             VertexId grand_parent;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                     grand_parent, problem->component_ids + parent);
-            if (to_track(node)) 
-                printf("PtrJumpUnMask [%d]: %d->%d\t", node, parent, grand_parent);
+            //if (to_track(node)) 
+            //    printf("PtrJumpUnMask [%d]: %d->%d\t", node, parent, grand_parent);
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                     grand_parent, problem->component_ids + node);
         }
