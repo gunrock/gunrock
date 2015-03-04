@@ -248,7 +248,7 @@ void RunTests(Test_Parameter *parameter)
         VertexId,
         SizeT,
         Value,
-        true> CcProblem; //use double buffer for edgemap and vertexmap.
+        false> CcProblem; //use double buffer for edgemap and vertexmap.
 
     typedef CCEnactor<
         CcProblem,
