@@ -70,7 +70,7 @@ public:
         Init(0,NONE,false,flag);
     } // Array1D()
 
-    /*Array1D(const std::string name)
+   Array1D(const char* const name)
     {
         this->name= name;
         file_name = "";
@@ -83,7 +83,7 @@ public:
         Init(0,NONE,false,NONE);
     }
 
-    Array1D(SizeT size, std::string name = "", unsigned int target = HOST, bool use_cuda_alloc = false, unsigned int flag = cudaHostAllocDefault)
+    /*Array1D(SizeT size, std::string name = "", unsigned int target = HOST, bool use_cuda_alloc = false, unsigned int flag = cudaHostAllocDefault)
     {
         this->name= name;
         file_name = "";
@@ -175,7 +175,7 @@ public:
             if (retval = GRError(cudaMalloc((void**)&(d_pointer), sizeof(Value) * size),
                           name+" cudaMalloc failed", __FILE__, __LINE__)) return retval;
             allocated = allocated | DEVICE;
-            //if (ARRAY_DEBUG) 
+            if (ARRAY_DEBUG) 
                 {printf("%s\t allocated on DEVICE, length =\t %d, size =\t %ld bytes, pointer =\t %p\n",name.c_str(),size, size*sizeof(Value), d_pointer);fflush(stdout);}
         }
         //}

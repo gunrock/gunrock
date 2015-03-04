@@ -35,7 +35,12 @@ template <
     typename    Value,
     bool        _USE_DOUBLE_BUFFER>
 struct CCProblem : ProblemBase<VertexId, SizeT, Value,
-                               false, false, _USE_DOUBLE_BUFFER, true, false, true>
+    false, // _MARK_PREDECESSORS
+    false, // _ENABLE_IDEMPOTENCE,
+    _USE_DOUBLE_BUFFER, 
+    false, // _EnABLE_BACKWARD
+    false, // _KEEP_ORDER
+    true>  // _KEEP_NODE_NUM
 {
     //Helper structures
 
@@ -109,12 +114,14 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             float queue_sizing = 2.0,
             float in_sizing    = 1.0)
         {   
-            cudaError_t retval         = cudaSuccess;
-            
+            cudaError_t retval = cudaSuccess;
+            SizeT       nodes  = graph->nodes;
+            SizeT       edges  = graph->edges;
+
             if (num_gpus>1) for (int gpu=0; gpu<num_gpus; gpu++)
             {
-                num_in_nodes[gpu]=graph->nodes;
-                num_out_nodes[gpu]=graph->nodes;
+                num_in_nodes [gpu] = nodes;
+                num_out_nodes[gpu] = gpu==1?nodes:0;
             }
 
             if (retval = DataSliceBase<SizeT, VertexId, Value>::Init(
@@ -126,10 +133,18 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
                 num_in_nodes,
                 num_out_nodes,
                 in_sizing)) return retval;
+            for (int peer_ = 2; peer_ < num_gpus; peer_++)
+            {
+                this->keys_out [peer_].SetPointer(this->keys_out[1].GetPointer(util::DEVICE), this->keys_out[1].GetSize(), util::DEVICE);
+                this->keys_outs[peer_] = this->keys_out[1].GetPointer(util::DEVICE);
+                this->vertex_associate_out[peer_][0].SetPointer(this->vertex_associate_out[1][0].GetPointer(util::DEVICE), this->vertex_associate_out[1][0].GetSize(), util::DEVICE);
+                this->vertex_associate_outs[peer_][0] = this->vertex_associate_out[1][0].GetPointer(util::DEVICE);
+                if (retval = this->vertex_associate_outs[peer_].Move(util::HOST, util::DEVICE)) return retval;
+            }
 
             // Create a single data slice for the currently-set gpu
-            if (retval = froms    .Allocate(graph->edges, util::HOST | util::DEVICE)) return retval;
-            if (retval = tos      .Allocate(graph->edges, util::HOST | util::DEVICE)) return retval;
+            if (retval = froms .Allocate(edges, util::HOST | util::DEVICE)) return retval;
+            if (retval = tos   .Allocate(edges, util::HOST | util::DEVICE)) return retval;
             // Construct coo from/to edge list from row_offsets and column_indices
             for (int node=0; node<graph->nodes; node++)
             {
@@ -145,13 +160,24 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = tos  .Release(util::HOST)) return retval;
 
             // Create SoA on device
-            if (retval = component_ids.Allocate(graph->nodes, util::DEVICE)) return retval;
-            if (retval = old_c_ids    .Allocate(graph->nodes, util::DEVICE)) return retval;
-            if (retval = CID_markers  .Allocate(graph->nodes+1, util::DEVICE)) return retval;
-            if (retval = masks        .Allocate(graph->nodes, util::DEVICE)) return retval;
-            if (retval = marks        .Allocate(graph->edges, util::DEVICE)) return retval;
+            if (retval = component_ids.Allocate(nodes  , util::DEVICE)) return retval;
+            if (retval = old_c_ids    .Allocate(nodes  , util::DEVICE)) return retval;
+            if (retval = CID_markers  .Allocate(nodes+1, util::DEVICE)) return retval;
+            if (retval = masks        .Allocate(nodes  , util::DEVICE)) return retval;
+            if (retval = marks        .Allocate(edges  , util::DEVICE)) return retval;
             if (retval = vertex_flag  .Allocate(1, util::HOST | util::DEVICE)) return retval;
             if (retval = edge_flag    .Allocate(1, util::HOST | util::DEVICE)) return retval;
+
+            if (retval = this->frontier_queues[0].keys  [0].Allocate(edges+2, util::DEVICE)) return retval;
+            if (retval = this->frontier_queues[0].keys  [1].Allocate(edges+2, util::DEVICE)) return retval;
+            if (retval = this->frontier_queues[0].values[0].Allocate(nodes+2, util::DEVICE)) return retval;
+            if (retval = this->frontier_queues[0].values[1].Allocate(nodes+2, util::DEVICE)) return retval;
+            if (num_gpus > 1) {
+                this->frontier_queues[num_gpus].keys  [0].SetPointer(this->frontier_queues[0].keys  [0].GetPointer(util::DEVICE), edges+2, util::DEVICE);
+                this->frontier_queues[num_gpus].keys  [1].SetPointer(this->frontier_queues[0].keys  [1].GetPointer(util::DEVICE), edges+2, util::DEVICE);
+                this->frontier_queues[num_gpus].values[0].SetPointer(this->frontier_queues[0].values[0].GetPointer(util::DEVICE), nodes+2, util::DEVICE);
+                this->frontier_queues[num_gpus].values[1].SetPointer(this->frontier_queues[0].values[1].GetPointer(util::DEVICE), nodes+2, util::DEVICE);
+            }
             return retval;
         }
     };
@@ -328,7 +354,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             float         partition_factor = -1.0f,
             int           partition_seed   = -1)
     {
-        ProblemBase<VertexId, SizeT, Value, false, false, _USE_DOUBLE_BUFFER, true, false, true>::Init(
+        ProblemBase<VertexId, SizeT, Value, false, false, _USE_DOUBLE_BUFFER, false, false, true>::Init(
             stream_from_host,
             graph,
             inversgraph,
@@ -394,35 +420,26 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             // Set device
             if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
 
-            if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, _USE_DOUBLE_BUFFER)) return retval;
-            if (retval = data_slice_->frontier_queues[0].keys  [0].EnsureSize(edges)) return retval;
-            if (retval = data_slice_->frontier_queues[0].keys  [1].EnsureSize(edges)) return retval;
-            if (retval = data_slice_->frontier_queues[0].values[0].EnsureSize(nodes)) return retval;
-            if (retval = data_slice_->frontier_queues[0].values[1].EnsureSize(nodes)) return retval;
+            //if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, _USE_DOUBLE_BUFFER)) return retval;
+            if (retval = data_slice_->frontier_queues[0].keys  [0].EnsureSize(edges+2)) return retval;
+            if (retval = data_slice_->frontier_queues[0].keys  [1].EnsureSize(edges+2)) return retval;
+            if (retval = data_slice_->frontier_queues[0].values[0].EnsureSize(nodes+2)) return retval;
+            if (retval = data_slice_->frontier_queues[0].values[1].EnsureSize(nodes+2)) return retval;
+
             // Allocate output component_ids if necessary
-            if (data_slice_->component_ids .GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slice_->component_ids .Allocate(nodes, util::DEVICE)) return retval;
             util::MemsetIdxKernel<<<128, 128>>>(data_slice_->component_ids .GetPointer(util::DEVICE), nodes);
 
             // Allocate marks if necessary
-            if (data_slice_->marks         .GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slice_->marks         .Allocate(edges, util::DEVICE)) return retval;
             util::MemsetKernel   <<<128, 128>>>(data_slice_->marks         .GetPointer(util::DEVICE), false, edges);
 
             // Allocate masks if necessary
-            if (data_slice_->masks         .GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slice_->masks         .Allocate(nodes, util::DEVICE)) return retval;
             util::MemsetKernel    <<<128, 128>>>(data_slice_->masks        .GetPointer(util::DEVICE),     0, nodes);
 
             // Allocate vertex_flag if necessary
-            if (data_slice_->vertex_flag   .GetPointer(util::HOST  ) == NULL)
-                if (retval = data_slice_->vertex_flag   .Allocate(1    , util::HOST  )) return retval;
             data_slice_->vertex_flag[0]=1;
             if (retval = data_slice_->vertex_flag.Move(util::HOST, util::DEVICE)) return retval;
 
             // Allocate edge_flag if necessary
-            if (data_slice_->edge_flag     .GetPointer(util::HOST  ) == NULL)
-                if (retval = data_slice_->edge_flag     .Allocate(1    , util::HOST  )) return retval;
             data_slice_->vertex_flag[0]=1;
             if (retval = data_slice_->edge_flag  .Move(util::HOST, util::DEVICE)) return retval;
 
