@@ -95,6 +95,8 @@ Gunrock Developers
 
 - [Yuduo Wu](http://www.ece.ucdavis.edu/~wyd855/), University of California, Davis
 
+- [Carl Yang](http://wwb.ece.ucdavis.edu/~ctcyang/), University of California, Davis
+
 - Andy Riffel, University of California, Davis
 
 - [John Owens](http://www.ece.ucdavis.edu/~jowens/), University of California,
