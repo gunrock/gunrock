@@ -331,9 +331,9 @@ class PREnactor : public EnactorBase
             frontier_attribute.queue_reset = true;
             int edge_map_queue_len = frontier_attribute.queue_length;
 
-            util::MemsetKernel<<<128, 128>>>(
+            /*util::MemsetKernel<<<128, 128>>>(
                 problem->data_slices[0]->d_rank_curr,
-                (Value)1.0 / edge_map_queue_len, graph_slice->nodes);
+                (Value)1.0 / edge_map_queue_len, graph_slice->nodes);*/
 
             cudaEvent_t start, stop;
             float actual_elapsed = 0.0f;
@@ -479,7 +479,7 @@ class PREnactor : public EnactorBase
                 }
 
                 if (done[0] == 0 || frontier_attribute.queue_length == 0 ||
-                    enactor_stats.iteration > max_iteration) break;
+                    enactor_stats.iteration >= max_iteration) break;
 
                 if (DEBUG)
                     printf("\n%lld", (long long) enactor_stats.iteration);
