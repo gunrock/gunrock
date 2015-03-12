@@ -546,11 +546,11 @@ class PREnactor : public EnactorBase
                 PRProblem,                          // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                8,                                  // LOG_THREADS
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                0,
+                1,                                  // MIN_CTA_OCCUPANCY
+                10,                                  // LOG_THREADS
+                8,                                  // LOG_LOAD_VEC_SIZE
+                32*128,                                  // LOG_LOADS_PER_TILE
+                1,
                 0,
                 5,                                  // LOG_RAKING_THREADS
                 32,                                 // WARP_GATHER_THRESHOLD
