@@ -105,14 +105,14 @@ void Usage()
  */
 template<typename VertexId, typename SizeT>
 void DisplaySolution(
-    VertexId *comp_ids,
-    SizeT nodes,
+    VertexId     *comp_ids,
+    SizeT        nodes,
     unsigned int num_components,
-    VertexId *roots,
+    VertexId     *roots,
     unsigned int *histogram)
 {
     typedef CcList<VertexId> CcListType;
-    printf("Number of components: %d\n", num_components);
+    printf("Number of Components: %d\n", num_components);
 
     if (nodes <= 40)
     {
@@ -245,9 +245,9 @@ void RunTests(
                   "CC Problem Initialization Failed", __FILE__, __LINE__);
 
     //
-    // Compute reference CPU BFS solution for source-distance
+    // Compute reference CPU CC
     //
-    if (reference_check != NULL)
+    if (reference_check != NULL && !g_quick)
     {
         printf("Computing reference value ...\n");
         ref_num_components = RefCPUCC(
@@ -257,6 +257,10 @@ void RunTests(
             reference_check);
         printf("\n");
     }
+
+    long long total_queued = 0;
+    VertexId  num_iter = 0;
+    double    avg_duty = 0.0;
 
     // Perform CC
     GpuTimer gpu_timer;
@@ -276,9 +280,11 @@ void RunTests(
         gpu_timer.Stop();
 
         elapsed += gpu_timer.ElapsedMillis();
-        // printf("iteration %d, time:%5f\n", iter + 1, gpu_timer.ElapsedMillis());
+        // printf("iteration %d, time: %.5f\n", iter+1, gpu_timer.ElapsedMillis());
     }
     elapsed /= iterations;
+
+    cc_enactor.GetStatistics(total_queued, num_iter, avg_duty);
 
     // Copy out results
     util::GRError(
@@ -286,31 +292,33 @@ void RunTests(
         "CC Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // Validity
-    if (ref_num_components == csr_problem->num_components)
-        printf("CORRECT.\n");
-    else
-        printf("INCORRECT. Ref Component Count: %d,"
-               "GPU Computed Component Count: %d\n",
-               ref_num_components, csr_problem->num_components);
-
-    //if (ref_num_components == csr_problem->num_components)
+    if (!g_quick)
     {
-        // Compute size and root of each component
-        VertexId     *h_roots      = new VertexId[csr_problem->num_components];
-        unsigned int *h_histograms = new unsigned int[csr_problem->num_components];
-
-        csr_problem->ComputeCCHistogram(h_component_ids, h_roots, h_histograms);
-
-        // Display Solution
-        DisplaySolution(
-            h_component_ids, graph.nodes,
-            ref_num_components, h_roots, h_histograms);
-
-        if (h_roots) delete[] h_roots;
-        if (h_histograms) delete[] h_histograms;
+        if (ref_num_components == csr_problem->num_components)
+            printf("CORRECT.\n");
+        else
+            printf("INCORRECT. Ref Component Count: %d,"
+                   "GPU Computed Component Count: %d\n",
+                   ref_num_components, csr_problem->num_components);
     }
 
-    printf("GPU Connected Component finished in %lf msec.\n", elapsed);
+    // Compute size and root of each component
+    VertexId     *h_roots      = new VertexId[csr_problem->num_components];
+    unsigned int *h_histograms = new unsigned int[csr_problem->num_components];
+
+    csr_problem->ComputeCCHistogram(h_component_ids, h_roots, h_histograms);
+
+    // Display Solution
+    DisplaySolution(h_component_ids, graph.nodes,
+                    csr_problem->num_components,
+                    h_roots, h_histograms);
+
+    if (h_roots) delete[] h_roots;
+    if (h_histograms) delete[] h_histograms;
+
+    printf("[GPU Connected Component] finished.\n");
+    printf(" elapsed: %.4f ms\n", elapsed);
+    printf(" num_iterations: %d\n", num_iter);
 
     // Cleanup
     if (csr_problem) delete csr_problem;
@@ -339,14 +347,13 @@ void RunTests(
     CommandLineArgs &args)
 {
     bool instrumented  = false; // Whether or not to collect instrumentation from kernels
-    int  max_grid_size = 0;     // maximum grid size (0: leave it up to the enactor)
+    int  max_grid_size = 0;     // Maximum grid size (0: leave it up to the enactor)
     int  num_gpus      = 1;     // Number of GPUs for multi-gpu enactor to use
-    int  iterations    = 1;
+    int  iterations    = 1;     // Default run test times
 
     instrumented = args.CheckCmdLineFlag("instrumented");
-
-    g_quick = args.CheckCmdLineFlag("quick");
-    g_verbose = args.CheckCmdLineFlag("v");
+    g_quick      = args.CheckCmdLineFlag("quick");
+    g_verbose    = args.CheckCmdLineFlag("v");
     args.GetCmdLineArgument("iteration-num", iterations);
 
     if (instrumented)

@@ -155,8 +155,9 @@ void run_page_rank(
         num_gpus),
         "Page Rank Problem Initialization Failed", __FILE__, __LINE__);
 
-    Stats *stats = new Stats("GPU Page Rank");
+    Stats *stats = new Stats("GPU PageRank");
     long long total_queued = 0;
+    long long num_iter = 0;
     double    avg_duty = 0.0;
 
     // Perform Page Rank
@@ -173,7 +174,7 @@ void run_page_rank(
 
     float elapsed = gpu_timer.ElapsedMillis();
 
-    pr_enactor.GetStatistics(total_queued, avg_duty);
+    pr_enactor.GetStatistics(total_queued, avg_duty, num_iter);
 
     // Copy out results
     util::GRError(csr_problem->Extract(page_rank, node_ids),

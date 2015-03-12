@@ -174,7 +174,8 @@ void DisplayStats(
 
     double redundant_work = 0.0;
     if (total_queued > 0) {
-        redundant_work = ((double) total_queued - edges_visited) / edges_visited;        // measure duplicate edges put through queue
+        redundant_work = ((double) total_queued - edges_visited) / edges_visited;
+        // measure duplicate edges put through queue
     }
     redundant_work *= 100;
 
@@ -187,12 +188,12 @@ void DisplayStats(
     } else {
         // Display the specific sample statistics
         double m_teps = (double) edges_visited / (elapsed * 1000.0);
-        printf(" elapsed: %.3f ms, rate: %.3f MiEdges/s", elapsed, m_teps);
+        printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed, m_teps);
         if (search_depth != 0) printf(", search_depth: %lld", (long long) search_depth);
         if (avg_duty != 0) {
             printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
         }
-        printf("\n src: %lld, nodes_visited: %lld, edges visited: %lld",
+        printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
                (long long) src, (long long) nodes_visited, (long long) edges_visited);
         if (total_queued > 0) {
             printf(", total queued: %lld", total_queued);

@@ -63,7 +63,8 @@ struct RankPair {
     VertexId        vertex_id;
     Value           page_rank;
 
-    RankPair(VertexId vertex_id, Value page_rank) : vertex_id(vertex_id), page_rank(page_rank) {}
+    RankPair(VertexId vertex_id, Value page_rank) :
+        vertex_id(vertex_id), page_rank(page_rank) {}
 };
 
 template<typename RankPair>
@@ -105,9 +106,9 @@ void Usage()
 template<typename VertexId, typename Value, typename SizeT>
 void DisplaySolution(VertexId *node_id, Value *rank, SizeT nodes)
 {
-    // Print out at most top 10 largest components
+    // Print out at most top 10 ranked nodes
     int top = (nodes < 10) ? nodes : 10;
-    printf("Top %d Page Ranks:\n", top);
+    printf("\nTop %d Page Ranks:\n", top);
     for (int i = 0; i < top; ++i)
     {
         printf("Vertex ID: %d, Page Rank: %5f\n", node_id[i], rank[i]);
@@ -154,17 +155,22 @@ void DisplayStats(
     const Csr<VertexId, Value, SizeT> &graph,
     double              elapsed,
     long long           total_queued,
-    double              avg_duty)
+    double              avg_duty,
+    long long           num_iter)
 {
     // Display test name
-    printf("[%s] finished. ", stats.name);
+    printf("[%s] finished.", stats.name);
 
     // Display the specific sample statistics
-    printf(" elapsed: %.3f ms", elapsed);
+    printf("\n elapsed: %.4f ms", elapsed);
+
     if (avg_duty != 0)
     {
         printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
     }
+
+    printf("\n num_iterations: %lld", num_iter);
+
     printf("\n");
 }
 
@@ -228,7 +234,7 @@ void SimpleReferencePr(
     if (!directed)
     {
         remove_dangling_links(g);
-        printf("finished remove dangling links.\n");
+        // printf("finished remove dangling links.\n");
     }
 
     std::vector<Value> ranks(num_vertices(g));
@@ -328,8 +334,9 @@ void RunTests(
 
     Stats *stats = new Stats("GPU PageRank");
 
-    long long           total_queued = 0;
-    double              avg_duty = 0.0;
+    long long total_queued = 0;
+    double    avg_duty     = 0.0;
+    long long num_iter     = 0;
 
     // Perform PageRank
     GpuTimer gpu_timer;
@@ -351,7 +358,7 @@ void RunTests(
     }
     elapsed /= iterations;
 
-    pr_enactor.GetStatistics(total_queued, avg_duty);
+    pr_enactor.GetStatistics(total_queued, avg_duty, num_iter);
 
     // Copy out results
     util::GRError(
@@ -387,7 +394,7 @@ void RunTests(
         printf("Validity: ");
         CompareResults(h_rank, reference_check, graph.nodes, true);
     }
-    printf("\nFirst 40 labels of the GPU result.");
+
     // Display Solution
     DisplaySolution(h_node_id, h_rank, graph.nodes);
 
@@ -397,8 +404,8 @@ void RunTests(
         graph,
         elapsed,
         total_queued,
-        avg_duty);
-
+        avg_duty,
+        num_iter);
 
     // Cleanup
     delete stats;
@@ -474,8 +481,6 @@ void RunTests(
             context);
     }
 }
-
-
 
 /******************************************************************************
  * Main
