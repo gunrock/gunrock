@@ -360,7 +360,7 @@ class PREnactor : public EnactorBase
                     (bool*)NULL,
                     d_scanned_edges,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
-                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],            // d_out_queue
+                    NULL,                                                                          // d_out_queue
                     (VertexId*)NULL,
                     (VertexId*)NULL,
                     graph_slice->d_row_offsets,
@@ -422,7 +422,7 @@ class PREnactor : public EnactorBase
                     d_done,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],      // d_in_queue
                     NULL,
-                    graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],    // d_out_queue
+                    NULL,//graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],    // d_out_queue
                     data_slice,
                     NULL,
                     work_progress,
@@ -542,7 +542,7 @@ class PREnactor : public EnactorBase
                 INSTRUMENT,                         // INSTRUMENT
                 0,                                  // SATURATION QUIT
                 true,                               // DEQUEUE_PROBLEM_SIZE
-                8,                                  // MIN_CTA_OCCUPANCY
+                1,                                  // MIN_CTA_OCCUPANCY
                 8,                                 // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
