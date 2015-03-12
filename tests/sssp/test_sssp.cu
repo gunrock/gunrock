@@ -176,7 +176,7 @@ void DisplayStats(
     redundant_work *= 100;
 
     // Display test name
-    printf("[%s] finished. ", stats.name);
+    printf("[%s] finished.", stats.name);
 
     // Display statistics
     if (nodes_visited < 5)
@@ -187,14 +187,14 @@ void DisplayStats(
     {
         // Display the specific sample statistics
         double m_teps = (double) edges_visited / (elapsed * 1000.0);
-        printf(" elapsed: %.3f ms, rate: %.3f MiEdges/s", elapsed, m_teps);
+        printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed, m_teps);
         if (search_depth != 0)
             printf(", search_depth: %lld", (long long) search_depth);
         if (avg_duty != 0)
         {
             printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
         }
-        printf("\n src: %lld, nodes_visited: %lld, edges visited: %lld",
+        printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
                (long long) src, (long long) nodes_visited, (long long) edges_visited);
         if (total_queued > 0)
         {
@@ -422,7 +422,7 @@ void RunTests(
     double              avg_duty = 0.0;
 
     // Perform SSSP
-    CpuTimer gpu_timer;
+    GpuTimer gpu_timer;
 
     float elapsed = 0.0f;
 

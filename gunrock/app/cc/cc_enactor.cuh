@@ -139,14 +139,16 @@ class CCEnactor : public EnactorBase
     template <typename VertexId>
     void GetStatistics(
         long long &total_queued,
-        double &avg_duty)
+        VertexId  &num_iter,
+        double    &avg_duty)
     {
         cudaThreadSynchronize();
 
         total_queued = this->total_queued;
+        num_iter = this->iteration;
 
-        avg_duty = (total_lifetimes >0) ?
-            double(total_runtimes) / total_lifetimes : 0.0;
+        avg_duty = (total_lifetimes > 0) ?
+            double (total_runtimes) / total_lifetimes : 0.0;
     }
 
     /** @} */

@@ -503,7 +503,7 @@ class SSSPEnactor : public EnactorBase
                 8>                                  // LOG_SCHEDULE_GRANULARITY
                 FilterKernelPolicy;
 
-            /*typedef gunrock::oprtr::advance::KernelPolicy<
+            typedef gunrock::oprtr::advance::KernelPolicy<
                 SSSPProblem,                        // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
@@ -518,8 +518,9 @@ class SSSPEnactor : public EnactorBase
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7,                                  // LOG_SCHEDULE_GRANULARITY
                 gunrock::oprtr::advance::TWC_FORWARD>
-                AdvanceKernelPolicy;*/
+                AdvanceKernelPolicy;
 
+            /*
             typedef gunrock::oprtr::advance::KernelPolicy<
                 SSSPProblem,                        // Problem data type
                 300,                                // CUDA_ARCH
@@ -536,7 +537,7 @@ class SSSPEnactor : public EnactorBase
                 7,                                  // LOG_SCHEDULE_GRANULARITY
                 gunrock::oprtr::advance::LB>
                 AdvanceKernelPolicy;
-
+            */
             return EnactSSSP<
                 AdvanceKernelPolicy, FilterKernelPolicy, SSSPProblem>(
                     context, problem, src, queue_sizing, max_grid_size);

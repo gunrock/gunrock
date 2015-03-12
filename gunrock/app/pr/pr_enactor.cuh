@@ -153,14 +153,14 @@ class PREnactor : public EnactorBase
      */
     void GetStatistics(
         long long &total_queued,
-        double &avg_duty)
+        double    &avg_duty,
+        long long &num_iter)
     {
         cudaThreadSynchronize();
-
         total_queued = enactor_stats.total_queued;
-
-        avg_duty = (enactor_stats.total_lifetimes >0) ?
+        avg_duty = (enactor_stats.total_lifetimes > 0) ?
             double(enactor_stats.total_runtimes) / enactor_stats.total_lifetimes : 0.0;
+        num_iter = enactor_stats.iteration;
     }
 
     /** @} */
@@ -335,8 +335,12 @@ class PREnactor : public EnactorBase
                 problem->data_slices[0]->d_rank_curr,
                 (Value)1.0 / edge_map_queue_len, graph_slice->nodes);
 
-            util::CpuTimer cpu_timer;
-            cpu_timer.Start();
+            cudaEvent_t start, stop;
+            float actual_elapsed = 0.0f;
+
+            cudaEventCreate(&start);
+            cudaEventCreate(&stop);
+            cudaEventRecord(start, 0);
 
             // Step through PageRank iterations
             while (done[0] < 0) {
@@ -481,10 +485,15 @@ class PREnactor : public EnactorBase
                     printf("\n%lld", (long long) enactor_stats.iteration);
 
             }
-            cpu_timer.Stop();
 
-            printf("Actual PageRank kernel elapsed time: %4f\n",
-                   cpu_timer.ElapsedMillis());
+            cudaEventRecord(stop, 0);
+            cudaEventSynchronize(stop);
+            cudaEventElapsedTime(&actual_elapsed, start, stop);
+
+            printf("PageRank actual_kernel_elapsed: %.4f ms\n", actual_elapsed);
+
+            cudaEventDestroy(start);
+            cudaEventDestroy(stop);
 
             if (retval) break;
 
@@ -534,7 +543,7 @@ class PREnactor : public EnactorBase
                 0,                                  // SATURATION QUIT
                 true,                               // DEQUEUE_PROBLEM_SIZE
                 8,                                  // MIN_CTA_OCCUPANCY
-                8,                                  // LOG_THREADS
+                8,                                 // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
@@ -547,7 +556,7 @@ class PREnactor : public EnactorBase
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 8,                                  // MIN_CTA_OCCUPANCY
-                8,                                  // LOG_THREADS
+                8,                                 // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 0,

@@ -57,9 +57,6 @@ set(LIBRARY_OUTPUT_PATH
   CACHE PATH
   "Directory where all the libraries will be stored")
 
-
-
-
 set(GENCODE_SM10 -gencode=arch=compute_10,code=sm_10 -gencode=arch=compute_10,code=compute_10)
 set(GENCODE_SM13 -gencode=arch=compute_13,code=sm_13 -gencode=arch=compute_13,code=compute_13)
 set(GENCODE_SM20 -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_20,code=compute_20)
@@ -201,10 +198,10 @@ endif(GUNROCK_BUILD_LIB)
 if(GUNROCK_BUILD_APPLICATIONS)
   #add_subdirectory(shared_lib_tests)
   #add_subdirectory(simple_example)
-  #add_subdirectory(tests/bc)
+  add_subdirectory(tests/bc)
   add_subdirectory(tests/bfs)
   add_subdirectory(tests/cc)
-  #add_subdirectory(tests/pr)
+  add_subdirectory(tests/pr)
   add_subdirectory(tests/sssp)
   add_subdirectory(tests/mst)
   add_subdirectory(tests/dobfs)

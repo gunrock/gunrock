@@ -374,13 +374,13 @@ struct Csr
 
             log_counts[log_length + 1]++;
         }
-        printf("\nDegree Histogram (%lld vertices, %lld directed edges):\n",
+        printf("\nDegree Histogram (%lld vertices, %lld edges):\n",
                (long long) nodes, (long long) edges);
 
-        printf("\tDegree   0: %d (%.2f%%)\n", log_counts[0],
+        printf("    Degree   0: %d (%.2f%%)\n", log_counts[0],
                (float) log_counts[0] * 100.0 / nodes);
         for (int i = 0; i < max_log_length + 1; i++) {
-            printf("\tDegree 2^%i: %d (%.2f%%)\n", i, log_counts[i + 1],
+            printf("    Degree 2^%i: %d (%.2f%%)\n", i, log_counts[i + 1],
                    (float) log_counts[i + 1] * 100.0 / nodes);
         }
         printf("\n");

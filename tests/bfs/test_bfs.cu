@@ -54,30 +54,32 @@ bool g_stream_from_host;
  ******************************************************************************/
 void Usage()
 {
-    printf("\ntest_bfs <graph type> <graph type args> [--device=<device_index>] "
-           "[--undirected] [--instrumented] [--src=<source index>] [--quick] "
-           "[--mark-pred] [--queue-sizing=<scale factor>]\n"
-           "[--v] [--iteration-num=<iteration numbers>] [--traversal-mode=<mode>]\n"
-           "\n"
-           "Graph types and args:\n"
-           "  market [<file>]\n"
-           "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
-           "    edges from stdin (or from the optionally-specified file).\n"
-
-           "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
-           "  --undirected If set then treat the graph as undirected.\n"
-           "  --instrumented If set then kernels keep track of queue-search_depth\n"
-           "  and barrier duty (a relative indicator of load imbalance.)\n"
-           "  --src Begins BFS from the vertex <source index>. If set as randomize\n"
-           "  then will begin with a random source vertex.\n"
-           "  If set as largestdegree then will begin with the node which has\n"
-           "  largest degree.\n"
-           "  --quick If set will skip the CPU validation code.\n"
-           "  --mark-pred If set then keep not only label info but also predecessor info.\n"
-           "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
-           "  Default is 1.0\n"
-           " --iteration-num sets how many times you want t operform the algorithm on the dataset. Default is 1.\n"
-           " --traversal-mode sets the traversal strategy, default is 0 (load-balanced), 1 for dynamic cooperative method.\n"
+    printf(
+        "\ntest_bfs <graph type> <graph type args> [--device=<device_index>]\n"
+        "[--undirected] [--idempotence] [--src=<source index>] [--quick]\n"
+        "[--mark-pred] [--queue-sizing=<scale factor>] [--instrumented]\n"
+        "[--v] [--iteration-num=<numbers>] [--traversal-mode=<mode>]\n"
+        "\n"
+        "Graph types and args:\n"
+        "  market [<file>]\n"
+        "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
+        "    edges from stdin (or from the optionally-specified file).\n"
+        "  --device=<device_index>  Set GPU device for running the primitive.\n"
+        "  --undirected If set then treat the graph as undirected (symmetric).\n"
+        "  --idempotence If set then enable idempotence.\n"
+        "  --instrumented If set then kernels keep track of queue-search_depth\n"
+        "  and barrier duty (a relative indicator of load imbalance.)\n"
+        "  --src Begins BFS from the vertex <source index>. If set as randomize\n"
+        "  then will begin with a random source vertex. If set as largestdegree\n"
+        "  then will begin with the node which has largest degree.\n"
+        "  --quick If set will skip the CPU validation code.\n"
+        "  --mark-pred If set then keep not only label info but also predecessor info.\n"
+        "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
+        "  Default is 1.0\n"
+        "  --v If set then print verbose per iteration info.\n"
+        "  --iteration-num Set number of runs to perform the algorithm, default 1.\n"
+        "  --traversal-mode Set traversal strategy, default 0.\n"
+        "  0 for load-balanced, 1 for dynamic-cooperative.\n"
         );
 }
 
@@ -193,14 +195,14 @@ void DisplayStats(
     {
         // Display the specific sample statistics
         double m_teps = (double) edges_visited / (elapsed * 1000.0);
-        printf(" elapsed: %.3f ms, rate: %.3f MiEdges/s", elapsed, m_teps);
+        printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed, m_teps);
         if (search_depth != 0)
             printf(", search_depth: %lld", (long long) search_depth);
         if (avg_duty != 0)
         {
             printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
         }
-        printf("\n src: %lld, nodes_visited: %lld, edges visited: %lld",
+        printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
                (long long) src, (long long) nodes_visited, (long long) edges_visited);
         if (total_queued > 0)
         {
@@ -297,7 +299,7 @@ void SimpleReferenceBfs(
     float elapsed = cpu_timer.ElapsedMillis();
     search_depth++;
 
-    printf("CPU BFS finished in %lf msec. Search depth is: %d\n",
+    printf("CPU BFS finished in %lf msec. cpu_search_depth: %d\n",
            elapsed, search_depth);
 }
 
@@ -362,7 +364,6 @@ void RunTests(
 
     }
 
-
     // Allocate BFS enactor map
     BFSEnactor<INSTRUMENT> bfs_enactor(g_verbose);
 
@@ -379,7 +380,7 @@ void RunTests(
     //
     if (reference_check_label != NULL)
     {
-        printf("compute ref value\n");
+        printf("Computing reference value ...\n");
         SimpleReferenceBfs<VertexId, Value, SizeT, MARK_PREDECESSORS>(
             graph,
             reference_check_label,
@@ -448,7 +449,7 @@ void RunTests(
         }
     }
 
-    printf("\nFirst 40 labels of the GPU result.");
+    printf("\nFirst 40 labels of the GPU result:\n");
     // Display Solution
     DisplaySolution(
         h_labels, h_preds, graph.nodes, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE);
@@ -696,6 +697,8 @@ int main( int argc, char** argv)
         }
 
         csr.PrintHistogram();
+
+        // printf("average degree: %d", csr.GetAverageDegree());
 
         // Run tests
         RunTests(csr, args, *context);
