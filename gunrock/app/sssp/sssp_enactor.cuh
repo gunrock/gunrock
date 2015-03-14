@@ -175,7 +175,7 @@ class SSSPEnactor : public EnactorBase
         total_queued = this->total_queued;
         search_depth = enactor_stats.iteration;
 
-        avg_duty = (total_lifetimes >0) ?
+        avg_duty = (total_lifetimes > 0) ?
             double(total_runtimes) / total_lifetimes : 0.0;
     }
 
@@ -283,7 +283,7 @@ class SSSPEnactor : public EnactorBase
 
             while (out_length > 0 || pq->queue_length > 0 || frontier_attribute.queue_length > 0) {
 
-                // Traversal::Advance
+                // Advance kernel
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SSSPProblem, SsspFunctor>
                 (
                     d_done,
@@ -350,7 +350,7 @@ class SSSPEnactor : public EnactorBase
                 // Disable here because of Priority Queue
                 //if (done[0] == 0) break;
 
-                // Vertex Map
+                // Filter kernel
                 gunrock::oprtr::filter::Kernel<FilterKernelPolicy, SSSPProblem, SsspFunctor>
                 <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
                     enactor_stats.iteration+1,
@@ -449,7 +449,9 @@ class SSSPEnactor : public EnactorBase
             /*bool overflowed = false;
             if (retval = work_progress.CheckOverflow<SizeT>(overflowed)) break;
             if (overflowed) {
-                retval = util::GRError(cudaErrorInvalidConfiguration, "Frontier queue overflow. Please increase queue-sizing factor.",__FILE__, __LINE__);
+            retval = util::GRError(cudaErrorInvalidConfiguration,
+            "Frontier queue overflow. Please increase queue-sizing factor.",
+            __FILE__, __LINE__);
                 break;
             }*/
 
@@ -475,17 +477,19 @@ class SSSPEnactor : public EnactorBase
      * @param[in] problem Pointer to SSSPProblem object.
      * @param[in] src Source node for SSSP.
      * @param[in] queue_sizing Scaling factor for input queue size.
+     * @param[in] traversal_mode Load-balanced or Dynamic cooperative
      * @param[in] max_grid_size Max grid size for SSSP kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template <typename SSSPProblem>
     cudaError_t Enact(
-        CudaContext                      &context,
-        SSSPProblem                      *problem,
-        typename SSSPProblem::VertexId    src,
-        double                          queue_sizing,
-        int                             max_grid_size = 0)
+        CudaContext                    &context,
+        SSSPProblem                    *problem,
+        typename SSSPProblem::VertexId src,
+        double                         queue_sizing,
+        int                            traversal_mode,
+        int                            max_grid_size = 0)
     {
         if (this->cuda_props.device_sm_version >= 300) {
             typedef gunrock::oprtr::filter::KernelPolicy<
@@ -518,9 +522,8 @@ class SSSPEnactor : public EnactorBase
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7,                                  // LOG_SCHEDULE_GRANULARITY
                 gunrock::oprtr::advance::TWC_FORWARD>
-                AdvanceKernelPolicy;
+                FWDAdvanceKernelPolicy;
 
-            /*
             typedef gunrock::oprtr::advance::KernelPolicy<
                 SSSPProblem,                        // Problem data type
                 300,                                // CUDA_ARCH
@@ -536,11 +539,20 @@ class SSSPEnactor : public EnactorBase
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7,                                  // LOG_SCHEDULE_GRANULARITY
                 gunrock::oprtr::advance::LB>
-                AdvanceKernelPolicy;
-            */
-            return EnactSSSP<
-                AdvanceKernelPolicy, FilterKernelPolicy, SSSPProblem>(
-                    context, problem, src, queue_sizing, max_grid_size);
+                LBAdvanceKernelPolicy;
+
+            if (traversal_mode == 0)
+            {
+                return EnactSSSP<
+                    LBAdvanceKernelPolicy, FilterKernelPolicy, SSSPProblem>(
+                        context, problem, src, queue_sizing, max_grid_size);
+            }
+            else
+            {
+                return EnactSSSP<
+                    FWDAdvanceKernelPolicy, FilterKernelPolicy, SSSPProblem>(
+                        context, problem, src, queue_sizing, max_grid_size);
+            }
         }
 
         //to reduce compile time, get rid of other architecture for now

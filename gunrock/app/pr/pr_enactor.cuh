@@ -533,6 +533,7 @@ class PREnactor : public EnactorBase
         CudaContext               &context,
         PRProblem                 *problem,
         typename PRProblem::SizeT max_iteration,
+        int                       traversal_mode,
         int                       max_grid_size = 0)
     {
         if (this->cuda_props.device_sm_version >= 300) {
@@ -543,7 +544,7 @@ class PREnactor : public EnactorBase
                 0,                                  // SATURATION QUIT
                 true,                               // DEQUEUE_PROBLEM_SIZE
                 1,                                  // MIN_CTA_OCCUPANCY
-                8,                                 // LOG_THREADS
+                8,                                  // LOG_THREADS
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
@@ -556,20 +557,47 @@ class PREnactor : public EnactorBase
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
                 1,                                  // MIN_CTA_OCCUPANCY
-                10,                                  // LOG_THREADS
+                10,                                 // LOG_THREADS
                 8,                                  // LOG_LOAD_VEC_SIZE
-                32*128,                                  // LOG_LOADS_PER_TILE
-                1,
-                0,
+                32*128,                             // LOG_LOADS_PER_TILE
+                1,                                  // LOG_LOAD_VEC_SIZE
+                0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
                 32,                                 // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7,                                  // LOG_SCHEDULE_GRANULARITY
                 gunrock::oprtr::advance::LB>
-                AdvanceKernelPolicy;
+                LBAdvanceKernelPolicy;
 
-            return EnactPR<AdvanceKernelPolicy, FilterKernelPolicy, PRProblem>(
-                context, problem, max_iteration, max_grid_size);
+            typedef gunrock::oprtr::advance::KernelPolicy<
+                PRProblem,                          // Problem data type
+                300,                                // CUDA_ARCH
+                INSTRUMENT,                         // INSTRUMENT
+                8,                                  // MIN_CTA_OCCUPANCY
+                7,                                  // LOG_THREADS
+                10,                                 // LOG_BLOCKS
+                32*128,                             // LIGHT_EDGE_THRESHOLD
+                1,                                  // LOG_LOAD_VEC_SIZE
+                1,                                  // LOG_LOADS_PER_TILE
+                5,                                  // LOG_RAKING_THREADS
+                32,                                 // WARP_GATHER_THRESHOLD
+                128 * 4,                            // CTA_GATHER_THRESHOLD
+                7,                                  // LOG_SCHEDULE_GRANULARITY
+                gunrock::oprtr::advance::TWC_FORWARD>
+                FWDAdvanceKernelPolicy;
+
+            if (traversal_mode == 1)
+            {
+                return EnactPR<
+                    FWDAdvanceKernelPolicy, FilterKernelPolicy, PRProblem>(
+                        context, problem, max_iteration, max_grid_size);
+            }
+            else
+            {
+                return EnactPR<
+                    LBAdvanceKernelPolicy, FilterKernelPolicy, PRProblem>(
+                        context, problem, max_iteration, max_grid_size);
+            }
         }
 
         //to reduce compile time, get rid of other architecture for now

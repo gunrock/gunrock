@@ -306,6 +306,7 @@ void RunTests(
     int max_grid_size,
     int num_gpus,
     int iterations,
+    int traversal_mode,
     CudaContext& context)
 {
 
@@ -351,7 +352,7 @@ void RunTests(
         gpu_timer.Start();
         util::GRError(
             pr_enactor.template Enact<Problem>(
-                context, csr_problem, max_iter, max_grid_size),
+                context, csr_problem, max_iter, traversal_mode, max_grid_size),
             "pr Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
         elapsed += gpu_timer.ElapsedMillis();
@@ -436,14 +437,22 @@ void RunTests(
     CommandLineArgs &args,
     CudaContext& context)
 {
-    Value    delta         = 0.85f; // Use whatever the specified graph-type's default is
-    Value    error         = 0.01f; // Error threshold
-    SizeT    max_iter      = 50;
-    bool     instrumented  = false; // Whether or not to collect instrumentation from kernels
-    int      max_grid_size = 0;     // maximum grid size (0: leave it up to the enactor)
-    int      num_gpus      = 1;     // Number of GPUs for multi-gpu enactor to use
-    VertexId src           = -1;
-    int      iterations    = 1;
+    Value    delta          = 0.85f; // Use whatever the specified graph-type's default is
+    Value    error          = 0.01f; // Error threshold
+    SizeT    max_iter       = 50;    // Maximum number of iteration
+    bool     instrumented   = false; // Whether or not to collect instrumentation from kernels
+    int      max_grid_size  = 0;     // maximum grid size (0: leave it up to the enactor)
+    int      num_gpus       = 1;     // Number of GPUs for multi-gpu enactor to use
+    VertexId src            = -1;    // Source vertex
+    int      iterations     = 1;     // Number of runs for testing
+    int      traversal_mode = -1;    // Load-balacned or Dynamic cooperative
+
+    // traversal mode
+    args.GetCmdLineArgument("traversal-mode", traversal_mode);
+    if (traversal_mode == -1)
+    {
+        traversal_mode = graph.GetAverageDegree() > 3 ? 0 : 1;
+    }
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("delta", delta);
@@ -465,6 +474,7 @@ void RunTests(
             max_grid_size,
             num_gpus,
             iterations,
+            traversal_mode,
             context);
     }
     else
@@ -478,6 +488,7 @@ void RunTests(
             max_grid_size,
             num_gpus,
             iterations,
+            traversal_mode,
             context);
     }
 }
@@ -506,7 +517,8 @@ int main( int argc, char** argv)
     //srand(time(NULL));
 
     // Parse graph-contruction params
-    g_undirected = args.CheckCmdLineFlag("undirected");
+    //g_undirected = args.CheckCmdLineFlag("undirected");
+    g_undirected = true;
 
     std::string graph_type = argv[1];
     int flags = args.ParsedArgc();

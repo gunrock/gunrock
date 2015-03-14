@@ -125,7 +125,8 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
             return;
 
         unsigned int my_vert = vertex_in[my_id];
-        if (my_vert < 0 || my_vert >= node_num) return;
+        //if (my_vert < 0 || my_vert >= node_num) return;
+        if (my_vert >= node_num) return;
         problem->d_visit_lookup[my_vert] = my_id;
     }
 
@@ -147,7 +148,8 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
 
         unsigned int bucket_max = UINT_MAX/problem->d_delta[0];
         unsigned int my_vert = vertex_in[my_id];
-        if (my_vert < 0 || my_vert >= node_num) { pq->d_valid_near[my_id] = 0; pq->d_valid_far[my_id] = 0; return; }
+        // if (my_vert < 0 || my_vert >= node_num) { pq->d_valid_near[my_id] = 0; pq->d_valid_far[my_id] = 0; return; }
+        if (my_vert >= node_num) { pq->d_valid_near[my_id] = 0; pq->d_valid_far[my_id] = 0; return; }
         unsigned int bucket_id = Functor::ComputePriorityScore(my_vert, problem);
         bool valid = (my_id == problem->d_visit_lookup[my_vert]);
         //printf(" valid:%d, my_id: %d, my_vert: %d\n", valid, my_id, my_vert, bucket_id);
@@ -171,7 +173,8 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
             return;
 
         unsigned int my_vert = vertex_in[my_id];
-        if (my_vert < 0 || my_vert >= node_num) { pq->d_valid_near[my_id] = 0; pq->d_valid_far[my_id] = 0; return; }
+        //if (my_vert < 0 || my_vert >= node_num) { pq->d_valid_near[my_id] = 0; pq->d_valid_far[my_id] = 0; return; }
+        if (my_vert >= node_num) { pq->d_valid_near[my_id] = 0; pq->d_valid_far[my_id] = 0; return; }
         pq->d_valid_near[my_id] = (my_id == problem->d_visit_lookup[my_vert]);
         pq->d_valid_far[my_id] = 0;
     }
@@ -193,7 +196,8 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
             return;
 
         unsigned int my_vert = vertex_in[my_id];
-        if (my_vert<0 || my_vert >= node_num) return;
+        //if (my_vert<0 || my_vert >= node_num) return;
+        if (my_vert >= node_num) return;
         unsigned int my_valid = pq->d_valid_near[my_id];
 
         if (my_valid == pq->d_valid_near[my_id+1]-1)
@@ -202,7 +206,7 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
         my_valid = pq->d_valid_far[my_id];
         if (my_valid == pq->d_valid_far[my_id+1]-1)
             pq->d_queue[selector][my_valid+far_pile_offset] = my_vert;
-        
+
     }
 
     static __device__ __forceinline__ void Compact2(
@@ -221,7 +225,8 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
             return;
 
         unsigned int my_vert = vertex_in[my_id];
-        if (my_vert<0 || my_vert >= node_num) return;
+        //if (my_vert<0 || my_vert >= node_num) return;
+        if (my_vert >= node_num) return;
         unsigned int my_valid = pq->d_valid_near[my_id];
 
         if (my_valid == pq->d_valid_near[my_id+1]-1)
@@ -434,9 +439,9 @@ template <typename KernelPolicy, typename ProblemData, typename PriorityQueue, t
         // get output_near_length
         // get output_far_length
         cudaMemcpy(&close_size[0], pq->nf_pile[0]->d_valid_near+input_queue_length, sizeof(VertexId),
-		    cudaMemcpyDeviceToHost);
-		cudaMemcpy(&far_size[0], pq->nf_pile[0]->d_valid_far+input_queue_length, sizeof(VertexId),
-		    cudaMemcpyDeviceToHost);
+                   cudaMemcpyDeviceToHost);
+        cudaMemcpy(&far_size[0], pq->nf_pile[0]->d_valid_far+input_queue_length, sizeof(VertexId),
+                   cudaMemcpyDeviceToHost);
 
     }
     // Update near/far length
@@ -495,7 +500,7 @@ template <typename KernelPolicy, typename ProblemData, typename PriorityQueue, t
         Compact2<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, nf_pile, pq->selector, input_queue_length, vertex_out, 0, node_num);
         // get output_length
         cudaMemcpy(&close_size[0], pq->nf_pile[0]->d_valid_near+input_queue_length, sizeof(VertexId),
-		    cudaMemcpyDeviceToHost);
+                   cudaMemcpyDeviceToHost);
     }
     // Update queue length
     return close_size[0];

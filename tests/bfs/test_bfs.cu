@@ -66,7 +66,7 @@ void Usage()
         "    edges from stdin (or from the optionally-specified file).\n"
         "  --device=<device_index>  Set GPU device for running the primitive.\n"
         "  --undirected If set then treat the graph as undirected (symmetric).\n"
-        "  --idempotence If set then enable idempotence.\n"
+        "  --idempotence If set then enable idempotence. Default: 1\n"
         "  --instrumented If set then kernels keep track of queue-search_depth\n"
         "  and barrier duty (a relative indicator of load imbalance.)\n"
         "  --src Begins BFS from the vertex <source index>. If set as randomize\n"
@@ -75,10 +75,10 @@ void Usage()
         "  --quick If set will skip the CPU validation code.\n"
         "  --mark-pred If set then keep not only label info but also predecessor info.\n"
         "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
-        "  Default is 1.0\n"
+        "  Default: 1.0\n"
         "  --v If set then print verbose per iteration info.\n"
-        "  --iteration-num Set number of runs to perform the algorithm, default 1.\n"
-        "  --traversal-mode Set traversal strategy, default 0.\n"
+        "  --iteration-num Set number of runs to perform the algorithm, default: 1.\n"
+        "  --traversal-mode Set traversal strategy. Default: automatic.\n"
         "  0 for load-balanced, 1 for dynamic-cooperative.\n"
         );
 }
@@ -103,11 +103,13 @@ void DisplaySolution(
     if (nodes > 40)
         nodes = 40;
     printf("[");
-    for (VertexId i = 0; i < nodes; ++i) {
+    for (VertexId i = 0; i < nodes; ++i)
+    {
         PrintValue(i);
         printf(":");
         PrintValue(source_path[i]);
-        if (MARK_PREDECESSORS && !ENABLE_IDEMPOTENCE) {
+        if (MARK_PREDECESSORS && !ENABLE_IDEMPOTENCE)
+        {
             printf(",");
             PrintValue(preds[i]);
         }
@@ -119,7 +121,8 @@ void DisplaySolution(
 /**
  * Performance/Evaluation statistics
  */
-struct Stats {
+struct Stats
+{
     const char *name;
     Statistic rate;
     Statistic search_depth;
@@ -361,7 +364,6 @@ void RunTests(
         {
             reference_check_preds = reference_preds;
         }
-
     }
 
     // Allocate BFS enactor map
@@ -494,18 +496,18 @@ void RunTests(
     CommandLineArgs &args,
     CudaContext& context)
 {
-    VertexId            src                 = -1;           // Use whatever the specified graph-type's default is
-    std::string         src_str;
-    bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
-    bool                mark_pred           = false;        // Whether or not to mark src-distance vs. parent vertices
-    bool                idempotence         = false;        // Whether or not to enable idempotence operation
-    int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
-    int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
-    double              max_queue_sizing    = 1.0;          // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
-    int                 iterations          = 1;
-    int                 traversal_mode      = 0;
+    VertexId    src              = -1;  // Use whatever the specified graph-type's default is
+    std::string src_str;
+    bool        instrumented     = 0;   // Whether or not to collect instrumentation from kernels
+    bool        mark_pred        = 0;   // Whether or not to mark src-distance vs. parent vertices
+    bool        idempotence      = 0;   // Whether or not to enable idempotence operation
+    int         max_grid_size    = 0;   // Maximum grid size (0: leave it up to the enactor)
+    int         num_gpus         = 1;   // Number of GPUs for multi-gpu enactor to use
+    double      max_queue_sizing = 1.0; // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
+    int         iterations       = 1;   // Number of runs for testing
+    int         traversal_mode   = -1;  // Load-balacned or Dynamic cooperative
 
-    instrumented = args.CheckCmdLineFlag("instrumented");
+    // source vertex
     args.GetCmdLineArgument("src", src_str);
     if (src_str.empty())
     {
@@ -517,31 +519,41 @@ void RunTests(
     }
     else if (src_str.compare("largestdegree") == 0)
     {
-        int temp;
-        src = graph.GetNodeWithHighestDegree(temp);
-        printf("highest degree: %d\n", temp);
+        int max_degree;
+        src = graph.GetNodeWithHighestDegree(max_degree);
+        printf("Using highest degree (%d) vertex: %d\n", max_degree, src);
     }
     else
     {
         args.GetCmdLineArgument("src", src);
     }
 
+    // traversal mode
+    args.GetCmdLineArgument("traversal-mode", traversal_mode);
+    if (traversal_mode == -1)
+    {
+        traversal_mode = graph.GetAverageDegree() > 8 ? 0 : 1;
+    }
+
     args.GetCmdLineArgument("iteration-num", iterations);
     args.GetCmdLineArgument("grid-size", max_grid_size);
-    args.GetCmdLineArgument("traversal-mode", traversal_mode);
 
-    //printf("Display neighbor list of src:\n");
-    //graph.DisplayNeighborList(src);
+    // printf("Display neighbor list of src:\n");
+    // graph.DisplayNeighborList(src);
 
+    instrumented = args.CheckCmdLineFlag("instrumented");
     g_quick = args.CheckCmdLineFlag("quick");
     mark_pred = args.CheckCmdLineFlag("mark-pred");
     idempotence = args.CheckCmdLineFlag("idempotence");
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
     g_verbose = args.CheckCmdLineFlag("v");
 
-    if (instrumented) {
-        if (mark_pred) {
-            if (idempotence) {
+    if (instrumented)
+    {
+        if (mark_pred)
+        {
+            if (idempotence)
+            {
                 RunTests<VertexId, Value, SizeT, true, true, true>(
                     graph,
                     src,
@@ -551,7 +563,9 @@ void RunTests(
                     iterations,
                     traversal_mode,
                     context);
-            } else {
+            }
+            else
+            {
                 RunTests<VertexId, Value, SizeT, true, true, false>(
                     graph,
                     src,
@@ -562,8 +576,11 @@ void RunTests(
                     traversal_mode,
                     context);
             }
-        } else {
-            if (idempotence) {
+        }
+        else
+        {
+            if (idempotence)
+            {
                 RunTests<VertexId, Value, SizeT, true, false, true>(
                     graph,
                     src,
@@ -573,7 +590,9 @@ void RunTests(
                     iterations,
                     traversal_mode,
                     context);
-            } else {
+            }
+            else
+            {
                 RunTests<VertexId, Value, SizeT, true, false, false>(
                     graph,
                     src,
@@ -585,9 +604,13 @@ void RunTests(
                     context);
             }
         }
-    } else {
-        if (mark_pred) {
-            if (idempotence) {
+    }
+    else
+    {
+        if (mark_pred)
+        {
+            if (idempotence)
+            {
                 RunTests<VertexId, Value, SizeT, false, true, true>(
                     graph,
                     src,
@@ -597,7 +620,9 @@ void RunTests(
                     iterations,
                     traversal_mode,
                     context);
-            } else {
+            }
+            else
+            {
                 RunTests<VertexId, Value, SizeT, false, true, false>(
                     graph,
                     src,
@@ -608,8 +633,11 @@ void RunTests(
                     traversal_mode,
                     context);
             }
-        } else {
-            if (idempotence) {
+        }
+        else
+        {
+            if (idempotence)
+            {
                 RunTests<VertexId, Value, SizeT, false, false, true>(
                     graph,
                     src,
@@ -619,7 +647,9 @@ void RunTests(
                     iterations,
                     traversal_mode,
                     context);
-            } else {
+            }
+            else
+            {
                 RunTests<VertexId, Value, SizeT, false, false, false>(
                     graph,
                     src,
@@ -697,8 +727,6 @@ int main( int argc, char** argv)
         }
 
         csr.PrintHistogram();
-
-        // printf("average degree: %d", csr.GetAverageDegree());
 
         // Run tests
         RunTests(csr, args, *context);

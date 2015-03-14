@@ -63,26 +63,28 @@ bool g_stream_from_host;
  ******************************************************************************/
 void Usage()
 {
-    printf("\ntest_sssp <graph type> <graph type args> [--device=<device_index>] "
-           "[--undirected] [--instrumented] [--src=<source index>] [--quick]\n"
-           "[--v] [mark-pred] [--queue-sizing=<scale factor>]\n"
-           "\n"
-           "Graph types and args:\n"
-           "  market [<file>]\n"
-           "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
-           "    edges from stdin (or from the optionally-specified file).\n"
-           "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
-           "  --undirected If set then treat the graph as undirected.\n"
-           "  --instrumented If set then kernels keep track of queue-search_depth\n"
-           "  and barrier duty (a relative indicator of load imbalance.)\n"
-           "  --src Begins SSSP from the vertex <source index>. If set as randomize\n"
-           "  then will begin with a random source vertex.\n"
-           "  If set as largestdegree then will begin with the node which has\n"
-           "  largest degree.\n"
-           "  --quick If set will skip the CPU validation code.\n"
-           "  --v Whether to show debug info.\n"
-           "  --mark-pred If set then keep not only label info but also predecessor info.\n"
-           "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
+    printf(
+        "\ntest_sssp <graph type> <graph type args> [--device=<device_index>] "
+        "[--undirected] [--instrumented] [--src=<source index>] [--quick] [--v]\n"
+        "[--mark-pred] [--queue-sizing=<scale factor>] [--traversal-mode=<mode>]\n"
+        "\n"
+        "Graph types and args:\n"
+        "  market [<file>]\n"
+        "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
+        "    edges from stdin (or from the optionally-specified file).\n"
+        "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
+        "  --undirected If set then treat the graph as undirected.\n"
+        "  --instrumented If set then kernels keep track of queue-search_depth\n"
+        "  and barrier duty (a relative indicator of load imbalance.)\n"
+        "  --src Begins SSSP from the vertex <source index>. If set as randomize\n"
+        "  then will begin with a random source vertex.\n"
+        "  If set as largestdegree then will begin with the node which has\n"
+        "  largest degree.\n"
+        "  --quick If set will skip the CPU validation code.\n"
+        "  --v Whether to show debug info.\n"
+        "  --mark-pred If set then keep not only label info but also predecessor info.\n"
+        "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
+        "  --traversal-mode 0 for Load-balanced, 1 for Dynamic cooperative\n"
         );
 }
 
@@ -190,12 +192,12 @@ void DisplayStats(
         printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed, m_teps);
         if (search_depth != 0)
             printf(", search_depth: %lld", (long long) search_depth);
+        printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
+               (long long) src, (long long) nodes_visited, (long long) edges_visited);
         if (avg_duty != 0)
         {
             printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
         }
-        printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
-               (long long) src, (long long) nodes_visited, (long long) edges_visited);
         if (total_queued > 0)
         {
             printf(", total queued: %lld", total_queued);
@@ -347,8 +349,9 @@ void SimpleReferenceSssp(
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] queue_sizing Scaling factor used in edge mapping
  * @param[in] num_gpus Number of GPUs
- * @param[in] delta_factor Parameter to specify delta value in delta-stepping SSSP
+ * @param[in] delta_factor Parameter to specify delta in delta-stepping SSSP
  * @param[in] iterations Number of iteration for running the test
+ & @param[in] traversal_mode Load-balanced or Dynamic cooperative
  * @param[in] context CudaContext pointer for moderngpu APIs
  */
 template <
@@ -365,6 +368,7 @@ void RunTests(
     int num_gpus,
     int delta_factor,
     int iterations,
+    int traversal_mode,
     CudaContext& context)
 {
     typedef SSSPProblem<
@@ -435,7 +439,8 @@ void RunTests(
         gpu_timer.Start();
         util::GRError(
             sssp_enactor.template Enact<Problem>(
-                context, csr_problem, src, queue_sizing, max_grid_size),
+                context, csr_problem, src, queue_sizing,
+                traversal_mode, max_grid_size),
             "SSSP Problem Enact Failed", __FILE__, __LINE__);
         gpu_timer.Stop();
 
@@ -451,26 +456,31 @@ void RunTests(
         csr_problem->Extract(h_labels, h_preds),
         "SSSP Problem Data Extraction Failed", __FILE__, __LINE__);
 
+    // Display Solution
+    printf("\nFirst 40 labels of the GPU result.\n");
+    DisplaySolution(h_labels, graph.nodes);
+
     // Verify the result
     if (reference_check_label != NULL)
     {
         printf("Label Validity: ");
         CompareResults(h_labels, reference_check_label, graph.nodes, true);
-    }
 
-    // Display Solution
-    printf("\nFirst 40 labels of the GPU result.\n");
-    DisplaySolution(h_labels, graph.nodes);
-    printf("\nFirst 40 labels of the reference CPU result.\n");
-    DisplaySolution(reference_check_label, graph.nodes);
+        printf("\nFirst 40 labels of the reference CPU result.\n");
+        DisplaySolution(reference_check_label, graph.nodes);
+    }
 
     if (MARK_PREDECESSORS)
     {
         printf("\nFirst 40 preds of the GPU result.\n");
         DisplaySolution(h_preds, graph.nodes);
-        printf("\nFirst 40 preds of the reference CPU result"
-               " (could be different because the paths are not unique).\n");
-        DisplaySolution(reference_check_pred, graph.nodes);
+
+        if (reference_check_label != NULL)
+        {
+            printf("\nFirst 40 preds of the reference CPU result"
+                   " (could be different because the paths are not unique).\n");
+            DisplaySolution(reference_check_pred, graph.nodes);
+        }
     }
 
     DisplayStats(
@@ -515,39 +525,55 @@ void RunTests(
     CommandLineArgs &args,
     CudaContext& context)
 {
-    VertexId            src                 = -1;           // Use whatever the specified graph-type's default is
-    std::string         src_str;
-    bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
-    int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
-    int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
-    float               max_queue_sizing    = 1.0;
-    bool                mark_pred           = false;
-    int                 iterations          = 1;
+    VertexId    src              = -1;  // Use whatever the specified graph-type's default is
+    std::string src_str;
+    bool        instrumented     = 0;   // Whether or not to collect instrumentation from kernels
+    int         max_grid_size    = 0;   // Maximum grid size (0: leave it up to the enactor)
+    int         num_gpus         = 1;   // Number of GPUs for multi-gpu enactor to use
+    float       max_queue_sizing = 1.0; // Max queue sizing factor
+    bool        mark_pred        = 0;   // Mark predecessor
+    int         iterations       = 1;   // Number of runs for testing
+    int         delta_factor     = 16;  // Delta factor for priority queue
+    int         traversal_mode   = -1;  // traversal mode: 0 for LB, 1 for TWC
 
-    instrumented = args.CheckCmdLineFlag("instrumented");
+    // source vertex to start
     args.GetCmdLineArgument("src", src_str);
-    args.GetCmdLineArgument("iteration-num", iterations);
-    if (src_str.empty()) {
+    if (src_str.empty())
+    {
         src = 0;
-    } else if (src_str.compare("randomize") == 0) {
+    }
+    else if (src_str.compare("randomize") == 0)
+    {
         src = graphio::RandomNode(graph.nodes);
-    } else if (src_str.compare("largestdegree") == 0) {
-        int max_degree = 0;
+    }
+    else if (src_str.compare("largestdegree") == 0)
+    {
+        int max_degree;
         src = graph.GetNodeWithHighestDegree(max_degree);
-    } else {
+        printf("Using highest degree (%d) vertex: %d\n", max_degree, src);
+    }
+    else
+    {
         args.GetCmdLineArgument("src", src);
     }
 
+    // traversal mode
+    args.GetCmdLineArgument("traversal-mode", traversal_mode);
+    if (traversal_mode == -1)
+    {
+        traversal_mode = graph.GetAverageDegree() > 8 ? 0 : 1;
+    }
+
+    instrumented = args.CheckCmdLineFlag("instrumented");
     mark_pred = args.CheckCmdLineFlag("mark-pred");
-    args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
-    int delta_factor = 16;
-    args.GetCmdLineArgument("delta-factor", delta_factor);
-
-    //printf("Display neighbor list of src:\n");
-    //graph.DisplayNeighborList(src);
-
     g_quick = args.CheckCmdLineFlag("quick");
     g_verbose = args.CheckCmdLineFlag("v");
+    args.GetCmdLineArgument("iteration-num", iterations);
+    args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
+    args.GetCmdLineArgument("delta-factor", delta_factor);
+
+    // printf("Display neighbor list of src:\n");
+    // graph.DisplayNeighborList(src);
 
     if (mark_pred) {
         if (instrumented) {
@@ -559,6 +585,7 @@ void RunTests(
                 num_gpus,
                 delta_factor,
                 iterations,
+                traversal_mode,
                 context);
         } else {
             RunTests<VertexId, Value, SizeT, false, true>(
@@ -569,6 +596,7 @@ void RunTests(
                 num_gpus,
                 delta_factor,
                 iterations,
+                traversal_mode,
                 context);
         }
     } else {
@@ -581,6 +609,7 @@ void RunTests(
                 num_gpus,
                 delta_factor,
                 iterations,
+                traversal_mode,
                 context);
         } else {
             RunTests<VertexId, Value, SizeT, false, false>(
@@ -591,6 +620,7 @@ void RunTests(
                 num_gpus,
                 delta_factor,
                 iterations,
+                traversal_mode,
                 context);
         }
     }
