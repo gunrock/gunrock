@@ -168,13 +168,13 @@ struct GraphSlice
         this->graph            = graph;
         nodes                  = graph->nodes;
         edges                  = graph->edges;
-        this->partition_table    .SetPointer(partition_table      , nodes     );
-        this->convertion_table   .SetPointer(convertion_table     , nodes     );
-        this->original_vertex    .SetPointer(original_vertex      , nodes     );
+        if (partition_table  != NULL) this->partition_table    .SetPointer(partition_table      , nodes     );
+        if (convertion_table != NULL) this->convertion_table   .SetPointer(convertion_table     , nodes     );
+        if (original_vertex  != NULL) this->original_vertex    .SetPointer(original_vertex      , nodes     );
         //this->in_offset          .SetPointer(in_offset            , num_gpus+1);
-        this->in_counter         .SetPointer(in_counter           , num_gpus+1);
-        this->out_offset         .SetPointer(out_offset           , num_gpus+1);
-        this->out_counter        .SetPointer(out_counter          , num_gpus+1);
+        if (in_counter       != NULL) this->in_counter         .SetPointer(in_counter           , num_gpus+1);
+        if (out_offset       != NULL) this->out_offset         .SetPointer(out_offset           , num_gpus+1);
+        if (out_counter      != NULL) this->out_counter        .SetPointer(out_counter          , num_gpus+1);
         this->row_offsets        .SetPointer(graph->row_offsets   , nodes+1   );
         this->column_indices     .SetPointer(graph->column_indices, edges     );
 
@@ -193,15 +193,18 @@ struct GraphSlice
             {
                 // Allocate and initalize convertion_table
                 if (retval = this->partition_table.Allocate (nodes     ,util::DEVICE)) break;
-                if (retval = this->partition_table.Move     (util::HOST,util::DEVICE)) break;
+                if (partition_table  != NULL)
+                    if (retval = this->partition_table.Move     (util::HOST,util::DEVICE)) break;
                 
                 // Allocate and initalize convertion_table
                 if (retval = this->convertion_table.Allocate(nodes     ,util::DEVICE)) break;
-                if (retval = this->convertion_table.Move    (util::HOST,util::DEVICE)) break;
+                if (convertion_table != NULL)
+                    if (retval = this->convertion_table.Move    (util::HOST,util::DEVICE)) break;
 
                 // Allocate and initalize original_vertex
                 if (retval = this->original_vertex .Allocate(nodes     ,util::DEVICE)) break;
-                if (retval = this->original_vertex .Move    (util::HOST,util::DEVICE)) break;
+                if (original_vertex  != NULL)
+                    if (retval = this->original_vertex .Move    (util::HOST,util::DEVICE)) break;
                 
                 // Allocate and initalize in_offset
                 //if (retval = this->in_offset       .Allocate(num_gpus+1,util::DEVICE)) break;
@@ -228,6 +231,28 @@ struct GraphSlice
         return retval;
     } // end of Init(...)
 
+    GraphSlice& operator=(GraphSlice other)
+    {
+        num_gpus            = other.num_gpus           ;
+        index               = other.index              ;
+        nodes               = other.nodes              ;
+        edges               = other.edges              ;
+        graph               = other.graph              ;
+        row_offsets         = other.row_offsets        ;
+        column_indices      = other.column_indices     ;
+        column_offsets      = other.column_offsets     ;
+        row_indices         = other.row_indices        ;
+        partition_table     = other.partition_table    ;
+        convertion_table    = other.convertion_table   ;
+        original_vertex     = other.original_vertex    ;
+        in_counter          = other.in_counter         ;
+        out_offset          = other.out_offset         ;
+        out_counter         = other.out_counter        ;
+        backward_offset     = other.backward_offset    ;
+        backward_partition  = other.backward_partition ;
+        backward_convertion = other.backward_convertion;
+        return *this;
+    }
 }; // end GraphSlice
 
 

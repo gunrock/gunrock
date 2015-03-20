@@ -244,7 +244,7 @@ public:
         SizeT*          out_counter           = thread_data->out_counter[gpu];
         SizeT           num_nodes             = 0, node_counter;
         SizeT           num_edges             = 0, edge_counter;
-        VertexId*       marker                = new int[graph->nodes];
+        VertexId*       marker                = new VertexId[graph->nodes];
         //SizeT*          cross_counter         = new SizeT[num_gpus];
         VertexId*       tconvertion_table     = new VertexId[graph->nodes];
         SizeT           in_counter_           = 0;

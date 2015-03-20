@@ -1,0 +1,979 @@
+Using 1 gpus:  0  ,0xb8e180 ,0xc27f20
+[host] Reading nodes...OK.
+[host] Reading constraints...OK.
+[host] Reading HCD table...OK.
+numVars             	 11104
+numObjectVars       	 2263
+numPtsConstraints   	 1423
+numCopyConstraints  	 3881
+numLoadConstraints  	 1940
+numStoreConstraints 	 611
+numGepInv           	 826
+numInitialRep       	 1574
+numHcdIndex         	 74
+numHcdTable         	 184
+[host] creating graphs 9938 => 9938
+
+creating ptsGraph
+1668 -> 6170
+2204 -> 10542
+2244 -> 10876
+creating copyInvGraph
+2424 -> 9938
+2444 -> 6183
+2444 -> 10285
+2444 -> 10287
+2447 -> 6183
+2447 -> 10365
+2447 -> 10367
+2447 -> 10371
+2457 -> 2458
+2457 -> 2459
+2457 -> 6167
+2457 -> 6169
+2457 -> 6183
+2457 -> 6238
+2457 -> 9879
+2457 -> 9957
+2457 -> 9969
+2457 -> 9977
+2457 -> 10517
+2457 -> 10519
+2457 -> 10829
+2457 -> 10874
+2457 -> 10875
+2457 -> 10886
+2457 -> 10896
+2457 -> 10906
+2458 -> 6176
+2458 -> 6242
+2458 -> 9938
+2458 -> 10891
+2458 -> 10901
+2459 -> 6247
+6167 -> 6169
+6167 -> 6176
+6167 -> 6181
+6168 -> 6167
+6169 -> 2467
+6171 -> 6170
+6173 -> 6170
+6176 -> 6169
+6176 -> 6171
+6181 -> 2460
+6183 -> 6168
+6183 -> 6181
+6246 -> 6183
+6248 -> 2460
+6257 -> 9938
+9922 -> 9938
+9936 -> 9938
+9938 -> 9938
+9938 -> 9938
+9938 -> 6183
+9938 -> 9965
+9938 -> 9985
+10286 -> 2444
+10364 -> 2447
+10370 -> 2447
+10518 -> 2457
+10533 -> 2457
+10543 -> 10542
+10545 -> 10542
+10877 -> 10876
+10879 -> 10876
+creating loadInvGraph
+6247 -> 6246
+9938 -> 9938
+9938 -> 9938
+9938 -> 9938
+9957 -> 9938
+creating storeGraph
+6169 -> 6173
+6171 -> 6174
+6248 -> 6246
+6183 -> 6249
+9938 -> 9917
+9938 -> 9929
+9938 -> 9938
+9938 -> 9938
+9938 -> 9938
+9959 -> 9938
+9938 -> 9955
+9938 -> 9963
+9938 -> 9975
+9938 -> 9983
+2458 -> 10545
+creating gepInvGraph
+OK.
+6172 -> 6171 o = 3
+6174 -> 6169 o = 2
+6175 -> 6171 o = 1
+6182 -> 6181 o = 2
+6249 -> 6248 o = 2
+9911 -> 9938 o = 3
+9925 -> 9938 o = 1
+9928 -> 9938 o = 1
+9938 -> 9938 o = 1
+9948 -> 9938 o = 2
+9950 -> 9938 o = 1
+9956 -> 9938 o = 1
+9968 -> 9938 o = 1
+9976 -> 9938 o = 1
+9988 -> 9938 o = 2
+10269 -> 2444 o = 3
+10274 -> 2444 o = 1
+10278 -> 2444 o = 1
+10284 -> 2444 o = 1
+10330 -> 2444 o = 1
+10342 -> 2444 o = 1
+10363 -> 2447 o = 3
+10366 -> 2447 o = 1
+10368 -> 2447 o = 1
+10515 -> 2457 o = 3
+10516 -> 2457 o = 1
+10520 -> 2457 o = 1
+10546 -> 2458 o = 2
+Andersen vertex map occupancy 8, level-grid size 120
+AndersenThread entered
+  	   	     	 GraphSlice Reset() begin.
+Iteration entered
+checking to_continue = true
+checking to_continue = true
+0	 0	 0	 stage0	 0	 Queue_Length = 0
+0	 0	 1	 stage0	 0	 Queue_Length = 0
+checking to_continue = true
+0	 0	 0	 stage4	 0	 Queue_Length = 0
+0	 0	 1	 stage4	 1	 Queue_Length = 0
+checking to_continue = true
+checking to_continue = true
+0	 0	 	 Subqueue finished. Total_Length= 0
+Inverting  : ptsIadd <- (pts_add)^-1
+MakeInverstFunctor CondEdge 13,0 : 1668->6170, e_id = 1220
+MakeInverstFunctor CondEdge 17,6 : 2204->10542, e_id = 1409
+MakeInverstFunctor CondEdge 17,15 : 2244->10876, e_id = 1418
+MakeInverstFunctor ApplyEdge 13,0 : 1668->6170, e_id = 1220
+MakeInverstFunctor ApplyEdge 17,6 : 2204->10542, e_id = 1409
+MakeInverstFunctor ApplyEdge 17,15 : 2244->10876, e_id = 1418
+InverstGraph 13,4 : 1668 -> 6170, e_id = 1220
+InverstGraph 17,68 : 2244 -> 10876, e_id = 1418
+InverstGraph 17,28 : 2204 -> 10542, e_id = 1409
+0	 0	 	 Fullqueue started. Total_Length= 11104
+0	 0	 0	 stage5	 	 Queue_Length = 11104
+0	 0	 0	 queue_length = 1427, output_length = 1423
+RuleKernel : pts_inc <- copyIad, pts
+r_offset = 11105,0x7048fac00 r_indices = 3881,0x7049c5e00
+s_offset = 11105,0x7048efe00 s_indices = 1423,0x7049c4600
+t_offset = 11105,0x70493c000 t_indices = 1423,0x7049cec00
+RuleKernelFunctor CondEdge 81,1 : 10370 -> 2447
+RuleKernelFunctor CondEdge 80,14 : 10286 -> 2444
+RuleKernelFunctor CondEdge 82,4 : 10518 -> 2457
+RuleKernelFunctor CondEdge 82,11 : 10533 -> 2457
+RuleKernelFunctor CondEdge 82,16 : 10543 -> 10542
+RuleKernelFunctor CondEdge 82,17 : 10545 -> 10542
+RuleKernelFunctor CondEdge 19,64 : 2457 -> 10874
+RuleKernelFunctor CondEdge 19,65 : 2457 -> 10875
+RuleKernelFunctor CondEdge 19,66 : 2457 -> 10886
+RuleKernelFunctor CondEdge 19,67 : 2457 -> 10896
+RuleKernelFunctor CondEdge 19,68 : 2457 -> 10906
+RuleKernelFunctor CondEdge 19,69 : 2458 -> 6176
+RuleKernelFunctor CondEdge 19,70 : 2458 -> 6242
+RuleKernelFunctor CondEdge 19,71 : 2458 -> 9938
+RuleKernelFunctor CondEdge 19,72 : 2458 -> 10891
+RuleKernelFunctor CondEdge 19,73 : 2458 -> 10901
+RuleKernelFunctor CondEdge 19,75 : 2459 -> 6247
+RuleKernelFunctor CondEdge 77,28 : 9922 -> 9938
+RuleKernelFunctor CondEdge 77,31 : 9936 -> 9938
+RuleKernelFunctor CondEdge 19,23 : 2444 -> 6183
+RuleKernelFunctor CondEdge 19,24 : 2444 -> 10285
+RuleKernelFunctor CondEdge 19,25 : 2444 -> 10287
+RuleKernelFunctor CondEdge 48,6 : 6167 -> 6169
+RuleKernelFunctor CondEdge 48,7 : 6167 -> 6176
+RuleKernelFunctor CondEdge 48,8 : 6167 -> 6181
+RuleKernelFunctor CondEdge 48,9 : 6168 -> 6167
+RuleKernelFunctor CondEdge 48,10 : 6169 -> 2467
+RuleKernelFunctor CondEdge 48,11 : 6171 -> 6170
+RuleKernelFunctor CondEdge 48,12 : 6173 -> 6170
+RuleKernelFunctor CondEdge 48,13 : 6176 -> 6169
+RuleKernelFunctor CondEdge 48,14 : 6176 -> 6171
+RuleKernelFunctor CondEdge 48,17 : 6181 -> 2460
+RuleKernelFunctor CondEdge 48,18 : 6183 -> 6168
+RuleKernelFunctor CondEdge 48,19 : 6183 -> 6181
+RuleKernelFunctor CondEdge 84,35 : 10877 -> 10876
+RuleKernelFunctor CondEdge 84,36 : 10879 -> 10876
+RuleKernelFunctor CondEdge 80,43 : 10364 -> 2447
+RuleKernelFunctor CondEdge 19,32 : 2447 -> 6183
+RuleKernelFunctor CondEdge 19,33 : 2447 -> 10365
+RuleKernelFunctor CondEdge 19,34 : 2447 -> 10367
+RuleKernelFunctor CondEdge 19,35 : 2447 -> 10371
+RuleKernelFunctor CondEdge 19,51 : 2457 -> 2458
+RuleKernelFunctor CondEdge 19,52 : 2457 -> 2459
+RuleKernelFunctor CondEdge 19,53 : 2457 -> 6167
+RuleKernelFunctor CondEdge 19,54 : 2457 -> 6169
+RuleKernelFunctor CondEdge 19,55 : 2457 -> 6183
+RuleKernelFunctor CondEdge 19,56 : 2457 -> 6238
+RuleKernelFunctor CondEdge 19,57 : 2457 -> 9879
+RuleKernelFunctor CondEdge 19,58 : 2457 -> 9957
+RuleKernelFunctor CondEdge 19,59 : 2457 -> 9969
+RuleKernelFunctor CondEdge 19,60 : 2457 -> 9977
+RuleKernelFunctor CondEdge 19,61 : 2457 -> 10517
+RuleKernelFunctor CondEdge 19,62 : 2457 -> 10519
+RuleKernelFunctor CondEdge 19,63 : 2457 -> 10829
+RuleKernelFunctor CondEdge 77,32 : 9938 -> 9938
+RuleKernelFunctor CondEdge 77,33 : 9938 -> 9938
+RuleKernelFunctor CondEdge 77,34 : 9938 -> 6183
+RuleKernelFunctor CondEdge 77,35 : 9938 -> 9965
+RuleKernelFunctor CondEdge 77,36 : 9938 -> 9985
+RuleKernelFunctor CondEdge 48,43 : 6246 -> 6183
+RuleKernelFunctor CondEdge 48,44 : 6248 -> 2460
+RuleKernelFunctor CondEdge 48,46 : 6257 -> 9938
+RuleKernelFunctor ApplyEdge 80,14 : 10286 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3607
+RuleKernelFunctor ApplyEdge 81,1 : 10370 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3638
+RuleKernelFunctor CondEdge 18,38 : 2424 -> 9938
+RuleKernelFunctor ApplyEdge 80,43 : 10364 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3636
+RuleKernelFunctor ApplyEdge 84,35 : 10877 -> 10876, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3794
+RuleKernelFunctor ApplyEdge 84,36 : 10879 -> 10876, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3795
+RuleKernelFunctor ApplyEdge 19,23 : 2444 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 764
+RuleKernelFunctor ApplyEdge 19,24 : 2444 -> 10285, edges [1423->1423) @ 0, e_id_in = 0, e_id = 765
+RuleKernelFunctor ApplyEdge 19,25 : 2444 -> 10287, edges [1423->1423) @ 0, e_id_in = 0, e_id = 766
+RuleKernelFunctor ApplyEdge 82,4 : 10518 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3692
+RuleKernelFunctor ApplyEdge 82,11 : 10533 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3699
+RuleKernelFunctor ApplyEdge 82,16 : 10543 -> 10542, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3704
+RuleKernelFunctor ApplyEdge 82,17 : 10545 -> 10542, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3705
+RuleKernelFunctor ApplyEdge 77,28 : 9922 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3485
+RuleKernelFunctor ApplyEdge 77,31 : 9936 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3488
+RuleKernelFunctor ApplyEdge 48,43 : 6246 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2101
+RuleKernelFunctor ApplyEdge 48,44 : 6248 -> 2460, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2102
+RuleKernelFunctor ApplyEdge 48,46 : 6257 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2104
+RuleKernelFunctor ApplyEdge 77,32 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3489
+RuleKernelFunctor ApplyEdge 77,33 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3490
+RuleKernelFunctor ApplyEdge 77,34 : 9938 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3491
+RuleKernelFunctor ApplyEdge 77,35 : 9938 -> 9965, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3492
+RuleKernelFunctor ApplyEdge 77,36 : 9938 -> 9985, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3493
+RuleKernelFunctor ApplyEdge 19,64 : 2457 -> 10874, edges [1423->1423) @ 0, e_id_in = 0, e_id = 805
+RuleKernelFunctor ApplyEdge 19,65 : 2457 -> 10875, edges [1423->1423) @ 0, e_id_in = 0, e_id = 806
+RuleKernelFunctor ApplyEdge 19,66 : 2457 -> 10886, edges [1423->1423) @ 0, e_id_in = 0, e_id = 807
+RuleKernelFunctor ApplyEdge 19,67 : 2457 -> 10896, edges [1423->1423) @ 0, e_id_in = 0, e_id = 808
+RuleKernelFunctor ApplyEdge 19,68 : 2457 -> 10906, edges [1423->1423) @ 0, e_id_in = 0, e_id = 809
+RuleKernelFunctor ApplyEdge 19,69 : 2458 -> 6176, edges [1423->1423) @ 0, e_id_in = 0, e_id = 810
+RuleKernelFunctor ApplyEdge 19,70 : 2458 -> 6242, edges [1423->1423) @ 0, e_id_in = 0, e_id = 811
+RuleKernelFunctor ApplyEdge 19,71 : 2458 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 812
+RuleKernelFunctor ApplyEdge 19,72 : 2458 -> 10891, edges [1423->1423) @ 0, e_id_in = 0, e_id = 813
+RuleKernelFunctor ApplyEdge 19,73 : 2458 -> 10901, edges [1423->1423) @ 0, e_id_in = 0, e_id = 814
+RuleKernelFunctor ApplyEdge 19,75 : 2459 -> 6247, edges [1423->1423) @ 0, e_id_in = 0, e_id = 816
+RuleKernelFunctor ApplyEdge 48,6 : 6167 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2064
+RuleKernelFunctor ApplyEdge 48,7 : 6167 -> 6176, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2065
+RuleKernelFunctor ApplyEdge 48,8 : 6167 -> 6181, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2066
+RuleKernelFunctor ApplyEdge 48,9 : 6168 -> 6167, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2067
+RuleKernelFunctor ApplyEdge 48,10 : 6169 -> 2467, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2068
+RuleKernelFunctor ApplyEdge 48,11 : 6171 -> 6170, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2069
+RuleKernelFunctor ApplyEdge 48,12 : 6173 -> 6170, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2070
+RuleKernelFunctor ApplyEdge 48,13 : 6176 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2071
+RuleKernelFunctor ApplyEdge 48,14 : 6176 -> 6171, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2072
+RuleKernelFunctor ApplyEdge 48,17 : 6181 -> 2460, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2075
+RuleKernelFunctor ApplyEdge 48,18 : 6183 -> 6168, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2076
+RuleKernelFunctor ApplyEdge 48,19 : 6183 -> 6181, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2077
+RuleKernelFunctor ApplyEdge 19,32 : 2447 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 773
+RuleKernelFunctor ApplyEdge 19,33 : 2447 -> 10365, edges [1423->1423) @ 0, e_id_in = 0, e_id = 774
+RuleKernelFunctor ApplyEdge 19,34 : 2447 -> 10367, edges [1423->1423) @ 0, e_id_in = 0, e_id = 775
+RuleKernelFunctor ApplyEdge 19,35 : 2447 -> 10371, edges [1423->1423) @ 0, e_id_in = 0, e_id = 776
+RuleKernelFunctor ApplyEdge 19,51 : 2457 -> 2458, edges [1423->1423) @ 0, e_id_in = 0, e_id = 792
+RuleKernelFunctor ApplyEdge 19,52 : 2457 -> 2459, edges [1423->1423) @ 0, e_id_in = 0, e_id = 793
+RuleKernelFunctor ApplyEdge 19,53 : 2457 -> 6167, edges [1423->1423) @ 0, e_id_in = 0, e_id = 794
+RuleKernelFunctor ApplyEdge 19,54 : 2457 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 795
+RuleKernelFunctor ApplyEdge 19,55 : 2457 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 796
+RuleKernelFunctor ApplyEdge 19,56 : 2457 -> 6238, edges [1423->1423) @ 0, e_id_in = 0, e_id = 797
+RuleKernelFunctor ApplyEdge 19,57 : 2457 -> 9879, edges [1423->1423) @ 0, e_id_in = 0, e_id = 798
+RuleKernelFunctor ApplyEdge 19,58 : 2457 -> 9957, edges [1423->1423) @ 0, e_id_in = 0, e_id = 799
+RuleKernelFunctor ApplyEdge 19,59 : 2457 -> 9969, edges [1423->1423) @ 0, e_id_in = 0, e_id = 800
+RuleKernelFunctor ApplyEdge 19,60 : 2457 -> 9977, edges [1423->1423) @ 0, e_id_in = 0, e_id = 801
+RuleKernelFunctor ApplyEdge 19,61 : 2457 -> 10517, edges [1423->1423) @ 0, e_id_in = 0, e_id = 802
+RuleKernelFunctor ApplyEdge 19,62 : 2457 -> 10519, edges [1423->1423) @ 0, e_id_in = 0, e_id = 803
+RuleKernelFunctor ApplyEdge 19,63 : 2457 -> 10829, edges [1423->1423) @ 0, e_id_in = 0, e_id = 804
+RuleKernelFunctor ApplyEdge 18,38 : 2424 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 725
+RuleKernel : pts_inc += copyInv, pts_add
+r_offset = 11105,0x7048fac00 r_indices = 3881,0x7049c5e00
+s_offset = 11105,0x7048efe00 s_indices = 1423,0x7049c4600
+t_offset = 11105,0x70493c000 t_indices = 1423,0x7049cec00
+RuleKernelFunctor CondEdge 81,1 : 10370 -> 2447
+RuleKernelFunctor CondEdge 80,14 : 10286 -> 2444
+RuleKernelFunctor CondEdge 82,4 : 10518 -> 2457
+RuleKernelFunctor CondEdge 82,11 : 10533 -> 2457
+RuleKernelFunctor CondEdge 82,16 : 10543 -> 10542
+RuleKernelFunctor CondEdge 82,17 : 10545 -> 10542
+RuleKernelFunctor CondEdge 19,64 : 2457 -> 10874
+RuleKernelFunctor CondEdge 19,65 : 2457 -> 10875
+RuleKernelFunctor CondEdge 19,66 : 2457 -> 10886
+RuleKernelFunctor CondEdge 19,67 : 2457 -> 10896
+RuleKernelFunctor CondEdge 19,68 : 2457 -> 10906
+RuleKernelFunctor CondEdge 19,69 : 2458 -> 6176
+RuleKernelFunctor CondEdge 19,70 : 2458 -> 6242
+RuleKernelFunctor CondEdge 19,71 : 2458 -> 9938
+RuleKernelFunctor CondEdge 19,72 : 2458 -> 10891
+RuleKernelFunctor CondEdge 19,73 : 2458 -> 10901
+RuleKernelFunctor CondEdge 19,75 : 2459 -> 6247
+RuleKernelFunctor CondEdge 19,23 : 2444 -> 6183
+RuleKernelFunctor CondEdge 19,24 : 2444 -> 10285
+RuleKernelFunctor CondEdge 19,25 : 2444 -> 10287
+RuleKernelFunctor CondEdge 84,35 : 10877 -> 10876
+RuleKernelFunctor CondEdge 84,36 : 10879 -> 10876
+RuleKernelFunctor CondEdge 77,28 : 9922 -> 9938
+RuleKernelFunctor CondEdge 77,31 : 9936 -> 9938
+RuleKernelFunctor CondEdge 48,6 : 6167 -> 6169
+RuleKernelFunctor CondEdge 48,7 : 6167 -> 6176
+RuleKernelFunctor CondEdge 48,8 : 6167 -> 6181
+RuleKernelFunctor CondEdge 48,9 : 6168 -> 6167
+RuleKernelFunctor CondEdge 48,10 : 6169 -> 2467
+RuleKernelFunctor CondEdge 48,11 : 6171 -> 6170
+RuleKernelFunctor CondEdge 48,12 : 6173 -> 6170
+RuleKernelFunctor CondEdge 48,13 : 6176 -> 6169
+RuleKernelFunctor CondEdge 48,14 : 6176 -> 6171
+RuleKernelFunctor CondEdge 48,17 : 6181 -> 2460
+RuleKernelFunctor CondEdge 48,18 : 6183 -> 6168
+RuleKernelFunctor CondEdge 48,19 : 6183 -> 6181
+RuleKernelFunctor CondEdge 19,32 : 2447 -> 6183
+RuleKernelFunctor CondEdge 19,33 : 2447 -> 10365
+RuleKernelFunctor CondEdge 19,34 : 2447 -> 10367
+RuleKernelFunctor CondEdge 19,35 : 2447 -> 10371
+RuleKernelFunctor CondEdge 19,51 : 2457 -> 2458
+RuleKernelFunctor CondEdge 19,52 : 2457 -> 2459
+RuleKernelFunctor CondEdge 19,53 : 2457 -> 6167
+RuleKernelFunctor CondEdge 19,54 : 2457 -> 6169
+RuleKernelFunctor CondEdge 19,55 : 2457 -> 6183
+RuleKernelFunctor CondEdge 19,56 : 2457 -> 6238
+RuleKernelFunctor CondEdge 19,57 : 2457 -> 9879
+RuleKernelFunctor CondEdge 19,58 : 2457 -> 9957
+RuleKernelFunctor CondEdge 19,59 : 2457 -> 9969
+RuleKernelFunctor CondEdge 19,60 : 2457 -> 9977
+RuleKernelFunctor CondEdge 19,61 : 2457 -> 10517
+RuleKernelFunctor CondEdge 19,62 : 2457 -> 10519
+RuleKernelFunctor CondEdge 19,63 : 2457 -> 10829
+RuleKernelFunctor CondEdge 80,43 : 10364 -> 2447
+RuleKernelFunctor CondEdge 77,32 : 9938 -> 9938
+RuleKernelFunctor CondEdge 77,33 : 9938 -> 9938
+RuleKernelFunctor CondEdge 77,34 : 9938 -> 6183
+RuleKernelFunctor CondEdge 77,35 : 9938 -> 9965
+RuleKernelFunctor CondEdge 77,36 : 9938 -> 9985
+RuleKernelFunctor CondEdge 48,43 : 6246 -> 6183
+RuleKernelFunctor CondEdge 48,44 : 6248 -> 2460
+RuleKernelFunctor CondEdge 48,46 : 6257 -> 9938
+RuleKernelFunctor ApplyEdge 80,14 : 10286 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3607
+RuleKernelFunctor ApplyEdge 81,1 : 10370 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3638
+RuleKernelFunctor CondEdge 18,38 : 2424 -> 9938
+RuleKernelFunctor ApplyEdge 80,43 : 10364 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3636
+RuleKernelFunctor ApplyEdge 84,35 : 10877 -> 10876, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3794
+RuleKernelFunctor ApplyEdge 84,36 : 10879 -> 10876, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3795
+RuleKernelFunctor ApplyEdge 19,23 : 2444 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 764
+RuleKernelFunctor ApplyEdge 19,24 : 2444 -> 10285, edges [1423->1423) @ 0, e_id_in = 0, e_id = 765
+RuleKernelFunctor ApplyEdge 19,25 : 2444 -> 10287, edges [1423->1423) @ 0, e_id_in = 0, e_id = 766
+RuleKernelFunctor ApplyEdge 82,4 : 10518 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3692
+RuleKernelFunctor ApplyEdge 82,11 : 10533 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3699
+RuleKernelFunctor ApplyEdge 82,16 : 10543 -> 10542, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3704
+RuleKernelFunctor ApplyEdge 82,17 : 10545 -> 10542, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3705
+RuleKernelFunctor ApplyEdge 77,28 : 9922 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3485
+RuleKernelFunctor ApplyEdge 77,31 : 9936 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3488
+RuleKernelFunctor ApplyEdge 48,43 : 6246 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2101
+RuleKernelFunctor ApplyEdge 48,44 : 6248 -> 2460, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2102
+RuleKernelFunctor ApplyEdge 48,46 : 6257 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2104
+RuleKernelFunctor ApplyEdge 77,32 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3489
+RuleKernelFunctor ApplyEdge 77,33 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3490
+RuleKernelFunctor ApplyEdge 77,34 : 9938 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3491
+RuleKernelFunctor ApplyEdge 77,35 : 9938 -> 9965, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3492
+RuleKernelFunctor ApplyEdge 77,36 : 9938 -> 9985, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3493
+RuleKernelFunctor ApplyEdge 19,64 : 2457 -> 10874, edges [1423->1423) @ 0, e_id_in = 0, e_id = 805
+RuleKernelFunctor ApplyEdge 19,65 : 2457 -> 10875, edges [1423->1423) @ 0, e_id_in = 0, e_id = 806
+RuleKernelFunctor ApplyEdge 19,66 : 2457 -> 10886, edges [1423->1423) @ 0, e_id_in = 0, e_id = 807
+RuleKernelFunctor ApplyEdge 19,67 : 2457 -> 10896, edges [1423->1423) @ 0, e_id_in = 0, e_id = 808
+RuleKernelFunctor ApplyEdge 19,68 : 2457 -> 10906, edges [1423->1423) @ 0, e_id_in = 0, e_id = 809
+RuleKernelFunctor ApplyEdge 19,69 : 2458 -> 6176, edges [1423->1423) @ 0, e_id_in = 0, e_id = 810
+RuleKernelFunctor ApplyEdge 19,70 : 2458 -> 6242, edges [1423->1423) @ 0, e_id_in = 0, e_id = 811
+RuleKernelFunctor ApplyEdge 19,71 : 2458 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 812
+RuleKernelFunctor ApplyEdge 19,72 : 2458 -> 10891, edges [1423->1423) @ 0, e_id_in = 0, e_id = 813
+RuleKernelFunctor ApplyEdge 19,73 : 2458 -> 10901, edges [1423->1423) @ 0, e_id_in = 0, e_id = 814
+RuleKernelFunctor ApplyEdge 19,75 : 2459 -> 6247, edges [1423->1423) @ 0, e_id_in = 0, e_id = 816
+RuleKernelFunctor ApplyEdge 48,6 : 6167 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2064
+RuleKernelFunctor ApplyEdge 48,7 : 6167 -> 6176, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2065
+RuleKernelFunctor ApplyEdge 48,8 : 6167 -> 6181, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2066
+RuleKernelFunctor ApplyEdge 48,9 : 6168 -> 6167, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2067
+RuleKernelFunctor ApplyEdge 48,10 : 6169 -> 2467, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2068
+RuleKernelFunctor ApplyEdge 48,11 : 6171 -> 6170, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2069
+RuleKernelFunctor ApplyEdge 48,12 : 6173 -> 6170, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2070
+RuleKernelFunctor ApplyEdge 48,13 : 6176 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2071
+RuleKernelFunctor ApplyEdge 48,14 : 6176 -> 6171, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2072
+RuleKernelFunctor ApplyEdge 48,17 : 6181 -> 2460, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2075
+RuleKernelFunctor ApplyEdge 48,18 : 6183 -> 6168, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2076
+RuleKernelFunctor ApplyEdge 48,19 : 6183 -> 6181, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2077
+RuleKernelFunctor ApplyEdge 19,32 : 2447 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 773
+RuleKernelFunctor ApplyEdge 19,33 : 2447 -> 10365, edges [1423->1423) @ 0, e_id_in = 0, e_id = 774
+RuleKernelFunctor ApplyEdge 19,34 : 2447 -> 10367, edges [1423->1423) @ 0, e_id_in = 0, e_id = 775
+RuleKernelFunctor ApplyEdge 19,35 : 2447 -> 10371, edges [1423->1423) @ 0, e_id_in = 0, e_id = 776
+RuleKernelFunctor ApplyEdge 19,51 : 2457 -> 2458, edges [1423->1423) @ 0, e_id_in = 0, e_id = 792
+RuleKernelFunctor ApplyEdge 19,52 : 2457 -> 2459, edges [1423->1423) @ 0, e_id_in = 0, e_id = 793
+RuleKernelFunctor ApplyEdge 19,53 : 2457 -> 6167, edges [1423->1423) @ 0, e_id_in = 0, e_id = 794
+RuleKernelFunctor ApplyEdge 19,54 : 2457 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 795
+RuleKernelFunctor ApplyEdge 19,55 : 2457 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 796
+RuleKernelFunctor ApplyEdge 19,56 : 2457 -> 6238, edges [1423->1423) @ 0, e_id_in = 0, e_id = 797
+RuleKernelFunctor ApplyEdge 19,57 : 2457 -> 9879, edges [1423->1423) @ 0, e_id_in = 0, e_id = 798
+RuleKernelFunctor ApplyEdge 19,58 : 2457 -> 9957, edges [1423->1423) @ 0, e_id_in = 0, e_id = 799
+RuleKernelFunctor ApplyEdge 19,59 : 2457 -> 9969, edges [1423->1423) @ 0, e_id_in = 0, e_id = 800
+RuleKernelFunctor ApplyEdge 19,60 : 2457 -> 9977, edges [1423->1423) @ 0, e_id_in = 0, e_id = 801
+RuleKernelFunctor ApplyEdge 19,61 : 2457 -> 10517, edges [1423->1423) @ 0, e_id_in = 0, e_id = 802
+RuleKernelFunctor ApplyEdge 19,62 : 2457 -> 10519, edges [1423->1423) @ 0, e_id_in = 0, e_id = 803
+RuleKernelFunctor ApplyEdge 19,63 : 2457 -> 10829, edges [1423->1423) @ 0, e_id_in = 0, e_id = 804
+RuleKernelFunctor ApplyEdge 18,38 : 2424 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 725
+RuleKernel : pts_inc += gepInv, pts_add
+r_offset = 11105,0x70491b600 r_indices = 826,0x704ac2400
+s_offset = 11105,0x7048efe00 s_indices = 1423,0x7049c4600
+t_offset = 11105,0x70493c000 t_indices = 1423,0x7049cec00
+RuleKernelFunctor CondEdge 78,0 : 9988 -> 9938
+RuleKernelFunctor CondEdge 81,0 : 10368 -> 2447
+RuleKernelFunctor CondEdge 48,12 : 6172 -> 6171
+RuleKernelFunctor CondEdge 48,13 : 6174 -> 6169
+RuleKernelFunctor CondEdge 48,14 : 6175 -> 6171
+RuleKernelFunctor CondEdge 48,16 : 6182 -> 6181
+RuleKernelFunctor CondEdge 82,11 : 10515 -> 2457
+RuleKernelFunctor CondEdge 82,12 : 10516 -> 2457
+RuleKernelFunctor CondEdge 82,13 : 10520 -> 2457
+RuleKernelFunctor CondEdge 82,17 : 10546 -> 2458
+RuleKernelFunctor CondEdge 77,11 : 9911 -> 9938
+RuleKernelFunctor CondEdge 77,17 : 9925 -> 9938
+RuleKernelFunctor CondEdge 77,19 : 9928 -> 9938
+RuleKernelFunctor CondEdge 77,24 : 9938 -> 9938
+RuleKernelFunctor CondEdge 77,25 : 9948 -> 9938
+RuleKernelFunctor CondEdge 77,26 : 9950 -> 9938
+RuleKernelFunctor CondEdge 77,28 : 9956 -> 9938
+RuleKernelFunctor CondEdge 48,35 : 6249 -> 6248
+RuleKernelFunctor CondEdge 77,32 : 9968 -> 9938
+RuleKernelFunctor CondEdge 77,36 : 9976 -> 9938
+RuleKernelFunctor CondEdge 80,2 : 10269 -> 2444
+RuleKernelFunctor CondEdge 80,4 : 10274 -> 2444
+RuleKernelFunctor CondEdge 80,5 : 10278 -> 2444
+RuleKernelFunctor CondEdge 80,7 : 10284 -> 2444
+RuleKernelFunctor CondEdge 80,22 : 10330 -> 2444
+RuleKernelFunctor CondEdge 80,24 : 10342 -> 2444
+RuleKernelFunctor CondEdge 80,28 : 10363 -> 2447
+RuleKernelFunctor CondEdge 80,29 : 10366 -> 2447
+RuleKernelFunctor ApplyEdge 78,0 : 9988 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 483
+RuleKernelFunctor ApplyEdge 81,0 : 10368 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 594
+RuleKernelFunctor ApplyEdge 48,12 : 6172 -> 6171, edges [1423->1423) @ 0, e_id_in = 0, e_id = 172
+RuleKernelFunctor ApplyEdge 48,13 : 6174 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 173
+RuleKernelFunctor ApplyEdge 48,14 : 6175 -> 6171, edges [1423->1423) @ 0, e_id_in = 0, e_id = 174
+RuleKernelFunctor ApplyEdge 48,16 : 6182 -> 6181, edges [1423->1423) @ 0, e_id_in = 0, e_id = 176
+RuleKernelFunctor ApplyEdge 48,35 : 6249 -> 6248, edges [1423->1423) @ 0, e_id_in = 0, e_id = 195
+RuleKernelFunctor ApplyEdge 82,11 : 10515 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 653
+RuleKernelFunctor ApplyEdge 82,12 : 10516 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 654
+RuleKernelFunctor ApplyEdge 82,13 : 10520 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 655
+RuleKernelFunctor ApplyEdge 82,17 : 10546 -> 2458, edges [1423->1423) @ 0, e_id_in = 0, e_id = 659
+RuleKernelFunctor ApplyEdge 77,32 : 9968 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 475
+RuleKernelFunctor ApplyEdge 77,36 : 9976 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 479
+RuleKernelFunctor ApplyEdge 77,11 : 9911 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 454
+RuleKernelFunctor ApplyEdge 77,17 : 9925 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 460
+RuleKernelFunctor ApplyEdge 77,19 : 9928 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 462
+RuleKernelFunctor ApplyEdge 77,24 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 467
+RuleKernelFunctor ApplyEdge 77,25 : 9948 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 468
+RuleKernelFunctor ApplyEdge 77,26 : 9950 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 469
+RuleKernelFunctor ApplyEdge 77,28 : 9956 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 471
+RuleKernelFunctor ApplyEdge 80,2 : 10269 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 566
+RuleKernelFunctor ApplyEdge 80,4 : 10274 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 568
+RuleKernelFunctor ApplyEdge 80,5 : 10278 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 569
+RuleKernelFunctor ApplyEdge 80,7 : 10284 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 571
+RuleKernelFunctor ApplyEdge 80,22 : 10330 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 586
+RuleKernelFunctor ApplyEdge 80,24 : 10342 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 588
+RuleKernelFunctor ApplyEdge 80,28 : 10363 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 592
+RuleKernelFunctor ApplyEdge 80,29 : 10366 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 593
+RuleKernelFunctor ApplyEdge 78,0 : 9988 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 483, offset = 0
+RuleKernelFunctor ApplyEdge 81,0 : 10368 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 594, offset = 0
+RuleKernelFunctor ApplyEdge 48,35 : 6249 -> 6248, edges [1423->1423) @ 0, e_id_in = 0, e_id = 195, offset = 0
+RuleKernelFunctor ApplyEdge 48,12 : 6172 -> 6171, edges [1423->1423) @ 0, e_id_in = 0, e_id = 172, offset = 0
+RuleKernelFunctor ApplyEdge 48,13 : 6174 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 173, offset = 0
+RuleKernelFunctor ApplyEdge 48,14 : 6175 -> 6171, edges [1423->1423) @ 0, e_id_in = 0, e_id = 174, offset = 0
+RuleKernelFunctor ApplyEdge 48,16 : 6182 -> 6181, edges [1423->1423) @ 0, e_id_in = 0, e_id = 176, offset = 0
+RuleKernelFunctor ApplyEdge 82,11 : 10515 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 653, offset = 0
+RuleKernelFunctor ApplyEdge 82,12 : 10516 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 654, offset = 0
+RuleKernelFunctor ApplyEdge 82,13 : 10520 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 655, offset = 0
+RuleKernelFunctor ApplyEdge 82,17 : 10546 -> 2458, edges [1423->1423) @ 0, e_id_in = 0, e_id = 659, offset = 0
+RuleKernelFunctor ApplyEdge 77,32 : 9968 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 475, offset = 0
+RuleKernelFunctor ApplyEdge 77,36 : 9976 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 479, offset = 0
+RuleKernelFunctor ApplyEdge 77,11 : 9911 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 454, offset = 0
+RuleKernelFunctor ApplyEdge 77,17 : 9925 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 460, offset = 0
+RuleKernelFunctor ApplyEdge 77,19 : 9928 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 462, offset = 0
+RuleKernelFunctor ApplyEdge 77,24 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 467, offset = 0
+RuleKernelFunctor ApplyEdge 77,25 : 9948 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 468, offset = 0
+RuleKernelFunctor ApplyEdge 77,26 : 9950 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 469, offset = 0
+RuleKernelFunctor ApplyEdge 77,28 : 9956 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 471, offset = 0
+RuleKernelFunctor ApplyEdge 80,2 : 10269 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 566, offset = 0
+RuleKernelFunctor ApplyEdge 80,4 : 10274 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 568, offset = 0
+RuleKernelFunctor ApplyEdge 80,5 : 10278 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 569, offset = 0
+RuleKernelFunctor ApplyEdge 80,7 : 10284 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 571, offset = 0
+RuleKernelFunctor ApplyEdge 80,22 : 10330 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 586, offset = 0
+RuleKernelFunctor ApplyEdge 80,24 : 10342 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 588, offset = 0
+RuleKernelFunctor ApplyEdge 80,28 : 10363 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 592, offset = 0
+RuleKernelFunctor ApplyEdge 80,29 : 10366 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 593, offset = 0
+pts: t_graphslice->edges = 0
+RuleKernelFunctor2 pts_inc <- copyIad, pts
+r_offset = 11105,0x7048fac00 r_indices = 3881,0x7049c5e00
+s_offset = 11105,0x7048efe00 s_indices = 1423,0x7049c4600
+t_offset = 11105,0x70493c000 t_indices = 1423,0x7049cec00
+RuleKernelFunctor2 CondEdge 81,1 : 10370 -> 2447
+RuleKernelFunctor2 CondEdge 80,14 : 10286 -> 2444
+RuleKernelFunctor2 CondEdge 82,4 : 10518 -> 2457
+RuleKernelFunctor2 CondEdge 82,11 : 10533 -> 2457
+RuleKernelFunctor2 CondEdge 82,16 : 10543 -> 10542
+RuleKernelFunctor2 CondEdge 82,17 : 10545 -> 10542
+RuleKernelFunctor2 CondEdge 19,64 : 2457 -> 10874
+RuleKernelFunctor2 CondEdge 19,65 : 2457 -> 10875
+RuleKernelFunctor2 CondEdge 19,66 : 2457 -> 10886
+RuleKernelFunctor2 CondEdge 19,67 : 2457 -> 10896
+RuleKernelFunctor2 CondEdge 19,68 : 2457 -> 10906
+RuleKernelFunctor2 CondEdge 19,69 : 2458 -> 6176
+RuleKernelFunctor2 CondEdge 19,70 : 2458 -> 6242
+RuleKernelFunctor2 CondEdge 19,71 : 2458 -> 9938
+RuleKernelFunctor2 CondEdge 19,72 : 2458 -> 10891
+RuleKernelFunctor2 CondEdge 19,73 : 2458 -> 10901
+RuleKernelFunctor2 CondEdge 19,75 : 2459 -> 6247
+RuleKernelFunctor2 CondEdge 19,23 : 2444 -> 6183
+RuleKernelFunctor2 CondEdge 19,24 : 2444 -> 10285
+RuleKernelFunctor2 CondEdge 19,25 : 2444 -> 10287
+RuleKernelFunctor2 CondEdge 19,32 : 2447 -> 6183
+RuleKernelFunctor2 CondEdge 19,33 : 2447 -> 10365
+RuleKernelFunctor2 CondEdge 19,34 : 2447 -> 10367
+RuleKernelFunctor2 CondEdge 19,35 : 2447 -> 10371
+RuleKernelFunctor2 CondEdge 19,51 : 2457 -> 2458
+RuleKernelFunctor2 CondEdge 19,52 : 2457 -> 2459
+RuleKernelFunctor2 CondEdge 19,53 : 2457 -> 6167
+RuleKernelFunctor2 CondEdge 19,54 : 2457 -> 6169
+RuleKernelFunctor2 CondEdge 19,55 : 2457 -> 6183
+RuleKernelFunctor2 CondEdge 19,56 : 2457 -> 6238
+RuleKernelFunctor2 CondEdge 19,57 : 2457 -> 9879
+RuleKernelFunctor2 CondEdge 19,58 : 2457 -> 9957
+RuleKernelFunctor2 CondEdge 19,59 : 2457 -> 9969
+RuleKernelFunctor2 CondEdge 19,60 : 2457 -> 9977
+RuleKernelFunctor2 CondEdge 19,61 : 2457 -> 10517
+RuleKernelFunctor2 CondEdge 19,62 : 2457 -> 10519
+RuleKernelFunctor2 CondEdge 19,63 : 2457 -> 10829
+RuleKernelFunctor2 CondEdge 84,35 : 10877 -> 10876
+RuleKernelFunctor2 CondEdge 84,36 : 10879 -> 10876
+RuleKernelFunctor2 CondEdge 77,28 : 9922 -> 9938
+RuleKernelFunctor2 CondEdge 77,31 : 9936 -> 9938
+RuleKernelFunctor2 CondEdge 80,43 : 10364 -> 2447
+RuleKernelFunctor2 CondEdge 48,6 : 6167 -> 6169
+RuleKernelFunctor2 CondEdge 48,7 : 6167 -> 6176
+RuleKernelFunctor2 CondEdge 48,8 : 6167 -> 6181
+RuleKernelFunctor2 CondEdge 48,9 : 6168 -> 6167
+RuleKernelFunctor2 CondEdge 48,10 : 6169 -> 2467
+RuleKernelFunctor2 CondEdge 48,11 : 6171 -> 6170
+RuleKernelFunctor2 CondEdge 48,12 : 6173 -> 6170
+RuleKernelFunctor2 CondEdge 48,13 : 6176 -> 6169
+RuleKernelFunctor2 CondEdge 48,14 : 6176 -> 6171
+RuleKernelFunctor2 CondEdge 48,17 : 6181 -> 2460
+RuleKernelFunctor2 CondEdge 48,18 : 6183 -> 6168
+RuleKernelFunctor2 CondEdge 48,19 : 6183 -> 6181
+RuleKernelFunctor2 CondEdge 77,32 : 9938 -> 9938
+RuleKernelFunctor2 CondEdge 77,33 : 9938 -> 9938
+RuleKernelFunctor2 CondEdge 77,34 : 9938 -> 6183
+RuleKernelFunctor2 CondEdge 77,35 : 9938 -> 9965
+RuleKernelFunctor2 CondEdge 77,36 : 9938 -> 9985
+RuleKernelFunctor2 CondEdge 48,43 : 6246 -> 6183
+RuleKernelFunctor2 CondEdge 48,44 : 6248 -> 2460
+RuleKernelFunctor2 CondEdge 48,46 : 6257 -> 9938
+RuleKernelFunctor2 ApplyEdge 80,14 : 10286 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3607
+RuleKernelFunctor2 ApplyEdge 81,1 : 10370 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3638
+RuleKernelFunctor2 CondEdge 18,38 : 2424 -> 9938
+RuleKernelFunctor2 ApplyEdge 80,43 : 10364 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3636
+RuleKernelFunctor2 ApplyEdge 84,35 : 10877 -> 10876, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3794
+RuleKernelFunctor2 ApplyEdge 84,36 : 10879 -> 10876, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3795
+RuleKernelFunctor2 ApplyEdge 19,23 : 2444 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 764
+RuleKernelFunctor2 ApplyEdge 19,24 : 2444 -> 10285, edges [1423->1423) @ 0, e_id_in = 0, e_id = 765
+RuleKernelFunctor2 ApplyEdge 19,25 : 2444 -> 10287, edges [1423->1423) @ 0, e_id_in = 0, e_id = 766
+RuleKernelFunctor2 ApplyEdge 82,4 : 10518 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3692
+RuleKernelFunctor2 ApplyEdge 82,11 : 10533 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3699
+RuleKernelFunctor2 ApplyEdge 82,16 : 10543 -> 10542, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3704
+RuleKernelFunctor2 ApplyEdge 82,17 : 10545 -> 10542, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3705
+RuleKernelFunctor2 ApplyEdge 77,28 : 9922 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3485
+RuleKernelFunctor2 ApplyEdge 77,31 : 9936 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3488
+RuleKernelFunctor2 ApplyEdge 48,43 : 6246 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2101
+RuleKernelFunctor2 ApplyEdge 48,44 : 6248 -> 2460, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2102
+RuleKernelFunctor2 ApplyEdge 48,46 : 6257 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2104
+RuleKernelFunctor2 ApplyEdge 77,32 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3489
+RuleKernelFunctor2 ApplyEdge 77,33 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3490
+RuleKernelFunctor2 ApplyEdge 77,34 : 9938 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3491
+RuleKernelFunctor2 ApplyEdge 77,35 : 9938 -> 9965, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3492
+RuleKernelFunctor2 ApplyEdge 77,36 : 9938 -> 9985, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3493
+RuleKernelFunctor2 ApplyEdge 19,64 : 2457 -> 10874, edges [1423->1423) @ 0, e_id_in = 0, e_id = 805
+RuleKernelFunctor2 ApplyEdge 19,65 : 2457 -> 10875, edges [1423->1423) @ 0, e_id_in = 0, e_id = 806
+RuleKernelFunctor2 ApplyEdge 19,66 : 2457 -> 10886, edges [1423->1423) @ 0, e_id_in = 0, e_id = 807
+RuleKernelFunctor2 ApplyEdge 19,67 : 2457 -> 10896, edges [1423->1423) @ 0, e_id_in = 0, e_id = 808
+RuleKernelFunctor2 ApplyEdge 19,68 : 2457 -> 10906, edges [1423->1423) @ 0, e_id_in = 0, e_id = 809
+RuleKernelFunctor2 ApplyEdge 19,69 : 2458 -> 6176, edges [1423->1423) @ 0, e_id_in = 0, e_id = 810
+RuleKernelFunctor2 ApplyEdge 19,70 : 2458 -> 6242, edges [1423->1423) @ 0, e_id_in = 0, e_id = 811
+RuleKernelFunctor2 ApplyEdge 19,71 : 2458 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 812
+RuleKernelFunctor2 ApplyEdge 19,72 : 2458 -> 10891, edges [1423->1423) @ 0, e_id_in = 0, e_id = 813
+RuleKernelFunctor2 ApplyEdge 19,73 : 2458 -> 10901, edges [1423->1423) @ 0, e_id_in = 0, e_id = 814
+RuleKernelFunctor2 ApplyEdge 19,75 : 2459 -> 6247, edges [1423->1423) @ 0, e_id_in = 0, e_id = 816
+RuleKernelFunctor2 ApplyEdge 48,6 : 6167 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2064
+RuleKernelFunctor2 ApplyEdge 48,7 : 6167 -> 6176, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2065
+RuleKernelFunctor2 ApplyEdge 48,8 : 6167 -> 6181, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2066
+RuleKernelFunctor2 ApplyEdge 48,9 : 6168 -> 6167, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2067
+RuleKernelFunctor2 ApplyEdge 48,10 : 6169 -> 2467, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2068
+RuleKernelFunctor2 ApplyEdge 48,11 : 6171 -> 6170, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2069
+RuleKernelFunctor2 ApplyEdge 48,12 : 6173 -> 6170, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2070
+RuleKernelFunctor2 ApplyEdge 48,13 : 6176 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2071
+RuleKernelFunctor2 ApplyEdge 48,14 : 6176 -> 6171, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2072
+RuleKernelFunctor2 ApplyEdge 48,17 : 6181 -> 2460, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2075
+RuleKernelFunctor2 ApplyEdge 48,18 : 6183 -> 6168, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2076
+RuleKernelFunctor2 ApplyEdge 48,19 : 6183 -> 6181, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2077
+RuleKernelFunctor2 ApplyEdge 19,32 : 2447 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 773
+RuleKernelFunctor2 ApplyEdge 19,33 : 2447 -> 10365, edges [1423->1423) @ 0, e_id_in = 0, e_id = 774
+RuleKernelFunctor2 ApplyEdge 19,34 : 2447 -> 10367, edges [1423->1423) @ 0, e_id_in = 0, e_id = 775
+RuleKernelFunctor2 ApplyEdge 19,35 : 2447 -> 10371, edges [1423->1423) @ 0, e_id_in = 0, e_id = 776
+RuleKernelFunctor2 ApplyEdge 19,51 : 2457 -> 2458, edges [1423->1423) @ 0, e_id_in = 0, e_id = 792
+RuleKernelFunctor2 ApplyEdge 19,52 : 2457 -> 2459, edges [1423->1423) @ 0, e_id_in = 0, e_id = 793
+RuleKernelFunctor2 ApplyEdge 19,53 : 2457 -> 6167, edges [1423->1423) @ 0, e_id_in = 0, e_id = 794
+RuleKernelFunctor2 ApplyEdge 19,54 : 2457 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 795
+RuleKernelFunctor2 ApplyEdge 19,55 : 2457 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 796
+RuleKernelFunctor2 ApplyEdge 19,56 : 2457 -> 6238, edges [1423->1423) @ 0, e_id_in = 0, e_id = 797
+RuleKernelFunctor2 ApplyEdge 19,57 : 2457 -> 9879, edges [1423->1423) @ 0, e_id_in = 0, e_id = 798
+RuleKernelFunctor2 ApplyEdge 19,58 : 2457 -> 9957, edges [1423->1423) @ 0, e_id_in = 0, e_id = 799
+RuleKernelFunctor2 ApplyEdge 19,59 : 2457 -> 9969, edges [1423->1423) @ 0, e_id_in = 0, e_id = 800
+RuleKernelFunctor2 ApplyEdge 19,60 : 2457 -> 9977, edges [1423->1423) @ 0, e_id_in = 0, e_id = 801
+RuleKernelFunctor2 ApplyEdge 19,61 : 2457 -> 10517, edges [1423->1423) @ 0, e_id_in = 0, e_id = 802
+RuleKernelFunctor2 ApplyEdge 19,62 : 2457 -> 10519, edges [1423->1423) @ 0, e_id_in = 0, e_id = 803
+RuleKernelFunctor2 ApplyEdge 19,63 : 2457 -> 10829, edges [1423->1423) @ 0, e_id_in = 0, e_id = 804
+RuleKernelFunctor2 ApplyEdge 18,38 : 2424 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 725
+RuleKernelFunctor2 pts_inc += copyInv, pts_add
+r_offset = 11105,0x7048fac00 r_indices = 3881,0x7049c5e00
+s_offset = 11105,0x7048efe00 s_indices = 1423,0x7049c4600
+t_offset = 11105,0x70493c000 t_indices = 1423,0x7049cec00
+RuleKernelFunctor2 CondEdge 81,1 : 10370 -> 2447
+RuleKernelFunctor2 CondEdge 80,14 : 10286 -> 2444
+RuleKernelFunctor2 CondEdge 82,4 : 10518 -> 2457
+RuleKernelFunctor2 CondEdge 82,11 : 10533 -> 2457
+RuleKernelFunctor2 CondEdge 82,16 : 10543 -> 10542
+RuleKernelFunctor2 CondEdge 82,17 : 10545 -> 10542
+RuleKernelFunctor2 CondEdge 19,64 : 2457 -> 10874
+RuleKernelFunctor2 CondEdge 19,65 : 2457 -> 10875
+RuleKernelFunctor2 CondEdge 19,66 : 2457 -> 10886
+RuleKernelFunctor2 CondEdge 19,67 : 2457 -> 10896
+RuleKernelFunctor2 CondEdge 19,68 : 2457 -> 10906
+RuleKernelFunctor2 CondEdge 19,69 : 2458 -> 6176
+RuleKernelFunctor2 CondEdge 19,70 : 2458 -> 6242
+RuleKernelFunctor2 CondEdge 19,71 : 2458 -> 9938
+RuleKernelFunctor2 CondEdge 19,72 : 2458 -> 10891
+RuleKernelFunctor2 CondEdge 19,73 : 2458 -> 10901
+RuleKernelFunctor2 CondEdge 19,75 : 2459 -> 6247
+RuleKernelFunctor2 CondEdge 19,23 : 2444 -> 6183
+RuleKernelFunctor2 CondEdge 19,24 : 2444 -> 10285
+RuleKernelFunctor2 CondEdge 19,25 : 2444 -> 10287
+RuleKernelFunctor2 CondEdge 84,35 : 10877 -> 10876
+RuleKernelFunctor2 CondEdge 84,36 : 10879 -> 10876
+RuleKernelFunctor2 CondEdge 77,28 : 9922 -> 9938
+RuleKernelFunctor2 CondEdge 77,31 : 9936 -> 9938
+RuleKernelFunctor2 CondEdge 80,43 : 10364 -> 2447
+RuleKernelFunctor2 CondEdge 19,32 : 2447 -> 6183
+RuleKernelFunctor2 CondEdge 19,33 : 2447 -> 10365
+RuleKernelFunctor2 CondEdge 19,34 : 2447 -> 10367
+RuleKernelFunctor2 CondEdge 19,35 : 2447 -> 10371
+RuleKernelFunctor2 CondEdge 19,51 : 2457 -> 2458
+RuleKernelFunctor2 CondEdge 19,52 : 2457 -> 2459
+RuleKernelFunctor2 CondEdge 19,53 : 2457 -> 6167
+RuleKernelFunctor2 CondEdge 19,54 : 2457 -> 6169
+RuleKernelFunctor2 CondEdge 19,55 : 2457 -> 6183
+RuleKernelFunctor2 CondEdge 19,56 : 2457 -> 6238
+RuleKernelFunctor2 CondEdge 19,57 : 2457 -> 9879
+RuleKernelFunctor2 CondEdge 19,58 : 2457 -> 9957
+RuleKernelFunctor2 CondEdge 19,59 : 2457 -> 9969
+RuleKernelFunctor2 CondEdge 19,60 : 2457 -> 9977
+RuleKernelFunctor2 CondEdge 19,61 : 2457 -> 10517
+RuleKernelFunctor2 CondEdge 19,62 : 2457 -> 10519
+RuleKernelFunctor2 CondEdge 19,63 : 2457 -> 10829
+RuleKernelFunctor2 CondEdge 48,6 : 6167 -> 6169
+RuleKernelFunctor2 CondEdge 48,7 : 6167 -> 6176
+RuleKernelFunctor2 CondEdge 48,8 : 6167 -> 6181
+RuleKernelFunctor2 CondEdge 48,9 : 6168 -> 6167
+RuleKernelFunctor2 CondEdge 48,10 : 6169 -> 2467
+RuleKernelFunctor2 CondEdge 48,11 : 6171 -> 6170
+RuleKernelFunctor2 CondEdge 48,12 : 6173 -> 6170
+RuleKernelFunctor2 CondEdge 48,13 : 6176 -> 6169
+RuleKernelFunctor2 CondEdge 48,14 : 6176 -> 6171
+RuleKernelFunctor2 CondEdge 48,17 : 6181 -> 2460
+RuleKernelFunctor2 CondEdge 48,18 : 6183 -> 6168
+RuleKernelFunctor2 CondEdge 48,19 : 6183 -> 6181
+RuleKernelFunctor2 CondEdge 77,32 : 9938 -> 9938
+RuleKernelFunctor2 CondEdge 77,33 : 9938 -> 9938
+RuleKernelFunctor2 CondEdge 77,34 : 9938 -> 6183
+RuleKernelFunctor2 CondEdge 77,35 : 9938 -> 9965
+RuleKernelFunctor2 CondEdge 77,36 : 9938 -> 9985
+RuleKernelFunctor2 CondEdge 48,43 : 6246 -> 6183
+RuleKernelFunctor2 CondEdge 48,44 : 6248 -> 2460
+RuleKernelFunctor2 CondEdge 48,46 : 6257 -> 9938
+RuleKernelFunctor2 ApplyEdge 80,14 : 10286 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3607
+RuleKernelFunctor2 ApplyEdge 81,1 : 10370 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3638
+RuleKernelFunctor2 CondEdge 18,38 : 2424 -> 9938
+RuleKernelFunctor2 ApplyEdge 80,43 : 10364 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3636
+RuleKernelFunctor2 ApplyEdge 84,35 : 10877 -> 10876, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3794
+RuleKernelFunctor2 ApplyEdge 84,36 : 10879 -> 10876, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3795
+RuleKernelFunctor2 ApplyEdge 19,23 : 2444 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 764
+RuleKernelFunctor2 ApplyEdge 19,24 : 2444 -> 10285, edges [1423->1423) @ 0, e_id_in = 0, e_id = 765
+RuleKernelFunctor2 ApplyEdge 19,25 : 2444 -> 10287, edges [1423->1423) @ 0, e_id_in = 0, e_id = 766
+RuleKernelFunctor2 ApplyEdge 82,4 : 10518 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3692
+RuleKernelFunctor2 ApplyEdge 82,11 : 10533 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3699
+RuleKernelFunctor2 ApplyEdge 82,16 : 10543 -> 10542, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3704
+RuleKernelFunctor2 ApplyEdge 82,17 : 10545 -> 10542, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3705
+RuleKernelFunctor2 ApplyEdge 77,28 : 9922 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3485
+RuleKernelFunctor2 ApplyEdge 77,31 : 9936 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3488
+RuleKernelFunctor2 ApplyEdge 48,43 : 6246 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2101
+RuleKernelFunctor2 ApplyEdge 48,44 : 6248 -> 2460, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2102
+RuleKernelFunctor2 ApplyEdge 48,46 : 6257 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2104
+RuleKernelFunctor2 ApplyEdge 77,32 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3489
+RuleKernelFunctor2 ApplyEdge 77,33 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3490
+RuleKernelFunctor2 ApplyEdge 77,34 : 9938 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3491
+RuleKernelFunctor2 ApplyEdge 77,35 : 9938 -> 9965, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3492
+RuleKernelFunctor2 ApplyEdge 77,36 : 9938 -> 9985, edges [1423->1423) @ 0, e_id_in = 0, e_id = 3493
+RuleKernelFunctor2 ApplyEdge 19,64 : 2457 -> 10874, edges [1423->1423) @ 0, e_id_in = 0, e_id = 805
+RuleKernelFunctor2 ApplyEdge 19,65 : 2457 -> 10875, edges [1423->1423) @ 0, e_id_in = 0, e_id = 806
+RuleKernelFunctor2 ApplyEdge 19,66 : 2457 -> 10886, edges [1423->1423) @ 0, e_id_in = 0, e_id = 807
+RuleKernelFunctor2 ApplyEdge 19,67 : 2457 -> 10896, edges [1423->1423) @ 0, e_id_in = 0, e_id = 808
+RuleKernelFunctor2 ApplyEdge 19,68 : 2457 -> 10906, edges [1423->1423) @ 0, e_id_in = 0, e_id = 809
+RuleKernelFunctor2 ApplyEdge 19,69 : 2458 -> 6176, edges [1423->1423) @ 0, e_id_in = 0, e_id = 810
+RuleKernelFunctor2 ApplyEdge 19,70 : 2458 -> 6242, edges [1423->1423) @ 0, e_id_in = 0, e_id = 811
+RuleKernelFunctor2 ApplyEdge 19,71 : 2458 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 812
+RuleKernelFunctor2 ApplyEdge 19,72 : 2458 -> 10891, edges [1423->1423) @ 0, e_id_in = 0, e_id = 813
+RuleKernelFunctor2 ApplyEdge 19,73 : 2458 -> 10901, edges [1423->1423) @ 0, e_id_in = 0, e_id = 814
+RuleKernelFunctor2 ApplyEdge 19,75 : 2459 -> 6247, edges [1423->1423) @ 0, e_id_in = 0, e_id = 816
+RuleKernelFunctor2 ApplyEdge 48,6 : 6167 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2064
+RuleKernelFunctor2 ApplyEdge 48,7 : 6167 -> 6176, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2065
+RuleKernelFunctor2 ApplyEdge 48,8 : 6167 -> 6181, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2066
+RuleKernelFunctor2 ApplyEdge 48,9 : 6168 -> 6167, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2067
+RuleKernelFunctor2 ApplyEdge 48,10 : 6169 -> 2467, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2068
+RuleKernelFunctor2 ApplyEdge 48,11 : 6171 -> 6170, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2069
+RuleKernelFunctor2 ApplyEdge 48,12 : 6173 -> 6170, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2070
+RuleKernelFunctor2 ApplyEdge 48,13 : 6176 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2071
+RuleKernelFunctor2 ApplyEdge 48,14 : 6176 -> 6171, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2072
+RuleKernelFunctor2 ApplyEdge 48,17 : 6181 -> 2460, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2075
+RuleKernelFunctor2 ApplyEdge 48,18 : 6183 -> 6168, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2076
+RuleKernelFunctor2 ApplyEdge 48,19 : 6183 -> 6181, edges [1423->1423) @ 0, e_id_in = 0, e_id = 2077
+RuleKernelFunctor2 ApplyEdge 19,32 : 2447 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 773
+RuleKernelFunctor2 ApplyEdge 19,33 : 2447 -> 10365, edges [1423->1423) @ 0, e_id_in = 0, e_id = 774
+RuleKernelFunctor2 ApplyEdge 19,34 : 2447 -> 10367, edges [1423->1423) @ 0, e_id_in = 0, e_id = 775
+RuleKernelFunctor2 ApplyEdge 19,35 : 2447 -> 10371, edges [1423->1423) @ 0, e_id_in = 0, e_id = 776
+RuleKernelFunctor2 ApplyEdge 19,51 : 2457 -> 2458, edges [1423->1423) @ 0, e_id_in = 0, e_id = 792
+RuleKernelFunctor2 ApplyEdge 19,52 : 2457 -> 2459, edges [1423->1423) @ 0, e_id_in = 0, e_id = 793
+RuleKernelFunctor2 ApplyEdge 19,53 : 2457 -> 6167, edges [1423->1423) @ 0, e_id_in = 0, e_id = 794
+RuleKernelFunctor2 ApplyEdge 19,54 : 2457 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 795
+RuleKernelFunctor2 ApplyEdge 19,55 : 2457 -> 6183, edges [1423->1423) @ 0, e_id_in = 0, e_id = 796
+RuleKernelFunctor2 ApplyEdge 19,56 : 2457 -> 6238, edges [1423->1423) @ 0, e_id_in = 0, e_id = 797
+RuleKernelFunctor2 ApplyEdge 19,57 : 2457 -> 9879, edges [1423->1423) @ 0, e_id_in = 0, e_id = 798
+RuleKernelFunctor2 ApplyEdge 19,58 : 2457 -> 9957, edges [1423->1423) @ 0, e_id_in = 0, e_id = 799
+RuleKernelFunctor2 ApplyEdge 19,59 : 2457 -> 9969, edges [1423->1423) @ 0, e_id_in = 0, e_id = 800
+RuleKernelFunctor2 ApplyEdge 19,60 : 2457 -> 9977, edges [1423->1423) @ 0, e_id_in = 0, e_id = 801
+RuleKernelFunctor2 ApplyEdge 19,61 : 2457 -> 10517, edges [1423->1423) @ 0, e_id_in = 0, e_id = 802
+RuleKernelFunctor2 ApplyEdge 19,62 : 2457 -> 10519, edges [1423->1423) @ 0, e_id_in = 0, e_id = 803
+RuleKernelFunctor2 ApplyEdge 19,63 : 2457 -> 10829, edges [1423->1423) @ 0, e_id_in = 0, e_id = 804
+RuleKernelFunctor2 ApplyEdge 18,38 : 2424 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 725
+RuleKernelFunctor2 :  pts_inc += gepInv, pts_add
+r_offset = 11105,0x70491b600 r_indices = 826,0x704ac2400
+s_offset = 11105,0x7048efe00 s_indices = 1423,0x7049c4600
+t_offset = 11105,0x70493c000 t_indices = 1423,0x7049cec00
+RuleKernel : copyIin <- loadInv, pts_add
+RuleKernelFunctor2 CondEdge 78,0 : 9988 -> 9938
+RuleKernelFunctor2 CondEdge 81,0 : 10368 -> 2447
+RuleKernelFunctor2 CondEdge 48,12 : 6172 -> 6171
+RuleKernelFunctor2 CondEdge 48,13 : 6174 -> 6169
+RuleKernelFunctor2 CondEdge 48,14 : 6175 -> 6171
+RuleKernelFunctor2 CondEdge 48,16 : 6182 -> 6181
+RuleKernelFunctor2 CondEdge 82,11 : 10515 -> 2457
+RuleKernelFunctor2 CondEdge 82,12 : 10516 -> 2457
+RuleKernelFunctor2 CondEdge 82,13 : 10520 -> 2457
+RuleKernelFunctor2 CondEdge 82,17 : 10546 -> 2458
+RuleKernelFunctor2 CondEdge 77,11 : 9911 -> 9938
+RuleKernelFunctor2 CondEdge 77,17 : 9925 -> 9938
+RuleKernelFunctor2 CondEdge 77,19 : 9928 -> 9938
+RuleKernelFunctor2 CondEdge 77,24 : 9938 -> 9938
+RuleKernelFunctor2 CondEdge 77,25 : 9948 -> 9938
+RuleKernelFunctor2 CondEdge 77,26 : 9950 -> 9938
+RuleKernelFunctor2 CondEdge 77,28 : 9956 -> 9938
+RuleKernelFunctor2 CondEdge 48,35 : 6249 -> 6248
+RuleKernelFunctor2 CondEdge 77,32 : 9968 -> 9938
+RuleKernelFunctor2 CondEdge 77,36 : 9976 -> 9938
+RuleKernelFunctor2 CondEdge 80,2 : 10269 -> 2444
+RuleKernelFunctor2 CondEdge 80,4 : 10274 -> 2444
+RuleKernelFunctor2 CondEdge 80,5 : 10278 -> 2444
+RuleKernelFunctor2 CondEdge 80,7 : 10284 -> 2444
+RuleKernelFunctor2 CondEdge 80,22 : 10330 -> 2444
+RuleKernelFunctor2 CondEdge 80,24 : 10342 -> 2444
+RuleKernelFunctor2 CondEdge 80,28 : 10363 -> 2447
+RuleKernelFunctor2 CondEdge 80,29 : 10366 -> 2447
+RuleKernelFunctor2 ApplyEdge 81,0 : 10368 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 594
+RuleKernelFunctor2 ApplyEdge 78,0 : 9988 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 483
+RuleKernelFunctor2 ApplyEdge 48,35 : 6249 -> 6248, edges [1423->1423) @ 0, e_id_in = 0, e_id = 195
+RuleKernelFunctor2 ApplyEdge 48,12 : 6172 -> 6171, edges [1423->1423) @ 0, e_id_in = 0, e_id = 172
+RuleKernelFunctor2 ApplyEdge 48,13 : 6174 -> 6169, edges [1423->1423) @ 0, e_id_in = 0, e_id = 173
+RuleKernelFunctor2 ApplyEdge 48,14 : 6175 -> 6171, edges [1423->1423) @ 0, e_id_in = 0, e_id = 174
+RuleKernelFunctor2 ApplyEdge 48,16 : 6182 -> 6181, edges [1423->1423) @ 0, e_id_in = 0, e_id = 176
+RuleKernelFunctor2 ApplyEdge 82,11 : 10515 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 653
+RuleKernelFunctor2 ApplyEdge 82,12 : 10516 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 654
+RuleKernelFunctor2 ApplyEdge 82,13 : 10520 -> 2457, edges [1423->1423) @ 0, e_id_in = 0, e_id = 655
+RuleKernelFunctor2 ApplyEdge 82,17 : 10546 -> 2458, edges [1423->1423) @ 0, e_id_in = 0, e_id = 659
+RuleKernelFunctor2 ApplyEdge 77,32 : 9968 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 475
+RuleKernelFunctor2 ApplyEdge 77,36 : 9976 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 479
+RuleKernelFunctor2 ApplyEdge 77,11 : 9911 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 454
+RuleKernelFunctor2 ApplyEdge 77,17 : 9925 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 460
+RuleKernelFunctor2 ApplyEdge 77,19 : 9928 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 462
+RuleKernelFunctor2 ApplyEdge 77,24 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 467
+RuleKernelFunctor2 ApplyEdge 77,25 : 9948 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 468
+RuleKernelFunctor2 ApplyEdge 77,26 : 9950 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 469
+RuleKernelFunctor2 ApplyEdge 77,28 : 9956 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 471
+RuleKernelFunctor2 ApplyEdge 80,2 : 10269 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 566
+RuleKernelFunctor2 ApplyEdge 80,4 : 10274 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 568
+RuleKernelFunctor2 ApplyEdge 80,5 : 10278 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 569
+RuleKernelFunctor2 ApplyEdge 80,7 : 10284 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 571
+RuleKernelFunctor2 ApplyEdge 80,22 : 10330 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 586
+RuleKernelFunctor2 ApplyEdge 80,24 : 10342 -> 2444, edges [1423->1423) @ 0, e_id_in = 0, e_id = 588
+RuleKernelFunctor2 ApplyEdge 80,28 : 10363 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 592
+RuleKernelFunctor2 ApplyEdge 80,29 : 10366 -> 2447, edges [1423->1423) @ 0, e_id_in = 0, e_id = 593
+r_offset = 11105,0x704905a00 r_indices = 1940,0x7049c9c00
+s_offset = 11105,0x7048efe00 s_indices = 1423,0x7049c4600
+t_offset = 11105,0x704951c00 t_indices = 3881,0x7049d4200
+RuleKernelFunctor CondEdge 48,14 : 6247 -> 6246
+RuleKernelFunctor CondEdge 77,9 : 9938 -> 9938
+RuleKernelFunctor CondEdge 77,10 : 9938 -> 9938
+RuleKernelFunctor CondEdge 77,11 : 9938 -> 9938
+RuleKernelFunctor CondEdge 77,13 : 9957 -> 9938
+RuleKernelFunctor ApplyEdge 48,14 : 6247 -> 6246, edges [1423->1423) @ 0, e_id_in = 0, e_id = 808
+RuleKernelFunctor ApplyEdge 77,9 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 1718
+RuleKernelFunctor ApplyEdge 77,10 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 1719
+RuleKernelFunctor ApplyEdge 77,11 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 1720
+RuleKernelFunctor ApplyEdge 77,13 : 9957 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 1722
+RuleKernel : copyIin += ptsIadd, store
+r_offset = 11105,0x704926400 r_indices = 1423,0x7049cbc00
+s_offset = 11105,0x704910800 s_indices = 611,0x704ac1a00
+t_offset = 11105,0x704951c00 t_indices = 3881,0x7049d4200
+RuleKernelFunctor CondEdge 82,0 : 10542 -> 2204
+RuleKernelFunctor CondEdge 48,4 : 6170 -> 1668
+RuleKernelFunctor CondEdge 84,7 : 10876 -> 2244
+RuleKernelFunctor ApplyEdge 84,7 : 10876 -> 2244, edges [8->8) @ 0, e_id_in = 0, e_id = 1418
+RuleKernelFunctor ApplyEdge 48,4 : 6170 -> 1668, edges [8->8) @ 0, e_id_in = 0, e_id = 1153
+RuleKernelFunctor ApplyEdge 82,0 : 10542 -> 2204, edges [8->8) @ 0, e_id_in = 0, e_id = 1402
+copyInv: edges += 0
+RuleKernelFunctor2 : copyInc <- loadInv, pts_add
+r_offset = 11105,0x704905a00 r_indices = 1940,0x7049c9c00
+s_offset = 11105,0x7048efe00 s_indices = 1423,0x7049c4600
+t_offset = 11105,0x704951c00 t_indices = 3881,0x7049d4200
+RuleKernelFunctor2 copyIin += ptsIadd, store
+RuleKernelFunctor2 CondEdge 48,14 : 6247 -> 6246
+RuleKernelFunctor2 CondEdge 77,9 : 9938 -> 9938
+RuleKernelFunctor2 CondEdge 77,10 : 9938 -> 9938
+RuleKernelFunctor2 CondEdge 77,11 : 9938 -> 9938
+RuleKernelFunctor2 CondEdge 77,13 : 9957 -> 9938
+RuleKernelFunctor2 ApplyEdge 48,14 : 6247 -> 6246, edges [1423->1423) @ 0, e_id_in = 0, e_id = 808
+RuleKernelFunctor2 ApplyEdge 77,9 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 1718
+RuleKernelFunctor2 ApplyEdge 77,10 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 1719
+RuleKernelFunctor2 ApplyEdge 77,11 : 9938 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 1720
+RuleKernelFunctor2 ApplyEdge 77,13 : 9957 -> 9938, edges [1423->1423) @ 0, e_id_in = 0, e_id = 1722
+r_offset = 11105,0x704926400 r_indices = 1423,0x7049cbc00
+s_offset = 11105,0x704910800 s_indices = 611,0x704ac1a00
+t_offset = 11105,0x704951c00 t_indices = 3881,0x7049d4200
+RuleKernelFunctor2 CondEdge 82,0 : 10542 -> 2204
+RuleKernelFunctor2 CondEdge 48,4 : 6170 -> 1668
+RuleKernelFunctor2 CondEdge 84,7 : 10876 -> 2244
+RuleKernelFunctor2 ApplyEdge 84,7 : 10876 -> 2244, edges [8->8) @ 0, e_id_in = 0, e_id = 1418
+RuleKernelFunctor2 ApplyEdge 82,0 : 10542 -> 2204, edges [8->8) @ 0, e_id_in = 0, e_id = 1402
+RuleKernelFunctor2 ApplyEdge 48,4 : 6170 -> 1668, edges [8->8) @ 0, e_id_in = 0, e_id = 1153
+0	 0	 	 Fullqueue finished. Total_Length= 11104
+0	 0	     	 out_length = 11104
+checking to_continue = true
+checking to_continue = true
+0	 1	 0	 stage0	 0	 Queue_Length = 11104
+0	 1	 1	 stage0	 0	 Queue_Length = 11104
+checking to_continue = true
+0	 1	 0	 stage3	 0	 Queue_Length = 11104
+0	 1	 1	 stage4	 0	 Queue_Length = 11104
+checking to_continue = true
+checking to_continue = true
+checking to_continue = true
+0	 1	 	 Subqueue finished. Total_Length= 11104
+GraphUnion : pts_add <- pts + pts_inc
+UnionGraphs 13,4 : 1668 -> 6170
+UnionGraphs 17,68 : 2244 -> 10876
+UnionGraphs 17,28 : 2204 -> 10542
+Assigment  : t <- pts; pts <- pts_add; pts_add <- pts_inc; pts_inc <- t(0)
+GraphUnion : copyIad <- copyInv + copyIin
+UnionGraphs 48,32 : 6176 -> 6169
+UnionGraphs 48,37 : 6181 -> 2460
+UnionGraphs 48,39 : 6183 -> 6168
+UnionGraphs 48,102 : 6246 -> 6183
+UnionGraphs 48,104 : 6248 -> 2460
+UnionGraphs 48,113 : 6257 -> 9938
+UnionGraphs 80,46 : 10286 -> 2444
+UnionGraphs 81,2 : 10370 -> 2447
+UnionGraphs 19,12 : 2444 -> 6183
+UnionGraphs 19,15 : 2447 -> 6183
+UnionGraphs 19,25 : 2457 -> 2458
+UnionGraphs 19,26 : 2458 -> 6176
+UnionGraphs 84,125 : 10877 -> 10876
+UnionGraphs 84,127 : 10879 -> 10876
+UnionGraphs 48,23 : 6167 -> 6169
+UnionGraphs 48,24 : 6168 -> 6167
+UnionGraphs 48,25 : 6169 -> 2467
+UnionGraphs 48,27 : 6171 -> 6170
+UnionGraphs 48,29 : 6173 -> 6170
+UnionGraphs 80,124 : 10364 -> 2447
+UnionGraphs 82,37 : 10533 -> 2457
+UnionGraphs 82,47 : 10543 -> 10542
+UnionGraphs 82,49 : 10545 -> 10542
+UnionGraphs 77,66 : 9922 -> 9938
+UnionGraphs 77,80 : 9936 -> 9938
+UnionGraphs 77,82 : 9938 -> 9938
+UnionGraphs 82,22 : 10518 -> 2457
+UnionGraphs 18,120 : 2424 -> 9938
+UnionGraphs 48,32 : 6176 -> 6171
+UnionGraphs 48,39 : 6183 -> 6181
+UnionGraphs 77,82 : 9938 -> 9938
+UnionGraphs 19,12 : 2444 -> 10285
+UnionGraphs 19,15 : 2447 -> 10365
+UnionGraphs 19,25 : 2457 -> 2459
+UnionGraphs 19,26 : 2458 -> 6242
+UnionGraphs 19,27 : 2459 -> 6247
+UnionGraphs 48,23 : 6167 -> 6176
+UnionGraphs 77,82 : 9938 -> 6183
+UnionGraphs 48,23 : 6167 -> 6181
+UnionGraphs 19,12 : 2444 -> 10287
+UnionGraphs 19,15 : 2447 -> 10367
+UnionGraphs 19,25 : 2457 -> 6167
+UnionGraphs 19,26 : 2458 -> 9938
+UnionGraphs 77,82 : 9938 -> 9965
+UnionGraphs 19,15 : 2447 -> 10371
+UnionGraphs 19,25 : 2457 -> 6169
+UnionGraphs 19,26 : 2458 -> 10891
+UnionGraphs 77,82 : 9938 -> 9985
+UnionGraphs 19,25 : 2457 -> 6183
+UnionGraphs 19,26 : 2458 -> 10901
+UnionGraphs 19,25 : 2457 -> 6238
+UnionGraphs 19,25 : 2457 -> 9879
+UnionGraphs 19,25 : 2457 -> 9957
+UnionGraphs 19,25 : 2457 -> 9969
+UnionGraphs 19,25 : 2457 -> 9977
+UnionGraphs 19,25 : 2457 -> 10517
+UnionGraphs 19,25 : 2457 -> 10519
+UnionGraphs 19,25 : 2457 -> 10829
+UnionGraphs 19,25 : 2457 -> 10874
+UnionGraphs 19,25 : 2457 -> 10875
+UnionGraphs 19,25 : 2457 -> 10886
+UnionGraphs 19,25 : 2457 -> 10896
+UnionGraphs 19,25 : 2457 -> 10906
+Assigment  : t <- copyInv; copyInv <- copyIad; copyIad <- copyIin; copyIin <- t(0)
+Inverting  : ptsIadd <- (pts_add)^-1
+0	 1	 	 Fullqueue started. Total_Length= 11104
+0	 1	 0	 stage5	 	 Queue_Length = 11104
+0	 1	 0	 queue_length = 3881, output_length = 0
+0	 1	 	 Fullqueue finished. Total_Length= 11104
+0	 1	     	 out_length = 11104
+checking to_continue = false
+Andersen_Thread finished
+
+GPU Andersen Done.
+GPU Andersen finished in 22.261913 msec.
+
+	Memory Usage(B)	 #keys0
+GPU_0	 4194304	 11104
+	 key_sizing =	 1.000000

@@ -1078,12 +1078,16 @@ void Iteration_Loop(
                         thread_num,
                         peer_,
                         frontier_queue_,
+                        scanned_edges_,
                         frontier_attribute_,
                         enactor_stats_,
                         data_slice,
+                        s_data_slice[thread_num].GetPointer(util::DEVICE),
                         graph_slice,
-                        streams[peer_]);
-                    selector            = frontier_attribute[peer_].selector;
+                        work_progress_,
+                        context[peer_],
+                        streams[peer_]); 
+                   selector            = frontier_attribute[peer_].selector;
                     if (enactor_stats_->retval) break;
                     
                     if (Enactor::DEBUG) {printf("%d\t %lld\t \t Fullqueue started. Total_Length= %d\n", thread_num, enactor_stats[0].iteration, frontier_attribute_->queue_length);fflush(stdout);}
@@ -1432,10 +1436,14 @@ public:
         int                            peer_,
         util::DoubleBuffer<SizeT, VertexId, Value>
                                       *frontier_queue,
+        util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
         EnactorStats                  *enactor_stats,
         DataSlice                     *data_slice,
+        DataSlice                     *d_data_slice,
         GraphSlice                    *graph_slice,
+        util::CtaWorkProgressLifetime *work_progress,
+        ContextPtr                     context,
         cudaStream_t                   stream)
     {
     }
@@ -1463,10 +1471,14 @@ public:
         int                            peer_,
         util::DoubleBuffer<SizeT, VertexId, Value>
                                       *frontier_queue,
+        util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
         EnactorStats                  *enactor_stats,
         DataSlice                     *data_slice,
+        DataSlice                     *d_data_slice,
         GraphSlice                    *graph_slice,
+        util::CtaWorkProgressLifetime *work_progress,
+        ContextPtr                     context,
         cudaStream_t                   stream)
     {
     }
