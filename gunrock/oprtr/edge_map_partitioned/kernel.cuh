@@ -328,6 +328,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 SizeT out_index = out_offset+edges_processed+(i-e_offset);
 
                 {
+                    printf("MARK_PREDECESSORS = %s\n", ProblemData::MARK_PREDECESSORS?"true":"false");
                     if (!ProblemData::MARK_PREDECESSORS) {
                         if (Functor::CondEdge(label, u, problem, lookup, e_id)) {
                             Functor::ApplyEdge(label, u, problem, lookup, e_id);
@@ -459,6 +460,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         end_id = end_id % KernelPolicy::THREADS;
         s_edges[tid] = (my_id < range ? d_scanned_edges[my_id] - offset : max_edges);
 
+        //printf(" blockId = %d, threadId = %d, range = %d, my_id = %d\n", blockIdx.x, threadIdx.x, range, my_id);
         if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
             s_vertices[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
             s_edge_ids[tid] = 0;
@@ -490,12 +492,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
             }
 
+            //printf(" blockId = %d, threadId = %d, i = %d, v = %d\n", blockIdx.x, threadIdx.x, i, v);
             int internal_offset = v_index > 0 ? s_edges[v_index-1] : 0;
             e = i - internal_offset;
 
             int lookup = d_row_offsets[v] + e;
             VertexId u = d_column_indices[lookup];
            
+            //printf("MARK_PREDECESSORS = %s\n", ProblemData::MARK_PREDECESSORS?"true":"false");
             if (!ProblemData::MARK_PREDECESSORS) {
                 if (Functor::CondEdge(label, u, problem, lookup, e_id)) {
                     Functor::ApplyEdge(label, u, problem, lookup, e_id);

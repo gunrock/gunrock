@@ -45,7 +45,7 @@ struct PRFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        return (problem->d_degrees[d_id] > 0 && problem->d_degrees[s_id] > 0);
+        return (problem->degrees[d_id] > 0 && problem->degrees[s_id] > 0);
     }
 
     /**
@@ -60,7 +60,7 @@ struct PRFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        atomicAdd(&problem->d_rank_next[d_id], problem->d_rank_curr[s_id]/problem->d_degrees[s_id]);
+        atomicAdd(problem->rank_next + d_id, problem->rank_curr[s_id]/problem->degrees[s_id]);
     }
 
     /**
@@ -73,11 +73,11 @@ struct PRFunctor
      */
     static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
-        Value delta = problem->d_delta[0];
-        VertexId src_node = problem->d_src_node[0];
-        Value threshold = (Value)problem->d_threshold[0];
-        problem->d_rank_next[node] = (delta * problem->d_rank_next[node]) + (1.0-delta) * ((src_node == node || src_node == -1) ? 1 : 0);
-        Value diff = fabs(problem->d_rank_next[node] - problem->d_rank_curr[node]);
+        Value delta = problem->delta;
+        VertexId src_node = problem->src_node;
+        Value threshold = (Value)problem->threshold;
+        problem->rank_next[node] = (delta * problem->rank_next[node]) + (1.0-delta) * ((src_node == node || src_node == -1) ? 1 : 0);
+        Value diff = fabs(problem->rank_next[node] - problem->rank_curr[node]);
  
         return (diff > threshold);
     }
@@ -120,7 +120,7 @@ struct RemoveZeroDegreeNodeFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        return (problem->d_degrees[d_id] == 0);
+        return (problem->degrees[d_id] == 0);
     }
 
     /**
@@ -135,7 +135,7 @@ struct RemoveZeroDegreeNodeFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        atomicAdd(&problem->d_degrees_pong[s_id], -1);
+        atomicAdd(problem->degrees_pong + s_id, -1);
     }
 
     /**
@@ -148,9 +148,9 @@ struct RemoveZeroDegreeNodeFunctor
      */
     static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
-        bool valid = (problem->d_degrees[node] == 0);
-        problem->d_degrees_pong[node] = valid ? -1 : problem->d_degrees_pong[node];
-        return (problem->d_degrees[node] > 0);
+        bool valid = (problem->degrees[node] == 0);
+        problem->degrees_pong[node] = valid ? -1 : problem->degrees_pong[node];
+        return (problem->degrees[node] > 0);
     }
 
     /**

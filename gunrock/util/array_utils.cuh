@@ -59,6 +59,8 @@ private:
 public:
     Array1D()
     {
+        //name.reserve(40);
+        //file_name.reserve(512);
         name      = "";
         file_name = "";
         h_pointer = NULL;
@@ -72,7 +74,9 @@ public:
 
    Array1D(const char* const name)
     {
-        this->name= name;
+        //this->name.reserve(40);
+        //file_name.reserve(512);
+        this->name= std::string(name);
         file_name = "";
         h_pointer = NULL;
         d_pointer = NULL;
@@ -102,7 +106,8 @@ public:
     cudaError_t Init(SizeT size, unsigned int target = HOST, bool use_cuda_alloc = false, unsigned int flag = cudaHostAllocDefault)
     {
         cudaError_t retval = cudaSuccess;
-        
+       
+        if (ARRAY_DEBUG) {printf("%s Init size = %d, target = %d\n", name.c_str(), size, target);fflush(stdout);} 
         if (retval = Release()) return retval;
         setted     = NONE;
         allocated  = NONE;
@@ -234,6 +239,10 @@ public:
 
     cudaError_t EnsureSize(SizeT size, bool keep = false, cudaStream_t stream = 0)
     {
+        if (ARRAY_DEBUG)
+        {
+            printf("%s EnsureSize : %d -> %d\n", name.c_str(), this->size, size);fflush(stdout);
+        }
         if (this->size >= size) return cudaSuccess;
         else {
             //printf("Expanding %s : %d -> %d\n",name.c_str(),this->size,size);fflush(stdout);
@@ -356,7 +365,6 @@ public:
     cudaError_t Move(unsigned int source, unsigned int target, SizeT size=-1, SizeT offset=0, cudaStream_t stream=0)
     {
         cudaError_t retval = cudaSuccess;
-        //if (ARRAY_DEBUG) {printf("%s Moving from %d to %d, size = %d, offset = %d\n", name.c_str(), source, target, size, offset);fflush(stdout);}
         if ((source == HOST || source == DEVICE) && 
             ((source & setted) != source) && ((source & allocated) != source)) 
             return GRError(name+" movment source is not valid", __FILE__, __LINE__);
@@ -369,6 +377,7 @@ public:
         if (size > this->size) return GRError(name+" size is invalid",__FILE__, __LINE__);
         if (size+offset > this->size) return GRError(name+" size+offset is invalid", __FILE__, __LINE__);
         if (size == 0) return retval;
+        if (ARRAY_DEBUG) {printf("%s Moving from %d to %d, size = %d, offset = %d, stream = %p, d_pointer = %p, h_pointer = %p\n", name.c_str(), source, target, size, offset, stream, d_pointer, h_pointer);fflush(stdout);}
 
         if      (source == HOST   && target == DEVICE) {
            if (use_cuda_alloc && stream != 0)
@@ -429,6 +438,24 @@ public:
         }
         return retval;
     } // Move(...)
+
+    Array1D& operator=(const Array1D& other)
+    {
+       if (ARRAY_DEBUG)
+       {
+           printf("%s Assigment\n", other.name.c_str());fflush(stdout);
+       }
+       //name      = other.name     ;
+       //file_name = other.file_name;
+       size      = other.size     ;
+       flag      = other.flag     ;
+       use_cuda_alloc = other.use_cuda_alloc;
+       setted    = other.setted   ;
+       allocated = other.allocated;
+       h_pointer = other.h_pointer;
+       d_pointer = other.d_pointer;
+       return *this;
+    }
 
     __host__ __device__ __forceinline__ Value& operator[](std::size_t idx)
     {
