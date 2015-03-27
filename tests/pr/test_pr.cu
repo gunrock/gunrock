@@ -80,19 +80,19 @@ bool PRCompare(
  ******************************************************************************/
 void Usage()
 {
-    printf("\ntest_pr <graph type> <graph type args> [--device=<device_index>] "
-           "[--undirected] [--instrumented] [--quick] "
-           "[--v]\n"
-           "\n"
-           "Graph types and args:\n"
-           "  market [<file>]\n"
-           "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
-           "    edges from stdin (or from the optionally-specified file).\n"
-           "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
-           "  --undirected If set then treat the graph as undirected.\n"
-           "  --instrumented If set then kernels keep track of queue-search_depth\n"
-           "  and barrier duty (a relative indicator of load imbalance.)\n"
-           "  --quick If set will skip the CPU validation code.\n"
+    printf(
+        "\ntest_pr <graph type> <graph type args> [--device=<device_index>] "
+        "[--undirected] [--instrumented] [--quick=<0|1>] [--v]\n"
+        "\n"
+        "Graph types and args:\n"
+        "  market [<file>]\n"
+        "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
+        "    edges from stdin (or from the optionally-specified file).\n"
+        "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
+        "  --undirected If set then treat the graph as undirected.\n"
+        "  --instrumented If set then kernels keep track of queue-search_depth\n"
+        "  and barrier duty (a relative indicator of load imbalance.)\n"
+        "  --quick If set will skip the CPU validation code. Default: 0\n"
         );
 }
 
@@ -446,6 +446,7 @@ void RunTests(
     VertexId src            = -1;    // Source vertex
     int      iterations     = 1;     // Number of runs for testing
     int      traversal_mode = -1;    // Load-balacned or Dynamic cooperative
+    g_quick                 = 1;     // Whether or not to skip ref validation
 
     // traversal mode
     args.GetCmdLineArgument("traversal-mode", traversal_mode);
@@ -455,13 +456,13 @@ void RunTests(
     }
 
     instrumented = args.CheckCmdLineFlag("instrumented");
+    g_verbose = args.CheckCmdLineFlag("v");
     args.GetCmdLineArgument("delta", delta);
     args.GetCmdLineArgument("error", error);
     args.GetCmdLineArgument("max-iter", max_iter);
     args.GetCmdLineArgument("src", src);
     args.GetCmdLineArgument("iteration-num", iterations);
-    g_quick = args.CheckCmdLineFlag("quick");
-    g_verbose = args.CheckCmdLineFlag("v");
+    args.GetCmdLineArgument("quick", g_quick);
 
     if (instrumented)
     {

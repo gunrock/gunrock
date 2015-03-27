@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <stdarg.h>
 #include <gunrock/util/test_utils.h>
 #include <gunrock/util/error_utils.cuh>
 
@@ -39,14 +40,17 @@ int CompareDeviceResults(
     cudaMemcpy(h_data, d_data, sizeof(T) * num_elements, cudaMemcpyDeviceToHost);
 
     // Display data
-    if (display_data) {
+    if (display_data)
+    {
         printf("Reference:\n");
-        for (int i = 0; i < num_elements; i++) {
+        for (int i = 0; i < num_elements; i++)
+        {
             PrintValue(h_reference[i]);
             printf(", ");
         }
         printf("\n\nData:\n");
-        for (int i = 0; i < num_elements; i++) {
+        for (int i = 0; i < num_elements; i++)
+        {
             PrintValue(h_data[i]);
             printf(", ");
         }
@@ -195,10 +199,10 @@ inline bool EnoughDeviceMemory(unsigned int mem_needed)
 }
 
 /******************************************************************************
- * Templated routines for printing keys/values to the console 
+ * Templated routines for printing keys/values to the console
  ******************************************************************************/
 
-template<typename T> 
+template<typename T>
 inline void PrintValue(T val) {
     val.Print();
 }
@@ -273,7 +277,7 @@ inline void PrintValue<bool>(bool val) {
 
 
 /******************************************************************************
- * Helper routines for list construction and validation 
+ * Helper routines for list construction and validation
  ******************************************************************************/
 
 /**
@@ -398,6 +402,63 @@ int CompareResults(float* computed, float* reference, SizeT len, bool verbose = 
     if (!flag)
         printf("CORRECT");
     return flag;
+}
+
+std::string stringprintf (const char* format, ...)
+{
+    va_list args;
+    va_start (args, format);
+    int len = vsnprintf (0, 0, format, args);
+    va_end (args);
+
+    std::string text;
+    text.resize (len);
+
+    va_start (args, format);
+    vsnprintf (&text[0], len + 1, format, args);
+    va_end (args);
+
+    return text;
+}
+
+struct FormatOpPrintf
+{
+    const char* format;
+    FormatOpPrintf (const char* f) : format(f) { }
+
+    template<typename T>
+    std::string operator() (int index, T x) const {
+        return stringprintf (format, x);
+    }
+};
+
+template<typename T, typename Op>
+std::string FormatArrayOp (const T* data, size_t count, Op op, int num_cols)
+{
+    std::string s;
+    size_t num_rows = (count + num_cols - 1) / num_cols;
+    for(size_t row(0); row < num_rows; ++row)
+    {
+        size_t left = row * num_cols;
+        s.append (stringprintf ("%6d: ", left));
+
+        for (size_t col(left); col < std::min (left + num_cols, count); ++col)
+        {
+            s.append (op (col, data[col]));
+            s.push_back (' ');
+        }
+        s.push_back ('\n');
+    }
+    return s;
+}
+
+template<typename T>
+void PrintFormatArray (const T* data, size_t length,
+                       const char* format, int num_cols)
+{
+    std::string s = FormatArrayOp (
+        data, length, FormatOpPrintf (format), num_cols);
+    printf("%s", s.c_str());
 }
 
 /** @} */
