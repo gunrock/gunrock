@@ -150,8 +150,8 @@ void RunTests(Test_Parameter *parameter)
         DEBUG,
         SIZE_CHECK> AndersenEnactor;
 
-    //Csr<VertexId, Value, SizeT>
-    //             *graph                 = (Csr<VertexId, Value, SizeT>*)parameter->graph;
+    Csr<VertexId, Value, SizeT>
+                 *graph                 = (Csr<VertexId, Value, SizeT>*)parameter->ptsGraph;
     //VertexId      src                   = (VertexId)parameter -> src;
     int           max_grid_size         = parameter -> max_grid_size;
     int           num_gpus              = parameter -> num_gpus;
@@ -168,6 +168,9 @@ void RunTests(Test_Parameter *parameter)
     //std::string   ref_filename          = parameter -> ref_filename;
     //int           iterations            = parameter -> iterations;
     size_t       *org_size              = new size_t  [num_gpus];
+    VertexId     *froms                 = NULL;//new VertexId[graph->nodes * graph->nodes];
+    VertexId     *tos                   = NULL;//new VertexId[graph->nodes * graph->nodes];
+    SizeT         num_pts               = 0;
 
     //printf("0: node %d: %d -> %d, node %d: %d -> %d\n", 131070, graph->row_offsets[131070], graph->row_offsets[131071], 131071, graph->row_offsets[131071], graph->row_offsets[131072]);
     //for (int edge = 0; edge < graph->edges; edge ++)
@@ -217,6 +220,15 @@ void RunTests(Test_Parameter *parameter)
 
     printf("GPU Andersen finished in %lf msec.\n", elapsed);
 
+    problem->GetNumPts(num_pts);
+    froms = new int[num_pts+2];
+    tos   = new int[num_pts+2];
+    problem->Extract(froms, tos);
+    printf("#Points-to constraints = %d\n", num_pts);
+    printf("First %d :\n", num_pts>40? 40:num_pts);
+    for (int i=0; i< (num_pts>40?40:num_pts); i++)
+        printf("[%d] => [%d]\n", froms[i], tos[i]);
+    printf("\n");
     printf("\n\tMemory Usage(B)\t");
     for (int gpu=0;gpu<num_gpus;gpu++)
     if (num_gpus>1)
@@ -257,6 +269,8 @@ void RunTests(Test_Parameter *parameter)
     printf("\n");
 
     // Cleanup 
+    if (froms                  ) {delete[] froms                  ; froms                   = NULL;}
+    if (tos                    ) {delete[] tos                    ; tos                     = NULL;}
     if (org_size               ) {delete[] org_size               ; org_size                = NULL;}
     if (problem                ) {delete   problem                ; problem                 = NULL;}
     if (enactor                ) {delete   enactor                ; enactor                 = NULL;}
@@ -418,6 +432,7 @@ uint readNodes(const char *fileName, Test_Parameter *parameter) {
     fprintf(stderr, "Error: file %s not found.\n", fileName);
     exit(-1);
   }
+  printf(".");fflush(stdout);
   istream inFile(&inFilebuffer);
   string line = skipBlanksAndComments(inFile);
   istringstream linestream(line);
@@ -433,6 +448,7 @@ uint readNodes(const char *fileName, Test_Parameter *parameter) {
   uint length = roundToNextMultipleOf(parameter->numObjectVars, 32);
   parameter->size = new uint[length];
   assert (parameter->size != NULL);
+  printf(".");fflush(stdout);
   for (uint i = 0; i < parameter->numObjectVars; i++) {
     line = skipBlanksAndComments(inFile);
     istringstream linestream(line);
@@ -440,6 +456,7 @@ uint readNodes(const char *fileName, Test_Parameter *parameter) {
     parameter->size[i] = nextUint(linestream);
     nextUint(linestream);// ignore functionNode crap
   }
+  printf(".");fflush(stdout);
   inFilebuffer.close();
   for (uint i = parameter->numObjectVars; i < length; i++) {
     parameter->size[i] = 0;
@@ -604,10 +621,11 @@ void constraintsToCSR(
     bool inverst = false,
     int *convertion = NULL)
 {
-    graph->nodes = nodes;
-    graph->edges = numConstraints;
-    graph->row_offsets = new int[nodes +1];
-    graph->column_indices = new int[numConstraints];
+    //graph->nodes = nodes;
+    //graph->edges = numConstraints;
+    //graph->row_offsets = new int[nodes +1];
+    //graph->column_indices = new int[numConstraints];
+    graph->FromScratch<false, false>(nodes, numConstraints);
     int *length = new int[nodes];
     uint *dst    = constraints;
     uint *src    = constraints + padNumber(numConstraints);
@@ -645,10 +663,11 @@ void constraintsGepToCSR(
     bool inverst = false,
     int* convertion = NULL)
 {
-    graph->nodes = nodes;
-    graph->edges = numConstraints;
-    graph->row_offsets = new int[nodes +1];
-    graph->column_indices = new int[numConstraints];
+    //graph->nodes = nodes;
+    //graph->edges = numConstraints;
+    //graph->row_offsets = new int[nodes +1];
+    //graph->column_indices = new int[numConstraints];
+    graph->FromScratch<false, false>(nodes, numConstraints);
     offsets      = new int[numConstraints];
     int *length = new int[nodes];
     memset(length, 0, sizeof(int) * nodes);
@@ -677,7 +696,7 @@ void constraintsGepToCSR(
         offsets[graph->row_offsets[x] + length[x]] = offset(constraints[i*2+1]);
         length[x] ++;
         int o = offset(constraints[i*2+1]);
-        if (to_track(x) || to_track(y)) printf("%d -> %d o = %d\n", x, y, o);
+        if (to_track(x) || to_track(y) || to_track(x+o)) printf("%d -> %d o = %d\n", x, y, o);
     }
     delete []length; length = NULL;
 }
@@ -809,9 +828,9 @@ int cpp_main( int argc, char** argv)
     Csr<VertexId, Value, SizeT> storeGraph  (false);
     constraintsToCSR(parameter->numVars, parameter->numStoreConstraints, parameter->storeConstraints, &storeGraph  , false, convertion);
     printf("creating gepInvGraph\n");fflush(stdout);
-    printf("OK.\n");fflush(stdout);
     Csr<VertexId, Value, SizeT> gepInvGraph (false);
     constraintsGepToCSR(parameter->numVars, parameter->numGepInv, parameter->gepInv, &gepInvGraph, parameter->gepOffset, true, convertion);
+    printf("OK.\n");fflush(stdout);
 
     parameter -> Init(args);
     parameter -> num_gpus = num_gpus;
@@ -824,6 +843,7 @@ int cpp_main( int argc, char** argv)
     parameter -> storeGraph   = &storeGraph;
     parameter -> gepInvGraph  = &gepInvGraph;
     parameter -> graph        = parameter->ptsGraph;
+    printf("OK.2\n");fflush(stdout);
     RunTests<VertexId, Value, SizeT>(parameter);
     return 0;
 }

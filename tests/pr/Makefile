@@ -39,9 +39,10 @@ SM_TARGETS = $(GEN_SM30)
 
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
 MGPU_INC = "../../../moderngpu/include"
-BOOST_INC = "../../../boost_1_53_0"
-CUB_INC = "../../../cub"
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(BOOST_INC) -I$(CUB_INC) -I.. -I../..
+CUB_INC  = "../../.."
+BOOST_DIR = "../../../boost_1_53_0"
+BOOST_DEPS = -Xlinker $(BOOST_DIR)/bin.v2/libs/timer/build/gcc-4.6/release/link-static/threading-multi/cpu_timer.o -Xlinker $(BOOST_DIR)/bin.v2/libs/chrono/build/gcc-4.6/release/link-static/threading-multi/chrono.o -Xlinker $(BOOST_DIR)/bin.v2/libs/system/build/gcc-4.6/release/link-static/threading-multi/libboost_system.a -Xlinker -lrt
+INC = -I$(CUDA_INC) -I$(BOOST_DIR) -I$(MGPU_INC) $(BOOST_DEPS) -I$(CUB_INC) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -105,7 +106,7 @@ test: bin/test_pr_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
 bin/test_pr_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_pr.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_pr_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_pr.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3  
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_pr_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_pr.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean

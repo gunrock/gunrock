@@ -111,7 +111,7 @@ test: bin/test_andersen_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
 bin/test_andersen_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_andersen.cu $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_andersen_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_andersen.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O0 -g -G
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_andersen_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_andersen.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3 -g -G
 
 #-------------------------------------------------------------------------------
 # Clean

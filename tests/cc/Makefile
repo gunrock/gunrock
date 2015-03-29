@@ -109,7 +109,7 @@ DEPS = 			./Makefile \
 
 test: bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_cc.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_cc.cu $(DEPS)
 	mkdir -p bin
 	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_cc.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
 

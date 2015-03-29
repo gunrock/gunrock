@@ -48,11 +48,6 @@ using namespace gunrock::app::cc;
  * Defines, constants, globals 
  ******************************************************************************/
 
-//bool g_verbose;
-//bool g_undirected;
-//bool g_quick;
-//bool g_stream_from_host;
-
 template <typename VertexId>
 struct CcList {
     VertexId        root;
