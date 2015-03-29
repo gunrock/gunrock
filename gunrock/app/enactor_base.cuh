@@ -547,15 +547,19 @@ void PushNeibor(
 
 template <typename Problem>
 void ShowDebugInfo(
-    int                    thread_num,
-    int                    peer_,
-    FrontierAttribute<typename Problem::SizeT>      *frontier_attribute,
-    EnactorStats           *enactor_stats,
-    typename Problem::DataSlice  *data_slice,
-    GraphSlice<typename Problem::SizeT, typename Problem::VertexId, typename Problem::Value> *graph_slice,
-    util::CtaWorkProgressLifetime *work_progress,
-    std::string            check_name = "",
-    cudaStream_t           stream = 0) 
+    int           thread_num,
+    int           peer_,
+    FrontierAttribute<typename Problem::SizeT>      
+                 *frontier_attribute,
+    EnactorStats *enactor_stats,
+    typename Problem::DataSlice  
+                 *data_slice,
+    GraphSlice<typename Problem::SizeT, typename Problem::VertexId, typename Problem::Value> 
+                 *graph_slice,
+    util::CtaWorkProgressLifetime 
+                 *work_progress,
+    std::string   check_name = "",
+    cudaStream_t  stream = 0) 
 {    
     typedef typename Problem::SizeT    SizeT;
     typedef typename Problem::VertexId VertexId;
@@ -570,10 +574,10 @@ void ShowDebugInfo(
     //util::cpu_mt::PrintCPUArray<SizeT, SizeT>((check_name+" Queue_Length").c_str(), &(queue_length), 1, thread_num, enactor_stats->iteration);
     printf("%d\t %lld\t %d\t stage%d\t %s\t Queue_Length = %d\n", thread_num, enactor_stats->iteration, peer_, data_slice->stages[peer_], check_name.c_str(), queue_length);fflush(stdout);
     //printf("%d \t %d\t \t peer_ = %d, selector = %d, length = %d, p = %p\n",thread_num, enactor_stats->iteration, peer_, frontier_attribute->selector,queue_length,graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE));fflush(stdout);
-    //util::cpu_mt::PrintGPUArray<SizeT, VertexId>((check_name+" keys").c_str(), graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE), queue_length, thread_num, enactor_stats->iteration,peer_, stream);
+    //util::cpu_mt::PrintGPUArray<SizeT, VertexId>((check_name+" keys").c_str(), data_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE), queue_length, thread_num, enactor_stats->iteration,peer_, stream);
     //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
     //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu1", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
-    //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labe1", data_slice[0]->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
+    //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("degrees", data_slice->degrees.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
     //if (BFSProblem::MARK_PREDECESSORS)
     //    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("pred1", data_slice[0]->preds.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
     //if (BFSProblem::ENABLE_IDEMPOTENCE)
@@ -827,7 +831,8 @@ void Iteration_Loop(
                             data_slice ->keys_in[iteration%2][peer_].GetPointer(util::DEVICE),
                             frontier_queue_->keys[selector^1].GetPointer(util::DEVICE),
                             offset,
-                            data_slice ->expand_incoming_array[peer_].GetPointer(util::DEVICE));
+                            data_slice ->expand_incoming_array[peer_].GetPointer(util::DEVICE),
+                            data_slice);
                         frontier_attribute_->selector^=1;
                         frontier_attribute_->queue_index++;
                         //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("in_keys", frontier_queue_->keys[selector^1].GetPointer(util::DEVICE), frontier_attribute_->queue_length, thread_num, iteration, peer_, streams[peer_]);
@@ -865,7 +870,7 @@ void Iteration_Loop(
                             graph_slice ->row_offsets     .GetPointer(util::DEVICE),
                             graph_slice ->column_indices  .GetPointer(util::DEVICE),
                             frontier_queue_->keys[selector].GetPointer(util::DEVICE),
-                            scanned_edges_->GetPointer(util::DEVICE),
+                            scanned_edges_,//->GetPointer(util::DEVICE),
                             graph_slice ->nodes,//frontier_queues[peer_].keys[frontier_attribute[peer_].selector  ].GetSize(), 
                             graph_slice ->edges,//frontier_queues[peer_].keys[frontier_attribute[peer_].selector^1].GetSize(),
                             context          [peer_][0],
@@ -1117,7 +1122,7 @@ void Iteration_Loop(
                             graph_slice ->row_offsets     .GetPointer(util::DEVICE),
                             graph_slice ->column_indices  .GetPointer(util::DEVICE),
                             frontier_queue_->keys[selector].GetPointer(util::DEVICE),
-                            scanned_edges_->GetPointer(util::DEVICE),
+                            scanned_edges_,//->GetPointer(util::DEVICE),
                             graph_slice ->nodes, 
                             graph_slice ->edges,
                             context          [peer_][0],
@@ -1206,16 +1211,18 @@ void Iteration_Loop(
                         Total_Length,
                         streams[0]);
                     Iteration::template Make_Output <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES> (
-                        graph_slice,
-                        data_slice,
-                        enactor_stats,
-                        &frontier_attribute[0],
-                        &data_slice->frontier_queues[Enactor::SIZE_CHECK?0:num_gpus],
+                        thread_num,
                         Total_Length,
                         num_gpus,
-                        thread_num,
-                        streams[0],
-                        context[0]);
+                        &data_slice->frontier_queues[Enactor::SIZE_CHECK?0:num_gpus],
+                        &data_slice->scanned_edges[0],
+                        &frontier_attribute[0],
+                        enactor_stats,
+                        &problem->data_slices[thread_num],
+                        graph_slice,
+                        &work_progress[0],
+                        context[0],
+                        streams[0]);
                 }
             } /*else {
                 for (int peer_=0;peer_<num_gpus;peer_++)
@@ -1223,7 +1230,7 @@ void Iteration_Loop(
             }*/
             for (peer_=0;peer_<num_gpus;peer_++)
                 frontier_attribute[peer_].queue_length = data_slice->out_length[peer_];
-            util::cpu_mt::PrintCPUArray<SizeT, SizeT>("out_length", data_slice->out_length.GetPointer(util::HOST), num_gpus, thread_num, enactor_stats[0].iteration);
+            //util::cpu_mt::PrintCPUArray<SizeT, SizeT>("out_length", data_slice->out_length.GetPointer(util::HOST), num_gpus, thread_num, enactor_stats[0].iteration);
 
         } /*else if (!Iteration::Stop_Condition(s_enactor_stats, s_frontier_attribute, s_data_slice, num_gpus)) {
             if (enactor_stats[0].retval = work_progress[0].GetQueueLength(frontier_attribute[0].queue_index, frontier_attribute[0].queue_length, false, data_slice->streams[0])) break;
@@ -1555,15 +1562,17 @@ public:
         int NUM_VERTEX_ASSOCIATES,
         int NUM_VALUE__ASSOCIATES>
     static void Make_Output(
-        GraphSlice                    *graph_slice,
-        DataSlice                     *data_slice,
-        EnactorStats                  *enactor_stats,
-        FrontierAttribute<SizeT>      *frontier_attribute,
-        util::DoubleBuffer<SizeT, VertexId, Value>
-                                      *frontier_queue,
+        int                            thread_num,
         SizeT                          num_elements,
         int                            num_gpus,
-        int                            thread_num,
+        util::DoubleBuffer<SizeT, VertexId, Value>
+                                      *frontier_queue,
+        util::Array1D<SizeT, SizeT>   *scanned_edges,
+        FrontierAttribute<SizeT>      *frontier_attribute,
+        EnactorStats                  *enactor_stats,
+        util::Array1D<SizeT, DataSlice>
+                                      *data_slice,
+        GraphSlice                    *graph_slice,
         cudaStream_t                   stream,
         ContextPtr                     context)
     {

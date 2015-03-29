@@ -36,11 +36,12 @@ struct Sweep
 {
     static __device__ __forceinline__ void Invoke(
         typename KernelPolicy::VertexId         &queue_index,
-        int                                     &num_gpus,
+        //int                                     &num_gpus,
         int                                     &label,
         typename KernelPolicy::VertexId         *&d_in_queue,
         typename KernelPolicy::VertexId         *&d_pred_out,
         typename KernelPolicy::VertexId         *&d_out_queue,
+        typename KernelPolicy::SizeT            *&d_row_offsets,
         typename KernelPolicy::VertexId         *&d_column_indices,
         typename KernelPolicy::VertexId         *&d_inverse_column_indices,
         typename ProblemData::DataSlice         *&problem,
@@ -48,8 +49,8 @@ struct Sweep
         util::CtaWorkProgress                   &work_progress,
         util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition,
         typename KernelPolicy::SizeT            &max_out_frontier,
-        texture<typename KernelPolicy::SizeT, cudaTextureType1D, cudaReadModeElementType> *&ts_rowoffset,
-        texture<typename KernelPolicy::VertexId, cudaTextureType1D, cudaReadModeElementType> *&ts_columnindices, 
+        //texture<typename KernelPolicy::SizeT, cudaTextureType1D, cudaReadModeElementType> *&ts_rowoffset,
+        //texture<typename KernelPolicy::VertexId, cudaTextureType1D, cudaReadModeElementType> *&ts_columnindices, 
         gunrock::oprtr::advance::TYPE           &ADVANCE_TYPE, 
         bool                                    &inverse_graph)
         {
@@ -70,19 +71,20 @@ struct Sweep
             // CTA processing abstraction
             Cta cta(
                 queue_index,
-                num_gpus,
+                //num_gpus,
                 label,
                 smem_storage,
                 d_in_queue,
                 d_pred_out,
                 d_out_queue,
+                d_row_offsets,
                 d_column_indices,
                 d_inverse_column_indices,
                 problem,
                 work_progress,
                 max_out_frontier,
-                ts_rowoffset,
-                ts_columnindices,
+                //ts_rowoffset,
+                //ts_columnindices,
                 ADVANCE_TYPE,
                 inverse_graph);
 
@@ -122,13 +124,14 @@ struct Dispatch
     static __device__ __forceinline__ void Kernel(
         bool                        &queue_reset,
         VertexId                    &queue_index,
-        int                         &num_gpus,
+        //int                         &num_gpus,
         int                         &label,
         SizeT                       &num_elements,
-        volatile int                *&d_done,
+        //volatile int                *&d_done,
         VertexId                    *&d_in_queue,
         VertexId                    *&d_pred_out,
         VertexId                    *&d_out_queue,
+        SizeT                       *&d_row_offsets,
         VertexId                    *&d_column_indices,
         VertexId                    *&d_inverse_column_indices,
         DataSlice                   *&problem,
@@ -136,8 +139,8 @@ struct Dispatch
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
         util::KernelRuntimeStats    &kernel_stats,
-        texture<SizeT, cudaTextureType1D, cudaReadModeElementType> *&ts_rowoffset,
-        texture<VertexId, cudaTextureType1D, cudaReadModeElementType> *&ts_columnindices,  
+        //texture<SizeT, cudaTextureType1D, cudaReadModeElementType> *&ts_rowoffset,
+        //texture<VertexId, cudaTextureType1D, cudaReadModeElementType> *&ts_columnindices,  
         gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
         bool                        &inverse_graph)
         {
@@ -159,13 +162,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     static __device__ __forceinline__ void Kernel(
         bool                        &queue_reset,
         VertexId                    &queue_index,
-        int                         &num_gpus,
+        //int                         &num_gpus,
         int                         &label,
         SizeT                       &num_elements,
-        volatile int                *&d_done,
+        //volatile int                *&d_done,
         VertexId                    *&d_in_queue,
         VertexId                    *&d_pred_out,
         VertexId                    *&d_out_queue,
+        SizeT                       *&d_row_offsets,
         VertexId                    *&d_column_indices,
         VertexId                    *&d_inverse_column_indices,
         DataSlice                   *&problem,
@@ -173,8 +177,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
         util::KernelRuntimeStats    &kernel_stats,
-        texture<SizeT, cudaTextureType1D, cudaReadModeElementType> *&ts_rowoffset,
-        texture<VertexId, cudaTextureType1D, cudaReadModeElementType> *&ts_columnindices,  
+        //texture<SizeT, cudaTextureType1D, cudaReadModeElementType> *&ts_rowoffset,
+        //texture<VertexId, cudaTextureType1D, cudaReadModeElementType> *&ts_columnindices,  
         gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
         bool                        &inverse_graph)
     {
@@ -213,9 +217,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 }
 
                 // Signal to host that we're done
-                if (num_elements == 0) {
-                    if (d_done) d_done[0] = num_elements;
-                }
+                //if (num_elements == 0) {
+                //    if (d_done) d_done[0] = num_elements;
+                //}
             }
 
             // Initialize work decomposition in smem
@@ -234,11 +238,12 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         Sweep<KernelPolicy, ProblemData, Functor>::Invoke(
                 queue_index,
-                num_gpus,
+                //num_gpus,
                 label,
                 d_in_queue,
                 d_pred_out,
-                d_out_queue, 
+                d_out_queue,
+                d_row_offsets, 
                 d_column_indices,
                 d_inverse_column_indices,
                 problem,
@@ -286,13 +291,14 @@ __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
 void Kernel(
         bool                                    queue_reset,
         typename KernelPolicy::VertexId         queue_index,
-        int                                     num_gpus,
+        //int                                     num_gpus,
         int                                     label,
         typename KernelPolicy::SizeT            num_elements,
-        volatile int                            *d_done, 
+        //volatile int                            *d_done, 
         typename KernelPolicy::VertexId         *d_in_queue,
         typename KernelPolicy::VertexId         *d_pred_out,
         typename KernelPolicy::VertexId         *d_out_queue,
+        typename KernelPolicy::SizeT            *d_row_offsets,
         typename KernelPolicy::VertexId         *d_column_indices,
         typename KernelPolicy::VertexId         *d_inverse_column_indices,
         typename ProblemData::DataSlice         *problem,
@@ -300,21 +306,22 @@ void Kernel(
         typename KernelPolicy::SizeT            max_in_frontier,
         typename KernelPolicy::SizeT            max_out_frontier,
         util::KernelRuntimeStats                kernel_stats,
-        texture<typename KernelPolicy::SizeT, cudaTextureType1D, cudaReadModeElementType> *ts_rowoffset,
-        texture<typename KernelPolicy::SizeT, cudaTextureType1D, cudaReadModeElementType> *ts_columnindices,
+        //texture<typename KernelPolicy::SizeT, cudaTextureType1D, cudaReadModeElementType> *ts_rowoffset,
+        //texture<typename KernelPolicy::SizeT, cudaTextureType1D, cudaReadModeElementType> *ts_columnindices,
         gunrock::oprtr::advance::TYPE           ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
         bool                                    inverse_graph = false)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
             queue_reset,    
             queue_index,
-            num_gpus,
+            //num_gpus,
             label,
             num_elements,
-            d_done,
+            //d_done,
             d_in_queue,
             d_pred_out,
             d_out_queue,
+            d_row_offsets,
             d_column_indices,
             d_inverse_column_indices,
             problem,

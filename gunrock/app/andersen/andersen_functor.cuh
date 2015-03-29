@@ -14,6 +14,7 @@ namespace andersen {
         const int num_to_track = 22;
         const VertexId node_to_track[] = {6167, 6168, 6176, 6183, 6246, 1668, 2204, 2244,
                    2457, 2458, 2444, 2447, 9938, 6249, 6247, 6248, 6169, 6181, 6171, 6170, 10542, 10876};
+        //const VertexId node_to_track[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22};
         for (int i=0; i<num_to_track; i++)
             if (node == node_to_track[i]) return true;
         return false;

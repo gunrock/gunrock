@@ -28,7 +28,7 @@
 
 #include <gunrock/app/problem_base.cuh>
 
-//#include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
+#include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_backward/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_partitioned_backward/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_partitioned/kernel_policy.cuh>
@@ -78,7 +78,7 @@ struct KernelPolicy {
     static const MODE   ADVANCE_MODE = _ADVANCE_MODE;
     static const int    CTA_OCCUPANCY = _MIN_CTA_OCCUPANCY;
 
-/*typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
+typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
     _ProblemData,
     _CUDA_ARCH,
     _INSTRUMENT,
@@ -89,7 +89,7 @@ struct KernelPolicy {
     _LOG_RAKING_THREADS,
     _WARP_GATHER_THRESHOLD,
     _CTA_GATHER_THRESHOLD,
-    _LOG_SCHEDULE_GRANULARITY> THREAD_WARP_CTA_FORWARD;*/
+    _LOG_SCHEDULE_GRANULARITY> THREAD_WARP_CTA_FORWARD;
 
 typedef gunrock::oprtr::edge_map_backward::KernelPolicy<
     _ProblemData,

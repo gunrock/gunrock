@@ -167,6 +167,9 @@ struct AndersenProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = copyInv_hash   .Allocate(copyInv_graph->edges*2, util::DEVICE)) return retval;
             if (retval = t_length       .Allocate(pts_graph    ->nodes+1, util::HOST | util::DEVICE)) return retval;
             if (retval = t_marker       .Allocate(max(pts_graph->edges, copyInv_graph->edges)*2, util::DEVICE)) return retval;
+            gepInv_offset.SetPointer(_gepInv_offset, gepInv_graph->edges, util::HOST);
+            if (retval = gepInv_offset.Move(util::HOST, util::DEVICE)) return retval;
+
             pts_graphslice     = new GraphSlice<SizeT, VertexId, Value>(gpu_idx);
             ptsIadd_graphslice = new GraphSlice<SizeT, VertexId, Value>(gpu_idx);
             pts_add_graphslice = new GraphSlice<SizeT, VertexId, Value>(gpu_idx);
@@ -230,6 +233,10 @@ struct AndersenProblem : ProblemBase<VertexId, SizeT, Value,
      * @{
      */
 
+    void GetNumPts(SizeT &numPts)
+    {
+        numPts = data_slices[0]->pts_graphslice->edges;
+    }
     /**
      * @brief Copy result component ids computed on the GPU back to a host-side vector.
      *
@@ -237,13 +244,25 @@ struct AndersenProblem : ProblemBase<VertexId, SizeT, Value,
      *
      *\return cudaError_t object which indicates the success of all CUDA function calls.
      */
-    cudaError_t Extract(VertexId *h_component_ids)
+    cudaError_t Extract(VertexId *froms, VertexId *tos)
     {
         cudaError_t retval = cudaSuccess;
 
         do {
             if (this->num_gpus == 1) {
                 if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
+                data_slices[0]->pts_graphslice->row_offsets.Move(util::DEVICE, util::HOST);
+                data_slices[0]->pts_graphslice->column_indices.Move(util::DEVICE, util::HOST);
+                for (VertexId v=0; v<data_slices[0]->pts_graphslice->nodes; v++)
+                {
+                    for (SizeT e=data_slices[0]->pts_graphslice->row_offsets[v];
+                               e<data_slices[0]->pts_graphslice->row_offsets[v+1]; e++)
+                    {
+                        froms[e] = v;
+                        tos[e] = data_slices[0]->pts_graphslice->column_indices[e];
+                    }
+                }
+                //num_pts = data_slices[0]->pts_graphslice->edges;
             } else {
                 for (int gpu=0; gpu< this->num_gpus; gpu++)
                 {

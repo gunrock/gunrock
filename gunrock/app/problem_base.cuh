@@ -292,7 +292,9 @@ struct DataSliceBase
     //util::Array1D<SizeT, cudaEvent_t >   local_events  ;
     util::Array1D<SizeT, bool        >   to_show       ;
     util::Array1D<SizeT, char        >   make_out_array;
-    util::Array1D<SizeT, char        >   *expand_incoming_array;
+    util::Array1D<SizeT, char        >  *expand_incoming_array;
+    util::Array1D<SizeT, VertexId    >   preds;
+    util::Array1D<SizeT, VertexId    >   temp_preds;
     
     //Frontier queues. Used to track working frontier.
     util::DoubleBuffer<SizeT, VertexId, Value>  *frontier_queues;
@@ -341,6 +343,8 @@ struct DataSliceBase
             events_set[i].SetName("events_set[]");
         }
         streams                .SetName("streams"                );
+        preds                  .SetName("preds"                  );
+        temp_preds             .SetName("temp_preds"             );
     } // DataSliceBase()
 
     ~DataSliceBase()
@@ -511,6 +515,8 @@ struct DataSliceBase
         stages        .Release();
         to_show       .Release();
         make_out_array.Release();
+        preds         .Release();
+        temp_preds    .Release();
         //util::cpu_mt::PrintMessage("~DataSliceBase() end.");
     } // ~DataSliceBase()
 
@@ -737,6 +743,8 @@ struct DataSliceBase
     {   
         util::cpu_mt::PrintMessage("GraphSlice Reset() begin.");
         cudaError_t retval = cudaSuccess;
+        for (int peer=0; peer<num_gpus; peer++)
+            out_length[peer] = 1;
 
         // Set device
         //if (retval = util::SetDevice(index)) return retval;
@@ -756,19 +764,19 @@ struct DataSliceBase
                 case VERTEX_FRONTIERS :
                     // O(n) ping-pong global vertex frontiers
                     new_frontier_elements[0] = double(num_gpus>1? graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +2;
-                    new_frontier_elements[1] = new_frontier_elements[0] +2;
+                    new_frontier_elements[1] = new_frontier_elements[0];
                     break;
 
                 case EDGE_FRONTIERS :
                     // O(m) ping-pong global edge frontiers
                     new_frontier_elements[0] = double(graph_slice->edges) * queue_sizing +2;
-                    new_frontier_elements[1] = new_frontier_elements[0] +2;
+                    new_frontier_elements[1] = new_frontier_elements[0];
                     break;
 
                 case MIXED_FRONTIERS :
                     // O(n) global vertex frontier, O(m) global edge frontier
                     new_frontier_elements[0] = double(num_gpus>1?graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +2;
-                    new_frontier_elements[1] = double(graph_slice->edges) * queue_sizing+2;
+                    new_frontier_elements[1] = double(graph_slice->edges) * queue_sizing +2;
                     break;
              }    
 
@@ -818,6 +826,7 @@ struct TestParameter_Base {
 public:
     bool          g_quick           ;   
     bool          g_stream_from_host;
+    bool          g_undirected      ;
     bool          instrumented      ;// Whether or not to collect instrumentation from kernels
     bool          debug             ;   
     bool          size_check        ;   
@@ -841,6 +850,7 @@ public:
     {   
         g_quick            = false;
         g_stream_from_host = false;
+        g_undirected       = false;
         instrumented       = false;
         debug              = false;
         size_check         = true;
@@ -878,6 +888,7 @@ public:
         size_check         = !disable_size_check;
         debug              = args.CheckCmdLineFlag("v");
         g_quick            = args.CheckCmdLineFlag("quick");
+        g_undirected       = args.CheckCmdLineFlag("undirected");
         //mark_predecessors  = args.CheckCmdLineFlag("mark-pred");
         //enable_idempotence = args.CheckCmdLineFlag("idempotence");
         args.GetCmdLineArgument("queue-sizing"    , max_queue_sizing);

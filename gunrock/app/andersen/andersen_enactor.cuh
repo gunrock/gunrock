@@ -334,10 +334,10 @@ public:
             
             //util::cpu_mt::PrintGPUArray("r_offsets", data_slice->r_offsets.GetPointer(util::DEVICE), t_graphslice->nodes, -1, -1, -1, stream);
             //util::cpu_mt::PrintGPUArray("s_offsets", data_slice->s_offsets.GetPointer(util::DEVICE), t_graphslice->nodes, -1, -1, -1, stream);
-            printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
-            printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
-            printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
-            fflush(stdout);
+            //printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
+            //printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
+            //printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
+            //fflush(stdout);
             gunrock::oprtr::advance::LaunchKernel
                 <AdvanceKernelPolicy, Problem, RuleKernelFunctor> (
                 enactor_stats[0],
@@ -376,10 +376,10 @@ public:
             data_slice->data_slice->Move(util::HOST, util::DEVICE, -1, 0, stream);
             //util::cpu_mt::PrintGPUArray("r_offsets", data_slice->r_offsets.GetPointer(util::DEVICE), t_graphslice->nodes, -1, -1, -1, stream);
             //util::cpu_mt::PrintGPUArray("s_offsets", data_slice->s_offsets.GetPointer(util::DEVICE), t_graphslice->nodes, -1, -1, -1, stream);
-            printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
-            printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
-            printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
-            fflush(stdout);
+            //printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
+            //printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
+            //printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
+            //fflush(stdout);
             gunrock::oprtr::advance::LaunchKernel
                 <AdvanceKernelPolicy, Problem, RuleKernelFunctor> (
                 enactor_stats[0],
@@ -419,10 +419,10 @@ public:
             data_slice->data_slice->Move(util::HOST, util::DEVICE, -1, 0, stream);
             //util::cpu_mt::PrintGPUArray("r_offsets", data_slice->r_offsets.GetPointer(util::DEVICE), t_graphslice->nodes, -1, -1, -1, stream);
             //util::cpu_mt::PrintGPUArray("s_offsets", data_slice->s_offsets.GetPointer(util::DEVICE), t_graphslice->nodes, -1, -1, -1, stream);
-            printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
-            printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
-            printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
-            fflush(stdout);
+            //printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
+            //printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
+            //printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
+            //fflush(stdout);
             gunrock::oprtr::advance::LaunchKernel
                 <AdvanceKernelPolicy, Problem, RuleKernelFunctor> (
                 enactor_stats[0],
@@ -518,10 +518,10 @@ public:
         data_slice -> t_conflict   = false;
         data_slice ->data_slice->Move(util::HOST, util::DEVICE, -1, 0, stream);
         printf("RuleKernelFunctor2 pts_inc <- copyIad, pts\n");
-        printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
-        printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
-        printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
-        fflush(stdout);
+        //printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
+        //printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
+        //printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
+        //fflush(stdout);
         gunrock::oprtr::advance::LaunchKernel
             <AdvanceKernelPolicy, Problem, RuleKernelFunctor2> (
             enactor_stats[0],
@@ -558,9 +558,9 @@ public:
         data_slice -> s_indices    = s_graphslice -> column_indices;
         data_slice->data_slice->Move(util::HOST, util::DEVICE, -1, 0, stream);
         printf("RuleKernelFunctor2 pts_inc += copyInv, pts_add\n");
-        printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
-        printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
-        printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
+        //printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
+        //printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
+        //printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
         fflush(stdout);
         gunrock::oprtr::advance::LaunchKernel
             <AdvanceKernelPolicy, Problem, RuleKernelFunctor2> (
@@ -599,9 +599,9 @@ public:
         data_slice -> s_indices    = s_graphslice -> column_indices;
         data_slice->data_slice->Move(util::HOST, util::DEVICE, -1, 0, stream);
         printf("RuleKernelFunctor2 :  pts_inc += gepInv, pts_add\n");
-        printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
-        printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
-        printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
+        //printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
+        //printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
+        //printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
         fflush(stdout);
         gunrock::oprtr::advance::LaunchKernel
             <AdvanceKernelPolicy, Problem, RuleKernelFunctor2> (
@@ -656,10 +656,10 @@ public:
             data_slice -> h_size       = data_slice   -> t_hash.GetSize();
             data_slice -> t_conflict   = false;
             data_slice ->data_slice->Move(util::HOST, util::DEVICE, -1, 0, stream);
-            printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
-            printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
-            printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
-            fflush(stdout);
+            //printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
+            //printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
+            //printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
+            //fflush(stdout);
             gunrock::oprtr::advance::LaunchKernel
                 <AdvanceKernelPolicy, Problem, RuleKernelFunctor> (
                 enactor_stats[0],
@@ -696,10 +696,10 @@ public:
             data_slice -> s_offsets    = s_graphslice -> row_offsets;
             data_slice -> s_indices    = s_graphslice -> column_indices;
             data_slice->data_slice->Move(util::HOST, util::DEVICE, -1, 0, stream);
-            printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
-            printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
-            printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
-            fflush(stdout);
+            //printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
+            //printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
+            //printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
+            //fflush(stdout);
             gunrock::oprtr::advance::LaunchKernel
                 <AdvanceKernelPolicy, Problem, RuleKernelFunctor> (
                 enactor_stats[0],
@@ -793,9 +793,9 @@ public:
         data_slice -> t_conflict   = false;
         data_slice ->data_slice->Move(util::HOST, util::DEVICE, -1, 0, stream);
         printf("RuleKernelFunctor2 : copyInc <- loadInv, pts_add\n");
-        printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
-        printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
-        printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
+        //printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
+        //printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
+        //printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
         fflush(stdout);
         gunrock::oprtr::advance::LaunchKernel
             <AdvanceKernelPolicy, Problem, RuleKernelFunctor2> (
@@ -832,10 +832,10 @@ public:
         data_slice -> s_offsets    = s_graphslice -> row_offsets;
         data_slice -> s_indices    = s_graphslice -> column_indices;
         data_slice->data_slice->Move(util::HOST, util::DEVICE, -1, 0, stream);
-        printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
-        printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
-        printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
-        fflush(stdout);
+        //printf("r_offset = %d,%p r_indices = %d,%p\n", data_slice->r_offsets.GetSize(), data_slice->r_offsets.GetPointer(util::DEVICE), data_slice->r_indices.GetSize(), data_slice->r_indices.GetPointer(util::DEVICE));
+        //printf("s_offset = %d,%p s_indices = %d,%p\n", data_slice->s_offsets.GetSize(), data_slice->s_offsets.GetPointer(util::DEVICE), data_slice->s_indices.GetSize(), data_slice->s_indices.GetPointer(util::DEVICE));
+        //printf("t_offset = %d,%p t_indices = %d,%p\n", data_slice->t_offsets.GetSize(), data_slice->t_offsets.GetPointer(util::DEVICE), data_slice->t_indices.GetSize(), data_slice->t_indices.GetPointer(util::DEVICE));
+        //fflush(stdout);
         gunrock::oprtr::advance::LaunchKernel
             <AdvanceKernelPolicy, Problem, RuleKernelFunctor2> (
             enactor_stats[0],
@@ -928,8 +928,8 @@ public:
 
         if (num_gpus < 2)
         {
-            printf("checking to_continue = %s\n", data_slice[0]->to_continue? "true" : "false");
-            fflush(stdout);
+            //printf("checking to_continue = %s\n", data_slice[0]->to_continue? "true" : "false");
+            //fflush(stdout);
             return !data_slice[0]->to_continue;
         }
         

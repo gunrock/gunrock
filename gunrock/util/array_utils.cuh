@@ -107,7 +107,7 @@ public:
     {
         cudaError_t retval = cudaSuccess;
        
-        if (ARRAY_DEBUG) {printf("%s Init size = %d, target = %d\n", name.c_str(), size, target);fflush(stdout);} 
+        //if (ARRAY_DEBUG) {printf("%s Init size = %d, target = %d\n", name.c_str(), size, target);fflush(stdout);} 
         if (retval = Release()) return retval;
         setted     = NONE;
         allocated  = NONE;
@@ -177,7 +177,8 @@ public:
             if ((setted    & (~(target    | DISK)) == NONE) && 
                 (allocated & (~(allocated | DISK)) == NONE)) this->size=size;
 
-            if (retval = GRError(cudaMalloc((void**)&(d_pointer), sizeof(Value) * size),
+            if (size!=0)
+                if (retval = GRError(cudaMalloc((void**)&(d_pointer), sizeof(Value) * size),
                           name+" cudaMalloc failed", __FILE__, __LINE__)) return retval;
             allocated = allocated | DEVICE;
             if (ARRAY_DEBUG) 
