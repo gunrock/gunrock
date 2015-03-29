@@ -1,4 +1,5 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
@@ -25,7 +26,7 @@
    <div id="projectname">gunrock
    &#160;<span id="projectnumber">0.2</span>
    </div>
-   <div id="projectbrief">Gunrock: High-Performance Graph Primitives for the GPU</div>
+   <div id="projectbrief">High-Performance Graph Primitives for the GPU</div>
   </td>
  </tr>
  </tbody>
@@ -52,11 +53,12 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
                onmouseout="return searchBox.OnSearchSelectHide()"
                alt=""/>
           <input type="text" id="MSearchField" value="Search" accesskey="S"
-               onfocus="searchBox.OnSearchFieldFocus(true)" 
-               onblur="searchBox.OnSearchFieldFocus(false)" 
+               onfocus="searchBox.OnSearchFieldFocus(true)"
+               onblur="searchBox.OnSearchFieldFocus(false)"
                onkeyup="searchBox.OnSearchFieldChange(event)"/>
           </span><span class="right">
-            <a id="MSearchClose" href="javascript:searchBox.CloseResultsWindow()"><img id="MSearchCloseImg" border="0" src="search/close.png" alt=""/></a>
+            <a id="MSearchClose" href="javascript:searchBox.CloseResultsWindow()">
+            <img id="MSearchCloseImg" border="0" src="search/close.png" alt=""/></a>
           </span>
         </div>
       </li>
@@ -67,39 +69,108 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Data Structures</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(10)"><span class="SelectionMark">&#160;</span>Groups</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(11)"><span class="SelectionMark">&#160;</span>Pages</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)">
+<span class="SelectionMark">&#160;</span>All</a>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)">
+<span class="SelectionMark">&#160;</span>Data Structures</a>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)">
+<span class="SelectionMark">&#160;</span>Namespaces</a>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)">
+<span class="SelectionMark">&#160;</span>Files</a>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)">
+<span class="SelectionMark">&#160;</span>Functions</a>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)">
+<span class="SelectionMark">&#160;</span>Variables</a>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)">
+<span class="SelectionMark">&#160;</span>Typedefs</a>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)">
+<span class="SelectionMark">&#160;</span>Enumerations</a>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)">
+<span class="SelectionMark">&#160;</span>Enumerator</a>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)">
+<span class="SelectionMark">&#160;</span>Macros</a>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(10)">
+<span class="SelectionMark">&#160;</span>Groups</a>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(11)">
+<span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
-<iframe src="javascript:void(0)" frameborder="0" 
+<iframe src="javascript:void(0)" frameborder="0"
         name="MSearchResults" id="MSearchResults">
 </iframe>
 </div>
 
 </div><!-- top -->
 <div class="header">
-  <div class="headertitle">
-<div class="title">Building Gunrock </div>  </div>
+    <div class="headertitle">
+<div class="title">Building Gunrock </div> </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p>This release (0.2) has currently been tested on Linux and has only been tuned for architectures with CUDA compute capability equal to or larger than 3.0. It is most likely that we will concentrate our future effort on 3.0+-capability devices going forward.</p>
-<h1><a class="anchor" id="build_boost"></a>
-Boost Dependency           </h1>
-<p>Gunrock uses the <a href="http://www.boost.org/doc/libs/1_53_0/libs/graph/doc/index.html">Boost Graph Library</a> for the implementation of connected component, betweenness centrality, PageRank, and Single-source shortest path CPU reference implementation. You will need to download the boost source distribution, install it, and modify the <code>BOOST_INC</code> variable in <code>tests/primitive_name/Makefile</code> to build test applications for bc, cc, pr, and sssp. To build the simple example, you will also need to modify the <code>BOOST_INC</code> variable in <code>simple_example/Makefile</code>.</p>
-<h1><a class="anchor" id="build_mgpu"></a>
-Moderngpu Dependency           </h1>
-<p>Gunrock uses APIs from <a href="https://github.com/NVlabs/moderngpu">moderngpu</a>. You will need to get it and place it at the same directory as Gunrock project. If you place it somewhere else, please change the <code>MGPU_INC</code> in Makefiles accordingly.</p>
-<h1><a class="anchor" id="generating_datasets"></a>
-Generating Datasets           </h1>
-<p>All dataset-related code is under the <code>dataset</code> subdirectory. The current version of Gunrock only supports Matrix-market coordinate-formatted graph file. The datasets are divided into two categories according to their sizes. Under the <code>dataset/small</code> subdirectory, there are trivial graph datasets for testing the correctness of the graph primitives. All of them are ready to use. Under the <code>dataset/large</code> subdirectory, there are large graph datasets for doing performance regression tests. To download them to your local machine, just type <code>make</code> in the dataset subdirectory. You can also choose to only download one specific dataset to your local machine by stepping into the subdirectory of that dataset and typing <code>make</code> inside that subdirectory.</p>
-<h1><a class="anchor" id="running_tests"></a>
-Running the Tests           </h1>
-<p>Before running the tests, make sure you have installed boost and have successfully generated the datasets.</p>
-<p>To build the tests, go into <code>tests/primitive_name</code> and simply type <code>make</code>.</p>
-<p>To run the tests for each graph primitive, go into <code>tests/primitive_name</code> and simply type <code>sh run.sh</code>.</p>
-<p>The current release (v0.2) has only been tuned for architectures with CUDA compute capability equal to or larger than 3.0. It is most likely that we will concentrate our future effort on 3.0+-capability devices going forward.</p>
-<h1>Building Shared Library </h1>
-<p>If you wish to build a shared library and load Gunrock`s primitives in your project which uses a language has a C-friendly interface, just create a directory to put all the build files and then type <code>cmake -i [directory of Gunrock]</code>. When asks about whether to show advanced options, answer <code>Yes</code>. You should be able to specify the directory of Boost then. You can then type <code>make</code> to build all test files and the shared library. The examples of how to call Gunrock APIs are located at shared_lib_tests. </p>
+<div class="textblock"><p>This release (0.2) has currently been tested on Linux
+    and has only been tuned for architectures with CUDA compute capability equal
+    to or larger than 3.0. It is most likely that we will concentrate our future
+    effort on 3.0+-capability devices going forward.</p>
+<h1><a class="anchor" id="build_boost"></a>Using Makefiles</h1>
+<h3><a class="anchor" id="build_boost"></a>Boost Dependency</h3>
+<p>Gunrock uses the <a href="http://www.boost.org/doc/libs/1_53_0/libs/graph/doc/index.html">Boost Graph Library</a>
+    for the implementation of CPU references of Connected Component, Betweenness
+    Centrality, PageRank, Single-Source Shortest Path and Minimum Spanning Tree.
+    You will need to download the boost source distribution, install it, and
+    modify the <code>BOOST_INC</code> variable in <code>tests/primitive_name/Makefile</code>
+    to build test applications for BC, CC, PageRank, SSSP and MST. To build the
+    simple example, you will also need to modify the <code>BOOST_INC</code>
+    variable in <code>simple_example/Makefile</code>.</p>
+<h3><a class="anchor" id="build_mgpu"></a>Modern GPU and CUB Dependency</h3>
+<p>Gunrock uses APIs from <a href="https://github.com/NVlabs/moderngpu">Modern GPU</a>
+    and <a href="http://nvlabs.github.io/cub/">CUB</a>. You can either download
+    them and change the path of <code>MGPU_INC</code> and <code>CUB_INC</code>
+    in Makefiles to the directory contains the Modern GPU and CUB accordingly.
+    Or, you can get the Modern GPU and CUB dependency using GitHub:
+    <p><code>git clone --recursive https://github.com/gunrock/gunrock</code></p>
+    or if you already cloned gunrock, enter the <code>gunrock</code> directory and type:</p>
+    <p><code>git submodule init</code></p>
+    <p><code>git submodule update</code></p>
+<h3><a class="anchor" id="generating_datasets"></a>
+Generating Datasets</h3>
+<p>All dataset-related code is under the <code>dataset</code> subdirectory.
+    The current version of Gunrock only supports Matrix-market coordinate-formatted
+    graph file. The datasets are divided into two categories according to their
+    sizes. Under the <code>dataset/small</code> subdirectory, there are trivial
+    graph datasets for testing the correctness of the graph primitives. All of
+    them are ready to use. Under the <code>dataset/large</code> subdirectory,
+    there are large graph datasets for doing performance regression tests. To
+    download them to your local machine, just type <code>make</code> in the
+    <code>dataset</code> subdirectory. You can also choose to only download
+    one specific dataset to your local machine by stepping into the subdirectory
+    of that dataset and typing <code>make</code> inside that subdirectory.</p>
+<h3><a class="anchor" id="running_tests"></a>
+Running the Tests</h3>
+<p>Before running the tests, make sure you have installed boost and have
+    successfully generated the datasets.</p>
+<p>To build the tests, go into <code>tests/primitive_name</code> and simply
+    type <code>make</code>.</p>
+<p>To run the tests for each graph primitive, go into <code>tests/primitive_name</code>
+    and simply type <code>sh run.sh</code>.</p>
+<h1>Alternative: Using <a href="http://www.cmake.org">CMake</a></h1>
+<p>If you wish to build a shared library and load Gunrock's primitives in
+    your project which uses a language has a C-friendly interface, just
+    create a directory to put all the build files and then type
+    <code>cmake -i [directory of Gunrock]</code>. When asks about whether
+    to show advanced options, answer <code>Yes</code> or <code>Y</code>. You
+    should be able to specify the directory of Boost then, leave the rest as
+    default. Similarly, get Modern GPU and CUB dependency by clone the repository
+    with <code>--recursive</code> flag.
+    You can then type <code>make</code> to build all test files and
+    the shared library. The examples of how to call Gunrock APIs are located
+    at directory: <code>shared_lib_tests</code>.</p>
+<h3>Building Example</h3>
+<p>I: Clone Gunrock: <code>git clone --recursive https://github.com/gunrock/gunrock</code></p>
+<p>II: Download Boost From: <code>http://sourceforge.net/projects/boost/</code></p>
+<p>III: Create Build Directory: <code>mkdir build_gunrock && cd build_gunrock</code></p>
+<p>IV: Make: <code>cmake [gunrock directory] -i</code> type <code>Y</code> for
+advance settings and specify [boost directory] for <code>Boost_INCLUDE_DIR</code>.
+Then type: <code>make</code></p> Binary test files are in directory: <code>bin</code>.
 </div></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
