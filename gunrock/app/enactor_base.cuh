@@ -1571,10 +1571,11 @@ public:
         FrontierAttribute<SizeT>      *frontier_attribute,
         EnactorStats                  *enactor_stats,
         util::Array1D<SizeT, DataSlice>
-                                      *data_slice,
+                                      *data_slice_,
         GraphSlice                    *graph_slice,
-        cudaStream_t                   stream,
-        ContextPtr                     context)
+        util::CtaWorkProgressLifetime *work_progress,
+        ContextPtr                     context,
+        cudaStream_t                   stream)
     {
         if (num_gpus < 2) return; 
         bool over_sized = false, keys_over_sized = false;
@@ -1586,6 +1587,7 @@ public:
         int grid_size  = num_elements / block_size;
         if ((num_elements % block_size)!=0) grid_size ++;
         if (grid_size > 512) grid_size=512;
+        DataSlice* data_slice=data_slice_->GetPointer(util::HOST);
 
         for (peer_ = 0; peer_<num_gpus; peer_++)
         {

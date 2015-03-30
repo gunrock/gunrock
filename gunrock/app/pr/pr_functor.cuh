@@ -121,14 +121,14 @@ struct PRFunctor
     {
         Value    delta     = problem->delta    ;
         VertexId src_node  = problem->src_node ;
-        Value    threshold = problem->threshold;
+        //Value    threshold = problem->threshold;
         //printf("delta = %f, threshold = %f, src_node = %d \t", delta, threshold, src_node);
         //Value    old_value = problem->rank_next[node];
         problem->rank_next[node] = (delta * problem->rank_next[node]) + (1.0-delta) * ((src_node == node || src_node == -1) ? 1 : 0);
         Value diff = fabs(problem->rank_next[node] - problem->rank_curr[node]);
 
         //if (node == 0 || node == 1) printf("r[%d] : %f -> %f (%f)\t", node, problem->rank_curr[node], problem->rank_next[node], old_value); 
-        return (diff > threshold);
+        return (diff > problem->threshold);
     }
 
     /**

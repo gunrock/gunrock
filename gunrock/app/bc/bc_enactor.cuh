@@ -136,14 +136,23 @@ namespace bc {
         }
     }
 
-template <typename AdvanceKernelPolicy, typename FilterKernelPolicy, typename Enactor>
-struct Forward_Iteration : public IterationBase <AdvanceKernelPolicy, FilterKernelPolicy, Enactor>
+template <
+    typename AdvanceKernelPolicy, 
+    typename FilterKernelPolicy, 
+    typename Enactor>
+struct Forward_Iteration : public IterationBase <
+    AdvanceKernelPolicy, FilterKernelPolicy, Enactor,
+    false, //HAS_SUBQ
+    true , //HAS_FULLQ
+    false, //BACKWARD
+    true , //FORWARD
+    true > //UPDATE_PREDECESSORS
 {
 public:
     typedef typename Enactor::SizeT      SizeT     ;
     typedef typename Enactor::Value      Value     ;
     typedef typename Enactor::VertexId   VertexId  ;
-    typedef typename Enactor::Problem    Problem ;
+    typedef typename Enactor::Problem    Problem   ;
     typedef typename Problem::DataSlice  DataSlice ;
     typedef GraphSlice<SizeT, VertexId, Value> GraphSlice;
     typedef ForwardFunctor<
@@ -152,23 +161,27 @@ public:
             Value,
             Problem> ForwardFunctor;
 
-    static const bool INSTRUMENT = Enactor::INSTRUMENT;
+    /*static const bool INSTRUMENT = Enactor::INSTRUMENT;
     static const bool DEBUG      = Enactor::DEBUG;
     static const bool SIZE_CHECK = Enactor::SIZE_CHECK;
     static const bool HAS_SUBQ   = false;
     static const bool HAS_FULLQ  = true;
     static const bool BACKWARD   = false;
-    static const bool UPDATE_PREDECESSORS = true;
+    static const bool UPDATE_PREDECESSORS = true;*/
 
     static void FullQueue_Gather(
         int                            thread_num,
         int                            peer_,
         util::DoubleBuffer<SizeT, VertexId, Value>
                                       *frontier_queue,
+        util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
         EnactorStats                  *enactor_stats,
         DataSlice                     *data_slice,
+        DataSlice                     *d_data_slice,
         GraphSlice                    *graph_slice,
+        util::CtaWorkProgressLifetime *work_progress,
+        ContextPtr                     context,
         cudaStream_t                   stream)
     {
         if (enactor_stats->iteration <= 0) return; 
@@ -205,10 +218,10 @@ public:
        if (frontier_attribute->queue_reset && frontier_attribute->queue_length ==0)
         {
             work_progress->SetQueueLength(frontier_attribute->queue_index, 0, false, stream);
-            if (DEBUG) util::cpu_mt::PrintMessage("return-1", thread_num, enactor_stats->iteration);
+            if (Enactor::DEBUG) util::cpu_mt::PrintMessage("return-1", thread_num, enactor_stats->iteration);
             return;
         }
-        if (DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration);
+        if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration);
 
         // Edge Map
         gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, ForwardFunctor>(
@@ -239,13 +252,13 @@ public:
         frontier_attribute->queue_reset = false;
         frontier_attribute->queue_index++;
         frontier_attribute->selector ^= 1;
-        if (DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration);
+        if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration);
         if (false) //(DEBUG || INSTRUMENT)
         {
             if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,stream)) return;
             enactor_stats->total_queued += frontier_attribute->queue_length;
-            if (DEBUG) ShowDebugInfo<Problem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_advance", stream);
-            if (INSTRUMENT) {
+            if (Enactor::DEBUG) ShowDebugInfo<Problem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_advance", stream);
+            if (Enactor::INSTRUMENT) {
                 if (enactor_stats->retval = enactor_stats->advance_kernel_stats.Accumulate(
                     enactor_stats->advance_grid_size,
                     enactor_stats->total_runtimes,
@@ -271,16 +284,16 @@ public:
             frontier_queue->keys[frontier_attribute->selector^1].GetSize(),// max_out_queue
             enactor_stats->filter_kernel_stats);
 
-        if (DEBUG && (enactor_stats->retval = util::GRError("filter_forward::Kernel failed", __FILE__, __LINE__))) return;
-        if (DEBUG) util::cpu_mt::PrintMessage("Filter end.", thread_num, enactor_stats->iteration);
+        if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter_forward::Kernel failed", __FILE__, __LINE__))) return;
+        if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Filter end.", thread_num, enactor_stats->iteration);
         frontier_attribute->queue_index++;
         frontier_attribute->selector ^= 1;
 
         if (false) {//(INSTRUMENT || DEBUG) {
             //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
             //enactor_stats->total_queued += frontier_attribute->queue_length;
-            if (DEBUG) ShowDebugInfo<Problem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_filter", stream);
-            if (INSTRUMENT) {
+            if (Enactor::DEBUG) ShowDebugInfo<Problem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_filter", stream);
+            if (Enactor::INSTRUMENT) {
                 if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
                     enactor_stats->filter_grid_size,
                     enactor_stats->total_runtimes,
@@ -296,11 +309,12 @@ public:
               int             block_size,
               size_t          shared_size,
               cudaStream_t    stream,
-        const SizeT           num_elements,
+              SizeT           &num_elements,
         const VertexId* const keys_in,
               VertexId*       keys_out,
         const size_t          array_size,
-              char*           array)
+              char*           array,
+              DataSlice*      data_slice)
     {
         Expand_Incoming_Forward
             <VertexId, SizeT, Value, NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
@@ -317,7 +331,7 @@ public:
         SizeT       *d_offsets,
         VertexId    *d_indices,
         VertexId    *d_in_key_queue,
-        SizeT       *partitioned_scanned_edges,
+        util::Array1D<SizeT, SizeT>       *partitioned_scanned_edges,
         SizeT        max_in,
         SizeT        max_out,
         CudaContext                    &context,
@@ -325,24 +339,35 @@ public:
         gunrock::oprtr::advance::TYPE  ADVANCE_TYPE,
         bool                           express = false)
     {
-        return gunrock::oprtr::advance::ComputeOutputLength
+        cudaError_t retval = cudaSuccess;
+        bool over_sized = false;
+        if (retval = Check_Size<Enactor::SIZE_CHECK, SizeT, SizeT> (
+            "scanned_edges", frontier_attribute->queue_length, partitioned_scanned_edges, over_sized, -1, -1, -1, false)) return retval;
+        retval = gunrock::oprtr::advance::ComputeOutputLength
             <AdvanceKernelPolicy, Problem, ForwardFunctor>(
             frontier_attribute,
             d_offsets,
             d_indices,
             d_in_key_queue,
-            partitioned_scanned_edges,
+            partitioned_scanned_edges->GetPointer(util::DEVICE),
             max_in,
             max_out,
             context,
             stream,
             ADVANCE_TYPE,
             express); 
+        return retval;
     }
 };
 
 template <typename AdvanceKernelPolicy, typename FilterKernelPolicy, typename Enactor>
-struct Backward_Iteration : public IterationBase <AdvanceKernelPolicy, FilterKernelPolicy, Enactor>
+struct Backward_Iteration : public IterationBase <
+    AdvanceKernelPolicy, FilterKernelPolicy, Enactor,
+    false, //HAS_SUBQ
+    true , //HAS_FULLQ
+    true , //BACKWARD
+    false, //FORWARD
+    false> //UPDATE_PREDECESSORS
 {
 public:
     typedef typename Enactor::SizeT      SizeT     ;
@@ -362,23 +387,27 @@ public:
             Value,
             Problem> BackwardFunctor2;
  
-    static const bool INSTRUMENT = Enactor::INSTRUMENT;
+    /*static const bool INSTRUMENT = Enactor::INSTRUMENT;
     static const bool DEBUG      = Enactor::DEBUG;
     static const bool SIZE_CHECK = Enactor::SIZE_CHECK;
     static const bool HAS_SUBQ   = false;
     static const bool HAS_FULLQ  = true;
     static const bool BACKWARD   = true;
-    static const bool UPDATE_PREDECESSORS = false;
+    static const bool UPDATE_PREDECESSORS = false;*/
    
     static void FullQueue_Gather(
         int                            thread_num,
         int                            peer_,
         util::DoubleBuffer<SizeT, VertexId, Value>
                                       *frontier_queue,
+        util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
         EnactorStats                  *enactor_stats,
         DataSlice                     *data_slice,
+        DataSlice                     *d_data_slice,
         GraphSlice                    *graph_slice,
+        util::CtaWorkProgressLifetime *work_progress,
+        ContextPtr                     context,
         cudaStream_t                   stream)
     {
         SizeT cur_pos = data_slice->forward_queue_offsets[peer_].back();
@@ -533,8 +562,8 @@ public:
         if (false) {//(INSTRUMENT || DEBUG) {
             //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
             //enactor_stats->total_queued += frontier_attribute->queue_length;
-            if (DEBUG) ShowDebugInfo<Problem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_filter", stream);
-            if (INSTRUMENT) {
+            if (Enactor::DEBUG) ShowDebugInfo<Problem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_filter", stream);
+            if (Enactor::INSTRUMENT) {
                 if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
                     enactor_stats->filter_grid_size,
                     enactor_stats->total_runtimes,
@@ -550,11 +579,12 @@ public:
               int             block_size,
               size_t          shared_size,
               cudaStream_t    stream,
-        const SizeT           num_elements,
+              SizeT           &num_elements,
         const VertexId* const keys_in,
               VertexId*       keys_out,
         const size_t          array_size,
-              char*           array)
+              char*           array,
+              DataSlice*      data_slice)
     {
         Expand_Incoming_Backward
             <VertexId, SizeT, Value, NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
@@ -571,7 +601,7 @@ public:
         SizeT       *d_offsets,
         VertexId    *d_indices,
         VertexId    *d_in_key_queue,
-        SizeT       *partitioned_scanned_edges,
+        util::Array1D<SizeT, SizeT>       *partitioned_scanned_edges,
         SizeT        max_in,
         SizeT        max_out,
         CudaContext                    &context,
@@ -579,19 +609,24 @@ public:
         gunrock::oprtr::advance::TYPE  ADVANCE_TYPE,
         bool                           express = false)
     {
-        return gunrock::oprtr::advance::ComputeOutputLength
+        cudaError_t retval = cudaSuccess;
+        bool over_sized = false;
+        if (retval = Check_Size<Enactor::SIZE_CHECK, SizeT, SizeT> (
+            "scanned_edges", frontier_attribute->queue_length, partitioned_scanned_edges, over_sized, -1, -1, -1, false)) return retval;
+        retval = gunrock::oprtr::advance::ComputeOutputLength
             <AdvanceKernelPolicy, Problem, BackwardFunctor>(
             frontier_attribute,
             d_offsets,
             d_indices,
             d_in_key_queue,
-            partitioned_scanned_edges,
+            partitioned_scanned_edges->GetPointer(util::DEVICE),
             max_in,
             max_out,
             context,
             stream,
             ADVANCE_TYPE,
             express); 
+        return retval;
     }
 
     static void Iteration_Change(long long &iterations)

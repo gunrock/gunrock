@@ -328,44 +328,52 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 SizeT out_index = out_offset+edges_processed+(i-e_offset);
 
                 {
-                    printf("MARK_PREDECESSORS = %s\n", ProblemData::MARK_PREDECESSORS?"true":"false");
+                    //printf("MARK_PREDECESSORS = %s\n", ProblemData::MARK_PREDECESSORS?"true":"false");
                     if (!ProblemData::MARK_PREDECESSORS) {
                         if (Functor::CondEdge(label, u, problem, lookup, e_id)) {
                             Functor::ApplyEdge(label, u, problem, lookup, e_id);
-                            if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
-                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                        u,
-                                        d_out + out_index); 
-                            } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
-                                     ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
-                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                        (VertexId)lookup,
-                                        d_out + out_index);
+                            if (d_out != NULL) {
+                                if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            u,
+                                            d_out + out_index); 
+                                } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
+                                         ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            (VertexId)lookup,
+                                            d_out + out_index);
+                                }
                             }
                         }
                         else {
-                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                    -1,
-                                    d_out + out_index);
+                            if (d_out != NULL) {
+                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        -1,
+                                        d_out + out_index);
+                            }
                         }
                     } else {
                         if (Functor::CondEdge(v, u, problem, lookup, e_id)) {
                             Functor::ApplyEdge(v, u, problem, lookup, e_id);
-                            if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
-                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                        u,
-                                        d_out + out_index); 
-                            } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
-                                     ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
-                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                        (VertexId)lookup,
-                                        d_out + out_index);
+                            if (d_out != NULL) {
+                                if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            u,
+                                            d_out + out_index); 
+                                } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
+                                         ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            (VertexId)lookup,
+                                            d_out + out_index);
+                                }
                             }
                         }
                         else {
-                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                    -1,
-                                    d_out + out_index);
+                            if (d_out != NULL) {
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        -1,
+                                        d_out + out_index);
+                            }
                         }
                     }
                 }
@@ -503,41 +511,49 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             if (!ProblemData::MARK_PREDECESSORS) {
                 if (Functor::CondEdge(label, u, problem, lookup, e_id)) {
                     Functor::ApplyEdge(label, u, problem, lookup, e_id);
-                    if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
-                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                u,
-                                d_out + offset+i); 
-                    } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
-                             ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
-                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                (VertexId)lookup,
-                                d_out + offset+i);
+                    if (d_out != NULL) {
+                        if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    u,
+                                    d_out + offset+i); 
+                        } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
+                                 ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    (VertexId)lookup,
+                                    d_out + offset+i);
+                        }
                     }
                 }
                 else {
-                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                            -1,
-                            d_out + offset+i);
+                    if (d_out != NULL) {
+                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                -1,
+                                d_out + offset+i);
+                    }
                 }
             } else {
                 //v:pre, u:neighbor, outoffset:offset+i
                 if (Functor::CondEdge(v, u, problem, lookup, e_id)) {
                     Functor::ApplyEdge(v, u, problem, lookup, e_id);
-                    if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
-                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                u,
-                                d_out + offset+i); 
-                    } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
-                             ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
-                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                (VertexId)lookup,
-                                d_out + offset+i);
+                    if (d_out != NULL) {
+                        if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    u,
+                                    d_out + offset+i); 
+                        } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
+                                 ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    (VertexId)lookup,
+                                    d_out + offset+i);
+                        }
                     }
                 }
                 else {
-                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                            -1,
-                            d_out + offset+i);
+                    if (d_out != NULL) {
+                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                -1,
+                                d_out + offset+i);
+                    }
                 }
             }
         }

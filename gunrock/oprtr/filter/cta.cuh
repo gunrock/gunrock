@@ -534,15 +534,17 @@ struct Cta
 
         // Scatter directly (without first contracting in smem scratch), predicated
         // on flags
-        util::io::ScatterTile<
-            KernelPolicy::LOG_LOADS_PER_TILE,
-            KernelPolicy::LOG_LOAD_VEC_SIZE,
-            KernelPolicy::THREADS,
-            ProblemData::QUEUE_WRITE_MODIFIER>::Scatter(
-                d_out,
-                tile.element_id,
-                tile.flags,
-                tile.ranks);
+        if (d_out != NULL) {
+            util::io::ScatterTile<
+                KernelPolicy::LOG_LOADS_PER_TILE,
+                KernelPolicy::LOG_LOAD_VEC_SIZE,
+                KernelPolicy::THREADS,
+                ProblemData::QUEUE_WRITE_MODIFIER>::Scatter(
+                    d_out,
+                    tile.element_id,
+                    tile.flags,
+                    tile.ranks);
+        }
     }
 };
 

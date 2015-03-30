@@ -63,9 +63,9 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, VertexId> preds;
         util::Array1D<SizeT, VertexId> temp_preds;
         int turn;
-        DataSlice *d_pointer;
+        //DataSlice *d_pointer;
         bool has_change;
-        util::CtaWorkProgressLifetime *work_progress;
+        //util::CtaWorkProgressLifetime *work_progress;
 
         DataSlice()
         {
@@ -79,8 +79,8 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             vertex_flag  .SetName("vertex_flag"  );
             edge_flag    .SetName("edge_flag"    );
             turn          = 0;
-            d_pointer     = NULL;
-            work_progress = NULL;
+            //d_pointer     = NULL;
+            //work_progress = NULL;
             has_change    = true;
             //labels       .SetName("labels"       );
         }
@@ -97,8 +97,8 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             tos          .Release();
             vertex_flag  .Release();
             edge_flag    .Release();
-            d_pointer     = NULL;
-            work_progress = NULL;
+            //d_pointer     = NULL;
+            //work_progress = NULL;
             //labels       .Release();
         }
 
@@ -387,7 +387,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
                 if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST)) return retval;
                 DataSlice* data_slice_ = data_slices[gpu].GetPointer(util::HOST);
-                data_slice_->d_pointer = data_slices[gpu].GetPointer(util::DEVICE);
+                //data_slice_->d_pointer = data_slices[gpu].GetPointer(util::DEVICE);
                 data_slice_->streams.SetPointer(&streams[gpu*num_gpus*2], num_gpus*2);
                 if (retval = data_slice_->Init(
                     this->num_gpus,

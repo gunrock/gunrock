@@ -324,9 +324,11 @@ void RunTests(Test_Parameter *parameter)
     CpuTimer cpu_timer;
 
     util::GRError(problem->Reset(enactor->GetFrontierType(), max_queue_sizing), "CC Problem Data Reset Failed", __FILE__, __LINE__);
+    printf("_________________________\n");fflush(stdout);
     cpu_timer.Start();
     util::GRError(enactor->Enact(), "CC Problem Enact Failed", __FILE__, __LINE__);
     cpu_timer.Stop();
+    printf("-------------------------\n");fflush(stdout);
 
     float elapsed = cpu_timer.ElapsedMillis();
 

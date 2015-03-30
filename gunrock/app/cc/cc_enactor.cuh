@@ -148,24 +148,19 @@ public:
     typedef typename Problem::DataSlice  DataSlice ;
     typedef GraphSlice<SizeT, VertexId, Value> GraphSlice;
 
-    /*static const bool INSTRUMENT = Enactor::INSTRUMENT;
-    static const bool DEBUG      = Enactor::DEBUG;
-    static const bool SIZE_CHECK = Enactor::SIZE_CHECK;
-    static const bool HAS_SUBQ   = false;
-    static const bool HAS_FULLQ  = true;
-    static const bool BACKWARD   = true;
-    static const bool FORWARD    = true;
-    static const bool UPDATE_PREDECESSORS = false;*/
-
     static void FullQueue_Gather(
         int                            thread_num,
         int                            peer_,
         util::DoubleBuffer<SizeT, VertexId, Value>
                                       *frontier_queue,
+        util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
         EnactorStats                  *enactor_stats,
         DataSlice                     *data_slice,
+        DataSlice                     *d_data_slice,
         GraphSlice                    *graph_slice,
+        util::CtaWorkProgressLifetime *work_progress,
+        ContextPtr                     context,
         cudaStream_t                   stream)
     {
         typedef HookInitFunctor<
@@ -195,10 +190,10 @@ public:
                 frontier_attribute->queue_length,
                 frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),  // d_in_queue
                 NULL,   //pred_queue, not used in CC
-                frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),  // d_out_queue
-                data_slice->d_pointer,
+                NULL, //frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),  // d_out_queue
+                d_data_slice,
                 NULL,   //d_visited_mask, not used in CC
-                data_slice->work_progress[0],
+                work_progress[0],
                 frontier_queue->keys[frontier_attribute->selector  ].GetSize(),           // max_in_queue
                 frontier_queue->keys[frontier_attribute->selector^1].GetSize(),         // max_out_queue
                 enactor_stats->filter_kernel_stats);
@@ -296,7 +291,7 @@ public:
                 frontier_attribute->queue_length,
                 frontier_queue->values[frontier_attribute->selector  ].GetPointer(util::DEVICE),      // d_in_queue
                 NULL,
-                frontier_queue->values[frontier_attribute->selector^1].GetPointer(util::DEVICE),    // d_out_queue
+                NULL,//frontier_queue->values[frontier_attribute->selector^1].GetPointer(util::DEVICE),    // d_out_queue
                 d_data_slice,
                 NULL,
                 work_progress[0],
@@ -307,7 +302,7 @@ public:
 
             frontier_attribute->queue_reset = false;
             frontier_attribute->queue_index++;
-            frontier_attribute->selector ^= 1;
+            //frontier_attribute->selector ^= 1;
             enactor_stats->iteration++;
             data_slice->vertex_flag.Move(util::DEVICE, util::HOST, 1, 0, stream);
 
@@ -332,7 +327,7 @@ public:
             frontier_attribute->queue_length,
             frontier_queue->values[frontier_attribute->selector  ].GetPointer(util::DEVICE),      // d_in_queue
             NULL,
-            frontier_queue->values[frontier_attribute->selector^1].GetPointer(util::DEVICE),    // d_out_queue
+            NULL, //frontier_queue->values[frontier_attribute->selector^1].GetPointer(util::DEVICE),    // d_out_queue
             d_data_slice,
             NULL,
             work_progress[0],
@@ -379,7 +374,7 @@ public:
                     frontier_attribute->queue_length,
                     frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_in_queue
                     NULL,
-                    frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+                    NULL, //frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
                     d_data_slice,
                     NULL,
                     work_progress[0],
@@ -393,7 +388,7 @@ public:
 
             frontier_attribute->queue_reset = false;
             frontier_attribute->queue_index++;
-            frontier_attribute->selector ^= 1;
+            //frontier_attribute->selector ^= 1;
             enactor_stats->iteration++;
 
             data_slice->edge_flag.Move(util::DEVICE, util::HOST, 1, 0, stream);
@@ -423,7 +418,7 @@ public:
                     frontier_attribute->queue_length,
                     frontier_queue->values[frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_in_queue
                     NULL,
-                    frontier_queue->values[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+                    NULL,//frontier_queue->values[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
                     d_data_slice,
                     NULL,
                     work_progress[0],
@@ -434,7 +429,7 @@ public:
 
                 frontier_attribute->queue_reset = false;
                 frontier_attribute->queue_index++;
-                frontier_attribute->selector ^= 1;
+                //frontier_attribute->selector ^= 1;
 
                 data_slice->vertex_flag.Move(util::DEVICE, util::HOST, 1, 0, stream);
                 if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__)) return;
@@ -458,7 +453,7 @@ public:
                 frontier_attribute->queue_length,
                 frontier_queue->values[frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_in_queue
                 NULL,
-                frontier_queue->values[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+                NULL, //frontier_queue->values[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
                 d_data_slice,
                 NULL,
                 work_progress[0],
@@ -477,7 +472,7 @@ public:
                 frontier_attribute->queue_length,
                 frontier_queue->values[frontier_attribute->selector  ].GetPointer(util::DEVICE),      // d_in_queue
                 NULL,
-                frontier_queue->values[frontier_attribute->selector^1].GetPointer(util::DEVICE),    // d_out_queue
+                NULL, //frontier_queue->values[frontier_attribute->selector^1].GetPointer(util::DEVICE),    // d_out_queue
                 d_data_slice,
                 NULL,
                 work_progress[0],
@@ -500,7 +495,7 @@ public:
         SizeT       *d_offsets,
         VertexId    *d_indices,
         VertexId    *d_in_key_queue,
-        SizeT       *partitioned_scanned_edges,
+        util::Array1D<SizeT, SizeT>       *partitioned_scanned_edges,
         SizeT        max_in,
         SizeT        max_out,
         CudaContext                    &context,
@@ -522,7 +517,8 @@ public:
         const VertexId* const keys_in,
               VertexId*       keys_out,
         const size_t          array_size,
-              char*           array)
+              char*           array,
+              DataSlice*      data_slice)
     {
         //printf("num_elements = %d\n", num_elements);fflush(stdout);
         Expand_Incoming_BothWay
@@ -583,17 +579,20 @@ public:
         int NUM_VERTEX_ASSOCIATES,
         int NUM_VALUE__ASSOCIATES>
     static void Make_Output(
-        GraphSlice                    *graph_slice,
-        DataSlice                     *data_slice,
-        EnactorStats                  *enactor_stats,
-        FrontierAttribute<SizeT>      *frontier_attribute,
-        util::DoubleBuffer<SizeT, VertexId, Value>
-                                      *frontier_queue,
+        int                            thread_num,
         SizeT                          num_elements,
         int                            num_gpus,
-        int                            thread_num,
-        cudaStream_t                   stream,
-        ContextPtr                     context)
+        util::DoubleBuffer<SizeT, VertexId, Value>
+                                      *frontier_queue,
+        util::Array1D<SizeT, SizeT>   *scanned_edges,
+        FrontierAttribute<SizeT>      *frontier_attribute,
+        EnactorStats                  *enactor_stats,
+        util::Array1D<SizeT, DataSlice>
+                                      *data_slice,
+        GraphSlice                    *graph_slice,
+        util::CtaWorkProgressLifetime *work_progress,
+        ContextPtr                     context,
+        cudaStream_t                   stream)
     {
         num_elements   = graph_slice -> nodes;
         int block_size = 256;
@@ -602,37 +601,37 @@ public:
         if ((num_elements % block_size)!=0) grid_size ++;
         if (grid_size > 512) grid_size = 512;
         for (peer_ = 0; peer_<num_gpus; peer_++)
-            data_slice->out_length[peer_] = 1;
+            data_slice[0]->out_length[peer_] = 1;
 
         Mark_Difference_Queue<VertexId, SizeT>
             <<<grid_size, block_size, 0, stream>>> (
             num_elements,
-            data_slice  -> old_c_ids.GetPointer(util::DEVICE),
-            data_slice  -> component_ids.GetPointer(util::DEVICE),
-            data_slice  -> CID_markers.GetPointer(util::DEVICE));
+            data_slice[0]  -> old_c_ids.GetPointer(util::DEVICE),
+            data_slice[0]  -> component_ids.GetPointer(util::DEVICE),
+            data_slice[0]  -> CID_markers.GetPointer(util::DEVICE));
 
         Scan<mgpu::MgpuScanTypeInc>(
-            (int*)data_slice->CID_markers.GetPointer(util::DEVICE),
+            (int*)(data_slice[0]->CID_markers.GetPointer(util::DEVICE)),
             num_elements,
             (int)0, mgpu::plus<int>(), (int*)0, (int*)0,
-            (int*)data_slice->CID_markers.GetPointer(util::DEVICE),
+            (int*)(data_slice[0]->CID_markers.GetPointer(util::DEVICE)),
             context[0]);
 
         Make_Difference_Queue<VertexId, SizeT>
             <<<grid_size, block_size, 0, stream>>> (
             num_elements,
-            data_slice->CID_markers  .GetPointer(util::DEVICE),
-            data_slice->component_ids.GetPointer(util::DEVICE),
-            data_slice->keys_out[1]  .GetPointer(util::DEVICE),
-            data_slice->vertex_associate_out[1][0].GetPointer(util::DEVICE));
+            data_slice[0]->CID_markers  .GetPointer(util::DEVICE),
+            data_slice[0]->component_ids.GetPointer(util::DEVICE),
+            data_slice[0]->keys_out[1]  .GetPointer(util::DEVICE),
+            data_slice[0]->vertex_associate_out[1][0].GetPointer(util::DEVICE));
 
         frontier_attribute->selector    = 0;
         frontier_attribute->queue_reset = true;
-        cudaMemcpyAsync(&frontier_attribute->queue_length, data_slice->CID_markers.GetPointer(util::DEVICE) + graph_slice->nodes -1, sizeof(SizeT), cudaMemcpyDeviceToHost, stream);
+        cudaMemcpyAsync(&frontier_attribute->queue_length, data_slice[0]->CID_markers.GetPointer(util::DEVICE) + graph_slice->nodes -1, sizeof(SizeT), cudaMemcpyDeviceToHost, stream);
         cudaStreamSynchronize(stream);
         for (peer_ =0; peer_ < num_gpus; peer_++)
-            data_slice->out_length[peer_] = frontier_attribute->queue_length;
-        if (frontier_attribute->queue_length !=0) data_slice->out_length[0]=1;
+            data_slice[0]->out_length[peer_] = frontier_attribute->queue_length;
+        if (frontier_attribute->queue_length !=0) data_slice[0]->out_length[0]=1;
 
         //work_progress->SetQueueLength(
         //    frontier_attribute->queue_index,
@@ -642,8 +641,8 @@ public:
 
         if (frontier_attribute->queue_length > 0)
         {
-            data_slice -> has_change = true;
-        } else data_slice -> has_change = false;
+            data_slice[0] -> has_change = true;
+        } else data_slice[0] -> has_change = false;
         //printf("%d\t %d\t \t has_change = %s\n", thread_num, data_slice->turn, data_slice -> has_change? "true" : "false"); fflush(stdout);
         //util::cpu_mt::PrintGPUArray("change keys", frontier_queue->keys[0].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration);
         //util::cpu_mt::PrintGPUArray("c_id", data_slice->component_ids.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
@@ -685,7 +684,7 @@ public:
                      *frontier_attribute = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
         EnactorStats *enactor_stats      = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
 
-        data_slice -> work_progress      = &(enactor     -> work_progress      [thread_num * num_gpus]);
+        //data_slice -> work_progress      = &(enactor     -> work_progress      [thread_num * num_gpus]);
         do {
             printf("CCThread entered\n");fflush(stdout);
             if (enactor_stats[0].retval = util::SetDevice(gpu_idx)) break;
