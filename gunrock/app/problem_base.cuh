@@ -789,7 +789,7 @@ struct DataSliceBase
                     new_frontier_elements[0] = double(num_gpus>1?graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +2;
                     new_frontier_elements[1] = double(graph_slice->edges) * queue_sizing +2;
                     break;
-             }    
+            }    
 
             // Iterate through global frontier queue setups
             for (int i = 0; i < 2; i++) {

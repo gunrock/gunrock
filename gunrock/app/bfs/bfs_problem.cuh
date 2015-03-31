@@ -144,6 +144,103 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             return retval;
         } // Init
 
+        cudaError_t Reset(
+            FrontierType frontier_type,     // The frontier type (i.e., edge/vertex/mixed)
+            GraphSlice<SizeT, VertexId, Value>  *graph_slice,
+            double queue_sizing = 2.0)
+        {         
+            cudaError_t retval = cudaSuccess;
+            SizeT nodes = graph_slice->nodes;
+            SizeT edges = graph_slice->edges;
+            SizeT new_frontier_elements[2] = {0,0};
+
+            for (int peer=0; peer<this->num_gpus; peer++)
+                this->out_length[peer] = 1;
+ 
+            if (this->num_gpus>1) 
+                util::cpu_mt::PrintCPUArray<int, SizeT>("in_counter", graph_slice->in_counter.GetPointer(util::HOST), this->num_gpus+1, this->gpu_idx); 
+
+            for (int peer=0;peer<(this->num_gpus > 1 ? this->num_gpus+1 : 1);peer++)
+            {    
+                switch (frontier_type) {
+                    case VERTEX_FRONTIERS :
+                        // O(n) ping-pong global vertex frontiers
+                        new_frontier_elements[0] = double(this->num_gpus>1? graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +2;
+                        new_frontier_elements[1] = new_frontier_elements[0];
+                        break;
+
+                    case EDGE_FRONTIERS :
+                        // O(m) ping-pong global edge frontiers
+                        new_frontier_elements[0] = double(graph_slice->edges) * queue_sizing +2;
+                        new_frontier_elements[1] = new_frontier_elements[0];
+                        break;
+
+                    case MIXED_FRONTIERS :
+                        // O(n) global vertex frontier, O(m) global edge frontier
+                        new_frontier_elements[0] = double(this->num_gpus>1? graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +2;
+                        new_frontier_elements[1] = double(graph_slice->edges) * queue_sizing +2;
+                        break;
+                }    
+
+                // Iterate through global frontier queue setups
+                for (int i = 0; i < 2; i++) {
+                    if (peer == this->num_gpus && i == 1) continue;
+                    if (new_frontier_elements[i] > edges) new_frontier_elements[i] = edges;
+                    if (this->frontier_queues[peer].keys[i].GetSize() < new_frontier_elements[i]) {
+
+                        // Free if previously allocated
+                        if (retval = this->frontier_queues[peer].keys[i].Release()) return retval;
+
+                        // Free if previously allocated
+                        if (_USE_DOUBLE_BUFFER) {
+                            if (retval = this->frontier_queues[peer].values[i].Release()) return retval;
+                        }
+
+                        //frontier_elements[peer][i] = new_frontier_elements[i];
+
+                        if (retval = this->frontier_queues[peer].keys[i].Allocate(new_frontier_elements[i],util::DEVICE)) return retval;
+                        if (_USE_DOUBLE_BUFFER) {
+                            if (retval = this->frontier_queues[peer].values[i].Allocate(new_frontier_elements[i],util::DEVICE)) return retval;
+                        }
+                    } //end if
+                } // end for i<2
+
+                if (peer == this->num_gpus)
+                {
+                    continue;
+                }
+                //if (peer == num_gpu) continue;
+                SizeT max_elements = new_frontier_elements[0];
+                if (new_frontier_elements[1] > max_elements) max_elements=new_frontier_elements[1];
+                if (max_elements > nodes) max_elements = nodes;
+                if (this->scanned_edges[peer].GetSize() < max_elements)
+                {
+                    if (retval = this->scanned_edges[peer].Release()) return retval;
+                    if (retval = this->scanned_edges[peer].Allocate(max_elements, util::DEVICE)) return retval;
+                }
+            }
+
+            // Allocate output labels if necessary
+            if (this->labels.GetPointer(util::DEVICE)==NULL)
+                if (retval = this->labels.Allocate(nodes,util::DEVICE)) return retval;
+            util::MemsetKernel<<<128, 128>>>(this->labels.GetPointer(util::DEVICE), _ENABLE_IDEMPOTENCE?-1:(util::MaxValue<Value>()-1), nodes);
+
+            // Allocate preds if necessary
+            if (_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE)
+            {
+                if (this->preds.GetPointer(util::DEVICE)==NULL)
+                    if (retval = this->preds.Allocate(nodes, util::DEVICE)) return retval;
+                util::MemsetKernel<<<128,128>>>(this->preds.GetPointer(util::DEVICE), -2, nodes); 
+            }
+
+            if (_ENABLE_IDEMPOTENCE) {
+                int visited_mask_bytes  = ((nodes * sizeof(unsigned char))+7)/8;
+                int visited_mask_elements = visited_mask_bytes * sizeof(unsigned char);
+                util::MemsetKernel<<<128, 128>>>(this->visited_mask.GetPointer(util::DEVICE), (unsigned char)0, visited_mask_elements);
+            }
+            
+            return retval;
+        } 
     }; // DataSlice
 
     // Members
@@ -341,28 +438,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             // Set device
             if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-
-            if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, _USE_DOUBLE_BUFFER)) return retval;
-
-            // Allocate output labels if necessary
-            if (data_slices[gpu]->labels.GetPointer(util::DEVICE)==NULL)
-                if (retval = data_slices[gpu]->labels.Allocate(this->sub_graphs[gpu].nodes,util::DEVICE)) return retval;
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->labels.GetPointer(util::DEVICE), _ENABLE_IDEMPOTENCE?-1:(util::MaxValue<Value>()-1), this->sub_graphs[gpu].nodes);
-
-            // Allocate preds if necessary
-            if (_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE)
-            {
-                if (data_slices[gpu]->preds.GetPointer(util::DEVICE)==NULL)
-                    if (retval = data_slices[gpu]->preds.Allocate(this->sub_graphs[gpu].nodes, util::DEVICE)) return retval;
-                util::MemsetKernel<<<128,128>>>(data_slices[gpu]->preds.GetPointer(util::DEVICE), -2, this->sub_graphs[gpu].nodes); 
-            }
-
-            if (_ENABLE_IDEMPOTENCE) {
-                int visited_mask_bytes  = ((this->sub_graphs[gpu].nodes * sizeof(unsigned char))+7)/8;
-                int visited_mask_elements = visited_mask_bytes * sizeof(unsigned char);
-                util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->visited_mask.GetPointer(util::DEVICE), (unsigned char)0, visited_mask_elements);
-            }
-            
+            if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing)) return retval;
             if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;
         }
  

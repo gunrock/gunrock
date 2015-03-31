@@ -483,7 +483,7 @@ void RunTests(Test_Parameter *parameter)
     else printf(" #keys%d", gpu);
     if (num_gpus>1) printf(" #keys%d",num_gpus);
     printf("\n");
-    double max_key_sizing=0, max_in_sizing_=0;
+    double max_queue_sizing_[2] = {0,0}, max_in_sizing_=0;
     for (int gpu=0;gpu<num_gpus;gpu++)
     {   
         size_t gpu_free,dummy;
@@ -491,24 +491,27 @@ void RunTests(Test_Parameter *parameter)
         cudaMemGetInfo(&gpu_free,&dummy);
         printf("GPU_%d\t %ld",gpu_idx[gpu],org_size[gpu]-gpu_free);
         for (int i=0;i<num_gpus;i++)
-        {   
-            SizeT x=problem->data_slices[gpu]->frontier_queues[i].keys[0].GetSize();
-            printf("\t %d", x); 
-            double factor = 1.0*x/(num_gpus>1?problem->graph_slices[gpu]->in_counter[i]:problem->graph_slices[gpu]->nodes);
-            if (factor > max_key_sizing) max_key_sizing=factor;
+        {  
+            for (int j=0; j<2; j++)
+            { 
+                SizeT x=problem->data_slices[gpu]->frontier_queues[i].keys[j].GetSize();
+                if (j == 0) printf("\t %d", x); 
+                double factor = 1.0*x/(num_gpus>1?problem->graph_slices[gpu]->in_counter[i]:problem->graph_slices[gpu]->nodes);
+                if (factor > max_queue_sizing_[j]) max_queue_sizing_[j]=factor;
+            }
             if (num_gpus>1 && i!=0 )
             for (int t=0;t<2;t++)
             {   
-                x=problem->data_slices[gpu][0].keys_in[t][i].GetSize();
+                SizeT x=problem->data_slices[gpu][0].keys_in[t][i].GetSize();
                 printf("\t %d", x); 
-                factor = 1.0*x/problem->graph_slices[gpu]->in_counter[i];
+                double factor = 1.0*x/problem->graph_slices[gpu]->in_counter[i];
                 if (factor > max_in_sizing_) max_in_sizing_=factor;
             }   
         }   
         if (num_gpus>1) printf("\t %d",problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
         printf("\n");
     }   
-    printf("\t key_sizing =\t %lf", max_key_sizing);
+    printf("\t queue_sizing =\t %lf \t %lf", max_queue_sizing_[0], max_queue_sizing_[1]);
     if (num_gpus>1) printf("\t in_sizing =\t %lf", max_in_sizing_);
     printf("\n");
 

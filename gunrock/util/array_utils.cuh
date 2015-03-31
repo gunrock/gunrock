@@ -272,6 +272,40 @@ public:
         }
     } // EnsureSize(...)
 
+    cudaError_t ShrinkSize(SizeT size, bool keep = false, cudaStream_t stream = 0)
+    {
+        if (ARRAY_DEBUG)
+        {
+            printf("%s ShrinkSize : %d -> %d\n", name.c_str(), this->size, size);fflush(stdout);
+        }
+        if (this->size <= size) return cudaSuccess;
+        else {
+            //printf("Expanding %s : %d -> %d\n",name.c_str(),this->size,size);fflush(stdout);
+            if (!keep) return Allocate(size, allocated);
+            else {
+                Array1D<SizeT, Value> temp_array;
+                cudaError_t retval = cudaSuccess;
+                unsigned int org_allocated = allocated;
+
+                temp_array.SetName("t_array");
+                if (retval = temp_array.Allocate(size, allocated)) return retval;
+                if ((allocated & HOST) == HOST)
+                    memcpy(temp_array.GetPointer(HOST), h_pointer, sizeof(Value) * this->size);
+                if ((allocated & DEVICE) == DEVICE)
+                    MemsetCopyVectorKernel<<<256,256,0,stream>>>(
+                        temp_array.GetPointer(DEVICE), d_pointer, this->size);
+                if (retval = Release(HOST  )) return retval;
+                if (retval = Release(DEVICE)) return retval;
+                if ((org_allocated & HOST  ) == HOST  ) h_pointer = temp_array.GetPointer(HOST  );
+                if ((org_allocated & DEVICE) == DEVICE) d_pointer = temp_array.GetPointer(DEVICE);
+                allocated=org_allocated; this->size= size;
+                if ((allocated & DEVICE) == DEVICE) temp_array.ForceUnSetPointer(DEVICE);
+                if ((allocated & HOST  ) == HOST  ) temp_array.ForceUnSetPointer(HOST  );
+                return retval;
+            }
+        }
+    } // ShrinkSize(...)
+
     Value* GetPointer(unsigned int target = HOST)
     {
         if (target == HOST  ) 
