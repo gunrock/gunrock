@@ -141,7 +141,7 @@ bool All_Done(EnactorStats                    *enactor_stats,
     for (int gpu=0;gpu<num_gpus*num_gpus;gpu++)
     if (frontier_attribute[gpu].queue_length!=0 || frontier_attribute[gpu].has_incoming)
     {
-        //printf("gpu=%d, queue_length=%d\n",gpu,frontier_attribute[gpu].queue_length);   
+        //printf("frontier_attribute[%d].queue_length = %d\n",gpu,frontier_attribute[gpu].queue_length);   
         return false;
     }
 
@@ -149,13 +149,19 @@ bool All_Done(EnactorStats                    *enactor_stats,
     for (int peer=1;peer<num_gpus;peer++)
     for (int i=0;i<2;i++)
     if (data_slice[gpu]->in_length[i][peer]!=0)
+    {
+        //printf("data_slice[%d]->in_length[%d][%d] = %d\n", gpu, i, peer, data_slice[gpu]->in_length[i][peer]);
         return false;
+    }
     //printf("all gpu done\n");fflush(stdout);
 
     for (int gpu=0;gpu<num_gpus;gpu++)
     for (int peer=1;peer<num_gpus;peer++)
     if (data_slice[gpu]->out_length[peer]!=0)
+    {
+        //printf("data_slice[%d]->out_length[%d] = %d\n", gpu, peer, data_slice[gpu]->out_length[peer]);
         return false;
+    }
 
     return true;
 } 
@@ -435,7 +441,8 @@ cudaError_t Check_Size(
         oversized=true;
         if (SIZE_CHECK)
         {
-            retval = array->EnsureSize(target_length, keep_content);
+            if (array->GetSize() != 0) retval = array->EnsureSize(target_length, keep_content);
+            else retval = array->Allocate(target_length, util::DEVICE);
         } else {
             char temp_str[]=" oversize", str[256];
             memcpy(str, name, sizeof(char) * strlen(name));
@@ -829,7 +836,7 @@ void Iteration_Loop(
                             streams[peer_],
                             frontier_attribute_->queue_length,
                             data_slice ->keys_in[iteration%2][peer_].GetPointer(util::DEVICE),
-                            frontier_queue_->keys[selector^1].GetPointer(util::DEVICE),
+                            &frontier_queue_->keys[selector^1],
                             offset,
                             data_slice ->expand_incoming_array[peer_].GetPointer(util::DEVICE),
                             data_slice);
@@ -939,6 +946,7 @@ void Iteration_Loop(
                 case 3: //Copy
                     if (num_gpus <=1) 
                     {
+                        if (enactor_stats_-> retval = util::GRError(cudaStreamSynchronize(streams[peer_]), "cudaStreamSynchronize failed",__FILE__, __LINE__)) break;
                         Total_Length = frontier_attribute_->queue_length; 
                         to_show[peer_]=false;break;
                     }
@@ -960,7 +968,8 @@ void Iteration_Loop(
 
                         if (enactor_stats_->retval = 
                             Check_Size<false, SizeT, VertexId> ("total_queue", Total_Length + frontier_attribute_->queue_length, &data_slice->frontier_queues[num_gpus].keys[0], over_sized, thread_num, iteration, peer_, false)) break;
-
+                        
+                        //util::cpu_mt::PrintGPUArray("keys3", frontier_queue_->keys[selector].GetPointer(util::DEVICE), frontier_attribute_->queue_length, thread_num, enactor_stats->iteration, peer_, streams[peer_]);
                         util::MemsetCopyVectorKernel<<<256,256, 0, streams[peer_]>>>(
                             data_slice->frontier_queues[num_gpus].keys[0].GetPointer(util::DEVICE) + Total_Length,
                             frontier_queue_->keys[selector].GetPointer(util::DEVICE),
@@ -1058,7 +1067,8 @@ void Iteration_Loop(
                     }
                 }
                 frontier_attribute[0].queue_length = Total_Length;
-                frontier_queue_ = &(data_slice->frontier_queues[Enactor::SIZE_CHECK?0:num_gpus]);
+                if (!Enactor::SIZE_CHECK) frontier_attribute[0].selector = 0;
+                frontier_queue_ = &(data_slice->frontier_queues[(Enactor::SIZE_CHECK || num_gpus == 1)?0:num_gpus]);
                 //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys", frontier_queue_->keys[frontier_attribute[0].selector].GetPointer(util::DEVICE), Total_Length, thread_num, enactor_stats[0].iteration, -1, streams[0]);
                 //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labels", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats[0].iteration, -1, streams[0]);
                 //util::cpu_mt::PrintGPUArray<SizeT, Value   >("sigmas", data_slice->sigmas.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats[0].iteration, -1, streams[0]);
@@ -1092,10 +1102,10 @@ void Iteration_Loop(
                         work_progress_,
                         context[peer_],
                         streams[peer_]); 
-                   selector            = frontier_attribute[peer_].selector;
+                    selector            = frontier_attribute[peer_].selector;
                     if (enactor_stats_->retval) break;
                     
-                    if (Enactor::DEBUG) {printf("%d\t %lld\t \t Fullqueue started. Total_Length= %d\n", thread_num, enactor_stats[0].iteration, frontier_attribute_->queue_length);fflush(stdout);}
+                    //if (Enactor::DEBUG) {printf("%d\t %lld\t \t Fullqueue started. Total_Length= %d\n", thread_num, enactor_stats[0].iteration, frontier_attribute_->queue_length);fflush(stdout);}
                     //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys", frontier_queue_->keys[selector].GetPointer(util::DEVICE), frontier_attribute_->queue_length, thread_num, enactor_stats_->iteration, -1, streams[peer_]);
                     
                     if (frontier_attribute_->queue_length !=0)
@@ -1223,7 +1233,7 @@ void Iteration_Loop(
                         &work_progress[0],
                         context[0],
                         streams[0]);
-                }
+                } else data_slice->out_length[0]= Total_Length;
             } /*else {
                 for (int peer_=0;peer_<num_gpus;peer_++)
                     data_slice->out_length[peer_]=0;
@@ -1738,6 +1748,8 @@ public:
                       sizeof(SizeT) * num_gpus);
             offset += sizeof(SizeT) * num_gpus;
             data_slice->make_out_array.Move(util::HOST, util::DEVICE, offset, 0, stream);
+
+            //<F3>util::cpu_mt::PrintGPUArray("keys_out", frontier_queue->keys[selector].GetPointer(util::DEVICE), num_elements, thread_num, enactor_stats->iteration, -1, stream);
 
             if (BACKWARD && t==1) 
                 Make_Out_Backward<VertexId, SizeT, Value, NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>

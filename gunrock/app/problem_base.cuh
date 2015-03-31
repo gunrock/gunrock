@@ -326,8 +326,11 @@ struct DataSliceBase
         value__associate_outs    = NULL;
         frontier_queues          = NULL;
         scanned_edges            = NULL;
+        keys_outs              .SetName("keys_outs"              );
         vertex_associate_outss .SetName("vertex_associate_outss" );  
-        value__associate_outss .SetName("value__associate_outss" );  
+        value__associate_outss .SetName("value__associate_outss" );
+        vertex_associate_orgs  .SetName("vertex_associate_orgs"  );
+        value__associate_orgs  .SetName("value__associate_orgs"  ); 
         out_length             .SetName("out_length"             );  
         in_length           [0].SetName("in_length[0]"           );  
         in_length           [1].SetName("in_length[1]"           );  
@@ -538,7 +541,12 @@ struct DataSliceBase
         this->num_vertex_associate = num_vertex_associate;
         this->num_value__associate = num_value__associate;
         this->frontier_queues      = new util::DoubleBuffer<SizeT, VertexId, Value>[num_gpus+1]; 
-        scanned_edges              = new util::Array1D<SizeT, SizeT>[num_gpus+1];
+        this->scanned_edges        = new util::Array1D<SizeT, SizeT>[num_gpus+1];
+        for (int i=0; i<num_gpus+1; i++)
+        {
+            //this->frontier_queues[i].SetName("frontier_queues[]");
+            this->scanned_edges[i].SetName("scanned_edges[]");
+        }
         if (retval = util::SetDevice(gpu_idx))  return retval;
         if (retval = in_length[0].Allocate(num_gpus,util::HOST)) return retval;
         if (retval = in_length[1].Allocate(num_gpus,util::HOST)) return retval;
@@ -690,10 +698,13 @@ struct DataSliceBase
                 util::HOST | util::DEVICE)) return retval;
             expand_incoming_array = new util::Array1D<SizeT, char>[num_gpus];
             for (int i=0;i<num_gpus;i++)
-            if (retval = expand_incoming_array[i].Allocate(
-                sizeof(Value*   ) * num_value__associate * 2 + 
-                sizeof(VertexId*) * num_vertex_associate * 2, 
-                util::HOST | util::DEVICE)) return retval;
+            {
+                expand_incoming_array[i].SetName("expand_incoming_array[]");
+                if (retval = expand_incoming_array[i].Allocate(
+                    sizeof(Value*   ) * num_value__associate * 2 + 
+                    sizeof(VertexId*) * num_vertex_associate * 2, 
+                    util::HOST | util::DEVICE)) return retval;
+            }
             /*memcpy(&make_out_array[offset], keys_markers.GetPointer(util::HOST), 
                       sizeof(SizeT*   ) * num_gpus);
             offset += sizeof(SizeT*   ) * num_gpus ;
@@ -741,7 +752,7 @@ struct DataSliceBase
         double queue_sizing = 2.0,
         bool _USE_DOUBLE_BUFFER = false)            // Size scaling factor for work queue allocation
     {   
-        util::cpu_mt::PrintMessage("GraphSlice Reset() begin.");
+        //util::cpu_mt::PrintMessage("GraphSlice Reset() begin.");
         cudaError_t retval = cudaSuccess;
         for (int peer=0; peer<num_gpus; peer++)
             out_length[peer] = 1;

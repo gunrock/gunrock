@@ -185,7 +185,7 @@ extern "C" {
     }
 #endif //_WIN32
 
-    void PrintMessage (const char* const message, const int gpu=-1, const int iteration=-1, clock_t stime = -1)
+    /*void PrintMessage (const char* const message, const int gpu=-1, const int iteration=-1, clock_t stime = -1)
     {
         float ft = (float)stime*1000/CLOCKS_PER_SEC;
         if      (gpu!=-1 && iteration!=-1 && stime>=0) printf("%d\t %d\t %.2f\t %s\n",gpu,iteration,ft,message);
@@ -196,6 +196,20 @@ extern "C" {
         else if (gpu!=-1                             ) printf("%d\t   \t     \t %s\n",gpu,             message);
         else if (           iteration!=-1            ) printf("  \t %d\t     \t %s\n",    iteration,   message);
         else                                           printf("  \t   \t     \t %s\n",                 message);
+        fflush(stdout);
+    }*/
+
+    void PrintMessage (const char* const message, const int gpu=-1, const int iteration=-1, int peer = -1)
+    {
+        //float ft = (float)stime*1000/CLOCKS_PER_SEC;
+        if      (gpu!=-1 && iteration!=-1 && peer >=0) printf("%d\t %d\t %d\t %s\n",gpu,iteration,peer,message);
+        else if (gpu!=-1                  && peer >=0) printf("%d\t   \t %d\t %s\n",gpu,          peer,message);
+        else if (           iteration!=-1 && peer >=0) printf("  \t %d\t %d\t %s\n",    iteration,peer,message);
+        else if (                            peer >=0) printf("  \t   \t %d\t %s\n",              peer,message);
+        else if (gpu!=-1 && iteration!=-1            ) printf("%d\t %d\t   \t %s\n",gpu,iteration,     message);
+        else if (gpu!=-1                             ) printf("%d\t   \t   \t %s\n",gpu,               message);
+        else if (           iteration!=-1            ) printf("  \t %d\t   \t %s\n",    iteration,     message);
+        else                                           printf("  \t   \t   \t %s\n",                   message);
         fflush(stdout);
     }
 
@@ -294,7 +308,8 @@ extern "C" {
     }
 
     template <typename _SizeT, typename _Value>
-    void PrintCPUArray(const char* const name, const _Value* const array, const _SizeT limit, const int gpu=-1, const int iteration=-1, clock_t stime = -1)
+    //void PrintCPUArray(const char* const name, const _Value* const array, const _SizeT limit, const int gpu=-1, const int iteration=-1, clock_t stime = -1)
+    void PrintCPUArray(const char* const name, const _Value* const array, const _SizeT limit, const int gpu=-1, const int iteration=-1, int peer = -1)
     {
         char *buffer = new char[1024 * 128];
         
@@ -305,7 +320,7 @@ extern "C" {
             if (i!=0) sprintf(buffer,(i%10)==0?"%s, | " : "%s, ",buffer);
             PrintValue(buffer,array[i],buffer);     
         }
-        PrintMessage(buffer,gpu,iteration, stime);
+        PrintMessage(buffer,gpu,iteration, peer);
         delete []buffer;buffer=NULL;
     }
 
@@ -316,7 +331,7 @@ extern "C" {
         const _SizeT limit, 
         const int gpu=-1, 
         const int iteration=-1, 
-              clock_t stime = -1,
+              int peer = -1,
               cudaStream_t stream = 0)
     {
         if (limit==0) return;
@@ -324,7 +339,7 @@ extern "C" {
         {
             _Value* h_array = new _Value[limit];
             util::GRError(cudaMemcpy(h_array,array,sizeof(_Value) * limit, cudaMemcpyDeviceToHost), "cuaMemcpy failed", __FILE__, __LINE__);
-            PrintCPUArray<_SizeT,_Value>(name,h_array,limit,gpu,iteration, stime);
+            PrintCPUArray<_SizeT,_Value>(name,h_array,limit,gpu,iteration, peer);
             delete[] h_array;h_array=NULL;
         } else {
             util::Array1D<_SizeT,_Value> arr;
@@ -333,7 +348,7 @@ extern "C" {
             arr.SetPointer(array,-1, util::DEVICE);
             arr.Move(util::DEVICE, util::HOST, -1, 0, stream);
             cudaStreamSynchronize(stream);
-            PrintCPUArray<_SizeT,_Value>(name,arr.GetPointer(util::HOST), limit, gpu, iteration, stime);
+            PrintCPUArray<_SizeT,_Value>(name,arr.GetPointer(util::HOST), limit, gpu, iteration, peer);
             arr.Release();
         }
     }

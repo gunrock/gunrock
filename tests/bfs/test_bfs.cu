@@ -433,9 +433,11 @@ void RunTests(Test_Parameter *parameter)
     util::GRError(enactor->Reset(), "BFS Enactor Reset failed", __FILE__, __LINE__);
 
     util::GRError("Error before Enact", __FILE__, __LINE__);
+    printf("__________________________\n");fflush(stdout);
     cpu_timer.Start();
     util::GRError(enactor->Enact(src), "BFS Problem Enact Failed", __FILE__, __LINE__);
     cpu_timer.Stop();
+    printf("--------------------------\n");fflush(stdout);
 
     enactor->GetStatistics(total_queued, search_depth, avg_duty);
 
@@ -490,7 +492,7 @@ void RunTests(Test_Parameter *parameter)
         printf("GPU_%d\t %ld",gpu_idx[gpu],org_size[gpu]-gpu_free);
         for (int i=0;i<num_gpus;i++)
         {   
-            SizeT x=problem->graph_slices[gpu]->frontier_queues[i].keys[0].GetSize();
+            SizeT x=problem->data_slices[gpu]->frontier_queues[i].keys[0].GetSize();
             printf("\t %d", x); 
             double factor = 1.0*x/(num_gpus>1?problem->graph_slices[gpu]->in_counter[i]:problem->graph_slices[gpu]->nodes);
             if (factor > max_key_sizing) max_key_sizing=factor;
@@ -503,7 +505,7 @@ void RunTests(Test_Parameter *parameter)
                 if (factor > max_in_sizing_) max_in_sizing_=factor;
             }   
         }   
-        if (num_gpus>1) printf("\t %d",problem->graph_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
+        if (num_gpus>1) printf("\t %d",problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
         printf("\n");
     }   
     printf("\t key_sizing =\t %lf", max_key_sizing);
