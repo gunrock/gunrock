@@ -147,12 +147,14 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         cudaError_t Reset(
             FrontierType frontier_type,     // The frontier type (i.e., edge/vertex/mixed)
             GraphSlice<SizeT, VertexId, Value>  *graph_slice,
-            double queue_sizing = 2.0)
+            double queue_sizing = 2.0,
+            double queue_sizing1 = -1.0)
         {         
             cudaError_t retval = cudaSuccess;
             SizeT nodes = graph_slice->nodes;
             SizeT edges = graph_slice->edges;
             SizeT new_frontier_elements[2] = {0,0};
+            if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
             for (int peer=0; peer<this->num_gpus; peer++)
                 this->out_length[peer] = 1;
@@ -161,31 +163,34 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 util::cpu_mt::PrintCPUArray<int, SizeT>("in_counter", graph_slice->in_counter.GetPointer(util::HOST), this->num_gpus+1, this->gpu_idx); 
 
             for (int peer=0;peer<(this->num_gpus > 1 ? this->num_gpus+1 : 1);peer++)
+            for (int i=0; i < 2; i++)
             {    
+                double queue_sizing_ = i==0?queue_sizing : queue_sizing1;
                 switch (frontier_type) {
                     case VERTEX_FRONTIERS :
                         // O(n) ping-pong global vertex frontiers
-                        new_frontier_elements[0] = double(this->num_gpus>1? graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +2;
+                        new_frontier_elements[0] = double(this->num_gpus>1? graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing_ +2;
                         new_frontier_elements[1] = new_frontier_elements[0];
                         break;
 
                     case EDGE_FRONTIERS :
                         // O(m) ping-pong global edge frontiers
-                        new_frontier_elements[0] = double(graph_slice->edges) * queue_sizing +2;
+                        new_frontier_elements[0] = double(graph_slice->edges) * queue_sizing_ +2;
                         new_frontier_elements[1] = new_frontier_elements[0];
                         break;
 
                     case MIXED_FRONTIERS :
                         // O(n) global vertex frontier, O(m) global edge frontier
-                        new_frontier_elements[0] = double(this->num_gpus>1? graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +2;
-                        new_frontier_elements[1] = double(graph_slice->edges) * queue_sizing +2;
+                        new_frontier_elements[0] = double(this->num_gpus>1? graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing_ +2;
+                        new_frontier_elements[1] = double(graph_slice->edges) * queue_sizing_ +2;
                         break;
                 }    
 
                 // Iterate through global frontier queue setups
-                for (int i = 0; i < 2; i++) {
+                //for (int i = 0; i < 2; i++) {
+                {
                     if (peer == this->num_gpus && i == 1) continue;
-                    if (new_frontier_elements[i] > edges) new_frontier_elements[i] = edges;
+                    if (new_frontier_elements[i] > edges + 2) new_frontier_elements[i] = edges+2;
                     if (this->frontier_queues[peer].keys[i].GetSize() < new_frontier_elements[i]) {
 
                         // Free if previously allocated
@@ -205,7 +210,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                     } //end if
                 } // end for i<2
 
-                if (peer == this->num_gpus)
+                if (peer == this->num_gpus || i == 1)
                 {
                     continue;
                 }
@@ -234,8 +239,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             }
 
             if (_ENABLE_IDEMPOTENCE) {
-                int visited_mask_bytes  = ((nodes * sizeof(unsigned char))+7)/8;
-                int visited_mask_elements = visited_mask_bytes * sizeof(unsigned char);
+                SizeT visited_mask_bytes  = ((nodes * sizeof(unsigned char))+7)/8;
+                SizeT visited_mask_elements = visited_mask_bytes * sizeof(unsigned char);
                 util::MemsetKernel<<<128, 128>>>(this->visited_mask.GetPointer(util::DEVICE), (unsigned char)0, visited_mask_elements);
             }
             
@@ -426,7 +431,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
     cudaError_t Reset(
             VertexId    src,
             FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
-            double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
+            double queue_sizing,                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
+            double queue_sizing1 = -1.0)
     {
         //util::cpu_mt::PrintMessage("BFSProblem Reset() begin.");
         typedef ProblemBase<VertexId, SizeT, Value, _MARK_PREDECESSORS, _ENABLE_IDEMPOTENCE, _USE_DOUBLE_BUFFER, false, false, false> BaseProblem;
@@ -434,11 +440,12 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         //BaseProblem::Reset(frontier_type, queue_sizing);
 
         cudaError_t retval = cudaSuccess;
+        if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
         for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             // Set device
             if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-            if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing)) return retval;
+            if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, queue_sizing1)) return retval;
             if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;
         }
  

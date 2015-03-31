@@ -166,7 +166,7 @@ public:
                                 name+" cudaHostRegister failed.", __FILE__, __LINE__)) return retval;
             } allocated = allocated | HOST;    
             if (ARRAY_DEBUG) 
-                {printf("%s\t allocated on HOST, length =\t %d, size =\t %ld bytes, pointer =\t %p\n",name.c_str(),size,size*sizeof(Value), h_pointer);fflush(stdout);}
+                {printf("%s\t allocated on HOST, length =\t %lld, size =\t %lld bytes, pointer =\t %p\n",name.c_str(), (long long) size, (long long) size*sizeof(Value), h_pointer);fflush(stdout);}
         }
         //}
     
@@ -182,7 +182,7 @@ public:
                           name+" cudaMalloc failed", __FILE__, __LINE__)) return retval;
             allocated = allocated | DEVICE;
             if (ARRAY_DEBUG) 
-                {printf("%s\t allocated on DEVICE, length =\t %d, size =\t %ld bytes, pointer =\t %p\n",name.c_str(),size, size*sizeof(Value), d_pointer);fflush(stdout);}
+                {printf("%s\t allocated on DEVICE, length =\t %lld, size =\t %lld bytes, pointer =\t %p\n",name.c_str(), (long long) size, (long long) size*sizeof(Value), d_pointer);fflush(stdout);}
         }
         //}
         this->size=size;
@@ -212,7 +212,7 @@ public:
                 h_pointer = NULL;
                 allocated = allocated - HOST + TARGETBASE;
                 if (ARRAY_DEBUG) 
-                    {printf("%s\t released on HOST, length =\t %d\n", name.c_str(), size);fflush(stdout);}
+                    {printf("%s\t released on HOST, length =\t %lld\n", name.c_str(), (long long) size);fflush(stdout);}
             } else if ((target & HOST)==HOST && (setted & HOST) == HOST) {
                 UnSetPointer(HOST);
             }
@@ -224,7 +224,7 @@ public:
             d_pointer = NULL;
             allocated = allocated - DEVICE + TARGETBASE; 
             if (ARRAY_DEBUG) 
-                {printf("%s\t released on DEVICE, length =\t %d\n", name.c_str(),size);fflush(stdout);}
+                {printf("%s\t released on DEVICE, length =\t %lld\n", name.c_str(), (long long) size);fflush(stdout);}
         } else if ((target & DEVICE) == DEVICE && (setted & DEVICE) == DEVICE) {
             UnSetPointer(DEVICE);
         }
@@ -242,7 +242,7 @@ public:
     {
         if (ARRAY_DEBUG)
         {
-            printf("%s EnsureSize : %d -> %d\n", name.c_str(), this->size, size);fflush(stdout);
+            printf("%s EnsureSize : %lld -> %lld\n", name.c_str(), (long long) this->size, (long long) size);fflush(stdout);
         }
         if (this->size >= size) return cudaSuccess;
         else {
@@ -276,7 +276,7 @@ public:
     {
         if (ARRAY_DEBUG)
         {
-            printf("%s ShrinkSize : %d -> %d\n", name.c_str(), this->size, size);fflush(stdout);
+            printf("%s ShrinkSize : %lld -> %lld\n", name.c_str(), (long long) this->size, (long long) size);fflush(stdout);
         }
         if (this->size <= size) return cudaSuccess;
         else {
@@ -336,7 +336,7 @@ public:
             h_pointer = pointer;
             if (setted == NONE && allocated == NONE) this->size=size;
             setted    = setted | HOST;
-            if (ARRAY_DEBUG) {printf("%s\t setted on HOST, size =\t %d, pointer =\t %p setted = %d\n", name.c_str(),this->size, h_pointer, setted);fflush(stdout);}
+            if (ARRAY_DEBUG) {printf("%s\t setted on HOST, size =\t %lld, pointer =\t %p setted = %d\n", name.c_str(), (long long) this->size, h_pointer, setted);fflush(stdout);}
         }
 
         if (target == DEVICE)
@@ -345,7 +345,7 @@ public:
             d_pointer = pointer;
             if (setted == NONE && allocated == NONE) this->size=size;
             setted    = setted | DEVICE;
-            if (ARRAY_DEBUG) {printf("%s\t setted on DEVICE, size =\t %d, pointer =\t %p\n", name.c_str(),this->size, d_pointer);fflush(stdout);}
+            if (ARRAY_DEBUG) {printf("%s\t setted on DEVICE, size =\t %lld, pointer =\t %p\n", name.c_str(), (long long)this->size, d_pointer);fflush(stdout);}
         }
         return retval;
     } // SetPointer(...)
@@ -412,7 +412,7 @@ public:
         if (size > this->size) return GRError(name+" size is invalid",__FILE__, __LINE__);
         if (size+offset > this->size) return GRError(name+" size+offset is invalid", __FILE__, __LINE__);
         if (size == 0) return retval;
-        if (ARRAY_DEBUG) {printf("%s Moving from %d to %d, size = %d, offset = %d, stream = %p, d_pointer = %p, h_pointer = %p\n", name.c_str(), source, target, size, offset, stream, d_pointer, h_pointer);fflush(stdout);}
+        if (ARRAY_DEBUG) {printf("%s Moving from %d to %d, size = %lld, offset = %lld, stream = %p, d_pointer = %p, h_pointer = %p\n", name.c_str(), source, target, (long long) size, (long long) offset, stream, d_pointer, h_pointer);fflush(stdout);}
 
         if      (source == HOST   && target == DEVICE) {
            if (use_cuda_alloc && stream != 0)

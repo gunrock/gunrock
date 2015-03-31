@@ -138,7 +138,7 @@ struct ClusterPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD
         //float       f1 = 1.0/this->num_gpus;
         SizeT       *current_count = new SizeT[this->num_gpus];
         VertexId    StartId, EndId;
-        VertexId    *row_offsets=this->graph->row_offsets;
+        SizeT       *row_offsets=this->graph->row_offsets;
         VertexId    *column_indices=this->graph->column_indices;
 
         if (factor < 0) this->factor = 1.0/this->num_gpus;

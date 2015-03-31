@@ -380,7 +380,7 @@ __global__ void Make_Out_Backward(
     {
         VertexId key    = keys_in [x];
         if (key <0) {x+=STRIDE; continue;}
-        for (int j=offsets[key];j<offsets[key+1];j++)
+        for (SizeT j=offsets[key];j<offsets[key+1];j++)
         {
             int      target = partition_table[j];
             SizeT    pos    = s_marker[target][x]-1 + s_offset[target];
@@ -899,24 +899,14 @@ void Iteration_Loop(
                             data_slice, iteration, peer_, 
                             stages[peer_]-1, stages[peer_], to_show[peer_])) break;
                         if (to_show[peer_]==false) break;
-
-                        if (Enactor::DEBUG)
-                            printf("%d\t %d\t %d\t queue_length = %d, output_length = %d\n",
-                                thread_num, iteration, peer_,
-                                frontier_queue_->keys[selector^1].GetSize(),
-                                frontier_attribute_->output_length[0]);fflush(stdout);
-
-                        if (enactor_stats_->retval = 
-                            Check_Size<true, SizeT, VertexId> ("queue3", frontier_attribute_->output_length[0]+2, &frontier_queue_->keys  [selector^1], over_sized, thread_num, iteration, peer_, false)) break;
-                        if (enactor_stats_->retval = 
-                            Check_Size<true, SizeT, VertexId> ("queue3", frontier_attribute_->output_length[0]+2, &frontier_queue_->keys  [selector  ], over_sized, thread_num, iteration, peer_, true )) break;
-                        if (Problem::USE_DOUBLE_BUFFER)
-                        {
-                            if (enactor_stats_->retval = 
-                                Check_Size<true, SizeT, Value   > ("queue3", frontier_attribute_->output_length[0]+2, &frontier_queue_->values[selector^1], over_sized, thread_num, iteration, peer_, false)) break;
-                            if (enactor_stats_->retval = 
-                                Check_Size<true, SizeT, Value   > ("queue3", frontier_attribute_->output_length[0]+2, &frontier_queue_->values[selector  ], over_sized, thread_num, iteration, peer_, true )) break;
-                        } 
+                        Iteration::Check_Queue_Size(
+                            thread_num,
+                            peer_,
+                            frontier_attribute_->output_length[0] + 2,
+                            frontier_queue_,
+                            frontier_attribute_,
+                            enactor_stats_,
+                            graph_slice);
                     }
 
                     Iteration::SubQueue_Core(
@@ -1152,16 +1142,15 @@ void Iteration_Loop(
                                     frontier_queue_->keys[selector^1].GetSize(),
                                     frontier_attribute_->output_length[0]);fflush(stdout);
 
-                            if (enactor_stats_-> retval =
-                                Check_Size<true, SizeT, VertexId> ("queue3", frontier_attribute->output_length[0]+2, &frontier_queue_->keys[selector^1], over_sized, thread_num, iteration, peer_, false)) break;
-                            if (enactor_stats_-> retval =
-                                Check_Size<true, SizeT, VertexId> ("queue3", frontier_attribute->output_length[0]+2, &frontier_queue_->keys[selector  ], over_sized, thread_num, iteration, peer_, true)) break;
-                            if (Problem::USE_DOUBLE_BUFFER) {
-                                if (enactor_stats_-> retval =
-                                    Check_Size<true, SizeT, Value> ("queue3", frontier_attribute->output_length[0]+2, &frontier_queue_->values[selector^1], over_sized, thread_num, iteration, peer_, false)) break;
-                                if (enactor_stats_-> retval =
-                                    Check_Size<true, SizeT, Value> ("queue3", frontier_attribute->output_length[0]+2, &frontier_queue_->values[selector  ], over_sized, thread_num, iteration, peer_, true)) break;
-                            }
+                            Iteration::Check_Queue_Size(
+                                thread_num,
+                                peer_,
+                                frontier_attribute_->output_length[0] + 2,
+                                frontier_queue_,
+                                frontier_attribute_,
+                                enactor_stats_,
+                                graph_slice);
+
                         }
                         
                         Iteration::FullQueue_Core(
@@ -1568,6 +1557,46 @@ public:
         }
     }
 
+    static void Check_Queue_Size(
+        int                            thread_num,
+        int                            peer_,
+        SizeT                          request_length,
+        util::DoubleBuffer<SizeT, VertexId, Value>
+                                      *frontier_queue,
+        //util::Array1D<SizeT, SizeT>   *scanned_edges,
+        FrontierAttribute<SizeT>      *frontier_attribute,
+        EnactorStats                  *enactor_stats,
+        //DataSlice                     *data_slice,
+        //DataSlice                     *d_data_slice,
+        GraphSlice                    *graph_slice
+        //util::CtaWorkProgressLifetime *work_progress,
+        //ContextPtr                     context,
+        //cudaStream_t                   stream
+        )
+    {
+        bool over_sized = false;
+        int  selector   = frontier_attribute->selector;
+        int  iteration  = enactor_stats -> iteration;
+
+        if (Enactor::DEBUG)
+            printf("%d\t %d\t %d\t queue_length = %d, output_length = %d\n",
+                thread_num, iteration, peer_,
+                frontier_queue->keys[selector^1].GetSize(),
+                request_length);fflush(stdout);
+
+        if (enactor_stats->retval = 
+            Check_Size<true, SizeT, VertexId > ("queue3", request_length, &frontier_queue->keys  [selector^1], over_sized, thread_num, iteration, peer_, false)) return;
+        if (enactor_stats->retval = 
+            Check_Size<true, SizeT, VertexId > ("queue3", request_length, &frontier_queue->keys  [selector  ], over_sized, thread_num, iteration, peer_, true )) return;
+        if (Problem::USE_DOUBLE_BUFFER)
+        {
+            if (enactor_stats->retval = 
+                Check_Size<true, SizeT, Value> ("queue3", request_length, &frontier_queue->values[selector^1], over_sized, thread_num, iteration, peer_, false)) return;
+            if (enactor_stats->retval = 
+                Check_Size<true, SizeT, Value> ("queue3", request_length, &frontier_queue->values[selector  ], over_sized, thread_num, iteration, peer_, true )) return;
+        } 
+    }
+
     template <
         int NUM_VERTEX_ASSOCIATES,
         int NUM_VALUE__ASSOCIATES>
@@ -1642,10 +1671,10 @@ public:
             for (peer_=0;peer_<num_gpus;peer_++)
             {
                 Scan<mgpu::MgpuScanTypeInc>(
-                    (int*)data_slice->keys_marker[peer_].GetPointer(util::DEVICE),
+                    (SizeT*)data_slice->keys_marker[peer_].GetPointer(util::DEVICE),
                     num_elements,
-                    (int)0, mgpu::plus<int>(), (int*)0, (int*)0,
-                    (int*)data_slice->keys_marker[peer_].GetPointer(util::DEVICE),
+                    (SizeT)0, mgpu::plus<SizeT>(), (SizeT*)0, (SizeT*)0,
+                    (SizeT*)data_slice->keys_marker[peer_].GetPointer(util::DEVICE),
                     context[0]);
             }
 
@@ -1778,6 +1807,7 @@ public:
         if (enactor_stats->retval) return;                    
         if (enactor_stats->retval = cudaStreamSynchronize(stream)) return;
         frontier_attribute->selector^=1;
+        if (t_out_length!=NULL) {delete[] t_out_length; t_out_length=NULL;}
         //if (enactor_stats[0].retval = util::GRError(cudaStreamSynchronize(streams[0]), "MemcpyAsync keys_marker error", __FILE__, __LINE__)) break;
     }
 

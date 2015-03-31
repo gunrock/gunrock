@@ -162,8 +162,8 @@ public:
                 }
             }
         }
-        partition_tables [0] = new int     [graph.nodes];
-        convertion_tables[0] = new VertexId[graph.nodes];
+        partition_tables [0] = (int*) malloc(sizeof(int) * graph.nodes);//new int     [graph.nodes];
+        convertion_tables[0] = (VertexId*) malloc(sizeof(VertexId) * graph.nodes);//new VertexId[graph.nodes];
         memset(partition_tables [0], 0, sizeof(int     ) * graph.nodes);
         memset(convertion_tables[0], 0, sizeof(VertexId) * graph.nodes);
         for (int i=0;i<num_gpus;i++)
@@ -249,6 +249,7 @@ public:
         VertexId*       tconvertion_table     = new VertexId[graph->nodes];
         SizeT           in_counter_           = 0;
 
+        //printf("thread %d: enter\n", gpu);fflush(stdout);
         memset(marker, 0, sizeof(int)*graph->nodes);
         memset(out_counter, 0, sizeof(SizeT) * (num_gpus+1));
 
@@ -258,6 +259,8 @@ public:
             convertion_table0[node] = KEEP_NODE_NUM ? node : out_counter[gpu];
             tconvertion_table[node] = KEEP_NODE_NUM ? node : out_counter[gpu];
             marker[node] =1;
+            //if (graph->row_offsets[node] < 0 || graph->row_offsets[node+1] <0 || graph->row_offsets[node+1] - graph->row_offsets[node] > graph->nodes)
+            //    printf("thread %d: row_offsets[%d] = %d, row_offsets[%d] = %d\n", gpu, node, graph->row_offsets[node], node+1, graph->row_offsets[node+1]);
             for (SizeT edge=graph->row_offsets[node]; edge<graph->row_offsets[node+1]; edge++)
             {
                 SizeT neibor = graph->column_indices[edge];

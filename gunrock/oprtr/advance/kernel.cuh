@@ -60,7 +60,7 @@ cudaError_t ComputeOutputLength(
         return cudaSuccess;
     }
 
-    int num_block = (frontier_attribute->queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
+    SizeT num_block = (frontier_attribute->queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
     //printf("%p, %p, %p, %p, %d, %d, %d, %d, %d\n",d_offsets, d_indices, d_in_key_queue, partitioned_scanned_edges, frontier_attribute->queue_length, max_in, max_out, num_block, stream); 
     //fflush(stdout);
     gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, Problem, Functor>
@@ -182,7 +182,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             typedef typename ProblemData::VertexId      VertexId;
             typedef typename KernelPolicy::LOAD_BALANCED LBPOLICY;
            // load edge-expand-partitioned kernel
-            int num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
+            SizeT num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
             if (get_output_length)
                 ComputeOutputLength<KernelPolicy, ProblemData, Functor>(
                     &frontier_attribute,
@@ -255,7 +255,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             typedef typename ProblemData::VertexId      VertexId;
             typedef typename KernelPolicy::LOAD_BALANCED LBPOLICY;
             // load edge-expand-partitioned kernel
-            int num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
+            SizeT num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
              if (get_output_length)
                 ComputeOutputLength<KernelPolicy, ProblemData, Functor>(
                     &frontier_attribute,

@@ -315,6 +315,46 @@ struct BFSIteration : public IterationBase <
         return retval;
     }
 
+    static void Check_Queue_Size(
+        int                            thread_num,
+        int                            peer_,
+        SizeT                          request_length,
+        util::DoubleBuffer<SizeT, VertexId, Value>
+                                      *frontier_queue,
+        //util::Array1D<SizeT, SizeT>   *scanned_edges,
+        FrontierAttribute<SizeT>      *frontier_attribute,
+        EnactorStats                  *enactor_stats,
+        //DataSlice                     *data_slice,
+        //DataSlice                     *d_data_slice,
+        GraphSlice                    *graph_slice
+        //util::CtaWorkProgressLifetime *work_progress,
+        //ContextPtr                     context,
+        //cudaStream_t                   stream
+        )    
+    {    
+        bool over_sized = false;
+        int  selector   = frontier_attribute->selector;
+        int  iteration  = enactor_stats -> iteration;
+
+        if (Enactor::DEBUG)
+            printf("%d\t %d\t %d\t queue_length = %d, output_length = %d\n",
+                thread_num, iteration, peer_,
+                frontier_queue->keys[selector^1].GetSize(),
+                request_length);fflush(stdout);
+
+        if (enactor_stats->retval = 
+            Check_Size<true, SizeT, VertexId > ("queue3", request_length, &frontier_queue->keys  [selector^1], over_sized, thread_num, iteration, peer_, false)) return;
+        if (enactor_stats->retval = 
+            Check_Size<true, SizeT, VertexId > ("queue3", graph_slice->nodes+2, &frontier_queue->keys  [selector  ], over_sized, thread_num, iteration, peer_, true )) return;
+        if (Problem::USE_DOUBLE_BUFFER)
+        {    
+            if (enactor_stats->retval = 
+                Check_Size<true, SizeT, Value> ("queue3", request_length, &frontier_queue->values[selector^1], over_sized, thread_num, iteration, peer_, false)) return;
+            if (enactor_stats->retval = 
+                Check_Size<true, SizeT, Value> ("queue3", graph_slice->nodes+2, &frontier_queue->values[selector  ], over_sized, thread_num, iteration, peer_, true )) return;
+        }    
+    }    
+
 };
 
     template<
@@ -493,7 +533,7 @@ public:
         {
             if (retval = util::SetDevice(this->gpu_idx[gpu])) break;
             if (Problem::ENABLE_IDEMPOTENCE) {
-                int bytes = (problem->graph_slices[gpu]->nodes + 8 - 1) / 8;
+                SizeT bytes = (problem->graph_slices[gpu]->nodes + 8 - 1) / 8;
                 cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
                 gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
                 if (retval = util::GRError(cudaBindTexture(

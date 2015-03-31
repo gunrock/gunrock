@@ -22,8 +22,10 @@
 #include <iostream>
 #include <algorithm>
 #include <iterator>
-
+#include <omp.h>
 #include <gunrock/util/error_utils.cuh>
+#include <gunrock/util/multithread_utils.cuh>
+#include <gunrock/util/sort_omp.cuh>
 
 using namespace std;
 
@@ -247,9 +249,9 @@ struct Csr
         bool undirected = false,
         bool reversed = false)
     {
-        printf("  Converting %d vertices, %d directed edges (%s tuples) "
+        printf("  Converting %lld vertices, %lld directed edges (%s tuples) "
                "to CSR format... \n",
-               coo_nodes, coo_edges, ordered_rows ? "ordered" : "unordered");
+               (long long) coo_nodes, (long long) coo_edges, ordered_rows ? "ordered" : "unordered");
         time_t mark1 = time(NULL);
         fflush(stdout);
 
@@ -257,48 +259,108 @@ struct Csr
 
         // Sort COO by row
         if (!ordered_rows) {
-            std::stable_sort(coo, coo + coo_edges, RowFirstTupleCompare<Tuple>);
+            //std::stable_sort(coo, coo + coo_edges, RowFirstTupleCompare<Tuple>);
+            util::omp_sort(coo, coo_edges, RowFirstTupleCompare<Tuple>);
         }
 
-        Tuple *new_coo = (Tuple*) malloc(sizeof(Tuple) * coo_edges);
-        SizeT real_edge = 1;
-        new_coo[0].row = coo[0].row;
-        new_coo[0].col = coo[0].col;
-        new_coo[0].val = coo[0].val;
-        for (int i = 0; i < coo_edges-1; ++i)
+        //time_t mark3 = time(NULL);
+        //printf("Done soerting (%ds).\n", (int)(mark3 - mark1));
+
+        //for (SizeT edge = 0; edge < coo_edges; edge ++)
+        //    printf("e%d: %d -> %d \t", edge, coo[edge].row, coo[edge].col);
+        //printf("\n"); 
+        SizeT edge_offsets[129];
+        SizeT edge_counts [129];
+        #pragma omp parallel
         {
-            if (((coo[i+1].col != coo[i].col) || (coo[i+1].row != coo[i].row)) && (coo[i+1].col != coo[i+1].row))
+            int num_threads  = omp_get_num_threads();
+            int thread_num   = omp_get_thread_num();
+            SizeT edge_start = (long long)(coo_edges) * thread_num / num_threads;
+            SizeT edge_end   = (long long)(coo_edges) * (thread_num+1) / num_threads;
+            SizeT node_start = (long long)(coo_nodes) * thread_num / num_threads;
+            SizeT node_end   = (long long)(coo_nodes) * (thread_num+1) / num_threads;
+            Tuple *new_coo   = (Tuple*) malloc (sizeof(Tuple) * (edge_end - edge_start));
+            SizeT edge       = edge_start;
+            SizeT new_edge   = 0;
+            //new_coo[new_edge].row = coo[0].row;
+            //new_coo[new_edge].col = coo[0].col;
+            //new_coo[].val = coo[0].val;
+            for (edge = edge_start; edge < edge_end; edge++)
             {
-                new_coo[real_edge].col = coo[i+1].col;
-                new_coo[real_edge].row = coo[i+1].row;
-                new_coo[real_edge++].val = coo[i+1].val;
+                //if (((coo[i+1].col != coo[i].col) || (coo[i+1].row != coo[i].row)) && (coo[i+1].col != coo[i+1].row))
+                VertexId col = coo[edge].col;
+                VertexId row = coo[edge].row;
+                if ((col != row) && (edge == 0 || col != coo[edge-1].col || row != coo[edge-1].row))
+                {
+                    new_coo[new_edge].col = col;
+                    new_coo[new_edge].row = row;
+                    new_coo[new_edge].val = coo[edge].val;
+                    new_edge++;
+                }
             }
+            edge_counts[thread_num] = new_edge;
+            for (VertexId node = node_start; node < node_end; node++)
+                row_offsets[node] = -1;
+
+            #pragma omp barrier
+            #pragma omp single
+            {
+                edge_offsets[0] = 0;
+                for (int i = 0; i < num_threads; i++)
+                    edge_offsets[i+1] = edge_offsets[i] + edge_counts[i];
+                //util::cpu_mt::PrintCPUArray("edge_offsets", edge_offsets, num_threads+1);
+                row_offsets[0] = 0;
+            }
+
+            SizeT edge_offset = edge_offsets[thread_num];
+            VertexId first_row= new_edge > 0? new_coo[0].row : -1;
+            VertexId last_row = new_edge > 0? new_coo[new_edge-1].row : -1;
+            SizeT pointer = -1;
+            for (edge = 0; edge < new_edge; edge++) {
+                SizeT edge_  = edge + edge_offset;
+                VertexId row = new_coo[edge].row;
+                row_offsets[row+1] = edge_ + 1;
+                if (row == first_row) pointer = edge_ + 1;
+                // Fill in rows up to and including the current row
+                //for (VertexId row = prev_row + 1; row <= current_row; row++) {
+                //    row_offsets[row] = edge;
+                //}
+                //prev_row = current_row;
+
+                column_indices[edge + edge_offset] = new_coo[edge].col;
+                if (LOAD_EDGE_VALUES) {
+                    //new_coo[edge].Val(edge_values[edge]);
+                    edge_values[edge + edge_offset] = new_coo[edge].val;
+                }
+            }
+            #pragma omp barrier
+            if (first_row != last_row)
+            {
+                row_offsets[first_row+1] = pointer;
+            }
+            #pragma omp barrier
+            // Fill out any trailing edgeless nodes (and the end-of-list element)
+            //for (VertexId row = prev_row + 1; row <= nodes; row++) {
+            //    row_offsets[row] = real_edge;
+            //}
+            if (row_offsets[node_start] == -1)
+            {
+                VertexId i=node_start;
+                while (row_offsets[i] == -1) i--;
+                row_offsets[node_start] = row_offsets[i];
+            }
+            for (VertexId node = node_start+1; node < node_end; node++)
+                if (row_offsets[node] == -1) row_offsets[node] = row_offsets[node-1];
+            if (thread_num == 0) edges = edge_offsets[num_threads];
+  
+            free(new_coo); new_coo = NULL;
         }
 
-        VertexId prev_row = -1;
-        for (SizeT edge = 0; edge < real_edge; edge++) {
-
-            VertexId current_row = new_coo[edge].row;
-
-            // Fill in rows up to and including the current row
-            for (VertexId row = prev_row + 1; row <= current_row; row++) {
-                row_offsets[row] = edge;
-            }
-            prev_row = current_row;
-
-            column_indices[edge] = new_coo[edge].col;
-            if (LOAD_EDGE_VALUES) {
-                new_coo[edge].Val(edge_values[edge]);
-            }
-        }
-
-        // Fill out any trailing edgeless nodes (and the end-of-list element)
-        for (VertexId row = prev_row + 1; row <= nodes; row++) {
-            row_offsets[row] = real_edge;
-        }
-
-        edges = real_edge;
-
+        //printf("nodes = %d, edges = %d\n", nodes, edges);
+        row_offsets[nodes] = edges;
+        //util::cpu_mt::PrintCPUArray("row_offsets", row_offsets, nodes+1);
+        //`util::cpu_mt::PrintCPUArray("column_indices", column_indices, edges);
+        
         time_t mark2 = time(NULL);
         printf("Done converting (%ds).\n", (int)(mark2 - mark1));
         
@@ -325,7 +387,6 @@ struct Csr
 		      column_indices);
         }
 
-        if (new_coo) free(new_coo);
         fflush(stdout);
 
         // Compute out_nodes
@@ -352,13 +413,13 @@ struct Csr
         fflush(stdout);
 
         // Initialize
-        int log_counts[32];
+        SizeT log_counts[32];
         for (int i = 0; i < 32; i++) {
             log_counts[i] = 0;
         }
 
         // Scan
-        int max_log_length = -1;
+        SizeT max_log_length = -1;
         for (VertexId i = 0; i < nodes; i++) {
 
             SizeT length = row_offsets[i + 1] - row_offsets[i];
