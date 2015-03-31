@@ -23,6 +23,7 @@
 
 // Graph construction utils
 #include <gunrock/graphio/market.cuh>
+#include <gunrock/graphio/rmat.cuh>
 
 // BFS includes
 #include <gunrock/app/bfs/bfs_enactor.cuh>
@@ -715,16 +716,15 @@ int main( int argc, char** argv)
     // Construct graph and perform search(es)
     //
 
+    typedef int VertexId;                   // Use as the node identifier
+    typedef int Value;                      // Use as the value type
+    typedef int SizeT;                      // Use as the graph size type
+    Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
+    if (graph_args < 1) { Usage(); return 1; }
+
     if (graph_type == "market")
     {
         // Matrix-market coordinate-formatted graph file
-        typedef int VertexId;                   // Use as the node identifier
-        typedef int Value;                      // Use as the value type
-        typedef int SizeT;                      // Use as the graph size type
-        Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
-
-        if (graph_args < 1) { Usage(); return 1; }
-
         char *market_filename = (graph_args == 2) ? argv[2] : NULL;
         if (graphio::BuildMarketGraph<false>(
                 market_filename,
@@ -736,8 +736,33 @@ int main( int argc, char** argv)
         }
 
         csr.PrintHistogram();
+        RunTests(csr, args, *context);
+    }
 
-        // Run tests
+    else if (graph_type == "rmat")
+    {
+        // parse rmat parameters
+        SizeT rmat_nodes = 1 << 10;
+        SizeT rmat_edges = 1 << 10;
+        double rmat_a = 0.55;
+        double rmat_b = 0.2;
+        double rmat_c = 0.2;
+        double rmat_d = 0.05;
+
+        if (graphio::BuildRmatGraph<false>(
+                rmat_nodes,
+                rmat_edges,
+                csr,
+                g_undirected,
+                rmat_a,
+                rmat_b,
+                rmat_c,
+                rmat_d) != 0)
+        {
+            return 1;
+        }
+
+        csr.PrintHistogram();
         RunTests(csr, args, *context);
     }
     else
