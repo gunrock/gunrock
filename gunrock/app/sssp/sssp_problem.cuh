@@ -33,12 +33,15 @@ template <
     typename    SizeT,
     typename    Value,
     bool        _MARK_PATHS>
-struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
+struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, 
+    true, //MARK_PREDECESSORS
+    false, //ENABLE_IDEMPOTENCE
+    false, //USE_DOUBLE_BUFFER
+    false, //ENABLE_BACKWARD
+    false, //KEEP_ORDER
+    false> //KEEP_NODE_NUM
 {
-    static const bool MARK_PREDECESSORS     = true;
-    static const bool ENABLE_IDEMPOTENCE    = false;
     static const bool MARK_PATHS            = _MARK_PATHS;
-    static const bool USE_DOUBLE_BUFFER     = false;
 
     //Helper structures
 
@@ -50,24 +53,24 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
         // device storage arrays
         util::Array1D<SizeT, Value       >    labels     ;     /**< Used for source distance */
         util::Array1D<SizeT, Value       >    weights    ;     /**< Used for storing edge weights */
-        util::Array1D<SizeT, VertexId    >    preds      ;     /**< Used for storing the actual shortest path */
+        //util::Array1D<SizeT, VertexId    >    preds      ;     /**< Used for storing the actual shortest path */
         util::Array1D<SizeT, VertexId    >    visit_lookup;    /**< Used for check duplicate */
         util::Array1D<SizeT, float       >    delta;
         //util::Array1D<SizeT, unsigned int>    temp_marker;
-        util::Array1D<SizeT, VertexId    >    temp_preds ;
-        util::Array1D<SizeT, SizeT       >    *scanned_edges;
+        //util::Array1D<SizeT, VertexId    >    temp_preds ;
+        //util::Array1D<SizeT, SizeT       >    *scanned_edges;
 
         DataSlice()
         {
             //util::cpu_mt::PrintMessage("DataSlice() begin.");
             labels          .SetName("labels"          );  
-            preds           .SetName("preds"           );  
+            //preds           .SetName("preds"           );  
             weights         .SetName("weights"         );
             visit_lookup    .SetName("visit_lookup"    );
             delta           .SetName("delta"           );
-            temp_preds      .SetName("temp_preds"      );
+            //temp_preds      .SetName("temp_preds"      );
             //temp_marker     .SetName("temp_marker"     );
-            scanned_edges   = NULL;
+            //scanned_edges   = NULL;
             //util::cpu_mt::PrintMessage("DataSlice() end.");
         }
 
@@ -75,15 +78,15 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
         {
             //util::cpu_mt::PrintMessage("~DataSlice() begin.");
             if (util::SetDevice(this->gpu_idx)) return;
-            for (int gpu=0;gpu<this->num_gpus;gpu++)
-                scanned_edges[gpu].Release();
-            delete[] scanned_edges; scanned_edges=NULL;
+            //for (int gpu=0;gpu<this->num_gpus;gpu++)
+            //    scanned_edges[gpu].Release();
+            //delete[] scanned_edges; scanned_edges=NULL;
             labels        .Release();
-            preds         .Release();
+            //preds         .Release();
             weights       .Release();
             visit_lookup  .Release();
             delta         .Release();
-            temp_preds    .Release();
+            //temp_preds    .Release();
             //temp_marker   .Release();
             //util::cpu_mt::PrintMessage("~DataSlice() end.");
         }
@@ -96,6 +99,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
             Csr<VertexId, Value, SizeT> *graph,
             SizeT *num_in_nodes,
             SizeT *num_out_nodes,
+            VertexId *original_vertex,
             int   delta_factor = 16,
             float queue_sizing = 2.0,
             float in_sizing    = 1.0)
@@ -117,12 +121,12 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
             if (retval = weights     .Allocate(graph->edges,util::DEVICE)) return retval;
             if (retval = delta       .Allocate(1           ,util::DEVICE)) return retval;
             if (retval = visit_lookup.Allocate(graph->nodes,util::DEVICE)) return retval;
-            scanned_edges = new util::Array1D<SizeT, SizeT>[num_gpus];
-            for (int gpu=0;gpu<num_gpus; gpu++)
-            {
-                scanned_edges[gpu].SetName("scanned_edges[]");
-                if (retval = scanned_edges[gpu].Allocate(graph->edges, util::DEVICE)) return retval;
-            }
+            //scanned_edges = new util::Array1D<SizeT, SizeT>[num_gpus];
+            //for (int gpu=0;gpu<num_gpus; gpu++)
+            //{
+            //    scanned_edges[gpu].SetName("scanned_edges[]");
+            //    if (retval = scanned_edges[gpu].Allocate(graph->edges, util::DEVICE)) return retval;
+            //}
  
             weights.SetPointer(graph->edge_values, graph->edges, util::HOST);
             if (retval = weights.Move(util::HOST, util::DEVICE)) return retval;
@@ -134,15 +138,18 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
 
             if (MARK_PATHS)
             {
-                if (retval = preds.Allocate(graph->nodes,util::DEVICE)) return retval;
-                if (retval = temp_preds.Allocate(graph->nodes, util::DEVICE)) return retval;
+                if (retval = this->preds.Allocate(graph->nodes,util::DEVICE)) return retval;
+                if (retval = this->temp_preds.Allocate(graph->nodes, util::DEVICE)) return retval;
+            } else {
+                if (retval = this->preds.Release()) return retval;
+                if (retval = this->temp_preds.Release()) return retval;
             }
 
             if (num_gpus >1)
             {
                 this->value__associate_orgs[0] = labels.GetPointer(util::DEVICE);
                 if (MARK_PATHS)
-                    this->vertex_associate_orgs[0] = preds.GetPointer(util::DEVICE);
+                    this->vertex_associate_orgs[0] = this->preds.GetPointer(util::DEVICE);
                 if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
                 if (retval = this->value__associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
                 //if (retval = temp_marker.Allocate(graph->nodes, util::DEVICE)) return retval;
@@ -158,7 +165,97 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
             return avgV * 32 / avgD;
         }
 
+        cudaError_t Reset(
+            FrontierType frontier_type,     // The frontier type (i.e., edge/vertex/mixed)
+            GraphSlice<SizeT, VertexId, Value>  *graph_slice,
+            double queue_sizing = 2.0)
+        {   
+            cudaError_t retval = cudaSuccess;
+            SizeT nodes = graph_slice -> nodes;
+            //SizeT edges = graph_slice -> edges;
+            SizeT new_frontier_elements[2] = {0,0};
 
+            for (int peer=0; peer<this->num_gpus; peer++)
+                this->out_length[peer] = 1;
+
+            if (this->num_gpus>1)
+                util::cpu_mt::PrintCPUArray<int, SizeT>("in_counter", graph_slice->in_counter.GetPointer(util::HOST), this->num_gpus+1, this->gpu_idx);
+
+            for (int peer=0;peer<(this->num_gpus > 1 ? this->num_gpus+1 : 1);peer++)
+            {
+                switch (frontier_type) {
+                    case VERTEX_FRONTIERS :
+                        // O(n) ping-pong global vertex frontiers
+                        new_frontier_elements[0] = double(this->num_gpus>1? graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +2;
+                        new_frontier_elements[1] = new_frontier_elements[0];
+                        break;
+
+                    case EDGE_FRONTIERS :
+                        // O(m) ping-pong global edge frontiers
+                        new_frontier_elements[0] = double(graph_slice->edges) * queue_sizing +2;
+                        new_frontier_elements[1] = new_frontier_elements[0];
+                        break;
+
+                    case MIXED_FRONTIERS :
+                        // O(n) global vertex frontier, O(m) global edge frontier
+                        new_frontier_elements[0] = double(this->num_gpus>1? graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +2;
+                        new_frontier_elements[1] = double(graph_slice->edges) * queue_sizing +2;
+                        break;
+                }
+
+                // Iterate through global frontier queue setups
+                for (int i = 0; i < 2; i++) {
+                    if (peer == this->num_gpus && i == 1) continue;
+                    if (peer == this->num_gpus && new_frontier_elements[i] > nodes * this->num_gpus) new_frontier_elements[i] = nodes * this->num_gpus;
+                    if (this->frontier_queues[peer].keys[i].GetSize() < new_frontier_elements[i]) {
+
+                        // Free if previously allocated
+                        if (retval = this->frontier_queues[peer].keys[i].Release()) return retval;
+
+                        // Free if previously allocated
+                        if (false) {
+                            if (retval = this->frontier_queues[peer].values[i].Release()) return retval;
+                        }
+                        //frontier_elements[peer][i] = new_frontier_elements[i];
+
+                        if (retval = this->frontier_queues[peer].keys[i].Allocate(new_frontier_elements[i],util::DEVICE)) return retval;
+                        if (false) {
+                            if (retval = this->frontier_queues[peer].values[i].Allocate(new_frontier_elements[i],util::DEVICE)) return retval;
+                        }
+                    } //end if
+                } // end for i<2
+
+                if (peer == this->num_gpus)
+                {
+                    continue;
+                }
+                //if (peer == num_gpu) continue;
+                SizeT max_elements = new_frontier_elements[0];
+                if (new_frontier_elements[1] > max_elements) max_elements=new_frontier_elements[1];
+                if (max_elements > nodes) max_elements = nodes;
+                if (this->scanned_edges[peer].GetSize() < max_elements)
+                {
+                    if (retval = this->scanned_edges[peer].Release()) return retval;
+                    if (retval = this->scanned_edges[peer].Allocate(max_elements, util::DEVICE)) return retval;
+                }
+            }
+           
+            // Allocate output labels if necessary
+            if (this->labels      .GetPointer(util::DEVICE) == NULL)
+                if (retval = this->labels      .Allocate(nodes, util::DEVICE)) return retval;
+
+            if (this->preds       .GetPointer(util::DEVICE) == NULL && MARK_PATHS)
+                if (retval = this->preds       .Allocate(nodes, util::DEVICE)) return retval;
+
+            if (this->visit_lookup.GetPointer(util::DEVICE) == NULL)
+                if (retval = this->visit_lookup.Allocate(nodes, util::DEVICE)) return retval;
+            
+            if (MARK_PATHS) util::MemsetIdxKernel<<<256, 256>>>(this->preds.GetPointer(util::DEVICE), nodes);
+            util::MemsetKernel<<<256, 256>>>(this->labels      .GetPointer(util::DEVICE), util::MaxValue<Value>(), nodes);
+            util::MemsetKernel<<<256, 256>>>(this->visit_lookup.GetPointer(util::DEVICE), -1, nodes);
+
+            return retval;
+        }
     }; // DataSlice
 
     // Members   
@@ -273,7 +370,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
      */
     cudaError_t Init(
             bool          stream_from_host,       // Only meaningful for single-GPU
-            Csr<VertexId, Value, SizeT> &graph,
+            Csr<VertexId, Value, SizeT> *graph,
             Csr<VertexId, Value, SizeT> *inversgraph = NULL,
             int           num_gpus = 1,
             int*          gpu_idx  = NULL,
@@ -286,9 +383,9 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
             int           partition_seed   = -1)
     {
         //printf("Problem in_sizing=%f\n", in_sizing);fflush(stdout);
-        ProblemBase<VertexId, SizeT, Value, false>::Init(
+        ProblemBase<VertexId, SizeT, Value, true, false, false, false, false, false>::Init(
             stream_from_host,
-            &graph,
+            graph,
             inversgraph,
             num_gpus,
             gpu_idx,
@@ -313,43 +410,18 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
                 _data_slice->streams.SetPointer(&streams[gpu*num_gpus*2], num_gpus*2);
 
                 //printf("Problem %d in_sizing=%f\n", gpu, in_sizing);fflush(stdout);
-                if (this->num_gpus > 1)
-                {
-                    if (MARK_PATHS)
-                        _data_slice->Init(
-                            this->num_gpus,
-                            this->gpu_idx[gpu],
-                            1,
-                            1,
-                            &(this->sub_graphs[gpu]),
-                            this->graph_slices[gpu]->in_counter.GetPointer(util::HOST),
-                            this->graph_slices[gpu]->out_counter.GetPointer(util::HOST),
-                            delta_factor,
-                            queue_sizing,
-                            in_sizing);
-                    else _data_slice->Init(
-                            this->num_gpus,
-                            this->gpu_idx[gpu],
-                            0,
-                            1,
-                            &(this->sub_graphs[gpu]),
-                            this->graph_slices[gpu]->in_counter.GetPointer(util::HOST),
-                            this->graph_slices[gpu]->out_counter.GetPointer(util::HOST),
-                            delta_factor,
-                            queue_sizing,
-                            in_sizing);
-                } else { _data_slice->Init(
-                            this->num_gpus,
-                            this->gpu_idx[gpu],
-                            0,
-                            0,
-                            &(this->sub_graphs[gpu]),
-                            NULL,
-                            NULL,
-                            delta_factor,
-                            queue_sizing,
-                            in_sizing);
-                }
+                _data_slice->Init(
+                    this->num_gpus,
+                    this->gpu_idx[gpu],
+                    this->num_gpus > 1? (MARK_PATHS ? 1 : 0) : 0,
+                    this->num_gpus > 1? 1 : 0,
+                    &(this->sub_graphs[gpu]),
+                    this->num_gpus > 1? this->graph_slices[gpu]->in_counter.GetPointer(util::HOST) : NULL,
+                    this->num_gpus > 1? this->graph_slices[gpu]->out_counter.GetPointer(util::HOST): NULL,
+                    this->num_gpus > 1? this->graph_slices[gpu]->original_vertex.GetPointer(util::HOST) : NULL,
+                    delta_factor,
+                    queue_sizing,
+                    in_sizing);
             } // end for (gpu)
         } while (0);
 
@@ -370,30 +442,16 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
             FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
             double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
     {
-        typedef ProblemBase<VertexId, SizeT, Value, false> BaseProblem;
+        typedef ProblemBase<VertexId, SizeT, Value, true, false, false, false, false, false> BaseProblem;
         //load ProblemBase Reset
-        BaseProblem::Reset(frontier_type, queue_sizing);
+        //BaseProblem::Reset(frontier_type, queue_sizing);
 
         cudaError_t retval = cudaSuccess;
 
         for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             // Set device
             if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-
-            // Allocate output labels if necessary
-            if (data_slices[gpu]->labels      .GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->labels      .Allocate(this->sub_graphs[gpu].nodes, util::DEVICE)) return retval;
-
-            if (data_slices[gpu]->preds       .GetPointer(util::DEVICE) == NULL && MARK_PATHS)
-                if (retval = data_slices[gpu]->preds       .Allocate(this->sub_graphs[gpu].nodes, util::DEVICE)) return retval;
-
-            if (data_slices[gpu]->visit_lookup.GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->visit_lookup.Allocate(this->sub_graphs[gpu].nodes, util::DEVICE)) return retval;
-            
-            if (MARK_PATHS) util::MemsetIdxKernel<<<256, 256>>>(data_slices[gpu]->preds.GetPointer(util::DEVICE), this->sub_graphs[gpu].nodes);
-            util::MemsetKernel<<<256, 256>>>(data_slices[gpu]->labels      .GetPointer(util::DEVICE), util::MaxValue<Value>(), this->sub_graphs[gpu].nodes);
-            util::MemsetKernel<<<256, 256>>>(data_slices[gpu]->visit_lookup.GetPointer(util::DEVICE), -1, this->sub_graphs[gpu].nodes);
-
+            if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing)) return retval;
             if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;
         }
 
@@ -409,7 +467,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, false>
         }
         if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
         if (retval = util::GRError(cudaMemcpy(
-                        BaseProblem::graph_slices[gpu]->frontier_queues[0].keys[0].GetPointer(util::DEVICE),
+                        data_slices[gpu]->frontier_queues[0].keys[0].GetPointer(util::DEVICE),
                         &tsrc,
                         sizeof(VertexId),
                         cudaMemcpyHostToDevice),

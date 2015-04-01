@@ -132,7 +132,7 @@ struct BFSIteration : public IterationBase <
             if (Enactor::DEBUG) util::cpu_mt::PrintMessage("return-1", thread_num, enactor_stats->iteration);
             return;
         }*/
-        if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration);
+        if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration, peer_);
         /*if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1,0,false,stream)) 
         {
             if (DEBUG) util::cpu_mt::PrintMessage("return0", thread_num, enactor_stats->iteration);
@@ -140,11 +140,12 @@ struct BFSIteration : public IterationBase <
         }*/
         //int queue_selector = (data_slice->num_gpus>1 && peer_==0 && enactor_stats->iteration>0)?data_slice->num_gpus:peer_;
         //printf("%d\t %d \t \t peer_ = %d, selector = %d, length = %d, index = %d\n",thread_num, enactor_stats->iteration, peer_, queue_selector,frontier_attribute->queue_length, frontier_attribute->queue_index);fflush(stdout);
-        if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, stream)) return;
+        //if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, stream)) return;
         //if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__)) return;
         //util::cpu_mt::PrintGPUArray("keys0", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
         //util::cpu_mt::PrintGPUArray("label0", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream); 
 
+        frontier_attribute->queue_reset = true;
         // Edge Map
         gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, BfsFunctor>(
             enactor_stats[0],
@@ -185,7 +186,7 @@ struct BFSIteration : public IterationBase <
         //    util::cpu_mt::PrintMessage("return2", thread_num, enactor_stats->iteration);
         //    return;
         //}
-        if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration);
+        if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration, peer_);
         frontier_attribute->queue_index++;
         frontier_attribute->selector ^= 1;
         if (false) //(DEBUG || INSTRUMENT)
@@ -208,7 +209,7 @@ struct BFSIteration : public IterationBase <
         //util::cpu_mt::PrintGPUArray("label1", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream); 
 
         //if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index+1, 0, false, stream)) return; 
-        if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Filter begin", thread_num, enactor_stats->iteration);
+        if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Filter begin", thread_num, enactor_stats->iteration, peer_);
 
         // Filter
         gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, BfsFunctor>

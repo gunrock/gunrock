@@ -55,10 +55,10 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
     {
         // device storage arrays
         util::Array1D<SizeT, VertexId      > labels        ;   
-        util::Array1D<SizeT, VertexId      > preds         ;   
+        //util::Array1D<SizeT, VertexId      > preds         ;   
         util::Array1D<SizeT, unsigned char > visited_mask  ;
         util::Array1D<SizeT, unsigned int  > temp_marker   ;
-        util::Array1D<SizeT, VertexId      > temp_preds    ;
+        //util::Array1D<SizeT, VertexId      > temp_preds    ;
         //util::Array1D<SizeT, SizeT         > *scanned_edges ;
 
         DataSlice()
@@ -136,7 +136,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             {
                 this->vertex_associate_orgs[0] = labels.GetPointer(util::DEVICE);
                 if (_MARK_PREDECESSORS)
-                    this->vertex_associate_orgs[1] = preds.GetPointer(util::DEVICE);
+                    this->vertex_associate_orgs[1] = this->preds.GetPointer(util::DEVICE);
                 if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
                 if (retval = temp_marker. Allocate(graph->nodes, util::DEVICE)) return retval;
             }
@@ -429,7 +429,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
     {
         //util::cpu_mt::PrintMessage("BFSProblem Reset() begin.");
-        typedef ProblemBase<VertexId, SizeT, Value, _MARK_PREDECESSORS, _ENABLE_IDEMPOTENCE, _USE_DOUBLE_BUFFER, false> BaseProblem;
+        typedef ProblemBase<VertexId, SizeT, Value, _MARK_PREDECESSORS, _ENABLE_IDEMPOTENCE, _USE_DOUBLE_BUFFER, false, false, false> BaseProblem;
         //load ProblemBase Reset
         //BaseProblem::Reset(frontier_type, queue_sizing);
 
