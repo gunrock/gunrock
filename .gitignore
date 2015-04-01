@@ -31,3 +31,9 @@ eval/
 # Ignore doc generated files
 doc/warn.log
 doc/html
+
+# Ignore text files under tests directories
+tests/*/*.txt
+
+# Ignore vim temp files
+*.sw~
