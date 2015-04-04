@@ -111,7 +111,7 @@ test: bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
 bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_sssp.cu $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_sssp.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O0 -G -g
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_sssp_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_sssp.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean

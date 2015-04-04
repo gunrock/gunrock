@@ -777,6 +777,7 @@ int cpp_main( int argc, char** argv)
         double rmat_b = 0.19;
         double rmat_c = 0.19;
         double rmat_d = 1-(rmat_a+rmat_b+rmat_c);
+        int    rmat_seed = -1;
 
         args.GetCmdLineArgument("rmat_scale", rmat_scale);
         rmat_nodes = 1 << rmat_scale;
@@ -789,6 +790,7 @@ int cpp_main( int argc, char** argv)
         args.GetCmdLineArgument("rmat_c", rmat_c);
         rmat_d = 1-(rmat_a+rmat_b+rmat_c);
         args.GetCmdLineArgument("rmat_d", rmat_d);
+        args.GetCmdLineArgument("rmat_seed", rmat_seed);
 
         CpuTimer cpu_timer;
         cpu_timer.Start();
@@ -800,7 +802,10 @@ int cpp_main( int argc, char** argv)
                 rmat_a,
                 rmat_b,
                 rmat_c,
-                rmat_d) != 0)
+                rmat_d,
+                1,
+                1,
+                rmat_seed) != 0)
         {
             return 1;
         }
@@ -814,6 +819,7 @@ int cpp_main( int argc, char** argv)
         double rgg_thfactor  = 0.55;
         double rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
         double rgg_vmultipiler = 1;
+        int    rgg_seed        = -1;
         
         args.GetCmdLineArgument("rgg_scale", rgg_scale);
         rgg_nodes = 1 << rgg_scale;
@@ -822,6 +828,7 @@ int cpp_main( int argc, char** argv)
         rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
         args.GetCmdLineArgument("rgg_threshold", rgg_threshold);
         args.GetCmdLineArgument("rgg_vmultipiler", rgg_vmultipiler);
+        args.GetCmdLineArgument("rgg_seed", rgg_seed);
 
         CpuTimer cpu_timer;
         cpu_timer.Start();
@@ -830,7 +837,9 @@ int cpp_main( int argc, char** argv)
             csr,
             rgg_threshold,
             g_undirected,
-            rgg_vmultipiler) !=0)
+            rgg_vmultipiler,
+            1,
+            rgg_seed) !=0)
         {
             return 1;
         }

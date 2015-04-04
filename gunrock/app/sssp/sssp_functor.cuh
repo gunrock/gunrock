@@ -24,7 +24,7 @@ namespace sssp {
  template <typename VertexId>
     static __device__ bool to_track(VertexId node)
     {   
-        const int num_to_track = 3;
+        const int num_to_track = 0;
         const VertexId node_to_track[] = {0,1,2};
         for (int i=0; i<num_to_track; i++)
             if (node == node_to_track[i]) return true;
@@ -68,8 +68,8 @@ struct SSSPFunctor
         
         // Check if the destination node has been claimed as someone's child
         Value old_weight = atomicMin(problem->labels + d_id, new_weight);
-        if (to_track(s_id) || to_track(d_id))
-            printf("lable[%d] : %d t-> %d + %d @ %d = %d \t", d_id, old_weight, weight, label, s_id, new_weight);
+        //if (to_track(s_id) || to_track(d_id))
+        //    printf("lable[%d] : %d t-> %d + %d @ %d = %d \t", d_id, old_weight, weight, label, s_id, new_weight);
         return (new_weight < old_weight);
     }
 
@@ -100,7 +100,9 @@ struct SSSPFunctor
      */
     static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
     {
-        return (node != -1);
+        if (node == -1) return false;
+        return (atomicCAS(problem->sssp_marker + node, 0, 1) == 0);
+        //return (node != -1);
     }
 
     /**

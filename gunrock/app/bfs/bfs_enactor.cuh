@@ -109,7 +109,7 @@ struct BFSIteration : public IterationBase <
     typedef typename Enactor::Problem    Problem ;
     typedef typename Problem::DataSlice  DataSlice ;
     typedef GraphSlice<SizeT, VertexId, Value> GraphSlice;
-    typedef BFSFunctor<VertexId, SizeT, VertexId, Problem> BfsFunctor;
+    typedef BFSFunctor<VertexId, SizeT, Value, Problem> BfsFunctor;
 
     static void SubQueue_Core(
         int                            thread_num,
@@ -374,7 +374,7 @@ struct BFSIteration : public IterationBase <
         typedef typename BfsEnactor::Value      Value     ;
         typedef typename Problem::DataSlice     DataSlice ;
         typedef GraphSlice<SizeT, VertexId, Value>    GraphSlice;
-        typedef BFSFunctor<VertexId, SizeT, VertexId, Problem> BfsFunctor;
+        typedef BFSFunctor<VertexId, SizeT, Value, Problem> BfsFunctor;
         //static const bool DEBUG      = BfsEnactor::DEBUG     ;
         //static const bool SIZE_CHECK = BfsEnactor::SIZE_CHECK;
         ThreadSlice  *thread_data        =  (ThreadSlice*) thread_data_;

@@ -76,7 +76,8 @@ int BuildRggGraph(
     double threshold  = -1,
     bool   undirected = true,
     double value_multipiler = 1,
-    double value_min        = 1)
+    double value_min        = 1,
+    int    seed             = -1)
 {
     typedef Coo<VertexId, Value> EdgeTupleType;
 
@@ -101,18 +102,21 @@ int BuildRggGraph(
     VertexId **blocks       = new VertexId* [row_length * row_length + 1];
     SizeT    *block_size    = new SizeT     [row_length * row_length + 1];
     SizeT    *block_length  = new SizeT     [row_length * row_length + 1];
-    VertexId *t_array       = NULL;
-    VertexId *block         = NULL;
+    //VertexId *t_array       = NULL;
+    //VertexId *block         = NULL;
     EdgeTupleType *coo      = NULL;
     long long reserved_factor2 = 8;
     long long initial_length   = reserved_factor2 * nodes / row_length / row_length;
-
+    
+    if (seed == -1) seed = time(NULL);
     if (initial_length <4) initial_length = 4;
     for (SizeT i=0; i< row_length * row_length +1; i++)
     {
-        block_size  [i] = initial_length;
+        //block_size  [i] = initial_length;
+        block_size  [i] = 0;
         block_length[i] = 0;
-        blocks      [i] = new VertexId[block_size[i]];
+        //blocks      [i] = new VertexId[block_size[i]];
+        blocks      [i] = NULL;
     }
     //printf("row_length = %lld\n", row_length);
     //printf("undirected = %s\n", undirected ? "true" : "false");
@@ -120,24 +124,25 @@ int BuildRggGraph(
     #pragma omp parallel
     {
         struct drand48_data rand_data;
-        int thread_num      = omp_get_thread_num();
-        int num_threads     = omp_get_num_threads();
-        SizeT node_start    = (long long)(nodes) * thread_num / num_threads;
-        SizeT node_end      = (long long)(nodes) * (thread_num + 1) / num_threads;
-        unsigned int seed   = time(NULL) + 805 * thread_num;
-        srand48_r(seed, &rand_data);
+        int       thread_num  = omp_get_thread_num();
+        int       num_threads = omp_get_num_threads();
+        SizeT     node_start  = (long long)(nodes) * thread_num / num_threads;
+        SizeT     node_end    = (long long)(nodes) * (thread_num + 1) / num_threads;
+        SizeT     counter     = 0;
+        VertexId *col_index   = col_index_ + reserved_size * node_start;
+        Value    *values      = WITH_VALUES ? values_ + reserved_size * node_start : NULL;
+        unsigned int seed_    = seed + 805 * thread_num;
+        srand48_r(seed_, &rand_data);
         #pragma omp single
-            offsets         = new SizeT[num_threads+1];
+            offsets           = new SizeT[num_threads+1];
 
         for (VertexId node = node_start; node < node_end; node++)
         {
             double t_value;
             drand48_r(&rand_data, &t_value); 
             points[node].x = t_value; 
-            //co_x[node] = t_value;
             drand48_r(&rand_data, &t_value); 
             points[node].y = t_value; 
-            //co_y[node] = t_value;
             points[node].node = node;
         }
 
@@ -147,9 +152,26 @@ int BuildRggGraph(
             std::stable_sort(points, points+nodes, XFirstPointCompare<RggPoint>);
         }
 
+        for (VertexId node = node_start; node < node_end; node++)
+        {
+            SizeT x_index = points[node].x / threshold;
+            SizeT y_index = points[node].y / threshold;
+            SizeT block_index = x_index * row_length + y_index;
+            #pragma omp atomic
+                block_size[block_index]++;
+        }
+
+        #pragma omp barrier
         #pragma omp single
-        //for (VertexId node = node_start; node < node_end; node++)
-        for (VertexId node = 0; node < nodes; node++)
+        {
+            for (SizeT i=0; i<row_length * row_length; i++)
+            if (block_size[i] != 0) 
+                blocks[i] = new VertexId[block_size[i]];
+        }
+
+        //#pragma omp single
+        for (VertexId node = node_start; node < node_end; node++)
+        //for (VertexId node = 0; node < nodes; node++)
         {
             double co_x0 = points[node].x; //co_x[node];
             double co_y0 = points[node].y; //co_y[node];
@@ -157,81 +179,37 @@ int BuildRggGraph(
             SizeT x_index = co_x0 / threshold;
             SizeT y_index = co_y0 / threshold;
             SizeT block_index = x_index * row_length + y_index;
+            SizeT pos = 0;
 
-            //blocks[SizeT(co_x0 / threshold) * row_length + SizeT(co_y0 / threshold)].push_back(node);
-            //#pragma atomic
+            #pragma omp atomic capture
             {
-                SizeT current_length = block_length[block_index];
-                //if (PureTwoFactor(current_size))
-                if (current_length == block_size[block_index])
-                {
-                    if (current_length != 0)
-                    {
-                        t_array = blocks[block_index];
-                        block   = new VertexId[current_length * 2+1];
-                        //printf("Expand %d : %d -> %d\n", block_index, current_length, current_length * 2 +1); fflush(stdout);
-                        for (SizeT i=0; i<current_length; i++)
-                            block[i] = t_array[i];
-                        delete[] t_array; t_array = NULL;
-                        blocks       [block_index] = block;
-                        block_length [block_index] = current_length * 2 +1;
-                    } else {
-                        blocks[block_index] = new VertexId[1+1];
-                    }
-                }
-                blocks[block_index][current_length] = node;
-                //printf("blocks[%d][%d] <- %d\n", block_index, current_size, node); fflush(stdout);
-                block_length[block_index] = current_length +1;
+                pos = block_length[block_index];
+                block_length[block_index] += 1;
             }
+            blocks[block_index][pos] = node;
         }
-
-        //struct drand48_data rand_data;
-        //int thread_num      = omp_get_thread_num();
-        //int num_threads     = omp_get_num_threads();
-        //SizeT node_start    = (long long)(nodes) * thread_num / num_threads;
-        //SizeT node_end      = (long long)(nodes) * (thread_num + 1) / num_threads;
-        //unsigned int seed   = time(NULL) + 805 * thread_num;
-        SizeT counter       = 0;
-        VertexId *col_index = col_index_ + reserved_size * node_start;
-        Value   *values     = WITH_VALUES ? values_ + reserved_size * node_start : NULL;
-        //srand48_r(seed, &rand_data);
+        
+        #pragma omp barrier
 
         for (VertexId node = node_start; node < node_end; node++)
         {
             row_offsets[node] = counter;
-            double co_x0 = points[node].x; //co_x[node];
-            double co_y0 = points[node].y; //co_y[node];
-            //RggPoint point_l, point_r;
-            //point_l.x = co_x0 - threshold;
-            //point_l.y = co_y0 - threshold;
-            //point_r.x = co_x0 + threshold;
-            //point_r.y = co_y0 + threshold;
-            //SizeT pos_l = util::bsearch(points, 0, nodes-1, point_l, XFirstPointCompare<RggPoint>);
-            //SizeT pos_r = util::bsearch(points, 0, nodes-1, point_r, XFirstPointCompare<RggPoint>);
+            double co_x0 = points[node].x;
+            double co_y0 = points[node].y;
             SizeT x_index = co_x0 / threshold;
             SizeT y_index = co_y0 / threshold;
  
             for (SizeT x1 = x_index-2; x1 <= x_index+2; x1++)
             for (SizeT y1 = y_index-2; y1 <= y_index+2; y1++)
-            // for (SizeT x1 = 0; x1 < row_length; x1++)
-            // for (SizeT y1 = 0; y1 < row_length; y1++)
             {
-                //if (block_index <0 || block_index >= row_length * row_length)
                 if (x1 < 0 || y1 < 0 || x1 >= row_length || y1 >= row_length)
                     continue;
 
                 SizeT block_index = x1*row_length + y1;
-                //std::list<long long>* block = &(blocks[block_index]);
                 VertexId *block = blocks[block_index];
-                //(*block)::iterator it;
-                //it =  block->begin();
-                //for (std::list<long long>::iterator it = block->begin(); it != block->end(); it++)
                 for (SizeT i = 0; i< block_length[block_index]; i++)
                 {
-                    //VertexId peer  = points[pos].node;
-                    //VertexId peer = *it;
                     VertexId peer = block[i];
-                    //if (node == peer) continue;
                     if (node >= peer) continue;
                     double   co_x1 = points[peer].x;//co_x[peer];
                     double   co_y1 = points[peer].y;//co_y[peer];
@@ -241,13 +219,7 @@ int BuildRggGraph(
                     if (fabs(dis_x) > threshold || fabs(dis_y) > threshold) continue;
                     double   dis   = SqrtSum(dis_x, dis_y);
                     if (dis > threshold) continue;
-                    //if (!undirected)
-                    //{
-                    //    double rand_v;
-                    //    drand48_r(&rand_data, &rand_v);
-                    //    if (rand_v > 0.5) continue;
-                    //}
-                    
+                   
                     col_index[counter] = peer;
                     //if (WITH_VALUES) values[counter] = dis * value_multipiler;
                     if (WITH_VALUES) 
@@ -322,7 +294,7 @@ int BuildRggGraph(
     if (block_size[i] != 0)
     {
         counter += block_length[i];
-        delete[] blocks[i]; blocks[i] = NULL;
+        if (blocks[i] != NULL) delete[] blocks[i]; blocks[i] = NULL;
     }
     //printf("counter = %lld\n", (long long) counter);
 

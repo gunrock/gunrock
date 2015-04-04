@@ -195,6 +195,7 @@ struct Csr
       
       SizeT csr_nodes = v.at(0);
       SizeT csr_edges = v.at(1);
+      printf("#nodes = %lld, #edges = %lld, #v = %lld\n", (long long)csr_nodes, (long long)csr_edges, (long long)v.size());
       
       FromScratch<LOAD_EDGE_VALUES, false>(csr_nodes, csr_edges); 
       
@@ -457,6 +458,7 @@ struct Csr
             for (SizeT edge = row_offsets[node];
                  edge < row_offsets[node + 1];
                  edge++) {
+                if (edge - row_offsets[node] > 40) break;
                  printf("[");
                 util::PrintValue(column_indices[edge]);
                 if (with_edge_value) {

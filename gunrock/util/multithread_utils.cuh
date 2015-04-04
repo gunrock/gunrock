@@ -344,7 +344,7 @@ extern "C" {
         } else {
             util::Array1D<_SizeT,_Value> arr;
             arr.SetName("array");
-            arr.Init(limit, util::HOST, true, cudaHostAllocMapped | cudaHostAllocPortable);
+            arr.Init(limit, util::HOST);//, true, cudaHostAllocMapped | cudaHostAllocPortable);
             arr.SetPointer(array,-1, util::DEVICE);
             arr.Move(util::DEVICE, util::HOST, -1, 0, stream);
             cudaStreamSynchronize(stream);

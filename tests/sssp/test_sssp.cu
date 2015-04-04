@@ -132,11 +132,13 @@ struct Test_Parameter : gunrock::app::TestParameter_Base {
 public:
     //bool          mark_predecessors ;// Whether or not to mark src-distance vs. parent vertices
     int delta_factor;
+    double max_queue_sizing1;
 
     Test_Parameter()
     { 
         delta_factor = 16;
         mark_predecessors = false;
+        max_queue_sizing1 = -1.0;
     }   
 
     ~Test_Parameter()
@@ -148,6 +150,7 @@ public:
         TestParameter_Base::Init(args);
         mark_predecessors = args.CheckCmdLineFlag("mark-pred");
         args.GetCmdLineArgument("delta-factor"    , delta_factor    );
+        args.GetCmdLineArgument("queue-sizing1", max_queue_sizing1);
     }   
 };
 
@@ -506,36 +509,39 @@ void RunTests(Test_Parameter *parameter)
 
     printf("\n\tMemory Usage(B)\t");
     for (int gpu=0;gpu<num_gpus;gpu++)
-    if (num_gpus>1) {if (gpu!=0) printf(" #keys%d\t #ins%d,0\t #ins%d,1",gpu,gpu,gpu); else printf(" $keys%d", gpu);}
-    else printf(" #keys%d", gpu);
+    if (num_gpus>1) {if (gpu!=0) printf(" #keys%d,0\t #keys%d,1\t #ins%d,0\t #ins%d,1",gpu,gpu,gpu,gpu); else printf(" #keys%d,0\t #keys%d,1", gpu, gpu);}
+    else printf(" #keys%d,0\t #keys%d,1", gpu, gpu);
     if (num_gpus>1) printf(" #keys%d",num_gpus);
     printf("\n");
-    double max_key_sizing=0, max_in_sizing_=0;
+    double max_queue_sizing_[2] = {0,0}, max_in_sizing_=0;
     for (int gpu=0;gpu<num_gpus;gpu++)
-    {
+    {   
         size_t gpu_free,dummy;
         cudaSetDevice(gpu_idx[gpu]);
         cudaMemGetInfo(&gpu_free,&dummy);
         printf("GPU_%d\t %ld",gpu_idx[gpu],org_size[gpu]-gpu_free);
         for (int i=0;i<num_gpus;i++)
-        {
-            SizeT x=problem->data_slices[gpu]->frontier_queues[i].keys[0].GetSize();
-            printf("\t %d", x);
-            double factor = 1.0*x/(num_gpus>1?problem->graph_slices[gpu]->in_counter[i]:problem->graph_slices[gpu]->nodes);
-            if (factor > max_key_sizing) max_key_sizing=factor;
+        {   
+            for (int j=0; j<2; j++)
+            {   
+                SizeT x=problem->data_slices[gpu]->frontier_queues[i].keys[j].GetSize();
+                printf("\t %lld", (long long) x); 
+                double factor = 1.0*x/(num_gpus>1?problem->graph_slices[gpu]->in_counter[i]:problem->graph_slices[gpu]->nodes);
+                if (factor > max_queue_sizing_[j]) max_queue_sizing_[j]=factor;
+            }   
             if (num_gpus>1 && i!=0 )
             for (int t=0;t<2;t++)
-            {
-                x=problem->data_slices[gpu][0].keys_in[t][i].GetSize();
-                printf("\t %d", x);
-                factor = 1.0*x/problem->graph_slices[gpu]->in_counter[i];
+            {   
+                SizeT x=problem->data_slices[gpu][0].keys_in[t][i].GetSize();
+                printf("\t %lld", (long long) x); 
+                double factor = 1.0*x/problem->graph_slices[gpu]->in_counter[i];
                 if (factor > max_in_sizing_) max_in_sizing_=factor;
-            }
-        }
-        if (num_gpus>1) printf("\t %d",problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
+            }   
+        }   
+        if (num_gpus>1) printf("\t %lld", (long long)(problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize()));
         printf("\n");
-    }
-    printf("\t key_sizing =\t %lf", max_key_sizing);
+    }   
+    printf("\t queue_sizing =\t %lf \t %lf", max_queue_sizing_[0], max_queue_sizing_[1]);
     if (num_gpus>1) printf("\t in_sizing =\t %lf", max_in_sizing_);
     printf("\n");
 
@@ -757,6 +763,7 @@ int cpp_main( int argc, char** argv)
         double rmat_d = 1-(rmat_a+rmat_b+rmat_c);
         double rmat_vmultipiler = 20;
         double rmat_vmin        = 1;
+        int    rmat_seed        = -1;
 
         args.GetCmdLineArgument("rmat_scale", rmat_scale);
         rmat_nodes = 1 << rmat_scale;
@@ -772,6 +779,7 @@ int cpp_main( int argc, char** argv)
         args.GetCmdLineArgument("rmat_d", rmat_d);
         args.GetCmdLineArgument("rmat_vmultipiler", rmat_vmultipiler);
         args.GetCmdLineArgument("rmat_vmin", rmat_vmin);
+        args.GetCmdLineArgument("rmat_seed", rmat_seed);
 
         CpuTimer cpu_timer;
         cpu_timer.Start();
@@ -785,7 +793,8 @@ int cpp_main( int argc, char** argv)
                 rmat_c,
                 rmat_d,
                 rmat_vmultipiler,
-                rmat_vmin) != 0)
+                rmat_vmin,
+                rmat_seed) != 0)
         {   
             return 1;
         }   
@@ -800,6 +809,7 @@ int cpp_main( int argc, char** argv)
         double rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
         double rgg_vmultipiler = 20;
         double rgg_vmin = 1;
+        int    rgg_seed = -1;
     
         args.GetCmdLineArgument("rgg_scale", rgg_scale);
         rgg_nodes = 1 << rgg_scale;
@@ -809,6 +819,7 @@ int cpp_main( int argc, char** argv)
         args.GetCmdLineArgument("rgg_threshold", rgg_threshold);
         args.GetCmdLineArgument("rgg_vmultipiler", rgg_vmultipiler);
         args.GetCmdLineArgument("rgg_vmin", rgg_vmin);
+        args.GetCmdLineArgument("rgg_seed", rgg_seed);
 
         CpuTimer cpu_timer;
         cpu_timer.Start();
@@ -818,7 +829,8 @@ int cpp_main( int argc, char** argv)
             rgg_threshold,
             g_undirected,
             rgg_vmultipiler,
-            rgg_vmin) !=0)
+            rgg_vmin,
+            rgg_seed) !=0)
         {
             return 1;
         }
@@ -833,8 +845,8 @@ int cpp_main( int argc, char** argv)
 
     csr.PrintHistogram();
     csr.DisplayGraph(true); //print graph with edge_value
-    util::cpu_mt::PrintCPUArray("row_offsets", csr.row_offsets,csr.nodes+1);
-    util::cpu_mt::PrintCPUArray("colum_indiece", csr.column_indices, csr.edges);
+    //util::cpu_mt::PrintCPUArray("row_offsets", csr.row_offsets,csr.nodes+1);
+    //util::cpu_mt::PrintCPUArray("colum_indiece", csr.column_indices, csr.edges);
     
     csr.GetAverageEdgeValue();
     csr.GetAverageDegree();

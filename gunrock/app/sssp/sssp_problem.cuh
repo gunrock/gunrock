@@ -56,6 +56,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
         //util::Array1D<SizeT, VertexId    >    preds      ;     /**< Used for storing the actual shortest path */
         util::Array1D<SizeT, VertexId    >    visit_lookup;    /**< Used for check duplicate */
         util::Array1D<SizeT, float       >    delta;
+        util::Array1D<SizeT, int         >    sssp_marker;
         //util::Array1D<SizeT, unsigned int>    temp_marker;
         //util::Array1D<SizeT, VertexId    >    temp_preds ;
         //util::Array1D<SizeT, SizeT       >    *scanned_edges;
@@ -68,6 +69,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             weights         .SetName("weights"         );
             visit_lookup    .SetName("visit_lookup"    );
             delta           .SetName("delta"           );
+            sssp_marker     .SetName("sssp_marker"     );
             //temp_preds      .SetName("temp_preds"      );
             //temp_marker     .SetName("temp_marker"     );
             //scanned_edges   = NULL;
@@ -86,6 +88,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             weights       .Release();
             visit_lookup  .Release();
             delta         .Release();
+            sssp_marker   .Release();
             //temp_preds    .Release();
             //temp_marker   .Release();
             //util::cpu_mt::PrintMessage("~DataSlice() end.");
@@ -121,6 +124,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = weights     .Allocate(graph->edges,util::DEVICE)) return retval;
             if (retval = delta       .Allocate(1           ,util::DEVICE)) return retval;
             if (retval = visit_lookup.Allocate(graph->nodes,util::DEVICE)) return retval;
+            if (retval = sssp_marker .Allocate(graph->nodes,util::DEVICE)) return retval;
             //scanned_edges = new util::Array1D<SizeT, SizeT>[num_gpus];
             //for (int gpu=0;gpu<num_gpus; gpu++)
             //{
@@ -168,12 +172,14 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
         cudaError_t Reset(
             FrontierType frontier_type,     // The frontier type (i.e., edge/vertex/mixed)
             GraphSlice<SizeT, VertexId, Value>  *graph_slice,
-            double queue_sizing = 2.0)
+            double queue_sizing = 2.0,
+            double queue_sizing1 = -1.0)
         {   
             cudaError_t retval = cudaSuccess;
             SizeT nodes = graph_slice -> nodes;
-            //SizeT edges = graph_slice -> edges;
+            SizeT edges = graph_slice -> edges;
             SizeT new_frontier_elements[2] = {0,0};
+            if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
             for (int peer=0; peer<this->num_gpus; peer++)
                 this->out_length[peer] = 1;
@@ -182,31 +188,35 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                 util::cpu_mt::PrintCPUArray<int, SizeT>("in_counter", graph_slice->in_counter.GetPointer(util::HOST), this->num_gpus+1, this->gpu_idx);
 
             for (int peer=0;peer<(this->num_gpus > 1 ? this->num_gpus+1 : 1);peer++)
+            for (int i=0; i < 2; i++)
             {
+                double queue_sizing_ = i==0?queue_sizing : queue_sizing1;
                 switch (frontier_type) {
                     case VERTEX_FRONTIERS :
                         // O(n) ping-pong global vertex frontiers
-                        new_frontier_elements[0] = double(this->num_gpus>1? graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +2;
+                        new_frontier_elements[0] = double(this->num_gpus>1? graph_slice->in_counter[peer]:nodes) * queue_sizing_ +2;
                         new_frontier_elements[1] = new_frontier_elements[0];
                         break;
 
                     case EDGE_FRONTIERS :
                         // O(m) ping-pong global edge frontiers
-                        new_frontier_elements[0] = double(graph_slice->edges) * queue_sizing +2;
+                        new_frontier_elements[0] = double(edges) * queue_sizing_ +2;
                         new_frontier_elements[1] = new_frontier_elements[0];
                         break;
 
                     case MIXED_FRONTIERS :
                         // O(n) global vertex frontier, O(m) global edge frontier
-                        new_frontier_elements[0] = double(this->num_gpus>1? graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing +2;
-                        new_frontier_elements[1] = double(graph_slice->edges) * queue_sizing +2;
+                        new_frontier_elements[0] = double(this->num_gpus>1? graph_slice->in_counter[peer]:nodes) * queue_sizing_ +2;
+                        new_frontier_elements[1] = double(edges) * queue_sizing_ +2;
                         break;
                 }
 
                 // Iterate through global frontier queue setups
-                for (int i = 0; i < 2; i++) {
+                //for (int i = 0; i < 2; i++) 
+                {
                     if (peer == this->num_gpus && i == 1) continue;
-                    if (peer == this->num_gpus && new_frontier_elements[i] > nodes * this->num_gpus) new_frontier_elements[i] = nodes * this->num_gpus;
+                    if (new_frontier_elements[i] > edges + 2) new_frontier_elements[i] = edges + 2;
+                    //if (peer == this->num_gpus && new_frontier_elements[i] > nodes * this->num_gpus) new_frontier_elements[i] = nodes * this->num_gpus;
                     if (this->frontier_queues[peer].keys[i].GetSize() < new_frontier_elements[i]) {
 
                         // Free if previously allocated
@@ -225,7 +235,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                     } //end if
                 } // end for i<2
 
-                if (peer == this->num_gpus)
+                if (peer == this->num_gpus || i == 1)
                 {
                     continue;
                 }
@@ -250,10 +260,10 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             if (this->visit_lookup.GetPointer(util::DEVICE) == NULL)
                 if (retval = this->visit_lookup.Allocate(nodes, util::DEVICE)) return retval;
             
-            if (MARK_PATHS) util::MemsetIdxKernel<<<256, 256>>>(this->preds.GetPointer(util::DEVICE), nodes);
-            util::MemsetKernel<<<256, 256>>>(this->labels      .GetPointer(util::DEVICE), util::MaxValue<Value>(), nodes);
-            util::MemsetKernel<<<256, 256>>>(this->visit_lookup.GetPointer(util::DEVICE), -1, nodes);
-
+            if (MARK_PATHS) util::MemsetIdxKernel<<<128, 128>>>(this->preds.GetPointer(util::DEVICE), nodes);
+            util::MemsetKernel<<<128, 128>>>(this->labels      .GetPointer(util::DEVICE), util::MaxValue<Value>(), nodes);
+            util::MemsetKernel<<<128, 128>>>(this->visit_lookup.GetPointer(util::DEVICE), -1, nodes);
+            util::MemsetKernel<<<128, 128>>>(sssp_marker.GetPointer(util::DEVICE), (int)0, nodes);
             return retval;
         }
     }; // DataSlice

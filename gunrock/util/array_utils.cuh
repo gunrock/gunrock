@@ -325,7 +325,15 @@ public:
     {
         cudaError_t retval = cudaSuccess;
         if (size == -1) size=this->size;
-        if (size < this->size) return GRError(name+" SetPointer size is too small",__FILE__,__LINE__);
+        if (size < this->size) 
+        {
+            if (ARRAY_DEBUG) {
+                printf("%s\t setting pointer, size too small, size = %lld, this->size = %lld\n",
+                    name.c_str(), (long long)size, (long long)this->size);
+                fflush(stdout);
+            }
+            return GRError(name+" SetPointer size is too small",__FILE__,__LINE__);
+        }
 
         if (target == HOST)
         {

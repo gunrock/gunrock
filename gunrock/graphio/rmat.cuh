@@ -35,7 +35,8 @@ int BuildRmatGraph (
     double c0 = 0.2,
     double d0 = 0.05,
     double vmultipiler = 1.00,
-    double vmin = 1.00)
+    double vmin = 1.00,
+    int    seed = -1)
 {
     typedef Coo<VertexId, Value> EdgeTupleType;
 
@@ -51,6 +52,9 @@ int BuildRmatGraph (
     EdgeTupleType *coo = (EdgeTupleType*) malloc (
         sizeof(EdgeTupleType) * directed_edges);
 
+    if (seed == -1) seed = time(NULL);
+    printf("rmat_seed = %lld\n", (long long)seed);
+
     //omp_set_num_threads(2);
     #pragma omp parallel
     {
@@ -59,8 +63,8 @@ int BuildRmatGraph (
         int num_threads   = omp_get_num_threads();
         SizeT i_start     = (long long )(edges) * thread_num / num_threads;
         SizeT i_end       = (long long )(edges) * (thread_num + 1) / num_threads;
-        unsigned int seed = time(NULL) + 616 * thread_num;
-        srand48_r(seed, &rand_data);
+        unsigned int seed_ = seed + 616 * thread_num;
+        srand48_r(seed_, &rand_data);
 
         for (SizeT i = i_start; i < i_end; i++)
         {

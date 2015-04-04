@@ -79,13 +79,13 @@ namespace sssp {
             Value old_value = atomicMin(s_value__associate_org[0]+key, t);
             if (old_value<=t)
             {
-                if (to_track(key)) printf("in[%d] : %d x-> %d \t", key, old_value, t);
+                //if (to_track(key)) printf("in[%d] : %d x-> %d \t", key, old_value, t);
                 keys_out[x]=-1;
                 x+=STRIDE;
                 continue;
             }
 
-            if (to_track(key)) printf("in[%d] : %d -> %d \t", key, old_value, t);
+            //if (to_track(key)) printf("in[%d] : %d -> %d \t", key, old_value, t);
             //}
         
             //if (atomicCAS(marker+key, 0, 1) ==0)
@@ -138,8 +138,8 @@ struct SSSPIteration : public IterationBase <
         //if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, stream)) return;
         //util::cpu_mt::PrintGPUArray("keys0", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
         //util::cpu_mt::PrintGPUArray("label0", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
-        util::cpu_mt::PrintCPUArray("queue_length", &frontier_attribute->queue_length, 1, thread_num, enactor_stats->iteration, peer_);
-        util::cpu_mt::PrintGPUArray("row_offsets", graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration, peer_, stream); 
+        //util::cpu_mt::PrintCPUArray("queue_length", &frontier_attribute->queue_length, 1, thread_num, enactor_stats->iteration, peer_);
+        //util::cpu_mt::PrintGPUArray("row_offsets0", graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration, peer_, stream); 
         frontier_attribute->queue_reset = true;
 
         // Edge Map
@@ -194,7 +194,8 @@ struct SSSPIteration : public IterationBase <
         //if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__)) return;
         //util::cpu_mt::PrintGPUArray("keys1", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
         //util::cpu_mt::PrintGPUArray("label1", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream); 
-
+        //util::cpu_mt::PrintGPUArray("row_offsets1", graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration, peer_, stream);
+ 
         //Vertex Map
         gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, SsspFunctor>
             <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
@@ -267,6 +268,7 @@ struct SSSPIteration : public IterationBase <
         //if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__)) return; 
         //util::cpu_mt::PrintGPUArray("keys2", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
         //util::cpu_mt::PrintGPUArray("label2", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream); 
+        //util::cpu_mt::PrintGPUArray("row_offsets2", graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration, peer_, stream);
 
         if (false) {//(INSTRUMENT || DEBUG) {
             //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
@@ -279,6 +281,11 @@ struct SSSPIteration : public IterationBase <
                     enactor_stats->total_lifetimes,
                     false, stream)) return;
             }
+        }
+
+        if (data_slice->num_gpus == 1)
+        {
+            util::MemsetKernel<<<128, 128, 0, stream>>> (data_slice -> sssp_marker.GetPointer(util::DEVICE), (int)0, graph_slice->nodes);
         }
     }
 
@@ -342,6 +349,34 @@ struct SSSPIteration : public IterationBase <
         return retval;
     }
 
+    template <
+        int NUM_VERTEX_ASSOCIATES,
+        int NUM_VALUE__ASSOCIATES>
+    static void Make_Output(
+        int                            thread_num,
+        SizeT                          num_elements,
+        int                            num_gpus,
+        util::DoubleBuffer<SizeT, VertexId, Value>
+                                      *frontier_queue,
+        util::Array1D<SizeT, SizeT>   *scanned_edges,
+        FrontierAttribute<SizeT>      *frontier_attribute,
+        EnactorStats                  *enactor_stats,
+        util::Array1D<SizeT, DataSlice>
+                                      *data_slice_,
+        GraphSlice                    *graph_slice,
+        util::CtaWorkProgressLifetime *work_progress,
+        ContextPtr                     context,
+        cudaStream_t                   stream)
+    {
+        typedef  IterationBase<AdvanceKernelPolicy, FilterKernelPolicy, Enactor, 
+            true, false, false, true, Enactor::Problem::MARK_PATHS> BaseEnactor;
+        util::MemsetKernel<<<128, 128, 0, stream>>> (data_slice_[0]->sssp_marker.GetPointer(util::DEVICE), (int)0, graph_slice->nodes);
+        BaseEnactor::template Make_Output < NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES> (
+            thread_num, num_elements, num_gpus,
+            frontier_queue, scanned_edges, frontier_attribute,
+            enactor_stats, data_slice_, graph_slice, work_progress, context, stream);
+    }
+
     static void Check_Queue_Size(
         int                            thread_num,
         int                            peer_,
@@ -380,7 +415,7 @@ struct SSSPIteration : public IterationBase <
             if (enactor_stats->retval = 
                 Check_Size<true, SizeT, Value> ("queue3", graph_slice->nodes+2, &frontier_queue->values[selector  ], over_sized, thread_num, iteration, peer_, true )) return; 
         }    
-    } 
+    }
 };
 
     template <
@@ -396,7 +431,7 @@ struct SSSPIteration : public IterationBase <
         typedef typename Enactor::Value      Value     ;   
         typedef typename Problem::DataSlice     DataSlice ;
         typedef GraphSlice<SizeT, VertexId, Value>    GraphSlice;
-        typedef SSSPFunctor<VertexId, SizeT, VertexId, Problem> Functor;
+        typedef SSSPFunctor<VertexId, SizeT, Value, Problem> Functor;
         ThreadSlice  *thread_data        =  (ThreadSlice*) thread_data_;
         Problem      *problem            =  (Problem*)     thread_data->problem;
         Enactor   *enactor            =  (Enactor*)  thread_data->enactor;
