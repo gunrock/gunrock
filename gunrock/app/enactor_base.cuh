@@ -34,12 +34,22 @@ using namespace mgpu;
 namespace gunrock {
 namespace app {
 
+template <typename SizeT1, typename SizeT2>
+__global__ void Accumulate_Num (
+    SizeT1 *num,
+    SizeT2 *sum)
+{
+    //printf("Accumulating : %lld + %lld -> %lld\n", (long long)sum[0], (long long)num[0], (long long)sum[0]+num[0]);
+    sum[0]+=num[0];
+}
+
 struct EnactorStats
 {
     long long           iteration;
     unsigned long long  total_lifetimes;
     unsigned long long  total_runtimes;
-    unsigned long long  total_queued;
+    //unsigned long long  total_queued;
+    util::Array1D<int, size_t> total_queued;
 
     unsigned int        advance_grid_size;
     unsigned int        filter_grid_size;
@@ -58,12 +68,19 @@ struct EnactorStats
         //util::cpu_mt::PrintMessage("EnactorStats() begin.");
         iteration       = 0;
         total_lifetimes = 0;
-        total_queued    = 0;
+        //total_queued    = 0;
         total_runtimes  = 0;
         retval          = cudaSuccess;
         node_locks    .SetName("node_locks"    );
         node_locks_out.SetName("node_locks_out");
+        total_queued  .SetName("total_queued");
         //util::cpu_mt::PrintMessage("EnactorStats() end.");
+    }
+
+    template <typename SizeT2>
+    void Accumulate(SizeT2 *d_queued, cudaStream_t stream)
+    {
+        Accumulate_Num<<<1,1,0,stream>>> (d_queued, total_queued.GetPointer(util::DEVICE));
     }
 };
 
@@ -1320,6 +1337,7 @@ protected:
             {
                 enactor_stats     [gpu*num_gpus+peer].node_locks    .Release();
                 enactor_stats     [gpu*num_gpus+peer].node_locks_out.Release();
+                enactor_stats     [gpu*num_gpus+peer].total_queued  .Release();
                 frontier_attribute[gpu*num_gpus+peer].output_length .Release();
                 if (work_progress [gpu*num_gpus+peer].HostReset()) return;
             }
@@ -1347,14 +1365,16 @@ protected:
             if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
             for (int peer=0;peer<num_gpus;peer++)
             {
+                EnactorStats *enactor_stats_ = enactor_stats + gpu*num_gpus + peer;
                 //initialize runtime stats
-                enactor_stats[gpu*num_gpus+peer].advance_grid_size = MaxGridSize(gpu, advance_occupancy, max_grid_size);
-                enactor_stats[gpu*num_gpus+peer].filter_grid_size  = MaxGridSize(gpu, filter_occupancy, max_grid_size);
+                enactor_stats_ -> advance_grid_size = MaxGridSize(gpu, advance_occupancy, max_grid_size);
+                enactor_stats_ -> filter_grid_size  = MaxGridSize(gpu, filter_occupancy, max_grid_size);
 
-                if (retval = enactor_stats[gpu*num_gpus+peer].advance_kernel_stats.Setup(enactor_stats[gpu].advance_grid_size)) return retval;
-                if (retval = enactor_stats[gpu*num_gpus+peer]. filter_kernel_stats.Setup(enactor_stats[gpu]. filter_grid_size)) return retval;
-                if (retval = enactor_stats[gpu*num_gpus+peer].node_locks.Allocate(node_lock_size,util::DEVICE)) return retval;
-                if (retval = enactor_stats[gpu*num_gpus+peer].node_locks_out.Allocate(node_lock_size, util::DEVICE)) return retval;
+                if (retval = enactor_stats_ -> advance_kernel_stats.Setup(enactor_stats_->advance_grid_size)) return retval;
+                if (retval = enactor_stats_ ->  filter_kernel_stats.Setup(enactor_stats_->filter_grid_size)) return retval;
+                if (retval = enactor_stats_ -> node_locks    .Allocate(node_lock_size, util::DEVICE)) return retval;
+                if (retval = enactor_stats_ -> node_locks_out.Allocate(node_lock_size, util::DEVICE)) return retval;
+                if (retval = enactor_stats_ -> total_queued  .Allocate(1, util::DEVICE | util::HOST)) return retval;
             }
         }
         //util::cpu_mt::PrintMessage("EnactorBase Setup() end.");
@@ -1366,12 +1386,18 @@ protected:
         //util::cpu_mt::PrintMessage("EnactorBase Reset() begin.");
         cudaError_t retval = cudaSuccess;
 
-        for (int gpu=0;gpu<num_gpus*num_gpus;gpu++)
+        for (int gpu=0;gpu<num_gpus;gpu++)
         {
-            enactor_stats[gpu].iteration             = 0;
-            enactor_stats[gpu].total_runtimes        = 0;
-            enactor_stats[gpu].total_lifetimes       = 0;
-            enactor_stats[gpu].total_queued          = 0;
+            if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
+            for (int peer=0; peer<num_gpus; peer++)
+            {
+                EnactorStats *enactor_stats_ = enactor_stats + gpu*num_gpus + peer;
+                enactor_stats_ -> iteration             = 0;
+                enactor_stats_ -> total_runtimes        = 0;
+                enactor_stats_ -> total_lifetimes       = 0;
+                enactor_stats_ -> total_queued[0]       = 0;
+                enactor_stats_ -> total_queued.Move(util::HOST, util::DEVICE);
+            }
         }
         //util::cpu_mt::PrintMessage("EnactorBase Reset() end.");
         return retval;

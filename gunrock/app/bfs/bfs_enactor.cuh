@@ -71,7 +71,7 @@ namespace bfs {
             //printf("\t %d,%d,%d,%d,%d ",x2,key,t,associate_org[0][key],marker[key]);
             if (atomicCAS(s_vertex_associate_org[0]+key, -1, t)!= -1)
             {
-               if (atomicMin(s_vertex_associate_org[0]+key, t)<t)
+               if (atomicMin(s_vertex_associate_org[0]+key, t)<=t)
                {
                    keys_out[x]=-1;
                    x+=STRIDE;
@@ -187,12 +187,15 @@ struct BFSIteration : public IterationBase <
         //    return;
         //}
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration, peer_);
-        frontier_attribute->queue_index++;
-        frontier_attribute->selector ^= 1;
+        frontier_attribute -> queue_index++;
+        frontier_attribute -> selector ^= 1;
+        enactor_stats      -> Accumulate(
+            work_progress  -> GetQueueLengthPointer<unsigned int,SizeT>(frontier_attribute->queue_index), stream);
+ 
         if (false) //(DEBUG || INSTRUMENT)
         {
             if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,stream)) return;
-            enactor_stats->total_queued += frontier_attribute->queue_length;
+            //enactor_stats->total_queued += frontier_attribute->queue_length;
             if (Enactor::DEBUG) ShowDebugInfo<Problem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_advance", stream);
             if (Enactor::INSTRUMENT) {
                 if (enactor_stats->retval = enactor_stats->advance_kernel_stats.Accumulate(
@@ -498,11 +501,16 @@ public:
                 if (util::SetDevice(this->gpu_idx[gpu])) return;
             cudaThreadSynchronize();
 
-            total_queued += this->enactor_stats[gpu].total_queued;
-            if (this->enactor_stats[gpu].iteration > search_depth) 
-                search_depth = this->enactor_stats[gpu].iteration;
-            total_lifetimes += this->enactor_stats[gpu].total_lifetimes;
-            total_runtimes  += this->enactor_stats[gpu].total_runtimes;
+            for (int peer=0; peer< this->num_gpus; peer++)
+            {
+                EnactorStats *enactor_stats_ = this->enactor_stats + gpu * this->num_gpus + peer;
+                enactor_stats_ -> total_queued.Move(util::DEVICE, util::HOST);
+                total_queued += enactor_stats_ -> total_queued[0];
+                if (enactor_stats_ -> iteration > search_depth) 
+                    search_depth = enactor_stats_ -> iteration;
+                total_lifetimes += enactor_stats_ -> total_lifetimes;
+                total_runtimes  += enactor_stats_ -> total_runtimes;
+            }
         }
         avg_duty = (total_lifetimes >0) ?
             double(total_runtimes) / total_lifetimes : 0.0;

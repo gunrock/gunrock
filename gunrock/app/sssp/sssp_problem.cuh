@@ -319,7 +319,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                 }   
 
             } else {
-                VertexId **th_labels=new VertexId*[this->num_gpus];
+                Value    **th_labels=new Value*[this->num_gpus];
                 VertexId **th_preds =new VertexId*[this->num_gpus];
                 for (int gpu=0;gpu<this->num_gpus;gpu++)
                 {   

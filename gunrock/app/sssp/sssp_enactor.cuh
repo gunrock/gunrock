@@ -76,12 +76,16 @@ namespace sssp {
             //if (atomicCAS(associate_org[0]+key, -1, t)== -1)
             //{
             //} else {
-            if (atomicMin(s_value__associate_org[0]+key, t)<t)
+            Value old_value = atomicMin(s_value__associate_org[0]+key, t);
+            if (old_value<=t)
             {
+                if (to_track(key)) printf("in[%d] : %d x-> %d \t", key, old_value, t);
                 keys_out[x]=-1;
                 x+=STRIDE;
                 continue;
             }
+
+            if (to_track(key)) printf("in[%d] : %d -> %d \t", key, old_value, t);
             //}
         
             //if (atomicCAS(marker+key, 0, 1) ==0)
@@ -113,7 +117,7 @@ struct SSSPIteration : public IterationBase <
     typedef typename Enactor::Problem    Problem ;
     typedef typename Problem::DataSlice  DataSlice ;
     typedef GraphSlice<SizeT, VertexId, Value> GraphSlice;
-    typedef SSSPFunctor<VertexId, SizeT, VertexId, Problem> SsspFunctor;
+    typedef SSSPFunctor<VertexId, SizeT, Value, Problem> SsspFunctor;
 
     static void SubQueue_Core(
         int                            thread_num,
@@ -132,6 +136,10 @@ struct SSSPIteration : public IterationBase <
     {
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration);
         //if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, stream)) return;
+        //util::cpu_mt::PrintGPUArray("keys0", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
+        //util::cpu_mt::PrintGPUArray("label0", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
+        util::cpu_mt::PrintCPUArray("queue_length", &frontier_attribute->queue_length, 1, thread_num, enactor_stats->iteration, peer_);
+        util::cpu_mt::PrintGPUArray("row_offsets", graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration, peer_, stream); 
         frontier_attribute->queue_reset = true;
 
         // Edge Map
@@ -164,11 +172,14 @@ struct SSSPIteration : public IterationBase <
         frontier_attribute->queue_reset = false;
         frontier_attribute->queue_index++;
         frontier_attribute->selector ^= 1;
+        enactor_stats     -> Accumulate(
+            work_progress -> GetQueueLengthPointer<unsigned int, SizeT>(frontier_attribute->queue_index), stream);
+
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration, peer_);
         if (false) //(DEBUG || INSTRUMENT)
         {
             if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,stream)) return;
-            enactor_stats->total_queued += frontier_attribute->queue_length;
+            //enactor_stats->total_queued += frontier_attribute->queue_length;
             if (Enactor::DEBUG) ShowDebugInfo<Problem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_advance", stream);
             if (Enactor::INSTRUMENT) {
                 if (enactor_stats->retval = enactor_stats->advance_kernel_stats.Accumulate(
@@ -178,6 +189,11 @@ struct SSSPIteration : public IterationBase <
                     false,stream)) return;
             }
         }
+
+        //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, stream)) return;
+        //if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__)) return;
+        //util::cpu_mt::PrintGPUArray("keys1", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
+        //util::cpu_mt::PrintGPUArray("label1", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream); 
 
         //Vertex Map
         gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, SsspFunctor>
@@ -246,6 +262,11 @@ struct SSSPIteration : public IterationBase <
 
         frontier_attribute->queue_index++;
         frontier_attribute->selector ^= 1;
+
+        //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, stream)) return;
+        //if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__)) return; 
+        //util::cpu_mt::PrintGPUArray("keys2", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
+        //util::cpu_mt::PrintGPUArray("label2", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream); 
 
         if (false) {//(INSTRUMENT || DEBUG) {
             //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
@@ -321,6 +342,45 @@ struct SSSPIteration : public IterationBase <
         return retval;
     }
 
+    static void Check_Queue_Size(
+        int                            thread_num,
+        int                            peer_,
+        SizeT                          request_length,
+        util::DoubleBuffer<SizeT, VertexId, Value>
+                                      *frontier_queue,
+        //util::Array1D<SizeT, SizeT>   *scanned_edges,
+        FrontierAttribute<SizeT>      *frontier_attribute,
+        EnactorStats                  *enactor_stats,
+        //DataSlice                     *data_slice,
+        //DataSlice                     *d_data_slice,
+        GraphSlice                    *graph_slice
+        //util::CtaWorkProgressLifetime *work_progress,
+        //ContextPtr                     context,
+        //cudaStream_t                   stream
+        )    
+    {    
+        bool over_sized = false;
+        int  selector   = frontier_attribute->selector;
+        int  iteration  = enactor_stats -> iteration;
+
+        if (Enactor::DEBUG)
+            printf("%d\t %d\t %d\t queue_length = %d, output_length = %d\n",
+                thread_num, iteration, peer_,
+                frontier_queue->keys[selector^1].GetSize(),
+                request_length);fflush(stdout);
+
+        if (enactor_stats->retval = 
+            Check_Size<true, SizeT, VertexId > ("queue3", request_length, &frontier_queue->keys  [selector^1], over_sized, thread_num, iteration, peer_, false)) return; 
+        if (enactor_stats->retval = 
+            Check_Size<true, SizeT, VertexId > ("queue3", graph_slice->nodes+2, &frontier_queue->keys  [selector  ], over_sized, thread_num, iteration, peer_, true )) return; 
+        if (Problem::USE_DOUBLE_BUFFER)
+        {    
+            if (enactor_stats->retval = 
+                Check_Size<true, SizeT, Value> ("queue3", request_length, &frontier_queue->values[selector^1], over_sized, thread_num, iteration, peer_, false)) return; 
+            if (enactor_stats->retval = 
+                Check_Size<true, SizeT, Value> ("queue3", graph_slice->nodes+2, &frontier_queue->values[selector  ], over_sized, thread_num, iteration, peer_, true )) return; 
+        }    
+    } 
 };
 
     template <
@@ -448,11 +508,16 @@ public:
                 if (util::SetDevice(this->gpu_idx[gpu])) return;
             cudaThreadSynchronize();
 
-            total_queued += this->enactor_stats[gpu].total_queued;
-            if (this->enactor_stats[gpu].iteration > search_depth) 
-                search_depth = this->enactor_stats[gpu].iteration;
-            total_lifetimes += this->enactor_stats[gpu].total_lifetimes;
-            total_runtimes  += this->enactor_stats[gpu].total_runtimes;
+            for (int peer=0; peer< this->num_gpus; peer++)
+            {   
+                EnactorStats *enactor_stats_ = this->enactor_stats + gpu * this->num_gpus + peer;
+                enactor_stats_ -> total_queued.Move(util::DEVICE, util::HOST);
+                total_queued += enactor_stats_ -> total_queued[0];
+                if (enactor_stats_ -> iteration > search_depth) 
+                    search_depth = enactor_stats_ -> iteration;
+                total_lifetimes += enactor_stats_ -> total_lifetimes;
+                total_runtimes  += enactor_stats_ -> total_runtimes;
+            } 
         }   
         avg_duty = (total_lifetimes >0) ?
             double(total_runtimes) / total_lifetimes : 0.0;

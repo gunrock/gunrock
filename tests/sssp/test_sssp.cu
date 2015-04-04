@@ -23,6 +23,8 @@
 
 // Graph construction utils
 #include <gunrock/graphio/market.cuh>
+#include <gunrock/graphio/rmat.cuh>
+#include <gunrock/graphio/rgg.cuh>
 
 // SSSP includes
 #include <gunrock/app/sssp/sssp_enactor.cuh>
@@ -723,16 +725,15 @@ int cpp_main( int argc, char** argv)
     //
     // Construct graph and perform search(es)
     //
+    typedef int VertexId;                   // Use as the node identifier type
+    typedef int Value;                      // Use as the value type
+    typedef int SizeT;                      // Use as the graph size type
+    Csr<VertexId, Value, SizeT> csr(false); // default value for stream_from_host is false
+    if (graph_args < 1) { Usage(); return 1; }
 
     if (graph_type == "market") {
     // Matrix-market coordinate-formatted graph file
 
-        typedef int VertexId;                   // Use as the node identifier type
-        typedef int Value;             // Use as the value type
-        typedef int SizeT;                      // Use as the graph size type
-        Csr<VertexId, Value, SizeT> csr(false); // default value for stream_from_host is false
-
-        if (graph_args < 1) { Usage(); return 1; }
         char *market_filename = (graph_args == 2) ? argv[2] : NULL;
         if (graphio::BuildMarketGraph<true>(
             market_filename, 
@@ -743,23 +744,106 @@ int cpp_main( int argc, char** argv)
             return 1;
         }
 
-        csr.PrintHistogram();
-        csr.DisplayGraph(true); //print graph with edge_value
-        
-        csr.GetAverageEdgeValue();
-        csr.GetAverageDegree();
-        int max_degree;
-        csr.GetNodeWithHighestDegree(max_degree);
-        printf("max degree:%d\n", max_degree);
-	
-        // Run tests
-        RunTests(&csr, args, num_gpus, context, gpu_idx, streams);
+    } else if (graph_type == "rmat")
+    {   
+        // parse rmat parameters
+        SizeT rmat_nodes = 1 << 10; 
+        SizeT rmat_edges = 1 << 10; 
+        SizeT rmat_scale = 10; 
+        SizeT rmat_edgefactor = 48; 
+        double rmat_a = 0.57;
+        double rmat_b = 0.19;
+        double rmat_c = 0.19;
+        double rmat_d = 1-(rmat_a+rmat_b+rmat_c);
+        double rmat_vmultipiler = 20;
+        double rmat_vmin        = 1;
 
+        args.GetCmdLineArgument("rmat_scale", rmat_scale);
+        rmat_nodes = 1 << rmat_scale;
+        args.GetCmdLineArgument("rmat_nodes", rmat_nodes);
+        args.GetCmdLineArgument("rmat_edgefactor", rmat_edgefactor);
+        rmat_edges = rmat_nodes * rmat_edgefactor;
+        rmat_vmultipiler = rmat_edgefactor * 2;
+        args.GetCmdLineArgument("rmat_edges", rmat_edges);
+        args.GetCmdLineArgument("rmat_a", rmat_a);
+        args.GetCmdLineArgument("rmat_b", rmat_b);
+        args.GetCmdLineArgument("rmat_c", rmat_c);
+        rmat_d = 1-(rmat_a+rmat_b+rmat_c);
+        args.GetCmdLineArgument("rmat_d", rmat_d);
+        args.GetCmdLineArgument("rmat_vmultipiler", rmat_vmultipiler);
+        args.GetCmdLineArgument("rmat_vmin", rmat_vmin);
+
+        CpuTimer cpu_timer;
+        cpu_timer.Start();
+        if (graphio::BuildRmatGraph<true>(
+                rmat_nodes,
+                rmat_edges,
+                csr,
+                g_undirected,
+                rmat_a,
+                rmat_b,
+                rmat_c,
+                rmat_d,
+                rmat_vmultipiler,
+                rmat_vmin) != 0)
+        {   
+            return 1;
+        }   
+        cpu_timer.Stop();
+        float elapsed = cpu_timer.ElapsedMillis();
+        printf("graph generated: %.3f ms, a = %.3f, b = %.3f, c = %.3f, d = %.3f\n", elapsed, rmat_a, rmat_b, rmat_c, rmat_d);
+    } else if (graph_type == "rgg") {
+    
+        SizeT rgg_nodes = 1 << 10; 
+        SizeT rgg_scale = 10; 
+        double rgg_thfactor  = 0.55;
+        double rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
+        double rgg_vmultipiler = 20;
+        double rgg_vmin = 1;
+    
+        args.GetCmdLineArgument("rgg_scale", rgg_scale);
+        rgg_nodes = 1 << rgg_scale;
+        args.GetCmdLineArgument("rgg_nodes", rgg_nodes);
+        args.GetCmdLineArgument("rgg_thfactor", rgg_thfactor);
+        rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
+        args.GetCmdLineArgument("rgg_threshold", rgg_threshold);
+        args.GetCmdLineArgument("rgg_vmultipiler", rgg_vmultipiler);
+        args.GetCmdLineArgument("rgg_vmin", rgg_vmin);
+
+        CpuTimer cpu_timer;
+        cpu_timer.Start();
+        if (graphio::BuildRggGraph<true>(
+            rgg_nodes,
+            csr,
+            rgg_threshold,
+            g_undirected,
+            rgg_vmultipiler,
+            rgg_vmin) !=0)
+        {
+            return 1;
+        }
+        cpu_timer.Stop();
+        float elapsed = cpu_timer.ElapsedMillis();
+        printf("graph generated: %.3f ms, threshold = %.3lf, vmultipiler = %.3lf\n", elapsed, rgg_threshold, rgg_vmultipiler);
     } else {
         // Unknown graph type
         fprintf(stderr, "Unspecified graph type\n");
         return 1;
     }
+
+    csr.PrintHistogram();
+    csr.DisplayGraph(true); //print graph with edge_value
+    util::cpu_mt::PrintCPUArray("row_offsets", csr.row_offsets,csr.nodes+1);
+    util::cpu_mt::PrintCPUArray("colum_indiece", csr.column_indices, csr.edges);
+    
+    csr.GetAverageEdgeValue();
+    csr.GetAverageDegree();
+    int max_degree;
+    csr.GetNodeWithHighestDegree(max_degree);
+    printf("max degree:%d\n", max_degree);
+
+    // Run tests
+    RunTests(&csr, args, num_gpus, context, gpu_idx, streams);
 
     return 0;
 }

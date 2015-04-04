@@ -24,6 +24,7 @@
 // Graph construction utils
 #include <gunrock/graphio/market.cuh>
 #include <gunrock/graphio/rmat.cuh>
+#include <gunrock/graphio/rgg.cuh>
 
 // BFS includes
 #include <gunrock/app/bfs/bfs_enactor.cuh>
@@ -806,7 +807,37 @@ int cpp_main( int argc, char** argv)
         cpu_timer.Stop();
         float elapsed = cpu_timer.ElapsedMillis();
         printf("graph generated: %.3f ms, a = %.3f, b = %.3f, c = %.3f, d = %.3f\n", elapsed, rmat_a, rmat_b, rmat_c, rmat_d);
-    } else
+    } else if (graph_type == "rgg") {
+        
+        SizeT rgg_nodes = 1 << 10;
+        SizeT rgg_scale = 10;
+        double rgg_thfactor  = 0.55;
+        double rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
+        double rgg_vmultipiler = 1;
+        
+        args.GetCmdLineArgument("rgg_scale", rgg_scale);
+        rgg_nodes = 1 << rgg_scale;
+        args.GetCmdLineArgument("rgg_nodes", rgg_nodes);
+        args.GetCmdLineArgument("rgg_thfactor", rgg_thfactor);
+        rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
+        args.GetCmdLineArgument("rgg_threshold", rgg_threshold);
+        args.GetCmdLineArgument("rgg_vmultipiler", rgg_vmultipiler);
+
+        CpuTimer cpu_timer;
+        cpu_timer.Start();
+        if (graphio::BuildRggGraph<false>(
+            rgg_nodes,
+            csr,
+            rgg_threshold,
+            g_undirected,
+            rgg_vmultipiler) !=0)
+        {
+            return 1;
+        }
+        cpu_timer.Stop();
+        float elapsed = cpu_timer.ElapsedMillis();
+        printf("graph generated: %.3f ms, threshold = %.3lf, vmultipiler = %.3lf\n", elapsed, rgg_threshold, rgg_vmultipiler);
+    }else
     {
         fprintf(stderr, "Unspecified graph type\n");
         return 1;

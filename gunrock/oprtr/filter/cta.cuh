@@ -65,6 +65,7 @@ struct Cta
     typedef typename KernelPolicy::SmemStorage      SmemStorage;
 
     typedef typename ProblemData::DataSlice         DataSlice;
+    typedef typename ProblemData::Value             Value;
 
     /**
      * Members
@@ -218,7 +219,7 @@ struct Cta
                     if (tile->element_id[LOAD][VEC] >= 0) {
                         VertexId row_id = (tile->element_id[LOAD][VEC]&KernelPolicy::ELEMENT_ID_MASK);///cta->num_gpus;
 
-                        VertexId label;
+                        Value label;
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                     label,
                                                     cta->problem->labels + row_id);

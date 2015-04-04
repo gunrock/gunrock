@@ -366,8 +366,8 @@ struct Csr
         
         // Write offsets, indices, node, edges etc. into file
         if (LOAD_EDGE_VALUES)
-	{
-	  WriteToFile(output_file, 
+	    {
+	        WriteToFile(output_file, 
 		      undirected, 
 		      reversed, 
 		      nodes, 
@@ -375,10 +375,8 @@ struct Csr
 		      row_offsets, 
 		      column_indices, 
 		      edge_values);
-        }
-        else
-        {
-	  WriteToFile(output_file, 
+        } else {
+	        WriteToFile(output_file, 
 		      undirected, 
 		      reversed,
 		      nodes, 

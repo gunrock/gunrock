@@ -346,6 +346,13 @@ public:
         return retval;
     }
 
+    template <typename IndexT, typename SizeT>
+    SizeT* GetQueueLengthPointer(IndexT index)
+    {
+        int queue_length_idx = index & 0x3;
+        return ((SizeT*)d_counters) + queue_length_idx;
+    }
+        
     // Set work queue length
     template <typename IterationT, typename SizeT>
     cudaError_t SetQueueLength(

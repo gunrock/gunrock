@@ -33,7 +33,9 @@ int BuildRmatGraph (
     double a0 = 0.55,
     double b0 = 0.2,
     double c0 = 0.2,
-    double d0 = 0.05)
+    double d0 = 0.05,
+    double vmultipiler = 1.00,
+    double vmin = 1.00)
 {
     typedef Coo<VertexId, Value> EdgeTupleType;
 
@@ -87,7 +89,12 @@ int BuildRmatGraph (
             // create edge
             coo_p->row = u - 1; // zero-based
             coo_p->col = v - 1; // zero-based
-            coo_p->val = 1;
+            if (WITH_VALUES)
+            {
+                double t_value;
+                drand48_r(&rand_data, &t_value);
+                coo_p->val = t_value * vmultipiler + vmin;
+            } else coo_p->val = 1;
 
             if (undirected)
             {
@@ -95,7 +102,12 @@ int BuildRmatGraph (
                 // reverse edge
                 cooi_p->row = coo_p->col;
                 cooi_p->col = coo_p->row;
-                cooi_p->val = 1;
+                if (WITH_VALUES)
+                {
+                    double t_value;
+                    drand48_r(&rand_data, &t_value);
+                    cooi_p->val = t_value * vmultipiler + vmin;
+                } else coo_p->val = 1;
             }
         }
     }
