@@ -71,8 +71,9 @@ namespace cc {
             //atomicMin(s_vertex_associate_org[0]+key, s_vertex_associate_in[0][x]);
             if (s_vertex_associate_in[0][x] < s_vertex_associate_org[0][key])
             {
-                //if (to_track(key))
-                //    printf("Expand_Incoming [%d]: %d->%d\n", key, s_vertex_associate_org[0][key], s_vertex_associate_in[0][x]);
+                if (TO_TRACK)
+                if (to_track(key))
+                    printf("Expand_Incoming [%d]: %d->%d\n", key, s_vertex_associate_org[0][key], s_vertex_associate_in[0][x]);
                 s_vertex_associate_org[0][key] = s_vertex_associate_in[0][x]; 
             }
             //keys_out[x]=-1;
@@ -97,8 +98,9 @@ namespace cc {
         while (x<num_elements)
         {
             //VertexId key = keys_in[x]
-            //if (to_track(x))
-            //    printf("Mark_Diff marker[%d]: %d->%d, CID: %d->%d\n", x, marker[x], (old_CID[x]!=new_CID[x]? 1:0), old_CID[x], new_CID[x]);
+            if (TO_TRACK)
+            if (to_track(x))
+                printf("Mark_Diff marker[%d]: %d->%d, CID: %d->%d\n", x, marker[x], (old_CID[x]!=new_CID[x]? 1:0), old_CID[x], new_CID[x]);
             marker[x] = old_CID[x]!=new_CID[x]? 1:0;
             x+=STRIDE;
         }
@@ -125,8 +127,9 @@ namespace cc {
             {
                 keys_out[Mx-1]=x;
                 c_ids_out[Mx-1]=c_ids[x];
-                //if (to_track(x))
-                //    printf("Make_Diff keys_out[%d] ->%d\n", marker[x]-1, x);
+                if (TO_TRACK)
+                if (to_track(x))
+                    printf("Make_Diff keys_out[%d] ->%d\n", marker[x]-1, x);
             }
             x+=STRIDE;
         }
@@ -166,7 +169,7 @@ public:
         typedef HookInitFunctor<
             VertexId,
             SizeT,
-            VertexId,
+            Value,
             Problem> HookInitFunctor;
 
         util::MemsetIdxKernel<<<128, 128, 0, stream>>>(frontier_queue->keys[0].GetPointer(util::DEVICE), graph_slice->edges);
@@ -198,6 +201,7 @@ public:
                 frontier_queue->keys[frontier_attribute->selector^1].GetSize(),         // max_out_queue
                 enactor_stats->filter_kernel_stats);
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) return;
+            enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
             //printf("HookInited\n");fflush(stdout);
         }
 
@@ -235,37 +239,37 @@ public:
         typedef UpdateMaskFunctor<
             VertexId,
             SizeT,
-            VertexId,
+            Value,
             Problem> UpdateMaskFunctor;
 
         typedef HookMinFunctor<
             VertexId,
             SizeT,
-            VertexId,
+            Value,
             Problem> HookMinFunctor;
 
         typedef HookMaxFunctor<
             VertexId,
             SizeT,
-            VertexId,
+            Value,
             Problem> HookMaxFunctor;
 
         typedef PtrJumpFunctor<
             VertexId,
             SizeT,
-            VertexId,
+            Value,
             Problem> PtrJumpFunctor;
 
         typedef PtrJumpMaskFunctor<
             VertexId,
             SizeT,
-            VertexId,
+            Value,
             Problem> PtrJumpMaskFunctor;
 
         typedef PtrJumpUnmaskFunctor<
             VertexId,
             SizeT,
-            VertexId,
+            Value,
             Problem> PtrJumpUnmaskFunctor;
 
         //bool has_change                  = false;
@@ -299,6 +303,7 @@ public:
                 frontier_queue->values[frontier_attribute->selector^1].GetSize(),         // max_out_queue
                 enactor_stats->filter_kernel_stats);
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel First Pointer Jumping Round failed", __FILE__, __LINE__))) return;
+            enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
 
             frontier_attribute->queue_reset = false;
             frontier_attribute->queue_index++;
@@ -335,6 +340,7 @@ public:
             frontier_queue->values[frontier_attribute->selector^1].GetSize(),         // max_out_queue
             enactor_stats->filter_kernel_stats);
         if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Update Mask Operation failed", __FILE__, __LINE__))) return;
+        enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
         //util::cpu_mt::PrintGPUArray("2_cid", data_slice->component_ids.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, data_slice->turn, enactor_stats->iteration, stream);
         //util::cpu_mt::PrintMessage("Update Mask finished", thread_num, data_slice->turn, enactor_stats->iteration);
 
@@ -383,6 +389,7 @@ public:
                     enactor_stats->filter_kernel_stats);
             //}
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Hook Min/Max Operation failed", __FILE__, __LINE__))) return;
+            enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
             //util::cpu_mt::PrintGPUArray("3_cid", data_slice->component_ids.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, data_slice->turn, enactor_stats->iteration, stream);
             //util::cpu_mt::PrintMessage("HookMax finished", thread_num, data_slice->turn, enactor_stats->iteration);
 
@@ -426,6 +433,7 @@ public:
                     frontier_queue->values[frontier_attribute->selector^1].GetSize(),         // max_out_queue
                     enactor_stats->filter_kernel_stats);
                 if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Pointer Jumping Mask failed", __FILE__, __LINE__))) return;
+                enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
 
                 frontier_attribute->queue_reset = false;
                 frontier_attribute->queue_index++;
@@ -461,6 +469,7 @@ public:
                 frontier_queue->values[frontier_attribute->selector^1].GetSize(),         // max_out_queue
                 enactor_stats->filter_kernel_stats);
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Pointer Jumping Unmask Operation failed", __FILE__, __LINE__))) return;
+            enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
             //util::cpu_mt::PrintGPUArray("5_cid", data_slice->component_ids.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, data_slice->turn, enactor_stats->iteration, stream);
             //util::cpu_mt::PrintMessage("Pointer Jumping Unmask finished", thread_num, data_slice->turn, enactor_stats->iteration);
 
@@ -480,6 +489,7 @@ public:
                 frontier_queue->values[frontier_attribute->selector^1].GetSize(),         // max_out_queue
                 enactor_stats->filter_kernel_stats);
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Update Mask Operation failed", __FILE__, __LINE__))) return;
+            enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
             //util::cpu_mt::PrintMessage("Update Mask finished", thread_num, data_slice->turn, enactor_stats->iteration);
 
             ///////////////////////////////////////////
@@ -515,7 +525,7 @@ public:
               cudaStream_t    stream,
               SizeT           &num_elements,
         const VertexId* const keys_in,
-              VertexId*       keys_out,
+        util::Array1D<SizeT, VertexId>*  keys_out,
         const size_t          array_size,
               char*           array,
               DataSlice*      data_slice)
@@ -526,10 +536,23 @@ public:
             <<<grid_size, block_size, shared_size, stream>>> (
             num_elements,
             keys_in,
-            keys_out,
+            keys_out->GetPointer(util::DEVICE),
             array_size,
             array);
         num_elements = 0;
+    }
+
+    static void Check_Queue_Size(
+        int                            thread_num,
+        int                            peer_,
+        SizeT                          request_length,
+        util::DoubleBuffer<SizeT, VertexId, Value>
+                                      *frontier_queue,
+        FrontierAttribute<SizeT>      *frontier_attribute,
+        EnactorStats                  *enactor_stats,
+        GraphSlice                    *graph_slice
+        )    
+    {
     }
 
     static bool Stop_Condition(
@@ -792,9 +815,14 @@ public:
             if (util::SetDevice(this->gpu_idx[gpu])) return;
             cudaThreadSynchronize();
 
-            total_queued    += this->enactor_stats[gpu].total_queued;
-            total_lifetimes += this->enactor_stats[gpu].total_lifetimes;
-            total_runtimes  += this->enactor_stats[gpu].total_runtimes;
+            for (int peer=0; peer< this->num_gpus; peer++)
+            {
+                EnactorStats *enactor_stats_ = this->enactor_stats + gpu * this->num_gpus + peer;
+                enactor_stats_ -> total_queued.Move(util::DEVICE, util::HOST);
+                total_queued    += enactor_stats_ -> total_queued[0];
+                total_lifetimes += enactor_stats_ -> total_lifetimes;
+                total_runtimes  += enactor_stats_ -> total_runtimes;
+            }
         }
 
         avg_duty = (total_lifetimes >0) ?

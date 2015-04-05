@@ -8,11 +8,13 @@ namespace gunrock {
 namespace app {
 namespace cc {
 
+#define TO_TRACK false
+
     template <typename VertexId>
-    static __device__ bool to_track(VertexId node)
+    static __device__ __host__ bool to_track(VertexId node)
     {
         const int num_to_track = 2;
-        const VertexId node_to_track[] = {131070, 131071, 60161, 60162};
+        const VertexId node_to_track[] = {254, 255};
         for (int i=0; i<num_to_track; i++)
             if (node == node_to_track[i]) return true;
         return false;
@@ -57,8 +59,9 @@ struct UpdateMaskFunctor
         VertexId parent;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                 parent, problem->component_ids + node);
-        //if (to_track(node)) 
-        //    printf("UpdateMask [%d]: %d->%d\n", node, problem->masks[node], (parent == node)?0:1);
+        if (TO_TRACK)
+        if (to_track(node)) 
+            printf("UpdateMask [%d]: %d->%d\n", node, problem->masks[node], (parent == node)?0:1);
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                 (parent == node)?0:1, problem->masks + node);
    }
@@ -108,8 +111,9 @@ struct HookInitFunctor
                 to_node, problem->tos + node);
         VertexId max_node = from_node > to_node ? from_node:to_node;
         VertexId min_node = from_node + to_node - max_node;
-        //if (to_track(max_node) || to_track(min_node))
-        //    printf("HookInit [%d]: ->%d\n", max_node, min_node);
+        if (TO_TRACK)
+        if (to_track(max_node) || to_track(min_node))
+            printf("HookInit [%d]: ->%d\n", max_node, min_node);
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                 min_node, problem->component_ids + max_node);
     }
@@ -240,14 +244,16 @@ struct HookMaxFunctor
             VertexId max_node = parent_from > parent_to ? parent_from: parent_to;
             VertexId min_node = parent_from + parent_to - max_node;
             if (max_node == min_node) {
-                //if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node)) 
-                //    printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d==\n", node, from_node, to_node, parent_from, parent_to, max_node, min_node); 
+                if (TO_TRACK)
+                if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node)) 
+                    printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d==\n", node, from_node, to_node, parent_from, parent_to, max_node, min_node); 
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         true, problem->marks + node);
             } else //if (problem->component_ids[max_node] > min_node) 
             {
-                //if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node)) 
-                //    printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d->%d\n", node, from_node, to_node, parent_from, parent_to, max_node, problem->component_ids[max_node], min_node); 
+                if (TO_TRACK)
+                if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node)) 
+                    printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d->%d\n", node, from_node, to_node, parent_from, parent_to, max_node, problem->component_ids[max_node], min_node); 
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         min_node, problem->component_ids + max_node);
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -303,8 +309,9 @@ struct PtrJumpFunctor
         if (parent != grand_parent) {
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         0, problem->vertex_flag + 0);
-            //if (to_track(node)) 
-            //    printf("PtrJump [%d]: %d->%d\n", node, problem->component_ids[node], grand_parent);
+            if (TO_TRACK)
+            if (to_track(node)) 
+                printf("PtrJump [%d]: %d->%d\n", node, problem->component_ids[node], grand_parent);
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         grand_parent, problem->component_ids + node);
         }
@@ -359,13 +366,15 @@ struct PtrJumpMaskFunctor
                     grand_parent, problem->component_ids + parent);
             if (parent != grand_parent) {
                 problem->vertex_flag[0] = 0;
-                //if (to_track(node)) 
-                //    printf("PtrJumpMask [%d]: %d->%d\n", node, problem->component_ids[node], grand_parent);
+                if (TO_TRACK)
+                if (to_track(node)) 
+                    printf("PtrJumpMask [%d]: %d->%d\n", node, problem->component_ids[node], grand_parent);
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         grand_parent, problem->component_ids + node);
             } else {
-                //if (to_track(node)) 
-                //    printf("PtrJumpMask mask[%d]: %d->%d\n", node, problem->masks[node], -1);
+                if (TO_TRACK)
+                if (to_track(node)) 
+                    printf("PtrJumpMask mask[%d]: %d->%d\n", node, problem->masks[node], -1);
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         -1, problem->masks + node);
             }
@@ -420,8 +429,9 @@ struct PtrJumpUnmaskFunctor
             VertexId grand_parent;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                     grand_parent, problem->component_ids + parent);
-            //if (to_track(node)) 
-            //    printf("PtrJumpUnMask [%d]: %d->%d\t", node, parent, grand_parent);
+            if (TO_TRACK)
+            if (to_track(node)) 
+                printf("PtrJumpUnMask [%d]: %d->%d\t", node, parent, grand_parent);
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                     grand_parent, problem->component_ids + node);
         }

@@ -23,6 +23,8 @@
 
 // Graph construction utils
 #include <gunrock/graphio/market.cuh>
+#include <gunrock/graphio/rmat.cuh>
+#include <gunrock/graphio/rgg.cuh>
 
 // CC includes
 #include <gunrock/app/cc/cc_enactor.cuh>
@@ -282,7 +284,9 @@ void RunTests(Test_Parameter *parameter)
     //    if (graph->column_indices[edge] == 131070 || graph->column_indices[edge] == 131071)
     //    printf("edge %d: -> %d\n", edge, graph->column_indices[edge]);
     //}
- 
+
+    //util::cpu_mt::PrintCPUArray("row_offsets", graph->row_offsets, graph->nodes+1);
+    //util::cpu_mt::PrintCPUArray("colunm_indices", graph->column_indices, graph->edges); 
     for (int gpu=0; gpu<num_gpus; gpu++)
     {
         size_t dummy;
@@ -324,6 +328,8 @@ void RunTests(Test_Parameter *parameter)
     CpuTimer cpu_timer;
 
     util::GRError(problem->Reset(enactor->GetFrontierType(), max_queue_sizing), "CC Problem Data Reset Failed", __FILE__, __LINE__);
+    util::GRError(enactor->Reset(), "CC Enactor Reset failed", __FILE__, __LINE__);   
+
     printf("_________________________\n");fflush(stdout);
     cpu_timer.Start();
     util::GRError(enactor->Enact(), "CC Problem Enact Failed", __FILE__, __LINE__);
@@ -336,11 +342,16 @@ void RunTests(Test_Parameter *parameter)
     util::GRError(problem->Extract(h_component_ids), "CC Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // Validity
-    if (ref_num_components == problem->num_components)
+    if (reference_check != NULL)
     {
-        printf("CORRECT.\n");
-    } else
-        printf("INCORRECT. Ref Component Count: %d, GPU Computed Component Count: %d\n", ref_num_components, problem->num_components);
+        if (ref_num_components == problem->num_components)
+        {
+            printf("CORRECT. Component Count: %d\n", ref_num_components);
+        } else
+            printf("INCORRECT. Ref Component Count: %d, GPU Computed Component Count: %d\n", ref_num_components, problem->num_components);
+    } else {
+        printf("Component Count: %lld\n", (long long) problem->num_components);
+    }
     if (reference_check != NULL)
     {
         ConvertIDs<VertexId, SizeT>(reference_check, graph->nodes, ref_num_components);
@@ -370,6 +381,11 @@ void RunTests(Test_Parameter *parameter)
     }
 
     printf("GPU Connected Component finished in %lf msec.\n", elapsed);
+    long long total_queued = 0;
+    for (int i=0; i<num_gpus * num_gpus; i++)
+        total_queued += enactor->enactor_stats[i].total_queued[0];
+    printf("Total number of elements processed: %lld .\n", total_queued);
+    printf("Rate: %.3lf MEPS\n", total_queued / 1000.0 / elapsed);
 
     printf("\n\tMemory Usage(B)\t");
     for (int gpu=0;gpu<num_gpus;gpu++)
@@ -559,17 +575,12 @@ int cpp_main( int argc, char** argv)
 	//
 	// Construct graph and perform search(es)
 	//
+    typedef int VertexId;							// Use as the node identifier type
+    typedef int Value;								// Use as the value type
+    typedef int SizeT;								// Use as the graph size type
+    Csr<VertexId, Value, SizeT> csr(false);         // default value for stream_from_host is false
 
 	if (graph_type == "market") {
-
-		// Matrix-market coordinate-formatted graph file
-
-		typedef int VertexId;							// Use as the node identifier type
-		typedef int Value;								// Use as the value type
-		typedef int SizeT;								// Use as the graph size type
-		Csr<VertexId, Value, SizeT> csr(false);         // default value for stream_from_host is false
-
-        printf("size of int:%ld\n", sizeof(int));
 
 		if (graph_args < 1) { Usage(); return 1; }
 		char *market_filename = (graph_args == 2) ? argv[2] : NULL;
@@ -582,19 +593,101 @@ int cpp_main( int argc, char** argv)
 			return 1;
 		}
 
-        csr.PrintHistogram();
-        fflush(stdout);
 
-		// Run tests
-		RunTests(&csr, args, num_gpus, context, gpu_idx, streams);
+	} else if (graph_type == "rmat")
+    {
+        // parse rmat parameters
+        SizeT rmat_nodes = 1 << 10;
+        SizeT rmat_edges = 1 << 10;
+        SizeT rmat_scale = 10;
+        SizeT rmat_edgefactor = 48;
+        double rmat_a = 0.57;
+        double rmat_b = 0.19;
+        double rmat_c = 0.19;
+        double rmat_d = 1-(rmat_a+rmat_b+rmat_c);
+        int    rmat_seed = -1;
 
-	} else {
+        args.GetCmdLineArgument("rmat_scale", rmat_scale);
+        rmat_nodes = 1 << rmat_scale;
+        args.GetCmdLineArgument("rmat_nodes", rmat_nodes);
+        args.GetCmdLineArgument("rmat_edgefactor", rmat_edgefactor);
+        rmat_edges = rmat_nodes * rmat_edgefactor;
+        args.GetCmdLineArgument("rmat_edges", rmat_edges);
+        args.GetCmdLineArgument("rmat_a", rmat_a);
+        args.GetCmdLineArgument("rmat_b", rmat_b);
+        args.GetCmdLineArgument("rmat_c", rmat_c);
+        rmat_d = 1-(rmat_a+rmat_b+rmat_c);
+        args.GetCmdLineArgument("rmat_d", rmat_d);
+        args.GetCmdLineArgument("rmat_seed", rmat_seed);
+
+        CpuTimer cpu_timer;
+        cpu_timer.Start();
+        if (graphio::BuildRmatGraph<false>(
+                rmat_nodes,
+                rmat_edges,
+                csr,
+                g_undirected,
+                rmat_a,
+                rmat_b,
+                rmat_c,
+                rmat_d,
+                1,
+                1,
+                rmat_seed) != 0)
+        {
+            return 1;
+        }
+        cpu_timer.Stop();
+        float elapsed = cpu_timer.ElapsedMillis();
+        printf("graph generated: %.3f ms, a = %.3f, b = %.3f, c = %.3f, d = %.3f\n", elapsed, rmat_a, rmat_b, rmat_c, rmat_d);
+    } else if (graph_type == "rgg") {
+
+        SizeT rgg_nodes = 1 << 10;
+        SizeT rgg_scale = 10;
+        double rgg_thfactor  = 0.55;
+        double rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
+        double rgg_vmultipiler = 1;
+        int    rgg_seed        = -1;
+
+        args.GetCmdLineArgument("rgg_scale", rgg_scale);
+        rgg_nodes = 1 << rgg_scale;
+        args.GetCmdLineArgument("rgg_nodes", rgg_nodes);
+        args.GetCmdLineArgument("rgg_thfactor", rgg_thfactor);
+        rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
+        args.GetCmdLineArgument("rgg_threshold", rgg_threshold);
+        args.GetCmdLineArgument("rgg_vmultipiler", rgg_vmultipiler);
+        args.GetCmdLineArgument("rgg_seed", rgg_seed);
+
+        CpuTimer cpu_timer;
+        cpu_timer.Start();
+        if (graphio::BuildRggGraph<false>(
+            rgg_nodes,
+            csr,
+            rgg_threshold,
+            g_undirected,
+            rgg_vmultipiler,
+            1,
+            rgg_seed) !=0)
+        {
+            return 1;
+        }
+        cpu_timer.Stop();
+        float elapsed = cpu_timer.ElapsedMillis();
+        printf("graph generated: %.3f ms, threshold = %.3lf, vmultipiler = %.3lf\n", elapsed, rgg_threshold, rgg_vmultipiler);
+    } else {
 
 		// Unknown graph type
 		fprintf(stderr, "Unspecified graph type\n");
 		return 1;
 
 	}
+
+    graphio::RemoveStandaloneNodes<VertexId, Value, SizeT>(&csr);
+    csr.PrintHistogram();
+    fflush(stdout);
+
+    // Run tests
+    RunTests(&csr, args, num_gpus, context, gpu_idx, streams);
 
 	return 0;
 }

@@ -109,6 +109,7 @@ int BuildRggGraph(
     long long initial_length   = reserved_factor2 * nodes / row_length / row_length;
     
     if (seed == -1) seed = time(NULL);
+    printf("rgg seed = %lld\n", (long long)seed);
     if (initial_length <4) initial_length = 4;
     for (SizeT i=0; i< row_length * row_length +1; i++)
     {
