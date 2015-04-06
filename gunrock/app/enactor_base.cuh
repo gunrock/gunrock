@@ -1153,11 +1153,11 @@ void Iteration_Loop(
                         {
                             tretval = cudaStreamSynchronize(streams[peer_]);
                             if (tretval != cudaSuccess) {enactor_stats_->retval=tretval;break;}
-                            if (Enactor::DEBUG)
+                            /*if (Enactor::DEBUG)
                                 printf("%d\t %d\t %d\t queue_length = %d, output_length = %d\n",
                                     thread_num, iteration, peer_,
                                     frontier_queue_->keys[selector^1].GetSize(),
-                                    frontier_attribute_->output_length[0]);fflush(stdout);
+                                    frontier_attribute_->output_length[0]);fflush(stdout);*/
 
                             Iteration::Check_Queue_Size(
                                 thread_num,

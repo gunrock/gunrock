@@ -85,6 +85,7 @@ public:
         CUTThread     thread_Id;
         int           *partition_table0;
         int           **partition_table1;
+        int           **partition_tables;
         VertexId      *convertion_table0;
         VertexId      **convertion_table1;
         VertexId      **convertion_tables;
@@ -233,6 +234,7 @@ public:
         VertexId*       convertion_table0     = thread_data->convertion_table0;
         int**           partition_table1      = thread_data->partition_table1;
         VertexId**      convertion_tables     = thread_data->convertion_tables;
+        int**           partition_tables      = thread_data->partition_tables;
         VertexId**      convertion_table1     = thread_data->convertion_table1;
         VertexId**      original_vertexes     = thread_data->original_vertexes;
         int**           backward_partitions   = thread_data->backward_partitions;
@@ -401,52 +403,58 @@ public:
             in_counter_ = 0;
             util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,gpu);
             //for (VertexId _node=0;_node<out_counter[gpu];_node++)
-            for (VertexId node_=0; node_<num_nodes; node_++)
+            if (!KEEP_NODE_NUM) 
             {
-                backward_offsets[gpu][node_]=in_counter_;
-                if (partition_table1[0][node_]!=0) 
+                for (VertexId node_=0; node_<num_nodes; node_++)
                 {
-                    //printf("%d@%dx\t", node_, gpu);fflush(stdout);
-                    continue;
-                }
-                for (int peer=0;peer<num_gpus;peer++)
-                {
-                    if (marker[node_*num_gpus+peer]==0) continue;
-                    int  peer_ = peer < gpu ? peer+1 : peer;
-                    VertexId neibor = marker[node_*num_gpus+peer]-1;
-                    VertexId neibor_ = convertion_table0[neibor];
-                    //VertexId node   = original_vertexes[0][node_];
-                    //printf("%d, %d: %d->%d\t", node_*num_gpus+peer, gpu, neibor, node);fflush(stdout);
-                    //printf("%d,%d\t", peer, neibor_);fflush(stdout);
-                    for (SizeT edge=sub_graphs[peer].row_offsets[neibor_]; edge<sub_graphs[peer].row_offsets[neibor_+1];edge++)
+                    backward_offsets[gpu][node_]=in_counter_;
+                    if (partition_table1[0][node_]!=0) 
                     {
-                        VertexId _node = sub_graphs[peer].column_indices[edge];
-                        if (convertion_tables[peer+1][_node] == node_)
-                        {
-                            backward_convertions[gpu][in_counter_]= _node;
-                            break;
-                        }
+                        //printf("%d@%dx\t", node_, gpu);fflush(stdout);
+                        continue;
                     }
-                    backward_partitions[gpu][in_counter_]=peer_;
-                    in_counter_++;
+                    for (int peer=0;peer<num_gpus;peer++)
+                    {
+                        if (marker[node_*num_gpus+peer]==0) continue;
+                        int  peer_ = peer < gpu ? peer+1 : peer;
+                        int  gpu_  = gpu  < peer ? gpu+1 : gpu;
+                        VertexId neibor = marker[node_*num_gpus+peer]-1;
+                        VertexId neibor_ = convertion_table0[neibor];
+                        //VertexId node   = original_vertexes[0][node_];
+                        //printf("%d, %d: %d->%d\t", node_*num_gpus+peer, gpu, neibor, node);fflush(stdout);
+                        //printf("%d,%d\t", peer, neibor_);fflush(stdout);
+                        for (SizeT edge=sub_graphs[peer].row_offsets[neibor_]; edge<sub_graphs[peer].row_offsets[neibor_+1];edge++)
+                        {
+                            VertexId _node = sub_graphs[peer].column_indices[edge];
+                            if (convertion_tables[peer+1][_node] == node_ && 
+                                partition_tables [peer+1][_node] == gpu_)
+                            {
+                                backward_convertions[gpu][in_counter_]= _node;
+                                //printf("b_c[%d][%d] <- %d, node_ = %d, edge = %d, neibor = %d, neibor_ = %d\n", gpu, in_counter_, _node, node_, edge, neibor, neibor_); fflush(stdout);
+                                break;
+                            }
+                        }
+                        backward_partitions[gpu][in_counter_]=peer_;
+                        in_counter_++;
+                    }
                 }
-            }
-            backward_offsets[gpu][num_nodes]=in_counter_;
-            //memset(marker,0,sizeof(int)*num_gpus*cross_counter[gpu]);
-            delete[] marker;marker=NULL;
-
-            delete[] backward_partitions[gpu];backward_partitions[gpu] = new int[num_nodes * (num_gpus-1)];
-            delete[] backward_convertions[gpu];backward_convertions[gpu] = new VertexId[num_nodes * (num_gpus-1)];
-            for (VertexId node=0; node<num_nodes; node++)
-            {
-                backward_offsets[gpu][node]=node*(num_gpus-1);
-                for (int peer=1;peer<num_gpus;peer++)
+                backward_offsets[gpu][num_nodes]=in_counter_;
+                //memset(marker,0,sizeof(int)*num_gpus*cross_counter[gpu]);
+            } else {
+                delete[] backward_partitions[gpu];backward_partitions[gpu] = new int[num_nodes * (num_gpus-1)];
+                delete[] backward_convertions[gpu];backward_convertions[gpu] = new VertexId[num_nodes * (num_gpus-1)];
+                for (VertexId node=0; node<num_nodes; node++)
                 {
-                    backward_convertions[gpu][node*(num_gpus-1)+peer-1]=node;
-                    backward_partitions [gpu][node*(num_gpus-1)+peer-1]=peer;
+                    backward_offsets[gpu][node]=node*(num_gpus-1);
+                    for (int peer=1;peer<num_gpus;peer++)
+                    {
+                        backward_convertions[gpu][node*(num_gpus-1)+peer-1]=node;
+                        backward_partitions [gpu][node*(num_gpus-1)+peer-1]=peer;
+                    }
                 }
+                backward_offsets[gpu][num_nodes]=num_nodes*(num_gpus-1);
             }
-            backward_offsets[gpu][num_nodes]=num_nodes*(num_gpus-1);
+            delete[] marker;marker=NULL;
         } 
         out_counter[num_gpus]=0;
         in_counter[num_gpus]=0;
@@ -487,6 +495,7 @@ public:
             thread_data[gpu].num_gpus            = num_gpus;
             thread_data[gpu].partition_table0    = partition_tables [0];
             thread_data[gpu].convertion_table0   = convertion_tables[0];
+            thread_data[gpu].partition_tables    = partition_tables;
             thread_data[gpu].partition_table1    = &(partition_tables[gpu+1]);
             thread_data[gpu].convertion_table1   = &(convertion_tables[gpu+1]);
             thread_data[gpu].original_vertexes   = &(original_vertexes[gpu]);

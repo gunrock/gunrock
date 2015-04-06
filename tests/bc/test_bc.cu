@@ -26,6 +26,8 @@
 
 // Graph construction utils
 #include <gunrock/graphio/market.cuh>
+#include <gunrock/graphio/rmat.cuh>
+#include <gunrock/graphio/rgg.cuh>
 
 // BC includes
 #include <gunrock/app/bc/bc_enactor.cuh>
@@ -116,10 +118,12 @@ void DisplaySolution(Value *sigmas, Value *bc_values, SizeT nodes)
 struct Test_Parameter : gunrock::app::TestParameter_Base {
 public:
     std::string ref_filename;
+    double max_queue_sizing1;
 
     Test_Parameter()
     {
         ref_filename="";
+        max_queue_sizing1=-1.0;
     }
 
     ~Test_Parameter()
@@ -129,6 +133,7 @@ public:
     void Init(CommandLineArgs &args)
     {
         TestParameter_Base::Init(args);
+        args.GetCmdLineArgument("queue-sizing1", max_queue_sizing1);
     }
 };
 
@@ -335,7 +340,7 @@ void RefCPUBC(
         cpu_timer.Stop();
         float elapsed = cpu_timer.ElapsedMillis();
 
-        printf("CPU BFS finished in %lf msec. Search depth is:%d\n",
+        printf("CPU BC finished in %lf msec. Search depth is:%d\n",
                elapsed, search_depth);
 
         //delete[] source_path;
@@ -387,6 +392,7 @@ void RunTests(Test_Parameter *parameter)
     int           max_grid_size         = parameter -> max_grid_size;
     int           num_gpus              = parameter -> num_gpus;
     double        max_queue_sizing      = parameter -> max_queue_sizing;
+    double        max_queue_sizing1     = parameter -> max_queue_sizing1;
     double        max_in_sizing         = parameter -> max_in_sizing;
     ContextPtr   *context               = (ContextPtr*)parameter -> context;
     std::string   partition_method      = parameter -> partition_method;
@@ -490,11 +496,14 @@ void RunTests(Test_Parameter *parameter)
             util::MemsetKernel<<<128,128>>>
                 (problem->data_slices[gpu]->bc_values.GetPointer(util::DEVICE), (Value)0.0f, (int)(problem->sub_graphs[gpu].nodes));
         }
+        util::GRError(problem->Reset(0, enactor->GetFrontierType(), max_queue_sizing, max_queue_sizing1), "BC Problem Data Reset Fa    iled", __FILE__, __LINE__);
 
+        printf("__________________________\n");fflush(stdout);
         cpu_timer.Start();
         for (VertexId i = start_src; i < end_src; ++i)
         {
-            util::GRError(problem->Reset(i, enactor->GetFrontierType(), max_queue_sizing), "BC Problem Data Reset Failed", __FILE__, __LINE__);
+            util::GRError(problem->Reset(i, enactor->GetFrontierType(), max_queue_sizing, max_queue_sizing1), "BC Problem Data Reset Failed", __FILE__, __LINE__);
+            util::GRError(enactor ->Reset(), "BC Enactor Reset failed", __FILE__, __LINE__);
             util::GRError(enactor ->Enact(i), "BC Problem Enact Failed", __FILE__, __LINE__);
         }
         for (int gpu=0;gpu<num_gpus;gpu++)
@@ -504,11 +513,13 @@ void RunTests(Test_Parameter *parameter)
                (problem->data_slices[gpu]->bc_values.GetPointer(util::DEVICE), (Value)0.5f, (int)(problem->sub_graphs[gpu].nodes));
         }
         cpu_timer.Stop();
+        printf("--------------------------\n");fflush(stdout);
         elapsed += cpu_timer.ElapsedMillis();
     }
 
     elapsed /= iterations;
-    enactor->GetStatistics(avg_duty);
+    long long total_queued;
+    enactor->GetStatistics(total_queued, avg_duty);
 
     // Copy out results
     util::GRError(problem->Extract(h_sigmas, h_bc_values, h_ebc_values, h_labels), "BC Problem Data Extraction Failed", __FILE__, __LINE__);
@@ -611,18 +622,15 @@ void RunTests(Test_Parameter *parameter)
     printf("GPU BC finished in %lf msec.\n", elapsed);
     if (avg_duty != 0)
         printf("\n avg CTA duty: %.2f%% \n", avg_duty * 100);
+    printf("Totaled number of edges visited: %lld = %lld *2\n", (long long) total_queued * 2, (long long) total_queued);
 
     printf("\n\tMemory Usage(B)\t");
     for (int gpu=0;gpu<num_gpus;gpu++)
-    if (num_gpus>1) 
-    {
-        if (gpu!=0) printf(" #keys%d\t #ins%d,0\t #ins%d,1",gpu,gpu,gpu); 
-        else printf(" $keys%d", gpu);
-    } else printf(" #keys%d", gpu);
+    if (num_gpus>1) {if (gpu!=0) printf(" #keys%d,0\t #keys%d,1\t #ins%d,0\t #ins%d,1",gpu,gpu,gpu,gpu); else printf(" #keys%d,0\t #keys%d,1", gpu, gpu);}
+    else printf(" #keys%d,0\t #keys%d,1", gpu, gpu);
     if (num_gpus>1) printf(" #keys%d",num_gpus);
     printf("\n");
-
-    double max_key_sizing=0, max_in_sizing_=0;
+    double max_queue_sizing_[2] = {0,0}, max_in_sizing_=0;
     for (int gpu=0;gpu<num_gpus;gpu++)
     {   
         size_t gpu_free,dummy;
@@ -631,26 +639,29 @@ void RunTests(Test_Parameter *parameter)
         printf("GPU_%d\t %ld",gpu_idx[gpu],org_size[gpu]-gpu_free);
         for (int i=0;i<num_gpus;i++)
         {   
-            SizeT x=problem->data_slices[gpu]->frontier_queues[i].keys[0].GetSize();
-            printf("\t %d", x); 
-            double factor = 1.0*x/(num_gpus>1?problem->graph_slices[gpu]->in_counter[i]:problem->graph_slices[gpu]->nodes);
-            if (factor > max_key_sizing) max_key_sizing=factor;
+            for (int j=0; j<2; j++)
+            {   
+                SizeT x=problem->data_slices[gpu]->frontier_queues[i].keys[j].GetSize();
+                printf("\t %lld", (long long) x); 
+                double factor = 1.0*x/(num_gpus>1?problem->graph_slices[gpu]->in_counter[i]:problem->graph_slices[gpu]->nodes);
+                if (factor > max_queue_sizing_[j]) max_queue_sizing_[j]=factor;
+            }   
             if (num_gpus>1 && i!=0 )
             for (int t=0;t<2;t++)
             {   
-                x=problem->data_slices[gpu][0].keys_in[t][i].GetSize();
-                printf("\t %d", x); 
-                factor = 1.0*x/problem->graph_slices[gpu]->in_counter[i];
+                SizeT x=problem->data_slices[gpu][0].keys_in[t][i].GetSize();
+                printf("\t %lld", (long long) x); 
+                double factor = 1.0*x/problem->graph_slices[gpu]->in_counter[i];
                 if (factor > max_in_sizing_) max_in_sizing_=factor;
             }   
         }   
-        if (num_gpus>1) printf("\t %d",problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
+        if (num_gpus>1) printf("\t %lld", (long long)(problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize()));
         printf("\n");
     }   
-    printf("\t key_sizing =\t %lf", max_key_sizing);
+    printf("\t queue_sizing =\t %lf \t %lf", max_queue_sizing_[0], max_queue_sizing_[1]);
     if (num_gpus>1) printf("\t in_sizing =\t %lf", max_in_sizing_);
     printf("\n");
-    
+
     // Cleanup
     if (org_size            ) {delete[] org_size            ; org_size             = NULL;}
     if (problem             ) {delete   problem             ; problem              = NULL;}
@@ -814,16 +825,16 @@ int cpp_main( int argc, char** argv)
     //
     // Construct graph and perform search(es)
     //
+    typedef int VertexId;  // Use as the node identifier type
+    typedef float Value;   // Use as the value type
+    typedef int SizeT;     // Use as the graph size type
+    Csr<VertexId, Value, SizeT> csr(false); // default value for stream_from_host is false
+    if (graph_args < 1) { Usage(); return 1; }
+
     if (graph_type == "market") {
 
         // Matrix-market coordinate-formatted graph file
 
-        typedef int VertexId;  // Use as the node identifier type
-        typedef float Value;   // Use as the value type
-        typedef int SizeT;     // Use as the graph size type
-        Csr<VertexId, Value, SizeT> csr(false); // default value for stream_from_host is false
-
-        if (graph_args < 1) { Usage(); return 1; }
         char *market_filename = (graph_args == 2 || graph_args == 3) ? argv[2] : NULL;
         if (graphio::BuildMarketGraph<false>(
                 market_filename,
@@ -834,12 +845,86 @@ int cpp_main( int argc, char** argv)
             return 1;
         }
 
-        csr.PrintHistogram();
-        //csr.DisplayGraph();
-        fflush(stdout);
 
-        // Run tests
-        RunTests(&csr, args, num_gpus, context, gpu_idx, streams);
+    } else if (graph_type == "rmat")
+    {   
+        // parse rmat parameters
+        SizeT rmat_nodes = 1 << 10; 
+        SizeT rmat_edges = 1 << 10; 
+        SizeT rmat_scale = 10; 
+        SizeT rmat_edgefactor = 48; 
+        double rmat_a = 0.57;
+        double rmat_b = 0.19;
+        double rmat_c = 0.19;
+        double rmat_d = 1-(rmat_a+rmat_b+rmat_c);
+        int    rmat_seed = -1; 
+
+        args.GetCmdLineArgument("rmat_scale", rmat_scale);
+        rmat_nodes = 1 << rmat_scale;
+        args.GetCmdLineArgument("rmat_nodes", rmat_nodes);
+        args.GetCmdLineArgument("rmat_edgefactor", rmat_edgefactor);
+        rmat_edges = rmat_nodes * rmat_edgefactor;
+        args.GetCmdLineArgument("rmat_edges", rmat_edges);
+        args.GetCmdLineArgument("rmat_a", rmat_a);
+        args.GetCmdLineArgument("rmat_b", rmat_b);
+        args.GetCmdLineArgument("rmat_c", rmat_c);
+        rmat_d = 1-(rmat_a+rmat_b+rmat_c);
+        args.GetCmdLineArgument("rmat_d", rmat_d);
+        args.GetCmdLineArgument("rmat_seed", rmat_seed);
+
+        CpuTimer cpu_timer;
+        cpu_timer.Start();
+        if (graphio::BuildRmatGraph<false>(
+                rmat_nodes,
+                rmat_edges,
+                csr,
+                g_undirected,
+                rmat_a,
+                rmat_b,
+                rmat_c,
+                rmat_d,
+                1,  
+                1,  
+                rmat_seed) != 0)
+        {   
+            return 1;
+        }   
+        cpu_timer.Stop();
+        float elapsed = cpu_timer.ElapsedMillis();
+        printf("graph generated: %.3f ms, a = %.3f, b = %.3f, c = %.3f, d = %.3f\n", elapsed, rmat_a, rmat_b, rmat_c, rmat_d);
+    } else if (graph_type == "rgg") {
+       SizeT rgg_nodes = 1 << 10; 
+        SizeT rgg_scale = 10; 
+        double rgg_thfactor  = 0.55;
+        double rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
+        double rgg_vmultipiler = 1;
+        int    rgg_seed        = -1;
+
+        args.GetCmdLineArgument("rgg_scale", rgg_scale);
+        rgg_nodes = 1 << rgg_scale;
+        args.GetCmdLineArgument("rgg_nodes", rgg_nodes);
+        args.GetCmdLineArgument("rgg_thfactor", rgg_thfactor);
+        rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
+        args.GetCmdLineArgument("rgg_threshold", rgg_threshold);
+        args.GetCmdLineArgument("rgg_vmultipiler", rgg_vmultipiler);
+        args.GetCmdLineArgument("rgg_seed", rgg_seed);
+
+        CpuTimer cpu_timer;
+        cpu_timer.Start();
+        if (graphio::BuildRggGraph<false>(
+            rgg_nodes,
+            csr,
+            rgg_threshold,
+            g_undirected,
+            rgg_vmultipiler,
+            1,
+            rgg_seed) !=0)
+        {
+            return 1;
+        }
+        cpu_timer.Stop();
+        float elapsed = cpu_timer.ElapsedMillis();
+        printf("graph generated: %.3f ms, threshold = %.3lf, vmultipiler = %.3lf\n", elapsed, rgg_threshold, rgg_vmultipiler);
 
     } else {
 
@@ -848,6 +933,13 @@ int cpp_main( int argc, char** argv)
         return 1;
 
     }
+
+    csr.PrintHistogram();
+    //csr.DisplayGraph();
+    fflush(stdout);
+
+    // Run tests
+    RunTests(&csr, args, num_gpus, context, gpu_idx, streams);
 
     return 0;
 }
