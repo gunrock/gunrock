@@ -20,6 +20,19 @@ namespace gunrock {
 namespace app {
 namespace pr {
 
+#define TO_TRACK true
+
+    template <typename VertexId>
+    static __device__ __host__ bool to_track(VertexId node)
+    {   
+        const int num_to_track = 4;
+        const VertexId node_to_track[] = {0, 1, 2, 3};
+        for (int i=0; i<num_to_track; i++)
+            if (node == node_to_track[i]) return true;
+        return false;
+    }   
+ 
+
 /**
  * @brief Structure contains device functions in PR graph traverse.
  *
@@ -105,7 +118,8 @@ struct PRFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        //if (d_id == 0 || d_id == 1) printf("r[%d] += %f from %d,%f\t", d_id, problem->rank_curr[s_id] / problem->degrees[s_id], s_id, problem->rank_curr[s_id]);
+        if (TO_TRACK)
+        if (to_track(d_id)) printf("%d \tr[%d] \t+= %f\t from %d,%f\n", problem->gpu_idx, d_id, problem->rank_curr[s_id] / problem->degrees[s_id], s_id, problem->rank_curr[s_id]);
         atomicAdd(problem->rank_next + d_id, problem->rank_curr[s_id]/problem->degrees[s_id]);
     }
 
@@ -123,11 +137,12 @@ struct PRFunctor
         VertexId src_node  = problem->src_node ;
         //Value    threshold = problem->threshold;
         //printf("delta = %f, threshold = %f, src_node = %d \t", delta, threshold, src_node);
-        //Value    old_value = problem->rank_next[node];
+        Value    old_value = problem->rank_next[node];
         problem->rank_next[node] = (delta * problem->rank_next[node]) + (1.0-delta) * ((src_node == node || src_node == -1) ? 1 : 0);
         Value diff = fabs(problem->rank_next[node] - problem->rank_curr[node]);
 
-        //if (node == 0 || node == 1) printf("r[%d] : %f -> %f (%f)\t", node, problem->rank_curr[node], problem->rank_next[node], old_value); 
+        if (TO_TRACK)
+        if (to_track(node)) printf("%d \tr[%d] \t%f \t-> %f \t(%f)\n", problem->gpu_idx, node, problem->rank_curr[node], problem->rank_next[node], old_value); 
         return (diff > problem->threshold);
     }
 

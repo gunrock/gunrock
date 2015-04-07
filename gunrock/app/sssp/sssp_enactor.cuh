@@ -452,8 +452,8 @@ struct SSSPIteration : public IterationBase <
             for (int peer_=0;peer_<num_gpus;peer_++)
             {
                 frontier_attribute[peer_].queue_index  = 0;        // Work queue index
-                frontier_attribute[peer_].selector     = 0;
                 frontier_attribute[peer_].queue_length = peer_==0?thread_data->init_size:0; 
+                frontier_attribute[peer_].selector     = 0;//frontier_attrbute[peer_].queue_length == 0 ? 0 : 1;
                 frontier_attribute[peer_].queue_reset  = true;
                 enactor_stats     [peer_].iteration    = 0;
             }

@@ -399,8 +399,8 @@ struct BFSIteration : public IterationBase <
             for (int peer=0;peer<num_gpus;peer++)
             {
                 frontier_attribute[peer].queue_index    = 0;        // Work queue index
-                frontier_attribute[peer].selector       = 0;
                 frontier_attribute[peer].queue_length   = peer==0?thread_data -> init_size:0; 
+                frontier_attribute[peer].selector       = 0; //frontier_attribute[peer].queue_length ==0 ? 0 : 1;
                 frontier_attribute[peer].queue_reset    = true;
                 enactor_stats     [peer].iteration      = 0;
             }

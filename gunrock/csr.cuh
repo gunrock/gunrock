@@ -267,9 +267,6 @@ struct Csr
         //time_t mark3 = time(NULL);
         //printf("Done soerting (%ds).\n", (int)(mark3 - mark1));
 
-        //for (SizeT edge = 0; edge < coo_edges; edge ++)
-        //    printf("e%d: %d -> %d \t", edge, coo[edge].row, coo[edge].col);
-        //printf("\n"); 
         SizeT edge_offsets[129];
         SizeT edge_counts [129];
         #pragma omp parallel
@@ -315,7 +312,7 @@ struct Csr
 
             SizeT edge_offset = edge_offsets[thread_num];
             VertexId first_row= new_edge > 0? new_coo[0].row : -1;
-            VertexId last_row = new_edge > 0? new_coo[new_edge-1].row : -1;
+            //VertexId last_row = new_edge > 0? new_coo[new_edge-1].row : -1;
             SizeT pointer = -1;
             for (edge = 0; edge < new_edge; edge++) {
                 SizeT edge_  = edge + edge_offset;
@@ -335,7 +332,9 @@ struct Csr
                 }
             }
             #pragma omp barrier
-            if (first_row != last_row)
+            //if (first_row != last_row)
+            if (edge_start > 0 && coo[edge_start].row == coo[edge_start-1].row) // same row as pervious thread
+            if (edge_end == coo_edges || coo[edge_end].row != coo[edge_start].row) // first row ends at this thread
             {
                 row_offsets[first_row+1] = pointer;
             }
@@ -351,7 +350,9 @@ struct Csr
                 row_offsets[node_start] = row_offsets[i];
             }
             for (VertexId node = node_start+1; node < node_end; node++)
-                if (row_offsets[node] == -1) row_offsets[node] = row_offsets[node-1];
+                if (row_offsets[node] == -1) {
+                    row_offsets[node] = row_offsets[node-1];
+                }
             if (thread_num == 0) edges = edge_offsets[num_threads];
   
             free(new_coo); new_coo = NULL;
@@ -360,7 +361,7 @@ struct Csr
         //printf("nodes = %d, edges = %d\n", nodes, edges);
         row_offsets[nodes] = edges;
         //util::cpu_mt::PrintCPUArray("row_offsets", row_offsets, nodes+1);
-        //`util::cpu_mt::PrintCPUArray("column_indices", column_indices, edges);
+        //util::cpu_mt::PrintCPUArray("column_indices", column_indices, edges);
         
         time_t mark2 = time(NULL);
         printf("Done converting (%ds).\n", (int)(mark2 - mark1));
