@@ -1,9 +1,10 @@
-@import url(https://fonts.googleapis.com/css?family=Lato:300italic,700italic,300,700);
+@import url(http://fonts.googleapis.com/css?family=Ubuntu:300,500,300italic);
+@import url(http://fonts.googleapis.com/css?family=Ubuntu+Condensed);
 
 body {
   padding:50px;
-  font:14px/1.5 Lato, "Helvetica Neue", Helvetica, Arial, sans-serif;
-  color:#777;
+  font:14px/1.5 "Ubuntu", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color:#222;
   font-weight:300;
 }
 
@@ -38,6 +39,10 @@ a {
   text-decoration:none;
 }
 
+a:hover {
+  color:#069;
+}
+
 a small {
   font-size:11px;
   color:#777;
@@ -45,8 +50,12 @@ a small {
   display:block;
 }
 
+a:hover small {
+  color:#777;
+}
+
 .wrapper {
-  width:860px;
+  width:780px;
   margin:0 auto;
 }
 
@@ -96,9 +105,14 @@ img {
 }
 
 header {
-  width:270px;
+  width:180px;
   float:left;
   position:fixed;
+}
+
+  
+header p {
+  margin-bottom: 5px;
 }
 
 header ul {
@@ -118,14 +132,24 @@ header ul {
   border-radius:5px;
   border:1px solid #d2d2d2;
   box-shadow:inset #fff 0 1px 0, inset rgba(0,0,0,0.03) 0 -1px 0;
-  width:270px;
+  width:179px;
+  margin-top: 20px;
 }
 
 header li {
   width:89px;
   float:left;
-  border-right:1px solid #d2d2d2;
   height:40px;
+}
+
+header li:first-child a {
+  border-right:1px solid #d2d2d2;
+  border-radius:5px 0 0 5px;
+}
+
+header li:last-child a {
+  border-radius:0 5px 5px 0;
+  border-right: 0px;
 }
 
 header ul a {
@@ -135,7 +159,23 @@ header ul a {
   display:block;
   text-align:center;
   padding-top:6px;
-  height:40px;
+  height:34px;
+}
+
+header ul a:hover {
+  color:#999;
+  background: -moz-linear-gradient(top, #fff 0%, #ddd 100%);
+  background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#fff), color-stop(100%,#ddd));
+  background: -webkit-linear-gradient(top, #fff 0%,#ddd 100%);
+  background: -o-linear-gradient(top, #fff 0%,#ddd 100%);
+  background: -ms-linear-gradient(top, #fff 0%,#ddd 100%);
+  background: linear-gradient(top, #fff 0%,#ddd 100%);
+}
+
+header ul a:active {
+  -webkit-box-shadow: inset 0px 2px 2px 0px #ddd;
+  -moz-box-shadow: inset 0px 2px 2px 0px #ddd;
+  box-shadow: inset 0px 2px 2px 0px #ddd;
 }
 
 strong {
@@ -226,7 +266,7 @@ footer {
   header {
     padding:0;
   }
-  
+
   header ul, header p.view {
     position:static;
   }
