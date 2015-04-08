@@ -215,7 +215,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                 //for (int i = 0; i < 2; i++) 
                 {
                     if (peer == this->num_gpus && i == 1) continue;
-                    if (new_frontier_elements[i] > edges + 2) new_frontier_elements[i] = edges + 2;
+                    if (new_frontier_elements[i] > edges + 2 && queue_sizing_ > 10) new_frontier_elements[i] = edges + 2;
                     //if (peer == this->num_gpus && new_frontier_elements[i] > nodes * this->num_gpus) new_frontier_elements[i] = nodes * this->num_gpus;
                     if (this->frontier_queues[peer].keys[i].GetSize() < new_frontier_elements[i]) {
 

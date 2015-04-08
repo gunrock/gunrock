@@ -24,6 +24,8 @@
 
 // Graph construction utils
 #include <gunrock/graphio/market.cuh>
+#include <gunrock/graphio/rmat.cuh>
+#include <gunrock/graphio/rgg.cuh>
 
 // BFS includes
 #include <gunrock/app/pr/pr_enactor.cuh>
@@ -150,6 +152,69 @@ struct Stats {
     Stats(const char *name) : name(name), rate(), search_depth(), redundant_work(), duty() {}
 };
 
+/**
+ * @brief Compares the equivalence of two arrays. If incorrect, print the location
+ * of the first incorrect value appears, the incorrect value, and the reference
+ * value.
+ *
+ * @tparam T datatype of the values being compared with.
+ * @tparam SizeT datatype of the array length.
+ *
+ * @param[in] computed Vector of values to be compared.
+ * @param[in] reference Vector of reference values
+ * @param[in] len Vector length
+ * @param[in] verbose Whether to print values around the incorrect one.
+ *
+ * \return Zero if two vectors are exactly the same, non-zero if there is any difference.
+ *
+ */
+template <typename SizeT>
+int CompareResults_(float* computed, float* reference, SizeT len, bool verbose = true)
+{
+    float THRESHOLD = 0.05f;
+    int flag = 0;
+    for (SizeT i = 0; i < len; i++) {
+
+        // Use relative error rate here.
+        bool is_right = true;
+        if (fabs(computed[i]) < 0.01f && fabs(reference[i]-1) < 0.01f) continue;
+        if (fabs(computed[i] - 0.0) < 0.01f) {
+            if (fabs(computed[i] - reference[i]) > THRESHOLD)
+                is_right = false;
+        } else {
+            if (fabs((computed[i] - reference[i])/reference[i]) > THRESHOLD)
+                is_right = false;
+        }   
+        if (!is_right && flag == 0) {
+            printf("\nINCORRECT: [%lu]: ", (unsigned long) i); 
+            PrintValue<float>(computed[i]);
+            printf(" != ");
+            PrintValue<float>(reference[i]);
+
+            if (verbose) {
+                printf("\nresult[...");
+                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+                    PrintValue<float>(computed[j]);
+                    printf(", ");
+                }   
+                printf("...]");
+                printf("\nreference[...");
+                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+                    PrintValue<float>(reference[j]);
+                    printf(", ");
+                }   
+                printf("...]");
+            }   
+            flag += 1;
+            //return flag;
+        }   
+        if (!is_right && flag > 0) flag += 1;
+    }   
+    printf("\n");
+    if (!flag)
+        printf("CORRECT");
+    return flag;
+}
 /**
  * @brief Displays timing and correctness statistics
  *
@@ -405,6 +470,7 @@ void RunTests(Test_Parameter *parameter)
     {
         total_pr += h_rank[i];
     }
+    printf("Total rank : %f\n", total_pr);
 
     //
     // Compute reference CPU PR solution for source-distance
@@ -425,8 +491,13 @@ void RunTests(Test_Parameter *parameter)
 
     // Verify the result
     if (reference_check != NULL && total_pr > 0) {
-        printf("Validity: ");
-        CompareResults(h_rank, reference_check, graph->nodes, true);
+        printf("Validity Rank: ");
+        int errors_count = CompareResults_(h_rank, reference_check, graph->nodes, true);
+        if (errors_count > 0) printf("number of errors : %lld\n",(long long) errors_count);
+
+        /*printf("Validity node_id: ");
+        errors_count = CompareResults(h_node_id, reference_node_id, graph->nodes, true);
+        if (errors_count > 0) printf("number of errors : %lld\n", (long long) errors_count);*/
     }
     printf("\nFirst 40 labels of the GPU result."); 
     // Display Solution
@@ -442,15 +513,11 @@ void RunTests(Test_Parameter *parameter)
 
     printf("\n\tMemory Usage(B)\t");
     for (int gpu=0;gpu<num_gpus;gpu++)
-    if (num_gpus>1)
-    {   
-        if (gpu!=0) printf(" #keys%d\t #ins%d,0\t #ins%d,1",gpu,gpu,gpu);
-        else printf(" $keys%d", gpu);
-    } else printf(" #keys%d", gpu);
+    if (num_gpus>1) {if (gpu!=0) printf(" #keys%d,0\t #keys%d,1\t #ins%d,0\t #ins%d,1",gpu,gpu,gpu,gpu); else printf(" #keys%d,0\t #keys%d,1", gpu, gpu);}
+    else printf(" #keys%d,0\t #keys%d,1", gpu, gpu);
     if (num_gpus>1) printf(" #keys%d",num_gpus);
     printf("\n");
-
-    double max_key_sizing=0, max_in_sizing_=0;
+    double max_queue_sizing_[2] = {0,0}, max_in_sizing_=0;
     for (int gpu=0;gpu<num_gpus;gpu++)
     {   
         size_t gpu_free,dummy;
@@ -459,23 +526,26 @@ void RunTests(Test_Parameter *parameter)
         printf("GPU_%d\t %ld",gpu_idx[gpu],org_size[gpu]-gpu_free);
         for (int i=0;i<num_gpus;i++)
         {   
-            SizeT x=problem->data_slices[gpu]->frontier_queues[i].keys[0].GetSize();
-            printf("\t %d", x); 
-            double factor = 1.0*x/(num_gpus>1?problem->graph_slices[gpu]->in_counter[i]:problem->graph_slices[gpu]->nodes);
-            if (factor > max_key_sizing) max_key_sizing=factor;
+            for (int j=0; j<2; j++)
+            {   
+                SizeT x=problem->data_slices[gpu]->frontier_queues[i].keys[j].GetSize();
+                printf("\t %lld", (long long) x); 
+                double factor = 1.0*x/(num_gpus>1?problem->graph_slices[gpu]->in_counter[i]:problem->graph_slices[gpu]->nodes);
+                if (factor > max_queue_sizing_[j]) max_queue_sizing_[j]=factor;
+            }   
             if (num_gpus>1 && i!=0 )
             for (int t=0;t<2;t++)
             {   
-                x=problem->data_slices[gpu][0].keys_in[t][i].GetSize();
-                printf("\t %d", x); 
-                factor = 1.0*x/problem->graph_slices[gpu]->in_counter[i];
+                SizeT x=problem->data_slices[gpu][0].keys_in[t][i].GetSize();
+                printf("\t %lld", (long long) x); 
+                double factor = 1.0*x/problem->graph_slices[gpu]->in_counter[i];
                 if (factor > max_in_sizing_) max_in_sizing_=factor;
             }   
         }   
-        if (num_gpus>1) printf("\t %d",problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
+        if (num_gpus>1) printf("\t %lld", (long long)(problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize()));
         printf("\n");
     }   
-    printf("\t key_sizing =\t %lf", max_key_sizing);
+    printf("\t queue_sizing =\t %lf \t %lf", max_queue_sizing_[0], max_queue_sizing_[1]);
     if (num_gpus>1) printf("\t in_sizing =\t %lf", max_in_sizing_);
     printf("\n");
 
@@ -616,18 +686,18 @@ int cpp_main( int argc, char** argv)
     parameter -> gpu_idx     = gpu_idx;
     parameter -> streams     = streams;
 
+    typedef int VertexId;							// Use as the node identifier type
+    typedef float Value;								// Use as the value type
+    typedef int SizeT;								// Use as the graph size type
+    Csr<VertexId, Value, SizeT> graph(false);         // default value for stream_from_host is false
+
 	if (graph_type == "market") {
 
 		// Matrix-market coordinate-formatted graph file
 
-		typedef int VertexId;							// Use as the node identifier type
-		typedef float Value;								// Use as the value type
-		typedef int SizeT;								// Use as the graph size type
-		Csr<VertexId, Value, SizeT> graph(false);         // default value for stream_from_host is false
-
-		if (graph_args < 1) { Usage(); return 1; }
-		char *market_filename = (graph_args == 2) ? argv[2] : NULL;
-		if (graphio::BuildMarketGraph<false>(
+        if (graph_args < 1) { Usage(); return 1; }
+        char *market_filename = (graph_args == 2) ? argv[2] : NULL;
+        if (graphio::BuildMarketGraph<false>(
 			market_filename, 
 			graph, 
 			parameter->g_undirected,
@@ -636,22 +706,102 @@ int cpp_main( int argc, char** argv)
 			return 1;
 		}
 
-        parameter -> graph       = &graph;
-	    if (parameter -> traversal_mode == -1)
-            parameter -> traversal_mode = graph.GetAverageDegree()>3 ? 0 : 1;
+	} else if (graph_type == "rmat")
+    {
+        // parse rmat parameters
+        SizeT rmat_nodes = 1 << 10;
+        SizeT rmat_edges = 1 << 10;
+        SizeT rmat_scale = 10;
+        SizeT rmat_edgefactor = 48;
+        double rmat_a = 0.57;
+        double rmat_b = 0.19;
+        double rmat_c = 0.19;
+        double rmat_d = 1-(rmat_a+rmat_b+rmat_c);
+        int    rmat_seed = -1;
 
-	    graph.PrintHistogram();
+        args.GetCmdLineArgument("rmat_scale", rmat_scale);
+        rmat_nodes = 1 << rmat_scale;
+        args.GetCmdLineArgument("rmat_nodes", rmat_nodes);
+        args.GetCmdLineArgument("rmat_edgefactor", rmat_edgefactor);
+        rmat_edges = rmat_nodes * rmat_edgefactor;
+        args.GetCmdLineArgument("rmat_edges", rmat_edges);
+        args.GetCmdLineArgument("rmat_a", rmat_a);
+        args.GetCmdLineArgument("rmat_b", rmat_b);
+        args.GetCmdLineArgument("rmat_c", rmat_c);
+        rmat_d = 1-(rmat_a+rmat_b+rmat_c);
+        args.GetCmdLineArgument("rmat_d", rmat_d);
+        args.GetCmdLineArgument("rmat_seed", rmat_seed);
 
-		// Run tests
-		RunTests<VertexId, Value, SizeT>(parameter);
+        CpuTimer cpu_timer;
+        cpu_timer.Start();
+        if (graphio::BuildRmatGraph<false>(
+                rmat_nodes,
+                rmat_edges,
+                graph,
+                parameter->g_undirected,
+                rmat_a,
+                rmat_b,
+                rmat_c,
+                rmat_d,
+                1,
+                1,
+                rmat_seed) != 0)
+        {
+            return 1;
+        }
+        cpu_timer.Stop();
+        float elapsed = cpu_timer.ElapsedMillis();
+        printf("graph generated: %.3f ms, a = %.3f, b = %.3f, c = %.3f, d = %.3f\n", elapsed, rmat_a, rmat_b, rmat_c, rmat_d);
+    } else if (graph_type == "rgg") {
 
-	} else {
+        SizeT rgg_nodes = 1 << 10;
+        SizeT rgg_scale = 10;
+        double rgg_thfactor  = 0.55;
+        double rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
+        double rgg_vmultipiler = 1;
+        int    rgg_seed        = -1;
+
+        args.GetCmdLineArgument("rgg_scale", rgg_scale);
+        rgg_nodes = 1 << rgg_scale;
+        args.GetCmdLineArgument("rgg_nodes", rgg_nodes);
+        args.GetCmdLineArgument("rgg_thfactor", rgg_thfactor);
+        rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
+        args.GetCmdLineArgument("rgg_threshold", rgg_threshold);
+        args.GetCmdLineArgument("rgg_vmultipiler", rgg_vmultipiler);
+        args.GetCmdLineArgument("rgg_seed", rgg_seed);
+
+        CpuTimer cpu_timer;
+        cpu_timer.Start();
+        if (graphio::BuildRggGraph<false>(
+            rgg_nodes,
+            graph,
+            rgg_threshold,
+            parameter->g_undirected,
+            rgg_vmultipiler,
+            1,
+            rgg_seed) !=0)
+        {
+            return 1;
+        }
+        cpu_timer.Stop();
+        float elapsed = cpu_timer.ElapsedMillis();
+        printf("graph generated: %.3f ms, threshold = %.3lf, vmultipiler = %.3lf\n", elapsed, rgg_threshold, rgg_vmultipiler);
+    } else {
 
 		// Unknown graph type
 		fprintf(stderr, "Unspecified graph type\n");
 		return 1;
 
 	}
+
+    parameter -> graph       = &graph;
+    if (parameter -> traversal_mode == -1)
+        parameter -> traversal_mode = graph.GetAverageDegree()>3 ? 0 : 1;
+
+    graph.PrintHistogram();
+
+    // Run tests
+    RunTests<VertexId, Value, SizeT>(parameter);
 
 	return 0;
 }

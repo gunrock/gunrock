@@ -20,7 +20,7 @@ namespace gunrock {
 namespace app {
 namespace pr {
 
-#define TO_TRACK true
+#define TO_TRACK false
 
     template <typename VertexId>
     static __device__ __host__ bool to_track(VertexId node)

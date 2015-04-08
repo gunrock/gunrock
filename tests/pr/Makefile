@@ -26,7 +26,7 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\"
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\" 
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" 
-SM_TARGETS = $(GEN_SM30) $(GEN_SM37)
+SM_TARGETS = $(GEN_SM35)
 #$(GEN_SM35)
 
 #-------------------------------------------------------------------------------

@@ -599,6 +599,46 @@ public:
         data_slice[0]->out_length[0] = frontier_attribute->queue_length; 
     }
 
+    /*static void Check_Queue_Size(
+        int                            thread_num,
+        int                            peer_,
+        SizeT                          request_length,
+        util::DoubleBuffer<SizeT, VertexId, Value>
+                                      *frontier_queue,
+        //util::Array1D<SizeT, SizeT>   *scanned_edges,
+        FrontierAttribute<SizeT>      *frontier_attribute,
+        EnactorStats                  *enactor_stats,
+        //DataSlice                     *data_slice,
+        //DataSlice                     *d_data_slice,
+        GraphSlice                    *graph_slice
+        //util::CtaWorkProgressLifetime *work_progress,
+        //ContextPtr                     context,
+        //cudaStream_t                   stream
+        )    
+    {    
+        bool over_sized = false;
+        int  selector   = frontier_attribute->selector;
+        int  iteration  = enactor_stats -> iteration;
+
+        if (Enactor::DEBUG)
+            printf("%d\t %d\t %d\t queue_length = %d, output_length = %d\n",
+                thread_num, iteration, peer_,
+                frontier_queue->keys[selector^1].GetSize(),
+                request_length);fflush(stdout);
+
+        if (enactor_stats->retval = 
+            Check_Size<true, SizeT, VertexId > ("queue3", request_length, &frontier_queue->keys  [selector^1], over_sized, thread_num, iteration, peer_, false)) return; 
+        if (enactor_stats->retval = 
+            Check_Size<true, SizeT, VertexId > ("queue3", graph_slice->nodes+2, &frontier_queue->keys  [selector  ], over_sized, thread_num, iteration, peer_, true )) return; 
+        if (Problem::USE_DOUBLE_BUFFER)
+        {    
+            if (enactor_stats->retval = 
+                Check_Size<true, SizeT, Value> ("queue3", request_length, &frontier_queue->values[selector^1], over_sized, thread_num, iteration, peer_, false)) return; 
+            if (enactor_stats->retval = 
+                Check_Size<true, SizeT, Value> ("queue3", graph_slice->nodes+2, &frontier_queue->values[selector  ], over_sized, thread_num, iteration, peer_, true )) return; 
+        }    
+    } */   
+
 }; // end R0DIteration
 
 template <
@@ -703,7 +743,7 @@ public:
         frontier_attribute->queue_length = data_slice->edge_map_queue_len;
         //if (enactor_stats->iteration == 0) util::cpu_mt::PrintGPUArray("keys", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
         //if (enactor_stats->iteration == 0) util::cpu_mt::PrintGPUArray<SizeT, SizeT>("degrees", data_slice->degrees.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
-        util::cpu_mt::PrintGPUArray<SizeT, Value>("ranks", data_slice->rank_curr.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
+        //util::cpu_mt::PrintGPUArray<SizeT, Value>("ranks", data_slice->rank_curr.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
 
         //printf("Advance start.\n");fflush(stdout); 
         // Edge Map
@@ -812,7 +852,7 @@ public:
               char*           array,
               DataSlice*      data_slice)
     {
-        util::cpu_mt::PrintCPUArray("Incoming_length", &num_elements, 1, data_slice->gpu_idx);
+        //util::cpu_mt::PrintCPUArray("Incoming_length", &num_elements, 1, data_slice->gpu_idx);
         Expand_Incoming_PR
             <VertexId, SizeT, Value, NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
             <<<grid_size, block_size, shared_size, stream>>> (
@@ -1075,15 +1115,15 @@ public:
             {
                 data_slice->value__associate_orgs[0] = data_slice->rank_next.GetPointer(util::DEVICE);
                 data_slice->value__associate_orgs.Move(util::HOST, util::DEVICE);
-                /*util::cpu_mt::IncrementnWaitBarrier(cpu_barrier, thread_num);
+                util::cpu_mt::IncrementnWaitBarrier(cpu_barrier, thread_num);
                 for (int i=0; i<4; i++)
                 for (int gpu=0; gpu<num_gpus; gpu++)
-                for (int stage=0; stage=data_slice->num_stages; stage++)
+                for (int stage=0; stage<data_slice->num_stages; stage++)
                     data_slice->events_set[i][gpu][stage] = false;
-                util::cpu_mt::IncrementnWaitBarrier(cpu_barrier+1, thread_num);*/
+                util::cpu_mt::IncrementnWaitBarrier(cpu_barrier+1, thread_num);
             }
             data_slice -> edge_map_queue_len = frontier_attribute[0].queue_length;
-            util::cpu_mt::PrintGPUArray("degrees", data_slice->degrees.GetPointer(util::DEVICE), graph_slice->nodes, thread_num);
+            //util::cpu_mt::PrintGPUArray("degrees", data_slice->degrees.GetPointer(util::DEVICE), graph_slice->nodes, thread_num);
 
             // Step through PR iterations
             gunrock::app::Iteration_Loop
