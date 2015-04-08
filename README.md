@@ -25,7 +25,7 @@ application for all the functionality of Gunrock.
 
 For the programming model we use in Gunrock, see [Programming Model](http://gunrock.github.io/gunrock/doc/0.2/programming_model.html).
 
-We have also provided a code walkthrough of a [simple example](http://gunrock.github.io/gunrock/doc/0.2/simple_example.html).
+We have also provided a code walkthrough of a [simple example](http://gunrock.github.io/gunrock/doc/0.2/simple_example.html) and [annotated code](http://gunrock.github.io/gunrock/doc/annotated_primitives/annotated_primitives.html) for two typical graph primitives.
 
 Reporting Problems
 ==================
