@@ -89,13 +89,15 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value, ENABLE_BACKWARD,
         int        seed   = -1)
     {
         cudaError_t retval = cudaSuccess;
+        //typedef idxtype idx_t;
         idx_t       nodes  = this->graph->nodes;
         idx_t       ngpus  = this->num_gpus;
         idx_t       ncons  = 1;
         idx_t       objval;
         idx_t*      tpartition_table = new idx_t[nodes];//=this->partition_tables[0];
 
-        int Status = METIS_PartGraphKway(
+        //int Status = 
+                METIS_PartGraphKway(
                     &nodes,                      // nvtxs  : the number of vertices in the graph
                     &ncons,                      // ncon   : the number of balancing constraints
                     this->graph->row_offsets,    // xadj   : the adjacency structure of the graph

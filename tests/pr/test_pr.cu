@@ -247,6 +247,7 @@ void DisplayStats(
 
     // Display the specific sample statistics
     printf(" elapsed: %.3f ms", elapsed);
+    printf(", #edges visited: %lld", total_queued);
     if (avg_duty != 0) {
         printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
     }

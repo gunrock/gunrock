@@ -27,7 +27,8 @@
 #include <gunrock/app/rp/rp_partitioner.cuh>
 #include <gunrock/app/cp/cp_partitioner.cuh>
 #include <gunrock/app/brp/brp_partitioner.cuh>
-//#include <gunrock/app/metisp/metis_partitioner.cuh>
+#include <gunrock/app/metisp/metis_partitioner.cuh>
+#include <gunrock/app/sp/sp_partitioner.cuh>
 #include <vector>
 #include <string>
 
@@ -1139,9 +1140,12 @@ struct ProblemBase
                 if (partition_method=="random")
                     partitioner=new rp::RandomPartitioner   <VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                         (*graph,num_gpus);
-               // else if (partition_method=="metis")
-               //     partitioner=new metisp::MetisPartitioner<VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
-               //         (*graph,num_gpus);
+                else if (partition_method=="metis")
+                    partitioner=new metisp::MetisPartitioner<VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
+                        (*graph,num_gpus);
+                else if (partition_method=="static")
+                    partitioner=new sp::StaticPartitioner<VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
+                        (*graph,num_gpus);
                 else if (partition_method=="cluster")
                     partitioner=new cp::ClusterPartitioner  <VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                         (*graph,num_gpus);
