@@ -9,7 +9,7 @@ for i in $DIRS
 do
     if [ -d $i ] ;
     then
-        echo $i
+        #echo $i
         ./make_summary $i
     fi
 done

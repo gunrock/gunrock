@@ -120,6 +120,9 @@ int main(int argc, char* argv[])
     char seperators[] = {' ', '\0', '\13', '\t', '\n', ':', '[', ']',',', ')', '('};
     int num_seperators = 11;
     int max_length = 0;
+    int num_tokens = 0;
+    string** token_lists = new string*[1024];
+    for (int i=0; i<1024; i++) token_lists[i] = NULL;
     ofstream fout;
     
     items[ 0].Init("test_name", 0, search_tokens,  0, 1);
@@ -181,6 +184,9 @@ int main(int argc, char* argv[])
             length = items[i].num_search_tokens + items[i].offset + items[i].num_record_tokens;
         }
         if (length > max_length) max_length = length;
+
+        num_tokens += items[i].num_record_tokens;
+        if (items[i].num_record_tokens==0) num_tokens++;
     }
     current_tokens = new string[max_length];
     
@@ -200,6 +206,7 @@ int main(int argc, char* argv[])
     for (int i=0; i<num_items; i++)
         items[i].Reset();
     string dir_name = string(argv[1]);
+    cout<<dir_name<<"\t";
     fout.open(string(dir_name+".txt").c_str());
     for (int i=0; i<num_items;i++)
     {
@@ -274,16 +281,39 @@ int main(int argc, char* argv[])
         }
         fin.close();
 
+        token_lists[num_data] = new string[num_tokens];
+        int temp_counter = 0;
         for (int i=0; i<num_items; i++)
         for (int j=0; j< (items[i].num_record_tokens ==0? 1: items[i].num_record_tokens); j++)
         {
-            fout<<items[i].record_tokens[j]<<"\t";
+            //fout<<items[i].record_tokens[j]<<"\t";
+            token_lists[num_data][temp_counter] = items[i].record_tokens[j];
+            temp_counter++;
         }
-        fout<<endl;
+        //fout<<endl;
         num_data ++;
     };
     cout<<"num_data = "<<num_data<<endl;
 
+    for (int i=0; i<num_data-1; i++)
+    for (int j=i+1; j<num_data; j++)
+    if (token_lists[i][0] > token_lists[j][0] || (token_lists[i][0] == token_lists[j][0] && token_lists[i][1] > token_lists[j][1])) {
+        for (int k=0; k<num_tokens; k++)
+        {
+            string temp_str = token_lists[i][k];
+            token_lists[i][k]=token_lists[j][k];
+            token_lists[j][k] = temp_str;
+        }
+    }
+
+    for (int i=0; i<num_data; i++)
+    {
+        for (int j=0; j<num_tokens-1; j++)
+            fout<<token_lists[i][j]<<"\t";
+        fout<<token_lists[i][num_tokens-1]<<endl;
+    }
+
+    fout.close();
     closedir(directory);
     return 0;
 }

@@ -453,6 +453,8 @@ void RunTests(Test_Parameter *parameter)
     GpuTimer gpu_timer;
 
     util::GRError(problem->Reset(src, delta, error, max_iter, enactor->GetFrontierType(), max_queue_sizing), "pr Problem Data Reset Failed", __FILE__, __LINE__);
+    util::GRError(enactor->Reset(), "PR Enactor Reset Reset failed", __FILE__, __LINE__);
+    
     printf("_________________________________________\n");fflush(stdout);
     gpu_timer.Start();
     util::GRError(enactor->Enact(traversal_mode), "pr Problem Enact Failed", __FILE__, __LINE__);
