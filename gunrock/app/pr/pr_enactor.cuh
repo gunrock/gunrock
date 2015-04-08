@@ -379,6 +379,8 @@ public:
 
         //if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
         //      "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break; 
+        enactor_stats      -> Accumulate(
+            work_progress  -> GetQueueLengthPointer<unsigned int,SizeT>(frontier_attribute->queue_index+1), stream);
 
         gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, RemoveZeroFunctor>
             <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
@@ -419,7 +421,7 @@ public:
         frontier_attribute->selector^=1;
         if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, stream)) return;
         if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__)) return;
-        enactor_stats->total_queued[0] += frontier_attribute->queue_length;
+        //enactor_stats->total_queued[0] += frontier_attribute->queue_length;
         //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys1", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
         //util::cpu_mt::PrintGPUArray<SizeT, SizeT>("degrees1", data_slice->degrees.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
 
@@ -775,7 +777,11 @@ public:
             gunrock::oprtr::advance::V2V,
             false,
             false);
+        
+        if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index+1, frontier_attribute->queue_length, false, stream, true)) return;
         if (enactor_stats->retval = cudaStreamSynchronize(stream)) return;
+        enactor_stats->total_queued[0] += frontier_attribute->queue_length;
+        frontier_attribute->queue_length = data_slice->edge_map_queue_len;
         //printf("Advance end.\n");fflush(stdout); 
 
         //if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
@@ -1301,7 +1307,8 @@ public:
             for (int peer=0; peer< this->num_gpus; peer++)
             {
                 EnactorStats *enactor_stats_ = this->enactor_stats + gpu * this->num_gpus + peer;
-                //enactor_stats_ -> total_queued.Move(util::DEVICE, util::HOST);
+                total_queued += enactor_stats_ -> total_queued[0];
+                enactor_stats_ -> total_queued.Move(util::DEVICE, util::HOST);
                 total_queued += enactor_stats_ -> total_queued[0];
                 //if (enactor_stats_ -> iteration > search_depth)
                 //    search_depth = enactor_stats_ -> iteration;
