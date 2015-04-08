@@ -39,7 +39,7 @@ Operating System Support and Requirements
 =========================================
 
 This release (0.2) has only been tested on Linux Mint 15 (64-bit) with
-CUDA 6.0 installed. We expect Gunrock to build and run correctly on
+CUDA 5.5, 6.0, and 6.5 installed. We expect Gunrock to build and run correctly on
 other 64-bit and 32-bit Linux distributions, Mac OS, and Windows.
 
 Requirements
