@@ -9,7 +9,8 @@ integrates, and generalizes best-of-class GPU implementations
 of breadth-first search, connected components, and betweenness
 centrality into a unified code base useful for future
 development of high-performance GPU graph primitives. For more
-details, please read our [paper on arxiv](http://arxiv.org/abs/1501.05387).
+details, please read our paper on arxiv:
+[Gunrock: A High-Performance Graph Processing Library on the GPU](http://arxiv.org/abs/1501.05387).
 
 Home Page
 ---------
@@ -65,11 +66,11 @@ detailed information.
 
 Publications
 ============
-Yangzihao Wang, Andrew Davidson, Yuechao Pan, Yuduo Wu, Andy Riffel, and John D. Owens. *Gunrock: A High-Performance Graph Processing Library on the GPU.* CoRR, abs/1501.05387v2), March 2015. [arXiv](http://arxiv.org/abs/1501.05387v2)
+Yangzihao Wang, Andrew Davidson, Yuechao Pan, Yuduo Wu, Andy Riffel, and John D. Owens. **Gunrock: A High-Performance Graph Processing Library on the GPU.** CoRR, abs/1501.05387v2), March 2015. [arXiv](http://arxiv.org/abs/1501.05387v2)
 
-Carl Yang, Yangzihao Wang, and John D. Owens. *Fast Sparse Matrix and Sparse Vector Multiplication Algorithm on the GPU.* In Graph Algorithms Building Blocks, GABB 2015, May 2015. [http](http://www.escholarship.org/uc/item/1rq9t3j3)
+Carl Yang, Yangzihao Wang, and John D. Owens. **Fast Sparse Matrix and Sparse Vector Multiplication Algorithm on the GPU.** In Graph Algorithms Building Blocks, GABB 2015, May 2015. [http](http://www.escholarship.org/uc/item/1rq9t3j3)
 
-Afton Geil, Yangzihao Wang, and John D. Owens. *WTF, GPU! Computing Twitter's Who-To-Follow on the GPU.* In Proceedings of the Second ACM Conference on Online Social Networks, COSN '14, pages 63–68, October 2014. [DOI](http://dx.doi.org/10.1145/2660460.2660481) | [http](http://escholarship.org/uc/item/5xq3q8k0)
+Afton Geil, Yangzihao Wang, and John D. Owens. **WTF, GPU! Computing Twitter's Who-To-Follow on the GPU.** In Proceedings of the Second ACM Conference on Online Social Networks, COSN '14, pages 63–68, October 2014. [DOI](http://dx.doi.org/10.1145/2660460.2660481) | [http](http://escholarship.org/uc/item/5xq3q8k0)
 
 Design Goals
 ============
