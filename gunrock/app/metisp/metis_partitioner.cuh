@@ -91,17 +91,25 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value, ENABLE_BACKWARD,
         cudaError_t retval = cudaSuccess;
         //typedef idxtype idx_t;
         idx_t       nodes  = this->graph->nodes;
+        idx_t       edges  = this->graph->edges;
         idx_t       ngpus  = this->num_gpus;
         idx_t       ncons  = 1;
         idx_t       objval;
         idx_t*      tpartition_table = new idx_t[nodes];//=this->partition_tables[0];
+        idx_t*      trow_offsets     = new idx_t[nodes+1];
+        idx_t*      tcolumn_indices  = new idx_t[edges];
+
+        for (idx_t node = 0; node <= nodes; node++)
+            trow_offsets[node] = this->graph->row_offsets[node];
+        for (idx_t edge = 0; edge < edges; edge++)
+            tcolumn_indices[edge] = this->graph->column_indices[edge];
 
         //int Status = 
                 METIS_PartGraphKway(
                     &nodes,                      // nvtxs  : the number of vertices in the graph
                     &ncons,                      // ncon   : the number of balancing constraints
-                    this->graph->row_offsets,    // xadj   : the adjacency structure of the graph
-                    this->graph->column_indices, // adjncy : the adjacency structure of the graph
+                    trow_offsets,                // xadj   : the adjacency structure of the graph
+                    tcolumn_indices,             // adjncy : the adjacency structure of the graph
                     NULL,                        // vwgt   : the weights of the vertices
                     NULL,                        // vsize  : the size of the vertices
                     NULL,                        // adjwgt : the weights of the edges
@@ -113,7 +121,9 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value, ENABLE_BACKWARD,
                     tpartition_table);           // part   : the returned partition vector of the graph
         
         for (SizeT i=0;i<nodes;i++) this->partition_tables[0][i]=tpartition_table[i];
-        delete[] tpartition_table;tpartition_table=NULL;
+        delete[] tpartition_table; tpartition_table = NULL;
+        delete[] trow_offsets    ; trow_offsets     = NULL;
+        delete[] tcolumn_indices ; tcolumn_indices  = NULL;
 
         retval = this->MakeSubGraph();
         sub_graphs           = this->sub_graphs;
