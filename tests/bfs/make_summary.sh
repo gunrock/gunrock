@@ -1,6 +1,6 @@
 #!/bin/bash
 
-g++ -Wall make_summary.cpp -o eval/make_summary
+g++ -Wall make_summary.cpp -o eval/make_summary -std=c++11
 cd eval
 
 DIRS="$(ls -d *K[48]0*)"

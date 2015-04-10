@@ -113,8 +113,8 @@ int main(int argc, char* argv[])
     DIR *directory;
     struct dirent *dir_item;
     struct stat filestat;
-    int num_items = 26;
-    SummaryItem *items = new SummaryItem[26];
+    int num_items = 27;
+    SummaryItem *items = new SummaryItem[27];
     string search_tokens[5];
     string *current_tokens = NULL;
     char seperators[] = {' ', '\0', '\13', '\t', '\n', ':', '[', ']',',', ')', '('};
@@ -166,13 +166,15 @@ int main(int argc, char* argv[])
     items[21].Init("GPU_6 mem", 1, search_tokens,  1, 1);
     search_tokens[0] = "GPU_7"   ;
     items[22].Init("GPU_7 mem", 1, search_tokens,  1, 1);
+    search_tokens[0] = " ";
+    items[23].Init("total mem", 1, search_tokens,  1, 1); 
 
     search_tokens[0] = "queue_sizing";
-    items[23].Init("q-sizing" , 1, search_tokens,  2, 2);
+    items[24].Init("q-sizing" , 1, search_tokens,  2, 2);
     search_tokens[0] = "in_sizing"   ;
-    items[24].Init("in-sizing", 1, search_tokens,  2, 1);
+    items[25].Init("in-sizing", 1, search_tokens,  2, 1);
     search_tokens[0] = "partition"; search_tokens[1] = "end.";
-    items[25].Init("partition time", 2, search_tokens, 2, 1);
+    items[26].Init("partition time", 2, search_tokens, 2, 1);
 
     for (int i=0; i<num_items; i++)
     {
@@ -282,6 +284,11 @@ int main(int argc, char* argv[])
             }
         }
         fin.close();
+
+        long long total_mem = 0;
+        for (int i=1; i<=8; i++)
+            total_mem += atoll(items[i+14].record_tokens[0].c_str());
+        items[23].record_tokens[0] = std::to_string(total_mem);
 
         token_lists[num_data] = new string[num_tokens];
         int temp_counter = 0;
