@@ -371,6 +371,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             double   queue_sizing)
     {
         cudaError_t retval = cudaSuccess;
+        SizeT *temp_in_counter = new SizeT[this->num_gpus+1];
 
         for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             SizeT nodes = this->sub_graphs[gpu].nodes;
@@ -379,8 +380,17 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             // Set device
             if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
 
+            for (int peer = 1; peer < this->num_gpus; peer++)
+            {
+                temp_in_counter[peer] = this->graph_slices[gpu]->in_counter[peer];
+                this->graph_slices[gpu]->in_counter[peer]=1;
+            }
+
             // Allocate output page ranks if necessary
             if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, false)) return retval;
+            for (int peer = 1; peer < this->num_gpus; peer++)
+                this->graph_slices[gpu]->in_counter[peer] = temp_in_counter[peer];
+
             if (data_slices[gpu]->rank_curr.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->rank_curr.Allocate(nodes, util::DEVICE)) return retval;
             
@@ -466,6 +476,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;
         }
 
+        delete[] temp_in_counter; temp_in_counter = NULL;
         return retval;
     }
 

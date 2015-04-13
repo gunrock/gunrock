@@ -109,7 +109,7 @@ test: bin/test_pr_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
 bin/test_pr_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_pr.cu $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_pr_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_pr.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3 -g -G
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_pr_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_pr.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean
