@@ -363,7 +363,7 @@ class CCEnactor : public EnactorBase
                                     cudaMemcpyHostToDevice),
                                 "CCProblem cudaMemcpy edge_flag to d_edge_flag failed", __FILE__, __LINE__)) return retval;
 
-                    if (iteration & 3) {
+                    /*if (0) {
                         gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, HookMinFunctor>
                             <<<num_elements/FilterPolicy::THREADS+1, FilterPolicy::THREADS>>>(
                                     0,
@@ -382,7 +382,7 @@ class CCEnactor : public EnactorBase
                                     graph_slice->frontier_elements[selector^1],         // max_out_queue
                                     this->filter_kernel_stats,
                                     false);
-                    } else {
+                    } else {*/
                         gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, HookMaxFunctor>
                             <<<num_elements/FilterPolicy::THREADS+1, FilterPolicy::THREADS>>>(
                                     0,
@@ -401,7 +401,7 @@ class CCEnactor : public EnactorBase
                                     graph_slice->frontier_elements[selector^1],         // max_out_queue
                                     this->filter_kernel_stats,
                                     false);
-                    }
+                    //}
 
                     if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel Hook Min/Max Operation failed", __FILE__, __LINE__))) break;
                     if (queue_reset) queue_reset = false;
