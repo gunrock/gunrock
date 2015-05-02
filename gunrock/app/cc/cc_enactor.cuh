@@ -363,7 +363,7 @@ class CCEnactor : public EnactorBase
                                     cudaMemcpyHostToDevice),
                                 "CCProblem cudaMemcpy edge_flag to d_edge_flag failed", __FILE__, __LINE__)) return retval;
 
-                    /*if (0) {
+                    /*if (iteration & 3) {
                         gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, HookMinFunctor>
                             <<<num_elements/FilterPolicy::THREADS+1, FilterPolicy::THREADS>>>(
                                     0,

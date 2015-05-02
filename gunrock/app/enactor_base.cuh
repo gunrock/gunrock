@@ -139,7 +139,7 @@ protected:
         int max_grid_size,
         int advance_occupancy,
         int filter_occupancy,
-        int node_lock_size = 256)
+        int node_lock_size = 257)
     {
         cudaError_t retval = cudaSuccess;
 
