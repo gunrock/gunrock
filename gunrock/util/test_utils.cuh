@@ -21,6 +21,101 @@
 namespace gunrock {
 namespace util {
 
+/******************************************************************************
+ * Templated routines for printing keys/values to the console
+ ******************************************************************************/
+
+template<typename T>
+inline void PrintValue(T val)
+{
+    val.Print();
+}
+
+template<>
+inline void PrintValue<char>(char val)
+{
+    printf("%d", val);
+}
+
+template<>
+inline void PrintValue<short>(short val)
+{
+    printf("%d", val);
+}
+
+template<>
+inline void PrintValue<int>(int val)
+{
+    printf("%d", val);
+}
+
+template<>
+inline void PrintValue<long>(long val)
+{
+    printf("%ld", val);
+}
+
+template<>
+inline void PrintValue<long long>(long long val)
+{
+    printf("%lld", val);
+}
+
+template<>
+inline void PrintValue<float>(float val)
+{
+    printf("%f", val);
+}
+
+template<>
+inline void PrintValue<double>(double val)
+{
+    printf("%f", val);
+}
+
+template<>
+inline void PrintValue<unsigned char>(unsigned char val)
+{
+    printf("%u", val);
+}
+
+template<>
+inline void PrintValue<unsigned short>(unsigned short val)
+{
+    printf("%u", val);
+}
+
+template<>
+inline void PrintValue<unsigned int>(unsigned int val)
+{
+    printf("%u", val);
+}
+
+template<>
+inline void PrintValue<unsigned long>(unsigned long val)
+{
+    printf("%lu", val);
+}
+
+template<>
+inline void PrintValue<unsigned long long>(unsigned long long val)
+{
+    printf("%llu", val);
+}
+
+template<>
+inline void PrintValue<bool>(bool val)
+{
+    if (val)
+    {
+        printf("true");
+    }
+    else
+    {
+        printf("false");
+    }
+}
+
 /**
  * Verify the contents of a device array match those
  * of a host array
@@ -97,14 +192,17 @@ int CompareDeviceDeviceResults(
     cudaMemcpy(h_data, d_data, sizeof(T) * num_elements, cudaMemcpyDeviceToHost);
 
     // Display data
-    if (display_data) {
+    if (display_data)
+    {
         printf("Reference:\n");
-        for (int i = 0; i < num_elements; i++) {
+        for (int i = 0; i < num_elements; i++)
+        {
             PrintValue(h_reference[i]);
             printf(", ");
         }
         printf("\n\nData:\n");
-        for (int i = 0; i < num_elements; i++) {
+        for (int i = 0; i < num_elements; i++)
+        {
             PrintValue(h_data[i]);
             printf(", ");
         }
@@ -139,7 +237,8 @@ void DisplayDeviceResults(
 
     // Display data
     printf("\n\nData:\n");
-    for (int i = 0; i < num_elements; i++) {
+    for (int i = 0; i < num_elements; i++)
+    {
         PrintValue(h_data[i]);
         printf(", ");
     }
@@ -199,84 +298,6 @@ inline bool EnoughDeviceMemory(unsigned int mem_needed)
 }
 
 /******************************************************************************
- * Templated routines for printing keys/values to the console
- ******************************************************************************/
-
-template<typename T>
-inline void PrintValue(T val) {
-    val.Print();
-}
-
-template<>
-inline void PrintValue<char>(char val) {
-    printf("%d", val);
-}
-
-template<>
-inline void PrintValue<short>(short val) {
-    printf("%d", val);
-}
-
-template<>
-inline void PrintValue<int>(int val) {
-    printf("%d", val);
-}
-
-template<>
-inline void PrintValue<long>(long val) {
-    printf("%ld", val);
-}
-
-template<>
-inline void PrintValue<long long>(long long val) {
-    printf("%lld", val);
-}
-
-template<>
-inline void PrintValue<float>(float val) {
-    printf("%f", val);
-}
-
-template<>
-inline void PrintValue<double>(double val) {
-    printf("%f", val);
-}
-
-template<>
-inline void PrintValue<unsigned char>(unsigned char val) {
-    printf("%u", val);
-}
-
-template<>
-inline void PrintValue<unsigned short>(unsigned short val) {
-    printf("%u", val);
-}
-
-template<>
-inline void PrintValue<unsigned int>(unsigned int val) {
-    printf("%u", val);
-}
-
-template<>
-inline void PrintValue<unsigned long>(unsigned long val) {
-    printf("%lu", val);
-}
-
-template<>
-inline void PrintValue<unsigned long long>(unsigned long long val) {
-    printf("%llu", val);
-}
-
-template<>
-inline void PrintValue<bool>(bool val) {
-    if (val)
-        printf("true");
-    else
-        printf("false");
-}
-
-
-/******************************************************************************
  * Helper routines for list construction and validation
  ******************************************************************************/
 
@@ -305,23 +326,27 @@ template <typename T, typename SizeT>
 int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
 {
     int flag = 0;
-    for (SizeT i = 0; i < len; i++) {
-
-        if (computed[i] != reference[i] && flag == 0) {
+    for (SizeT i = 0; i < len; i++)
+    {
+        if (computed[i] != reference[i] && flag == 0)
+        {
             printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
             PrintValue<T>(computed[i]);
             printf(" != ");
             PrintValue<T>(reference[i]);
 
-            if (verbose) {
+            if (verbose)
+            {
                 printf("\nresult[...");
-                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                {
                     PrintValue<T>(computed[j]);
                     printf(", ");
                 }
                 printf("...]");
                 printf("\nreference[...");
-                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                {
                     PrintValue<T>(reference[j]);
                     printf(", ");
                 }
@@ -334,7 +359,9 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
     }
     printf("\n");
     if (flag == 0)
+    {
         printf("CORRECT");
+    }
     return flag;
 }
 
@@ -358,36 +385,48 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
  *
  */
 template <typename SizeT>
-int CompareResults(float* computed, float* reference, SizeT len, bool verbose = true)
+int CompareResults(
+    float* computed, float* reference, SizeT len, bool verbose = true)
 {
     float THRESHOLD = 0.05f;
     int flag = 0;
-    for (SizeT i = 0; i < len; i++) {
-
+    for (SizeT i = 0; i < len; i++)
+    {
         // Use relative error rate here.
         bool is_right = true;
-        if (fabs(computed[i] - 0.0) < 0.01f) {
+        if (fabs(computed[i] - 0.0) < 0.01f)
+        {
             if (fabs(computed[i] - reference[i]) > THRESHOLD)
+            {
                 is_right = false;
-        } else {
-            if (fabs((computed[i] - reference[i])/reference[i]) > THRESHOLD)
-                is_right = false;
+            }
         }
-        if (!is_right && flag == 0) {
+        else
+        {
+            if (fabs((computed[i] - reference[i])/reference[i]) > THRESHOLD)
+            {
+                is_right = false;
+            }
+        }
+        if (!is_right && flag == 0)
+        {
             printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
             PrintValue<float>(computed[i]);
             printf(" != ");
             PrintValue<float>(reference[i]);
 
-            if (verbose) {
+            if (verbose)
+            {
                 printf("\nresult[...");
-                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                {
                     PrintValue<float>(computed[j]);
                     printf(", ");
                 }
                 printf("...]");
                 printf("\nreference[...");
-                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                {
                     PrintValue<float>(reference[j]);
                     printf(", ");
                 }
@@ -400,65 +439,10 @@ int CompareResults(float* computed, float* reference, SizeT len, bool verbose = 
     }
     printf("\n");
     if (!flag)
-        printf("CORRECT");
-    return flag;
-}
-
-std::string stringprintf (const char* format, ...)
-{
-    va_list args;
-    va_start (args, format);
-    int len = vsnprintf (0, 0, format, args);
-    va_end (args);
-
-    std::string text;
-    text.resize (len);
-
-    va_start (args, format);
-    vsnprintf (&text[0], len + 1, format, args);
-    va_end (args);
-
-    return text;
-}
-
-struct FormatOpPrintf
-{
-    const char* format;
-    FormatOpPrintf (const char* f) : format(f) { }
-
-    template<typename T>
-    std::string operator() (int index, T x) const {
-        return stringprintf (format, x);
-    }
-};
-
-template<typename T, typename Op>
-std::string FormatArrayOp (const T* data, size_t count, Op op, int num_cols)
-{
-    std::string s;
-    size_t num_rows = (count + num_cols - 1) / num_cols;
-    for(size_t row(0); row < num_rows; ++row)
     {
-        size_t left = row * num_cols;
-        s.append (stringprintf ("%6d: ", left));
-
-        for (size_t col(left); col < std::min (left + num_cols, count); ++col)
-        {
-            s.append (op (col, data[col]));
-            s.push_back (' ');
-        }
-        s.push_back ('\n');
+        printf("CORRECT");
     }
-    return s;
-}
-
-template<typename T>
-void PrintFormatArray (const T* data, size_t length,
-                       const char* format, int num_cols)
-{
-    std::string s = FormatArrayOp (
-        data, length, FormatOpPrintf (format), num_cols);
-    printf("%s", s.c_str());
+    return flag;
 }
 
 /** @} */

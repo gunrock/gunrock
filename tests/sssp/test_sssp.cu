@@ -103,8 +103,7 @@ template<typename VertexId, typename SizeT>
 void DisplaySolution (VertexId *source_path, SizeT num_nodes)
 {
     if (num_nodes > 40) num_nodes = 40;
-    PrintFormatArray (source_path, num_nodes, "%4d", 10);
-    /*
+
     printf("[");
     for (VertexId i = 0; i < num_nodes; ++i)
     {
@@ -114,7 +113,6 @@ void DisplaySolution (VertexId *source_path, SizeT num_nodes)
         printf(" ");
     }
     printf("]\n");
-    */
 }
 
 /**

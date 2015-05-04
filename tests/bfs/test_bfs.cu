@@ -106,14 +106,7 @@ void DisplaySolution(
     if (num_nodes > 40) num_nodes = 40;
 
     printf("\nFirst %d labels of the GPU result:\n", num_nodes);
-    PrintFormatArray (labels, num_nodes, "%4d", 10);
-    if (MARK_PREDECESSORS && !ENABLE_IDEMPOTENCE)
-    {
-        printf("\nFirst %d predecessors:\n", num_nodes);
-        PrintFormatArray (preds, num_nodes, "%4d", 10);
-    }
 
-    /*
     printf("[");
     for (VertexId i = 0; i < num_nodes; ++i)
     {
@@ -128,7 +121,6 @@ void DisplaySolution(
         printf(" ");
     }
     printf("]\n");
-    */
 }
 
 /**

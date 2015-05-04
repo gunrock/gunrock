@@ -116,8 +116,6 @@ void DisplaySolution(
 
     if (nodes <= 40)
     {
-        PrintFormatArray (comp_ids, nodes, "%4d", 10);
-        /*
         printf("[");
         for (VertexId i = 0; i < nodes; ++i)
         {
@@ -128,7 +126,6 @@ void DisplaySolution(
             printf(" ");
         }
         printf("]\n");
-        */
     }
     else
     {
