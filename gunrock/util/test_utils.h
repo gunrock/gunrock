@@ -111,10 +111,9 @@ void CommandLineArgs::GetCmdLineArgument(
     const char *arg_name,
     T &val)
 {
-    using namespace std;
-    map<string, string>::iterator itr;
+    std::map<std::string, std::string>::iterator itr;
     if ((itr = pairs.find(arg_name)) != pairs.end()) {
-        istringstream str_stream(itr->second);
+        std::istringstream str_stream(itr->second);
         str_stream >> val;
     }
 }
@@ -124,23 +123,21 @@ void CommandLineArgs::GetCmdLineArguments(
     const char *arg_name,
     std::vector<T> &vals)
 {
-    using namespace std;
-
-    // Recover multi-value string
-    map<string, string>::iterator itr;
+     // Recover multi-value string
+    std::map<std::string, std::string>::iterator itr;
     if ((itr = pairs.find(arg_name)) != pairs.end()) {
 
         // Clear any default values
         vals.clear();
 
-        string val_string = itr->second;
-        istringstream str_stream(val_string);
-        string::size_type old_pos = 0;
-        string::size_type new_pos = 0;
+        std::string val_string = itr->second;
+        std::istringstream str_stream(val_string);
+        std::string::size_type old_pos = 0;
+        std::string::size_type new_pos = 0;
 
         // Iterate comma-separated values
         T val;
-        while ((new_pos = val_string.find(',', old_pos)) != string::npos) {
+        while ((new_pos = val_string.find(',', old_pos)) != std::string::npos) {
 
             if (new_pos != old_pos) {
                 str_stream.width(new_pos - old_pos);

@@ -22,12 +22,12 @@ namespace gunrock {
 namespace graphio {
 
 
-double Sprng ()
+inline double Sprng ()
 {
     return double (rand()) / RAND_MAX;
 }
 
-bool Flip ()
+inline bool Flip ()
 {
     return (rand() >= RAND_MAX / 2);
 }
