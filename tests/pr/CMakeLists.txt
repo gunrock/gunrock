@@ -18,7 +18,7 @@ else()
   message(SEND_ERROR "CUB include directory not set.")
 endif()
 
-CUDA_ADD_EXECUTABLE(page_rank
+CUDA_ADD_EXECUTABLE(pagerank
   test_pr.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/test_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu

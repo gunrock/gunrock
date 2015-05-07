@@ -1,9 +1,9 @@
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 /**
  * @file
@@ -22,11 +22,8 @@
 
 #include <gunrock/graphio/utils.cuh>
 
-using namespace std;
-
 namespace gunrock {
 namespace graphio {
-
 
 /**
  * @brief Reads a MARKET graph from an input-stream into a CSR sparse format

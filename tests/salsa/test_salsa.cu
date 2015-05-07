@@ -380,7 +380,7 @@ void RunTests(
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("max-iter", max_iter);
 
-    g_quick = args.CheckCmdLineFlag("quick");
+    g_quick = true; // missing reference now
     g_verbose = args.CheckCmdLineFlag("v");
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
 

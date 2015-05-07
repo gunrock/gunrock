@@ -58,24 +58,22 @@ public:
     // Constructor
     CommandLineArgs(int argc, char **argv)
     {
-        using namespace std;
-
         for (int i = 1; i < argc; i++)
         {
-            string arg = argv[i];
+            std::string arg = argv[i];
 
             if ((arg[0] != '-') || (arg[1] != '-')) {
                 continue;
             }
 
-            string::size_type pos;
-            string key, val;
-            if ((pos = arg.find( '=')) == string::npos) {
-                key = string(arg, 2, arg.length() - 2);
+            std::string::size_type pos;
+            std::string key, val;
+            if ((pos = arg.find('=')) == std::string::npos) {
+                key = std::string(arg, 2, arg.length() - 2);
                 val = "";
             } else {
-                key = string(arg, 2, pos - 2);
-                val = string(arg, pos + 1, arg.length() - 1);
+                key = std::string(arg, 2, pos - 2);
+                val = std::string(arg, pos + 1, arg.length() - 1);
             }
             pairs[key] = val;
         }
@@ -84,8 +82,7 @@ public:
     // Checks whether a flag "--<flag>" is present in the commandline
     bool CheckCmdLineFlag(const char* arg_name)
     {
-        using namespace std;
-        map<string, string>::iterator itr;
+        std::map<std::string, std::string>::iterator itr;
         if ((itr = pairs.find(arg_name)) != pairs.end()) {
             return true;
         }
