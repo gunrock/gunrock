@@ -297,7 +297,7 @@ namespace edge_map_forward {
                                                     if (cta->advance_type == gunrock::oprtr::advance::V2V) {
                                                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                                 neighbor_id,
-                                                                cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank); 
+                                                                cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
                                                     } else if (cta->advance_type == gunrock::oprtr::advance::V2E
                                                             ||cta->advance_type == gunrock::oprtr::advance::E2E) {
                                                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -334,14 +334,14 @@ namespace edge_map_forward {
                                             // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
                                             // if Cond(neighbor_id) returns true
                                             // if Cond(neighbor_id) returns false or Apply returns false
-                                            // set neighbor_id to -1 for invalid                                    
+                                            // set neighbor_id to -1 for invalid
                                             if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x, edge_id)) {
                                                 Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x, edge_id);
                                                 if (cta->d_out != NULL) {
                                                     if (cta->advance_type == gunrock::oprtr::advance::V2V) {
                                                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                                 neighbor_id,
-                                                                cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank); 
+                                                                cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
                                                     } else if (cta->advance_type == gunrock::oprtr::advance::V2E
                                                             ||cta->advance_type == gunrock::oprtr::advance::E2E) {
                                                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -385,7 +385,7 @@ namespace edge_map_forward {
                                         int warp_id = threadIdx.x >> GR_LOG_WARP_THREADS(KernelPolicy::CUDA_ARCH);
                                         int lane_id = util::LaneId();
 
-                                        while (__any(tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD)) {
+                                        while (::__any(tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD)) {
                                             if (tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD) {
                                                 // All threads inside one warp vie for control of the warp
                                                 cta->smem_storage.state.warp_comm[warp_id][0] = lane_id;
@@ -411,7 +411,7 @@ namespace edge_map_forward {
 
                                             }
 
-                                            
+
                                             SizeT coop_offset   = cta->smem_storage.state.warp_comm[warp_id][0];
                                             SizeT coop_rank     = cta->smem_storage.state.warp_comm[warp_id][1] + lane_id;
                                             SizeT coop_oob      = cta->smem_storage.state.warp_comm[warp_id][2];
@@ -435,7 +435,7 @@ namespace edge_map_forward {
                                                 // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
                                                 // if Cond(neighbor_id) returns true
                                                 // if Cond(neighbor_id) returns false or Apply returns false
-                                                // set neighbor_id to -1 for invalid 
+                                                // set neighbor_id to -1 for invalid
                                                 if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id, edge_id)) {
                                                     Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id, edge_id);
                                                     if (cta->advance_type == gunrock::oprtr::advance::V2E
@@ -473,7 +473,7 @@ namespace edge_map_forward {
                                                 // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
                                                 // if Cond(neighbor_id) returns true
                                                 // if Cond(neighbor_id) returns false or Apply returns false
-                                                // set neighbor_id to -1 for invalid                                            
+                                                // set neighbor_id to -1 for invalid
                                                 if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id, edge_id)) {
                                                     Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id, edge_id);
                                                     if (cta->advance_type == gunrock::oprtr::advance::V2E
