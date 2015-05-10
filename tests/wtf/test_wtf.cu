@@ -512,6 +512,7 @@ void RunTests(
     int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
     int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
     VertexId            src                 = 0;            // Default source ID is 0
+    g_quick                                 = false;        // Whether or not to skip ref validation
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("delta", delta);
@@ -519,8 +520,7 @@ void RunTests(
     args.GetCmdLineArgument("error", error);
     args.GetCmdLineArgument("max-iter", max_iter);
     args.GetCmdLineArgument("src", src);
-    //g_quick = args.CheckCmdLineFlag("quick");
-    g_quick = true;
+    g_quick = args.CheckCmdLineFlag("quick");
     g_verbose = args.CheckCmdLineFlag("v");
 
     if (instrumented)

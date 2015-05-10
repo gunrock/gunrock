@@ -405,6 +405,7 @@ struct PRProblem : ProblemBase<_VertexId, _SizeT, false> // USE_DOUBLE_BUFFER = 
             //util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_rank_curr,
             //    (Value)1.0/nodes, nodes);
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_rank_curr, (Value)(1.0-delta), nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_rank_next, (Value)(1.0-delta), nodes);
             
             // Compute degrees
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_degrees, 0, nodes);

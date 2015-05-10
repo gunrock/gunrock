@@ -350,11 +350,11 @@ void RunTests(
     int  max_grid_size = 0;     // Maximum grid size (0: leave it up to the enactor)
     int  num_gpus      = 1;     // Number of GPUs for multi-gpu enactor to use
     int  iterations    = 1;     // Default run test times
-    g_quick            = 1;     // Whether or not to skip ref validation
+    g_quick            = false; // Whether or not to skip reference validation
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     g_verbose    = args.CheckCmdLineFlag("v");
-    args.GetCmdLineArgument("quick", g_quick);
+    g_quick      = args.CheckCmdLineFlag("quick");
     args.GetCmdLineArgument("iteration-num", iterations);
 
     if (instrumented)

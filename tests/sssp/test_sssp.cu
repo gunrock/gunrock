@@ -540,7 +540,7 @@ void RunTests(
     int         iterations       = 1;   // Number of runs for testing
     int         delta_factor     = 16;  // Delta factor for priority queue
     int         traversal_mode   = -1;  // traversal mode: 0 for LB, 1 for TWC
-    g_quick                      = 1;   // Whether or not to skip ref validation
+    g_quick                      = false;   // Whether or not to skip ref validation
 
     // source vertex to start
     args.GetCmdLineArgument("src", src_str);
@@ -573,8 +573,8 @@ void RunTests(
     instrumented = args.CheckCmdLineFlag("instrumented");
     mark_pred = args.CheckCmdLineFlag("mark-pred");
     g_verbose = args.CheckCmdLineFlag("v");
+    g_quick   = args.CheckCmdLineFlag("quick");
 
-    args.GetCmdLineArgument("quick", g_quick);
     args.GetCmdLineArgument("iteration-num", iterations);
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
     args.GetCmdLineArgument("delta-factor", delta_factor);

@@ -231,7 +231,7 @@ void SimpleReferencePr(
     CpuTimer cpu_timer;
     cpu_timer.Start();
 
-    if (!directed)
+    if (directed)
     {
         remove_dangling_links(g);
         printf("finished remove dangling links.\n");
@@ -446,7 +446,7 @@ void RunTests(
     VertexId src            = -1;    // Source vertex
     int      iterations     = 1;     // Number of runs for testing
     int      traversal_mode = -1;    // Load-balacned or Dynamic cooperative
-    g_quick                 = 1;     // Whether or not to skip ref validation
+    g_quick                 = false; // Whether or not to skip ref validation
 
     // traversal mode
     args.GetCmdLineArgument("traversal-mode", traversal_mode);
@@ -457,12 +457,13 @@ void RunTests(
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     g_verbose = args.CheckCmdLineFlag("v");
+    g_quick = args.CheckCmdLineFlag("quick");
+
     args.GetCmdLineArgument("delta", delta);
     args.GetCmdLineArgument("error", error);
     args.GetCmdLineArgument("max-iter", max_iter);
     args.GetCmdLineArgument("src", src);
     args.GetCmdLineArgument("iteration-num", iterations);
-    args.GetCmdLineArgument("quick", g_quick);
 
     if (instrumented)
     {

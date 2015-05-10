@@ -483,7 +483,7 @@ void RunTests(
     int         num_gpus         = 1;   // Number of GPUs for multi-gpu enactor to use
     double      max_queue_sizing = 1.0; // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
     int         iterations       = 1;   // Number of runs
-    g_quick                      = 1;   // Whether or not to skip ref validation
+    g_quick                      = false; // Whether or not to skip reference validation
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("src", src_str);
@@ -507,12 +507,12 @@ void RunTests(
 
     mark_pred = args.CheckCmdLineFlag("mark-pred");
     g_verbose = args.CheckCmdLineFlag("v");
+    g_quick   = args.CheckCmdLineFlag("quick");
 
     args.GetCmdLineArgument("iteration-num", iterations);
     args.GetCmdLineArgument("grid-size", max_grid_size);
     args.GetCmdLineArgument("idempotence", idempotence);
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
-    args.GetCmdLineArgument("quick", g_quick);
     args.GetCmdLineArgument("alpha", g_alpha);
     args.GetCmdLineArgument("beta", g_beta);
 

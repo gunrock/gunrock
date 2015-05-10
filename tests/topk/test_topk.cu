@@ -134,7 +134,7 @@ void SimpleReferenceTopK(
     (Value*)malloc(sizeof(Value) * graph_reversed.nodes);
 
   // store reference output results
-  std::vector< pair<int, int> > results;
+  std::vector< std::pair<int, int> > results;
 
   // calculations
   for (SizeT node = 0; node < graph_original.nodes; ++node)
@@ -328,6 +328,7 @@ void RunTests(
   bool instrumented  = false;
   int  max_grid_size = 0;
   int  num_gpus      = 1;
+  g_quick            = false;
 
   instrumented = args.CheckCmdLineFlag("instrumented");
 

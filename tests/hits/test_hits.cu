@@ -383,6 +383,8 @@ void RunTests(
     bool     instrumented  = false; // Whether or not to collect instrumentation from kernels
     int      max_grid_size = 0;     // maximum grid size (0: leave it up to the enactor)
     int      num_gpus      = 1;     // Number of GPUs for multi-gpu enactor to use
+    g_quick                = true;  // Missing ref algorithm
+
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("delta", delta);
@@ -390,7 +392,6 @@ void RunTests(
     args.GetCmdLineArgument("src", src);
 
     //g_quick = args.CheckCmdLineFlag("quick");
-    g_quick = true;
     g_verbose = args.CheckCmdLineFlag("v");
 
     if (instrumented)

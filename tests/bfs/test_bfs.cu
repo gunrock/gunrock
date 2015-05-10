@@ -510,7 +510,7 @@ void RunTests(
     double      max_queue_sizing = 1.0; // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
     int         iterations       = 1;   // Number of runs for testing
     int         traversal_mode   = -1;  // Load-balacned or Dynamic cooperative
-    g_quick                      = 1;   // Whether or not to skip reference validation
+    g_quick                      = false;   // Whether or not to skip reference validation
     // source vertex
     args.GetCmdLineArgument("src", src_str);
     if (src_str.empty())
@@ -545,8 +545,8 @@ void RunTests(
     mark_pred    = args.CheckCmdLineFlag("mark-pred");
     g_verbose    = args.CheckCmdLineFlag("v");
     instrumented = args.CheckCmdLineFlag("instrumented");
+    g_quick = args.CheckCmdLineFlag("quick");
 
-    args.GetCmdLineArgument("quick", g_quick);
     args.GetCmdLineArgument("iteration-num", iterations);
     args.GetCmdLineArgument("grid-size", max_grid_size);
     args.GetCmdLineArgument("idempotence", idempotence);

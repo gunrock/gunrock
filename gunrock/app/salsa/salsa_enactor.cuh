@@ -193,6 +193,8 @@ class SALSAEnactor : public EnactorBase
 
         cudaError_t retval = cudaSuccess;
 
+        unsigned int *d_scanned_edges = NULL;
+
         do {
             if (DEBUG) {
                 printf("Iteration, Edge map queue, Vertex map queue\n");
@@ -221,6 +223,13 @@ class SALSAEnactor : public EnactorBase
 
             frontier_attribute.queue_reset      = true;
 
+            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
+                if (retval = util::GRError(cudaMalloc(
+                                (void**)&d_scanned_edges,
+                                graph_slice->edges * sizeof(unsigned int)),
+                                "SALSAProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
+            }
+
             // Step through SALSA iterations 
             {
 
@@ -245,7 +254,7 @@ class SALSAEnactor : public EnactorBase
                     (VertexId*)NULL,
                     (bool*)NULL,
                     (bool*)NULL,
-                    (unsigned int*)NULL,
+                    d_scanned_edges,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],               //d_in_queue
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],             //d_out_queue
                     (VertexId*)NULL,    //d_pred_in_queue
@@ -280,7 +289,7 @@ class SALSAEnactor : public EnactorBase
                     (VertexId*)NULL,
                     (bool*)NULL,
                     (bool*)NULL,
-                    (unsigned int*)NULL,
+                    d_scanned_edges,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],               //d_in_queue
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],             //d_out_queue
                     (VertexId*)NULL,    //d_pred_in_queue
@@ -326,7 +335,7 @@ class SALSAEnactor : public EnactorBase
                     (VertexId*)NULL,
                     (bool*)NULL,
                     (bool*)NULL,
-                    (unsigned int*)NULL,
+                    d_scanned_edges,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],            // d_out_queue
                     (VertexId*)NULL,
@@ -367,7 +376,7 @@ class SALSAEnactor : public EnactorBase
                     (VertexId*)NULL,
                     (bool*)NULL,
                     (bool*)NULL,
-                    (unsigned int*)NULL,
+                    d_scanned_edges,
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector],              // d_in_queue
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],            // d_out_queue
                     (VertexId*)NULL,
@@ -405,7 +414,6 @@ class SALSAEnactor : public EnactorBase
                 if (enactor_stats.iteration >= max_iteration) break;
 
                 if (DEBUG) printf("\n%lld", (long long) enactor_stats.iteration);
-
             
             }
 
@@ -462,17 +470,17 @@ class SALSAEnactor : public EnactorBase
                 SALSAProblem,                         // Problem data type
                 300,                                // CUDA_ARCH
                 INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                6,                                  // LOG_THREADS
-                0,                                  // LOG_BLOCKS
-                0,                                  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+                1,                                  // MIN_CTA_OCCUPANCY
+                10,                                  // LOG_THREADS
+                8,                                  // LOG_BLOCKS
+                32*128,                                  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
                 1,                                  // LOG_LOAD_VEC_SIZE
                 0,                                  // LOG_LOADS_PER_TILE
                 5,                                  // LOG_RAKING_THREADS
                 32,                            // WARP_GATHER_THRESHOLD
                 128 * 4,                            // CTA_GATHER_THRESHOLD
                 7,                                  // LOG_SCHEDULE_GRANULARITY
-                gunrock::oprtr::advance::TWC_FORWARD>
+                gunrock::oprtr::advance::LB>
                     AdvanceKernelPolicy;
 
             return EnactSALSA<AdvanceKernelPolicy, FilterKernelPolicy, SALSAProblem>(
