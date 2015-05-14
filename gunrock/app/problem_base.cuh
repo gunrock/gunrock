@@ -107,7 +107,6 @@ struct ProblemBase
             d_row_indices(NULL),
             d_out_degrees(NULL),
             d_in_degrees(NULL),
-            d_degrees(NULL),
             nodes(0),
             edges(0),
             stream(stream)
@@ -316,7 +315,7 @@ struct ProblemBase
 
                     // count number of out-going degrees for each node
                     util::MemsetMadVectorKernel<<<128, 128>>>(
-                        data_slices[0]->d_out_degrees,
+                        graph_slices[0]->d_out_degrees,
                         graph_slices[0]->d_row_offsets,
                         &graph_slices[0]->d_row_offsets[1], -1, nodes);
 
@@ -356,7 +355,7 @@ struct ProblemBase
 
                         // count number of in-going degrees for each node
                         util::MemsetMadVectorKernel<<<128, 128>>>(
-                                data_slices[0]->d_in_degrees,
+                                graph_slices[0]->d_in_degrees,
                                 graph_slices[0]->d_column_offsets,
                                 &graph_slices[0]->d_column_offsets[1], -1, nodes);
                     }
