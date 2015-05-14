@@ -33,6 +33,18 @@ namespace global_indicator {
 //to the same cluster, then compute the modularity accoring to the following equation:
 //Q=sum_of_same_cluster_edges(A_ij - k_i*k_i/2m)/2m
 //m:#edges, k_i:out degree of i, A_ij: 1/0
+template<typename VertexId, typename SizeT>
+float GetModularity(
+            SizeT       *d_row_offsets,
+            VertexId    *d_column_indices,
+            SizeT       *d_degrees,
+            VertexId    *d_input_frontier,
+            SizeT       edge,
+            float       *modularity_scores,
+            VertexId    *community_ids)
+            {
+
+            }
 
 } // namespace global_indicator
 } // namespace gunrock

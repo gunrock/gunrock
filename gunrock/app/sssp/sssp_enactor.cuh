@@ -250,7 +250,7 @@ class SSSPEnactor : public EnactorBase
             if (retval = Setup(problem)) break;
 
             // Lazy initialization
-            if (retval = EnactorBase::Setup(problem, max_grid_size,
+            if (retval = EnactorBase::Setup(max_grid_size,
                                             AdvanceKernelPolicy::CTA_OCCUPANCY,
                                             FilterKernelPolicy::CTA_OCCUPANCY))
                 break;
