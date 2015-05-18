@@ -48,7 +48,7 @@ int binary_search(
     SizeT    left,
     SizeT    right) {
     while (left <= right) {
-        int mid = (left + right) / 2;
+        int mid = left + (right - left) / 2;
         if (arr[mid] == val) {
             return arr[mid];
         } else if (arr[mid] > val) {

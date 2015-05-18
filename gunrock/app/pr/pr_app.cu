@@ -30,22 +30,6 @@ using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::pr;
 
-// Defines, constants, globals
-template <typename VertexId, typename Value>
-struct RankPair {
-    VertexId vertex_id;
-    Value    page_rank;
-    RankPair(VertexId vertex_id, Value page_rank) :
-        vertex_id(vertex_id), page_rank(page_rank) {}
-};
-
-template<typename RankPair>
-inline bool PRCompare(
-    RankPair elem1,
-    RankPair elem2) {
-    return elem1.page_rank > elem2.page_rank;
-}
-
 /**
  * @brief run page rank
  *
