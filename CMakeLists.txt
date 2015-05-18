@@ -196,7 +196,7 @@ if(GUNROCK_BUILD_LIB)
 endif(GUNROCK_BUILD_LIB)
 
 if(GUNROCK_BUILD_APPLICATIONS)
-  #add_subdirectory(shared_lib_tests)
+  add_subdirectory(shared_lib_tests)
   add_subdirectory(simple_example)
   add_subdirectory(tests/bc)
   add_subdirectory(tests/bfs)
@@ -230,7 +230,7 @@ set_tests_properties(TestSSSP
 
 add_test(NAME TestPR COMMAND test_pr --undirected)
 set_tests_properties(TestPR
-  PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*2.*: Page Rank.*0.402378.")
+  PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*2.*: Page Rank.*0.357069.")
 
 add_test(NAME TestTopK COMMAND test_topk)
 set_tests_properties(TestTopK

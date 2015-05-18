@@ -1,15 +1,14 @@
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 /**
- * @file
- * test_pr.cu
+ * @file pr_app.cu
  *
- * @brief Gunrock Computing Page Rank Implementation
+ * @brief Gunrock PageRank Implementation
  */
 
 #include <stdio.h>
@@ -33,8 +32,7 @@ using namespace gunrock::app::pr;
 
 // Defines, constants, globals
 template <typename VertexId, typename Value>
-struct RankPair
-{
+struct RankPair {
     VertexId vertex_id;
     Value    page_rank;
     RankPair(VertexId vertex_id, Value page_rank) :
@@ -44,59 +42,8 @@ struct RankPair
 template<typename RankPair>
 inline bool PRCompare(
     RankPair elem1,
-    RankPair elem2)
-{
+    RankPair elem2) {
     return elem1.page_rank > elem2.page_rank;
-}
-
-/**
-* Performance/Evaluation statistics
-*/
-struct Stats
-{
-    const char *name;
-    Statistic rate;
-    Statistic search_depth;
-    Statistic redundant_work;
-    Statistic duty;
-    Stats() :
-        name(NULL), rate(), search_depth(), redundant_work(), duty() {}
-    Stats(const char *name) :
-        name(name), rate(), search_depth(), redundant_work(), duty() {}
-};
-
-/**
- * @brief Displays timing and correctness statistics
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] stats Reference to the Stats object defined in run_page_rank
- * @param[in] h_rank Host-side vector stores computed page rank values
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] elapsed Total elapsed kernel running time
- * @param[in] total_queued Total element queued in PR kernel running process
- * @param[in] avg_duty Average duty of the PR kernels
- */
-template<
-    typename VertexId,
-    typename Value,
-    typename SizeT>
-void DisplayStats(
-    const Stats     &stats,
-    const Value     *h_rank,
-    const Csr<VertexId, Value, SizeT> &graph,
-    const double    elapsed,
-    const long long total_queued,
-    const double    avg_duty)
-{
-    fflush(stdout);
-    // Display test name
-    printf("[%s] finished. ", stats.name);
-    // Display the specific sample statistics
-    printf(" elapsed: %.3f ms", elapsed);
-    printf("\n");
 }
 
 /**
@@ -121,7 +68,7 @@ void DisplayStats(
 template <
     typename VertexId,
     typename Value,
-    typename SizeT>
+    typename SizeT >
 void run_page_rank(
     GunrockGraph   *ggraph_out,
     VertexId       *node_ids,
@@ -133,12 +80,11 @@ void run_page_rank(
     const SizeT    max_iter,
     const int      max_grid_size,
     const int      num_gpus,
-    CudaContext&   context)
-{
-    typedef PRProblem<
+    CudaContext&   context) {
+    typedef PRProblem <
         VertexId,
         SizeT,
-        Value> Problem;
+        Value > Problem;
 
     // Allocate host-side label array for gpu-computed results
     //Value    *h_rank    = (Value*)malloc(sizeof(Value) * graph.nodes);
@@ -150,46 +96,31 @@ void run_page_rank(
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
     util::GRError(csr_problem->Init(
-        false,
-        graph,
-        num_gpus),
-        "Page Rank Problem Initialization Failed", __FILE__, __LINE__);
+                      false,
+                      graph,
+                      num_gpus),
+                  "PageRank Problem Initialization Failed", __FILE__, __LINE__);
 
-    Stats *stats = new Stats("GPU PageRank");
-    long long total_queued = 0;
-    long long num_iter = 0;
-    double    avg_duty = 0.0;
-
-    // Perform Page Rank
+    // Perform PageRank
     GpuTimer gpu_timer;
 
     util::GRError(csr_problem->Reset(
-        source, delta, error, pr_enactor.GetFrontierType()),
-        "Page Rank Problem Data Reset Failed", __FILE__, __LINE__);
+                      source, delta, error, pr_enactor.GetFrontierType()),
+                  "PageRank Problem Data Reset Failed", __FILE__, __LINE__);
     gpu_timer.Start();
     util::GRError(pr_enactor.template Enact<Problem>(
-        context, csr_problem, max_iter, max_grid_size),
-        "Page Rank Problem Enact Failed", __FILE__, __LINE__);
+                      context, csr_problem, max_iter, max_grid_size),
+                  "PageRank Problem Enact Failed", __FILE__, __LINE__);
     gpu_timer.Stop();
 
     float elapsed = gpu_timer.ElapsedMillis();
 
-    pr_enactor.GetStatistics(total_queued, avg_duty, num_iter);
-
     // Copy out results
     util::GRError(csr_problem->Extract(page_rank, node_ids),
-        "Page Rank Problem Data Extraction Failed", __FILE__, __LINE__);
-
-    DisplayStats(
-        *stats,
-        page_rank,
-        graph,
-        elapsed,
-        total_queued,
-        avg_duty);
+                  "PageRank Problem Data Extraction Failed",
+                  __FILE__, __LINE__);
 
     // Cleanup
-    delete stats;
     if (csr_problem) delete csr_problem;
     //if (h_node_id)   free(h_node_id);
     //if (h_rank)      free(h_rank);
@@ -215,8 +146,7 @@ void dispatch_page_rank(
     const GunrockGraph    *ggraph_in,
     const GunrockConfig   pr_config,
     const GunrockDataType data_type,
-    CudaContext&          context)
-{
+    CudaContext&          context) {
     switch (data_type.VTXID_TYPE) {
     case VTXID_INT: {
         switch (data_type.SIZET_TYPE) {
@@ -250,29 +180,24 @@ void dispatch_page_rank(
                 int   src_node      = -1;    //!< source node to start
 
                 // determine source vertex to start sssp
-                switch (pr_config.src_mode)
-                {
-                    case randomize:
-                    {
-                        src_node = graphio::RandomNode(csr_graph.nodes);
-                        break;
-                    }
-                    case largest_degree:
-                    {
-                        int max_node = 0;
-                        src_node = csr_graph.GetNodeWithHighestDegree(max_node);
-                        break;
-                    }
-                    case manually:
-                    {
-                        src_node = pr_config.src_node;
-                        break;
-                    }
-                    default:
-                    {
-                        src_node = -1;
-                        break;
-                    }
+                switch (pr_config.src_mode) {
+                case randomize: {
+                    src_node = graphio::RandomNode(csr_graph.nodes);
+                    break;
+                }
+                case largest_degree: {
+                    int max_node = 0;
+                    src_node = csr_graph.GetNodeWithHighestDegree(max_node);
+                    break;
+                }
+                case manually: {
+                    src_node = pr_config.src_node;
+                    break;
+                }
+                default: {
+                    src_node = -1;
+                    break;
+                }
                 }
                 delta    = pr_config.delta;
                 error    = pr_config.error;
@@ -297,7 +222,7 @@ void dispatch_page_rank(
                 break;
             }
             }
-        break;
+            break;
         }
         }
         break;
@@ -321,8 +246,8 @@ void gunrock_pr_func(
     void                  *page_rank,
     const GunrockGraph    *ggraph_in,
     const GunrockConfig   pr_config,
-    const GunrockDataType data_type)
-{
+    const GunrockDataType data_type) {
+
     // moderngpu preparations
     int device = 0;
     device = pr_config.device;
