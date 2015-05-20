@@ -1,8 +1,8 @@
 /**
- * @brief pr test for pr shared library
- * @file test_pr.c
+ * @brief SSSP test for shared library
+ * @file test_sssp.c
  *
- * set input graph, configs and call function gunrock_pr
+ * set input graph, configs and call function gunrock_sssp_func
  * return per node or per edge values in graph_out node_values
  */
 
@@ -63,7 +63,8 @@ int main(int argc, char* argv[])
   label = (int*)graph_output->node_values;
   for (i = 0; i < num_nodes; ++i)
   {
-    printf("Node ID [%d] : Label [%d] : Predecessor [%d]\n", i, label[i], predecessor[i]);
+    printf("Node ID [%d] : Label [%d] : Predecessor [%d]\n",
+           i, label[i], predecessor[i]);
   }
 
   if (predecessor)  { free(predecessor);  }

@@ -23,6 +23,8 @@
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/problem_base.cuh>
 
+#include <cub/cub.cuh>
+
 namespace gunrock {
 namespace global_indicator {
 namespace modularity {
@@ -34,6 +36,7 @@ struct ModularityFunctor
 
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
+        //should assign modularity_scores to 0 if not pass.
         return (&problem->d_community_ids[d_id] == &problem->d_community_ids[s_id]);
     }
 
@@ -109,6 +112,13 @@ float GetModularity(
 
 
                 //do a global reduction to get the final modularity_score
+                void    *d_temp_storage = NULL;
+                size_t  temp_storage_bytes = 0;
+                cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, data_slice->modularity_scores, data_slice->modularity_scores, problem->edges);
+                cudaMalloc(&d_temp_storage, temp_storage_bytes);
+                cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, data_slice->modularity_scores, data_slice->modularity_scores, problem->edges);
+                // now the accumulated modularity_scores is stored in data_slice->modularity_scores[problem->edges-1]
+                // need to either keep it in device array or have a volatile var to get it afterwards.
             }
 
 } // namespace modularity

@@ -1,13 +1,12 @@
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 /**
- * @file
- * test_bc.cu
+ * @file bc_app.cu
  *
  * @brief Gunrock Betweeness Centrality Implementation
  */
@@ -48,7 +47,7 @@ using namespace gunrock::app::bc;
 template <
     typename VertexId,
     typename Value,
-    typename SizeT>
+    typename SizeT >
 void run_bc(
     GunrockGraph *ggraph_out,
     const Csr<VertexId, Value, SizeT> &graph,
@@ -56,14 +55,13 @@ void run_bc(
     int      max_grid_size,
     int      num_gpus,
     double   max_queue_sizing,
-    CudaContext& context)
-{
-    typedef BCProblem<
+    CudaContext& context) {
+    typedef BCProblem <
         VertexId,
         SizeT,
         Value,
         true, // MARK_PREDECESSORS
-        false> Problem; //does not use double buffer
+        false > Problem; //does not use double buffer
 
     // Allocate host-side array (for both reference and gpu-computed results)
     Value *h_sigmas     = (Value*)malloc(sizeof(Value) * graph.nodes);
@@ -76,39 +74,35 @@ void run_bc(
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
     util::GRError(csr_problem->Init(
-        false,
-        graph,
-        num_gpus),
-        "BC Problem Initialization Failed", __FILE__, __LINE__);
+                      false,
+                      graph,
+                      num_gpus),
+                  "BC Problem Initialization Failed", __FILE__, __LINE__);
 
     // Perform BC
     GpuTimer gpu_timer;
 
     VertexId start_source;
     VertexId end_source;
-    if (source == -1)
-    {
+    if (source == -1) {
         start_source = 0;
         end_source = graph.nodes;
-    }
-    else
-    {
+    } else {
         start_source = source;
         end_source = source + 1;
     }
 
     gpu_timer.Start();
-    for (VertexId i = start_source; i < end_source; ++i)
-    {
+    for (VertexId i = start_source; i < end_source; ++i) {
         util::GRError(csr_problem->Reset(
-            i, bc_enactor.GetFrontierType(), max_queue_sizing),
-            "BC Problem Data Reset Failed", __FILE__, __LINE__);
+                          i, bc_enactor.GetFrontierType(), max_queue_sizing),
+                      "BC Problem Data Reset Failed", __FILE__, __LINE__);
         util::GRError(bc_enactor.template Enact<Problem>(
-            context, csr_problem, i, max_grid_size),
-            "BC Problem Enact Failed", __FILE__, __LINE__);
+                          context, csr_problem, i, max_grid_size),
+                      "BC Problem Enact Failed", __FILE__, __LINE__);
     }
 
-    util::MemsetScaleKernel<<<128, 128>>>(
+    util::MemsetScaleKernel <<< 128, 128>>>(
         csr_problem->data_slices[0]->d_bc_values, (Value)0.5f, (int)graph.nodes);
 
     gpu_timer.Stop();
@@ -120,7 +114,7 @@ void run_bc(
 
     // Copy out results to Host Device
     util::GRError(csr_problem->Extract(h_sigmas, h_bc_values, h_ebc_values),
-        "BC Problem Data Extraction Failed", __FILE__, __LINE__);
+                  "BC Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // copy h_bc_values per node to GunrockGraph output
     ggraph_out->node_values = (float*)&h_bc_values[0];
@@ -151,8 +145,7 @@ void dispatch_bc(
     const GunrockGraph *ggraph_in,
     GunrockConfig      bc_config,
     GunrockDataType    data_type,
-    CudaContext&       context)
-{
+    CudaContext&       context) {
     switch (data_type.VTXID_TYPE) {
     case VTXID_INT: {
         switch (data_type.SIZET_TYPE) {
@@ -186,29 +179,24 @@ void dispatch_bc(
                 float max_queue_sizing = 1.0; //!< Maximum size scaling factor for work queues
 
                 // determine source vertex to start bc
-                switch (bc_config.src_mode)
-                {
-                    case randomize:
-                    {
-                        src_node = graphio::RandomNode(csr_graph.nodes);
-                        break;
-                    }
-                    case largest_degree:
-                    {
-                        int max_deg = 0;
-                        src_node = csr_graph.GetNodeWithHighestDegree(max_deg);
-                        break;
-                    }
-                    case manually:
-                    {
-                        src_node = bc_config.src_node;
-                        break;
-                    }
-                    default:
-                    {
-                        src_node = 0;
-                        break;
-                    }
+                switch (bc_config.src_mode) {
+                case randomize: {
+                    src_node = graphio::RandomNode(csr_graph.nodes);
+                    break;
+                }
+                case largest_degree: {
+                    int max_deg = 0;
+                    src_node = csr_graph.GetNodeWithHighestDegree(max_deg);
+                    break;
+                }
+                case manually: {
+                    src_node = bc_config.src_node;
+                    break;
+                }
+                default: {
+                    src_node = 0;
+                    break;
+                }
                 }
                 max_queue_sizing = bc_config.queue_size;
 
@@ -228,7 +216,7 @@ void dispatch_bc(
                 break;
             }
             }
-        break;
+            break;
         }
         }
         break;
@@ -237,19 +225,19 @@ void dispatch_bc(
 }
 
 /*
-* @brief gunrock_bc function
-*
-* @param[out] ggraph_out output of bc problem
-* @param[in]  ggraph_in  input graph need to process on
-* @param[in]  bc_config  gunrock primitive specific configurations
-* @param[in]  data_type  gunrock datatype struct
-*/
+ * @brief gunrock_bc function
+ *
+ * @param[out] ggraph_out output of bc problem
+ * @param[in]  ggraph_in  input graph need to process on
+ * @param[in]  bc_config  gunrock primitive specific configurations
+ * @param[in]  data_type  gunrock datatype struct
+ */
 void gunrock_bc_func(
     GunrockGraph       *ggraph_out,
     const GunrockGraph *ggraph_in,
     GunrockConfig      bc_config,
-    GunrockDataType    data_type)
-{
+    GunrockDataType    data_type) {
+
     // moderngpu preparations
     int device = 0;
     device = bc_config.device;
