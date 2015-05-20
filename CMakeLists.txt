@@ -138,46 +138,11 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   # also see how to do overrides:
   # https://gist.github.com/robertmaynard/11297565
 
-  # comment from @jowens:
-  #
-  # The clang compiler version to compile Gunrock must be at least
-  # r201031, since that fixes a template bug in clang.
-  # http://llvm.org/bugs/show_bug.cgi?id=18009
-  # As of July 2014, xcode's clang compiler version has not reached
-  # this point, and we don't expect it to in the near future. Thus,
-  # below, we use the macports (top-of-tree) build of clang for OS X.
-  #
-  # NOTE FOR CUDA 6.0: The clang compiler version must be named
-  # "clang"/"clang++", or else nvcc goes bananas. (Naming it
-  # "clang-mp-3.5", the name under which MacPorts installs it, does not
-  # work for nvcc; nvcc decides its base compiler based only the
-  # executable name, "clang"/"clang++", and if it doesn't match those,
-  # it defaults back to a non-clang compiler.) To solve this, write
-  # your own 2-line shell script named 'clang' that looks like this:
-  #
-  # #!/bin/sh
-  # exec /opt/local/libexec/llvm-3.5/bin/clang "${@}"
-  #
-  # NOTE FOR CUDA 6.5 RC: This appears to be fixed! This file thus
-  # reflects CUDA 6.5+.
-
-  # set( CUDA_HOST_COMPILER /Users/jowens/bin/clang/clang++ CACHE FILEPATH
-  set( CUDA_HOST_COMPILER /opt/local/bin/clang++-mp-3.5 CACHE FILEPATH
-    "Host side compiler used by NVCC"
-    FORCE )
-  # set(CMAKE_C_COMPILER /Users/jowens/bin/clang/clang CACHE FILEPATH
-  set(CMAKE_C_COMPILER /opt/local/bin/clang-mp-3.5 CACHE FILEPATH
-    "C compiler"
-    FORCE )
-  # set(CMAKE_CXX_COMPILER /Users/jowens/bin/clang/clang++ CACHE FILEPATH
-  set(CMAKE_CXX_COMPILER /opt/local/bin/clang++-mp-3.5 CACHE FILEPATH
-    "CXX compiler"
-    FORCE )
-
-  # current CUDA on Mavericks uses libstdc++, not libc++
-  # https://github.com/cudpp/cudpp/wiki/BuildingCUDPPWithMavericks
-  set(CMAKE_CXX_FLAGS -stdlib=libstdc++)
-  set(CMAKE_C_FLAGS -stdlib=libstdc++)
+  # updated for CUDA 7, which uses libc++ rather than libstdc++
+  # older settings: check the git history
+  set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+  set(CMAKE_CXX_FLAGS -std=c++11)
+  set(CUDA_NVCC_FLAGS -std=c++11)
 endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 if(GUNROCK_BUILD_LIB)
@@ -197,7 +162,7 @@ endif(GUNROCK_BUILD_LIB)
 
 if(GUNROCK_BUILD_APPLICATIONS)
   #add_subdirectory(shared_lib_tests)
-  add_subdirectory(simple_example)
+  #add_subdirectory(simple_example)
   add_subdirectory(tests/bc)
   add_subdirectory(tests/bfs)
   add_subdirectory(tests/cc)
@@ -206,8 +171,8 @@ if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(tests/mst)
   add_subdirectory(tests/dobfs)
   add_subdirectory(tests/hits)
-  add_subdirectory(tests/salsa)
-  add_subdirectory(tests/wtf)
+  #add_subdirectory(tests/salsa)
+  #add_subdirectory(tests/wtf)
 endif(GUNROCK_BUILD_APPLICATIONS)
 
 enable_testing()
