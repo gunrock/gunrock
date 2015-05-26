@@ -42,7 +42,7 @@ struct ModularityFunctor
 
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        &problem->d_modularity_scores[e_id] = (1 - &problem->d_degrees[s_id]*&problem->d_degrees[d_id]/(2*&problem->d_edge_num));
+        &problem->d_modularity_scores[e_id] = (&problem->d_edge_num << 1 - &problem->d_degrees[s_id]*&problem->d_degrees[d_id]);
     }
 
 };
@@ -50,7 +50,7 @@ struct ModularityFunctor
 //An internal function to compute unweighted graph for CommunityDetection
 //For each edge in the graph, use filter to find edges whose two end nodes belong
 //to the same cluster, then compute the modularity accoring to the following equation:
-//Q=sum_of_same_cluster_edges(A_ij - k_i*k_i/2m)/2m
+//Q=sum_of_same_cluster_edges(A_ij - k_i*k_j/2m)/2m
 //m:#edges, k_i:out degree of i, A_ij: 1/0
 template<class ModularityProblem, class VertexId, class SizeT, class Value=float>
 float GetModularity(
@@ -118,6 +118,7 @@ float GetModularity(
                 cudaMalloc(&d_temp_storage, temp_storage_bytes);
                 cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, data_slice->modularity_scores, data_slice->modularity_scores, problem->edges);
                 // now the accumulated modularity_scores is stored in data_slice->modularity_scores[problem->edges-1]
+                // should divide it by 4m^2
                 // need to either keep it in device array or have a volatile var to get it afterwards.
             }
 
