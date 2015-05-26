@@ -1,13 +1,12 @@
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 /**
- * @file
- * gunrock.h
+ * @file gunrock.h
  *
  * @brief Main Library header file. Defines public interface.
  * The Gunrock public interface is a C-only interface to enable linking

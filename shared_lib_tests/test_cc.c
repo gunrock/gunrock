@@ -1,8 +1,8 @@
 /**
- * @brief cc test for bfs shared library
+ * @brief CC test for shared library
  * @file test_cc.c
  *
- * set input graph, configs and call function gunrock_bfs
+ * set input graph, configs and call function gunrock_cc_func
  * return per node label values in graph_out node_values
  */
 

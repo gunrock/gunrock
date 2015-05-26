@@ -1,13 +1,12 @@
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 /**
- * @file
- * test_sssp.cu
+ * @file sssp_app.cu
  *
  * @brief single-source shortest path problem implementation
  */
@@ -32,91 +31,6 @@ using namespace gunrock::oprtr;
 using namespace gunrock::app::sssp;
 
 /**
- * Performance/Evaluation statistics
- */
-struct Stats
-{
-  const char *name;
-  Statistic  rate;
-  Statistic  search_depth;
-  Statistic  redundant_work;
-  Statistic  duty;
-
-  Stats() : name(NULL), rate(), search_depth(), redundant_work(), duty() {}
-  Stats(const char *name) : name(name), rate(), search_depth(), redundant_work(), duty() {}
-};
-
-/**
- * @brief Displays timing and correctness statistics
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] stats Reference to the Stats object defined in RunTests
- * @param[in] source Source node where SSSP starts
- * @param[in] h_labels Host-side vector stores computed labels for validation
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] elapsed Total elapsed kernel running time
- * @param[in] search_depth Maximum search depth of the SSSP algorithm
- * @param[in] total_queued Total element queued in SSSP kernel running process
- * @param[in] avg_duty Average duty of the SSSP kernels
- */
-template<
-    typename VertexId,
-    typename Value,
-    typename SizeT>
-void DisplayStats(
-    const Stats        &stats,
-    const VertexId     source,
-    const unsigned int *h_labels,
-    const Csr<VertexId, Value, SizeT> &graph,
-    const double       elapsed,
-    const VertexId     search_depth,
-    const long long    total_queued,
-    const double       avg_duty)
-{
-    // Compute nodes and edges visited
-    SizeT edges_visited = 0;
-    SizeT nodes_visited = 0;
-    for (VertexId i = 0; i < graph.nodes; ++i)
-    {
-        if (h_labels[i] < UINT_MAX)
-        {
-            ++nodes_visited;
-            edges_visited += graph.row_offsets[i+1] - graph.row_offsets[i];
-        }
-    }
-
-    double redundant_work = 0.0;
-    if (total_queued > 0)
-    {
-        // measure duplicate edges put through queue
-        redundant_work = ((double) total_queued - edges_visited) / edges_visited;
-    }
-    redundant_work *= 100;
-
-    // Display test name
-    printf("%s finished.\n", stats.name);
-
-    // Display statistics
-    if (nodes_visited < 5)
-    {
-        printf("Fewer than 5 vertices visited.\n");
-    }
-    else
-    {
-        // Display the specific sample statistics
-        double m_teps = (double) edges_visited / (elapsed * 1000.0);
-        printf(" elapsed: %.3f ms, rate: %.3f MiEdges/s", elapsed, m_teps);
-        printf(", search_depth: %lld", (long long) search_depth);
-        printf("\n source: %lld, nodes_visited: %lld, edges visited: %lld",
-            (long long) source, (long long) nodes_visited, (long long) edges_visited);
-        printf("\n");
-    }
-}
-
-/**
  * @brief run single-source shortest path procedures
  *
  * @tparam VertexId
@@ -138,7 +52,7 @@ template <
     typename VertexId,
     typename Value,
     typename SizeT,
-    bool MARK_PREDECESSORS>
+    bool MARK_PREDECESSORS >
 void run_sssp(
     GunrockGraph   *ggraph_out,
     VertexId       *predecessor,
@@ -148,21 +62,20 @@ void run_sssp(
     const float    queue_sizing,
     const int      num_gpus,
     const int      delta_factor,
-    CudaContext& context)
-{
+    CudaContext& context) {
     // Preparations
-    typedef SSSPProblem<
+    typedef SSSPProblem <
         VertexId,
         SizeT,
-        MARK_PREDECESSORS> Problem;
+        Value,
+        MARK_PREDECESSORS > Problem;
 
     // Allocate host-side label array for gpu-computed results
     unsigned int *h_labels
         = (unsigned int*)malloc(sizeof(unsigned int) * graph.nodes);
     //VertexId     *h_preds  = NULL;
 
-    if (MARK_PREDECESSORS)
-    {
+    if (MARK_PREDECESSORS) {
         //h_preds = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
     }
 
@@ -172,55 +85,33 @@ void run_sssp(
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
     util::GRError(csr_problem->Init(
-        false,
-        graph,
-        num_gpus,
-        delta_factor),
-        "Problem SSSP Initialization Failed", __FILE__, __LINE__);
-
-    Stats *stats = new Stats("Single-Source Shortest Path");
+                      false,
+                      graph,
+                      num_gpus,
+                      delta_factor),
+                  "Problem SSSP Initialization Failed", __FILE__, __LINE__);
 
     // Perform SSSP
     CpuTimer gpu_timer;
 
     util::GRError(csr_problem->Reset(
-        source, sssp_enactor.GetFrontierType(), queue_sizing),
-        "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
+                      source, sssp_enactor.GetFrontierType(), queue_sizing),
+                  "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
     gpu_timer.Start();
     util::GRError(sssp_enactor.template Enact<Problem>(
-        context, csr_problem, source, queue_sizing, max_grid_size),
-        "SSSP Problem Enact Failed", __FILE__, __LINE__);
+                      context, csr_problem, source,
+                      queue_sizing, max_grid_size),
+                  "SSSP Problem Enact Failed", __FILE__, __LINE__);
     gpu_timer.Stop();
     float elapsed = gpu_timer.ElapsedMillis();
 
-    /*
-    long long total_queued =   0;
-    VertexId  search_depth =   0;
-    double    avg_duty     = 0.0;
-    sssp_enactor.GetStatistics(total_queued, search_depth, avg_duty);
-    */
-
     // Copy out results
     util::GRError(csr_problem->Extract(h_labels, predecessor),
-        "SSSP Problem Data Extraction Failed", __FILE__, __LINE__);
+                  "SSSP Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // copy label_values per node to GunrockGraph output
     ggraph_out->node_values = (unsigned int*)&h_labels[0];
 
-    /*
-    DisplayStats(
-        *stats,
-        source,
-        h_labels,
-        graph,
-        elapsed,
-        search_depth,
-        total_queued,
-        avg_duty);
-    */
-
-    // Clean up
-    delete stats;
     if (csr_problem) delete csr_problem;
     //if (h_labels)    free(h_labels);
     //if (h_preds)     free(h_preds);
@@ -244,8 +135,7 @@ void dispatch_sssp(
     const GunrockGraph    *ggraph_in,
     const GunrockConfig   sssp_config,
     const GunrockDataType data_type,
-    CudaContext&          context)
-{
+    CudaContext&          context) {
     switch (data_type.VTXID_TYPE) {
     case VTXID_INT: {
         switch (data_type.SIZET_TYPE) {
@@ -276,36 +166,30 @@ void dispatch_sssp(
                 float max_queue_sizing = 1.0; //!< default maximum queue sizing
 
                 // determine source vertex to start sssp
-                switch (sssp_config.src_mode)
-                {
-                    case randomize:
-                    {
-                        src_node = graphio::RandomNode(csr_graph.nodes);
-                        break;
-                    }
-                    case largest_degree:
-                    {
-                        int max_deg = 0;
-                        src_node = csr_graph.GetNodeWithHighestDegree(max_deg);
-                        break;
-                    }
-                    case manually:
-                    {
-                        src_node = sssp_config.src_node;
-                        break;
-                    }
-                    default:
-                    {
-                        src_node = 0;
-                        break;
-                    }
+                switch (sssp_config.src_mode) {
+                case randomize: {
+                    src_node = graphio::RandomNode(csr_graph.nodes);
+                    break;
+                }
+                case largest_degree: {
+                    int max_deg = 0;
+                    src_node = csr_graph.GetNodeWithHighestDegree(max_deg);
+                    break;
+                }
+                case manually: {
+                    src_node = sssp_config.src_node;
+                    break;
+                }
+                default: {
+                    src_node = 0;
+                    break;
+                }
                 }
                 mark_pred        = sssp_config.mark_pred;
                 delta_factor     = sssp_config.delta_factor;
                 max_queue_sizing = sssp_config.queue_size;
 
-                switch (mark_pred)
-                {
+                switch (mark_pred) {
                 case true: {
                     run_sssp<int, unsigned int, int, true>(
                         ggraph_out,
@@ -346,7 +230,7 @@ void dispatch_sssp(
                 break;
             }
             }
-        break;
+            break;
         }
         }
         break;
@@ -372,8 +256,8 @@ void gunrock_sssp_func(
     void                  *predecessor,
     const GunrockGraph    *ggraph_in,
     const GunrockConfig   sssp_config,
-    const GunrockDataType data_type)
-{
+    const GunrockDataType data_type) {
+
     // moderngpu preparations
     int device = 0;
     device = sssp_config.device;
