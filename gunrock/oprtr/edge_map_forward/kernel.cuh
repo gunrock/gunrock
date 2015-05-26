@@ -49,7 +49,12 @@ struct Sweep
         util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition,
         typename KernelPolicy::SizeT            &max_out_frontier,
         gunrock::oprtr::advance::TYPE           &ADVANCE_TYPE,
-        bool                                    &inverse_graph)
+        bool                                    &inverse_graph,
+        gunrock::oprtr::advance::REDUCE_TYPE    &R_TYPE,
+        gunrock::oprtr::advance::REDUCE_OP      &R_OP,
+        typename KernelPolicy::Value            *&d_value_to_reduce,
+        typename KernelPolicy::Value            *&d_reduce_frontier,
+        typename KernelPolicy::Value            *&d_reduced_value)
         {
             typedef Cta<KernelPolicy, ProblemData, Functor>     Cta;
             typedef typename KernelPolicy::SizeT                SizeT;
@@ -80,7 +85,12 @@ struct Sweep
                 work_progress,
                 max_out_frontier,
                 ADVANCE_TYPE,
-                inverse_graph);
+                inverse_graph,
+                R_TYPE,
+                R_OP,
+                d_value_to_reduce,
+                d_reduce_frontier,
+                d_reduced_value);
 
             // Process full tiles
             while (work_limits.offset < work_limits.guarded_offset) {
@@ -133,7 +143,12 @@ struct Dispatch
         SizeT                       &max_out_frontier,
         util::KernelRuntimeStats    &kernel_stats,
         gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
-        bool                        &inverse_graph)
+        bool                        &inverse_graph,
+        gunrock::oprtr::advance::REDUCE_TYPE    &R_TYPE,
+        gunrock::oprtr::advance::REDUCE_OP      &R_OP,
+        typename KernelPolicy::Value            *&d_value_to_reduce,
+        typename KernelPolicy::Value            *&d_reduce_frontier,
+        typename KernelPolicy::Value            *&d_reduced_value)
         {
             // empty
         }
@@ -168,7 +183,13 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         SizeT                       &max_out_frontier,
         util::KernelRuntimeStats    &kernel_stats,
         gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
-        bool                        &inverse_graph)
+        bool                        &inverse_graph,
+        gunrock::oprtr::advance::REDUCE_TYPE    &R_TYPE,
+        gunrock::oprtr::advance::REDUCE_OP      &R_OP,
+        typename KernelPolicy::Value            *&d_value_to_reduce,
+        typename KernelPolicy::Value            *&d_reduce_frontier,
+        typename KernelPolicy::Value            *&d_reduced_value)
+
     {
         // Shared storage for the kernel
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
@@ -239,7 +260,12 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 smem_storage.state.work_decomposition,
                 max_out_frontier,
                 ADVANCE_TYPE,
-                inverse_graph); 
+                inverse_graph,
+                R_TYPE,
+                R_OP,
+                d_value_to_reduce,
+                d_reduce_frontier,
+                d_reduced_value);
 
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
             kernel_stats.MarkStop();
@@ -293,7 +319,12 @@ void Kernel(
         typename KernelPolicy::SizeT            max_out_frontier,
         util::KernelRuntimeStats                kernel_stats,
         gunrock::oprtr::advance::TYPE           ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
-        bool                                    inverse_graph = false)
+        bool                                    inverse_graph = false,
+        gunrock::oprtr::advance::REDUCE_TYPE    R_TYPE = gunrock::oprtr::advance::EMPTY,
+        gunrock::oprtr::advance::REDUCE_OP      R_OP = gunrock::oprtr::advance::NONE,
+        typename KernelPolicy::Value            *d_value_to_reduce = NULL,
+        typename KernelPolicy::Value            *d_reduce_frontier = NULL,
+        typename KernelPolicy::Value            *d_reduced_value = NULL)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
             queue_reset,    
@@ -313,7 +344,12 @@ void Kernel(
             max_out_frontier,
             kernel_stats,
             ADVANCE_TYPE,
-            inverse_graph);
+            inverse_graph,
+            R_TYPE,
+            R_OP,
+            d_value_to_reduce,
+            d_reduce_frontier,
+            d_reduced_value);
 }
 
 } //edge_map_forward

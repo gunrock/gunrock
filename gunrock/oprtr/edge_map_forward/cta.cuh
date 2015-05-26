@@ -72,6 +72,7 @@ namespace edge_map_forward {
 
             typedef typename KernelPolicy::VertexId         VertexId;
             typedef typename KernelPolicy::SizeT            SizeT;
+            typedef typename KernelPolicy::Value            Value;
 
             typedef typename KernelPolicy::SmemStorage      SmemStorage;
             typedef typename KernelPolicy::SoaScanOp        SoaScanOp;
@@ -104,6 +105,11 @@ namespace edge_map_forward {
             int                     label;                      // Current label of the frontier
             gunrock::oprtr::advance::TYPE           advance_type;
             bool                    inverse_graph;
+            gunrock::oprtr::advance::REDUCE_TYPE    r_type;     
+            gunrock::oprtr::advance::REDUCE_OP      r_op;
+            Value                                   *d_value_to_reduce;
+            Value                                   *d_reduce_frontier;
+            Value                                   *d_reduced_value;
 
             // Operational details for raking grid
             RakingSoaDetails        raking_soa_details;
@@ -667,7 +673,12 @@ namespace edge_map_forward {
                     util::CtaWorkProgress       &work_progress,
                     SizeT                       max_out_frontier,
                     gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
-                    bool                        inverse_graph) :
+                    bool                        inverse_graph,
+                    gunrock::oprtr::advance::REDUCE_TYPE    R_TYPE,
+                    gunrock::oprtr::advance::REDUCE_OP      R_OP,
+                    Value            *d_value_to_reduce,
+                    Value            *d_reduce_frontier,
+                    Value            *d_reduced_value) :
 
                 queue_index(queue_index),
                 num_gpus(num_gpus),
@@ -690,7 +701,12 @@ namespace edge_map_forward {
                 work_progress(work_progress),
                 max_out_frontier(max_out_frontier),
                 advance_type(ADVANCE_TYPE),
-                inverse_graph(inverse_graph)
+                inverse_graph(inverse_graph),
+                r_type(R_TYPE),
+                r_op(R_OP),
+                d_value_to_reduce(d_value_to_reduce),
+                d_reduce_frontier(d_reduce_frontier),
+                d_reduced_value(d_reduced_value)
                 {
                     if (threadIdx.x == 0) {
                         smem_storage.state.cta_comm = KernelPolicy::THREADS;
