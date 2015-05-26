@@ -50,14 +50,6 @@ struct BFSFunctor
             return true;
         } else {
             // Check if the destination node has been claimed as someone's child
-            /*if (ProblemData::MARK_PREDECESSORS)
-                return (atomicCAS( problem->preds + d_id , -2, s_id) == -2) ? true : false;
-            else { 
-                return (atomicCAS( problem->labels + d_id, -1, s_id+1) == -1) ? true : false;
-            }*/
-            //Value label, new_weight;
-            //util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            //    label, problem->labels + s_id);
             Value new_weight;
             if (ProblemData::MARK_PREDECESSORS)
             {
@@ -68,7 +60,6 @@ struct BFSFunctor
             }
             else new_weight = s_id +1;
             bool result = new_weight < atomicMin(problem->labels + d_id, new_weight);
-            //printf("s=%d d=%d new_weight=%d keep=%d\n", s_id, d_id, new_weight, result?1:0);
             return result;
         }
     }
@@ -88,17 +79,10 @@ struct BFSFunctor
         if (ProblemData::ENABLE_IDEMPOTENCE) {
             // do nothing here
         } else {
-            //set d_labels[d_id] to be d_labels[s_id]+1
+            //set preds[d_id] to be s_id
             if (ProblemData::MARK_PREDECESSORS) {
-                /*VertexId label;
-                util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                        label, problem->labels + s_id);
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        label+1, problem->labels + d_id);*/
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                     s_id, problem->preds + d_id);
-                //if (s_id >= problem->nodes)
-                //    printf("s_id = %d, d_id = %d \t", s_id, d_id);
             }
         }
     }

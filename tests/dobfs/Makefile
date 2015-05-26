@@ -11,7 +11,6 @@
 
 force64 = 1
 NVCC = "$(shell which nvcc)"
-#NVCC = "/usr/local/cuda-5.5/bin/nvcc"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
 KERNELS = 
@@ -23,10 +22,10 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 # Gen targets
 #-------------------------------------------------------------------------------
 
+GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\" 
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\" 
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" 
 SM_TARGETS = $(GEN_SM35)
-#$(GEN_SM35)
 
 #-------------------------------------------------------------------------------
 # Libs
@@ -39,7 +38,11 @@ SM_TARGETS = $(GEN_SM35)
 
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
 MGPU_INC = "../../../moderngpu/include"
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I.. -I../..
+BOOST_DIR = "../../../boost_1_53_0"
+BOOST_DEPS = -Xlinker $(BOOST_DIR)/bin.v2/libs/timer/build/gcc-4.6/release/link-static/threading-multi/cpu_timer.o -Xlinker $(BOOST_DIR)/bin.v2/libs/chrono/build/gcc-4.6/release/link-static/threading-multi/chrono.o -Xlinker $(BOOST_DIR)/bin.v2/libs/system/build/gcc-4.6/release/link-static/threading-multi/libboost_system.a -Xlinker -lrt
+OMP_DEPS = -Xcompiler -fopenmp -Xlinker -lgomp
+METIS_DEPS = -Xlinker "/usr/local/lib/libmetis.a"
+INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(BOOST_DIR) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -101,9 +104,9 @@ DEPS = 			./Makefile \
 
 test: bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_dobfs.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_dobfs.cu $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_dobfs.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3  
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_dobfs.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O0 -g
 
 #-------------------------------------------------------------------------------
 # Clean

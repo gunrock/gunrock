@@ -709,13 +709,13 @@ bool EnoughDeviceMemory(unsigned int mem_needed)
 }
 
 template <typename T>
-T MaxValue()
+__device__ __host__ __forceinline__ T MaxValue()
 {
     return 0;
 }
 
 template <>
-int MaxValue<int>()
+__device__ __host__ __forceinline__ int MaxValue<int>()
 {
     return INT_MAX;
 }

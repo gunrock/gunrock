@@ -262,7 +262,6 @@ void SimpleReferenceBfs(
     //initialize distances
     for (VertexId i = 0; i < graph->nodes; ++i) {
         source_path[i] = ENABLE_IDEMPOTENCE? -1: util::MaxValue<VertexId>()-1;
-        //source_path[i] = -1;
         if (MARK_PREDECESSORS)
             predecessor[i] = -1;
     }
@@ -658,8 +657,6 @@ void RunTests(
         args.GetCmdLineArgument("src", parameter->src);
     }
     printf("src = %lld\n", (long long) parameter->src);
-    //printf("Display neighbor list of src:\n");
-    //graph.DisplayNeighborList(src);
 
     RunTests_instrumented<VertexId, Value, SizeT>(parameter);
 }
@@ -713,23 +710,6 @@ int cpp_main( int argc, char** argv)
     }
     printf("\n"); fflush(stdout);
     
-    /*for (int gpu=0;gpu<num_gpus;gpu++)
-    {    
-	util::SetDevice(gpu_idx[gpu]);
-        util::Array1D<int,int> arr;
-        arr.Init(1,util::HOST | util::DEVICE, true, cudaHostAllocMapped | cudaHostAllocPortable);
-	for (int i=0;i<num_gpus;i++)
-	{    
-	    util::cpu_mt::PrintMessage("check point",gpu,i);
-	    int _i=gpu*num_gpus+i;
-            arr[0]=0;
-            util::MemsetKernel<<<1,1,0,streams[_i]>>>(arr.GetPointer(util::DEVICE), 0, 1);
-            cudaStreamSynchronize(streams[_i]);
-            util::GRError("MemsetKernel failed.", __FILE__, __LINE__);
-	}
-        arr.Release(); 
-    } */   
-
     // Parse graph-contruction params
     g_undirected = args.CheckCmdLineFlag("undirected");
 
