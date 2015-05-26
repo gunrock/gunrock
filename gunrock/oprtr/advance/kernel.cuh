@@ -92,10 +92,10 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             typename KernelPolicy::SizeT            max_out,
             util::CtaWorkProgress                   work_progress,
             CudaContext                             &context,
-            TYPE                                    ADVANCE_TYPE,
+            gunrock::oprtr::advance::TYPE           ADVANCE_TYPE,
             bool                                    inverse_graph = false,
-            REDUCE_OP                               R_OP = gunrock::oprtr::advance::NONE,
-            REDUCE_TYPE                             R_TYPE = gunrock::oprtr::advance::EMPTY,
+            gunrock::oprtr::advance::REDUCE_OP      R_OP = gunrock::oprtr::advance::NONE,
+            gunrock::oprtr::advance::REDUCE_TYPE    R_TYPE = gunrock::oprtr::advance::EMPTY,
             typename KernelPolicy::Value            *d_value_to_reduce = NULL,
             typename KernelPolicy::Value            *d_reduce_frontier = NULL,
             typename KernelPolicy::Value            *d_reduced_value = NULL)
@@ -125,7 +125,12 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     max_out,                 // max_out_queue
                     enactor_stats.advance_kernel_stats,
                     ADVANCE_TYPE,
-                    inverse_graph);
+                    inverse_graph,
+                    R_TYPE,
+                    R_OP,
+                    d_value_to_reduce,
+                    d_reduce_frontier,
+                    d_reduced_value);
             break;
         }
         case LB_BACKWARD:
