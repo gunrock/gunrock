@@ -49,9 +49,11 @@ template <
     typename SizeT >
 void run_cc(
     GunrockGraph *ggraph_out,
+    unsigned int *components,
     const Csr<VertexId, Value, SizeT> &csr_graph,
     const int    max_grid_size,
     const int    num_gpus) {
+
     // Define CCProblem
     typedef CCProblem <
         VertexId,
@@ -93,11 +95,9 @@ void run_cc(
     util::GRError(csr_problem->Extract(h_component_ids),
                   "CC Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    // Compute size and root of each component
-    VertexId     *h_roots      = new VertexId[csr_problem->num_components];
-    unsigned int *h_histograms = new unsigned int[csr_problem->num_components];
-
-    csr_problem->ComputeCCHistogram(h_component_ids, h_roots, h_histograms);
+    // Compute number of components in graph
+    unsigned int temp = csr_problem->num_components;
+    *components = temp;
 
     // copy component_id per node to GunrockGraph struct
     ggraph_out->node_values = (int*)&h_component_ids[0];
@@ -105,10 +105,7 @@ void run_cc(
     printf("GPU Connected Component finished in %lf msec.\n", elapsed);
 
     // Cleanup
-    if (h_roots)      delete[] h_roots;
-    if (h_histograms) delete[] h_histograms;
-    if (csr_problem)  delete   csr_problem;
-    //if (h_component_ids) free(h_component_ids);
+    if (csr_problem)  delete csr_problem;
 
     cudaDeviceSynchronize();
 }
@@ -123,6 +120,7 @@ void run_cc(
  */
 void dispatch_cc(
     GunrockGraph          *ggraph_out,
+    unsigned int          *components,
     const GunrockGraph    *ggraph_in,
     const GunrockConfig   cc_config,
     const GunrockDataType data_type) {
@@ -146,6 +144,7 @@ void dispatch_cc(
                 // lunch cc dispatch function
                 run_cc<int, int, int>(
                     ggraph_out,
+                    (unsigned int*)components,
                     csr_graph,
                     max_grid_size,
                     num_gpus);
@@ -184,12 +183,13 @@ void dispatch_cc(
  */
 void gunrock_cc_func(
     GunrockGraph          *ggraph_out,
+    unsigned int          *components,
     const GunrockGraph    *ggraph_in,
     const GunrockConfig   cc_configs,
     const GunrockDataType data_type) {
 
     // lunch dispatch function
-    dispatch_cc(ggraph_out, ggraph_in, cc_configs, data_type);
+    dispatch_cc(ggraph_out, components, ggraph_in, cc_configs, data_type);
 }
 
 // Leave this at the end of the file

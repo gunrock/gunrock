@@ -38,16 +38,19 @@ int main(int argc, char* argv[])
   // malloc output graph
   struct GunrockGraph *graph_output =
     (struct GunrockGraph*)malloc(sizeof(struct GunrockGraph));
+  unsigned int *components = (unsigned int*)malloc(sizeof(unsigned int));
 
   // run connected component calculations
   gunrock_cc_func(
     graph_output,
+    components,
     graph_input,
     configs,
     data_type);
 
   // test print
   int i;
+  printf("Number of Components: %d\n", components[0]);
   printf("Demo Outputs:\n");
   int *component_ids = (int*)malloc(sizeof(int) * graph_input->num_nodes);
   component_ids = (int*)graph_output->node_values;
