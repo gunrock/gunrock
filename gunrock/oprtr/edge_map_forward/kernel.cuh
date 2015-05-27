@@ -53,8 +53,7 @@ struct Sweep
         gunrock::oprtr::advance::REDUCE_TYPE    &R_TYPE,
         gunrock::oprtr::advance::REDUCE_OP      &R_OP,
         typename KernelPolicy::Value            *&d_value_to_reduce,
-        typename KernelPolicy::Value            *&d_reduce_frontier,
-        typename KernelPolicy::Value            *&d_reduced_value)
+        typename KernelPolicy::Value            *&d_reduce_frontier)
         {
             typedef Cta<KernelPolicy, ProblemData, Functor>     Cta;
             typedef typename KernelPolicy::SizeT                SizeT;
@@ -89,8 +88,7 @@ struct Sweep
                 R_TYPE,
                 R_OP,
                 d_value_to_reduce,
-                d_reduce_frontier,
-                d_reduced_value);
+                d_reduce_frontier);
 
             // Process full tiles
             while (work_limits.offset < work_limits.guarded_offset) {
@@ -147,8 +145,7 @@ struct Dispatch
         gunrock::oprtr::advance::REDUCE_TYPE    &R_TYPE,
         gunrock::oprtr::advance::REDUCE_OP      &R_OP,
         typename KernelPolicy::Value            *&d_value_to_reduce,
-        typename KernelPolicy::Value            *&d_reduce_frontier,
-        typename KernelPolicy::Value            *&d_reduced_value)
+        typename KernelPolicy::Value            *&d_reduce_frontier)
         {
             // empty
         }
@@ -187,8 +184,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         gunrock::oprtr::advance::REDUCE_TYPE    &R_TYPE,
         gunrock::oprtr::advance::REDUCE_OP      &R_OP,
         typename KernelPolicy::Value            *&d_value_to_reduce,
-        typename KernelPolicy::Value            *&d_reduce_frontier,
-        typename KernelPolicy::Value            *&d_reduced_value)
+        typename KernelPolicy::Value            *&d_reduce_frontier)
 
     {
         // Shared storage for the kernel
@@ -264,8 +260,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 R_TYPE,
                 R_OP,
                 d_value_to_reduce,
-                d_reduce_frontier,
-                d_reduced_value);
+                d_reduce_frontier);
 
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
             kernel_stats.MarkStop();
@@ -323,8 +318,7 @@ void Kernel(
         gunrock::oprtr::advance::REDUCE_TYPE    R_TYPE = gunrock::oprtr::advance::EMPTY,
         gunrock::oprtr::advance::REDUCE_OP      R_OP = gunrock::oprtr::advance::NONE,
         typename KernelPolicy::Value            *d_value_to_reduce = NULL,
-        typename KernelPolicy::Value            *d_reduce_frontier = NULL,
-        typename KernelPolicy::Value            *d_reduced_value = NULL)
+        typename KernelPolicy::Value            *d_reduce_frontier = NULL)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
             queue_reset,    
@@ -348,8 +342,7 @@ void Kernel(
             R_TYPE,
             R_OP,
             d_value_to_reduce,
-            d_reduce_frontier,
-            d_reduced_value);
+            d_reduce_frontier);
 }
 
 } //edge_map_forward

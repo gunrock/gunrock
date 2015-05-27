@@ -109,7 +109,6 @@ namespace edge_map_forward {
             gunrock::oprtr::advance::REDUCE_OP      r_op;
             Value                                   *d_value_to_reduce;
             Value                                   *d_reduce_frontier;
-            Value                                   *d_reduced_value;
 
             // Operational details for raking grid
             RakingSoaDetails        raking_soa_details;
@@ -316,6 +315,19 @@ namespace edge_map_forward {
                                                                 pred_id,
                                                                 cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
                                                     }
+                                                if (cta->d_value_to_reduce != NULL) {
+                                                    if (cta->r_type == gunrock::oprtr::advance::VERTEX) {
+                                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                cta->d_value_to_reduce[neighbor_id],
+                                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                    } else if (cta->r_type == gunrock::oprtr::advance::EDGE) {
+                                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                cta->d_value_to_reduce[coop_offset+threadIdx.x],
+                                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                    }
+                                                } else if (cta->r_type != gunrock::oprtr::advance::EMPTY) { 
+                                                    // use user-specified function to generate value to reduce
+                                                }
                                             }
                                             else {
                                                 if (cta->d_out != NULL) {
@@ -323,6 +335,50 @@ namespace edge_map_forward {
                                                             -1,
                                                             cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
                                                 }
+                                                    if (cta->d_value_to_reduce != NULL) {
+                                                            switch (cta->r_op) {
+                                                                case gunrock::oprtr::advance::PLUS :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::MULTIPLIES :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)1, 
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::MAXIMUM :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)INT_MIN,
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::MINIMUM :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)INT_MAX,
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::BIT_OR :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::BIT_AND :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0xffffffff,
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::BIT_XOR :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                                default:
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                            }
+                                                        }
                                             }
 
                                             coop_offset += KernelPolicy::THREADS;
@@ -360,6 +416,19 @@ namespace edge_map_forward {
                                                             pred_id,
                                                             cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
                                                 }
+                                                if (cta->d_value_to_reduce != NULL) {
+                                                    if (cta->r_type == gunrock::oprtr::advance::VERTEX) {
+                                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                cta->d_value_to_reduce[neighbor_id],
+                                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                    } else if (cta->r_type == gunrock::oprtr::advance::EDGE) {
+                                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                cta->d_value_to_reduce[coop_offset+threadIdx.x],
+                                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                    }
+                                                } else if (cta->r_type != gunrock::oprtr::advance::EMPTY) { 
+                                                    // use user-specified function to generate value to reduce
+                                                }
                                             }
                                             else {
                                                 if (cta->d_out != NULL) {
@@ -367,6 +436,50 @@ namespace edge_map_forward {
                                                             -1,
                                                             cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
                                                 }
+                                                    if (cta->d_value_to_reduce != NULL) {
+                                                            switch (cta->r_op) {
+                                                                case gunrock::oprtr::advance::PLUS :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::MULTIPLIES :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)1, 
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::MAXIMUM :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)INT_MIN,
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::MINIMUM :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)INT_MAX,
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::BIT_OR :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::BIT_AND :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0xffffffff,
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                                case gunrock::oprtr::advance::BIT_XOR :
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                                default:
+                                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                            (Value)0,
+                                                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                    break;
+                                                            }
+                                                        }
                                             }
 
                                         }
@@ -445,12 +558,70 @@ namespace edge_map_forward {
                                                 if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id, edge_id)) {
                                                     Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id, edge_id);
                                                     if (cta->advance_type == gunrock::oprtr::advance::V2E
-                                                      ||cta->advance_type == gunrock::oprtr::advance::E2E) {
+                                                            ||cta->advance_type == gunrock::oprtr::advance::E2E) {
                                                         neighbor_id = coop_offset+lane_id;
                                                     }
+                                                    if (cta->d_value_to_reduce != NULL) {
+                                                        if (cta->r_type == gunrock::oprtr::advance::VERTEX) {
+                                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                    cta->d_value_to_reduce[neighbor_id],
+                                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                        } else if (cta->r_type == gunrock::oprtr::advance::EDGE) {
+                                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                    cta->d_value_to_reduce[coop_offset+lane_id],
+                                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                        }
+                                                    } else if (cta->r_type != gunrock::oprtr::advance::EMPTY) { 
+                                                        // use user-specified function to generate value to reduce
+                                                    }
                                                 }
-                                                else
+                                                else {
                                                     neighbor_id = -1;
+                                                    if (cta->d_value_to_reduce != NULL) {
+                                                        switch (cta->r_op) {
+                                                            case gunrock::oprtr::advance::PLUS :
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)0,
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                            case gunrock::oprtr::advance::MULTIPLIES :
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)1, 
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                            case gunrock::oprtr::advance::MAXIMUM :
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)INT_MIN,
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                            case gunrock::oprtr::advance::MINIMUM :
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)INT_MAX,
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                            case gunrock::oprtr::advance::BIT_OR :
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)0,
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                            case gunrock::oprtr::advance::BIT_AND :
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)0xffffffff,
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                            case gunrock::oprtr::advance::BIT_XOR :
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)0,
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                            default:
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)0,
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                        }
+                                                    }
+                                                }
 
                                                 if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
                                                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -483,12 +654,70 @@ namespace edge_map_forward {
                                                 if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id, edge_id)) {
                                                     Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id, edge_id);
                                                     if (cta->advance_type == gunrock::oprtr::advance::V2E
-                                                      ||cta->advance_type == gunrock::oprtr::advance::E2E) {
+                                                            ||cta->advance_type == gunrock::oprtr::advance::E2E) {
                                                         neighbor_id = coop_offset+lane_id;
                                                     }
+                                                    if (cta->d_value_to_reduce != NULL) {
+                                                        if (cta->r_type == gunrock::oprtr::advance::VERTEX) {
+                                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                    cta->d_value_to_reduce[neighbor_id],
+                                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                        } else if (cta->r_type == gunrock::oprtr::advance::EDGE) {
+                                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                    cta->d_value_to_reduce[coop_offset+threadIdx.x],
+                                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                        }
+                                                    } else if (cta->r_type != gunrock::oprtr::advance::EMPTY) { 
+                                                        // use user-specified function to generate value to reduce
+                                                    }
                                                 }
-                                                else
+                                                else {
                                                     neighbor_id = -1;
+                                                    if (cta->d_value_to_reduce != NULL) {
+                                                        switch (cta->r_op) {
+                                                            case gunrock::oprtr::advance::PLUS :
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)0,
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                            case gunrock::oprtr::advance::MULTIPLIES :
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)1, 
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                            case gunrock::oprtr::advance::MAXIMUM :
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)INT_MIN,
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                            case gunrock::oprtr::advance::MINIMUM :
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)INT_MAX,
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                            case gunrock::oprtr::advance::BIT_OR :
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)0,
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                            case gunrock::oprtr::advance::BIT_AND :
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)0xffffffff,
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                            case gunrock::oprtr::advance::BIT_XOR :
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)0,
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                            default:
+                                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                        (Value)0,
+                                                                        cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                                break;
+                                                        }
+                                                    }
+                                                }
 
                                                 if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
                                                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -677,8 +906,7 @@ namespace edge_map_forward {
                     gunrock::oprtr::advance::REDUCE_TYPE    R_TYPE,
                     gunrock::oprtr::advance::REDUCE_OP      R_OP,
                     Value            *d_value_to_reduce,
-                    Value            *d_reduce_frontier,
-                    Value            *d_reduced_value) :
+                    Value            *d_reduce_frontier) :
 
                 queue_index(queue_index),
                 num_gpus(num_gpus),
@@ -705,8 +933,7 @@ namespace edge_map_forward {
                 r_type(R_TYPE),
                 r_op(R_OP),
                 d_value_to_reduce(d_value_to_reduce),
-                d_reduce_frontier(d_reduce_frontier),
-                d_reduced_value(d_reduced_value)
+                d_reduce_frontier(d_reduce_frontier)
                 {
                     if (threadIdx.x == 0) {
                         smem_storage.state.cta_comm = KernelPolicy::THREADS;
@@ -833,9 +1060,68 @@ namespace edge_map_forward {
                             Functor::ApplyEdge(predecessor_id, neighbor_id, problem, smem_storage.gather_offsets[scratch_offset], edge_id);
                             if (advance_type == gunrock::oprtr::advance::V2E || advance_type == gunrock::oprtr::advance::E2E)
                                 neighbor_id = smem_storage.gather_offsets[scratch_offset];
+
+                            if (d_value_to_reduce != NULL) {
+                                if (r_type == gunrock::oprtr::advance::VERTEX) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            d_value_to_reduce[neighbor_id],
+                                            d_reduce_frontier + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                                } else if (r_type == gunrock::oprtr::advance::EDGE) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            d_value_to_reduce[smem_storage.gather_offsets[scratch_offset]],
+                                            d_reduce_frontier + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                                }
+                            } else if (r_type != gunrock::oprtr::advance::EMPTY) { 
+                                // use user-specified function to generate value to reduce
+                            }
                         }
-                        else
+                        else {
                             neighbor_id = -1;
+                            if (d_value_to_reduce != NULL) {
+                                switch (r_op) {
+                                    case gunrock::oprtr::advance::PLUS :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                d_reduce_frontier + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                                        break;
+                                    case gunrock::oprtr::advance::MULTIPLIES :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)1, 
+                                                d_reduce_frontier + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                                        break;
+                                    case gunrock::oprtr::advance::MAXIMUM :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)INT_MIN,
+                                                d_reduce_frontier + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                                        break;
+                                    case gunrock::oprtr::advance::MINIMUM :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)INT_MAX,
+                                                d_reduce_frontier + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                                        break;
+                                    case gunrock::oprtr::advance::BIT_OR :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                d_reduce_frontier + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                                        break;
+                                    case gunrock::oprtr::advance::BIT_AND :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0xffffffff,
+                                                d_reduce_frontier + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                                        break;
+                                    case gunrock::oprtr::advance::BIT_XOR :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                d_reduce_frontier + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                                        break;
+                                    default:
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                d_reduce_frontier + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                                        break;
+                                }
+                            }
+                        }
                         // Scatter into out_queue
                         if (d_out != NULL) {
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(

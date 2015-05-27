@@ -239,6 +239,8 @@ class CCEnactor : public EnactorBase
             SizeT num_elements          = graph_slice->edges;
             bool queue_reset            = true;
 
+            printf("before HookInit:\n");
+            util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
 
             gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, HookInitFunctor>
                 <<<num_elements/FilterPolicy::THREADS+1, FilterPolicy::THREADS>>>(
@@ -258,6 +260,9 @@ class CCEnactor : public EnactorBase
                         graph_slice->frontier_elements[selector^1],         // max_out_queue
                         this->filter_kernel_stats,
                         false);
+
+            printf("Before first PtrJump:\n");
+            util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
 
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) break;
 
@@ -325,6 +330,9 @@ class CCEnactor : public EnactorBase
             num_elements          = graph_slice->nodes;
             queue_reset            = true;
 
+            printf("Before UpdateMask:\n");
+            util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
+
             gunrock::oprtr::filter::Kernel<FilterPolicy, CCProblem, UpdateMaskFunctor>
                 <<<filter_grid_size, FilterPolicy::THREADS>>>(
                         0,
@@ -349,6 +357,9 @@ class CCEnactor : public EnactorBase
 
                 edge_flag[0] = 0;
                 while (!edge_flag[0]) {
+
+                    printf("HookMax:\n");
+                    util::DisplayDeviceResults(problem->data_slices[0]->d_component_ids, graph_slice->nodes);
 
                     queue_index             = 0;        // Work queue index
                     num_elements            = graph_slice->edges;
@@ -405,6 +416,7 @@ class CCEnactor : public EnactorBase
 
                     if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel Hook Min/Max Operation failed", __FILE__, __LINE__))) break;
                     if (queue_reset) queue_reset = false;
+
                     queue_index++;
                     selector ^= 1;
                     iteration++;
