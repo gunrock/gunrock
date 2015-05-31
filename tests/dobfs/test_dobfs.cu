@@ -373,7 +373,7 @@ void RunTests(Test_Parameter *parameter)
     //double        max_queue_sizing1     = parameter -> max_queue_sizing1;
     //double        max_in_sizing         = parameter -> max_in_sizing;
     ContextPtr   *context               = (ContextPtr*)parameter -> context;
-    std::string   partition_method      = parameter -> partition_method;
+    //std::string   partition_method      = parameter -> partition_method;
     int          *gpu_idx               = parameter -> gpu_idx;
     //cudaStream_t *streams               = parameter -> streams;
     //float         partition_factor      = parameter -> partition_factor;

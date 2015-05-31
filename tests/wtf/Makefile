@@ -23,10 +23,10 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 # Gen targets
 #-------------------------------------------------------------------------------
 
+GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\" 
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\" 
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" 
 SM_TARGETS = $(GEN_SM35)
-#$(GEN_SM35)
 
 #-------------------------------------------------------------------------------
 # Libs
@@ -39,9 +39,12 @@ SM_TARGETS = $(GEN_SM35)
 
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
 MGPU_INC = "../../../moderngpu/include"
-BOOST_INC = "../../../boost_1_53_0"
-CUB_INC = "../../../cub"
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(BOOST_INC) -I$(CUB_INC) -I.. -I../..
+CUB_INC = "../../.."
+BOOST_DIR = "../../../boost_1_53_0"
+BOOST_DEPS = -Xlinker $(BOOST_DIR)/bin.v2/libs/timer/build/gcc-4.6/release/link-static/threading-multi/cpu_timer.o -Xlinker $(BOOST_DIR)/bin.v2/libs/chrono/build/gcc-4.6/release/link-static/threading-multi/chrono.o -Xlinker $(BOOST_DIR)/bin.v2/libs/system/build/gcc-4.6/release/link-static/threading-multi/libboost_system.a -Xlinker -lrt
+OMP_DEPS = -Xcompiler -fopenmp -Xlinker -lgomp
+METIS_DEPS = -Xlinker "/usr/local/lib/libmetis.a"
+INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) -I$(BOOST_DIR) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -103,7 +106,7 @@ DEPS = 			./Makefile \
 
 test: bin/test_wtf_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_wtf_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_wtf.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/test_wtf_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_wtf.cu $(DEPS)
 	mkdir -p bin
 	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_wtf_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_wtf.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3  
 

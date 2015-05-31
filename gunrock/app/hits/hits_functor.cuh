@@ -60,9 +60,9 @@ struct HUBFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        Value val = (s_id == problem->d_src_node[0] ? problem->d_delta[0]/problem->d_out_degrees[s_id] : 0)
-                  + (1-problem->d_delta[0])*problem->d_arank_curr[d_id]/problem->d_in_degrees[d_id];
-        atomicAdd(&problem->d_hrank_next[s_id], val);
+        Value val = (s_id == problem->src_node ? problem->delta/problem->out_degrees[s_id] : 0)
+                  + (1-problem->delta)*problem->arank_curr[d_id]/problem->in_degrees[d_id];
+        atomicAdd(&problem->hrank_next[s_id], val);
     }
 
 };
@@ -107,8 +107,8 @@ struct AUTHFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        Value val = problem->d_hrank_curr[d_id]/ (problem->d_out_degrees[d_id] > 0 ? problem->d_out_degrees[d_id] : 1.0);
-        atomicAdd(&problem->d_arank_next[s_id], val);
+        Value val = problem->hrank_curr[d_id]/ (problem->out_degrees[d_id] > 0 ? problem->out_degrees[d_id] : 1.0);
+        atomicAdd(&problem->arank_next[s_id], val);
     }
 };
 
@@ -121,3 +121,4 @@ struct AUTHFunctor
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
+

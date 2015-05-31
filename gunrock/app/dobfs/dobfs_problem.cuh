@@ -225,7 +225,6 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT, Value,
             float       _beta,
             cudaStream_t* streams = NULL)
     {
-        printf("Dobfs initing...\n");
         num_gpus = _num_gpus;
         undirected = _undirected;
         nodes = graph.nodes;

@@ -7,7 +7,7 @@
 
 /**
  * @file
- * dc_functor.cuh
+ * topk_functor.cuh
  *
  * @brief Device functions for TopK problem.
  */
@@ -15,11 +15,11 @@
 #pragma once
 
 #include <gunrock/app/problem_base.cuh>
-#include <gunrock/app/dc/dc_problem.cuh>
+#include <gunrock/app/topk/topk_problem.cuh>
 
 namespace gunrock {
 namespace app {
-namespace dc {
+namespace topk {
 
 /**
  * @brief Structure contains device functions in top k problem.
@@ -30,7 +30,7 @@ namespace dc {
  *
  */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct DCFunctor
+struct TOPKFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
   
@@ -88,7 +88,7 @@ struct DCFunctor
   {}
 };
   
-} // dc
+} // topk
 } // app
 } // gunrock
 
