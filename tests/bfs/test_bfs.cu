@@ -12,7 +12,7 @@
  * @brief Simple test driver program for breadth-first search.
  */
 
-#include <stdio.h> 
+#include <stdio.h>
 #include <string>
 #include <deque>
 #include <vector>
@@ -42,9 +42,8 @@ using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::bfs;
 
-
 /******************************************************************************
- * Defines, constants, globals 
+ * Defines, constants, globals
  ******************************************************************************/
 
 //bool g_verbose;
@@ -57,56 +56,66 @@ using namespace gunrock::app::bfs;
  ******************************************************************************/
  void Usage()
  {
- printf("\ntest_bfs <graph type> <graph type args> [--device=<device_index>] "
-        "[--undirected] [--instrumented] [--src=<source index>] [--quick] "
-        "[--mark-pred] [--queue-sizing=<scale factor>] "
-        "[--in-sizing=<in/out queue scale factor>] [--disable-size-check] "
-        "[--grid-size=<grid size>] [partition_method=random / biasrandom / clustered / metis]\n"
-        "[--v]\n"
+    printf(
+        " test_bfs <graph type> <graph type args> [--device=<device_index>]\n"
+        " [--undirected] [--instrumented] [--src=<source index>] [--quick=<0|1>]\n"
+        " [--mark-pred] [--queue-sizing=<scale factor>] [--iteration-num=<num>]\n"
+        " [--in-sizing=<in/out queue scale factor>] [--disable-size-check]\n "
+        " [--grid-size=<grid size>] [partition_method=<random|biasrandom|clustered|metis]\n"
+        " [--v] [--idempotence=<0|1>]\n"
         "\n"
         "Graph types and args:\n"
-        "  market [<file>]\n"
-        "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
+        "  market <file>\n"
+        "    Reads a Matrix-Market coordinate-formatted graph of directed / undirected\n"
         "    edges from stdin (or from the optionally-specified file).\n"
-        
-        "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
-        "  --undirected If set then treat the graph as undirected.\n"
-        "  --instrumented If set then kernels keep track of queue-search_depth\n"
-        "  and barrier duty (a relative indicator of load imbalance.)\n"
-        "  --src Begins BFS from the vertex <source index>. If set as randomize\n"
-        "  then will begin with a random source vertex.\n"
-        "  If set as largestdegree then will begin with the node which has\n"
-        "  largest degree.\n"
-        "  --quick If set will skip the CPU validation code.\n"
-        "  --mark-pred If set then keep not only label info but also predecessor info.\n"
-        "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
-        "  Default is 1.0\n"
+        "  --device=<device_index>   Set GPU device for running the test. [Default: 0].\n"
+        "  --undirected              Treat the graph as undirected (symmetric).\n"
+        "  --idempotence=<0 or 1>    Enable: 1, Disable: 0 [Default: Enable].\n"
+        "  --instrumented            Keep kernels statics [Default: Disable].\n"
+        "                            total_queued, search_depth and barrier duty\n"
+        "                            (a relative indicator of load imbalance.)\n"
+        "  --src=<source vertex id>  Begins BFS from the source [Default: 0].\n"
+        "                            If randomize: from a random source vertex.\n"
+        "                            If largestdegree: from largest degree vertex.\n"
+        "  --quick=<0 or 1>          Skip the CPU validation: 1, or not: 0 [Default: 1].\n"
+        "  --mark-pred               Keep both label info and predecessor info.\n"
+        "  --queue-sizing=<factor>   Allocates a frontier queue sized at: \n"
+        "                            (graph-edges * <scale factor>). [Default: 1.0]\n"
+        "  --v                       Print verbose per iteration debug info.\n"
+        "  --iteration-num=<number>  Number of runs to perform the test [Default: 1].\n"
+        "  --traversal-mode=<0 or 1> Set traversal strategy, 0 for Load-Balanced, \n"
+        "                            1 for Dynamic-Cooperative [Default: dynamic\n"
+        "                            determine based on average degree].\n"
         );
- }
+}
 
- /**
-  * @brief Displays the BFS result (i.e., distance from source)
-  *
-  * @param[in] source_path Search depth from the source for each node.
-  * @param[in] preds Predecessor node id for each node.
-  * @param[in] nodes Number of nodes in the graph.
-  * @param[in] MARK_PREDECESSORS Whether to show predecessor of each node.
-  */
-template <
-    typename VertexId, 
-    typename SizeT,
-    bool MARK_PREDECESSORS,
-    bool ENABLE_IDEMPOTENCE>
-void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes)
+/**
+ * @brief Displays the BFS result (i.e., distance from source)
+ *
+ * @param[in] source_path Search depth from the source for each node.
+ * @param[in] preds Predecessor node id for each node.
+ * @param[in] nodes Number of nodes in the graph.
+ * @param[in] MARK_PREDECESSORS Whether to show predecessor of each node.
+ * @param[in] ENABLE_IDEMPOTENCE Whether to enable idempotence mode.
+ */
+template<typename VertexId, typename SizeT, bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE>
+void DisplaySolution(
+    VertexId *labels,
+    VertexId *preds,
+    SizeT     num_nodes)
 {
-    if (nodes > 40)
-        nodes = 40;
+    if (num_nodes > 40) num_nodes = 40;
+
+    printf("\nFirst %d labels of the GPU result:\n", num_nodes);
+
     printf("[");
-    for (VertexId i = 0; i < nodes; ++i) {
+    for (VertexId i = 0; i < num_nodes; ++i)
+    {
         PrintValue(i);
         printf(":");
-        PrintValue(source_path[i]);
-        if (MARK_PREDECESSORS && !ENABLE_IDEMPOTENCE) {
+        PrintValue(labels[i]);
+        if (MARK_PREDECESSORS && !ENABLE_IDEMPOTENCE)
+        {
             printf(",");
             PrintValue(preds[i]);
         }
@@ -115,11 +124,11 @@ void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes)
     printf("]\n");
 }
 
- /**
-  * Performance/Evaluation statistics
-  */ 
-
-struct Stats {
+/**
+ * Performance/Evaluation statistics
+ */
+struct Stats
+{
     const char *name;
     Statistic rate;
     Statistic search_depth;
@@ -163,7 +172,7 @@ public:
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * 
+ *
  * @param[in] stats Reference to the Stats object defined in RunTests
  * @param[in] src Source node where BFS starts
  * @param[in] h_labels Host-side vector stores computed labels for validation
@@ -199,8 +208,10 @@ void DisplayStats(
     }
 
     double redundant_work = 0.0;
-    if (total_queued > 0) {
-        redundant_work = ((double) total_queued - edges_visited) / edges_visited;        // measure duplicate edges put through queue
+    if (total_queued > 0)
+    {
+        // measure duplicate edges put through queue
+        redundant_work = ((double)total_queued - edges_visited) / edges_visited;
     }
     redundant_work *= 100;
 
@@ -208,45 +219,51 @@ void DisplayStats(
     printf("[%s] finished. ", stats.name);
 
     // Display statistics
-    if (nodes_visited < 5) {
+    if (nodes_visited < 5)
+    {
         printf("Fewer than 5 vertices visited.\n");
-    } else {
+    }
+    else
+    {
         // Display the specific sample statistics
         double m_teps = (double) edges_visited / (elapsed * 1000.0);
-        printf(" elapsed: %.3f ms, rate: %.3f MiEdges/s", elapsed, m_teps);
-        if (search_depth != 0) printf(", search_depth: %lld", (long long) search_depth);
-        if (avg_duty != 0) {
+        printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed, m_teps);
+        if (search_depth != 0)
+            printf(", search_depth: %lld", (long long) search_depth);
+        if (avg_duty != 0)
+        {
             printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
         }
-        printf("\n src: %lld, nodes_visited: %lld, edges visited: %lld",
-            (long long) src, (long long) nodes_visited, (long long) edges_visited);
-        if (total_queued > 0) {
+        printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
+               (long long) src, (long long) nodes_visited, (long long) edges_visited);
+        if (total_queued > 0)
+        {
             printf(", total queued: %lld", total_queued);
         }
-        if (redundant_work > 0) {
+        if (redundant_work > 0)
+        {
             printf(", redundant work: %.2f%%", redundant_work);
         }
         printf("\n");
     }
-    
 }
-
 
 /******************************************************************************
  * BFS Testing Routines
  *****************************************************************************/
 
- /**
-  * @brief A simple CPU-based reference BFS ranking implementation.
-  *
-  * @tparam VertexId
-  * @tparam Value
-  * @tparam SizeT
-  *
-  * @param[in] graph Reference to the CSR graph we process on
-  * @param[in] source_path Host-side vector to store CPU computed labels for each node
-  * @param[in] src Source node where BFS starts
-  */
+/**
+ * @brief A simple CPU-based reference BFS ranking implementation.
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] source_path Host-side vector to store CPU computed labels for each node
+ * @param[in] predecessor Host-side vector to store CPU computed predecessor for each node
+ * @param[in] src Source node where BFS starts
+ */
 template<
     typename VertexId,
     typename Value,
@@ -273,13 +290,13 @@ void SimpleReferenceBfs(
     frontier.push_back(src);
 
     //
-    //Perform BFS
+    // Perform BFS
     //
 
     CpuTimer cpu_timer;
     cpu_timer.Start();
-    while (!frontier.empty()) {
-        
+    while (!frontier.empty())
+    {
         // Dequeue node from frontier
         VertexId dequeued_node = frontier.front();
         frontier.pop_front();
@@ -296,7 +313,8 @@ void SimpleReferenceBfs(
                 source_path[neighbor] = neighbor_dist;
                 if (MARK_PREDECESSORS)
                     predecessor[neighbor] = dequeued_node;
-                if (search_depth < neighbor_dist) {
+                if (search_depth < neighbor_dist)
+                {
                     search_depth = neighbor_dist;
                 }
                 frontier.push_back(neighbor);
@@ -311,7 +329,8 @@ void SimpleReferenceBfs(
     float elapsed = cpu_timer.ElapsedMillis();
     search_depth++;
 
-    printf("CPU BFS finished in %lf msec. Search depth is:%d\n", elapsed, search_depth);
+    printf("CPU BFS finished in %lf msec. cpu_search_depth: %d\n",
+           elapsed, search_depth);
 }
 
 /**
@@ -328,6 +347,9 @@ void SimpleReferenceBfs(
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] num_gpus Number of GPUs
  * @param[in] max_queue_sizing Scaling factor used in edge mapping
+ * @param[in] iterations Number of iterations for running the test
+ * @param[in] traversal_mode Graph traversal mode: Load-balanced or Dynamic cooperative
+ * @param[in] context CudaContext pointer for moderngpu APIs
  *
  */
 template <
@@ -372,6 +394,8 @@ void RunTests(Test_Parameter *parameter)
     int           partition_seed        = parameter -> partition_seed;
     bool          g_quick               = parameter -> g_quick;
     bool          g_stream_from_host    = parameter -> g_stream_from_host;
+    int           traversal_mode        = parameter -> traversal_mode;
+    SizeT         iterations            = parameter -> iterations;
     size_t       *org_size              = new size_t  [num_gpus];
     // Allocate host-side label array (for both reference and gpu-computed results)
     VertexId     *reference_labels      = new VertexId[graph->nodes];
@@ -411,13 +435,14 @@ void RunTests(Test_Parameter *parameter)
         max_in_sizing,
         partition_factor,
         partition_seed), "Problem BFS Initialization Failed", __FILE__, __LINE__);
-    util::GRError(enactor->Init (context, problem, max_grid_size), "BFS Enactor init failed", __FILE__, __LINE__);
+    util::GRError(enactor->Init (context, problem, max_grid_size, traversal_mode), "BFS Enactor init failed", __FILE__, __LINE__);
+
     //
     // Compute reference CPU BFS solution for source-distance
     //
     if (reference_check_label != NULL)
     {
-        printf("compute ref value\n");
+        printf("Computing reference value ...\n");
         SimpleReferenceBfs<VertexId, Value, SizeT, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE>(
             graph,
             reference_check_label,
@@ -430,23 +455,28 @@ void RunTests(Test_Parameter *parameter)
     long long total_queued = 0;
     VertexId  search_depth = 0;
     double    avg_duty     = 0.0; 
+    float     elapsed      = 0.0;
 
     // Perform BFS
     CpuTimer cpu_timer;
 
-    util::GRError(problem->Reset(src, enactor->GetFrontierType(), max_queue_sizing, max_queue_sizing1), "BFS Problem Data Reset Failed", __FILE__, __LINE__);
-    util::GRError(enactor->Reset(), "BFS Enactor Reset failed", __FILE__, __LINE__);
+    for (int iter = 0; iter < iterations; ++iter)
+    {
+        util::GRError(problem->Reset(src, enactor->GetFrontierType(), max_queue_sizing, max_queue_sizing1), "BFS Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(enactor->Reset(), "BFS Enactor Reset failed", __FILE__, __LINE__);
 
-    util::GRError("Error before Enact", __FILE__, __LINE__);
-    printf("__________________________\n");fflush(stdout);
-    cpu_timer.Start();
-    util::GRError(enactor->Enact(src), "BFS Problem Enact Failed", __FILE__, __LINE__);
-    cpu_timer.Stop();
-    printf("--------------------------\n");fflush(stdout);
+        util::GRError("Error before Enact", __FILE__, __LINE__);
+        printf("__________________________\n");fflush(stdout);
+        cpu_timer.Start();
+        util::GRError(enactor->Enact(src, traversal_mode), "BFS Problem Enact Failed", __FILE__, __LINE__);
+        cpu_timer.Stop();
+        printf("--------------------------\n");fflush(stdout);
+        elapsed += cpu_timer.ElapsedMillis();
+    }
+
+    elapsed /= iterations;
 
     enactor->GetStatistics(total_queued, search_depth, avg_duty);
-
-    float elapsed = cpu_timer.ElapsedMillis();
 
     // Copy out results
     util::GRError(problem->Extract(h_labels, h_preds), "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
@@ -467,6 +497,7 @@ void RunTests(Test_Parameter *parameter)
             }
         }
     }
+
     printf("\nFirst 40 labels of the GPU result."); 
     // Display Solution
     DisplaySolution<VertexId, SizeT, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE>
@@ -622,6 +653,7 @@ void RunTests_instrumented(Test_Parameter *parameter)
  *
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] args Reference to the command line arguments
+ * @param[in] context CudaContext pointer for moderngpu APIs
  */
 template <
     typename VertexId,
@@ -658,16 +690,21 @@ void RunTests(
     }
     printf("src = %lld\n", (long long) parameter->src);
 
+    // traversal mode
+    args.GetCmdLineArgument("traversal-mode", parameter->traversal_mode);
+    if (parameter->traversal_mode == -1)
+    {
+        parameter->traversal_mode = graph->GetAverageDegree() > 8 ? 0 : 1;
+    }
+
     RunTests_instrumented<VertexId, Value, SizeT>(parameter);
 }
-
-
 
 /******************************************************************************
 * Main
 ******************************************************************************/
 
-int cpp_main( int argc, char** argv)
+int main( int argc, char** argv)
 {
     CommandLineArgs  args(argc, argv);
     int              num_gpus     = 0;

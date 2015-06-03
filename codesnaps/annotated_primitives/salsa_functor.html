@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>salsa_functor.cuh</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id="background"></div>
+<div id='container'>
+  <div class='section'>
+    <div class='docs'><h1>salsa_functor.cuh</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      <p>Forward advance functors for the Hub nodes (original graph).
+Here, e_id_in is the incoming edge ID and e_id is the outgoing edge ID.
+This is essentially an initialization (setting all predecessors).</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">template</span><span class="o">&lt;</span><span class="kr">typename</span> <span class="n">VertexId</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">SizeT</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">Value</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">&gt;</span>
+<span class="k">struct</span> <span class="n">HFORWARDFunctor</span>
+<span class="p">{</span>
+    <span class="k">typedef</span> <span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">::</span><span class="n">DataSlice</span> <span class="n">DataSlice</span><span class="p">;</span>
+    <span class="k">static</span> <span class="n">__device__</span> <span class="n">__forceinline__</span> <span class="kt">bool</span> <span class="nf">CondEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">problem</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id_in</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="nb">true</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">static</span> <span class="n">__device__</span> <span class="n">__forceinline__</span> <span class="kt">void</span> <span class="nf">ApplyEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">problem</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id_in</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>For the hub graph (original graph), set each edge's source node ID</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_hub_predecessors</span><span class="p">[</span><span class="n">e_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">s_id</span><span class="p">;</span>
+    <span class="p">}</span>
+
+<span class="p">};</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>Backward advance functors for the Hub nodes (original graph).
+The backward advance functors distribute ranks to nodes.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">template</span><span class="o">&lt;</span><span class="kr">typename</span> <span class="n">VertexId</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">SizeT</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">Value</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">&gt;</span>
+<span class="k">struct</span> <span class="n">HBACKWARDFunctor</span>
+<span class="p">{</span>
+    <span class="k">typedef</span> <span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">::</span><span class="n">DataSlice</span> <span class="n">DataSlice</span><span class="p">;</span>
+    <span class="k">static</span> <span class="n">__device__</span> <span class="n">__forceinline__</span> <span class="kt">bool</span> <span class="nf">CondEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">problem</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id_in</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>Choose nodes with non-zero outgoing degrees ...</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">VertexId</span> <span class="n">v_id</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_hub_predecessors</span><span class="p">[</span><span class="n">e_id_in</span><span class="p">];</span>
+        <span class="kt">bool</span> <span class="n">flag</span> <span class="o">=</span> <span class="p">(</span><span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_out_degrees</span><span class="p">[</span><span class="n">v_id</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">flag</span><span class="p">)</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_hrank_next</span><span class="p">[</span><span class="n">v_id</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+        <span class="k">return</span> <span class="n">flag</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">static</span> <span class="n">__device__</span> <span class="n">__forceinline__</span> <span class="kt">void</span> <span class="nf">ApplyEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">problem</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id_in</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>then atomically update hub ranks.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">Value</span> <span class="n">hrank_dst</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_hrank_curr</span><span class="p">[</span><span class="n">d_id</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_in_degrees</span><span class="p">[</span><span class="n">s_id</span><span class="p">]</span> <span class="o">*</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_out_degrees</span><span class="p">[</span><span class="n">d_id</span><span class="p">]);</span>
+        <span class="n">VertexId</span> <span class="n">v_id</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_hub_predecessors</span><span class="p">[</span><span class="n">e_id_in</span><span class="p">];</span>
+        <span class="n">atomicAdd</span><span class="p">(</span><span class="o">&amp;</span><span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_hrank_next</span><span class="p">[</span><span class="n">v_id</span><span class="p">],</span> <span class="n">hrank_dst</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">};</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>Forward advance functors for the Authority nodes (reverse graph)
+Like the Hub forward advance functor, this just sets all predecessors.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">template</span><span class="o">&lt;</span><span class="kr">typename</span> <span class="n">VertexId</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">SizeT</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">Value</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">&gt;</span>
+<span class="k">struct</span> <span class="n">AFORWARDFunctor</span>
+<span class="p">{</span>
+    <span class="k">typedef</span> <span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">::</span><span class="n">DataSlice</span> <span class="n">DataSlice</span><span class="p">;</span>
+
+    <span class="k">static</span> <span class="n">__device__</span> <span class="n">__forceinline__</span> <span class="kt">bool</span> <span class="nf">CondEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">problem</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id_in</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="nb">true</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">static</span> <span class="n">__device__</span> <span class="n">__forceinline__</span> <span class="kt">void</span> <span class="nf">ApplyEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">problem</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id_in</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>For authority graph (reverse graph), set each edge's source node ID</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_auth_predecessors</span><span class="p">[</span><span class="n">e_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">s_id</span><span class="p">;</span>
+    <span class="p">}</span>
+
+<span class="p">};</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <p>Backward advance functors for the Authority nodes (reverse graph)
+The backward advance functors distribute ranks to nodes.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">template</span><span class="o">&lt;</span><span class="kr">typename</span> <span class="n">VertexId</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">SizeT</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">Value</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">&gt;</span>
+<span class="k">struct</span> <span class="n">ABACKWARDFunctor</span>
+<span class="p">{</span>
+    <span class="k">typedef</span> <span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">::</span><span class="n">DataSlice</span> <span class="n">DataSlice</span><span class="p">;</span>
+
+    <span class="k">static</span> <span class="n">__device__</span> <span class="n">__forceinline__</span> <span class="kt">bool</span> <span class="nf">CondEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">problem</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id_in</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>Choose nodes with non-zero outgoing degrees ...</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">VertexId</span> <span class="n">v_id</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_auth_predecessors</span><span class="p">[</span><span class="n">e_id_in</span><span class="p">];</span>
+        <span class="kt">bool</span> <span class="n">flag</span> <span class="o">=</span> <span class="p">(</span><span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_in_degrees</span><span class="p">[</span><span class="n">v_id</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">flag</span><span class="p">)</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_arank_next</span><span class="p">[</span><span class="n">v_id</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+        <span class="k">return</span> <span class="n">flag</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">static</span> <span class="n">__device__</span> <span class="n">__forceinline__</span> <span class="kt">void</span> <span class="nf">ApplyEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">problem</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">e_id_in</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>... then atomically update authority ranks.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">Value</span> <span class="n">arank_dst</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_arank_curr</span><span class="p">[</span><span class="n">d_id</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_out_degrees</span><span class="p">[</span><span class="n">s_id</span><span class="p">]</span> <span class="o">*</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_in_degrees</span><span class="p">[</span><span class="n">d_id</span><span class="p">]);</span>
+        <span class="n">VertexId</span> <span class="n">v_id</span> <span class="o">=</span> <span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_auth_predecessors</span><span class="p">[</span><span class="n">e_id_in</span><span class="p">];</span>
+        <span class="n">atomicAdd</span><span class="p">(</span><span class="o">&amp;</span><span class="n">problem</span><span class="o">-&gt;</span><span class="n">d_arank_next</span><span class="p">[</span><span class="n">v_id</span><span class="p">],</span> <span class="n">arank_dst</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">};</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

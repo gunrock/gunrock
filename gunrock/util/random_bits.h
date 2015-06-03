@@ -7,7 +7,7 @@
 
 /**
  * @file
- * random_bits.cuh
+ * random_bits.h
  *
  * @brief A random bits generator
  */

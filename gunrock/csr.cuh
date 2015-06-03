@@ -1,15 +1,15 @@
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 /**
  * @file
  * csr.cuh
  *
- * @brief CSR (Column Sparse Row) Graph Data Structure
+ * @brief CSR (Compressed Sparse Row) Graph Data Structure
  */
 
 #pragma once
@@ -23,11 +23,11 @@
 #include <algorithm>
 #include <iterator>
 #include <omp.h>
+
+#include <gunrock/util/test_utils.cuh>
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/multithread_utils.cuh>
 #include <gunrock/util/sort_omp.cuh>
-
-using namespace std;
 
 namespace gunrock {
 
@@ -39,20 +39,20 @@ namespace gunrock {
 template<typename VertexId, typename Value, typename SizeT>
 struct Csr
 {
-    SizeT nodes;    /**< Number of nodes in the graph. */
-    SizeT edges;    /**< Number of edges in the graph. */
+    SizeT nodes;     /**< Number of nodes in the graph. */
+    SizeT edges;     /**< Number of edges in the graph. */
     SizeT out_nodes; /**< Number of nodes which have outgoing edges. */
     SizeT average_degree;
 
-    VertexId    *column_indices;/**< Column indices corresponding to all the non-zero values in the sparse matrix. */
-    SizeT       *row_offsets;   /**< List of indices where each row of the sparse matrix starts. */
-    Value       *edge_values;   /**< List of values attached to edges in the graph. */
-    Value       *node_values;   /**< List of values attached to nodes in the graph. */
+    VertexId *column_indices; /**< Column indices corresponding to all the non-zero values in the sparse matrix. */
+    SizeT    *row_offsets;    /**< List of indices where each row of the sparse matrix starts. */
+    Value    *edge_values;    /**< List of values attached to edges in the graph. */
+    Value    *node_values;    /**< List of values attached to nodes in the graph. */
 
-    Value       average_edge_value;
-    Value       average_node_value;
+    Value average_edge_value;
+    Value average_node_value;
 
-    bool        pinned;        /**< Whether to use pinned memory */
+    bool  pinned;        /**< Whether to use pinned memory */
 
     /**
      * @brief CSR Constructor
@@ -134,121 +134,130 @@ struct Csr
     }
 
     /**
-     * @store graph information into files
-     * 
+     *
+     * @brief Store graph information into files
+     *
      */
-  void WriteToFile(char * file_name,
-		   bool undirected, 
-		   bool reversed,
-		   SizeT num_nodes, 
-		   SizeT num_edges, 
-		   SizeT *row_offsets,
-		   VertexId *col_indices,
-		   Value *edge_values = NULL)
-  {
-    printf("==> Writing into file:  %s\n", file_name);
-    
-    time_t mark1 = time(NULL);
-    
-    std::ofstream output(file_name);
-    
-    if (output.is_open())
+    void WriteToFile(
+        char     *file_name,
+        bool     undirected,
+        bool     reversed,
+        SizeT    num_nodes,
+        SizeT    num_edges,
+        SizeT    *row_offsets,
+        VertexId *col_indices,
+        Value    *edge_values = NULL)
     {
-      output << num_nodes << " " << num_edges << " ";
-      std::copy(row_offsets,   row_offsets + num_nodes + 1, ostream_iterator<int>(output, " "));
-      std::copy(column_indices, column_indices + num_edges, ostream_iterator<int>(output, " "));
-      if (edge_values != NULL)
-      {
-	std::copy(edge_values, edge_values + num_edges, ostream_iterator<int>(output, " "));
-      }
-      output.close();
-    }
-    else
-    {
-      std::cout << "Cannot Open The File." << std::endl;
-    }
+        printf("==> Writing into file:  %s\n", file_name);
+        time_t mark1 = time(NULL);
 
-    time_t mark2 = time(NULL);
-    printf("Finished writing in %ds.\n", (int)(mark2 - mark1));
-  }
+        std::ofstream output(file_name);
+        if (output.is_open())
+        {
+            output << num_nodes << " " << num_edges << " ";
+            std::copy(row_offsets, row_offsets + num_nodes + 1,
+                      std::ostream_iterator<SizeT>(output, " "));
+            std::copy(column_indices, column_indices + num_edges,
+                      std::ostream_iterator<VertexId>(output, " "));
+            if (edge_values != NULL)
+            {
+                std::copy(edge_values, edge_values + num_edges,
+                          std::ostream_iterator<Value>(output, " "));
+            }
+            output.close();
+        } else
+        {
+          std::cout << "Cannot Open The File." << std::endl;
+        }
 
-  // read from stored row_offsets, column_indices arrays
-  template <bool LOAD_EDGE_VALUES>
-  void FromCsr(char *f_in, 
-	       bool undirected, 
-	       bool reversed)
-  {
-    printf("  Reading directly from previously stored CSR arrays ...\n");
-    
-    ifstream _file;
-    char buf[65536];
-    _file.rdbuf()->pubsetbuf(buf,65536);
-
-    _file.open(f_in);
-    
-    if (_file.is_open())
-    {
-      time_t mark1 = time(NULL);
-      
-      std::istream_iterator<int> start(_file), end;
-      std::vector<int> v(start, end);
-      
-      SizeT csr_nodes = v.at(0);
-      SizeT csr_edges = v.at(1);
-      printf("#nodes = %lld, #edges = %lld, #v = %lld\n", (long long)csr_nodes, (long long)csr_edges, (long long)v.size());
-      
-      FromScratch<LOAD_EDGE_VALUES, false>(csr_nodes, csr_edges); 
-      
-      copy(v.begin()+2, v.begin()+3+csr_nodes, row_offsets);
-      copy(v.begin()+3+csr_nodes, v.begin()+3+csr_nodes+csr_edges, column_indices);
-      if(LOAD_EDGE_VALUES) 
-      { 
-	copy(v.begin()+3+csr_nodes+csr_edges, v.end(), edge_values); 
-      }
-      
-      time_t mark2 = time(NULL);
-      printf("Done reading (%ds).\n", (int) (mark2 - mark1));
-      
-      v.clear();
-    }
-    else 
-    {
-      perror("Unable to open the file."); 
+        time_t mark2 = time(NULL);
+        printf("Finished writing in %ds.\n", (int)(mark2 - mark1));
     }
 
-    // compute out_nodes
-    SizeT out_node = 0;
-    for (SizeT node = 0; node < nodes; node++) 
+    /**
+     *
+     * @brief Read from stored row_offsets, column_indices arrays
+     *
+     */
+    template <bool LOAD_EDGE_VALUES>
+    void FromCsr(char *f_in, bool undirected, bool reversed)
     {
-      if (row_offsets[node+1] - row_offsets[node] > 0)
-      {
-	++out_node;
-      }
-    }
-    out_nodes = out_node;
+        printf("  Reading directly from previously stored CSR arrays ...\n");
 
-    fflush(stdout);
-  }
+        std::ifstream _file;
+        char buf[65536];
+        _file.rdbuf()->pubsetbuf(buf,65536);
+        _file.open(f_in);
+
+        if (_file.is_open())
+        {
+            time_t mark1 = time(NULL);
+
+            std::istream_iterator<int> start(_file), end;
+            std::vector<int> v(start, end);
+
+            SizeT csr_nodes = v.at(0);
+            SizeT csr_edges = v.at(1);
+            printf("#nodes = %lld, #edges = %lld, #v = %lld\n", (long long)csr_nodes, (long long)csr_edges, (long long)v.size());
+
+            FromScratch<LOAD_EDGE_VALUES, false>(csr_nodes, csr_edges);
+
+            std::copy(v.begin() + 2, v.begin() + 3 + csr_nodes, row_offsets);
+            std::copy(v.begin() + 3 + csr_nodes,
+                      v.begin() + 3 + csr_nodes + csr_edges,
+                      column_indices);
+            if(LOAD_EDGE_VALUES)
+            {
+                std::copy(v.begin() + 3 + csr_nodes + csr_edges,
+                          v.end(), edge_values);
+            }
+
+            time_t mark2 = time(NULL);
+            printf("Done reading (%ds).\n", (int) (mark2 - mark1));
+
+            v.clear();
+        }
+        else
+        {
+            perror("Unable To Open The File.");
+        }
+
+        // compute out_nodes
+        SizeT out_node = 0;
+        for (SizeT node = 0; node < nodes; node++)
+        {
+            if (row_offsets[node+1] - row_offsets[node] > 0)
+            {
+                ++out_node;
+            }
+        }
+        out_nodes = out_node;
+
+        fflush(stdout);
+    }
 
 
     /**
      * @brief Build CSR graph from COO graph, sorted or unsorted
      *
+     * @param[in] output_file Output file to dump the graph topology info
      * @param[in] coo Pointer to COO-format graph
      * @param[in] coo_nodes Number of nodes in COO-format graph
      * @param[in] coo_edges Number of edges in COO-format graph
      * @param[in] ordered_rows Are the rows sorted? If not, sort them.
+     * @param[in] undirected Is the graph directed or not?
+     * @param[in] reversed Is the graph reversed or not?
      * Default: Assume rows are not sorted.
      */
     template <bool LOAD_EDGE_VALUES, typename Tuple>
     void FromCoo(
-        char *output_file,
+        char  *output_file,
         Tuple *coo,
         SizeT coo_nodes,
         SizeT coo_edges,
-        bool ordered_rows = false,
-        bool undirected = false,
-        bool reversed = false)
+        bool  ordered_rows = false,
+        bool  undirected = false,
+        bool  reversed = false)
     {
         printf("  Converting %lld vertices, %lld directed edges (%s tuples) "
                "to CSR format... \n",
@@ -260,12 +269,8 @@ struct Csr
 
         // Sort COO by row
         if (!ordered_rows) {
-            //std::stable_sort(coo, coo + coo_edges, RowFirstTupleCompare<Tuple>);
             util::omp_sort(coo, coo_edges, RowFirstTupleCompare<Tuple>);
         }
-
-        //time_t mark3 = time(NULL);
-        //printf("Done soerting (%ds).\n", (int)(mark3 - mark1));
 
         SizeT edge_offsets[129];
         SizeT edge_counts [129];
@@ -280,9 +285,6 @@ struct Csr
             Tuple *new_coo   = (Tuple*) malloc (sizeof(Tuple) * (edge_end - edge_start));
             SizeT edge       = edge_start;
             SizeT new_edge   = 0;
-            //new_coo[new_edge].row = coo[0].row;
-            //new_coo[new_edge].col = coo[0].col;
-            //new_coo[].val = coo[0].val;
             for (edge = edge_start; edge < edge_end; edge++)
             {
                 //if (((coo[i+1].col != coo[i].col) || (coo[i+1].row != coo[i].row)) && (coo[i+1].col != coo[i+1].row))
@@ -358,14 +360,11 @@ struct Csr
             free(new_coo); new_coo = NULL;
         }
 
-        //printf("nodes = %d, edges = %d\n", nodes, edges);
         row_offsets[nodes] = edges;
-        //util::cpu_mt::PrintCPUArray("row_offsets", row_offsets, nodes+1);
-        //util::cpu_mt::PrintCPUArray("column_indices", column_indices, edges);
         
         time_t mark2 = time(NULL);
         printf("Done converting (%ds).\n", (int)(mark2 - mark1));
-        
+
         // Write offsets, indices, node, edges etc. into file
         if (LOAD_EDGE_VALUES)
 	    {
@@ -435,10 +434,13 @@ struct Csr
 
             log_counts[log_length + 1]++;
         }
-        printf("\nDegree Histogram (%lld vertices, %lld directed edges):\n",
+        printf("\nDegree Histogram (%lld vertices, %lld edges):\n",
                (long long) nodes, (long long) edges);
-        for (int i = -1; i < max_log_length + 1; i++) {
-            printf("\tDegree 2^%i: %d (%.2f%%)\n", i, log_counts[i + 1],
+
+        printf("    Degree   0: %d (%.2f%%)\n", log_counts[0],
+               (float) log_counts[0] * 100.0 / nodes);
+        for (int i = 0; i < max_log_length + 1; i++) {
+            printf("    Degree 2^%i: %d (%.2f%%)\n", i, log_counts[i + 1],
                    (float) log_counts[i + 1] * 100.0 / nodes);
         }
         printf("\n");
@@ -452,7 +454,8 @@ struct Csr
     void DisplayGraph(bool with_edge_value = false)
     {
         SizeT displayed_node_num = (nodes > 40) ? 40:nodes;
-        printf("First %d nodes's neighbor list of the input graph:\n", displayed_node_num);
+        printf("First %d nodes's neighbor list of the input graph:\n",
+               displayed_node_num);
         for (SizeT node = 0; node < displayed_node_num; node++) {
             util::PrintValue(node);
             printf(":");
@@ -579,10 +582,11 @@ struct Csr
     }
 
     /**
-     * @brief Display the neighbor list of a node
+     * @brief Display the neighbor list of a given node
      */
     void DisplayNeighborList(VertexId node)
     {
+        if (node < 0 || node >= nodes) return;
         for (SizeT edge = row_offsets[node];
                  edge < row_offsets[node + 1];
                  edge++) {
@@ -592,6 +596,9 @@ struct Csr
             printf("\n");
     }
 
+    /**
+     * @brief Get the average degree of all the nodes in graph
+     */
     SizeT GetAverageDegree() {
         if (average_degree == 0) {
             double mean = 0, count = 0;
@@ -604,6 +611,9 @@ struct Csr
         return average_degree;
     }
 
+    /**
+     * @brief Get the average node value in graph
+     */
     Value GetAverageNodeValue() {
         if (abs(average_node_value - 0) < 0.001 && node_values != NULL) {
             double mean = 0, count = 0;
@@ -618,6 +628,9 @@ struct Csr
         return average_node_value;
     }
 
+    /**
+     * @brief Get the average edge value in graph
+     */
     Value GetAverageEdgeValue() {
         if (abs(average_edge_value - 0) < 0.001 && edge_values != NULL) {
             double mean = 0, count = 0;
@@ -661,7 +674,7 @@ struct Csr
         }
         if (edge_values) { free (edge_values); edge_values = NULL; }
         if (node_values) { free (node_values); node_values = NULL; }
-        
+
         nodes = 0;
         edges = 0;
     }
@@ -674,7 +687,6 @@ struct Csr
         Free();
     }
 };
-
 
 } // namespace gunrock
 

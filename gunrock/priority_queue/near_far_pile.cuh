@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include <gunrock/util/basic_utils.cuh>
+#include <gunrock/util/basic_utils.h>
 #include <gunrock/util/cuda_properties.cuh>
 #include <gunrock/util/memset_kernel.cuh>
 #include <gunrock/util/cta_work_progress.cuh>
@@ -28,27 +28,30 @@
 namespace gunrock {
 namespace priority_queue {
 
+/**
+ * @brief PriorityQueue data structure which only has two level
+ * of priorities (Near Far Pile).
+ */
 template <
     typename    _VertexId,
     typename    _SizeT>
-
 struct PriorityQueue
 {
     typedef _VertexId           VertexId;
     typedef _SizeT              SizeT;
 
     struct NearFarPile {
-        VertexId                                    *d_queue[2];    //ping-pong buffer for nf_pile
-        VertexId                                    *d_valid_near;
-        VertexId                                    *d_valid_far;
+        VertexId                                    *d_queue[2];    /**< ping-pong buffer for near and far piles */
+        VertexId                                    *d_valid_near;  /**< array which shows whether an element is valid in the near pile */
+        VertexId                                    *d_valid_far;   /**< array which shows whether an element is valid in the far pile */
     };
 
-    NearFarPile             **nf_pile;
-    NearFarPile             **d_nf_pile;
+    NearFarPile             **nf_pile;  /**< host pointer for near far pile data */
+    NearFarPile             **d_nf_pile; /**< device pointer for near far pile data */
 
-    SizeT                   queue_length;
-    SizeT                   max_queue_length;
-    int                     selector;
+    SizeT                   queue_length; /**< current queue length */
+    unsigned int            max_queue_length; /**< upper limit of the queue length */
+    int                     selector; /**< binary switch for choosing from ping-pong buffers */
 
     PriorityQueue() :
         queue_length(0),
@@ -68,6 +71,14 @@ struct PriorityQueue
         if (d_nf_pile) delete[] d_nf_pile;
     }
 
+    /**
+     * @brief Initialize near far pile
+     *
+     * @param[in] edges Number of edges in the CSR graph. the max queue length will be 1 element larger.
+     * @param[in] queue_sizing scaling factor of the near far pile.
+     *
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     */
     cudaError_t Init(SizeT edges, double queue_sizing)
     {
         cudaError_t retval = cudaSuccess;

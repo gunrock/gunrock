@@ -1,9 +1,9 @@
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ---------------------------------------------------------------- 
+// ----------------------------------------------------------------------------
 /**
  * @file
  * pr_functor.cuh
@@ -31,7 +31,6 @@ namespace pr {
             if (node == node_to_track[i]) return true;
         return false;
     }   
- 
 
 /**
  * @brief Structure contains device functions in PR graph traverse.
@@ -81,29 +80,36 @@ struct PRMarkerFunctor
 /**
  * @brief Structure contains device functions in PR graph traverse.
  *
- * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam ProblemData         Problem data type which contains data slice for PR problem
+ * @tparam VertexId    Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT       Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam ProblemData Problem data type which contains data slice for PR problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<
+    typename VertexId, typename SizeT, typename Value, typename ProblemData>
 struct PRFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
 
     /**
-     * @brief Forward Edge Mapping condition function. Check if the destination node
-     * has been claimed as someone else's child.
+     * @brief Forward Edge Mapping condition function. Check if the
+     * destination node has been claimed as someone else's child.
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id output edge id
+     * @param[in] e_id_in input edge id
      *
-     * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
+     * \return Whether to load the apply function for the edge and
+     *         include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId s_id, VertexId d_id, DataSlice *problem,
+        VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        return (problem->degrees[d_id] > 0 && problem->degrees[s_id] > 0);
+        //return (problem->degrees[d_id] > 0 && problem->degrees[s_id] > 0);
+        return true;
     }
 
     /**
@@ -114,36 +120,45 @@ struct PRFunctor
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id output edge id
+     * @param[in] e_id_in input edge id
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId s_id, VertexId d_id, DataSlice *problem,
+        VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        if (TO_TRACK)
-        if (to_track(d_id)) printf("%d \tr[%d] \t+= %f\t from %d,%f\n", problem->gpu_idx, d_id, problem->rank_curr[s_id] / problem->degrees[s_id], s_id, problem->rank_curr[s_id]);
-        atomicAdd(problem->rank_next + d_id, problem->rank_curr[s_id]/problem->degrees[s_id]);
+        //if (TO_TRACK)
+        //if (to_track(d_id)) printf("%d \tr[%d] \t+= %f\t from %d,%f\n", problem->gpu_idx, d_id, problem->rank_curr[s_id] / problem->degrees[s_id], s_id, problem->rank_curr[s_id]);
+        atomicAdd(problem->rank_next + d_id, 
+            problem->rank_curr[s_id]/problem->degrees[s_id]);
     }
 
     /**
-     * @brief Vertex mapping condition function. Check if the Vertex Id is valid (not equal to -1).
+     * @brief Vertex mapping condition function. Check if the Vertex Id
+     *        is valid (not equal to -1). Personal PageRank feature will
+     *        be activated when a source node ID is set.
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
-     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
+     * \return Whether to load the apply function for the node and
+     *         include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(
+        VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         Value    delta     = problem->delta    ;
-        VertexId src_node  = problem->src_node ;
-        //Value    threshold = problem->threshold;
-        //printf("delta = %f, threshold = %f, src_node = %d \t", delta, threshold, src_node);
-        Value    old_value = problem->rank_next[node];
-        problem->rank_next[node] = (delta * problem->rank_next[node]) + (1.0-delta) * ((src_node == node || src_node == -1) ? 1 : 0);
+        //VertexId src_node  = problem->src_node ;
+        //Value    old_value = problem->rank_next[node];
+        //problem->rank_next[node] = (delta * problem->rank_next[node]) + (1.0-delta) * ((src_node == node || src_node == -1) ? 1 : 0);
+        problem->rank_next[node] = (1.0 - delta) + delta * problem->rank_next[node];
         Value diff = fabs(problem->rank_next[node] - problem->rank_curr[node]);
 
-        if (TO_TRACK)
-        if (to_track(node)) printf("%d \tr[%d] \t%f \t-> %f \t(%f)\n", problem->gpu_idx, node, problem->rank_curr[node], problem->rank_next[node], old_value); 
-        return (diff > problem->threshold);
+        //if (TO_TRACK)
+        //if (to_track(node)) printf("%d \tr[%d] \t%f \t-> %f \t(%f)\n", problem->gpu_idx, node, problem->rank_curr[node], problem->rank_next[node], old_value); 
+        return (diff >= problem->threshold);
     }
 
     /**
@@ -151,9 +166,11 @@ struct PRFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(
+        VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         // Doing nothing here
     }
@@ -226,7 +243,8 @@ struct RemoveZeroDegreeNodeFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(
+        VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         // Doing nothing here
     }

@@ -35,7 +35,7 @@ PROJECT_NAME           = gunrock
 # This could be handy for archiving the generated documentation or
 # if some version control system is used.
 
-PROJECT_NUMBER         = 0.1
+PROJECT_NUMBER         = 0.2
 
 # Using the PROJECT_BRIEF tag one can provide an optional one line description
 # for a project that appears at the top of each page and should give viewer
@@ -146,11 +146,15 @@ FULL_PATH_NAMES        = YES
 STRIP_FROM_PATH        = ./ \
                          ./gunrock \
                          ./oprtr \
+                         ./priority_queue \
                          ./util \
                          ./app \
                          ./app/bc \
                          ./app/bfs \
                          ./app/cc \
+                         ./app/dobfs \
+                         ./app/pr \
+                         ./app/sssp \
                          ./simple_example
 
 # The STRIP_FROM_INC_PATH tag can be used to strip a user-defined part of
@@ -679,7 +683,8 @@ INPUT                  = ../README.md \
                          ../simple_example \
                          ./simple_example.dox \
                          ./building_gunrock.md \
-                         ./programming_model.md
+                         ./programming_model.md \
+                         ../FAQ.md
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding, which is

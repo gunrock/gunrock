@@ -264,7 +264,6 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, _Value,
                     0,
                     &hub_graph,
                     NULL,
-                    NULL,
                     NULL);
 
                 // Create SoA on device

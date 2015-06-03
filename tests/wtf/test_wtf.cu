@@ -446,7 +446,6 @@ void RunTests(Test_Parameter *parameter)
 
     // Allocate WTF enactor map
     WTFEnactor<Problem, INSTRUMENT, DEBUG, SIZE_CHECK> wtf_enactor(gpu_idx);
-
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
     util::GRError(csr_problem->Init(
@@ -534,54 +533,6 @@ void RunTests(Test_Parameter *parameter)
     cudaDeviceSynchronize();
 }
 
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] args Reference to the command line arguments
- * @param[in] context CudaContex for moderngpu library
- */
-/*template <
-    typename VertexId,
-    typename Value,
-    typename SizeT>
-void RunTests(
-    Csr<VertexId, Value, SizeT> &graph,
-    CommandLineArgs &args,
-    CudaContext& context)
-{
-    if (instrumented)
-    {
-        RunTests<VertexId, Value, SizeT, true>(
-            graph,
-            src,
-            delta,
-            alpha,
-            error,
-            max_iter,
-            max_grid_size,
-            num_gpus,
-            context);
-    }
-    else
-    {
-        RunTests<VertexId, Value, SizeT, false>(
-            graph,
-            src,
-            delta,
-            alpha,
-            error,
-            max_iter,
-            max_grid_size,
-            num_gpus,
-            context);
-    }
-}*/
-
 template <
     typename      VertexId,
     typename      Value,
@@ -667,7 +618,7 @@ void RunTests(
 /******************************************************************************
  * Main
  ******************************************************************************/
-int cpp_main( int argc, char** argv)
+int main( int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
 

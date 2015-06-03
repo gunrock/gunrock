@@ -74,7 +74,7 @@ namespace edge_map_backward {
             typedef typename KernelPolicy::SoaScanOp        SoaScanOp;
             typedef typename KernelPolicy::RakingSoaDetails RakingSoaDetails;
             typedef typename KernelPolicy::TileTuple        TileTuple;
- 
+
             typedef typename ProblemData::DataSlice         DataSlice;
 
             typedef util::Tuple<
@@ -97,7 +97,7 @@ namespace edge_map_backward {
             // Work progress
             VertexId                queue_index;                // Current frontier queue counter index
             util::CtaWorkProgress   &work_progress;             // Atomic queueing counters
-            int                     num_gpus;                   // Number of GPUs
+            //int                     num_gpus;                   // Number of GPUs
 
             // Operational details for raking grid
             RakingSoaDetails        raking_soa_details;
@@ -179,7 +179,7 @@ namespace edge_map_backward {
                                 if (tile->vertex_id[LOAD][VEC] != -1) {
 
                                         // Translate vertex-id into local gpu row-id (currently stride of num_gpu)
-                                        VertexId row_id = tile->vertex_id[LOAD][VEC] / cta->num_gpus;
+                                        VertexId row_id = tile->vertex_id[LOAD][VEC] ; // / cta->num_gpus;
 
                                         // Load neighbor row range from d_row_offsets
                                         Vec2SizeT   row_range;
@@ -242,7 +242,7 @@ namespace edge_map_backward {
                                         cta->smem_storage.state.warp_comm[0][1] = tile->vertex_idx[LOAD][VEC];                             // queue rank
                                         cta->smem_storage.state.warp_comm[0][2] = tile->row_offset[LOAD][VEC] + tile->row_length[LOAD][VEC];    // oob
                                         cta->smem_storage.state.warp_comm[0][3] = tile->vertex_id[LOAD][VEC];                                   // predecessor
-                                        
+
                                         // Unset row length
                                         tile->row_length[LOAD][VEC] = 0;
 
@@ -280,7 +280,7 @@ namespace edge_map_backward {
                                             if (Functor::CondEdge(parent_id, child_id, cta->problem, coop_offset+threadIdx.x))
                                                 Functor::ApplyEdge(parent_id, child_id, cta->problem, coop_offset+threadIdx.x);
                                             child_id = -1;
-                                            
+
                                         }
 
                                         if (child_id == -1)
@@ -290,13 +290,13 @@ namespace edge_map_backward {
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                 -1,
                                                 cta->d_queue + cta->smem_storage.state.warp_comm[0][1]);
-                                            
+
                                             //Set bitmap_out to true
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                     true,
                                                     cta->d_bitmap_out + cta->smem_storage.state.warp_comm[0][3]);
                                         }
-                                        
+
                                         coop_offset += KernelPolicy::THREADS;
                                     }
 
@@ -327,7 +327,7 @@ namespace edge_map_backward {
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                 -1,
                                                 cta->d_queue + cta->smem_storage.state.warp_comm[0][1]);
-                                            
+
                                             //Set bitmap_out to true
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                                     true,
@@ -355,7 +355,7 @@ namespace edge_map_backward {
                                     int warp_id = threadIdx.x >> GR_LOG_WARP_THREADS(KernelPolicy::CUDA_ARCH);
                                     int lane_id = util::LaneId();
 
-                                    while (__any(tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD)) {
+                                    while (::__any(tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD)) {
                                         if (tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD) {
                                             // All threads inside one warp vie for control of the warp
                                             cta->smem_storage.state.warp_comm[warp_id][0] = lane_id;
@@ -382,12 +382,12 @@ namespace edge_map_backward {
                                         while ((coop_offset + GR_WARP_THREADS(KernelPolicy::CUDA_ARCH) < coop_oob)&&child_id >= 0) {
 
                                             // Gather
-                                            
+
                                             //parent_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, coop_offset + lane_id);
                                             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                     parent_id,
                                                     cta->d_column_indices + coop_offset + lane_id);
-                                            
+
 
                                             bool bitmap_in;
                                             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -604,7 +604,7 @@ namespace edge_map_backward {
              */
             __device__ __forceinline__ Cta(
                 VertexId                    queue_index,
-                int                         num_gpus,
+                //int                         num_gpus,
                 SmemStorage                 &smem_storage,
                 VertexId                    *d_queue,
                 VertexId                    *d_index,
@@ -617,7 +617,7 @@ namespace edge_map_backward {
                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE) :
 
                 queue_index(queue_index),
-                num_gpus(num_gpus),
+                //num_gpus(num_gpus),
                 smem_storage(smem_storage),
                 raking_soa_details(
                         typename RakingSoaDetails::GridStorageSoa(
@@ -667,7 +667,7 @@ namespace edge_map_backward {
                             cta_offset,
                             guarded_elements,
                             (VertexId) -1);
-                
+
                 util::io::LoadTile<
                     KernelPolicy::LOG_LOADS_PER_TILE,
                     KernelPolicy::LOG_LOAD_VEC_SIZE,
@@ -701,7 +701,7 @@ namespace edge_map_backward {
                 // Only one work queue, serves both as input and output.
                 // So no need to set queue length for index+1 and check
                 // overflow.
-                                
+
                 if (coarse_count > 0)
                 {
                     // Enqueue valid edge lists into outgoing queue by CTA
@@ -734,7 +734,7 @@ namespace edge_map_backward {
                         // Gather a incoming-neighbor
                         VertexId parent_id;
                         //parent_id = tex1Dfetch(ColumnIndicesTex<VertexId>::ref, smem_storage.gather_offsets[scratch_offset]);
-                        
+
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                 parent_id,
                                 d_column_indices + smem_storage.gather_offsets[scratch_offset]);

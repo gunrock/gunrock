@@ -53,45 +53,27 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
         // device storage arrays
         util::Array1D<SizeT, Value       >    labels     ;     /**< Used for source distance */
         util::Array1D<SizeT, Value       >    weights    ;     /**< Used for storing edge weights */
-        //util::Array1D<SizeT, VertexId    >    preds      ;     /**< Used for storing the actual shortest path */
         util::Array1D<SizeT, VertexId    >    visit_lookup;    /**< Used for check duplicate */
         util::Array1D<SizeT, float       >    delta;
         util::Array1D<SizeT, int         >    sssp_marker;
-        //util::Array1D<SizeT, unsigned int>    temp_marker;
-        //util::Array1D<SizeT, VertexId    >    temp_preds ;
-        //util::Array1D<SizeT, SizeT       >    *scanned_edges;
 
         DataSlice()
         {
-            //util::cpu_mt::PrintMessage("DataSlice() begin.");
             labels          .SetName("labels"          );  
-            //preds           .SetName("preds"           );  
             weights         .SetName("weights"         );
             visit_lookup    .SetName("visit_lookup"    );
             delta           .SetName("delta"           );
             sssp_marker     .SetName("sssp_marker"     );
-            //temp_preds      .SetName("temp_preds"      );
-            //temp_marker     .SetName("temp_marker"     );
-            //scanned_edges   = NULL;
-            //util::cpu_mt::PrintMessage("DataSlice() end.");
         }
 
         ~DataSlice()
         {
-            //util::cpu_mt::PrintMessage("~DataSlice() begin.");
             if (util::SetDevice(this->gpu_idx)) return;
-            //for (int gpu=0;gpu<this->num_gpus;gpu++)
-            //    scanned_edges[gpu].Release();
-            //delete[] scanned_edges; scanned_edges=NULL;
             labels        .Release();
-            //preds         .Release();
             weights       .Release();
             visit_lookup  .Release();
             delta         .Release();
             sssp_marker   .Release();
-            //temp_preds    .Release();
-            //temp_marker   .Release();
-            //util::cpu_mt::PrintMessage("~DataSlice() end.");
         }
 
         cudaError_t Init(
@@ -107,8 +89,6 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             float queue_sizing = 2.0,
             float in_sizing    = 1.0)
         {
-            //printf("Data_slice in_sizing=%f\n", in_sizing);fflush(stdout);
-            //util::cpu_mt::PrintMessage("DataSlice Init() begin.");
             cudaError_t retval  = cudaSuccess;
             if (retval = DataSliceBase<SizeT, VertexId, Value>::Init(
                 num_gpus,
@@ -125,12 +105,6 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = delta       .Allocate(1           ,util::DEVICE)) return retval;
             if (retval = visit_lookup.Allocate(graph->nodes,util::DEVICE)) return retval;
             if (retval = sssp_marker .Allocate(graph->nodes,util::DEVICE)) return retval;
-            //scanned_edges = new util::Array1D<SizeT, SizeT>[num_gpus];
-            //for (int gpu=0;gpu<num_gpus; gpu++)
-            //{
-            //    scanned_edges[gpu].SetName("scanned_edges[]");
-            //    if (retval = scanned_edges[gpu].Allocate(graph->edges, util::DEVICE)) return retval;
-            //}
  
             weights.SetPointer(graph->edge_values, graph->edges, util::HOST);
             if (retval = weights.Move(util::HOST, util::DEVICE)) return retval;
@@ -163,7 +137,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             return retval;
         } // Init
         
-        float EstimatedDelta(const Csr<VertexId, unsigned int, SizeT> &graph) {
+        float EstimatedDelta(const Csr<VertexId, Value, SizeT> &graph) {
             double  avgV = graph.average_edge_value;
             int     avgD = graph.average_degree;
             return avgV * 32 / avgD;
@@ -375,6 +349,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[in] stream_from_host Whether to stream data from host.
      * @param[in] graph Reference to the CSR graph object we process on. @see Csr
      * @param[in] _num_gpus Number of the GPUs used.
+     * @param[in] delta_factor Parameter for delta-stepping SSSP
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -392,7 +367,6 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             float         partition_factor = -1.0,
             int           partition_seed   = -1)
     {
-        //printf("Problem in_sizing=%f\n", in_sizing);fflush(stdout);
         ProblemBase<VertexId, SizeT, Value, true, false, false, false, false, false>::Init(
             stream_from_host,
             graph,
@@ -409,7 +383,6 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
         cudaError_t retval = cudaSuccess;
         data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
-        //printf("Problem in_sizing=%f\n", in_sizing);fflush(stdout);
         do {
             for (int gpu=0;gpu<this->num_gpus;gpu++)
             {
@@ -419,7 +392,6 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                 DataSlice* _data_slice = data_slices[gpu].GetPointer(util::HOST);
                 _data_slice->streams.SetPointer(&streams[gpu*num_gpus*2], num_gpus*2);
 
-                //printf("Problem %d in_sizing=%f\n", gpu, in_sizing);fflush(stdout);
                 _data_slice->Init(
                     this->num_gpus,
                     this->gpu_idx[gpu],
@@ -444,7 +416,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
      *  @param[in] src Source node for one SSSP computing pass.
      *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
      *  @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
-     * 
+     *
      *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Reset(
@@ -452,9 +424,6 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
             double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
     {
-        typedef ProblemBase<VertexId, SizeT, Value, true, false, false, false, false, false> BaseProblem;
-        //load ProblemBase Reset
-        //BaseProblem::Reset(frontier_type, queue_sizing);
 
         cudaError_t retval = cudaSuccess;
 

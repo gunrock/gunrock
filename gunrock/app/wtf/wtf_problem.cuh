@@ -258,7 +258,6 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, _Value,
                     0,
                     &graph,
                     NULL,
-                    NULL,
                     NULL);
 
                 // Create SoA on device

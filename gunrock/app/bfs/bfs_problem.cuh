@@ -25,9 +25,9 @@ namespace bfs {
 /**
  * @brief Breadth-First Search Problem structure stores device-side vectors for doing BFS computing on the GPU.
  *
- * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam _Value               Type of float or double to use for computing BC value.
+ * @tparam VertexId             Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT                Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam Value                Type of float or double to use for computing BC value.
  * @tparam _MARK_PREDECESSORS   Boolean type parameter which defines whether to mark predecessor value for each node.
  * @tparam _ENABLE_IDEMPOTENCE  Boolean type parameter which defines whether to enable idempotence operation for graph traverse.
  * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer.
@@ -47,6 +47,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
     false, // _KEEP_ORDER
     false> // _KEEP_NODE_NUM
 {
+    //Helper structures
 
     /**
      * @brief Data slice structure which contains BFS problem specific data.
@@ -399,7 +400,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             double queue_sizing,                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
             double queue_sizing1 = -1.0)
     {
-        typedef ProblemBase<VertexId, SizeT, Value, _MARK_PREDECESSORS, _ENABLE_IDEMPOTENCE, _USE_DOUBLE_BUFFER, false, false, false> BaseProblem;
+        //typedef ProblemBase<VertexId, SizeT, Value, _MARK_PREDECESSORS, _ENABLE_IDEMPOTENCE, _USE_DOUBLE_BUFFER, false, false, false> BaseProblem;
 
         cudaError_t retval = cudaSuccess;
         if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;

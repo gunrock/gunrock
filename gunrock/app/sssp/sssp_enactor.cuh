@@ -18,7 +18,6 @@
 #include <gunrock/util/multithread_utils.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
-//#include <gunrock/util/scan/multi_scan.cuh>
 
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
@@ -66,32 +65,20 @@ namespace sssp {
 
         x = blockIdx.x * blockDim.x + threadIdx.x;
 
-        //if (x>=num_elements) return;
-        //SizeT x2=incoming_offset+x;
         while (x<num_elements)
         {
             VertexId key=keys_in[x];
             Value t=s_value__associate_in[0][x];
 
-            //if (atomicCAS(associate_org[0]+key, -1, t)== -1)
-            //{
-            //} else {
             Value old_value = atomicMin(s_value__associate_org[0]+key, t);
             if (old_value<=t)
             {
-                //if (to_track(key)) printf("in[%d] : %d x-> %d \t", key, old_value, t);
                 keys_out[x]=-1;
                 x+=STRIDE;
                 continue;
             }
 
-            //if (to_track(key)) printf("in[%d] : %d -> %d \t", key, old_value, t);
-            //}
-        
-            //if (atomicCAS(marker+key, 0, 1) ==0)
-            //{   
-                keys_out[x]=key;
-            //} else keys_out[x]=-1;
+            keys_out[x]=key;
 
             #pragma unrool
             for (SizeT i=1;i<NUM_VALUE__ASSOCIATES;i++)
@@ -135,16 +122,10 @@ struct SSSPIteration : public IterationBase <
         cudaStream_t                   stream)
     {
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration);
-        //if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, stream)) return;
-        //util::cpu_mt::PrintGPUArray("keys0", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
-        //util::cpu_mt::PrintGPUArray("label0", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
-        //util::cpu_mt::PrintCPUArray("queue_length", &frontier_attribute->queue_length, 1, thread_num, enactor_stats->iteration, peer_);
-        //util::cpu_mt::PrintGPUArray("row_offsets0", graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration, peer_, stream); 
         frontier_attribute->queue_reset = true;
 
         // Edge Map
         gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, SsspFunctor>(
-            //d_done,
             enactor_stats[0],
             frontier_attribute[0],
             d_data_slice,
@@ -160,8 +141,8 @@ struct SSSPIteration : public IterationBase <
             graph_slice->column_indices.GetPointer(util::DEVICE),
             (SizeT*)   NULL,
             (VertexId*)NULL,
-            graph_slice->nodes,//graph_slice->frontier_elements[frontier_attribute.selector], // max_in_queue
-            graph_slice->edges,//graph_slice->frontier_elements[frontier_attribute.selector^1], // max_out_queue
+            graph_slice->nodes, // max_in_queue
+            graph_slice->edges, // max_out_queue
             work_progress[0],
             context[0],
             stream,
@@ -176,26 +157,7 @@ struct SSSPIteration : public IterationBase <
             work_progress -> GetQueueLengthPointer<unsigned int, SizeT>(frontier_attribute->queue_index), stream);
 
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration, peer_);
-        if (false) //(DEBUG || INSTRUMENT)
-        {
-            if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,stream)) return;
-            //enactor_stats->total_queued += frontier_attribute->queue_length;
-            if (Enactor::DEBUG) ShowDebugInfo<Problem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_advance", stream);
-            if (Enactor::INSTRUMENT) {
-                if (enactor_stats->retval = enactor_stats->advance_kernel_stats.Accumulate(
-                    enactor_stats->advance_grid_size,
-                    enactor_stats->total_runtimes,
-                    enactor_stats->total_lifetimes,
-                    false,stream)) return;
-            }
-        }
 
-        //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, stream)) return;
-        //if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__)) return;
-        //util::cpu_mt::PrintGPUArray("keys1", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
-        //util::cpu_mt::PrintGPUArray("label1", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream); 
-        //util::cpu_mt::PrintGPUArray("row_offsets1", graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration, peer_, stream);
- 
         //Vertex Map
         gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, SsspFunctor>
             <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
@@ -264,25 +226,6 @@ struct SSSPIteration : public IterationBase <
         frontier_attribute->queue_index++;
         frontier_attribute->selector ^= 1;
 
-        //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, stream)) return;
-        //if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__)) return; 
-        //util::cpu_mt::PrintGPUArray("keys2", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
-        //util::cpu_mt::PrintGPUArray("label2", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream); 
-        //util::cpu_mt::PrintGPUArray("row_offsets2", graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration, peer_, stream);
-
-        if (false) {//(INSTRUMENT || DEBUG) {
-            //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
-            //enactor_stats->total_queued += frontier_attribute->queue_length;
-            if (Enactor::DEBUG) ShowDebugInfo<Problem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_filter", stream);
-            if (Enactor::INSTRUMENT) {
-                if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
-                    enactor_stats->filter_grid_size,
-                    enactor_stats->total_runtimes,
-                    enactor_stats->total_lifetimes,
-                    false, stream)) return;
-            }
-        }
-
         if (data_slice->num_gpus == 1)
         {
             util::MemsetKernel<<<128, 128, 0, stream>>> (data_slice -> sssp_marker.GetPointer(util::DEVICE), (int)0, graph_slice->nodes);
@@ -303,7 +246,6 @@ struct SSSPIteration : public IterationBase <
               DataSlice*      data_slice)
     {
         bool over_sized = false;
-        //util::cpu_mt::PrintGPUArray<SizeT, VertexId> ("keys_in", keys_in, num_elements, data_slice->gpu_idx, -1, -1,stream);
         Check_Size<Enactor::SIZE_CHECK, SizeT, VertexId>(
             "queue1", num_elements, keys_out, over_sized, -1, -1, -1);
         Expand_Incoming_SSSP
@@ -383,15 +325,9 @@ struct SSSPIteration : public IterationBase <
         SizeT                          request_length,
         util::DoubleBuffer<SizeT, VertexId, Value>
                                       *frontier_queue,
-        //util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
         EnactorStats                  *enactor_stats,
-        //DataSlice                     *data_slice,
-        //DataSlice                     *d_data_slice,
         GraphSlice                    *graph_slice
-        //util::CtaWorkProgressLifetime *work_progress,
-        //ContextPtr                     context,
-        //cudaStream_t                   stream
         )    
     {    
         bool over_sized = false;
@@ -495,11 +431,9 @@ public:
     SSSPEnactor(int num_gpus = 1, int* gpu_idx = NULL) :
         EnactorBase<SizeT, _DEBUG, _SIZE_CHECK>(VERTEX_FRONTIERS, num_gpus, gpu_idx)//,
     {
-        //util::cpu_mt::PrintMessage("SSSPEnactor() begin.");
         thread_slices = NULL;
         thread_Ids    = NULL;
         problem       = NULL;
-        //util::cpu_mt::PrintMessage("SSSPEnactor() end.");
     }
 
     /**
@@ -507,12 +441,10 @@ public:
      */
     virtual ~SSSPEnactor()
     {
-        //util::cpu_mt::PrintMessage("~SSSPEnactor() begin.");
         cutWaitForThreads(thread_Ids, this->num_gpus);
         delete[] thread_Ids   ; thread_Ids    = NULL;
         delete[] thread_slices; thread_slices = NULL;
         problem = NULL;
-        //util::cpu_mt::PrintMessage("~SSSPEnactor() end.");
     }
 
     /**
@@ -623,12 +555,14 @@ public:
     /**
      * @brief SSSP Enact kernel entry.
      *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam FilterPolicy Kernel policy for vertex mapping.
+     * @tparam AdvanceKernelPolicy Kernel policy for advance operator.
+     * @tparam FilterKernelPolicy Kernel policy for filter operator.
      * @tparam SSSPProblem SSSP Problem type.
      *
+     * @param[in] context CudaContext pointer for moderngpu APIs
      * @param[in] problem SSSPProblem object.
      * @param[in] src Source node for SSSP.
+     * @param[in] queue_sizing Scaling factor for frontier queue
      * @param[in] max_grid_size Max grid size for SSSP kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -641,6 +575,28 @@ public:
     {
         clock_t      start_time = clock();
         cudaError_t  retval     = cudaSuccess;
+        
+        /*typedef PQFunctor<
+            VertexId,
+            SizeT,
+            SSSPProblem> PqFunctor;
+
+        typedef gunrock::priority_queue::PriorityQueue<
+            VertexId,
+            SizeT> NearFarPriorityQueue;
+
+        typedef gunrock::priority_queue::KernelPolicy<
+            SSSPProblem,                        // Problem data type
+            300,                                // CUDA_ARCH
+            INSTRUMENT,                         // INSTRUMENT
+            8,                                  // MIN_CTA_OCCUPANCY
+            10>                                 // LOG_THREADS
+            PriorityQueueKernelPolicy;
+
+        NearFarPriorityQueue *pq = new NearFarPriorityQueue;
+        util::GRError(
+            pq->Init(problem->graph_slices[0]->edges, queue_sizing),
+            "Priority Queue SSSP Initialization Failed", __FILE__, __LINE__);*/
 
         do {
             for (int gpu=0;gpu<this->num_gpus;gpu++)
@@ -674,24 +630,68 @@ public:
      * @{
      */
 
+    typedef gunrock::oprtr::filter::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        0,                                  // SATURATION QUIT
+        true,                               // DEQUEUE_PROBLEM_SIZE
+        8,                                  // MIN_CTA_OCCUPANCY
+        8,                                  // LOG_THREADS
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        5,                                  // END_BITMASK_CULL
+        8>                                  // LOG_SCHEDULE_GRANULARITY
+    FilterKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        8,                                  // MIN_CTA_OCCUPANCY
+        7,                                  // LOG_THREADS
+        10,                                 // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD
+        1,                                  // LOG_LOAD_VEC_SIZE
+        1,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::TWC_FORWARD>
+    FWDAdvanceKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        1,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        8,                                  // LOG_BLOCKS
+        32*1024,                            // LIGHT_EDGE_THRESHOLD
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB>
+    LBAdvanceKernelPolicy;
+
     /**
      * @brief SSSP Enact kernel entry.
      *
      * @tparam SSSPProblem SSSP Problem type. @see SSSPProblem
      *
-     * @param[in] problem Pointer to SSSPProblem object.
      * @param[in] src Source node for SSSP.
-     * @param[in] max_grid_size Max grid size for SSSP kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     //template <typename SSSPProblem>
     cudaError_t Enact(
-        //ContextPtr   *context,
-        //SSSPProblem  *problem,
-        VertexId     src)
-        //double       queue_sizing,
-        //int          max_grid_size = 0)
+        VertexId     src,
+        int traversal_mode = 0)
     {
         int min_sm_version = -1;
         for (int i=0;i<this->num_gpus;i++)
@@ -699,46 +699,14 @@ public:
                 min_sm_version = this->cuda_props[i].device_sm_version;
 
         if (min_sm_version >= 300) {
-            typedef gunrock::oprtr::filter::KernelPolicy<
-            Problem,                            // Problem data type
-            300,                                // CUDA_ARCH
-            INSTRUMENT,                         // INSTRUMENT
-            0,                                  // SATURATION QUIT
-            true,                               // DEQUEUE_PROBLEM_SIZE
-            8,                                  // MIN_CTA_OCCUPANCY
-            8,                                  // LOG_THREADS
-            1,                                  // LOG_LOAD_VEC_SIZE
-            0,                                  // LOG_LOADS_PER_TILE
-            5,                                  // LOG_RAKING_THREADS
-            5,                                  // END_BITMASK_CULL
-            8>                                  // LOG_SCHEDULE_GRANULARITY
-                FilterKernelPolicy;
-
-            typedef gunrock::oprtr::advance::KernelPolicy<
-                Problem,                            // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                10,                                  // LOG_THREADS
-                8,                                  // LOG_BLOCKS
-                32*128,                             // LIGHT_EDGE_THRESHOLD    
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                            // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7,                                  // LOG_SCHEDULE_GRANULARITY
-                gunrock::oprtr::advance::LB>
-                    AdvanceKernelPolicy;
-
-            return EnactSSSP<AdvanceKernelPolicy, FilterKernelPolicy>(
-                    //context, problem, src, queue_sizing, max_grid_size);
-                   src);
+            if (traversal_mode == 0)
+                return EnactSSSP< LBAdvanceKernelPolicy, FilterKernelPolicy>(src);
+            else
+                return EnactSSSP<FWDAdvanceKernelPolicy, FilterKernelPolicy>(src);
         }
 
         //to reduce compile time, get rid of other architecture for now
         //TODO: add all the kernelpolicy settings for all archs
-
         printf("Not yet tuned for this architecture\n");
         return cudaErrorInvalidDeviceFunction;
     }
@@ -751,22 +719,19 @@ public:
     /**
      * @brief SSSP Enact kernel entry.
      *
-     * @tparam SSSPProblem SSSP Problem type. @see SSSPProblem
-     *
+     * @param[in] context CudaContext pointer for moderngpu APIs
      * @param[in] problem Pointer to SSSPProblem object.
-     * @param[in] src Source node for SSSP.
+     * @param[in] traversal_mode Load-balanced or Dynamic cooperative
      * @param[in] max_grid_size Max grid size for SSSP kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
-    //template <typename SSSPProblem>
     cudaError_t Init(
         ContextPtr   *context,
         Problem      *problem,
-        //VertexId     src)
-        //double       queue_sizing,
         int          max_grid_size = 0,
-        bool         size_check = true)
+        bool         size_check = true,
+        int          traversal_mode = 0)
     {
         int min_sm_version = -1;
         for (int i=0;i<this->num_gpus;i++)
@@ -774,45 +739,16 @@ public:
                 min_sm_version = this->cuda_props[i].device_sm_version;
 
         if (min_sm_version >= 300) {
-            typedef gunrock::oprtr::filter::KernelPolicy<
-            Problem,                            // Problem data type
-            300,                                // CUDA_ARCH
-            INSTRUMENT,                         // INSTRUMENT
-            0,                                  // SATURATION QUIT
-            true,                               // DEQUEUE_PROBLEM_SIZE
-            8,                                  // MIN_CTA_OCCUPANCY
-            8,                                  // LOG_THREADS
-            1,                                  // LOG_LOAD_VEC_SIZE
-            0,                                  // LOG_LOADS_PER_TILE
-            5,                                  // LOG_RAKING_THREADS
-            5,                                  // END_BITMASK_CULL
-            8>                                  // LOG_SCHEDULE_GRANULARITY
-                FilterKernelPolicy;
-
-            typedef gunrock::oprtr::advance::KernelPolicy<
-                Problem,                            // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                10,                                  // LOG_THREADS
-                8,                                  // LOG_BLOCKS
-                32*128,                             // LIGHT_EDGE_THRESHOLD    
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                            // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7,                                  // LOG_SCHEDULE_GRANULARITY
-                gunrock::oprtr::advance::LB>
-                    AdvanceKernelPolicy;
-
-            return InitSSSP<AdvanceKernelPolicy, FilterKernelPolicy>(
+            if (traversal_mode == 0)
+                return InitSSSP< LBAdvanceKernelPolicy, FilterKernelPolicy>(
+                    context, problem, max_grid_size, size_check);
+            else
+                return InitSSSP<FWDAdvanceKernelPolicy, FilterKernelPolicy>(
                     context, problem, max_grid_size, size_check);
         }
 
         //to reduce compile time, get rid of other architecture for now
         //TODO: add all the kernelpolicy settings for all archs
-
         printf("Not yet tuned for this architecture\n");
         return cudaErrorInvalidDeviceFunction;
     }

@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include <stdio.h>
 #include <string>
 
 namespace gunrock {
@@ -29,32 +28,14 @@ cudaError_t GRError(
     const char *message,
     const char *filename,
     int line,
-    bool print = true)
-{
-    if (error && print) {
-        int gpu;
-        cudaGetDevice(&gpu);
-        fprintf(stderr, "[%s, %d @ gpu %d] %s (CUDA error %d: %s)\n", filename, line, gpu, message, error, cudaGetErrorString(error));
-        fflush(stderr);
-    }
-    return error;
-}
+    bool print = true);
 
 cudaError_t GRError(
     cudaError_t error,
     std::string message,
     const char *filename,
     int line,
-    bool print = true)
-{
-    if (error && print) {
-        int gpu;
-        cudaGetDevice(&gpu);
-        fprintf(stderr, "[%s, %d @ gpu %d] %s (CUDA error %d: %s)\n", filename, line, gpu, message.c_str(), error, cudaGetErrorString(error));
-        fflush(stderr);
-    }
-    return error;
-}
+    bool print = true);
 
 /**
  * Checks and resets last CUDA error.  If set, displays last error message in accordance with debug mode.
@@ -63,62 +44,28 @@ cudaError_t GRError(
     const char *message,
     const char *filename,
     int line,
-    bool print = true)
-{
-    cudaError_t error = cudaGetLastError();
-    if (error && print) {
-
-        fprintf(stderr, "[%s, %d] %s (CUDA error %d: %s)\n", filename, line, message, error, cudaGetErrorString(error));
-        fflush(stderr);
-    }
-    return error;
-}
+    bool print = true);
 
 cudaError_t GRError(
     std::string message,
     const char *filename,
     int line,
-    bool print = true)
-{
-    cudaError_t error = cudaGetLastError();
-    if (error && print) {
-
-        fprintf(stderr, "[%s, %d] %s (CUDA error %d: %s)\n", filename, line, message.c_str(), error, cudaGetErrorString(error));
-        fflush(stderr);
-    }
-    return error;
-}
-
+    bool print = true);
 
 /**
  * Displays error message in accordance with debug mode
  */
 cudaError_t GRError(
     cudaError_t error,
-    bool print = true)
-{
-    if (error && print) {
-        fprintf(stderr, "(CUDA error %d: %s)\n", error, cudaGetErrorString(error));
-        fflush(stderr);
-    }
-    return error;
-}
+    bool print = true);
 
 
 /**
  * Checks and resets last CUDA error.  If set, displays last error message in accordance with debug mode.
  */
 cudaError_t GRError(
-    bool print = true)
-{
-    cudaError_t error = cudaGetLastError();
-    if (error && print) {
-        fprintf(stderr, "(CUDA error %d: %s)\n", error, cudaGetErrorString(error));
-        fflush(stderr);
-    }
-    return error;
-}
-
+    bool print = true);
+	
 
 } // namespace util
 } // namespace gunrock

@@ -156,10 +156,11 @@ struct EdgeProperties
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] graph Reference to ...
- * @param[in] bc_values Pointer to ...
- * @param[in] sigmas Pointer to ...
- * @param[in] src VertexId of ...
+ * @param[in] graph Reference to graph we process on
+ * @param[in] bc_values Pointer to node bc value
+ * @param[in] ebc_values Pointer to edge bc value
+ * @param[in] sigmas Pointer to node sigma value
+ * @param[in] src VertexId of source node if there is any
  */
 template<
     typename VertexId,
@@ -358,10 +359,12 @@ void RefCPUBC(
  *
  * @param[in] graph Reference to the CSR graph object defined in main driver
  * @param[in] src
- * @param[in] ref_filename 
+ * @param[in] ref_filename
  * @param[in] max_grid_size
  * @param[in] num_gpus
  * @param[in] max_queue_sizing
+ * @param[in] iterations Number of iterations for running the test
+ * @param[in] context CudaContext pointer for moderngpu APIs
  */
 template <
     typename VertexId,
@@ -450,7 +453,7 @@ void RunTests(Test_Parameter *parameter)
     //
     if (reference_check_bc_values != NULL) {
         if (ref_filename.empty()) {
-            printf("compute ref value\n");
+            printf("Computing reference value ...\n");
             RefCPUBC(
                     *graph,
                     reference_check_bc_values,
@@ -737,7 +740,6 @@ void RunTests(
     cudaStream_t                *streams)
 {
     std::string src_str = "";
-    //std::string ref_filename = "";
     Test_Parameter *parameter = new Test_Parameter;
 
     parameter -> Init(args);
@@ -769,7 +771,7 @@ void RunTests(
  * Main
  ******************************************************************************/
 
-int cpp_main( int argc, char** argv)
+int main( int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
     int          num_gpus = 0;

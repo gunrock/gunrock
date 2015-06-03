@@ -55,20 +55,20 @@ using namespace gunrock::app::topk;
  ******************************************************************************/
 void Usage()
 {
-  printf("\ntest_topk <graph type> <graph type args> [--top=<K_value>] [--device=<device_index>] "
-	 "[--instrumented] [--quick] "
-	 "[--v]\n"
-	 "\n"
-	 "Graph types and args:\n"
-	 "  market [<file>]\n"
-	 "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
-	 "    edges from stdin (or from the optionally-specified file).\n"
-	 "    k value top K value.\n"
-	 "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
-	 "  --instrumented If set then kernels keep track of queue-search_depth\n"
-	 "  and barrier duty (a relative indicator of load imbalance.)\n"
-	 "  --quick If set will skip the CPU validation code.\n"
-	 );
+  printf(
+    "\ntest_topk <graph type> <graph type args> [--top=<K_value>] [--device=<device_index>] "
+    "[--instrumented] [--quick] "
+    "[--v]\n"
+    "\n"
+    "Graph types and args:\n"
+    "  market [<file>]\n"
+    "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
+    "    edges from stdin (or from the optionally-specified file).\n"
+    "    k value top K value.\n"
+    "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
+    "  --instrumented If set then kernels keep track of queue-search_depth\n"
+    "  and barrier duty (a relative indicator of load imbalance.)\n"
+    "  --quick If set will skip the CPU validation code.\n");
 }
 
 /**
@@ -113,6 +113,7 @@ public:
         TestParameter_Base::Init(args);
    }   
 };
+
 /******************************************************************************
  * Degree Centrality Testing Routines
  *****************************************************************************/
@@ -196,16 +197,20 @@ void SimpleReferenceTopK(
 }
 
 /**
- * @brief Run TOPK tests
+ * @brief Run TopK tests
  *
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] graph_original Reference to the CSR graph we process on
+ * @param[in] graph_reversed Reference to the inversed CSR graph we process on
+ * @param[in] args Reference to the command line arguments
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] num_gpus Number of GPUs
+ * @param[in] top_nodes Number of nodes to process for Top-K algorithm
+ * @param[in] context CudaContext for moderngpu library
  *
  */
 template <
@@ -237,12 +242,9 @@ void RunTests(Test_Parameter *parameter)
                  *graph_reversed        = (Csr<VertexId, Value, SizeT>*)parameter->inv_graph;
     int           max_grid_size         = parameter -> max_grid_size;
     int           num_gpus              = parameter -> num_gpus;
-    //double        max_queue_sizing      = parameter -> max_queue_sizing;
     ContextPtr   *context               = (ContextPtr*)parameter -> context;
     int          *gpu_idx               = parameter -> gpu_idx;
-    //bool          g_quick               = parameter -> g_quick;
     bool          g_stream_from_host    = parameter -> g_stream_from_host;
-    //bool          g_undirected          = parameter -> g_undirected;
     SizeT         top_nodes             = parameter -> top_nodes;
   
   // INSTRUMENT specifies whether we want to keep such statistical data
@@ -272,7 +274,7 @@ void RunTests(Test_Parameter *parameter)
     num_gpus),
     "Problem TOPK Initialization Failed", __FILE__, __LINE__);
   
-  // perform degree centrality
+  // perform topk degree centrality calculations
   GpuTimer gpu_timer; // Record the kernel running time
   
   // reset values in DataSlice for graph
@@ -280,6 +282,7 @@ void RunTests(Test_Parameter *parameter)
 		"TOPK Problem Data Reset Failed", __FILE__, __LINE__);
 
   gpu_timer.Start();
+  // launch topk enactor
   util::GRError(topk_enactor.template Enact<Problem>(*context, 
 						   topk_problem, 
 						   top_nodes, 
@@ -330,55 +333,6 @@ void RunTests(Test_Parameter *parameter)
   cudaDeviceSynchronize();
 }
 
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] args Reference to the command line arguments
- */
-/*template <
-  typename VertexId,
-  typename Value,
-  typename SizeT>
-void RunTests(Csr<VertexId, Value, SizeT> &graph,
-	      Csr<VertexId, Value, SizeT> &graph_inv,
-	      CommandLineArgs		  &args,
-	      SizeT                       top_nodes,
-	      CudaContext                 &context)
-{
-  bool 	instrumented 	= false;
-  int 	max_grid_size 	= 0;            
-  int 	num_gpus	= 1;            
-    
-  instrumented = args.CheckCmdLineFlag("instrumented");
-    
-  g_quick = args.CheckCmdLineFlag("quick");
-  g_verbose = args.CheckCmdLineFlag("v");
-  
-  if (instrumented) {
-    RunTests<VertexId, Value, SizeT, true>(graph,
-					   graph_inv,
-					   args,
-					   max_grid_size,
-					   num_gpus,
-					   top_nodes,
-					   context);
-  }
-  else {
-    RunTests<VertexId, Value, SizeT, false>(graph,
-					    graph_inv,
-					    args,
-					    max_grid_size,
-					    num_gpus,
-					    top_nodes,
-					    context);
-  }
-}*/
-
 template <
     typename      VertexId,
     typename      Value,
@@ -424,6 +378,19 @@ void RunTests_instrumented(Test_Parameter *parameter)
         false> (parameter);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] graph_original Reference to the CSR graph we process on
+ * @param[in] graph_reversed Reference to the inversed CSR graph we process on
+ * @param[in] args Reference to the command line arguments
+ * @param[in] top_nodes Number of nodes to process for Top-K algorithm
+ * @param[in] context CudaContext for moderngpu library
+ */
 template <
     typename VertexId,
     typename Value,
@@ -456,7 +423,7 @@ void RunTests(
 /******************************************************************************
  * Main
  ******************************************************************************/
-int cpp_main(int argc, char** argv)
+int main(int argc, char** argv)
 {
   CommandLineArgs args(argc, argv);
   
@@ -498,9 +465,9 @@ int cpp_main(int argc, char** argv)
   {
     // Matrix-market coordinate-formatted graph file
     
-    typedef int VertexId;	// Use as the node identifier type
-    typedef int Value;	        // Use as the value type
-    typedef int SizeT;	        // Use as the graph size type
+    typedef int VertexId; //!< Use as the node identifier type
+    typedef int Value;    //!< Use as the value type
+    typedef int SizeT;    //!< Use as the graph size type
 
     Csr<VertexId, Value, SizeT> csr_original(false);
     Csr<VertexId, Value, SizeT> csr_reversed(false);
@@ -549,8 +516,13 @@ int cpp_main(int argc, char** argv)
     fprintf(stderr, "Unspecified graph type\n");
     return 1;
   }
-  
+
   return 0;
 }
 
-/* end */
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:
+

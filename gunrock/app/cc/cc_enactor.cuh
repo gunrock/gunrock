@@ -53,7 +53,6 @@ namespace cc {
         size_t      offset                 = 0;
         VertexId**  s_vertex_associate_in  = (VertexId**)&(s_array[offset]);
         offset+=sizeof(VertexId*) * NUM_VERTEX_ASSOCIATES;
-        //Value**     s_value__associate_in  = (Value**   )&(s_array[offset]);
         offset+=sizeof(Value*   ) * NUM_VALUE__ASSOCIATES;
         VertexId**  s_vertex_associate_org = (VertexId**)&(s_array[offset]);
         SizeT x = threadIdx.x;
@@ -68,7 +67,6 @@ namespace cc {
         while (x<num_elements)
         {
             VertexId key = keys_in[x];
-            //atomicMin(s_vertex_associate_org[0]+key, s_vertex_associate_in[0][x]);
             if (s_vertex_associate_in[0][x] < s_vertex_associate_org[0][key])
             {
                 if (TO_TRACK)
@@ -76,7 +74,6 @@ namespace cc {
                     printf("Expand_Incoming [%d]: %d->%d\n", key, s_vertex_associate_org[0][key], s_vertex_associate_in[0][x]);
                 s_vertex_associate_org[0][key] = s_vertex_associate_in[0][x]; 
             }
-            //keys_out[x]=-1;
             x+=STRIDE;
         }
     }
@@ -86,8 +83,6 @@ namespace cc {
         typename SizeT>
     __global__ void Mark_Difference_Queue (
         const SizeT           num_elements,
-        //const VertexId* const keys_in,
-        //      VertexId*       keys_out,
         const VertexId* const old_CID,
         const VertexId* const new_CID,
               SizeT*          marker)
@@ -97,7 +92,6 @@ namespace cc {
 
         while (x<num_elements)
         {
-            //VertexId key = keys_in[x]
             if (TO_TRACK)
             if (to_track(x))
                 printf("Mark_Diff marker[%d]: %d->%d, CID: %d->%d\n", x, marker[x], (old_CID[x]!=new_CID[x]? 1:0), old_CID[x], new_CID[x]);
@@ -175,18 +169,16 @@ public:
         util::MemsetIdxKernel<<<128, 128, 0, stream>>>(frontier_queue->keys[0].GetPointer(util::DEVICE), graph_slice->edges);
         util::MemsetIdxKernel<<<128, 128, 0, stream>>>(frontier_queue->values[0].GetPointer(util::DEVICE), graph_slice->nodes);
         util::MemsetKernel<<<128, 128, 0, stream>>>(data_slice->marks.GetPointer(util::DEVICE), false, graph_slice->edges);
-        //util::MemsetKernel<<<128, 128, 0, stream>>>(data_slice->masks.GetPointer(util::DEVICE), 0, graph_slice->nodes);
 
-        //printf("queue set\n");fflush(stdout);
         if (data_slice->turn==0)
         {
             frontier_attribute->queue_index  = 0;
             frontier_attribute->selector     = 0;
             frontier_attribute->queue_length = graph_slice->edges;
             frontier_attribute->queue_reset  = true;
-            //printf("HookInit begin, %d, %d, %p\n", frontier_queue->keys[frontier_attribute->selector].GetSize(), frontier_queue->keys[frontier_attribute->selector^1].GetSize(), data_slice->d_pointer);fflush(stdout);
             gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, HookInitFunctor>
-                <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+                <<<frontier_attribute->queue_length/FilterKernelPolicy::THREADS+1, FilterKernelPolicy::THREADS, 0, stream>>>(
+                //<<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
                 0,  //iteration, not used in CC
                 frontier_attribute->queue_reset,
                 frontier_attribute->queue_index,
@@ -202,7 +194,6 @@ public:
                 enactor_stats->filter_kernel_stats);
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) return;
             enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
-            //printf("HookInited\n");fflush(stdout);
         }
 
         if (data_slice->num_gpus > 1)
@@ -272,15 +263,12 @@ public:
             Value,
             Problem> PtrJumpUnmaskFunctor;
 
-        //bool has_change                  = false;
-        // Pointer Jumping
         enactor_stats->iteration=0; 
         frontier_attribute->queue_index  = 0;
         frontier_attribute->selector     = 0;
         frontier_attribute->queue_length = graph_slice->nodes;
         frontier_attribute->queue_reset  = true;
 
-        //util::cpu_mt::PrintGPUArray("0_cid", data_slice->component_ids.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, data_slice->turn, enactor_stats->iteration, stream);
         // First Pointer Jumping Round
         data_slice->vertex_flag[0] = 0;
         while (!data_slice->vertex_flag[0]) {
@@ -307,17 +295,13 @@ public:
 
             frontier_attribute->queue_reset = false;
             frontier_attribute->queue_index++;
-            //frontier_attribute->selector ^= 1;
             enactor_stats->iteration++;
             data_slice->vertex_flag.Move(util::DEVICE, util::HOST, 1, 0, stream);
 
             if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__)) return;
-            //util::cpu_mt::PrintMessage("PtrJump finished", thread_num, data_slice->turn, enactor_stats->iteration);
             // Check if done
             if (data_slice->vertex_flag[0]) break;
-            //else has_change = true;
         }
-        //util::cpu_mt::PrintGPUArray("1_cid", data_slice->component_ids.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, data_slice->turn, enactor_stats->iteration, stream);
 
         frontier_attribute->queue_index   = 0;        // Work queue index
         frontier_attribute->selector      = 0;
@@ -341,8 +325,6 @@ public:
             enactor_stats->filter_kernel_stats);
         if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Update Mask Operation failed", __FILE__, __LINE__))) return;
         enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
-        //util::cpu_mt::PrintGPUArray("2_cid", data_slice->component_ids.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, data_slice->turn, enactor_stats->iteration, stream);
-        //util::cpu_mt::PrintMessage("Update Mask finished", thread_num, data_slice->turn, enactor_stats->iteration);
 
         enactor_stats->iteration = 1;
         data_slice->edge_flag[0] = 0;
@@ -373,7 +355,8 @@ public:
                     enactor_stats->filter_kernel_stats);
             } else {*/
                 gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, HookMaxFunctor>
-                    <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+                    <<<frontier_attribute->queue_length/FilterKernelPolicy::THREADS+1, FilterKernelPolicy::THREADS, 0, stream>>>(
+                    //<<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
                     0,
                     frontier_attribute->queue_reset,
                     frontier_attribute->queue_index,
@@ -390,19 +373,15 @@ public:
             //}
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Hook Min/Max Operation failed", __FILE__, __LINE__))) return;
             enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
-            //util::cpu_mt::PrintGPUArray("3_cid", data_slice->component_ids.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, data_slice->turn, enactor_stats->iteration, stream);
-            //util::cpu_mt::PrintMessage("HookMax finished", thread_num, data_slice->turn, enactor_stats->iteration);
 
             frontier_attribute->queue_reset = false;
             frontier_attribute->queue_index++;
-            //frontier_attribute->selector ^= 1;
             enactor_stats->iteration++;
 
             data_slice->edge_flag.Move(util::DEVICE, util::HOST, 1, 0, stream);
             if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__)) return;
             // Check if done
             if (data_slice->edge_flag[0]) break; //|| enactor_stats->iteration>5) break;
-            //else has_change = true;
 
             ///////////////////////////////////////////
             // Pointer Jumping 
@@ -437,16 +416,12 @@ public:
 
                 frontier_attribute->queue_reset = false;
                 frontier_attribute->queue_index++;
-                //frontier_attribute->selector ^= 1;
 
                 data_slice->vertex_flag.Move(util::DEVICE, util::HOST, 1, 0, stream);
                 if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__)) return;
-                //util::cpu_mt::PrintMessage("Pointer Jumping Mask finished", thread_num, data_slice->turn, enactor_stats->iteration);
                 // Check if done
                 if (data_slice->vertex_flag[0]) break;
-                //else has_change = true;
             }
-            //util::cpu_mt::PrintGPUArray("4_cid", data_slice->component_ids.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, data_slice->turn, enactor_stats->iteration, stream);
 
             frontier_attribute->queue_index  = 0;        // Work queue index
             frontier_attribute->selector     = 0;
@@ -470,8 +445,6 @@ public:
                 enactor_stats->filter_kernel_stats);
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Pointer Jumping Unmask Operation failed", __FILE__, __LINE__))) return;
             enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
-            //util::cpu_mt::PrintGPUArray("5_cid", data_slice->component_ids.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, data_slice->turn, enactor_stats->iteration, stream);
-            //util::cpu_mt::PrintMessage("Pointer Jumping Unmask finished", thread_num, data_slice->turn, enactor_stats->iteration);
 
             gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, UpdateMaskFunctor>
                 <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
@@ -490,12 +463,9 @@ public:
                 enactor_stats->filter_kernel_stats);
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Update Mask Operation failed", __FILE__, __LINE__))) return;
             enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
-            //util::cpu_mt::PrintMessage("Update Mask finished", thread_num, data_slice->turn, enactor_stats->iteration);
 
             ///////////////////////////////////////////
         }
-        //util::cpu_mt::PrintGPUArray("6_cid", data_slice->component_ids.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, data_slice->turn, enactor_stats->iteration, stream);
-        //util::cpu_mt::PrintMessage("Loop finished", thread_num, data_slice->turn, enactor_stats->iteration);
 
         enactor_stats->iteration = data_slice->turn;
     }
@@ -530,7 +500,6 @@ public:
               char*           array,
               DataSlice*      data_slice)
     {
-        //printf("num_elements = %d\n", num_elements);fflush(stdout);
         Expand_Incoming_BothWay
             <VertexId, SizeT, Value, NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
             <<<grid_size, block_size, shared_size, stream>>> (
@@ -666,9 +635,6 @@ public:
         {
             data_slice[0] -> has_change = true;
         } else data_slice[0] -> has_change = false;
-        //printf("%d\t %d\t \t has_change = %s\n", thread_num, data_slice->turn, data_slice -> has_change? "true" : "false"); fflush(stdout);
-        //util::cpu_mt::PrintGPUArray("change keys", frontier_queue->keys[0].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration);
-        //util::cpu_mt::PrintGPUArray("c_id", data_slice->component_ids.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
     }
 };
 
@@ -707,7 +673,6 @@ public:
                      *frontier_attribute = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
         EnactorStats *enactor_stats      = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
 
-        //data_slice -> work_progress      = &(enactor     -> work_progress      [thread_num * num_gpus]);
         do {
             printf("CCThread entered\n");fflush(stdout);
             if (enactor_stats[0].retval = util::SetDevice(gpu_idx)) break;
@@ -804,7 +769,8 @@ public:
     template <typename VertexId>
     void GetStatistics(
         long long &total_queued,
-        double &avg_duty)
+        VertexId  &num_iter,
+        double    &avg_duty)
     {
         unsigned long long total_lifetimes = 0;
         unsigned long long total_runtimes  = 0;
@@ -825,8 +791,8 @@ public:
             }
         }
 
-        avg_duty = (total_lifetimes >0) ?
-            double(total_runtimes) / total_lifetimes : 0.0;
+        avg_duty = (total_lifetimes > 0) ?
+            double (total_runtimes) / total_lifetimes : 0.0;
     }
 
     /** @} */
@@ -841,9 +807,6 @@ public:
         bool        size_check    = true)
     {
         cudaError_t retval = cudaSuccess;
-        //cpu_barrier = new util::cpu_mt::CPUBarrier[2];
-        //cpu_barrier[0]=util::cpu_mt::CreateBarrier(this->num_gpus);
-        //cpu_barrier[1]=util::cpu_mt::CreateBarrier(this->num_gpus);
         // Lazy initialization
         if (retval = EnactorBase <SizeT, DEBUG, SIZE_CHECK> ::Init(
             problem,
@@ -914,12 +877,44 @@ public:
      * @{
      */
 
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            //Problem data type
+        300,                                //CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        8,                                  // MIN_CTA_OCCUPANCY,
+        7,                                  // LOG_THREADS,
+        8,                                  // LOG_BLOCKS,
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        1,                                  // LOG_LOAD_VEC_SIZE,
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS,
+        32,                                 // WART_GATHER_THRESHOLD,
+        128 * 4,                            // CTA_GATHER_THRESHOLD,
+        7,                                  // LOG_SCHEDULE_GRANULARITY,
+        gunrock::oprtr::advance::LB>
+    AdvancePolicy;
+
+    typedef gunrock::oprtr::filter::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        0,                                  // SATURATION QUIT
+        true,                               // DEQUEUE_PROBLEM_SIZE
+        8,                                  // MIN_CTA_OCCUPANCY
+        7,                                  // LOG_THREADS
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        0,                                  // END_BITMASK (no bitmask for cc)
+        8>                                  // LOG_SCHEDULE_GRANULARITY
+    FilterPolicy;
+
     /**
      * @brief Enact Kernel Entry, specify KernelPolicy
      *
      * @tparam CCProblem CC Problem type. @see CCProblem
      * @param[in] problem Pointer to CCProblem object.
-     * @param[in] max_grid_size Max grid size for CC kernel calls. 
+     * @param[in] max_grid_size Max grid size for CC kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -934,44 +929,11 @@ public:
                 min_sm_version = this->cuda_props[gpu].device_sm_version;
 
         if (min_sm_version >= 300) {
-            typedef gunrock::oprtr::advance::KernelPolicy<
-                Problem,                            //Problem data type
-                300,                                //CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY,
-                7,                                  // LOG_THREADS,
-                8,                                  // LOG_BLOCKS,
-                32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
-                1,                                  // LOG_LOAD_VEC_SIZE,
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS,
-                32,                                 // WART_GATHER_THRESHOLD,
-                128 * 4,                            // CTA_GATHER_THRESHOLD,
-                7,                                  // LOG_SCHEDULE_GRANULARITY,
-                gunrock::oprtr::advance::LB>
-                    AdvancePolicy;
-
-            typedef gunrock::oprtr::filter::KernelPolicy<
-                Problem,                            // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                0,                                  // SATURATION QUIT
-                true,                               // DEQUEUE_PROBLEM_SIZE
-                8,                                  // MIN_CTA_OCCUPANCY
-                7,                                  // LOG_THREADS
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                0,                                  // END_BITMASK (no bitmask for cc)
-                8>                                  // LOG_SCHEDULE_GRANULARITY
-                    FilterPolicy;
-
             return EnactCC<AdvancePolicy, FilterPolicy>();
         }
 
         //to reduce compile time, get rid of other architecture for now
         //TODO: add all the kernelpolicy settings for all archs
-
         printf("Not yet tuned for this architecture\n");
         return cudaErrorInvalidDeviceFunction;
     }
@@ -988,45 +950,12 @@ public:
                 min_sm_version = this->cuda_props[gpu].device_sm_version;
 
         if (min_sm_version >= 300) {
-            typedef gunrock::oprtr::advance::KernelPolicy<
-                Problem,                            //Problem data type
-                300,                                //CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY,
-                7,                                  // LOG_THREADS,
-                8,                                  // LOG_BLOCKS,
-                32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
-                1,                                  // LOG_LOAD_VEC_SIZE,
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS,
-                32,                                 // WART_GATHER_THRESHOLD,
-                128 * 4,                            // CTA_GATHER_THRESHOLD,
-                7,                                  // LOG_SCHEDULE_GRANULARITY,
-                gunrock::oprtr::advance::LB>
-                    AdvancePolicy;
-
-            typedef gunrock::oprtr::filter::KernelPolicy<
-                Problem,                            // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                0,                                  // SATURATION QUIT
-                true,                               // DEQUEUE_PROBLEM_SIZE
-                8,                                  // MIN_CTA_OCCUPANCY
-                7,                                  // LOG_THREADS
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                0,                                  // END_BITMASK (no bitmask for cc)
-                8>                                  // LOG_SCHEDULE_GRANULARITY
-                    FilterPolicy;
-
             return InitCC<AdvancePolicy, FilterPolicy>(
                     context, problem, max_grid_size, size_check);
         }
 
         //to reduce compile time, get rid of other architecture for now
         //TODO: add all the kernelpolicy settings for all archs
-
         printf("Not yet tuned for this architecture\n");
         return cudaErrorInvalidDeviceFunction;
 

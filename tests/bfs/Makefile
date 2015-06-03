@@ -13,7 +13,7 @@ force64 = 1
 NVCC = "$(shell which nvcc)"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
-KERNELS = 
+KERNELS =
 
 # detect OS
 OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
@@ -37,7 +37,7 @@ SM_TARGETS = $(GEN_SM35) $(GEN_SM37)
 #-------------------------------------------------------------------------------
 
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
-MGPU_INC = "../../../moderngpu/include"
+MGPU_INC = "../../externals/moderngpu/include"
 BOOST_DIR = "../../../boost_1_53_0"
 BOOST_DEPS = -Xlinker $(BOOST_DIR)/bin.v2/libs/timer/build/gcc-4.6/release/link-static/threading-multi/cpu_timer.o -Xlinker $(BOOST_DIR)/bin.v2/libs/chrono/build/gcc-4.6/release/link-static/threading-multi/chrono.o -Xlinker $(BOOST_DIR)/bin.v2/libs/system/build/gcc-4.6/release/link-static/threading-multi/libboost_system.a -Xlinker -lrt
 OMP_DEPS = -Xcompiler -fopenmp -Xlinker -lgomp
@@ -48,7 +48,7 @@ INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(BOOST_DIR) $(BOOST_DEPS) $(OMP_DEPS) $(MET
 # Defines
 #-------------------------------------------------------------------------------
 
-DEFINES = 
+DEFINES =
 
 #-------------------------------------------------------------------------------
 # Compiler Flags
@@ -95,22 +95,21 @@ DEPS = 			./Makefile \
 				$(wildcard ../../gunrock/oprtr/**/*.cuh) \
 				$(wildcard ../../gunrock/app/*.cuh) \
 				$(wildcard ../../gunrock/app/**/*.cuh)
-				 
+
 #-------------------------------------------------------------------------------
-# (make test) Test driver for 
+# (make test) Test driver for
 #-------------------------------------------------------------------------------
 
 test: bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_bfs.cu $(DEPS)
+bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_bfs.cu  ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_bfs.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_bfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_bfs.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean
 #-------------------------------------------------------------------------------
 
 clean :
-	rm -f bin/*_$(NVCC_VERSION)_$(ARCH_SUFFIX)* 
+	rm -f bin/*_$(NVCC_VERSION)_$(ARCH_SUFFIX)*
 	rm -f *.i* *.cubin *.cu.c *.cudafe* *.fatbin.c *.ptx *.hash *.cu.cpp *.o
-

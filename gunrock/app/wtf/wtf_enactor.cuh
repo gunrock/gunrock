@@ -68,8 +68,6 @@ public:
      * @brief Prepare the enactor for WTF kernel call. Must be called prior to each WTF search.
      *
      * @param[in] problem WTF Problem object which holds the graph data and WTF problem data to compute.
-     * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] filter_grid_size CTA occupancy for vertex mapping kernel call.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -198,8 +196,11 @@ public:
      * @tparam FilterPolicy Kernel policy for vertex mapping.
      * @tparam WTFProblem WTF Problem type.
      *
+     * @param[in] context CudaContext for moderngpu library
+     * @param[in] src Source node ID for WTF algorithm
+     * @param[in] alpha Parameter to determine iteration number
      * @param[in] problem WTFProblem object.
-     * @param[in] src Source node for WTF.
+     * @param[in] max_iteration Max iteration number
      * @param[in] max_grid_size Max grid size for WTF kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -427,7 +428,6 @@ public:
 
         util::CUBRadixSort<Value, VertexId>(false, graph_slice->nodes, problem->data_slices[0]->rank_curr.GetPointer(util::DEVICE), problem->data_slices[0]->node_ids.GetPointer(util::DEVICE));
         
-        
          // 1 according to the first 1000 circle of trust nodes. Get all their neighbors.
          // 2 compute atomicAdd their neighbors' incoming node number.
          
@@ -570,6 +570,10 @@ public:
             elapsed = gpu_timer.ElapsedMillis();
             printf("WTF Time: %5f\n", elapsed);
 
+            gpu_timer.Stop();
+            elapsed = gpu_timer.ElapsedMillis();
+            printf("WTF Time: %5f\n", elapsed);
+
         } while(0); 
 
         if (d_scanned_edges) cudaFree(d_scanned_edges);
@@ -588,8 +592,11 @@ public:
      *
      * @tparam WTFProblem WTF Problem type. @see PRProblem
      *
-     * @param[in] problem Pointer to WTFProblem object.
+     * @param[in] context CudaContext for moderngpu library
      * @param[in] src Source node for WTF.
+     * @param[in] alpha Parameters related to iteration number of WTF algorithm
+     * @param[in] problem Pointer to WTFProblem object.
+     * @param[in] max_iteration Max iteration number of WTF algorithm
      * @param[in] max_grid_size Max grid size for WTF kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -616,7 +623,7 @@ public:
             0,                                  // SATURATION QUIT
             true,                               // DEQUEUE_WTFOBLEM_SIZE
             8,                                  // MIN_CTA_OCCUPANCY
-            6,                                  // LOG_THREADS
+            8,                                  // LOG_THREADS
             1,                                  // LOG_LOAD_VEC_SIZE
             0,                                  // LOG_LOADS_PER_TILE
             5,                                  // LOG_RAKING_THREADS
@@ -624,22 +631,22 @@ public:
             8>                                  // LOG_SCHEDULE_GRANULARITY
                 FilterKernelPolicy;
 
-            typedef gunrock::oprtr::advance::KernelPolicy<
-                WTFProblem,                         // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                10,                                  // LOG_THREADS
-                8,
-                32*1024,
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                            // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7,                                  // LOG_SCHEDULE_GRANULARITY
-                gunrock::oprtr::advance::TWC_FORWARD>
-                    AdvanceKernelPolicy;
+                typedef gunrock::oprtr::advance::KernelPolicy<
+                    WTFProblem,                         // Problem data type
+                    300,                                // CUDA_ARCH
+                    INSTRUMENT,                         // INSTRUMENT
+                    8,                                  // MIN_CTA_OCCUPANCY
+                    10,                                  // LOG_THREADS
+                    8,                                  // LOG_BLOCKS
+                    32*128,                                  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+                    1,                                  // LOG_LOAD_VEC_SIZE
+                    0,                                  // LOG_LOADS_PER_TILE
+                    5,                                  // LOG_RAKING_THREADS
+                    32,                            // WARP_GATHER_THRESHOLD
+                    128 * 4,                            // CTA_GATHER_THRESHOLD
+                    7,                                  // LOG_SCHEDULE_GRANULARITY
+                    gunrock::oprtr::advance::LB>
+                        AdvanceKernelPolicy;
 
             return EnactWTF<AdvanceKernelPolicy, FilterKernelPolicy, WTFProblem>(
                     context, src, alpha, problem, max_iteration, max_grid_size);

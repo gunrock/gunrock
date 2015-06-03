@@ -42,6 +42,9 @@ __global__ void Accumulate_Num (
     sum[0]+=num[0];
 }
 
+/**
+ * @brief Structure for auxiliary variables used in enactor.
+ */
 struct EnactorStats
 {
     long long                        iteration           ;
@@ -75,6 +78,9 @@ struct EnactorStats
     }
 };
 
+/**
+ * @brief Structure for auxiliary variables used in frontier operations.
+ */
 template <typename SizeT>
 struct FrontierAttribute
 {
@@ -1213,7 +1219,9 @@ protected:
         }
     }
 
-
+    /**
+     * @brief Destructor
+     */
     virtual ~EnactorBase()
     {
         for (int gpu=0;gpu<num_gpus;gpu++)
@@ -1234,6 +1242,18 @@ protected:
         frontier_attribute.Release();
     }
 
+   /**
+     * @brief Init function for enactor base class
+     *
+     * @tparam ProblemData
+     *
+     * @param[in] problem The problem object for the graph primitive
+     * @param[in] max_grid_size Maximum CUDA block numbers in on grid
+     * @param[in] advance_occupancy CTA Occupancy for Advance operator
+     * @param[in] filter_occupancy CTA Occupancy for Filter operator
+     * @param[in] node_lock_size The size of an auxiliary array used in enactor, 256 by default.
+     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     */
     template <typename Problem>
     cudaError_t Init(
         Problem *problem,

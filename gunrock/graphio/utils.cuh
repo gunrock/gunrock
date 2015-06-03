@@ -21,7 +21,7 @@
 #include <omp.h>
 
 #include <gunrock/util/error_utils.cuh>
-#include <gunrock/util/random_bits.cuh>
+#include <gunrock/util/random_bits.h>
 
 #include <gunrock/coo.cuh>
 #include <gunrock/csr.cuh>
@@ -45,101 +45,10 @@ SizeT RandomNode (SizeT num_nodes)
     return node_id % num_nodes;
 }
 
-double Sprng (struct drand48_data *rand_data)
-{
-    double result;
-    drand48_r(rand_data, &result);
-    return result;
-}
-
-bool Flip (struct drand48_data *rand_data)
-{
-    return Sprng(rand_data) >= 0.5;
-}
-
-template <typename VertexId>
-void ChoosePartition (
-    VertexId *u, VertexId *v, VertexId step,
-    double a, double b, double c, double d, struct drand48_data *rand_data)
-{
-    double p;
-    p = Sprng(rand_data);
-
-    if (p < a)
-    {
-        // do nothing
-    }
-    else if ((a < p) && (p < a + b))
-    {
-        *v = *v + step;
-    }
-    else if ((a + b < p) && (p < a + b + c))
-    {
-        *u = *u + step;
-    }
-    else if ((a + b + c < p) && (p < a + b + c + d))
-    {
-        *u = *u + step;
-        *v = *v + step;
-    }
-}
-
-void VaryParams (double *a, double *b, double *c, double *d, drand48_data *rand_data)
-{
-    double v, S;
-
-    // Allow a max. of 5% variation
-    v = 0.05;
-
-    if (Flip(rand_data))
-    {
-        *a += *a * v * Sprng(rand_data);
-    }
-    else
-    {
-        *a -= *a * v * Sprng(rand_data);
-    }
-    if (Flip(rand_data))
-    {
-        *b += *b * v * Sprng(rand_data);
-    }
-    else
-    {
-        *b -= *b * v * Sprng(rand_data);
-    }
-    if (Flip(rand_data))
-    {
-        *c += *c * v * Sprng(rand_data);
-    }
-    else
-    {
-        *c -= *c * v * Sprng(rand_data);
-    }
-    if (Flip(rand_data))
-    {
-        *d += *d * v * Sprng(rand_data);
-    }
-    else
-    {
-        *d -= *d * v * Sprng(rand_data);
-    }
-
-    S = *a + *b + *c + *d;
-
-    *a = *a / S;
-    *b = *b / S;
-    *c = *c / S;
-    *d = *d / S;
-}
-
 template <typename VertexId, typename Value, typename SizeT>
 void RemoveStandaloneNodes(
     Csr<VertexId, Value, SizeT>* graph)
 {
-    //typedef Graph::SizeT    SizeT;
-    //typedef Graph::VertexId VertexId;
-    //typedef Graph::Value    Value;
-
     SizeT nodes = graph->nodes;
     SizeT edges = graph->edges;
     int *marker = new int[nodes];
@@ -171,7 +80,6 @@ void RemoveStandaloneNodes(
         if (thread_num == 0) block_offsets = new SizeT[num_threads+1];
         #pragma omp barrier
         
-        //SizeT counter = 0;
         displacements[node_start] = 0;
         for (VertexId node = node_start; node < node_end-1; node++)
             displacements[node+1] = displacements[node] + 1 - marker[node];
@@ -185,7 +93,6 @@ void RemoveStandaloneNodes(
             block_offsets[0] = 0;
             for (int i=0; i<num_threads; i++)
                 block_offsets[i+1] += block_offsets[i];
-            //util::cpu_mt::PrintCPUArray("block_offsets", block_offsets, num_threads+1);
         }
 
         for (VertexId node = node_start; node < node_end; node++)
@@ -196,8 +103,6 @@ void RemoveStandaloneNodes(
             new_offsets[node_] = row_offsets[node];
             if (values != NULL) new_values[node_] = values[node];
         }
-        //#pragma omp barrier
-        //printf("thread %d\n", thread_num);fflush(stdout);
     }
 
     for (SizeT edge = 0; edge < edges; edge++)
@@ -205,7 +110,6 @@ void RemoveStandaloneNodes(
         column_indices[edge] = new_nodes[column_indices[edge]];
     }
 
-    //printf("num_threads = %d\n", num_threads);
     nodes = nodes - block_offsets[num_threads];
     memcpy(row_offsets, new_offsets, sizeof(SizeT) * (nodes + 1));
     if (values!=NULL) memcpy(values, new_values, sizeof(Value) * nodes);

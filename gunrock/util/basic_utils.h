@@ -7,7 +7,7 @@
 
 /**
  * @file
- * basic_utils.cuh
+ * basic_utils.h
  *
  * @brief Basic utility macros/routines
  */

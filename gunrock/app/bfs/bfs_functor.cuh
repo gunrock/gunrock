@@ -41,6 +41,8 @@ struct BFSFunctor
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id output edge id
+     * @param[in] e_id_in input edge id
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
@@ -72,6 +74,8 @@ struct BFSFunctor
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id output edge id
+     * @param[in] e_id_in input edge id
      *
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
@@ -92,10 +96,11 @@ struct BFSFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         return node != -1;
     }
@@ -105,9 +110,10 @@ struct BFSFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         if (ProblemData::ENABLE_IDEMPOTENCE) {
             util::io::ModifiedStore<util::io::st::cg>::St(

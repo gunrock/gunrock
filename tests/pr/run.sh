@@ -1,11 +1,27 @@
 #!/bin/bash
+OPTION1="--undirected" #undirected
+OPTION2="--quick" #quick running without CPU reference algorithm, if you want to test CPU reference algorithm, delete $OPTION2 in some lines. Warning: for large data this can take a long time.
+
+#get all execution files in ./bin
+files=(./bin/*)
+#split file names into arr
+arr=$(echo $files | tr " " "\n")
+max_ver_num="$"
+exe_file=${arr[0]}
+#iterate over all file names to get the largest version number
+for x in $arr
+do
+    output=$(grep -o "[0-9]\.[0-9]" <<<"$x")
+    if [ "$output" \> "$max_ver_num" ]; then
+        exe_file=$x
+    fi
+done
 
 OPTION[0]="--partition-method=random --undirected --quick"
 
 MARK[0]=""
 
-#put OS and Device type here
-EXCUTION="./bin/test_pr_6.5_x86_64"
+EXCUTION=$exe_file
 DATADIR="/data/gunrock_dataset/large/"
 
 NAME[ 0]="ak2010"            && Q_SIZE_DIR[ 0]="0.30" && I_SIZE_DIR[ 0]="0.10" && Q_SIZE_UDIR[ 0]="3.00" && I_SIZE_UDIR[ 0]="1.00"
@@ -88,5 +104,4 @@ do
         done
     done
 done
-
 

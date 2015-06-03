@@ -12,7 +12,7 @@
  * @brief Simple test driver program for connected component.
  */
 
-#include <stdio.h> 
+#include <stdio.h>
 #include <string>
 #include <deque>
 #include <vector>
@@ -47,15 +47,17 @@ using namespace gunrock::app::cc;
 
 
 /******************************************************************************
- * Defines, constants, globals 
+ * Defines, constants, globals
  ******************************************************************************/
 
 template <typename VertexId>
-struct CcList {
+struct CcList
+{
     VertexId        root;
     unsigned int    histogram;
 
-    CcList(VertexId root, unsigned int histogram) : root(root), histogram(histogram) {}
+    CcList(VertexId root, unsigned int histogram) :
+        root(root), histogram(histogram) {}
 };
 
 template<typename CcList>
@@ -80,12 +82,13 @@ public:
 /******************************************************************************
  * Housekeeping Routines
  ******************************************************************************/
- void Usage()
- {
- printf("\ntest_cc <graph type> <graph type args> [--device=<device_index>] "
-        "[--instrumented] [--quick] [--v]\n"
-        "[--queue-sizing=<scale factor>] [--in-sizing=<in/out queue scale factor>] [--disable-size-check]"
-        "[--grid-sizing=<grid size>] [--partition_method=random / biasrandom / clustered / metis] [--partition_seed=<seed>]"
+void Usage()
+{
+    printf(
+        "\ntest_cc <graph type> <graph type args> [--device=<device_index>] "
+        "[--instrumented] [--quick=<0|1>] [--v]\n"
+        "[--queue-sizing=<scale factor>] [--in-sizing=<in/out queue scale factor>] [--disable-size-check]\n"
+        "[--grid-sizing=<grid size>] [--partition_method=<random|biasrandom|clustered|metis] [--partition_seed=<seed>]\n"
         "\n"
         "Graph types and args:\n"
         "  market [<file>]\n"
@@ -94,31 +97,38 @@ public:
         "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
         "  --instrumented If set then kernels keep track of queue-search_depth\n"
         "  and barrier duty (a relative indicator of load imbalance.)\n"
-        "  --quick If set will skip the CPU validation code.\n"
+        "  --quick If set will skip the CPU validation code. Default: 0.\n"
         );
- }
+}
 
- /**
-  * @brief Displays the CC result (i.e., number of components)
-  *
-  * @tparam VertexId
-  * @tparam SizeT
-  *
-  * @param[in] comp_ids Host-side vector to store computed component id for each node
-  * @param[in] nodes Number of nodes in the graph
-  * @param[in] num_components Number of connected components in the graph
-  * @param[in] roots Host-side vector stores the root for each node in the graph
-  * @param[in] histogram Histogram of connected component ids
-  */
- template<typename VertexId, typename SizeT>
- void DisplaySolution(VertexId *comp_ids, SizeT nodes, unsigned int num_components, VertexId *roots, unsigned int *histogram)
- {
+/**
+ * @brief Displays the CC result (i.e., number of components)
+ *
+ * @tparam VertexId
+ * @tparam SizeT
+ *
+ * @param[in] comp_ids Host-side vector to store computed component id for each node
+ * @param[in] nodes Number of nodes in the graph
+ * @param[in] num_components Number of connected components in the graph
+ * @param[in] roots Host-side vector stores the root for each node in the graph
+ * @param[in] histogram Histogram of connected component ids
+ */
+template<typename VertexId, typename SizeT>
+void DisplaySolution(
+    VertexId     *comp_ids,
+    SizeT        nodes,
+    unsigned int num_components,
+    VertexId     *roots,
+    unsigned int *histogram)
+{
     typedef CcList<VertexId> CcListType;
     //printf("Number of components: %d\n", num_components);
 
-    if (nodes <= 40) {
+    if (nodes <= 40)
+    {
         printf("[");
-        for (VertexId i = 0; i < nodes; ++i) {
+        for (VertexId i = 0; i < nodes; ++i)
+        {
             PrintValue(i);
             printf(":");
             PrintValue(comp_ids[i]);
@@ -127,31 +137,35 @@ public:
         }
         printf("]\n");
     }
-    else {
+    else
+    {
         //sort the components by size
-        CcListType *cclist = (CcListType*)malloc(sizeof(CcListType) * num_components);
+        CcListType *cclist =
+            (CcListType*)malloc(sizeof(CcListType) * num_components);
         for (int i = 0; i < num_components; ++i)
         {
             cclist[i].root = roots[i];
             cclist[i].histogram = histogram[i];
         }
-        std::stable_sort(cclist, cclist + num_components, CCCompare<CcListType>);
+        std::stable_sort(
+            cclist, cclist + num_components, CCCompare<CcListType>);
 
         // Print out at most top 10 largest components
         int top = (num_components < 10) ? num_components : 10;
         printf("Top %d largest components:\n", top);
         for (int i = 0; i < top; ++i)
         {
-            printf("CC ID: %d, CC Root: %d, CC Size: %d\n", i, cclist[i].root, cclist[i].histogram);
+            printf("CC ID: %d, CC Root: %d, CC Size: %d\n",
+                   i, cclist[i].root, cclist[i].histogram);
         }
 
         free(cclist);
     }
- }
+}
 
- /**
-  * Performance/Evaluation statistics
-  */
+/**
+ * Performance/Evaluation statistics
+ */
 
 /******************************************************************************
  * CC Testing Routines
@@ -230,6 +244,7 @@ void ConvertIDs(
  *
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] max_grid_size Maximum CTA occupancy for CC kernels
+ * @param[in] iterations Number of iterations for running the test
  * @param[in] num_gpus Number of GPUs
  */
 template <
@@ -255,11 +270,11 @@ void RunTests(Test_Parameter *parameter)
 
     Csr<VertexId, Value, SizeT>
                  *graph                 = (Csr<VertexId, Value, SizeT>*)parameter->graph;
-    //VertexId      src                   = (VertexId)parameter -> src;
     int           max_grid_size         = parameter -> max_grid_size;
     int           num_gpus              = parameter -> num_gpus;
     double        max_queue_sizing      = parameter -> max_queue_sizing;
     double        max_in_sizing         = parameter -> max_in_sizing;
+    SizeT         iterations            = parameter -> iterations;
     ContextPtr   *context               = (ContextPtr*)parameter -> context;
     std::string   partition_method      = parameter -> partition_method;
     int          *gpu_idx               = parameter -> gpu_idx;
@@ -313,11 +328,11 @@ void RunTests(Test_Parameter *parameter)
     util::GRError(enactor->Init(context, problem, max_grid_size), "BC Enactor Init failed", __FILE__, __LINE__);
 
     //
-    // Compute reference CPU BFS solution for source-distance
+    // Compute reference CPU CC
     //
     if (reference_check != NULL)
     {
-        printf("compute ref value\n");
+        printf("Computing reference value ...\n");
         ref_num_components = RefCPUCC(
             *graph,
             reference_check);
@@ -326,17 +341,21 @@ void RunTests(Test_Parameter *parameter)
 
     // Perform CC
     CpuTimer cpu_timer;
+    float elapsed = 0.0f;
 
-    util::GRError(problem->Reset(enactor->GetFrontierType(), max_queue_sizing), "CC Problem Data Reset Failed", __FILE__, __LINE__);
-    util::GRError(enactor->Reset(), "CC Enactor Reset failed", __FILE__, __LINE__);   
+    for (SizeT iter = 0; iter < iterations; ++iter)
+    {
+        util::GRError(problem->Reset(enactor->GetFrontierType(), max_queue_sizing), "CC Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(enactor->Reset(), "CC Enactor Reset failed", __FILE__, __LINE__);   
 
-    printf("_________________________\n");fflush(stdout);
-    cpu_timer.Start();
-    util::GRError(enactor->Enact(), "CC Problem Enact Failed", __FILE__, __LINE__);
-    cpu_timer.Stop();
-    printf("-------------------------\n");fflush(stdout);
-
-    float elapsed = cpu_timer.ElapsedMillis();
+        printf("_________________________\n");fflush(stdout);
+        cpu_timer.Start();
+        util::GRError(enactor->Enact(), "CC Problem Enact Failed", __FILE__, __LINE__);
+        cpu_timer.Stop();
+        printf("-------------------------\n");fflush(stdout);
+        elapsed += cpu_timer.ElapsedMillis();
+    }
+    elapsed /= iterations;
 
     // Copy out results
     util::GRError(problem->Extract(h_component_ids), "CC Problem Data Extraction Failed", __FILE__, __LINE__);
@@ -519,7 +538,7 @@ void RunTests(
  * Main
  ******************************************************************************/
 
-int cpp_main( int argc, char** argv)
+int main( int argc, char** argv)
 {
 	CommandLineArgs  args(argc, argv);
     int              num_gpus = 0;
@@ -582,6 +601,7 @@ int cpp_main( int argc, char** argv)
 
 	if (graph_type == "market") {
 
+        // Matrix-market coordinate-formatted graph file
 		if (graph_args < 1) { Usage(); return 1; }
 		char *market_filename = (graph_args == 2) ? argv[2] : NULL;
 		if (graphio::BuildMarketGraph<false>(
@@ -675,12 +695,10 @@ int cpp_main( int argc, char** argv)
         float elapsed = cpu_timer.ElapsedMillis();
         printf("graph generated: %.3f ms, threshold = %.3lf, vmultipiler = %.3lf\n", elapsed, rgg_threshold, rgg_vmultipiler);
     } else {
-
-		// Unknown graph type
-		fprintf(stderr, "Unspecified graph type\n");
-		return 1;
-
-	}
+        // Unknown graph type
+        fprintf(stderr, "Unspecified graph type\n");
+        return 1;
+    }
 
     graphio::RemoveStandaloneNodes<VertexId, Value, SizeT>(&csr);
     csr.PrintHistogram();

@@ -15,7 +15,7 @@
 
 
 #pragma once
-#include <gunrock/util/basic_utils.cuh>
+#include <gunrock/util/basic_utils.h>
 #include <gunrock/util/cuda_properties.cuh>
 #include <gunrock/util/cta_work_distribution.cuh>
 #include <gunrock/util/soa_tuple.cuh>
@@ -69,6 +69,7 @@ struct KernelPolicy
     typedef _ProblemData                    ProblemData;
     typedef typename ProblemData::VertexId  VertexId;
     typedef typename ProblemData::SizeT     SizeT;
+    typedef typename ProblemData::Value     Value;
 
     enum {
 

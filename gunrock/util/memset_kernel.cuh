@@ -55,6 +55,7 @@ template <typename T> __global__ void MemsetKernel(T *d_out, T value, int length
  *
  * @param[in] d_out Device-side vector we need to process on
  * @param[in] length Vector length
+ * @param[in] scale The scale for indexing (1 by default)
  */
 template <typename T>
 __global__ void MemsetIdxKernel(T *d_out, int length, int scale=1)

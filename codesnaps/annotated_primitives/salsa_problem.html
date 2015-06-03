@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>salsa_problem.cuh</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id="background"></div>
+<div id='container'>
+  <div class='section'>
+    <div class='docs'><h1>salsa_problem.cuh</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      <p>This data structure (the "Problem" struct) stores the graph
+topology in CSR format and the frontier. All Problem structs
+inherit from the ProblemBase struct. Algorithm-specific data is
+stored in a "DataSlice".</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">template</span><span class="o">&lt;</span>
+<span class="kr">typename</span> <span class="n">VertexId</span><span class="p">,</span>
+<span class="kr">typename</span> <span class="n">SizeT</span><span class="p">,</span>
+<span class="kr">typename</span> <span class="n">Value</span><span class="o">&gt;</span>
+<span class="k">struct</span> <span class="nl">SALSAProblem</span> <span class="p">:</span> <span class="n">public</span> <span class="n">ProblemBase</span>
+<span class="p">{</span>
+
+    <span class="k">static</span> <span class="k">const</span> <span class="kt">bool</span> <span class="n">MARK_PREDECESSORS</span>     <span class="o">=</span> <span class="nb">true</span><span class="p">;</span> <span class="c1">// for SALSA algorithm, we need to track predecessors in Advance</span>
+    <span class="k">static</span> <span class="k">const</span> <span class="kt">bool</span> <span class="n">ENABLE_IDEMPOTENCE</span>    <span class="o">=</span> <span class="nb">false</span><span class="p">;</span> <span class="c1">// In SALSA, data races during Advance are not allowed.</span>
+
+    <span class="k">struct</span> <span class="n">DataSlice</span>
+    <span class="p">{</span>
+        <span class="n">Value</span> <span class="o">*</span><span class="n">d_hrank_curr</span><span class="p">;</span> <span class="c1">// hub rank score for current iteration</span>
+        <span class="n">Value</span> <span class="o">*</span><span class="n">d_arank_curr</span><span class="p">;</span> <span class="c1">// authority rank score for current iteration</span>
+        <span class="n">Value</span> <span class="o">*</span><span class="n">d_hrank_next</span><span class="p">;</span> <span class="c1">// hub rank score for next iteration</span>
+        <span class="n">Value</span> <span class="o">*</span><span class="n">d_arank_next</span><span class="p">;</span> <span class="c1">// authority rank score for next iteration</span>
+        <span class="n">VertexId</span> <span class="o">*</span><span class="n">d_in_degrees</span><span class="p">;</span> <span class="c1">// in degrees for each node</span>
+        <span class="n">VertexId</span> <span class="o">*</span><span class="n">d_out_degrees</span><span class="p">;</span> <span class="c1">// out degrees for each node</span>
+        <span class="n">VertexId</span> <span class="o">*</span><span class="n">d_hub_predecessors</span><span class="p">;</span> <span class="c1">// hub graph predecessors (original graph)</span>
+        <span class="n">VertexId</span> <span class="o">*</span><span class="n">d_auth_predecessors</span><span class="p">;</span> <span class="c1">// authority graph predecessors (reverse graph)</span>
+    <span class="p">};</span>
+
+    <span class="n">SizeT</span> <span class="n">nodes</span><span class="p">;</span> <span class="c1">// node number of the graph</span>
+    <span class="n">SizeT</span> <span class="n">edges</span><span class="p">;</span> <span class="c1">// edge number of the graph</span>
+    <span class="n">SizeT</span> <span class="n">out_nodes</span><span class="p">;</span> <span class="c1">// number of nodes that have outgoing edges</span>
+    <span class="n">SizeT</span> <span class="n">in_nodes</span><span class="p">;</span> <span class="c1">// number of nodes that have incoming edges</span>
+    <span class="n">DataSlice</span> <span class="o">*</span><span class="n">d_data_slices</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>The constructor and destructor are ignored here.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>"Extract" copies final hub rank scores and authority rank
+scores back to the CPU.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">cudaError_t</span> <span class="nf">Extract</span><span class="p">(</span><span class="n">VertexId</span> <span class="o">*</span><span class="n">h_hrank</span><span class="p">,</span> <span class="n">VertexId</span> <span class="o">*</span><span class="n">h_arank</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">CopyGPU2CPU</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_hrank_curr</span><span class="p">,</span> <span class="n">h_hrank</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">CopyGPU2CPU</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_arank_curr</span><span class="p">,</span> <span class="n">h_arank</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
+        <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>SALSA is an algorithm for bipartite graphs. So the Init
+function takes two CSR graphs---the hub (original) graph and
+the auth (reverse) graph stored on the CPU, and uses them to
+initialize the graph topology data and the SALSA-specific
+DataSlice on the GPU.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">cudaError_t</span> <span class="nf">Init</span><span class="p">(</span>
+            <span class="k">const</span> <span class="n">Csr</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">Value</span><span class="p">,</span> <span class="n">SizeT</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">hub_graph</span><span class="p">,</span>
+            <span class="k">const</span> <span class="n">Csr</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">Value</span><span class="p">,</span> <span class="n">SizeT</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">auth_graph</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">ProblemBase</span><span class="o">::</span><span class="n">Init</span><span class="p">(</span><span class="n">hub_graph</span><span class="p">,</span> <span class="n">auth_graph</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">GPUMalloc</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_hrank_curr</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">GPUMalloc</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_arank_curr</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">GPUMalloc</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_hrank_next</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">GPUMalloc</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_arank_next</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">GPUMalloc</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_in_degrees</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">GPUMalloc</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_out_degrees</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">GPUMalloc</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_hub_predecessors</span><span class="p">,</span> <span class="n">edges</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">GPUMalloc</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_auth_predecessors</span><span class="p">,</span> <span class="n">edges</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span>
+        <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>The Reset function primes the graph data structure to an
+initial state, which includes ...</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">cudaError_t</span> <span class="nf">Reset</span><span class="p">(</span><span class="k">const</span> <span class="n">Csr</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">Value</span><span class="p">,</span> <span class="n">SizeT</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">graph</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">GRError</span><span class="p">(</span><span class="n">ProblemBase</span><span class="o">::</span><span class="n">Reset</span><span class="p">(</span><span class="n">graph</span><span class="p">)))</span> <span class="k">break</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>... initializing the hub and authority rank scores ...</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_hrank_curr</span><span class="p">,</span> <span class="p">(</span><span class="n">Value</span><span class="p">)</span><span class="mf">1.0</span><span class="o">/</span><span class="n">out_nodes</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span>
+        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_arank_curr</span><span class="p">,</span> <span class="p">(</span><span class="n">Value</span><span class="p">)</span><span class="mf">1.0</span><span class="o">/</span><span class="n">in_nodes</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span>
+        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_hrank_next</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span>
+        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_arank_next</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>... accurate in and out degrees for each node ...</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_out_degrees</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span>
+        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_in_degrees</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span>
+        <span class="n">util</span><span class="o">::</span><span class="n">MemsetMadVectorKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_out_degrees</span><span class="p">,</span> <span class="n">BaseProblem</span><span class="o">::</span><span class="n">graph_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_row_offsets</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">BaseProblem</span><span class="o">::</span><span class="n">graph_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_row_offsets</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span>
+        <span class="n">util</span><span class="o">::</span><span class="n">MemsetMadVectorKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_in_degrees</span><span class="p">,</span> <span class="n">BaseProblem</span><span class="o">::</span><span class="n">graph_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_column_offsets</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">BaseProblem</span><span class="o">::</span><span class="n">graph_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_column_offsets</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">nodes</span><span class="p">);</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <p>... and initializing predecessors with an INVALID_PREDECESSOR_ID.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_hub_predecessors</span><span class="p">,</span> <span class="n">INVALID_PREDECESSOR_ID</span><span class="p">,</span> <span class="n">edges</span><span class="p">);</span>
+        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="n">BLOCK</span><span class="p">,</span> <span class="n">THREAD</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">d_auth_predecessors</span><span class="p">,</span> <span class="n">INVALID_PREDECESSOR_ID</span><span class="p">,</span> <span class="n">edges</span><span class="p">);</span>
+
+        <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">};</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

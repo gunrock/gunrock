@@ -46,11 +46,6 @@ using namespace gunrock::app::hits;
  * Defines, constants, globals
  ******************************************************************************/
 
-//bool g_verbose;
-//bool g_undirected;
-//bool g_quick;
-//bool g_stream_from_host;
-
 template <typename VertexId, typename Value>
 struct RankPair
 {
@@ -184,7 +179,6 @@ public:
     long long src          ;// = 0;
     long long max_iter     ;// = 1;
     void*     inv_graph    ;
-    //bool      instrumented ;// = false; // Whether or not to collect instrumentation from kernels
 
     Test_Parameter()
     {
@@ -495,8 +489,7 @@ void RunTests(
 /******************************************************************************
  * Main
  ******************************************************************************/
-
-int cpp_main( int argc, char** argv)
+int main( int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
 

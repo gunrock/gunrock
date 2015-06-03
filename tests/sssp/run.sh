@@ -1,5 +1,21 @@
 #!/bin/bash
 
+#get all execution files in ./bin
+files=(./bin/*)
+#split file names into arr
+arr=$(echo $files | tr " " "\n")
+max_ver_num="$"
+
+exe_file=${arr[0]}
+#iterate over all file names to get the largest version number
+for x in $arr
+do
+    output=$(grep -o "[0-9]\.[0-9]" <<<"$x")
+    if [ "$output" \> "$max_ver_num" ]; then
+        exe_file=$x
+    fi
+done
+
 OPTION[0]="--src=largestdegree --device=2,3 --partition-method=biasrandom --grid-size=768"
 #OPTION[0]="" #directed and do not mark-pred"
 OPTION[1]=${OPTION[0]}" --undirected" #undirected and do not mark-pred"
@@ -20,7 +36,7 @@ MARK[3]=${MARK[1]}"_markpath"
 #MARK[7]=${MARK[3]}".idempotence"
 
 #put OS and Device type here
-EXCUTION="./bin/test_sssp_6.5_x86_64"
+EXCUTION=$exe_file
 DATADIR="/data/gunrock_dataset/large"
 
 NAME[ 0]="ak2010"            && Q_SIZE_DIR[ 0]="0.05" && I_SIZE_DIR[ 0]="0.02" && Q_SIZE_UDIR[ 0]="3.00" && I_SIZE_UDIR[ 0]="1.00"
@@ -78,6 +94,7 @@ F[10]="1.0"
  
 for k in {0..10}
 do
+    #put OS and Device type here
     SUFFIX="ubuntu12.04_k40cx2_brp${F[$k]}"
     mkdir -p eval/$SUFFIX
 
@@ -100,3 +117,4 @@ do
         done
     done
 done
+

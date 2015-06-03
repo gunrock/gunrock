@@ -66,8 +66,6 @@ public:
      * @brief Prepare the enactor for DOBFS kernel call. Must be called prior to each DOBFS search.
      *
      * @param[in] problem DOBFS Problem object which holds the graph data and DOBFS problem data to compute.
-     * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] filter_grid_size CTA occupancy for vertex mapping kernel call.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -121,6 +119,7 @@ public:
             if (ProblemData::ENABLE_IDEMPOTENCE) {
                 int bytes = (graph_slice->nodes + 8 - 1) / 8;
                 cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
+
                 gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
                 if (retval = util::GRError(cudaBindTexture(
                                 0,
@@ -200,10 +199,12 @@ public:
     /**
      * @brief Enacts a direction optimal breadth-first search computing on the specified graph. (now only reverse bfs for testing purpose)
      *
-     * @tparam AdvanceKernelPolicy Kernel policy for forward edge mapping.
-     * @tparam FilterKernelPolicy Kernel policy for vertex mapping.
+     * @tparam AdvanceKernelPolicy Kernel policy for advance operator.
+     * @tparam BackwardAdvanceKernelPolicy Kernel policy for backward advance operator.
+     * @tparam FilterKernelPolicy Kernel policy for filter operator.
      * @tparam DOBFSProblem BFS Problem type.
      *
+     * @param[in] context CudaContext pointer for moderngpu APIs
      * @param[in] problem DOBFSProblem object.
      * @param[in] src Source node for BFS.
      * @param[in] max_grid_size Max grid size for DOBFS kernel calls.
@@ -795,13 +796,14 @@ public:
      */
 
     /**
-     * @brief BFS Enact kernel entry.
+     * @brief Direction Optimal BFS Enact kernel entry.
      *
-     * @tparam BFSProblem BFS Problem type. @see BFSProblem
+     * @tparam DOBFSProblem DOBFS Problem type. @see DOBFSProblem
      *
-     * @param[in] problem Pointer to BFSProblem object.
-     * @param[in] src Source node for BFS.
-     * @param[in] max_grid_size Max grid size for BFS kernel calls.
+     * @param[in] context CudaContext pointer for moderngpu APIs
+     * @param[in] problem Pointer to DOBFSProblem object.
+     * @param[in] src Source node for DOBFS.
+     * @param[in] max_grid_size Max grid size for DOBFS kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -825,7 +827,7 @@ public:
                     0,                                  // SATURATION QUIT
                     true,                               // DEQUEUE_PROBLEM_SIZE
                     8,                                  // MIN_CTA_OCCUPANCY
-                    6,                                  // LOG_THREADS
+                    8,                                  // LOG_THREADS
                     1,                                  // LOG_LOAD_VEC_SIZE
                     0,                                  // LOG_LOADS_PER_TILE
                     5,                                  // LOG_RAKING_THREADS
@@ -857,7 +859,7 @@ public:
                     0,                                  // SATURATION QUIT
                     true,                               // DEQUEUE_PROBLEM_SIZE
                     8,                                  // MIN_CTA_OCCUPANCY
-                    6,                                  // LOG_THREADS
+                    8,                                  // LOG_THREADS
                     1,                                  // LOG_LOAD_VEC_SIZE
                     0,                                  // LOG_LOADS_PER_TILE
                     5,                                  // LOG_RAKING_THREADS
@@ -879,7 +881,7 @@ public:
                     32,                                 // WARP_GATHER_THRESHOLD
                     128 * 4,                            // CTA_GATHER_THRESHOLD
                     7,                                  // LOG_SCHEDULE_GRANULARITY
-                    gunrock::oprtr::advance::TWC_BACKWARD>
+                    gunrock::oprtr::advance::LB_BACKWARD>
                         BackwardAdvanceKernelPolicy;
 
 

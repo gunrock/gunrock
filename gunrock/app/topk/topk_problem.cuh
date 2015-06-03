@@ -98,7 +98,7 @@ struct TOPKProblem : ProblemBase<_VertexId, _SizeT, _Value,
     nodes(0),
     edges(0),
     num_gpus(0) {}
-  
+
   /**
    * @brief TOPKProblem constructor
    *
@@ -257,84 +257,83 @@ struct TOPKProblem : ProblemBase<_VertexId, _SizeT, _Value,
     if (streams == NULL) {streams = new cudaStream_t[num_gpus]; streams[0] = 0;}
  
     do {
-      if (num_gpus <= 1) 
-	{
-	  gpu_idx = (int*)malloc(sizeof(int));
-	  // Create a single data slice for the currently-set gpu
-	  int gpu;
-	  if (retval = util::GRError(cudaGetDevice(&gpu), 
-	    "TOPKProblem cudaGetDevice failed", __FILE__, __LINE__)) break;
-	  gpu_idx[0] = gpu;
+        if (num_gpus <= 1) 
+        {
+            gpu_idx = (int*)malloc(sizeof(int));
+            // Create a single data slice for the currently-set gpu
+            int gpu;
+            if (retval = util::GRError(cudaGetDevice(&gpu), 
+            "TOPKProblem cudaGetDevice failed", __FILE__, __LINE__)) break;
+            gpu_idx[0] = gpu;
+
+            data_slices[0] = new DataSlice;
+            if (retval = util::GRError(cudaMalloc((void**)&d_data_slices[0],
+                            sizeof(DataSlice)),
+                         "TOPKProblem cudaMalloc d_data_slices failed", __FILE__, __LINE__)) return retval;
+            data_slices[0][0].streams.SetPointer(streams,1);
+            data_slices[0]->Init(
+                1,  
+                gpu_idx[0],
+                0,  
+                0,  
+                &graph_original,
+                NULL,
+                NULL);
+
+            data_slices[0]->labels.SetName("labels");
+
+            // Create SoA on device
+            VertexId    *d_node_id;
+            if (retval = util::GRError(cudaMalloc(
+              (void**)&d_node_id,
+              nodes * sizeof(VertexId)),
+              "TOPK cudaMalloc d_node_id failed",
+              __FILE__, __LINE__)) return retval;
+            data_slices[0]->d_node_id = d_node_id;
+
+            Value *d_degrees_s;
+            if (retval = util::GRError(cudaMalloc(
+              (void**)&d_degrees_s,
+              nodes * sizeof(Value)),
+              "TOPK cudaMalloc d_degrees_s failed",
+              __FILE__, __LINE__)) return retval;
+            data_slices[0]->d_degrees_s = d_degrees_s;
+
+            Value *d_degrees_i;
+            if (retval = util::GRError(cudaMalloc(
+              (void**)&d_degrees_i,
+              nodes * sizeof(Value)),
+              "TOPK cudaMalloc d_degrees_i failed",
+              __FILE__, __LINE__)) return retval;
+            data_slices[0]->d_degrees_i = d_degrees_i;
+
+            Value *d_degrees_o;
+            if (retval = util::GRError(cudaMalloc(
+              (void**)&d_degrees_o,
+              nodes * sizeof(Value)),
+              "TOPK cudaMalloc d_degrees_o failed",
+              __FILE__, __LINE__)) return retval;
+            data_slices[0]->d_degrees_o = d_degrees_o;
+
+            Value *d_temp_i;
+            if (retval = util::GRError(cudaMalloc(
+              (void**)&d_temp_i,
+              nodes * sizeof(Value)),
+              "TOPK cudaMalloc d_temp_i failed",
+              __FILE__, __LINE__)) return retval;
+            data_slices[0]->d_temp_i = d_temp_i;
+
+            Value *d_temp_o;
+            if (retval = util::GRError(cudaMalloc(
+              (void**)&d_temp_o,
+              nodes * sizeof(Value)),
+              "TOPK cudaMalloc d_temp_o failed",
+              __FILE__, __LINE__)) return retval;
+            data_slices[0]->d_temp_o = d_temp_o;
+
 	  
-	  data_slices[0] = new DataSlice;
-	  if (retval = util::GRError(cudaMalloc((void**)&d_data_slices[0],
-						sizeof(DataSlice)),
-				     "TOPKProblem cudaMalloc d_data_slices failed", __FILE__, __LINE__)) return retval;
-	  data_slices[0][0].streams.SetPointer(streams,1);
-      data_slices[0]->Init(
-            1,  
-            gpu_idx[0],
-            0,  
-            0,  
-            &graph_original,
-            NULL,
-            NULL,
-            NULL);
-
-      data_slices[0]->labels.SetName("labels");
-
-	  // Create SoA on device
-        VertexId    *d_node_id;
-        if (retval = util::GRError(cudaMalloc(
-          (void**)&d_node_id,
-          nodes * sizeof(VertexId)),
-          "TOPK cudaMalloc d_node_id failed",
-          __FILE__, __LINE__)) return retval;
-        data_slices[0]->d_node_id = d_node_id;
-
-        Value *d_degrees_s;
-        if (retval = util::GRError(cudaMalloc(
-          (void**)&d_degrees_s,
-          nodes * sizeof(Value)),
-          "TOPK cudaMalloc d_degrees_s failed",
-          __FILE__, __LINE__)) return retval;
-        data_slices[0]->d_degrees_s = d_degrees_s;
-
-        Value *d_degrees_i;
-        if (retval = util::GRError(cudaMalloc(
-          (void**)&d_degrees_i,
-          nodes * sizeof(Value)),
-          "TOPK cudaMalloc d_degrees_i failed",
-          __FILE__, __LINE__)) return retval;
-        data_slices[0]->d_degrees_i = d_degrees_i;
-
-        Value *d_degrees_o;
-        if (retval = util::GRError(cudaMalloc(
-          (void**)&d_degrees_o,
-          nodes * sizeof(Value)),
-          "TOPK cudaMalloc d_degrees_o failed",
-          __FILE__, __LINE__)) return retval;
-        data_slices[0]->d_degrees_o = d_degrees_o;
-
-        Value *d_temp_i;
-        if (retval = util::GRError(cudaMalloc(
-          (void**)&d_temp_i,
-          nodes * sizeof(Value)),
-          "TOPK cudaMalloc d_temp_i failed",
-          __FILE__, __LINE__)) return retval;
-        data_slices[0]->d_temp_i = d_temp_i;
-
-        Value *d_temp_o;
-        if (retval = util::GRError(cudaMalloc(
-          (void**)&d_temp_o,
-          nodes * sizeof(Value)),
-          "TOPK cudaMalloc d_temp_o failed",
-          __FILE__, __LINE__)) return retval;
-        data_slices[0]->d_temp_o = d_temp_o;
-
-	  
-	}
-      //TODO: add multi-GPU allocation code
+	    }
+        //TODO: add multi-GPU allocation code
     } while (0);
     
     return retval;
@@ -358,87 +357,85 @@ struct TOPKProblem : ProblemBase<_VertexId, _SizeT, _Value,
     cudaError_t retval = cudaSuccess;
     
     for (int gpu = 0; gpu < num_gpus; ++gpu) 
-      {
-	// Set device
-	if (retval = util::GRError(cudaSetDevice(gpu_idx[gpu]),
+    {
+	    // Set device
+	    if (retval = util::GRError(cudaSetDevice(gpu_idx[gpu]),
 				   "TOPKProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
 	
-    data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], 1.0f, 1.0f);
+        data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], 1.0f, 1.0f);
+        // Allocate output if necessary
+        if (!data_slices[gpu]->d_node_id)
+        {
+          VertexId    *d_node_id;
+          if (retval = util::GRError(cudaMalloc(
+            (void**)&d_node_id,
+            nodes * sizeof(VertexId)),
+            "TOPK cudaMalloc d_node_id failed", __FILE__, __LINE__)) return retval;
+          data_slices[gpu]->d_node_id = d_node_id;
+        }
 
-    // Allocate output if necessary
-    if (!data_slices[gpu]->d_node_id)
-    {
-      VertexId    *d_node_id;
-      if (retval = util::GRError(cudaMalloc(
-        (void**)&d_node_id,
-        nodes * sizeof(VertexId)),
-        "TOPK cudaMalloc d_node_id failed", __FILE__, __LINE__)) return retval;
-      data_slices[gpu]->d_node_id = d_node_id;
-    }
+        if (!data_slices[gpu]->d_degrees_s)
+        {
+          Value *d_degrees_s;
+          if (retval = util::GRError(cudaMalloc(
+            (void**)&d_degrees_s,
+            nodes * sizeof(Value)),
+            "TOPK cudaMalloc d_degrees_s failed",
+            __FILE__, __LINE__)) return retval;
+          data_slices[gpu]->d_degrees_s = d_degrees_s;
+        }
 
-    if (!data_slices[gpu]->d_degrees_s)
-    {
-      Value *d_degrees_s;
-      if (retval = util::GRError(cudaMalloc(
-        (void**)&d_degrees_s,
-        nodes * sizeof(Value)),
-        "TOPK cudaMalloc d_degrees_s failed",
-        __FILE__, __LINE__)) return retval;
-      data_slices[gpu]->d_degrees_s = d_degrees_s;
-    }
+        if (!data_slices[gpu]->d_degrees_i)
+        {
+          Value *d_degrees_i;
+          if (retval = util::GRError(cudaMalloc(
+            (void**)&d_degrees_i,
+            nodes * sizeof(Value)),
+            "TOPK cudaMalloc d_degrees_i failed",
+            __FILE__, __LINE__)) return retval;
+          data_slices[gpu]->d_degrees_i = d_degrees_i;
+        }
 
-    if (!data_slices[gpu]->d_degrees_i)
-    {
-      Value *d_degrees_i;
-      if (retval = util::GRError(cudaMalloc(
-        (void**)&d_degrees_i,
-        nodes * sizeof(Value)),
-        "TOPK cudaMalloc d_degrees_i failed",
-        __FILE__, __LINE__)) return retval;
-      data_slices[gpu]->d_degrees_i = d_degrees_i;
-    }
+        if (!data_slices[gpu]->d_degrees_o)
+        {
+          Value *d_degrees_o;
+          if (retval = util::GRError(cudaMalloc(
+            (void**)&d_degrees_o,
+            nodes * sizeof(Value)),
+            "TOPK cudaMalloc d_degrees_o failed",
+            __FILE__, __LINE__)) return retval;
+          data_slices[gpu]->d_degrees_o = d_degrees_o;
+        }
 
-    if (!data_slices[gpu]->d_degrees_o)
-    {
-      Value *d_degrees_o;
-      if (retval = util::GRError(cudaMalloc(
-        (void**)&d_degrees_o,
-        nodes * sizeof(Value)),
-        "TOPK cudaMalloc d_degrees_o failed",
-        __FILE__, __LINE__)) return retval;
-      data_slices[gpu]->d_degrees_o = d_degrees_o;
-    }
+        if (!data_slices[gpu]->d_temp_i)
+        {
+          Value *d_temp_i;
+          if (retval = util::GRError(cudaMalloc(
+            (void**)&d_temp_i,
+            nodes * sizeof(Value)),
+            "TOPK cudaMalloc d_temp_i failed",
+            __FILE__, __LINE__)) return retval;
+          data_slices[gpu]->d_temp_i = d_temp_i;
+        }
 
-    if (!data_slices[gpu]->d_temp_i)
-    {
-      Value *d_temp_i;
-      if (retval = util::GRError(cudaMalloc(
-        (void**)&d_temp_i,
-        nodes * sizeof(Value)),
-        "TOPK cudaMalloc d_temp_i failed",
-        __FILE__, __LINE__)) return retval;
-      data_slices[gpu]->d_temp_i = d_temp_i;
-    }
+        if (!data_slices[gpu]->d_temp_o)
+        {
+          Value *d_temp_o;
+          if (retval = util::GRError(cudaMalloc(
+            (void**)&d_temp_o,
+            nodes * sizeof(Value)),
+            "TOPK cudaMalloc d_temp_o failed",
+            __FILE__, __LINE__)) return retval;
+          data_slices[gpu]->d_temp_o = d_temp_o;
+        }
 
-    if (!data_slices[gpu]->d_temp_o)
-    {
-      Value *d_temp_o;
-      if (retval = util::GRError(cudaMalloc(
-        (void**)&d_temp_o,
-        nodes * sizeof(Value)),
-        "TOPK cudaMalloc d_temp_o failed",
-        __FILE__, __LINE__)) return retval;
-      data_slices[gpu]->d_temp_o = d_temp_o;
-    }
-
-    //data_slices[gpu]->d_labels = NULL;
-    if (retval = util::GRError(cudaMemcpy(
-      d_data_slices[gpu],
-      data_slices[gpu],
-      sizeof(DataSlice),
-      cudaMemcpyHostToDevice),
-      "TOPK cudaMemcpy data_slices to d_data_slices failed",
-      __FILE__, __LINE__)) return retval;
+        if (retval = util::GRError(cudaMemcpy(
+          d_data_slices[gpu],
+          data_slices[gpu],
+          sizeof(DataSlice),
+          cudaMemcpyHostToDevice),
+          "TOPK cudaMemcpy data_slices to d_data_slices failed",
+          __FILE__, __LINE__)) return retval;
     }
 
     // Fillin the initial input_queue for TOPK problem, this needs to be modified
@@ -465,7 +462,6 @@ struct TOPKProblem : ProblemBase<_VertexId, _SizeT, _Value,
   /** @} */
   
 };
-  
   
 } //namespace topk
 } //namespace app

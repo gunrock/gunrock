@@ -26,10 +26,6 @@ namespace gunrock {
 namespace oprtr {
 namespace edge_map_partitioned {
 
-// GetRowOffsets
-//
-// RelaxPartitionedEdges
-
 /**
  * Arch dispatch
  */
@@ -46,6 +42,7 @@ struct Dispatch
 {
     typedef typename KernelPolicy::VertexId VertexId;
     typedef typename KernelPolicy::SizeT    SizeT;
+    typedef typename KernelPolicy::Value    Value;
     typedef typename ProblemData::DataSlice DataSlice;
 
     static __device__ __forceinline__ SizeT GetNeighborListLength(
@@ -70,7 +67,15 @@ struct Dispatch
     {
     }
 
-    static __device__ __forceinline__ void RelaxPartitionedEdges(
+    static __device__ __forceinline__ void MarkPartitionSizes(
+                                unsigned int *&d_needles,
+                                unsigned int &split_val,
+                                SizeT &num_elements,
+                                SizeT &output_queue_len)
+    {
+    }
+
+    static __device__ __forceinline__ void RelaxPartitionedEdges2(
                                 bool &queue_reset,
                                 VertexId &queue_index,
                                 int &label,
@@ -92,7 +97,11 @@ struct Dispatch
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
-                                bool &inverse_graph)
+                                bool &inverse_graph, 
+                                gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
+                                gunrock::oprtr::advance::REDUCE_OP R_OP,
+                                Value *&d_value_to_reduce,
+                                Value *&d_reduce_frontier)
     {
     }
 
@@ -115,7 +124,11 @@ struct Dispatch
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
-                                bool &inverse_graph)
+                                bool &inverse_graph, 
+                                gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
+                                gunrock::oprtr::advance::REDUCE_OP R_OP,
+                                Value *&d_value_to_reduce,
+                                Value *&d_reduce_frontier)
     {
     }
 
@@ -125,6 +138,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 {
     typedef typename KernelPolicy::VertexId         VertexId;
     typedef typename KernelPolicy::SizeT            SizeT;
+    typedef typename KernelPolicy::Value            Value;
     typedef typename ProblemData::DataSlice         DataSlice;
 
     static __device__ __forceinline__ SizeT GetNeighborListLength(
@@ -160,23 +174,39 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         int bid = blockIdx.x;
 
         int my_id = bid*blockDim.x + tid;
-        if (my_id >= num_elements )//|| my_id >= max_edge)
+        //if (my_id > num_elements || my_id >= max_edge)
+        if (my_id >= num_elements )
         {
             //printf("my_id = %d returned\t",my_id);
             return;
         }
+        
         VertexId v_id = d_queue[my_id];
-        if (v_id == -1) {
+        if (v_id < 0 || v_id > max_vertex) {
             d_scanned_edges[my_id] = 0;
-            //printf("my_id = %d ->0\t", my_id);
             return;
         }
-        SizeT num_edges = GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
+
+        // add a zero length neighbor list to the end (this for getting both exclusive and inclusive scan in one array)
+        SizeT ncount = GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
+        SizeT num_edges = (my_id == num_elements) ? 0 : ncount;
         d_scanned_edges[my_id] = num_edges;
         //printf("my_id %d assign %d\t", my_id, num_edges);
     }
 
-    static __device__ __forceinline__ void RelaxPartitionedEdges(
+    static __device__ __forceinline__ void MarkPartitionSizes(
+                                unsigned int *&d_needles,
+                                unsigned int &split_val,
+                                SizeT &num_elements,
+                                SizeT &output_queue_len)
+    {
+        int my_id = threadIdx.x + blockIdx.x * blockDim.x;
+        if (my_id >= num_elements) return;
+
+        d_needles[my_id] = split_val * my_id > output_queue_len ? output_queue_len : split_val * my_id;
+    }
+
+    static __device__ __forceinline__ void RelaxPartitionedEdges2(
                                 bool &queue_reset,
                                 VertexId &queue_index,
                                 int &label,
@@ -198,8 +228,13 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
-                                bool &inverse_graph)
-    {
+                                bool &inverse_graph,
+                                gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
+                                gunrock::oprtr::advance::REDUCE_OP R_OP,
+                                Value *&d_value_to_reduce,
+                                Value *&d_reduce_frontier)
+
+   {
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0 && blockIdx.x == 0)) {
             kernel_stats.MarkStart();
         }
@@ -310,12 +345,12 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 {
                     v_index = BinarySearch<KernelPolicy::THREADS>(i, s_edges);
                     if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
-                        v = d_queue[v_index];
+                        v = s_vertices[v_index];
                         e_id = 0;
                     }
                     if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
-                        v = inverse_graph ? d_inverse_column_indices[d_queue[v_index]] : d_column_indices[d_queue[v_index]];
-                        e_id = d_queue[v_index];
+                        v = inverse_graph ? d_inverse_column_indices[s_vertices[v_index]] : d_column_indices[s_vertices[v_index]];
+                        e_id = s_vertices[v_index];
                     }
                     end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_edges);
                     internal_offset = v_index > 0 ? s_edges[v_index-1] : 0;
@@ -344,15 +379,73 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                             d_out + out_index);
                                 }
                             }
-                        }
-                        else {
+
+                            if (d_value_to_reduce != NULL) {
+                                if (R_TYPE == gunrock::oprtr::advance::VERTEX) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            d_value_to_reduce[u],
+                                            d_reduce_frontier + out_index);
+                                } else if (R_TYPE == gunrock::oprtr::advance::EDGE) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            d_value_to_reduce[lookup],
+                                            d_reduce_frontier + out_index);
+                                }
+                            } else if (R_TYPE != gunrock::oprtr::advance::EMPTY) { 
+                                // use user-specified function to generate value to reduce
+                            }
+                        } else {
                             if (d_out != NULL) {
                                  util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                         -1,
                                         d_out + out_index);
                             }
+
+                            if (d_value_to_reduce != NULL) {
+                                switch (R_OP) {
+                                    case gunrock::oprtr::advance::PLUS :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                d_reduce_frontier + out_index);
+                                        break;
+                                    case gunrock::oprtr::advance::MULTIPLIES :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)1,
+                                                d_reduce_frontier + out_index);
+                                        break;
+                                    case gunrock::oprtr::advance::MAXIMUM :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)INT_MIN,
+                                                d_reduce_frontier + out_index);
+                                        break;
+                                    case gunrock::oprtr::advance::MINIMUM :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)INT_MAX,
+                                                d_reduce_frontier + out_index);
+                                        break;
+                                    case gunrock::oprtr::advance::BIT_OR :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                d_reduce_frontier + out_index);
+                                        break;
+                                    case gunrock::oprtr::advance::BIT_AND :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0xffffffff,
+                                                d_reduce_frontier + out_index);
+                                        break;
+                                    case gunrock::oprtr::advance::BIT_XOR :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                d_reduce_frontier + out_index);
+                                        break;
+                                    default:
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                d_reduce_frontier + out_index);
+                                        break;
+                                }
+                            }
                         }
-                    } else {
+                    } else {  // if (ProblemData::MARK_PREDECESSORS) 
                         if (Functor::CondEdge(v, u, problem, lookup, e_id)) {
                             Functor::ApplyEdge(v, u, problem, lookup, e_id);
                             if (d_out != NULL) {
@@ -367,18 +460,59 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                             d_out + out_index);
                                 }
                             }
-                        }
-                        else {
+
+                            if (d_value_to_reduce != NULL) {
+                                if (R_TYPE == gunrock::oprtr::advance::VERTEX) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            d_value_to_reduce[u],
+                                            d_reduce_frontier + out_index);
+                                } else if (R_TYPE == gunrock::oprtr::advance::EDGE) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            d_value_to_reduce[lookup],
+                                            d_reduce_frontier + out_index);
+                                }
+                            }
+                        } else {
                             if (d_out != NULL) {
                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                         -1,
                                         d_out + out_index);
                             }
-                        }
-                    }
-                }
 
-            }
+                            if (d_value_to_reduce != NULL) {
+                                switch (R_OP) {
+                                    case gunrock::oprtr::advance::PLUS :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                d_reduce_frontier + out_index);
+                                        break;
+                                    case gunrock::oprtr::advance::MULTIPLIES :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)1,
+                                                d_reduce_frontier + out_index);
+                                        break;
+                                    case gunrock::oprtr::advance::MAXIMUM :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)INT_MIN,
+                                                d_reduce_frontier + out_index);
+                                        break;
+                                    case gunrock::oprtr::advance::MINIMUM :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)INT_MAX,
+                                                d_reduce_frontier + out_index);
+                                        break;
+                                    default:
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                d_reduce_frontier + out_index);
+                                        break;
+                                }
+                            }
+                        }
+                    } // end if
+                } // empty 
+            } // for
+
             edges_processed += e_last;
             my_start_partition += KernelPolicy::THREADS;
             e_offset = 0;
@@ -389,6 +523,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             kernel_stats.Flush();
         }
     }
+
 
     static __device__ __forceinline__ void RelaxLightEdges(
                                 bool &queue_reset,
@@ -409,7 +544,11 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
-                                bool inverse_graph)
+                                bool &inverse_graph, 
+                                gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
+                                gunrock::oprtr::advance::REDUCE_OP R_OP,
+                                Value *&d_value_to_reduce,
+                                Value *&d_reduce_frontier)
     {
         if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
             kernel_stats.MarkStart();
@@ -506,8 +645,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
             int lookup = d_row_offsets[v] + e;
             VertexId u = d_column_indices[lookup];
-           
-            //printf("MARK_PREDECESSORS = %s\n", ProblemData::MARK_PREDECESSORS?"true":"false");
+
             if (!ProblemData::MARK_PREDECESSORS) {
                 if (Functor::CondEdge(label, u, problem, lookup, e_id)) {
                     Functor::ApplyEdge(label, u, problem, lookup, e_id);
@@ -523,12 +661,69 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                     d_out + offset+i);
                         }
                     }
+                    if (d_value_to_reduce != NULL) {
+                        if (R_TYPE == gunrock::oprtr::advance::VERTEX) {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    d_value_to_reduce[u],
+                                    d_reduce_frontier + offset + i);
+                        } else if (R_TYPE == gunrock::oprtr::advance::EDGE) {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    d_value_to_reduce[lookup],
+                                    d_reduce_frontier + offset + i);
+                        }
+                    } else if (R_TYPE != gunrock::oprtr::advance::EMPTY) { 
+                        // use user-specified function to generate value to reduce
+                    }
                 }
                 else {
                     if (d_out != NULL) {
                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                 -1,
                                 d_out + offset+i);
+                    }
+                    if (d_value_to_reduce != NULL) {
+                        switch (R_OP) {
+                            case gunrock::oprtr::advance::PLUS :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::MULTIPLIES :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)1,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::MAXIMUM :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)INT_MIN,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::MINIMUM :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)INT_MAX,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::BIT_OR :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::BIT_AND :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0xffffffff,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::BIT_XOR :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            default:
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                        }
                     }
                 }
             } else {
@@ -547,12 +742,71 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                     d_out + offset+i);
                         }
                     }
+
+                    if (d_value_to_reduce != NULL) {
+                        if (R_TYPE == gunrock::oprtr::advance::VERTEX) {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    d_value_to_reduce[u],
+                                    d_reduce_frontier + offset+i);
+                        } else if (R_TYPE == gunrock::oprtr::advance::EDGE) {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    d_value_to_reduce[lookup],
+                                    d_reduce_frontier + offset+i);
+                        }
+                    } else if (R_TYPE != gunrock::oprtr::advance::EMPTY) { 
+                        // use user-specified function to generate value to reduce
+                    }
                 }
                 else {
                     if (d_out != NULL) {
                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                 -1,
                                 d_out + offset+i);
+                    }
+                    
+                    if (d_value_to_reduce != NULL) {
+                        switch (R_OP) {
+                            case gunrock::oprtr::advance::PLUS :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::MULTIPLIES :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)1,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::MAXIMUM :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)INT_MIN,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::MINIMUM :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)INT_MAX,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::BIT_OR :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::BIT_AND :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0xffffffff,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            case gunrock::oprtr::advance::BIT_XOR :
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                            default:
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        (Value)0,
+                                        d_reduce_frontier + offset+i);
+                                break;
+                        }
                     }
                 }
             }
@@ -566,6 +820,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
 };
 
+
 /**
  * @brief Kernel entry for relax partitioned edge function
  *
@@ -575,26 +830,29 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  *
  * @param[in] queue_reset       If reset queue counter
  * @param[in] queue_index       Current frontier queue counter index
+ * @param[in] label             label value to use in functor
  * @param[in] d_row_offset      Device pointer of SizeT to the row offsets queue
  * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
  * @param[in] d_scanned_edges   Device pointer of scanned neighbor list queue of the current frontier
  * @param[in] partition_starts  Device pointer of partition start index computed by sorted search in moderngpu lib
  * @param[in] num_partitions    Number of partitions in the current frontier
- * @param[in] d_done            Pointer of volatile int to the flag to set when we detect incoming frontier is empty
  * @param[in] d_queue           Device pointer of VertexId to the incoming frontier queue
  * @param[out] d_out            Device pointer of VertexId to the outgoing frontier queue
  * @param[in] problem           Device pointer to the problem object
  * @param[in] input_queue_len   Length of the incoming frontier queue
  * @param[in] output_queue_len  Length of the outgoing frontier queue
+ * @param[in] partition_size    Size of workload partition that one block handles
  * @param[in] max_vertices      Maximum number of elements we can place into the incoming frontier
  * @param[in] max_edges         Maximum number of elements we can place into the outgoing frontier
  * @param[in] work_progress     queueing counters to record work progress
  * @param[in] kernel_stats      Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT is set)
+ * @param[in] ADVANCE_TYPE      enumerator which shows the advance type: V2V, V2E, E2V, or E2E
+ * @param[in] inverse_graph     Whether this iteration's advance operator is in the opposite direction to the previous iteration
  */
     template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
     __global__
-void RelaxPartitionedEdges(
+void RelaxPartitionedEdges2(
         bool                                    queue_reset,
         typename KernelPolicy::VertexId         queue_index,
         int                                     label,
@@ -604,7 +862,6 @@ void RelaxPartitionedEdges(
         typename KernelPolicy::SizeT            *d_scanned_edges,
         unsigned int                            *partition_starts,
         unsigned int                            num_partitions,
-        //volatile int                            *d_done,
         typename KernelPolicy::VertexId         *d_queue,
         typename KernelPolicy::VertexId         *d_out,
         typename ProblemData::DataSlice         *problem,
@@ -616,9 +873,13 @@ void RelaxPartitionedEdges(
         util::CtaWorkProgress                   work_progress,
         util::KernelRuntimeStats                kernel_stats,
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
-        bool                                    inverse_graph = false)
+        bool                                    inverse_graph = false,
+        gunrock::oprtr::advance::REDUCE_TYPE R_TYPE = gunrock::oprtr::advance::EMPTY,
+        gunrock::oprtr::advance::REDUCE_OP R_OP = gunrock::oprtr::advance::NONE,
+        typename KernelPolicy::Value            *d_value_to_reduce = NULL,
+        typename KernelPolicy::Value            *d_reduce_frontier = NULL)
 {
-    Dispatch<KernelPolicy, ProblemData, Functor>::RelaxPartitionedEdges(
+    Dispatch<KernelPolicy, ProblemData, Functor>::RelaxPartitionedEdges2(
             queue_reset,
             queue_index,
             label,
@@ -628,7 +889,6 @@ void RelaxPartitionedEdges(
             d_scanned_edges,
             partition_starts,
             num_partitions,
-            //d_done,
             d_queue,
             d_out,
             problem,
@@ -640,7 +900,11 @@ void RelaxPartitionedEdges(
             work_progress,
             kernel_stats,
             ADVANCE_TYPE,
-            inverse_graph);
+            inverse_graph,
+            R_TYPE,
+            R_OP,
+            d_value_to_reduce,
+            d_reduce_frontier);
 }
 
 /**
@@ -652,10 +916,10 @@ void RelaxPartitionedEdges(
  *
  * @param[in] queue_reset       If reset queue counter
  * @param[in] queue_index       Current frontier queue counter index
+ * @param[in] label             label value to use in functor
  * @param[in] d_row_offset      Device pointer of SizeT to the row offsets queue
  * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
  * @param[in] d_scanned_edges   Device pointer of scanned neighbor list queue of the current frontier
- * @param[in] d_done            Pointer of volatile int to the flag to set when we detect incoming frontier is empty
  * @param[in] d_queue           Device pointer of VertexId to the incoming frontier queue
  * @param[out] d_out            Device pointer of VertexId to the outgoing frontier queue
  * @param[in] problem           Device pointer to the problem object
@@ -665,6 +929,8 @@ void RelaxPartitionedEdges(
  * @param[in] max_edges         Maximum number of elements we can place into the outgoing frontier
  * @param[in] work_progress     queueing counters to record work progress
  * @param[in] kernel_stats      Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT is set)
+ * @param[in] ADVANCE_TYPE      enumerator which shows the advance type: V2V, V2E, E2V, or E2E
+ * @param[in] inverse_graph     Whether this iteration's advance operator is in the opposite direction to the previous iteration
  */
     template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
@@ -677,7 +943,6 @@ void RelaxLightEdges(
         typename KernelPolicy::VertexId *d_column_indices,
         typename KernelPolicy::VertexId *d_inverse_column_indices,
         typename KernelPolicy::SizeT    *d_scanned_edges,
-        //volatile int                    *d_done,
         typename KernelPolicy::VertexId *d_queue,
         typename KernelPolicy::VertexId *d_out,
         typename ProblemData::DataSlice *problem,
@@ -688,7 +953,11 @@ void RelaxLightEdges(
         util::CtaWorkProgress           work_progress,
         util::KernelRuntimeStats        kernel_stats,
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
-        bool                            inverse_graph = false)
+        bool                            inverse_graph = false, 
+        gunrock::oprtr::advance::REDUCE_TYPE R_TYPE = gunrock::oprtr::advance::EMPTY,
+        gunrock::oprtr::advance::REDUCE_OP R_OP = gunrock::oprtr::advance::NONE,
+        typename KernelPolicy::Value    *d_value_to_reduce = NULL,
+        typename KernelPolicy::Value    *d_reduce_frontier = NULL)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::RelaxLightEdges(
                                 queue_reset,
@@ -698,7 +967,6 @@ void RelaxLightEdges(
                                 d_column_indices,
                                 d_inverse_column_indices,
                                 d_scanned_edges,
-                                //d_done,
                                 d_queue,
                                 d_out,
                                 problem,
@@ -709,7 +977,11 @@ void RelaxLightEdges(
                                 work_progress,
                                 kernel_stats,
                                 ADVANCE_TYPE,
-                                inverse_graph);
+                                inverse_graph,
+                                R_TYPE,
+                                R_OP,
+                                d_value_to_reduce,
+                                d_reduce_frontier);
 }
 
 /**
@@ -719,12 +991,14 @@ void RelaxLightEdges(
  * @tparam ProblemData Problem data type for partitioned edge mapping.
  * @tparam Functor Functor type for the specific problem type.
  *
- * @param[in] d_row_offset      Device pointer of SizeT to the row offsets queue
+ * @param[in] d_row_offsets     Device pointer of SizeT to the row offsets queue
+ * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
  * @param[in] d_queue           Device pointer of VertexId to the incoming frontier queue
- * @param[out] d_scanned_edges   Device pointer of scanned neighbor list queue of the current frontier
+ * @param[out] d_scanned_edges  Device pointer of scanned neighbor list queue of the current frontier
  * @param[in] num_elements      Length of the current frontier queue
  * @param[in] max_vertices      Maximum number of elements we can place into the incoming frontier
  * @param[in] max_edges         Maximum number of elements we can place into the outgoing frontier
+ * @param[in] ADVANCE_TYPE      enumerator which shows the advance type: V2V, V2E, E2V, or E2E
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
@@ -751,6 +1025,22 @@ void GetEdgeCounts(
                                     max_edge,
                                     ADVANCE_TYPE);
 }
+
+template<typename KernelPolicy, typename ProblemData, typename Functor>
+__launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
+    __global__
+void MarkPartitionSizes(
+                                unsigned int *d_needles,
+                                unsigned int split_val,
+                                typename KernelPolicy::SizeT num_elements,
+                                typename KernelPolicy::SizeT output_queue_len)
+    {
+       Dispatch<KernelPolicy, ProblemData, Functor>::MarkPartitionSizes(
+                                d_needles,
+                                split_val,
+                                num_elements,
+                                output_queue_len);
+    }
 
 } //edge_map_partitioned
 } //oprtr

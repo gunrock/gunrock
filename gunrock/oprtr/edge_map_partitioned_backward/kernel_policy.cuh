@@ -15,7 +15,7 @@
 
 
 #pragma once
-#include <gunrock/util/basic_utils.cuh>
+#include <gunrock/util/basic_utils.h>
 #include <gunrock/util/cuda_properties.cuh>
 #include <gunrock/util/cta_work_distribution.cuh>
 #include <gunrock/util/soa_tuple.cuh>
@@ -47,6 +47,8 @@ namespace edge_map_partitioned_backward {
  * @tparam _INSTRUMENT                  Whether or not we want instrumentation logic generated
  * @tparam _MIN_CTA_OCCUPANCY           Lower bound on number of CTAs to have resident per SM (influences per-CTA smem cache sizes and register allocation/spills).
  * @tparam _LOG_THREADS                 Number of threads per CTA (log).
+ * @tparam _LOG_BLOCKS                  Number of blocks per grid (log).
+ * @tparam _LIGHT_EDGE_THRESHOLD        When to switch between two edge relax algorithms
  */
 template <
     typename _ProblemData,

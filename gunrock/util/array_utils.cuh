@@ -15,7 +15,7 @@
 #pragma once
 
 #include <string>
-#include <gunrock/util/basic_utils.cuh>
+#include <gunrock/util/basic_utils.h>
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/memset_kernel.cuh>
 

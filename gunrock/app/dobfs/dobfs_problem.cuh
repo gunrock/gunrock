@@ -32,13 +32,13 @@ namespace dobfs {
  * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer.
  */
 template <
-    typename    VertexId,                       
-    typename    SizeT,                          
-    typename    Value,                          
+    typename    _VertexId,                       
+    typename    _SizeT,                          
+    typename    _Value,                          
     bool        _MARK_PREDECESSORS,             
     bool        _ENABLE_IDEMPOTENCE,
     bool        _USE_DOUBLE_BUFFER>
-struct DOBFSProblem : ProblemBase<VertexId, SizeT, Value,
+struct DOBFSProblem : ProblemBase<_VertexId, _SizeT, _Value,
     _MARK_PREDECESSORS,
     _ENABLE_IDEMPOTENCE,
     _USE_DOUBLE_BUFFER,
@@ -46,6 +46,10 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT, Value,
     false, // _KEEP_ORDER
     false> // _KEEP_NODE_NUM
 {
+
+    typedef _VertexId       VertexId;
+    typedef _SizeT          SizeT;
+    typedef _Value          Value;
 
     static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
     static const bool ENABLE_IDEMPOTENCE    = _ENABLE_IDEMPOTENCE;
@@ -112,6 +116,8 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[in] graph Reference to the CSR graph object we process on.
      * @param[in] inv_graph Reference to the inverse (CSC) graph object we process on.
      * @param[in] num_gpus Number of the GPUs used.
+     * @param[in] alpha Tuning parameter for switching to backward BFS
+     * @param[in] beta Tuning parameter for switching back to normal BFS
      */
     DOBFSProblem(bool        stream_from_host,       // Only meaningful for single-GPU
                  bool        undirected,
@@ -208,10 +214,12 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT, Value,
      * @brief DOBFSProblem initialization
      *
      * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] undirected Whether the input graph is undirected.
+     * @param[in] _undirected Whether the input graph is undirected.
      * @param[in] graph Reference to the CSR graph object we process on. @see Csr
      * @param[in] inv_graph Reference to the inverse (CSC) graph object we process on.
      * @param[in] _num_gpus Number of the GPUs used.
+     * @param[in] _alpha Tuning parameter for switching to backward BFS
+     * @param[in] _beta Tuning parameter for switching back to normal BFS
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -279,7 +287,6 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT, Value,
                     0,
                     0,
                     &graph,
-                    NULL,
                     NULL,
                     NULL);
                 // Create SoA on device
@@ -353,9 +360,6 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT, Value,
             FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
             double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
     {
-        printf("Dobfs resting...\n");
-        //typedef ProblemBase<VertexId, SizeT,
-        //                        _USE_DOUBLE_BUFFER> BaseProblem;
         //load ProblemBase Reset
         //BaseProblem::Reset(frontier_type, queue_sizing);
 

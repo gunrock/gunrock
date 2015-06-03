@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include <gunrock/util/basic_utils.cuh>
+#include <gunrock/util/basic_utils.h>
 #include <gunrock/util/cuda_properties.cuh>
 #include <gunrock/util/memset_kernel.cuh>
 #include <gunrock/util/cta_work_progress.cuh>
@@ -67,8 +67,10 @@ struct GraphSlice
     Csr<VertexId, Value, SizeT   > *graph             ; // Pointer to CSR format subgraph
     util::Array1D<SizeT, SizeT   > row_offsets        ; // CSR format row offset
     util::Array1D<SizeT, VertexId> column_indices     ; // CSR format column indices
+    util::Array1D<SizeT, SizeT   > out_degrees        ;
     util::Array1D<SizeT, SizeT   > column_offsets     ; // CSR format column offset
     util::Array1D<SizeT, VertexId> row_indices        ; // CSR format row indices
+    util::Array1D<SizeT, SizeT   > in_degrees         ;
     util::Array1D<SizeT, int     > partition_table    ; // Partition number for vertices, local is always 0
     util::Array1D<SizeT, VertexId> convertion_table   ; // IDs of vertices in their hosting partition
     util::Array1D<SizeT, VertexId> original_vertex    ; // Original IDs of vertices
@@ -93,14 +95,16 @@ struct GraphSlice
     {
         row_offsets        .SetName("row_offsets"        );
         column_indices     .SetName("column_indices"     );
+        out_degrees        .SetName("out_degrees"        );
         column_offsets     .SetName("column_offsets"     );
         row_indices        .SetName("row_indices"        );
+        in_degrees         .SetName("in_degrees"         );
         partition_table    .SetName("partition_table"    );
         convertion_table   .SetName("convertion_table"   );
         original_vertex    .SetName("original_vertex"    );
         in_counter         .SetName("in_counter"         );  
         out_offset         .SetName("out_offset"         );
-        out_counter        .SetName("out_counter"      );
+        out_counter        .SetName("out_counter"        );
         backward_offset    .SetName("backward_offset"    );
         backward_partition .SetName("backward_partition" );
         backward_convertion.SetName("backward_convertion");
@@ -117,8 +121,10 @@ struct GraphSlice
         // Release allocated host / device memory
         row_offsets        .Release();
         column_indices     .Release();
+        out_degrees        .Release();
         column_offsets     .Release();
         row_indices        .Release();
+        in_degrees         .Release();
         partition_table    .Release();
         convertion_table   .Release();
         original_vertex    .Release();
@@ -197,6 +203,16 @@ struct GraphSlice
             if (retval = this->column_indices.Allocate(edges     ,util::DEVICE)) break;
             if (retval = this->column_indices.Move    (util::HOST,util::DEVICE)) break;
 
+            // Allocate out degrees for each node
+            if (retval = this->out_degrees.Allocate(nodes        ,util::DEVICE)) break;
+            // count number of out-going degrees for each node
+            util::MemsetMadVectorKernel<<<128, 128>>>(
+                this->out_degrees.GetPointer(util::DEVICE),
+                this->row_offsets.GetPointer(util::DEVICE),
+                this->row_offsets.GetPointer(util::DEVICE) + 1,
+                -1, nodes);
+           
+
             if (inverstgraph != NULL)
             {
                 // Allocate and initialize column_offsets
@@ -206,6 +222,15 @@ struct GraphSlice
                 // Allocate and initialize row_indices
                 if (retval = this->row_indices.Allocate(edges     ,util::DEVICE)) break;
                 if (retval = this->row_indices.Move    (util::HOST,util::DEVICE)) break;
+
+                // Allocate in degrees for each node
+                if (retval = this->in_degrees .Allocate(nodes,  util::DEVICE)) break;
+                // count number of in-going degrees for each node
+                util::MemsetMadVectorKernel<<<128, 128>>>(
+                    this->in_degrees    .GetPointer(util::DEVICE),
+                    this->column_offsets.GetPointer(util::DEVICE),
+                    this->column_offsets.GetPointer(util::DEVICE) + 1,
+                    -1, nodes);
             }
 
             // For multi-GPU cases
@@ -902,6 +927,7 @@ public:
     float         partition_factor  ; // Partition factor
     int           partition_seed    ; // Partition seed
     int           iterations        ; // Number of repeats
+    int           traversal_mode    ; // Load-balacned or Dynamic cooperative
 
     /**
      * @brief TestParameter_Base constructor
@@ -928,6 +954,7 @@ public:
         partition_factor   = -1; 
         partition_seed     = -1;
         iterations         = 1;
+        traversal_mode     = -1;
     } // end TestParameter_Base() 
   
    /**
@@ -1211,15 +1238,15 @@ struct ProblemBase
                     //util::cpu_mt::PrintCPUArray<SizeT,int     >("backward_partitions" , backward_partitions [gpu], backward_offsets[gpu][sub_graphs[gpu].nodes]);
                     //util::cpu_mt::PrintCPUArray<SizeT,VertexId>("backward_convertions", backward_convertions[gpu], backward_offsets[gpu][sub_graphs[gpu].nodes]);
                 }*/
-                /*for (int gpu=0;gpu<num_gpus;gpu++)
-                {
-                    cross_counter[gpu][num_gpus]=0;
-                    for (int peer=0;peer<num_gpus;peer++)
-                    {
-                        cross_counter[gpu][peer]=out_offsets[gpu][peer+1]-out_offsets[gpu][peer];
-                    }
-                    cross_counter[gpu][num_gpus]=in_offsets[gpu][num_gpus];
-                }*/
+                //for (int gpu=0;gpu<num_gpus;gpu++)
+                //{
+                //    cross_counter[gpu][num_gpus]=0;
+                //    for (int peer=0;peer<num_gpus;peer++)
+                //    {
+                //        cross_counter[gpu][peer]=out_offsets[gpu][peer+1]-out_offsets[gpu][peer];
+                //    }
+                //    cross_counter[gpu][num_gpus]=in_offsets[gpu][num_gpus];
+                //}
                 /*for (int gpu=0;gpu<num_gpus;gpu++)
                 for (int peer=0;peer<=num_gpus;peer++)
                 {

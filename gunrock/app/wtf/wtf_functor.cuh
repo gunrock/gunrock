@@ -71,7 +71,7 @@ struct PRFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         Value delta = problem->delta;
         VertexId src_node = problem->src_node;
@@ -89,7 +89,7 @@ struct PRFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         // Doing nothing here
     }

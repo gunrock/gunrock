@@ -97,6 +97,7 @@ struct SweepPass
 /**
  * Not valid for this arch (default)
  */
+
 template <
     typename    KernelPolicy,
     typename    ProblemData,
@@ -107,6 +108,24 @@ struct Dispatch
     typedef typename KernelPolicy::VertexId VertexId;
     typedef typename KernelPolicy::SizeT SizeT;
     typedef typename ProblemData::DataSlice DataSlice;
+
+    static __device__ __forceinline__ void  Kernel2(
+            VertexId &iteration,
+            bool &queue_reset,
+            VertexId &queue_index,
+            //int &num_gpus,
+            SizeT &num_elements,
+            //volatile int *&d_done,
+            VertexId *&d_in_queue,
+            VertexId *&d_out_queue,
+            DataSlice *&problem,
+            util::CtaWorkProgress &work_progress,
+            SizeT &max_in_queue,
+            SizeT &max_out_queue,
+            util::KernelRuntimeStats &kernel_stats)
+    {
+      //Empty
+    }
 
     static __device__ __forceinline__ void Kernel(
         VertexId                    &iteration,
@@ -234,6 +253,89 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             kernel_stats.Flush();
         }
     }
+
+    static __device__ __forceinline__ void  Kernel2(
+            VertexId &iteration,
+            bool &queue_reset,
+            VertexId &queue_index,
+            //int &num_gpus,
+            SizeT &num_elements,
+            //volatile int *&d_done,
+            VertexId *&d_in_queue,
+            VertexId *&d_out_queue,
+            DataSlice *&problem,
+            util::CtaWorkProgress &work_progress,
+            SizeT &max_in_frontier,
+            SizeT &max_out_frontier,
+            util::KernelRuntimeStats &kernel_stats)
+    {
+      /*// Shared storage for the kernel
+        __shared__ typename KernelPolicy::SmemStorage smem_storage;
+
+        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+            kernel_stats.MarkStart();
+        }
+    
+        // workprogress reset
+        if (queue_reset)
+        {
+            if (threadIdx.x < gunrock::util::CtaWorkProgress::COUNTERS) {
+                //Reset all counters
+                work_progress.template Reset<SizeT>();
+            }
+        }
+
+
+        // Determine work decomposition
+        if (threadIdx.x == 0) {
+            // Obtain problem size
+            if (queue_reset)
+            {
+                work_progress.template StoreQueueLength<SizeT>(num_elements, queue_index);
+            }
+            else
+            {
+                num_elements = work_progress.template LoadQueueLength<SizeT>(queue_index);
+
+                // Check if we previously overflowed
+                if (num_elements >= max_in_frontier) {
+                    num_elements = 0;
+                }
+
+                // Signal to host that we're done
+                if ((num_elements == 0) ||
+                        (KernelPolicy::SATURATION_QUIT && (num_elements <= gridDim.x * KernelPolicy::SATURATION_QUIT)))
+                {
+                    if (d_done) d_done[0] = num_elements;
+                }
+            }
+
+            // Initialize work decomposition in smem
+            smem_storage.state.work_decomposition.template Init<KernelPolicy::LOG_SCHEDULE_GRANULARITY>(
+                    num_elements, gridDim.x);
+
+            // Reset our next outgoing queue counter to zero
+            work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
+
+        }
+
+        // Barrier to protect work decomposition
+        __syncthreads();*/
+
+        SizeT my_idx = threadIdx.x + blockIdx.x * blockDim.x;
+        if (my_idx >= num_elements)
+            return;
+        //if (my_idx == 0)
+        //    printf("num elements:%d\n", num_elements);
+
+        Functor::ApplyFilter(d_in_queue[my_idx], problem, iteration);
+        d_out_queue[my_idx] = d_in_queue[my_idx];
+
+        /*if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+            kernel_stats.MarkStop();
+            kernel_stats.Flush();
+        }*/
+    }
 };
 
 /**
@@ -258,6 +360,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @param[in] max_in_queue  Maximum number of elements we can place into the incoming frontier
  * @param[in] max_out_queue Maximum number of elements we can place into the outgoing frontier
  * @param[in] kernel_stats  Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT is set)
+ * @param[in] filtering_flag Boolean value indicates whether to filter out elements in the frontier (if not don't use scan+scatter, just apply computation to each element)
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
@@ -266,9 +369,7 @@ void Kernel(
     typename KernelPolicy::VertexId         iteration,
     bool                                    queue_reset,
     typename KernelPolicy::VertexId         queue_index,                
-    //int                                     num_gpus,                  
     typename KernelPolicy::SizeT            num_elements,             
-    //volatile int                            *d_done,                 
     typename KernelPolicy::VertexId         *d_in_queue,            
     typename KernelPolicy::VertexId         *d_in_predecessor_queue,
     typename KernelPolicy::VertexId         *d_out_queue,          
@@ -277,26 +378,42 @@ void Kernel(
     util::CtaWorkProgress                   work_progress,        
     typename KernelPolicy::SizeT            max_in_queue,        
     typename KernelPolicy::SizeT            max_out_queue,      
-    util::KernelRuntimeStats                kernel_stats)
-    //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *ts_bitmask)
+    util::KernelRuntimeStats                kernel_stats,
+    bool                                    filtering_flag = true)
 {
-    Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
-        iteration,
-        queue_reset,
-        queue_index,
-        //num_gpus,
-        num_elements,
-        //d_done,
-        d_in_queue,
-        d_in_predecessor_queue,
-        d_out_queue,
-        problem,
-        d_visited_mask,
-        work_progress,
-        max_in_queue,
-        max_out_queue,
-        kernel_stats);
-        //ts_bitmask);
+    if (filtering_flag) {
+        Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
+                iteration,
+                queue_reset,
+                queue_index,
+                //num_gpus,
+                num_elements,
+                //d_done,
+                d_in_queue,
+                d_in_predecessor_queue,
+                d_out_queue,
+                problem,
+                d_visited_mask,
+                work_progress,
+                max_in_queue,
+                max_out_queue,
+                kernel_stats);
+    } else {
+        Dispatch<KernelPolicy, ProblemData, Functor>::Kernel2(
+                iteration,
+                queue_reset,
+                queue_index,
+                //num_gpus,
+                num_elements,
+                //d_done,
+                d_in_queue,
+                d_out_queue,
+                problem,
+                work_progress,
+                max_in_queue,
+                max_out_queue,
+                kernel_stats);
+    }
 }
 
 

@@ -469,10 +469,11 @@ public:
     /**
      * @brief Enacts a breadth-first search computing on the specified graph.
      *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam FilterPolicy Kernel policy for filter.
+     * @tparam AdvanceKernelPolicy Kernel policy for advance operator.
+     * @tparam FilterKernelPolicy Kernel policy for filter operator.
      * @tparam BFSProblem BFS Problem type.
      *
+     * @param[in] context CudaContext pointer for moderngpu APIs
      * @param[in] problem BFSProblem object.
      * @param[in] src Source node for BFS.
      * @param[in] max_grid_size Max grid size for BFS kernel calls.
@@ -515,6 +516,89 @@ public:
         return retval;
     }
 
+    typedef gunrock::oprtr::filter::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        0,                                  // SATURATION QUIT
+        true,                               // DEQUEUE_PROBLEM_SIZE
+        8,                                  // MIN_CTA_OCCUPANCY
+        8,                                  // LOG_THREADS
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        5,                                  // END_BITMASK_CULL
+        8>                                  // LOG_SCHEDULE_GRANULARITY
+    FilterKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        8,                                  // MIN_CTA_OCCUPANCY
+        7,                                  // LOG_THREADS
+        8,                                  // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::TWC_FORWARD>
+    ForwardAdvanceKernelPolicy_IDEM;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        1,                                  // MIN_CTA_OCCUPANCY
+        7,                                  // LOG_THREADS
+        8,                                  // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::TWC_FORWARD>
+    ForwardAdvanceKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        8,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        8,                                  // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB>
+    LBAdvanceKernelPolicy_IDEM;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        1,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        8,                                  // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB>
+    LBAdvanceKernelPolicy;
+
     /**
      * \addtogroup PublicInterface
      * @{
@@ -531,94 +615,34 @@ public:
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
-    cudaError_t Enact(VertexId    src)
+    cudaError_t Enact(VertexId    src,
+                      int traversal_mode = 0)
     {
         int min_sm_version = -1;
         for (int i=0;i<this->num_gpus;i++)
             if (min_sm_version == -1 || this->cuda_props[i].device_sm_version < min_sm_version)
                 min_sm_version = this->cuda_props[i].device_sm_version;
 
-        if (Problem::ENABLE_IDEMPOTENCE) {
-            if (min_sm_version >= 300) {
-                typedef gunrock::oprtr::filter::KernelPolicy<
-                    Problem,                            // Problem data type
-                    300,                                // CUDA_ARCH
-                    INSTRUMENT,                         // INSTRUMENT
-                    0,                                  // SATURATION QUIT
-                    true,                               // DEQUEUE_PROBLEM_SIZE
-                    8,                                  // MIN_CTA_OCCUPANCY
-                    8,                                  // LOG_THREADS
-                    1,                                  // LOG_LOAD_VEC_SIZE
-                    0,                                  // LOG_LOADS_PER_TILE
-                    5,                                  // LOG_RAKING_THREADS
-                    5,                                  // END_BITMASK_CULL
-                    8>                                  // LOG_SCHEDULE_GRANULARITY
-                    FilterKernelPolicy;
-
-                typedef gunrock::oprtr::advance::KernelPolicy<
-                    Problem,                            // Problem data type
-                    300,                                // CUDA_ARCH
-                    INSTRUMENT,                         // INSTRUMENT
-                    8,                                  // MIN_CTA_OCCUPANCY
-                    10,                                 // LOG_THREADS
-                    8,                                  // LOG_BLOCKS
-                    32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
-                    1,                                  // LOG_LOAD_VEC_SIZE
-                    0,                                  // LOG_LOADS_PER_TILE
-                    5,                                  // LOG_RAKING_THREADS
-                    32,                                 // WARP_GATHER_THRESHOLD
-                    128 * 4,                            // CTA_GATHER_THRESHOLD
-                    7,                                  // LOG_SCHEDULE_GRANULARITY
-                    gunrock::oprtr::advance::LB>
-                        AdvanceKernelPolicy;
-
-                return EnactBFS<AdvanceKernelPolicy, FilterKernelPolicy>(
-                        src);
-            }
-        } else {
-                if (min_sm_version >= 300) {
-                typedef gunrock::oprtr::filter::KernelPolicy<
-                    Problem,                            // Problem data type
-                    300,                                // CUDA_ARCH
-                    INSTRUMENT,                         // INSTRUMENT
-                    0,                                  // SATURATION QUIT
-                    true,                               // DEQUEUE_PROBLEM_SIZE
-                    8,                                  // MIN_CTA_OCCUPANCY
-                    8,                                  // LOG_THREADS
-                    1,                                  // LOG_LOAD_VEC_SIZE
-                    0,                                  // LOG_LOADS_PER_TILE
-                    5,                                  // LOG_RAKING_THREADS
-                    5,                                  // END_BITMASK_CULL
-                    8>                                  // LOG_SCHEDULE_GRANULARITY
-                    FilterKernelPolicy;
-
-                typedef gunrock::oprtr::advance::KernelPolicy<
-                    Problem,                            // Problem data type
-                    300,                                // CUDA_ARCH
-                    INSTRUMENT,                         // INSTRUMENT
-                    8,                                  // MIN_CTA_OCCUPANCY
-                    10,                                 // LOG_THREADS
-                    8,                                  // LOG_BLOCKS
-                    32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
-                    1,                                  // LOG_LOAD_VEC_SIZE
-                    0,                                  // LOG_LOADS_PER_TILE
-                    5,                                  // LOG_RAKING_THREADS
-                    32,                                 // WARP_GATHER_THRESHOLD
-                    128 * 4,                            // CTA_GATHER_THRESHOLD
-                    7,                                  // LOG_SCHEDULE_GRANULARITY
-                    gunrock::oprtr::advance::LB>
-                        AdvanceKernelPolicy;
-
-                return EnactBFS<AdvanceKernelPolicy, FilterKernelPolicy>(
-                        src);
+        if (min_sm_version >= 300)
+        {
+            if (Problem::ENABLE_IDEMPOTENCE) {
+                if (traversal_mode == 0)
+                    return EnactBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
+                else
+                    return EnactBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
+            } else {
+                if (traversal_mode == 0)
+                    return EnactBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(src);
+                else
+                    return EnactBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(src);
             }
         }
 
         //to reduce compile time, get rid of other architecture for now
         //TODO: add all the kernelpolicy settings for all archs
-
         printf("Not yet tuned for this architecture\n");
         return cudaErrorInvalidDeviceFunction;
+
     }
 
     /**
@@ -631,104 +655,49 @@ public:
      *
      * @tparam BFSProblem BFS Problem type. @see BFSProblem
      *
+     * @param[in] context CudaContext pointer for moderngpu APIs
      * @param[in] problem Pointer to BFSProblem object.
      * @param[in] src Source node for BFS.
      * @param[in] max_grid_size Max grid size for BFS kernel calls.
+     * @param[in] traversal_mode Traversal Mode for advance operator: Load-balanced or Dynamic cooperative
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Init(
         ContextPtr  *context,
         Problem     *problem,
-        int         max_grid_size = 0,
-        bool        size_check = true)
+        int         max_grid_size  = 0,
+        bool        size_check     = true,
+        int         traversal_mode = 0)
     {
         int min_sm_version = -1;
         for (int i=0;i<this->num_gpus;i++)
             if (min_sm_version == -1 || this->cuda_props[i].device_sm_version < min_sm_version)
                 min_sm_version = this->cuda_props[i].device_sm_version;
 
-        if (Problem::ENABLE_IDEMPOTENCE) {
-            if (min_sm_version >= 300) {
-                typedef gunrock::oprtr::filter::KernelPolicy<
-                    Problem,                            // Problem data type
-                    300,                                // CUDA_ARCH
-                    INSTRUMENT,                         // INSTRUMENT
-                    0,                                  // SATURATION QUIT
-                    true,                               // DEQUEUE_PROBLEM_SIZE
-                    8,                                  // MIN_CTA_OCCUPANCY
-                    8,                                  // LOG_THREADS
-                    1,                                  // LOG_LOAD_VEC_SIZE
-                    0,                                  // LOG_LOADS_PER_TILE
-                    5,                                  // LOG_RAKING_THREADS
-                    5,                                  // END_BITMASK_CULL
-                    8>                                  // LOG_SCHEDULE_GRANULARITY
-                    FilterKernelPolicy;
-
-                typedef gunrock::oprtr::advance::KernelPolicy<
-                    Problem,                            // Problem data type
-                    300,                                // CUDA_ARCH
-                    INSTRUMENT,                         // INSTRUMENT
-                    8,                                  // MIN_CTA_OCCUPANCY
-                    10,                                 // LOG_THREADS
-                    8,                                  // LOG_BLOCKS
-                    32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
-                    1,                                  // LOG_LOAD_VEC_SIZE
-                    0,                                  // LOG_LOADS_PER_TILE
-                    5,                                  // LOG_RAKING_THREADS
-                    32,                                 // WARP_GATHER_THRESHOLD
-                    128 * 4,                            // CTA_GATHER_THRESHOLD
-                    7,                                  // LOG_SCHEDULE_GRANULARITY
-                    gunrock::oprtr::advance::LB>
-                        AdvanceKernelPolicy;
-
-                return InitBFS<AdvanceKernelPolicy, FilterKernelPolicy>(
-                        context, problem, max_grid_size,size_check);
-            }
-        } else {
-                if (min_sm_version >= 300) {
-                typedef gunrock::oprtr::filter::KernelPolicy<
-                    Problem,                            // Problem data type
-                    300,                                // CUDA_ARCH
-                    INSTRUMENT,                         // INSTRUMENT
-                    0,                                  // SATURATION QUIT
-                    true,                               // DEQUEUE_PROBLEM_SIZE
-                    8,                                  // MIN_CTA_OCCUPANCY
-                    8,                                  // LOG_THREADS
-                    1,                                  // LOG_LOAD_VEC_SIZE
-                    0,                                  // LOG_LOADS_PER_TILE
-                    5,                                  // LOG_RAKING_THREADS
-                    5,                                  // END_BITMASK_CULL
-                    8>                                  // LOG_SCHEDULE_GRANULARITY
-                    FilterKernelPolicy;
-
-                typedef gunrock::oprtr::advance::KernelPolicy<
-                    Problem,                            // Problem data type
-                    300,                                // CUDA_ARCH
-                    INSTRUMENT,                         // INSTRUMENT
-                    8,                                  // MIN_CTA_OCCUPANCY
-                    10,                                 // LOG_THREADS
-                    8,                                  // LOG_BLOCKS
-                    32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
-                    1,                                  // LOG_LOAD_VEC_SIZE
-                    0,                                  // LOG_LOADS_PER_TILE
-                    5,                                  // LOG_RAKING_THREADS
-                    32,                                 // WARP_GATHER_THRESHOLD
-                    128 * 4,                            // CTA_GATHER_THRESHOLD
-                    7,                                  // LOG_SCHEDULE_GRANULARITY
-                    gunrock::oprtr::advance::LB>
-                        AdvanceKernelPolicy;
-
-                return InitBFS<AdvanceKernelPolicy, FilterKernelPolicy>(
-                        context, problem, max_grid_size, size_check);
+        if (min_sm_version >= 300) {
+            if (Problem::ENABLE_IDEMPOTENCE) {
+                if (traversal_mode == 0)
+                    return InitBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
+                            context, problem, max_grid_size, size_check);
+                else
+                    return InitBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
+                            context, problem, max_grid_size, size_check);
+            } else {
+                if (traversal_mode == 0)
+                    return InitBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(
+                            context, problem, max_grid_size, size_check);
+                else
+                    return InitBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(
+                            context, problem, max_grid_size, size_check);
             }
         }
 
         //to reduce compile time, get rid of other architecture for now
         //TODO: add all the kernelpolicy settings for all archs
-
         printf("Not yet tuned for this architecture\n");
         return cudaErrorInvalidDeviceFunction;
+
     }
 
     /** @} */

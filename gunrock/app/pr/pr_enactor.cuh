@@ -1,9 +1,9 @@
-// ----------------------------------------------------------------
+// ---------------------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
-// ----------------------------------------------------------------
+// ---------------------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ----------------------------------------------------------------
+// ---------------------------------------------------------------------------
 
 /**
  * @file
@@ -17,19 +17,14 @@
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
 #include <gunrock/util/sort_utils.cuh>
-
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel_policy.cuh>
-
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/pr/pr_problem.cuh>
 #include <gunrock/app/pr/pr_functor.cuh>
-
 #include <moderngpu.cuh>
-
-//#include <cub/cub.cuh>
 
 using namespace mgpu;
 
@@ -313,7 +308,6 @@ public:
         ContextPtr                     context,
         cudaStream_t                   stream)
     {
-        //Print_Const<DataSlice><<<1,1,0,stream>>>(d_data_slice);
         if (enactor_stats->iteration == 0)
         {
             frontier_attribute->queue_reset  = true;
@@ -352,7 +346,6 @@ public:
         //if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, stream)) return;
         frontier_attribute->queue_reset = true;
         gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, RemoveZeroFunctor>(
-            //d_done,
             enactor_stats[0],
             frontier_attribute[0],
             d_data_slice,
@@ -387,9 +380,7 @@ public:
             enactor_stats->iteration,
             frontier_attribute->queue_reset,
             frontier_attribute->queue_index,
-            //enactor_stats.num_gpus,
             frontier_attribute->queue_length,
-            //d_done,
             frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),      // d_in_queue
             NULL,
             frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),    // d_out_queue
@@ -1057,15 +1048,16 @@ public:
     /**
      * @brief Enacts a page rank computing on the specified graph.
      *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam FilterPolicy Kernel policy for vertex mapping.
+     * @tparam AdvanceKernelPolicy Kernel policy for advance operator.
+     * @tparam FilterKernelPolicy Kernel policy for filter operator.
      * @tparam PRProblem PR Problem type.
      *
+     * @param[in] context CudaContext pointer for moderngpu APIs.
      * @param[in] problem PRProblem object.
-     * @param[in] src Source node for PR.
+     * @param[in] max_iteration Maximum iteration number for PR.
      * @param[in] max_grid_size Max grid size for PR kernel calls.
      *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     * \return cudaError_t object which indicates the success of all CUDA calls.
      */
     template<
         typename AdvanceKernelPolicy,
@@ -1084,8 +1076,8 @@ public:
         ThreadSlice  *thread_data        =  (ThreadSlice*) thread_data_;
         Problem      *problem            =  (Problem*)     thread_data->problem;
         PrEnactor    *enactor            =  (PrEnactor*)   thread_data->enactor;
-        util::cpu_mt::CPUBarrier
-                     *cpu_barrier        =   thread_data -> cpu_barrier;
+        //util::cpu_mt::CPUBarrier
+        //             *cpu_barrier        =   thread_data -> cpu_barrier;
         int           num_gpus           =   problem     -> num_gpus;
         int           thread_num         =   thread_data -> thread_num;
         int           gpu_idx            =   problem     -> gpu_idx            [thread_num] ;
@@ -1110,25 +1102,25 @@ public:
                 frontier_attribute[peer_].queue_reset   = true;
                 enactor_stats     [peer_].iteration     = 0;
             }
-            gunrock::app::Iteration_Loop
-                <0, 0, PrEnactor, PrFunctor, R0DIteration<AdvanceKernelPolicy, FilterKernelPolicy, PrEnactor> > (thread_data);
+            //gunrock::app::Iteration_Loop
+            //    <0, 0, PrEnactor, PrFunctor, R0DIteration<AdvanceKernelPolicy, FilterKernelPolicy, PrEnactor> > (thread_data);
             
             data_slice->PR_queue_selector = frontier_attribute[0].selector;
-            for (int peer_=0; peer_<num_gpus; peer_++)
-            {
-                frontier_attribute[peer_].queue_reset = true;
-                enactor_stats     [peer_].iteration   = 0;
-            }
+            //for (int peer_=0; peer_<num_gpus; peer_++)
+            //{
+            //    frontier_attribute[peer_].queue_reset = true;
+            //    enactor_stats     [peer_].iteration   = 0;
+            //}
             if (num_gpus > 1)
             {
                 data_slice->value__associate_orgs[0] = data_slice->rank_next.GetPointer(util::DEVICE);
                 data_slice->value__associate_orgs.Move(util::HOST, util::DEVICE);
-                util::cpu_mt::IncrementnWaitBarrier(cpu_barrier, thread_num);
-                for (int i=0; i<4; i++)
-                for (int gpu=0; gpu<num_gpus; gpu++)
-                for (int stage=0; stage<data_slice->num_stages; stage++)
-                    data_slice->events_set[i][gpu][stage] = false;
-                util::cpu_mt::IncrementnWaitBarrier(cpu_barrier+1, thread_num);
+                //util::cpu_mt::IncrementnWaitBarrier(cpu_barrier, thread_num);
+                //for (int i=0; i<4; i++)
+                //for (int gpu=0; gpu<num_gpus; gpu++)
+                //for (int stage=0; stage<data_slice->num_stages; stage++)
+                //    data_slice->events_set[i][gpu][stage] = false;
+                //util::cpu_mt::IncrementnWaitBarrier(cpu_barrier+1, thread_num);
             }
             data_slice -> edge_map_queue_len = frontier_attribute[0].queue_length;
             //util::cpu_mt::PrintGPUArray("degrees", data_slice->degrees.GetPointer(util::DEVICE), graph_slice->nodes, thread_num);
@@ -1207,8 +1199,6 @@ public:
                     data_slice->node_ids.GetPointer(util::DEVICE));
             }
 
-            //if (d_scanned_edges) cudaFree(d_scanned_edges);
-        
         } while(0); 
 
         printf("PR_Thread finished\n");fflush(stdout);
@@ -1292,11 +1282,13 @@ public:
      */
     void GetStatistics(
         long long &total_queued,
-        double &avg_duty)
+        double &avg_duty,
+        long long &num_iter)
     {
         unsigned long long total_lifetimes = 0;
         unsigned long long total_runtimes  = 0;
         total_queued = 0;
+        num_iter     = 0;
 
         for (int gpu=0; gpu<this->num_gpus; gpu++)
         {
@@ -1310,8 +1302,8 @@ public:
                 total_queued += enactor_stats_ -> total_queued[0];
                 enactor_stats_ -> total_queued.Move(util::DEVICE, util::HOST);
                 total_queued += enactor_stats_ -> total_queued[0];
-                //if (enactor_stats_ -> iteration > search_depth)
-                //    search_depth = enactor_stats_ -> iteration;
+                if (enactor_stats_ -> iteration > num_iter)
+                    num_iter = enactor_stats_ -> iteration;
                 total_lifetimes += enactor_stats_ -> total_lifetimes;
                 total_runtimes  += enactor_stats_ -> total_runtimes;
             }
@@ -1404,16 +1396,66 @@ public:
         return retval;
     }
 
+    typedef gunrock::oprtr::filter::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        0,                                  // SATURATION QUIT
+        true,                               // DEQUEUE_PROBLEM_SIZE
+        1,                                  // MIN_CTA_OCCUPANCY
+        6,                                  // LOG_THREADS
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        5,                                  // END_BITMASK_CULL
+        8>                                  // LOG_SCHEDULE_GRANULARITY
+    FilterKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        1,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        8,                                  // LOG_LOAD_VEC_SIZE
+        32*128,                             // LOG_LOADS_PER_TILE
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB>
+    LBAdvanceKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        8,                                  // MIN_CTA_OCCUPANCY
+        7,                                  // LOG_THREADS
+        10,                                 // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD
+        1,                                  // LOG_LOAD_VEC_SIZE
+        1,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::TWC_FORWARD>
+    FWDAdvanceKernelPolicy;
+
     /**
      * @brief PR Enact kernel entry.
      *
      * @tparam PRProblem PR Problem type. @see PRProblem
      *
+     * @param[in] context CudaContext pointer for moderngpu APIs.
      * @param[in] problem Pointer to PRProblem object.
-     * @param[in] src Source node for PR.
+     * @param[in] max_iteration Max iterations for PR.
      * @param[in] max_grid_size Max grid size for PR kernel calls.
      *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     * \return cudaError_t object which indicates the success of all CUDA calls.
      */
     cudaError_t Enact(
         int   traversal_mode)
@@ -1424,70 +1466,18 @@ public:
                 min_sm_version = this->cuda_props[gpu].device_sm_version;
 
         if (min_sm_version >= 300) {
-            typedef gunrock::oprtr::filter::KernelPolicy<
-                Problem,                            // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                0,                                  // SATURATION QUIT
-                true,                               // DEQUEUE_PROBLEM_SIZE
-                1,                                  // MIN_CTA_OCCUPANCY
-                8,                                  // LOG_THREADS
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                5,                                  // END_BITMASK_CULL
-                8>                                  // LOG_SCHEDULE_GRANULARITY
-                FilterKernelPolicy;
-
-            typedef gunrock::oprtr::advance::KernelPolicy<
-                Problem,                            // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                1,                                  // MIN_CTA_OCCUPANCY
-                10,                                 // LOG_THREADS
-                8,                                  // LOG_LOAD_VEC_SIZE
-                32*128,                             // LOG_LOADS_PER_TILE
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                                 // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7,                                  // LOG_SCHEDULE_GRANULARITY
-                gunrock::oprtr::advance::LB>
-                LBAdvanceKernelPolicy;
-
-            typedef gunrock::oprtr::advance::KernelPolicy<
-                Problem,                            // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                7,                                  // LOG_THREADS
-                10,                                 // LOG_BLOCKS
-                32*128,                             // LIGHT_EDGE_THRESHOLD
-                1,                                  // LOG_LOAD_VEC_SIZE
-                1,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                                 // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7,                                  // LOG_SCHEDULE_GRANULARITY
-                gunrock::oprtr::advance::TWC_FORWARD>
-                FWDAdvanceKernelPolicy;
-
             if (traversal_mode == 1)
             {
-                return EnactPR<
-                    FWDAdvanceKernelPolicy, FilterKernelPolicy>();
+                return EnactPR<FWDAdvanceKernelPolicy, FilterKernelPolicy>();
             }
             else
             {
-                return EnactPR<
-                     LBAdvanceKernelPolicy, FilterKernelPolicy>();
+                return EnactPR< LBAdvanceKernelPolicy, FilterKernelPolicy>();
             }
         }
 
         //to reduce compile time, get rid of other architecture for now
         //TODO: add all the kernelpolicy settings for all archs
-
         printf("Not yet tuned for this architecture\n");
         return cudaErrorInvalidDeviceFunction;
     }
@@ -1505,56 +1495,7 @@ public:
                 min_sm_version = this->cuda_props[gpu].device_sm_version;
 
         if (min_sm_version >= 300) {
-            typedef gunrock::oprtr::filter::KernelPolicy<
-                Problem,                            // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                0,                                  // SATURATION QUIT
-                true,                               // DEQUEUE_PROBLEM_SIZE
-                1,                                  // MIN_CTA_OCCUPANCY
-                8,                                  // LOG_THREADS
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                5,                                  // END_BITMASK_CULL
-                8>                                  // LOG_SCHEDULE_GRANULARITY
-                FilterKernelPolicy;
-
-            typedef gunrock::oprtr::advance::KernelPolicy<
-                Problem,                            // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                1,                                  // MIN_CTA_OCCUPANCY
-                10,                                 // LOG_THREADS
-                8,                                  // LOG_LOAD_VEC_SIZE
-                32*128,                             // LOG_LOADS_PER_TILE
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                                 // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7,                                  // LOG_SCHEDULE_GRANULARITY
-                gunrock::oprtr::advance::LB>
-                LBAdvanceKernelPolicy;
-
-            typedef gunrock::oprtr::advance::KernelPolicy<
-                Problem,                            // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                7,                                  // LOG_THREADS
-                10,                                 // LOG_BLOCKS
-                32*128,                             // LIGHT_EDGE_THRESHOLD
-                1,                                  // LOG_LOAD_VEC_SIZE
-                1,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                                 // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7,                                  // LOG_SCHEDULE_GRANULARITY
-                gunrock::oprtr::advance::TWC_FORWARD>
-                FWDAdvanceKernelPolicy;
-
-            if (traversal_mode == 1)
+           if (traversal_mode == 1)
                 return InitPR<FWDAdvanceKernelPolicy, FilterKernelPolicy>(
                     context, problem, /*max_iteration,*/ max_grid_size);
             else return InitPR<LBAdvanceKernelPolicy, FilterKernelPolicy>(
@@ -1562,8 +1503,7 @@ public:
         }
 
         //to reduce compile time, get rid of other architecture for now
-        //TODO: add all the kernelpolicy settings for all archs
-
+        //TODO: add all the kernel policy settings for all architectures
         printf("Not yet tuned for this architecture\n");
         return cudaErrorInvalidDeviceFunction;
 

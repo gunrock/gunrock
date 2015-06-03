@@ -4,9 +4,24 @@ OPTION[0]="--src=largestdegree --device=0 --partition_method=random"
 
 MARK[0]=""
 
+#get all execution files in ./bin
+files=(./bin/*)
+#split file names into arr
+arr=$(echo $files | tr " " "\n")
+max_ver_num="$"
+exe_file=${arr[0]}
+#iterate over all file names to get the largest version number
+for x in $arr
+do
+    output=$(grep -o "[0-9]\.[0-9]" <<<"$x")
+    if [ "$output" \> "$max_ver_num" ]; then
+        exe_file=$x
+    fi
+done
+
 #put OS and Device type here
-SUFFIX="ubuntu12.04.k40c"
-EXCUTION="./bin/test_bc_6.0_x86_64"
+SUFFIX="ubuntu12.04_k40c"
+EXCUTION=$exe_file
 DATADIR="/data/gunrock_dataset/large"
 
 mkdir -p eval/$SUFFIX

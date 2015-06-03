@@ -18,7 +18,6 @@
 #include <gunrock/util/multithread_utils.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
-//#include <gunrock/util/scan/multi_scan.cuh>
 
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
@@ -109,11 +108,9 @@ namespace bc {
         extern __shared__ char s_array[];
         const SizeT STRIDE = gridDim.x * blockDim.x;
         size_t      offset                = 0; 
-        //VertexId** s_vertex_associate_in  = (VertexId**)&(s_array[offset]);
         offset+=sizeof(VertexId*) * NUM_VERTEX_ASSOCIATES;
         Value**    s_value__associate_in  = (Value**   )&(s_array[offset]);
         offset+=sizeof(Value*   ) * NUM_VALUE__ASSOCIATES;
-        //VertexId** s_vertex_associate_org = (VertexId**)&(s_array[offset]);
         offset+=sizeof(VertexId*) * NUM_VERTEX_ASSOCIATES;
         Value**    s_value__associate_org = (Value**   )&(s_array[offset]);
         SizeT x = threadIdx.x;
@@ -161,14 +158,6 @@ public:
             Value,
             Problem> ForwardFunctor;
 
-    /*static const bool INSTRUMENT = Enactor::INSTRUMENT;
-    static const bool DEBUG      = Enactor::DEBUG;
-    static const bool SIZE_CHECK = Enactor::SIZE_CHECK;
-    static const bool HAS_SUBQ   = false;
-    static const bool HAS_FULLQ  = true;
-    static const bool BACKWARD   = false;
-    static const bool UPDATE_PREDECESSORS = true;*/
-
     static void FullQueue_Gather(
         int                            thread_num,
         int                            peer_,
@@ -188,15 +177,12 @@ public:
 
         SizeT cur_offset = data_slice->forward_queue_offsets[peer_].back();
         bool oversized = false;
-        //printf("%d\t %lld\t %d\t offset = %d current length = %d resulted_length = %d size = %d\n", thread_num, enactor_stats->iteration, peer_, cur_offset, frontier_attribute->queue_length, cur_offset+frontier_attribute->queue_length, data_slice->forward_output[peer_].GetSize());fflush(stdout);
         if (enactor_stats->retval = 
             Check_Size<Enactor::SIZE_CHECK, SizeT, VertexId> ("forward_output", cur_offset + frontier_attribute->queue_length, &data_slice->forward_output[peer_], oversized, thread_num, enactor_stats->iteration, peer_)) return;
         util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
             data_slice ->forward_output[peer_].GetPointer(util::DEVICE) + cur_offset, 
             frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
             frontier_attribute->queue_length);
-        //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
-                //util::DisplayDeviceResults(&problem->data_slices[0]->d_forward_output[cur_offset], frontier_attribute.queue_length);
         data_slice->forward_queue_offsets[peer_].push_back(frontier_attribute->queue_length+cur_offset); 
     }
  
@@ -215,16 +201,6 @@ public:
         ContextPtr                     context,
         cudaStream_t                   stream)
     {
-        /*if (frontier_attribute->queue_reset && frontier_attribute->queue_length ==0)
-        {
-            work_progress->SetQueueLength(frontier_attribute->queue_index, 0, false, stream);
-            if (Enactor::DEBUG) util::cpu_mt::PrintMessage("return-1", thread_num, enactor_stats->iteration);
-            return;
-        }*/
-        //util::cpu_mt::PrintGPUArray("keys0", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
-        //util::cpu_mt::PrintGPUArray("label0", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
-        //util::cpu_mt::PrintGPUArray("sigma0", data_slice->sigmas.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
-
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration);
 
         frontier_attribute->queue_reset = true;
@@ -261,25 +237,6 @@ public:
             work_progress  -> GetQueueLengthPointer<unsigned int,SizeT>(frontier_attribute->queue_index), stream);
 
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration);
-        //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,stream)) return;
-        //util::cpu_mt::PrintGPUArray("keys1", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
-        //util::cpu_mt::PrintGPUArray("label1", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
-        //util::cpu_mt::PrintGPUArray("sigma1", data_slice->sigmas.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
-
-
-        if (false) //(DEBUG || INSTRUMENT)
-        {
-            if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,stream)) return;
-            //enactor_stats->total_queued += frontier_attribute->queue_length;
-            if (Enactor::DEBUG) ShowDebugInfo<Problem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_advance", stream);
-            if (Enactor::INSTRUMENT) {
-                if (enactor_stats->retval = enactor_stats->advance_kernel_stats.Accumulate(
-                    enactor_stats->advance_grid_size,
-                    enactor_stats->total_runtimes,
-                    enactor_stats->total_lifetimes,
-                    false,stream)) return;
-            }
-        }
 
         // Filter
         gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, ForwardFunctor>
@@ -304,23 +261,6 @@ public:
         frontier_attribute->selector ^= 1;
         if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,stream,true)) return;
         if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__)) return;
-        //util::cpu_mt::PrintGPUArray("keys3", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
-        //util::cpu_mt::PrintGPUArray("label3", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
-        //util::cpu_mt::PrintGPUArray("sigma3", data_slice->sigmas.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
-
-
-        if (false) {//(INSTRUMENT || DEBUG) {
-            //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
-            //enactor_stats->total_queued += frontier_attribute->queue_length;
-            if (Enactor::DEBUG) ShowDebugInfo<Problem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_filter", stream);
-            if (Enactor::INSTRUMENT) {
-                if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
-                    enactor_stats->filter_grid_size,
-                    enactor_stats->total_runtimes,
-                    enactor_stats->total_lifetimes,
-                    false, stream)) return;
-            }
-        }
     }
 
     template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
@@ -389,16 +329,9 @@ public:
         SizeT                          request_length,
         util::DoubleBuffer<SizeT, VertexId, Value>
                                       *frontier_queue,
-        //util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
         EnactorStats                  *enactor_stats,
-        //DataSlice                     *data_slice,
-        //DataSlice                     *d_data_slice,
-        GraphSlice                    *graph_slice
-        //util::CtaWorkProgressLifetime *work_progress,
-        //ContextPtr                     context,
-        //cudaStream_t                   stream
-        )    
+        GraphSlice                    *graph_slice)    
     {    
         bool over_sized = false;
         int  selector   = frontier_attribute->selector;
@@ -451,14 +384,6 @@ public:
             Value,
             Problem> BackwardFunctor2;
  
-    /*static const bool INSTRUMENT = Enactor::INSTRUMENT;
-    static const bool DEBUG      = Enactor::DEBUG;
-    static const bool SIZE_CHECK = Enactor::SIZE_CHECK;
-    static const bool HAS_SUBQ   = false;
-    static const bool HAS_FULLQ  = true;
-    static const bool BACKWARD   = true;
-    static const bool UPDATE_PREDECESSORS = false;*/
-   
     static void FullQueue_Gather(
         int                            thread_num,
         int                            peer_,
@@ -477,7 +402,6 @@ public:
         SizeT cur_pos = data_slice->forward_queue_offsets[peer_].back();
         data_slice->forward_queue_offsets[peer_].pop_back();
         SizeT pre_pos = data_slice->forward_queue_offsets[peer_].back();
-        //printf("%d\t %lld\t %d\t offset = %d current length = %d resulted_length = %d size = %d\n", thread_num, enactor_stats->iteration, peer_, pre_pos, cur_pos-pre_pos, cur_pos, data_slice->forward_output[peer_].GetSize());fflush(stdout);
         frontier_attribute->queue_reset  = true;
         frontier_attribute->selector     = 0;//frontier_queue->keys[0].GetSize() > frontier_queue->keys[1].GetSize() ? 1 : 0;
         if (enactor_stats->iteration>0 && cur_pos - pre_pos >0)
@@ -566,7 +490,6 @@ public:
         // Edge Map
         if (enactor_stats->iteration > 0) {
             gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, BackwardFunctor>(
-                //d_done,
                 enactor_stats[0],
                 frontier_attribute[0],
                 d_data_slice,
@@ -592,7 +515,6 @@ public:
                 false);
         } else {
             gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, BackwardFunctor2>(
-                //d_done,
                 enactor_stats[0],
                 frontier_attribute[0],
                 d_data_slice,
@@ -618,26 +540,6 @@ public:
                 false);
         }
 
-        //if (/*DEBUG &&*/ (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
-        //cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
-
-        //frontier_attribute.queue_index++;
-        //frontier_attribute.selector ^= 1;
-
-        //util::MemsetAddKernel<<<128, 128>>>(problem->data_slices[0]->d_labels, 1, graph_slice->nodes);
-
-        if (false) {//(INSTRUMENT || DEBUG) {
-            //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
-            //enactor_stats->total_queued += frontier_attribute->queue_length;
-            if (Enactor::DEBUG) ShowDebugInfo<Problem>(thread_num, peer_, frontier_attribute, enactor_stats, data_slice, graph_slice, work_progress, "post_filter", stream);
-            if (Enactor::INSTRUMENT) {
-                if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
-                    enactor_stats->filter_grid_size,
-                    enactor_stats->total_runtimes,
-                    enactor_stats->total_lifetimes,
-                    false, stream)) return;
-            }    
-        }    
     }
 
     template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
@@ -710,7 +612,6 @@ public:
         util::Array1D<SizeT, DataSlice> *data_slice,
         int num_gpus)
     {
-        //printf("Backward Stop checked\n");fflush(stdout);
         for (int gpu=0;gpu<num_gpus*num_gpus;gpu++)
         if (enactor_stats[gpu].retval!=cudaSuccess)
         {    
@@ -721,7 +622,6 @@ public:
         {
             for (int gpu=0;gpu<num_gpus*num_gpus;gpu++)
             if (enactor_stats[gpu].iteration>1) {
-                //printf("gpu %d iteration=%lld\n",gpu,enactor_stats[gpu].iteration);fflush(stdout);
                 return false;
             }
             return true;
@@ -734,16 +634,9 @@ public:
         SizeT                          request_length,
         util::DoubleBuffer<SizeT, VertexId, Value>
                                       *frontier_queue,
-        //util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
         EnactorStats                  *enactor_stats,
-        //DataSlice                     *data_slice,
-        //DataSlice                     *d_data_slice,
-        GraphSlice                    *graph_slice
-        //util::CtaWorkProgressLifetime *work_progress,
-        //ContextPtr                     context,
-        //cudaStream_t                   stream
-        )    
+        GraphSlice                    *graph_slice)    
     {    
         return;
         /*bool over_sized = false;
@@ -843,11 +736,9 @@ public:
                     if (s_enactor_stats[gpu*num_gpus].iteration>max_iteration)
                         max_iteration=s_enactor_stats[gpu*num_gpus].iteration;
                 }
-                //printf("thread_num = %d, iteration = %d, max_iteration = %d\n", thread_num, enactor_stats[0].iteration, max_iteration);fflush(stdout);
                 while (data_slice->forward_queue_offsets[0].size()<max_iteration)
                 {
                     data_slice->forward_queue_offsets[0].push_back(data_slice->forward_queue_offsets[0].back());
-                    //enactor_stats[0].iteration++;
                 }
                 enactor_stats[0].iteration=max_iteration; 
                 for (VertexId node=0;node<graph_slice->in_counter[0];node++)
@@ -857,16 +748,12 @@ public:
                         int peer = graph_slice->backward_partition[i];
                         if (peer<=thread_num) peer--;
                         int _node = graph_slice->backward_convertion[i];
-                        //printf("%d,%d -> %d,%d : %d,%f -> %d,%f\n", thread_num, node, peer, _node, s_data_slice[peer]->sigmas[_node], s_data_slice[peer]->labels[_node], data_slice->sigmas[node], data_slice->labels[node]);fflush(stdout);
                         s_data_slice[peer]->sigmas[_node]=data_slice->sigmas[node];
                         s_data_slice[peer]->labels[_node]=data_slice->labels[node];
-                        //printf("(%f, %d) %d @ %d -> %d @ %d\n", data_slice->sigmas[node], data_slice->labels[node], _node, peer, node, thread_num);
                     }
                 }
                 //CPU_Barrier;
                 util::cpu_mt::IncrementnWaitBarrier(&cpu_barrier[1],thread_num);
-                //util::cpu_mt::PrintCPUArray<SizeT, Value>("sigmas", data_slice->sigmas.GetPointer(util::HOST), graph_slice->nodes, thread_num);
-                //util::cpu_mt::PrintCPUArray<SizeT, VertexId>("labels", data_slice->labels.GetPointer(util::HOST), graph_slice->nodes, thread_num);
                 for (int i=0;i<num_gpus;i++)
                 for (int j=0;j<4;j++)
                 for (int k=0;k<4;k++)
@@ -877,15 +764,7 @@ public:
                 data_slice->value__associate_orgs[1]=data_slice->bc_values.GetPointer(util::DEVICE);
                 data_slice->value__associate_orgs.Move(util::HOST, util::DEVICE);
             } else {
-                //util::cpu_mt::PrintGPUArray("sigmas", data_slice->sigmas.GetPointer(util::DEVICE), graph_slice->nodes, thread_num);
-                //util::cpu_mt::PrintGPUArray("labels", data_slice->labels.GetPointer(util::DEVICE), graph_slice->nodes, thread_num);
             }
-
-            
-            //printf("thread_num = %d, size = %d: ", thread_num, data_slice->forward_queue_offsets[0].size());//fflush(stdout);
-            //for (int i=0;i<data_slice->forward_queue_offsets[0].size();i++)
-            //    printf(", %d",data_slice ->forward_queue_offsets[0].at(i));
-            //printf("\n");fflush(stdout);
 
             gunrock::app::Iteration_Loop
                 <0, 2, BcEnactor, BcBFunctor, Backward_Iteration<AdvanceKernelPolicy, FilterKernelPolicy, BcEnactor> > (thread_data);
@@ -1039,11 +918,10 @@ public:
     /**
      * @brief Enacts a brandes betweenness centrality computing on the specified graph.
      *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam FilterPolicy Kernel policy for filter operator.
+     * @tparam AdvanceKernelPolicy Kernel policy for advance operator.
+     * @tparam FilterKernelPolicy Kernel policy for filter operator.
      * @tparam BCProblem BC Problem type.
-     * @tparam ForwardFunctor Forward Functor type used in the forward sigma computing pass.
-     * @tparam BackwardFunctor Backward Functor type used in the backward bc value accumulation pass.
+     * @param[in] context CudaContext pointer for moderngpu APIs
      * @param[in] problem BCProblem object.
      * @param[in] src Source node for BC. -1 to compute BC value for each node.
      * @param[in] max_grid_size Max grid size for BC kernel calls.
@@ -1091,11 +969,44 @@ public:
      * @{
      */
 
+    typedef gunrock::oprtr::filter::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        0,                                  // SATURATION QUIT
+        true,                               // DEQUEUE_PROBLEM_SIZE
+        8,                                  // MIN_CTA_OCCUPANCY
+        8,                                  // LOG_THREADS
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        5,                                  // END BIT_MASK (no bitmask cull in BC)
+        8>                                  // LOG_SCHEDULE_GRANULARITY
+    FilterKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        INSTRUMENT,                         // INSTRUMENT
+        8,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        8,                                  // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB>
+    AdvanceKernelPolicy;
+
     /**
      * @brief BC Enact kernel entry.
      *
      * @tparam BCProblem BC Problem type. @see BCProblem
      *
+     * @param[in] context CudaContedt pointer for moderngpu APIs
      * @param[in] problem Pointer to BCProblem object.
      * @param[in] src Source node for BC. -1 indicates computing BC value for all nodes.
      * @param[in] max_grid_size Max grid size for BC kernel calls.
@@ -1111,44 +1022,11 @@ public:
                 min_sm_version = this->cuda_props[i].device_sm_version;
 
         if (min_sm_version >= 300) {
-            typedef gunrock::oprtr::filter::KernelPolicy<
-                Problem,                            // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                0,                                  // SATURATION QUIT
-                true,                               // DEQUEUE_PROBLEM_SIZE
-                8,                                  // MIN_CTA_OCCUPANCY
-                8,                                  // LOG_THREADS
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                5,                                  // END BIT_MASK (no bitmask cull in BC)
-                8>                                  // LOG_SCHEDULE_GRANULARITY
-                FilterKernelPolicy;
-
-            typedef gunrock::oprtr::advance::KernelPolicy<
-                Problem,                            // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                10,                                 // LOG_THREADS
-                8,                                  // LOG_BLOCKS
-                32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                                 // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7,                                  // LOG_SCHEDULE_GRANULARITY
-                gunrock::oprtr::advance::LB>
-                AdvanceKernelPolicy;
-
             return EnactBC<AdvanceKernelPolicy, FilterKernelPolicy>(src);
         }
 
         //to reduce compile time, get rid of other architecture for now
         //TODO: add all the kernelpolicy settings for all archs
-
         printf("Not yet tuned for this architecture\n");
         return cudaErrorInvalidDeviceFunction;
     }
@@ -1165,45 +1043,12 @@ public:
                 min_sm_version = this->cuda_props[i].device_sm_version;
 
         if (min_sm_version >= 300) {
-            typedef gunrock::oprtr::filter::KernelPolicy<
-                Problem,                            // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                0,                                  // SATURATION QUIT
-                true,                               // DEQUEUE_PROBLEM_SIZE
-                8,                                  // MIN_CTA_OCCUPANCY
-                8,                                  // LOG_THREADS
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                5,                                  // END BIT_MASK (no bitmask cull in BC)
-                8>                                  // LOG_SCHEDULE_GRANULARITY
-                FilterKernelPolicy;
-
-            typedef gunrock::oprtr::advance::KernelPolicy<
-                Problem,                           // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                10,                                 // LOG_THREADS
-                8,                                  // LOG_BLOCKS
-                32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                                 // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7,                                  // LOG_SCHEDULE_GRANULARITY
-                gunrock::oprtr::advance::LB>
-                AdvanceKernelPolicy;
-           
             return InitBC<AdvanceKernelPolicy, FilterKernelPolicy>(
                 context, problem, max_grid_size, size_check);
         }
  
         //to reduce compile time, get rid of other architecture for now
         //TODO: add all the kernelpolicy settings for all archs
-
         printf("Not yet tuned for this architecture\n");
         return cudaErrorInvalidDeviceFunction;   
     }

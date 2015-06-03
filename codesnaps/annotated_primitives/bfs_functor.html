@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>bfs_functor.cuh</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id="background"></div>
+<div id='container'>
+  <div class='section'>
+    <div class='docs'><h1>bfs_functor.cuh</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      <p>bfs_functor defines user-specific computations with (1) two
+per-edge functors, CondEdge and ApplyEdge, which will be used in
+the Advance operator; and (2) two per-node functors, CondVertex and
+ApplyVertex, which will be used in the Filter operator.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">template</span><span class="o">&lt;</span><span class="kr">typename</span> <span class="n">VertexId</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">SizeT</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">Value</span><span class="p">,</span> <span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">&gt;</span>
+<span class="k">struct</span> <span class="n">BFSFunctor</span> <span class="p">{</span>
+    <span class="k">typedef</span> <span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">::</span><span class="n">DataSlice</span> <span class="n">DataSlice</span><span class="p">;</span>
+
+    <span class="n">__device__</span> <span class="kt">bool</span> <span class="nf">CondEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">ProblemData</span><span class="o">::</span><span class="n">MARK_PREDECESSORS</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>Set predecessor for each destination node. We set the
+depth later, because we only want to set the depth for
+valid nodes.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">return</span> <span class="p">(</span><span class="n">atomicCAS</span><span class="p">(</span><span class="o">&amp;</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">d_preds</span><span class="p">[</span><span class="n">d_id</span><span class="p">],</span> <span class="n">INVALID_PREDECESSOR_ID</span><span class="p">,</span> <span class="n">s_id</span><span class="p">)</span> <span class="o">==</span> <span class="n">INVALID_PREDECESSOR_ID</span><span class="p">)</span>
+                <span class="o">?</span> <span class="nb">true</span> <span class="o">:</span> <span class="nb">false</span><span class="p">;</span>
+        <span class="k">else</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>If we're not keeping track of predecessors, we can
+immediately set the depth of the destination vertex to
+one plus the source vertex's depth.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">return</span> <span class="p">(</span><span class="n">atomicCAS</span><span class="p">(</span><span class="o">&amp;</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">[</span><span class="n">d_id</span><span class="p">],</span> <span class="n">INVALID_NODE_VALUE</span><span class="p">,</span> <span class="n">s_id</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">==</span> <span class="n">INVALID_NODE_VALUE</span><span class="p">)</span>
+                <span class="o">?</span> <span class="nb">true</span> <span class="o">:</span> <span class="nb">false</span><span class="p">;</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>ApplyEdge here increments the depth value.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">__device__</span> <span class="kt">void</span> <span class="nf">ApplyEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">ProblemData</span><span class="o">::</span><span class="n">MARK_PREDECESSORS</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>We know the destination node is valid (from CondEdge),
+so here we set its depth to one plus the source
+vertex's depth.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">p</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">[</span><span class="n">d_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span><span class="o">-&gt;</span><span class="n">d_labels</span><span class="p">[</span><span class="n">s_id</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>In BFS, CondVertex checks if the vertex is valid in the next frontier.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">__device__</span> <span class="kt">void</span> <span class="nf">CondVertex</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">node</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="n">node</span> <span class="o">!=</span> <span class="n">INVALID_NODE_ID</span><span class="p">;</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>In BFS, we don't apply any actions to vertices.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">__device__</span> <span class="kt">void</span> <span class="nf">ApplyVertex</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">node</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
+    <span class="p">{</span>
+    <span class="p">}</span>
+<span class="p">};</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

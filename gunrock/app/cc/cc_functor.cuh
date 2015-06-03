@@ -38,10 +38,11 @@ struct UpdateMaskFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         return true;
     }
@@ -52,9 +53,10 @@ struct UpdateMaskFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         VertexId parent;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -85,10 +87,11 @@ struct HookInitFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         return true; 
     }
@@ -99,23 +102,24 @@ struct HookInitFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
-     *
+     * @param[in] v auxiliary value
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
-        VertexId from_node;
-        VertexId to_node;
-        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+        VertexId from_node = problem->froms[node];
+        VertexId to_node   = problem->tos  [node];
+        /*util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                 from_node, problem->froms + node);
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                to_node, problem->tos + node);
+                to_node, problem->tos + node);*/
         VertexId max_node = from_node > to_node ? from_node:to_node;
         VertexId min_node = from_node + to_node - max_node;
         if (TO_TRACK)
         if (to_track(max_node) || to_track(min_node))
             printf("HookInit [%d]: ->%d\n", max_node, min_node);
-        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                min_node, problem->component_ids + max_node);
+        //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+        //        min_node, problem->component_ids + max_node);
+        problem->component_ids[max_node] = min_node;
     }
 };
 
@@ -136,11 +140,11 @@ struct HookMinFunctor
      * @brief Vertex mapping condition function. The vertex id is always valid.
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     *
+     * @param[in] problem Data slice object 
+     * @param[in] v auxiliary value
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         return true;
     }
@@ -151,10 +155,10 @@ struct HookMinFunctor
 
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     *
+     * @param[in] problem Data slice object 
+     * @param[in] v auxiliary value
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         bool mark;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -172,8 +176,8 @@ struct HookMinFunctor
                     parent_from, problem->component_ids + from_node);
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                     parent_to, problem->component_ids + to_node);
-            VertexId max_node = parent_from > parent_to ? parent_from: parent_to;
-            VertexId min_node = parent_from + parent_to - max_node;
+            VertexId min_node = parent_from <= parent_to ? parent_from: parent_to;
+            VertexId max_node = parent_from + parent_to - min_node;
             if (max_node == min_node) {
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         true, problem->marks + node);
@@ -204,11 +208,12 @@ struct HookMaxFunctor
      * @brief Vertex mapping condition function. The vertex id is always valid.
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
+     * @param[in] problem Data slice object 
+     * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
        return true; 
     }
@@ -219,10 +224,10 @@ struct HookMaxFunctor
 
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     *
+     * @param[in] problem Data slice object 
+     * @param[in] v auxiliary value
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         bool mark;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -281,10 +286,11 @@ struct PtrJumpFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         return true;
     }
@@ -296,9 +302,10 @@ struct PtrJumpFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         VertexId parent;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -336,10 +343,11 @@ struct PtrJumpMaskFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         return true; 
     }
@@ -350,9 +358,10 @@ struct PtrJumpMaskFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         VertexId mask;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -400,11 +409,12 @@ struct PtrJumpUnmaskFunctor
      * @brief Vertex mapping condition function. The vertex id is always valid.
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
+     * @param[in] problem Data slice object 
+     * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         return true;
     }
@@ -415,9 +425,10 @@ struct PtrJumpUnmaskFunctor
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
+     * @param[in] v auxiliary value
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         VertexId mask;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(

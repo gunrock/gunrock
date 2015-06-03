@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include <gunrock/util/basic_utils.cuh>
+#include <gunrock/util/basic_utils.h>
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/multithread_utils.cuh>
 #include <gunrock/util/multithreading.cuh>

@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <gunrock/util/basic_utils.cuh>
+#include <gunrock/util/basic_utils.h>
 #include <gunrock/util/array_utils.cuh>
 
 namespace gunrock {

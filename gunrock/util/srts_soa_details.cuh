@@ -16,7 +16,7 @@
 #pragma once
 
 #include <gunrock/util/cuda_properties.cuh>
-#include <gunrock/util/basic_utils.cuh>
+#include <gunrock/util/basic_utils.h>
 
 namespace gunrock {
 namespace util {

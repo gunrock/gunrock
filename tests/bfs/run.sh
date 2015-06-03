@@ -19,6 +19,21 @@ MARK[5]=${MARK[1]}".idempotence"
 MARK[6]=${MARK[2]}".idempotence"
 MARK[7]=${MARK[3]}".idempotence"
 
+#get all execution files in ./bin
+files=(./bin/*)
+#split file names into arr
+arr=$(echo $files | tr " " "\n")
+max_ver_num="$"
+exe_file=${arr[0]}
+#iterate over all file names to get the largest version number
+for x in $arr
+do
+    output=$(grep -o "[0-9]\.[0-9]" <<<"$x")
+    if [ "$output" \> "$max_ver_num" ]; then
+        exe_file=$x
+    fi
+done
+
 #put OS and Device type here
 SUFFIX="ubuntu12.04.k40cx4_brp0.5_dsize3"
 EXCUTION="./bin/test_bfs_6.5_x86_64"
