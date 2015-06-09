@@ -111,7 +111,8 @@ struct EdgeFunctor
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    return problem->d_successors[s_id] == d_id;
+    return problem->d_successors[s_id] == d_id &&
+      problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id];
   }
 
   /**
