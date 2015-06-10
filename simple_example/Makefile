@@ -125,7 +125,7 @@ endif
 
 DEPS = ./Makefile \
 	$(wildcard ../gunrock/util/*.cuh) \
-	(wildcard ../gunrock/util/**/*.cuh) \
+	$(wildcard ../gunrock/util/**/*.cuh) \
 	$(wildcard ../gunrock/*.cuh) \
 	$(wildcard ../gunrock/graphio/*.cuh) \
 	$(wildcard ../gunrock/oprtr/*.cuh) \
