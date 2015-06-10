@@ -28,11 +28,16 @@ namespace sssp {
  * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
  */
 template <
-    typename    VertexId,                       
-    typename    SizeT,
+    typename    _VertexId,
+    typename    _SizeT,
+    typename    _Value,
     bool        _MARK_PREDECESSORS>
-struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
+struct SSSPProblem : ProblemBase<_VertexId, _SizeT, false>
 {
+
+    typedef _VertexId       VertexId;
+    typedef _SizeT          SizeT;
+    typedef _Value          Value;
 
     static const bool MARK_PREDECESSORS     = true;
     static const bool ENABLE_IDEMPOTENCE    = false;
@@ -46,15 +51,15 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
     struct DataSlice
     {
         // device storage arrays
-        unsigned int        *d_labels;              /**< Used for source distance */
-        unsigned int        *d_weights;             /**< Used for storing edge weights */
+        Value               *d_labels;              /**< Used for source distance */
+        Value               *d_weights;             /**< Used for storing edge weights */
         VertexId            *d_preds;               /**< Used for storing the actual shortest path */
         VertexId            *d_visit_lookup;        /**< Used for check duplicate */
         float               *d_delta;
     };
 
     // Members
-    
+
     // Number of GPUs to be sliced over
     int                 num_gpus;
 
@@ -64,7 +69,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
 
     // Set of data slices (one for each GPU)
     DataSlice           **data_slices;
-   
+
     // Nasty method for putting struct on device
     // while keeping the SoA structure
     DataSlice           **d_data_slices;
@@ -91,7 +96,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
      * @param[in] num_gpus Number of the GPUs used.
      */
     SSSPProblem(bool        stream_from_host,       // Only meaningful for single-GPU
-               const Csr<VertexId, unsigned int, SizeT> &graph,
+               const Csr<VertexId, Value, SizeT> &graph,
                int         num_gpus) :
         num_gpus(num_gpus)
     {
@@ -134,7 +139,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
      *
      *\return cudaError_t object which indicates the success of all CUDA function calls.
      */
-    cudaError_t Extract(unsigned int *h_labels, VertexId *h_preds)
+    cudaError_t Extract(Value *h_labels, VertexId *h_preds)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -148,7 +153,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
                 if (retval = util::GRError(cudaMemcpy(
                                 h_labels,
                                 data_slices[0]->d_labels,
-                                sizeof(unsigned int) * nodes,
+                                sizeof(Value) * nodes,
                                 cudaMemcpyDeviceToHost),
                             "SSSPProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) break;
                 if (MARK_PATHS) {
@@ -179,16 +184,16 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
      */
     cudaError_t Init(
             bool        stream_from_host,       // Only meaningful for single-GPU
-            const Csr<VertexId, unsigned int, SizeT> &graph,
+            const Csr<VertexId, Value, SizeT> &graph,
             int         _num_gpus,
             int         delta_factor = 16)
     {
         num_gpus = _num_gpus;
         nodes = graph.nodes;
         edges = graph.edges;
-        VertexId *h_row_offsets = graph.row_offsets;
+        SizeT *h_row_offsets = graph.row_offsets;
         VertexId *h_column_indices = graph.column_indices;
-            ProblemBase<VertexId, SizeT, false>::Init(stream_from_host,
+            ProblemBase<_VertexId, _SizeT, false>::Init(stream_from_host,
                     nodes,
                     edges,
                     h_row_offsets,
@@ -221,17 +226,17 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
                             "SSSPProblem cudaMalloc d_data_slices failed", __FILE__, __LINE__)) return retval;
 
                 // Create SoA on device
-                unsigned int    *d_labels;
+                Value    *d_labels;
                 if (retval = util::GRError(cudaMalloc(
                         (void**)&d_labels,
-                        nodes * sizeof(unsigned int)),
+                        nodes * sizeof(Value)),
                     "SSSPProblem cudaMalloc d_labels failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_labels = d_labels;
 
-                unsigned int    *d_weights;
+                Value    *d_weights;
                 if (retval = util::GRError(cudaMalloc(
                         (void**)&d_weights,
-                        edges * sizeof(unsigned int)),
+                        edges * sizeof(Value)),
                     "SSSPProblem cudaMalloc d_weights failed", __FILE__, __LINE__)) return retval;
 
                 float    *d_delta;
@@ -255,18 +260,18 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
                                 nodes * sizeof(VertexId)),
                             "SSSPProblem cudaMalloc d_visit_lookup failed", __FILE__, __LINE__)) return retval;
                 data_slices[0]->d_visit_lookup = d_visit_lookup;
-    
+
                 if (retval = util::GRError(cudaMemcpy(
                         d_weights,
                         graph.edge_values,
-                        edges * sizeof(unsigned int),
+                        edges * sizeof(Value),
                         cudaMemcpyHostToDevice),
                         "ProblemBase cudaMemcpy d_weights failed", __FILE__, __LINE__)) return retval;
 
                 data_slices[0]->d_weights = d_weights;
 
                 float delta = EstimatedDelta(graph)*delta_factor;
-                printf("estimated delta:%5f\n", delta);
+                // printf("estimated delta:%5f\n", delta);
 
                 if (retval = util::GRError(cudaMemcpy(
                             d_delta,
@@ -288,7 +293,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
      *  @param[in] src Source node for one SSSP computing pass.
      *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
      *  @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
-     * 
+     *
      *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Reset(
@@ -296,7 +301,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
             FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
             double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
     {
-        typedef ProblemBase<VertexId, SizeT, false> BaseProblem;
+        typedef ProblemBase<_VertexId, _SizeT, false> BaseProblem;
         //load ProblemBase Reset
         BaseProblem::Reset(frontier_type, queue_sizing);
 
@@ -309,10 +314,10 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
 
             // Allocate output labels if necessary
             if (!data_slices[gpu]->d_labels) {
-                unsigned int    *d_labels;
+                Value    *d_labels;
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_labels,
-                                nodes * sizeof(unsigned int)),
+                                nodes * sizeof(Value)),
                             "SSSPProblem cudaMalloc d_labels failed", __FILE__, __LINE__)) return retval;
                 data_slices[gpu]->d_labels = d_labels;
             }
@@ -347,8 +352,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
 
         }
 
-        
-        // Fillin the initial input_queue for SSSP problem, this needs to be modified
+             // Fillin the initial input_queue for SSSP problem, this needs to be modified
         // in multi-GPU scene
         if (retval = util::GRError(cudaMemcpy(
                         BaseProblem::graph_slices[0]->frontier_queues.d_keys[0],
@@ -356,7 +360,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
                         sizeof(VertexId),
                         cudaMemcpyHostToDevice),
                     "SSSPProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
-        VertexId src_label = 0; 
+        VertexId src_label = 0;
         if (retval = util::GRError(cudaMemcpy(
                         data_slices[0]->d_labels+src,
                         &src_label,
@@ -372,7 +376,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
         return retval;
     }
 
-    float EstimatedDelta(const Csr<VertexId, unsigned int, SizeT> &graph) {
+    float EstimatedDelta(const Csr<VertexId, Value, SizeT> &graph) {
         double  avgV = graph.average_edge_value;
         int     avgD = graph.average_degree;
         return avgV * 32 / avgD;

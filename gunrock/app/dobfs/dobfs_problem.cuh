@@ -32,15 +32,19 @@ namespace dobfs {
  * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer.
  */
 template <
-    typename    VertexId,                       
-    typename    SizeT,                          
-    typename    Value,                          
+    typename    _VertexId,                       
+    typename    _SizeT,                          
+    typename    _Value,                          
     bool        _MARK_PREDECESSORS,             
     bool        _ENABLE_IDEMPOTENCE,
     bool        _USE_DOUBLE_BUFFER>
-struct DOBFSProblem : ProblemBase<VertexId, SizeT,
+struct DOBFSProblem : ProblemBase<_VertexId, _SizeT,
                                 _USE_DOUBLE_BUFFER>
 {
+
+    typedef _VertexId       VertexId;
+    typedef _SizeT          SizeT;
+    typedef _Value          Value;
 
     static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
     static const bool ENABLE_IDEMPOTENCE    = _ENABLE_IDEMPOTENCE;
@@ -230,7 +234,7 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
         VertexId *h_column_indices = graph.column_indices;
         VertexId *h_col_offsets = inv_graph.row_offsets;
         VertexId *h_row_indices = inv_graph.column_indices;
-        ProblemBase<VertexId, SizeT,
+        ProblemBase<_VertexId, _SizeT,
                                 _USE_DOUBLE_BUFFER>::Init(stream_from_host,
                                         nodes,
                                         edges,
@@ -330,7 +334,7 @@ struct DOBFSProblem : ProblemBase<VertexId, SizeT,
             FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
             double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
     {
-        typedef ProblemBase<VertexId, SizeT,
+        typedef ProblemBase<_VertexId, _SizeT,
                                 _USE_DOUBLE_BUFFER> BaseProblem;
         //load ProblemBase Reset
         BaseProblem::Reset(frontier_type, queue_sizing);

@@ -59,6 +59,28 @@ enum TYPE {
 };
 
 /**
+ * @brief opeartion to use for mgpu primitives
+ */
+enum REDUCE_OP {
+    NONE,
+    PLUS,
+    MINUS,
+    MULTIPLIES,
+    MODULUS,
+    BIT_OR,
+    BIT_AND,
+    BIT_XOR,
+    MAXIMUM,
+    MINIMUM
+};
+
+enum REDUCE_TYPE {
+    EMPTY,
+    VERTEX,
+    EDGE
+};
+
+/**
  * @brief Kernel configuration policy for all three advance kernels (forward, backward, and load balanced).
  *
  * Parameterizations of this type encapsulate our kernel-tuning parameters
@@ -110,6 +132,7 @@ struct KernelPolicy {
     typedef _ProblemData                    ProblemData;
     typedef typename ProblemData::VertexId  VertexId;
     typedef typename ProblemData::SizeT     SizeT;
+    typedef typename ProblemData::Value     Value;
 
     static const MODE   ADVANCE_MODE = _ADVANCE_MODE;
     static const int    CTA_OCCUPANCY = _MIN_CTA_OCCUPANCY;

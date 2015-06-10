@@ -12,7 +12,7 @@
  * @brief Simple test driver program for connected component.
  */
 
-#include <stdio.h> 
+#include <stdio.h>
 #include <string>
 #include <deque>
 #include <vector>
@@ -44,7 +44,7 @@ using namespace gunrock::app::cc;
 
 
 /******************************************************************************
- * Defines, constants, globals 
+ * Defines, constants, globals
  ******************************************************************************/
 
 bool g_verbose;
@@ -53,11 +53,13 @@ bool g_quick;
 bool g_stream_from_host;
 
 template <typename VertexId>
-struct CcList {
+struct CcList
+{
     VertexId        root;
     unsigned int    histogram;
 
-    CcList(VertexId root, unsigned int histogram) : root(root), histogram(histogram) {}
+    CcList(VertexId root, unsigned int histogram) :
+        root(root), histogram(histogram) {}
 };
 
 template<typename CcList>
@@ -72,9 +74,10 @@ bool CCCompare(
 /******************************************************************************
  * Housekeeping Routines
  ******************************************************************************/
- void Usage()
- {
- printf("\ntest_cc <graph type> <graph type args> [--device=<device_index>] "
+void Usage()
+{
+    printf(
+        "\ntest_cc <graph type> <graph type args> [--device=<device_index>] "
         "[--instrumented] [--quick]\n"
         "\n"
         "Graph types and args:\n"
@@ -86,29 +89,36 @@ bool CCCompare(
         "  and barrier duty (a relative indicator of load imbalance.)\n"
         "  --quick If set will skip the CPU validation code.\n"
         );
- }
+}
 
- /**
-  * @brief Displays the CC result (i.e., number of components)
-  *
-  * @tparam VertexId
-  * @tparam SizeT
-  *
-  * @param[in] comp_ids Host-side vector to store computed component id for each node
-  * @param[in] nodes Number of nodes in the graph
-  * @param[in] num_components Number of connected components in the graph
-  * @param[in] roots Host-side vector stores the root for each node in the graph
-  * @param[in] histogram Histogram of connected component ids
-  */
- template<typename VertexId, typename SizeT>
- void DisplaySolution(VertexId *comp_ids, SizeT nodes, unsigned int num_components, VertexId *roots, unsigned int *histogram)
- {
+/**
+ * @brief Displays the CC result (i.e., number of components)
+ *
+ * @tparam VertexId
+ * @tparam SizeT
+ *
+ * @param[in] comp_ids Host-side vector to store computed component id for each node
+ * @param[in] nodes Number of nodes in the graph
+ * @param[in] num_components Number of connected components in the graph
+ * @param[in] roots Host-side vector stores the root for each node in the graph
+ * @param[in] histogram Histogram of connected component ids
+ */
+template<typename VertexId, typename SizeT>
+void DisplaySolution(
+    VertexId     *comp_ids,
+    SizeT        nodes,
+    unsigned int num_components,
+    VertexId     *roots,
+    unsigned int *histogram)
+{
     typedef CcList<VertexId> CcListType;
-    printf("Number of components: %d\n", num_components);
+    printf("Number of Components: %d\n", num_components);
 
-    if (nodes <= 40) {
+    if (nodes <= 40)
+    {
         printf("[");
-        for (VertexId i = 0; i < nodes; ++i) {
+        for (VertexId i = 0; i < nodes; ++i)
+        {
             PrintValue(i);
             printf(":");
             PrintValue(comp_ids[i]);
@@ -117,31 +127,35 @@ bool CCCompare(
         }
         printf("]\n");
     }
-    else {
+    else
+    {
         //sort the components by size
-        CcListType *cclist = (CcListType*)malloc(sizeof(CcListType) * num_components);
+        CcListType *cclist =
+            (CcListType*)malloc(sizeof(CcListType) * num_components);
         for (int i = 0; i < num_components; ++i)
         {
             cclist[i].root = roots[i];
             cclist[i].histogram = histogram[i];
         }
-        std::stable_sort(cclist, cclist + num_components, CCCompare<CcListType>);
+        std::stable_sort(
+            cclist, cclist + num_components, CCCompare<CcListType>);
 
         // Print out at most top 10 largest components
         int top = (num_components < 10) ? num_components : 10;
         printf("Top %d largest components:\n", top);
         for (int i = 0; i < top; ++i)
         {
-            printf("CC ID: %d, CC Root: %d, CC Size: %d\n", i, cclist[i].root, cclist[i].histogram);
+            printf("CC ID: %d, CC Root: %d, CC Size: %d\n",
+                   i, cclist[i].root, cclist[i].histogram);
         }
 
         free(cclist);
     }
- }
+}
 
- /**
-  * Performance/Evaluation statistics
-  */
+/**
+ * Performance/Evaluation statistics
+ */
 
 /******************************************************************************
  * CC Testing Routines
@@ -161,7 +175,8 @@ bool CCCompare(
  * \return Number of connected components in the graph
  */
 template<typename VertexId, typename SizeT>
-unsigned int RefCPUCC(SizeT *row_offsets, VertexId *column_indices, int num_nodes, int *labels)
+unsigned int RefCPUCC(
+    SizeT *row_offsets, VertexId *column_indices, int num_nodes, int *labels)
 {
     using namespace boost;
     typedef adjacency_list <vecS, vecS, undirectedS> Graph;
@@ -212,86 +227,105 @@ void RunTests(
         Value,
         true> Problem; //use double buffer for edgemap and vertexmap.
 
-        // Allocate host-side label array (for both reference and gpu-computed results)
-        VertexId    *reference_component_ids        = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-        VertexId    *h_component_ids                = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-        VertexId    *reference_check                = (g_quick) ? NULL : reference_component_ids;
-        unsigned int ref_num_components             = 0;
+    // Allocate host-side label array (for both reference and gpu-computed results)
+    VertexId    *reference_component_ids        = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+    VertexId    *h_component_ids                = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+    VertexId    *reference_check                = (g_quick) ? NULL : reference_component_ids;
+    unsigned int ref_num_components             = 0;
 
-        // Allocate CC enactor map
-        CCEnactor<INSTRUMENT> cc_enactor(g_verbose);
+    // Allocate CC enactor map
+    CCEnactor<INSTRUMENT> cc_enactor(g_verbose);
 
-        // Allocate problem on GPU
-        Problem *csr_problem = new Problem;
-        util::GRError(csr_problem->Init(
-            g_stream_from_host,
-            graph,
-            num_gpus), "CC Problem Initialization Failed", __FILE__, __LINE__);
+    // Allocate problem on GPU
+    Problem *csr_problem = new Problem;
+    util::GRError(csr_problem->Init(
+                      g_stream_from_host,
+                      graph,
+                      num_gpus),
+                  "CC Problem Initialization Failed", __FILE__, __LINE__);
 
-        //
-        // Compute reference CPU BFS solution for source-distance
-        //
-        if (reference_check != NULL)
-        {
-            printf("compute ref value\n");
-            ref_num_components = RefCPUCC(
-                    graph.row_offsets,
-                    graph.column_indices,
-                    graph.nodes,
-                    reference_check);
-            printf("\n");
-        }
+    //
+    // Compute reference CPU CC
+    //
+    if (reference_check != NULL && !g_quick)
+    {
+        printf("Computing reference value ...\n");
+        ref_num_components = RefCPUCC(
+            graph.row_offsets,
+            graph.column_indices,
+            graph.nodes,
+            reference_check);
+        printf("\n");
+    }
 
-        // Perform CC
-        GpuTimer gpu_timer;
+    long long total_queued = 0;
+    VertexId  num_iter = 0;
+    double    avg_duty = 0.0;
 
-        float elapsed = 0.0f;
+    // Perform CC
+    GpuTimer gpu_timer;
 
-        for (int iter = 0; iter < iterations; ++iter)
-        {
+    float elapsed = 0.0f;
 
-            util::GRError(csr_problem->Reset(cc_enactor.GetFrontierType()), "CC Problem Data Reset Failed", __FILE__, __LINE__);
-            gpu_timer.Start();
-            util::GRError(cc_enactor.template Enact<Problem>(csr_problem, max_grid_size), "CC Problem Enact Failed", __FILE__, __LINE__);
-            gpu_timer.Stop();
+    for (int iter = 0; iter < iterations; ++iter)
+    {
+        util::GRError(
+            csr_problem->Reset(cc_enactor.GetFrontierType()),
+            "CC Problem Data Reset Failed", __FILE__, __LINE__);
 
-            elapsed += gpu_timer.ElapsedMillis();
-            printf("iteration %d, time:%5f\n", iter+1, gpu_timer.ElapsedMillis());
-        }
-        elapsed /= iterations;
+        gpu_timer.Start();
+        util::GRError(
+            cc_enactor.template Enact<Problem>(csr_problem, max_grid_size),
+            "CC Problem Enact Failed", __FILE__, __LINE__);
+        gpu_timer.Stop();
 
-        // Copy out results
-        util::GRError(csr_problem->Extract(h_component_ids), "CC Problem Data Extraction Failed", __FILE__, __LINE__);
+        elapsed += gpu_timer.ElapsedMillis();
+        // printf("iteration %d, time: %.5f\n", iter+1, gpu_timer.ElapsedMillis());
+    }
+    elapsed /= iterations;
 
-        // Validity
+    cc_enactor.GetStatistics(total_queued, num_iter, avg_duty);
+
+    // Copy out results
+    util::GRError(
+        csr_problem->Extract(h_component_ids),
+        "CC Problem Data Extraction Failed", __FILE__, __LINE__);
+
+    // Validity
+    if (!g_quick)
+    {
         if (ref_num_components == csr_problem->num_components)
             printf("CORRECT.\n");
         else
-            printf("INCORRECT. Ref Component Count: %d, GPU Computed Component Count: %d\n", ref_num_components, csr_problem->num_components);
+            printf("INCORRECT. Ref Component Count: %d,"
+                   "GPU Computed Component Count: %d\n",
+                   ref_num_components, csr_problem->num_components);
+    }
 
-        //if (ref_num_components == csr_problem->num_components)
-        {
-            // Compute size and root of each component
-            VertexId        *h_roots            = new VertexId[csr_problem->num_components];
-            unsigned int    *h_histograms       = new unsigned int[csr_problem->num_components];
+    // Compute size and root of each component
+    VertexId     *h_roots      = new VertexId[csr_problem->num_components];
+    unsigned int *h_histograms = new unsigned int[csr_problem->num_components];
 
-            csr_problem->ComputeCCHistogram(h_component_ids, h_roots, h_histograms);
+    csr_problem->ComputeCCHistogram(h_component_ids, h_roots, h_histograms);
 
-            // Display Solution
-            DisplaySolution(h_component_ids, graph.nodes, ref_num_components, h_roots, h_histograms);
-            
-            if (h_roots) delete[] h_roots;
-            if (h_histograms) delete[] h_histograms;
-        }
+    // Display Solution
+    DisplaySolution(h_component_ids, graph.nodes,
+                    csr_problem->num_components,
+                    h_roots, h_histograms);
 
-        printf("GPU Connected Component finished in %lf msec.\n", elapsed);
+    if (h_roots) delete[] h_roots;
+    if (h_histograms) delete[] h_histograms;
 
-        // Cleanup 
-        if (csr_problem) delete csr_problem;
-        if (reference_component_ids) free(reference_component_ids);
-        if (h_component_ids) free(h_component_ids);
+    printf("[GPU Connected Component] finished.\n");
+    printf(" elapsed: %.4f ms\n", elapsed);
+    printf(" num_iterations: %d\n", num_iter);
 
-        cudaDeviceSynchronize();
+    // Cleanup
+    if (csr_problem) delete csr_problem;
+    if (reference_component_ids) free(reference_component_ids);
+    if (h_component_ids) free(h_component_ids);
+
+    cudaDeviceSynchronize();
 }
 
 /**
@@ -312,33 +346,33 @@ void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
     CommandLineArgs &args)
 {
-    bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
-    int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
-    int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
-    int                 iterations          = 1;
+    bool instrumented  = false; // Whether or not to collect instrumentation from kernels
+    int  max_grid_size = 0;     // Maximum grid size (0: leave it up to the enactor)
+    int  num_gpus      = 1;     // Number of GPUs for multi-gpu enactor to use
+    int  iterations    = 1;     // Default run test times
 
     instrumented = args.CheckCmdLineFlag("instrumented");
-
-    g_quick = args.CheckCmdLineFlag("quick");
-    g_verbose = args.CheckCmdLineFlag("v");
+    g_quick      = args.CheckCmdLineFlag("quick");
+    g_verbose    = args.CheckCmdLineFlag("v");
     args.GetCmdLineArgument("iteration-num", iterations);
 
-    if (instrumented) {
-            RunTests<VertexId, Value, SizeT, true>(
-                graph,
-                max_grid_size,
-                iterations,
-                num_gpus);
-    } else {
-            RunTests<VertexId, Value, SizeT, false>(
-                graph,
-                max_grid_size,
-                iterations,
-                num_gpus);
+    if (instrumented)
+    {
+        RunTests<VertexId, Value, SizeT, true>(
+            graph,
+            max_grid_size,
+            iterations,
+            num_gpus);
+    }
+    else
+    {
+        RunTests<VertexId, Value, SizeT, false>(
+            graph,
+            max_grid_size,
+            iterations,
+            num_gpus);
     }
 }
-
-
 
 /******************************************************************************
  * Main
@@ -346,65 +380,65 @@ void RunTests(
 
 int main( int argc, char** argv)
 {
-	CommandLineArgs args(argc, argv);
+    CommandLineArgs args(argc, argv);
 
-	if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
-		Usage();
-		return 1;
-	}
+    if ((argc < 2) || (args.CheckCmdLineFlag("help")))
+    {
+        Usage();
+        return 1;
+    }
 
-	DeviceInit(args);
-	cudaSetDeviceFlags(cudaDeviceMapHost);
+    DeviceInit(args);
+    cudaSetDeviceFlags(cudaDeviceMapHost);
 
-	// Parse graph-contruction params
-	g_undirected = false; //Does not make undirected graph
+    // Parse graph-contruction params
+    g_undirected = false; //Does not make undirected graph
 
-	std::string graph_type = argv[1];
-	int flags = args.ParsedArgc();
-	int graph_args = argc - flags - 1;
+    std::string graph_type = argv[1];
+    int flags = args.ParsedArgc();
+    int graph_args = argc - flags - 1;
 
-	if (graph_args < 1) {
-		Usage();
-		return 1;
-	}
-	
-	//
-	// Construct graph and perform search(es)
-	//
+    if (graph_args < 1)
+    {
+        Usage();
+        return 1;
+    }
 
-	if (graph_type == "market") {
+    //
+    // Construct graph and perform search(es)
+    //
 
-		// Matrix-market coordinate-formatted graph file
+    if (graph_type == "market")
+    {
+        // Matrix-market coordinate-formatted graph file
 
-		typedef int VertexId;							// Use as the node identifier type
-		typedef int Value;								// Use as the value type
-		typedef int SizeT;								// Use as the graph size type
-		Csr<VertexId, Value, SizeT> csr(false);         // default value for stream_from_host is false
+        typedef int VertexId;                   // Use as the node identifier
+        typedef int Value;                      // Use as the value type
+        typedef int SizeT;                      // Use as the graph size type
+        Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
 
-		if (graph_args < 1) { Usage(); return 1; }
-		char *market_filename = (graph_args == 2) ? argv[2] : NULL;
-		if (graphio::BuildMarketGraph<false>(
-			market_filename, 
-			csr, 
-			g_undirected,
-			false) != 0) // no inverse graph
-		{
-			return 1;
-		}
+        if (graph_args < 1) { Usage(); return 1; }
+
+        char *market_filename = (graph_args == 2) ? argv[2] : NULL;
+        if (graphio::BuildMarketGraph<false>(
+                market_filename,
+                csr,
+                g_undirected,
+                false) != 0) // no inverse graph
+        {
+            return 1;
+        }
 
         csr.PrintHistogram();
         fflush(stdout);
 
-		// Run tests
-		RunTests(csr, args);
-
-	} else {
-
-		// Unknown graph type
-		fprintf(stderr, "Unspecified graph type\n");
-		return 1;
-
-	}
-
-	return 0;
+        // Run tests
+        RunTests(csr, args);
+    }
+    else
+    {
+        fprintf(stderr, "Unspecified graph type\n");
+        return 1;
+    }
+    return 0;
 }

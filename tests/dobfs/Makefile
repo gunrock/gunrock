@@ -82,15 +82,15 @@ endif
 # Dependency Lists
 #-------------------------------------------------------------------------------
 
-DEPS = 			./Makefile \
-				$(wildcard ../../gunrock/util/*.cuh) \
-				$(wildcard ../../gunrock/util/**/*.cuh) \
-				$(wildcard ../../gunrock/*.cuh) \
-				$(wildcard ../../gunrock/graphio/*.cuh) \
-				$(wildcard ../../gunrock/oprtr/*.cuh) \
-				$(wildcard ../../gunrock/oprtr/**/*.cuh) \
-				$(wildcard ../../gunrock/app/*.cuh) \
-				$(wildcard ../../gunrock/app/**/*.cuh)
+DEPS = ./Makefile \
+	$(wildcard ../../gunrock/util/*.cuh) \
+	$(wildcard ../../gunrock/util/**/*.cuh) \
+	$(wildcard ../../gunrock/*.cuh) \
+	$(wildcard ../../gunrock/graphio/*.cuh) \
+	$(wildcard ../../gunrock/oprtr/*.cuh) \
+	$(wildcard ../../gunrock/oprtr/**/*.cuh) \
+	$(wildcard ../../gunrock/app/*.cuh) \
+	$(wildcard ../../gunrock/app/**/*.cuh)
 
 #-------------------------------------------------------------------------------
 # (make test) Test driver for
@@ -98,9 +98,9 @@ DEPS = 			./Makefile \
 
 test: bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_dobfs.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_dobfs.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_dobfs.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../../moderngpu/src/mgpucontext.cu ../../../moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_dobfs_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_dobfs.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean

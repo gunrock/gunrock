@@ -293,15 +293,17 @@ namespace edge_map_forward {
                                             // set neighbor_id to -1 for invalid
                                             if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x, edge_id)) {
                                                 Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x, edge_id);
-                                                if (cta->advance_type == gunrock::oprtr::advance::V2V) {
-                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                            neighbor_id,
-                                                            cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank); 
-                                                } else if (cta->advance_type == gunrock::oprtr::advance::V2E
-                                                         ||cta->advance_type == gunrock::oprtr::advance::E2E) {
-                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                            (VertexId)(coop_offset+threadIdx.x),
-                                                            cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                if (cta->d_out != NULL) {
+                                                    if (cta->advance_type == gunrock::oprtr::advance::V2V) {
+                                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                neighbor_id,
+                                                                cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank); 
+                                                    } else if (cta->advance_type == gunrock::oprtr::advance::V2E
+                                                            ||cta->advance_type == gunrock::oprtr::advance::E2E) {
+                                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                (VertexId)(coop_offset+threadIdx.x),
+                                                                cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                    }
                                                 }
                                                 if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
                                                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -310,9 +312,11 @@ namespace edge_map_forward {
                                                     }
                                             }
                                             else {
-                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                    -1,
-                                                    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                if (cta->d_out != NULL) {
+                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                            -1,
+                                                            cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                }
                                             }
 
                                             coop_offset += KernelPolicy::THREADS;
@@ -333,15 +337,17 @@ namespace edge_map_forward {
                                             // set neighbor_id to -1 for invalid                                    
                                             if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x, edge_id)) {
                                                 Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x, edge_id);
-                                                if (cta->advance_type == gunrock::oprtr::advance::V2V) {
-                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                            neighbor_id,
-                                                            cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank); 
-                                                } else if (cta->advance_type == gunrock::oprtr::advance::V2E
-                                                         ||cta->advance_type == gunrock::oprtr::advance::E2E) {
-                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                            (VertexId)(coop_offset+threadIdx.x),
-                                                            cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                if (cta->d_out != NULL) {
+                                                    if (cta->advance_type == gunrock::oprtr::advance::V2V) {
+                                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                neighbor_id,
+                                                                cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank); 
+                                                    } else if (cta->advance_type == gunrock::oprtr::advance::V2E
+                                                            ||cta->advance_type == gunrock::oprtr::advance::E2E) {
+                                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                                (VertexId)(coop_offset+threadIdx.x),
+                                                                cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                    }
                                                 }
                                                 if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
                                                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -350,9 +356,11 @@ namespace edge_map_forward {
                                                 }
                                             }
                                             else {
-                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                    -1,
-                                                    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                if (cta->d_out != NULL) {
+                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                            -1,
+                                                            cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                }
                                             }
 
                                         }
@@ -445,9 +453,11 @@ namespace edge_map_forward {
                                                 }
 
                                                 // Scatter neighbor
-                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                        neighbor_id,
-                                                        cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                if (cta->d_out != NULL) {
+                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                            neighbor_id,
+                                                            cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                }
 
                                                 coop_offset += GR_WARP_THREADS(KernelPolicy::CUDA_ARCH);
                                                 coop_rank += GR_WARP_THREADS(KernelPolicy::CUDA_ARCH);
@@ -481,9 +491,11 @@ namespace edge_map_forward {
                                                 }
 
                                                 // Scatter neighbor
-                                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                        neighbor_id,
-                                                        cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                if (cta->d_out != NULL) {
+                                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                            neighbor_id,
+                                                            cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                                }
                                             }
                                         }
 
@@ -809,9 +821,11 @@ namespace edge_map_forward {
                         else
                             neighbor_id = -1;
                         // Scatter into out_queue
-                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                neighbor_id,
-                                d_out + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                        if (d_out != NULL) {
+                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    neighbor_id,
+                                    d_out + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                        }
 
                         if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && d_pred_out != NULL) {
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(

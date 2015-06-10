@@ -78,7 +78,7 @@ class CCEnactor : public EnactorBase
     {
         typedef typename ProblemData::SizeT         SizeT;
         typedef typename ProblemData::VertexId      VertexId;
-        
+
         cudaError_t retval = cudaSuccess;
 
         do {
@@ -93,7 +93,7 @@ class CCEnactor : public EnactorBase
             total_queued        = 0;
 
         } while (0);
-        
+
         return retval;
     }
 
@@ -120,7 +120,7 @@ class CCEnactor : public EnactorBase
      */
     ~CCEnactor()
     {
-        
+
         if (vertex_flag) delete vertex_flag;
         if (edge_flag) delete edge_flag;
     }
@@ -139,14 +139,16 @@ class CCEnactor : public EnactorBase
     template <typename VertexId>
     void GetStatistics(
         long long &total_queued,
-        double &avg_duty)
+        VertexId  &num_iter,
+        double    &avg_duty)
     {
         cudaThreadSynchronize();
 
         total_queued = this->total_queued;
+        num_iter = this->iteration;
 
-        avg_duty = (total_lifetimes >0) ?
-            double(total_runtimes) / total_lifetimes : 0.0;
+        avg_duty = (total_lifetimes > 0) ?
+            double (total_runtimes) / total_lifetimes : 0.0;
     }
 
     /** @} */
@@ -259,7 +261,7 @@ class CCEnactor : public EnactorBase
 
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) break;
 
-            // Pointer Jumping 
+            // Pointer Jumping
             queue_index = 0;
             selector = 0;
             num_elements = graph_slice->nodes;
@@ -301,7 +303,7 @@ class CCEnactor : public EnactorBase
                 queue_index++;
                 selector ^= 1;
                 iteration++;
-                
+
                 if (retval = util::GRError(cudaMemcpy(
                                 vertex_flag,
                                 problem->data_slices[0]->d_vertex_flag,
@@ -311,7 +313,11 @@ class CCEnactor : public EnactorBase
 
 
                 // Check if done
-                if (vertex_flag[0]) { printf("first p_jump round. v_f\n"); break;}
+                if (vertex_flag[0])
+                {
+                    //printf("first p_jump round. v_f\n");
+                    break;
+                }
             }
 
             queue_index        = 0;        // Work queue index
@@ -410,10 +416,14 @@ class CCEnactor : public EnactorBase
                                     cudaMemcpyDeviceToHost),
                                 "CCProblem cudaMemcpy d_edge_flag to edge_flag failed", __FILE__, __LINE__)) return retval;
                     // Check if done
-                    if (edge_flag[0]) {printf("edge flag after hook minmax.\n"); break;}
+                    if (edge_flag[0])
+                    {
+                        //printf("edge flag after hook minmax.\n");
+                        break;
+                    }
 
                     ///////////////////////////////////////////
-                    // Pointer Jumping 
+                    // Pointer Jumping
                     queue_index = 0;
                     selector = 0;
                     num_elements = graph_slice->nodes;
@@ -510,7 +520,7 @@ class CCEnactor : public EnactorBase
                     if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter::Kernel Update Mask Operation failed", __FILE__, __LINE__))) break;
 
                     ///////////////////////////////////////////
-                } 
+                }
 
 
             if (retval) break;
@@ -531,7 +541,7 @@ class CCEnactor : public EnactorBase
      *
      * @tparam CCProblem CC Problem type. @see CCProblem
      * @param[in] problem Pointer to CCProblem object.
-     * @param[in] max_grid_size Max grid size for CC kernel calls. 
+     * @param[in] max_grid_size Max grid size for CC kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -555,7 +565,7 @@ class CCEnactor : public EnactorBase
                 0,                                  // END_BITMASK (no bitmask for cc)
                 8>                                  // LOG_SCHEDULE_GRANULARITY
                 FilterPolicy;
-                
+
                 return EnactCC<FilterPolicy, CCProblem>(
                 problem, max_grid_size);
         }

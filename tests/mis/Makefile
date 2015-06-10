@@ -1,3 +1,10 @@
+# ----------------------------------------------------------------
+# Gunrock -- Fast and Efficient GPU Graph Library
+# ----------------------------------------------------------------
+# This source code is distributed under the terms of LICENSE.TXT
+# in the root directory of this source distribution.
+# ----------------------------------------------------------------
+
 #-------------------------------------------------------------------------------
 # Build script for project
 #-------------------------------------------------------------------------------
@@ -7,7 +14,7 @@ NVCC = "$(shell which nvcc)"
 #NVCC = "/usr/local/cuda-6.0/bin/nvcc"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
-KERNELS = 
+KERNELS =
 
 # detect OS
 OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
@@ -16,8 +23,8 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 # Gen targets
 #-------------------------------------------------------------------------------
 
-GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\" 
-GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" 
+GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
+GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
 SM_TARGETS = $(GEN_SM35)
 #$(GEN_SM35)
 
@@ -31,20 +38,23 @@ SM_TARGETS = $(GEN_SM35)
 #-------------------------------------------------------------------------------
 
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
-INC = -I$(CUDA_INC) -I.. -I../..
+MGPU_INC = "../../externals/moderngpu/include"
+BOOST_INC = "../../../boost_1_53_0"
+CUB_INC = "../../externals/cub"
+INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(BOOST_INC) -I$(CUB_INC) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
 #-------------------------------------------------------------------------------
 
-DEFINES = 
+DEFINES =
 
 #-------------------------------------------------------------------------------
 # Compiler Flags
 #-------------------------------------------------------------------------------
 
 ifneq ($(force64), 1)
-# Compile with 32-bit device pointers by default
+	# Compile with 32-bit device pointers by default
 	ARCH_SUFFIX = i386
 	ARCH = -m32
 else
@@ -57,7 +67,6 @@ NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
 endif
-
 
 ifeq ($(verbose), 1)
     NVCCFLAGS += -v
@@ -76,30 +85,29 @@ endif
 #-------------------------------------------------------------------------------
 
 DEPS = 			./Makefile \
-				$(wildcard ../util/*.cuh) \
-				$(wildcard ../cuda/*.cuh) \
-				$(wildcard ../app/*.cuh) \
-				$(wildcard ../app/**/*.cuh)
+				$(wildcard ../../gunrock/util/*.cuh) \
+				$(wildcard ../../gunrock/util/**/*.cuh) \
+				$(wildcard ../../gunrock/*.cuh) \
+				$(wildcard ../../gunrock/graphio/*.cuh) \
+				$(wildcard ../../gunrock/oprtr/*.cuh) \
+				$(wildcard ../../gunrock/oprtr/**/*.cuh) \
+				$(wildcard ../../gunrock/app/*.cuh) \
+				$(wildcard ../../gunrock/app/**/*.cuh)
 
 #-------------------------------------------------------------------------------
-# (make test) Test driver for 
+# (make test) Test driver for
 #-------------------------------------------------------------------------------
-test : gunrock_mad.o gunrock.o util.o $(DEPS)
-	nvcc -o test gunrock_mad.o gunrock.o util.o $(ARCH) $(INC) -O3
 
-gunrock_mad.o : gunrock_mad.cu $(DEPS)
-	nvcc -c gunrock_mad.cu $(NVCCFLAGS) $(ARCH) $(INC) -O3
+test: bin/test_mis_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-util.o : ../util/util.cu $(DEPS)
-	nvcc -c ../util/util.cu $(NVCCFLAGS) $(ARCH) $(INC) -O3
-
-gunrock.o : gunrock.cpp $(DEPS)
-	gcc -c gunrock.cpp $(INC) -O3
+bin/test_mis_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_mis.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(DEPS)
+	mkdir -p bin
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_mis_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_mis.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean
 #-------------------------------------------------------------------------------
 
 clean :
-	rm -f bin/*_$(NVCC_VERSION)_$(ARCH_SUFFIX)* 
+	rm -f bin/*_$(NVCC_VERSION)_$(ARCH_SUFFIX)*
 	rm -f *.i* *.cubin *.cu.c *.cudafe* *.fatbin.c *.ptx *.hash *.cu.cpp *.o

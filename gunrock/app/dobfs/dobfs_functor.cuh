@@ -55,7 +55,7 @@ struct PrepareInputFrontierMapFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v =0, SizeT nid=0)
     {
        return true; 
     }
@@ -63,7 +63,7 @@ struct PrepareInputFrontierMapFunctor
     /**
      * @brief Vertex mapping apply function. Set frontier_map_in
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
             true, problem->d_frontier_map_in + node);
@@ -92,7 +92,7 @@ struct PrepareUnvisitedQueueFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v =0, SizeT nid=0)
     {
         VertexId label;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -103,7 +103,7 @@ struct PrepareUnvisitedQueueFunctor
     /**
      * @brief Vertex mapping apply function. Doing nothing.
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         // Doing nothing here
     }
@@ -183,7 +183,7 @@ struct ReverseBFSFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         return (node != -1);
     }
@@ -191,7 +191,7 @@ struct ReverseBFSFunctor
     /**
      * @brief Vertex mapping apply function. Doing nothing.
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         // Doing nothing here
     }
@@ -223,7 +223,7 @@ struct SwitchToNormalFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         bool flag;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -234,7 +234,7 @@ struct SwitchToNormalFunctor
     /**
      * @brief Vertex mapping apply function. Doing nothing.
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
         // Doing nothing here
     }

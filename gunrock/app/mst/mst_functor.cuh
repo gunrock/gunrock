@@ -1,9 +1,9 @@
-// ----------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
-// ----------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ----------------------------------------------------------------
+// -----------------------------------------------------------------------------
 
 /**
  * @file
@@ -24,7 +24,7 @@ namespace mst {
 ////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief Structure contains device functions in MST graph traverse.
- * find the successor of each vertex and add to mst outputs
+ *   find the successor of each vertex / super-vertex
  *
  * @tparam VertexId    Type of signed integer use as vertex id
  * @tparam SizeT       Type of unsigned integer for array indexing
@@ -40,8 +40,7 @@ struct SuccFunctor
   typedef typename ProblemData::DataSlice DataSlice;
 
   /**
-   * @brief Forward Edge Mapping condition function.
-   * Used for generating successor array
+   * @brief Forward Advance Kernel condition function.
    *
    * @param[in] s_id Vertex Id of the edge source node
    * @param[in] d_id Vertex Id of the edge destination node
@@ -56,11 +55,12 @@ struct SuccFunctor
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    return true;
+    // find successors that contribute to the reduced weight value
+    return problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id];
   }
 
   /**
-   * @brief Forward Edge Mapping apply function.
+   * @brief Forward Advance Kernel apply function.
    *
    * @param[in] s_id Vertex Id of the edge source node
    * @param[in] d_id Vertex Id of the edge destination node
@@ -72,24 +72,70 @@ struct SuccFunctor
     VertexId s_id,  VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    if (problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id])
-    {
-      //problem->d_successors[s_id] = d_id;
-      // mark MST output results
-      //problem->d_mst_output[problem->d_origin_edges[e_id]] = 1;
-      if (atomicMin(&problem->d_successors[s_id], d_id) > d_id)
-      {
-       // keep outgoing selected minimum weighted e_ids
-        problem->d_temp_storage[s_id] = problem->d_origin_edges[e_id];
-      }
-    }
+    // select one successor with minimum vertex id
+    atomicMin(&problem->d_successors[s_id], d_id);
   }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief Structure contains device functions in MST graph traverse.
- * used for removing cycles in successors
+ *   find original edge ids for marking MST outputs
+ *
+ * @tparam VertexId    Type of signed integer use as vertex id
+ * @tparam SizeT       Type of unsigned integer for array indexing
+ * @tparam ProblemData Problem data type contains data slice for MST problem
+ */
+template<
+  typename VertexId,
+  typename SizeT,
+  typename Value,
+  typename ProblemData>
+struct EdgeFunctor
+{
+  typedef typename ProblemData::DataSlice DataSlice;
+
+  /**
+   * @brief Forward Advance Kernel condition function.
+   *
+   * @param[in] s_id Vertex Id of the edge source node
+   * @param[in] d_id Vertex Id of the edge destination node
+   * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
+   *
+   * \return Whether to load the apply function for the edge and include
+   * the destination node in the next frontier.
+   */
+  static __device__ __forceinline__ bool CondEdge(
+    VertexId s_id, VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+  {
+    return problem->d_successors[s_id] == d_id;
+  }
+
+  /**
+   * @brief Forward Advance Kernel apply function.
+   *
+   * @param[in] s_id Vertex Id of the edge source node
+   * @param[in] d_id Vertex Id of the edge destination node
+   * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
+   */
+  static __device__ __forceinline__ void ApplyEdge(
+    VertexId s_id,  VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+  {
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      problem->d_origin_edges[e_id], problem->d_temp_storage + s_id);
+  }
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief Structure contains device functions in MST graph traverse.
+ *   used for marking MST output array
  *
  * @tparam VertexId    Type of signed integer to use as vertex id
  * @tparam SizeT       Type of unsigned integer to use for array indexing
@@ -100,13 +146,12 @@ template<
   typename SizeT,
   typename Value,
   typename ProblemData>
-struct RmCycFunctor
+struct MarkFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
 
   /**
-   * @brief Forward Edge Mapping condition function.
-   * Used for finding Vetex Id that have minimum weight value.
+   * @brief Forward Advance Kernel condition function.
    *
    * @param[in] s_id Vertex Id of the edge source node
    * @param[in] d_id Vertex Id of the edge destination node
@@ -125,7 +170,7 @@ struct RmCycFunctor
   }
 
   /**
-   * @brief Forward Edge Mapping apply function.
+   * @brief Forward Advance Kernel apply function.
    *
    * @param[in] s_id Vertex Id of the edge source node
    * @param[in] d_id Vertex Id of the edge destination node
@@ -137,18 +182,71 @@ struct RmCycFunctor
   VertexId s_id, VertexId d_id, DataSlice *problem,
   VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    // mark minimum spanning tree outputs
-    problem->d_mst_output[problem->d_temp_storage[s_id]] = 1;
-    // remove length two cycles
-    if (problem->d_successors[s_id] > s_id &&
-        problem->d_successors[problem->d_successors[s_id]] == s_id)
-    {
-      //printf(" remove-s_id:%4d d_id:%4d e_id:%4d origin_e_id:%4d\n",
-      //  s_id, d_id, e_id, problem->d_origin_edges[e_id]);
-      problem->d_successors[s_id] = s_id;
-      // remove edges in the mst output results
-      problem->d_mst_output[problem->d_origin_edges[e_id]] = 0;
-    }
+    // mark minimum spanning tree output edges
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      1, problem->d_mst_output + problem->d_temp_storage[s_id]);
+  }
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief Structure contains device functions in MST graph traverse.
+ *   used for removing cycles in successors
+ *
+ * @tparam VertexId    Type of signed integer to use as vertex id
+ * @tparam SizeT       Type of unsigned integer to use for array indexing
+ * @tparam ProblemData Problem data type contains data slice for MST problem
+ */
+template<
+  typename VertexId,
+  typename SizeT,
+  typename Value,
+  typename ProblemData>
+struct CyRmFunctor
+{
+  typedef typename ProblemData::DataSlice DataSlice;
+
+  /**
+   * @brief Forward Advance Kernel condition function.
+   *
+   * @param[in] s_id Vertex Id of the edge source node
+   * @param[in] d_id Vertex Id of the edge destination node
+   * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
+   *
+   * \return Whether to load the apply function for the edge and include
+   * the destination node in the next frontier.
+   */
+  static __device__ __forceinline__ bool CondEdge(
+    VertexId s_id, VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+  {
+    // cycle of length two
+    return problem->d_successors[s_id] > s_id &&
+      problem->d_successors[problem->d_successors[s_id]] == s_id;
+  }
+
+  /**
+   * @brief Forward Advance Kernel apply function.
+   *
+   * @param[in] s_id Vertex Id of the edge source node
+   * @param[in] d_id Vertex Id of the edge destination node
+   * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
+   */
+  static __device__ __forceinline__ void ApplyEdge(
+    VertexId s_id, VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+  {
+    // remove cycles by assigning successor to its s_id
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      s_id, problem->d_successors + s_id);
+
+    // remove some edges in the MST output result
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      0, problem->d_mst_output + problem->d_temp_storage[s_id]);
   }
 };
 
@@ -165,12 +263,12 @@ template<
   typename SizeT,
   typename Value,
   typename ProblemData>
-struct PtrJumpFunctor
+struct PJmpFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
 
   /**
-   * @brief Vertex mapping condition function. The vertex id is always valid.
+   * @brief Filter Kernel condition function. The vertex id is always valid.
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
@@ -180,13 +278,13 @@ struct PtrJumpFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     return true;
   }
 
   /**
-   * @brief Vertex mapping apply function. Point the current node to the
+   * @brief Filter Kernel apply function. Point the current node to the
    * parent node of its parent node.
    *
    * @param[in] node Vertex Id
@@ -194,7 +292,7 @@ struct PtrJumpFunctor
    * @param[in] v Vertex value
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     VertexId parent;
     util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -215,7 +313,7 @@ struct PtrJumpFunctor
 ////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief Structure contains device functions in MST graph traverse.
- * used for remove redundent edges in one supervertex
+ *   used for remove redundant edges in one super-vertex
  *
  * @tparam VertexId    Type of signed integer to use as vertex id
  * @tparam SizeT       Type of unsigned integer to use for array indexing
@@ -226,12 +324,12 @@ template<
   typename SizeT,
   typename Value,
   typename ProblemData>
-struct EdgeRmFunctor
+struct EgRmFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
 
   /**
-   * @brief Forward Edge Mapping condition function.
+   * @brief Forward Advance Kerenl condition function.
    *
    * @param[in] s_id Vertex Id of the edge source node
    * @param[in] d_id Vertex Id of the edge destination node
@@ -246,12 +344,12 @@ struct EdgeRmFunctor
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    return true;
+    return problem->d_successors[s_id] == problem->d_successors[d_id];
   }
 
   /**
-   * @brief Forward Edge Mapping apply function.
-   * Each edge looks at the supervertex id of both endpoints
+   * @brief Forward Advance Kernel apply function.
+   * Each edge looks at the super-vertex id of both endpoints
    * and mark -1 (to be removed) if the id is the same
    *
    * @param[in] s_id Vertex Id of the edge source node
@@ -264,21 +362,18 @@ struct EdgeRmFunctor
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    if (problem->d_successors[s_id] == problem->d_successors[d_id])
-    {
-      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        -1, problem->d_keys_array + e_id);
-      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        -1, problem->d_col_indices + e_id);
-      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        -1, problem->d_edge_weights + e_id);
-      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        -1, problem->d_origin_edges + e_id);
-    }
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      -1, problem->d_keys_array + e_id);
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      -1, problem->d_col_indices + e_id);
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      -1, problem->d_edge_weights + e_id);
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      -1, problem->d_origin_edges + e_id);
   }
 
   /**
-   * @brief Vertex mapping condition function.
+   * @brief Filter Kernel condition function.
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
@@ -288,33 +383,35 @@ struct EdgeRmFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     return true;
   }
 
   /**
-   * @brief Vertex mapping apply function.
-   * removing edges belonging to the same supervertex
+   * @brief Filter Kernel apply function.
+   * removing edges belonging to the same super-vertex
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v Vertex value
    */
   static __device__ __forceinline__ void ApplyFilter(
-  VertexId node, DataSlice *problem, Value v = 0)
+  VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
-    problem->d_keys_array[node]  =
-      problem->d_super_vids[problem->d_keys_array[node]];
-    problem->d_col_indices[node] =
-      problem->d_super_vids[problem->d_col_indices[node]];
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      problem->d_supervtx_ids[problem->d_keys_array[node]],
+      problem->d_keys_array + node);
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      problem->d_supervtx_ids[problem->d_col_indices[node]],
+      problem->d_col_indices + node);
   }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief Structure contains device functions in MST graph traverse.
- * used for calculating row_offsets array for next iteration
+ *   used for calculating row_offsets array for next iteration
  *
  * @tparam VertexId    Type of signed integer to use as vertex id
  * @tparam SizeT       Type of unsigned integer to use for array indexing
@@ -326,12 +423,13 @@ template<
   typename SizeT,
   typename Value,
   typename ProblemData>
-struct RowOffsetsFunctor
+struct RIdxFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
 
   /**
-   * @brief Vertex mapping condition function. Calculate new row_offsets
+   * @brief Filter Kerenel condition function.
+   *   calculate new row_offsets
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
@@ -341,13 +439,13 @@ struct RowOffsetsFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
-    return true;
+    return problem->d_flags_array[node] == 1;
   }
 
   /**
-   * @brief Vertex mapping apply function.
+   * @brief Filter Kernel apply function.
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
@@ -355,19 +453,17 @@ struct RowOffsetsFunctor
    *
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
-    if (problem->d_flags_array[node] == 1)
-    {
-      problem->d_row_offsets[problem->d_keys_array[node]] = node;
-    }
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      node, problem->d_row_offsets + problem->d_keys_array[node]);
   }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief Structure contains device functions in MST graph traverse.
- * used for generate edge flags
+ *   used for generate edge flags
  *
  * @tparam VertexId    Type of signed integer to use as vertex id
  * @tparam SizeT       Type of unsigned integer to use for array indexing
@@ -378,12 +474,12 @@ template<
   typename SizeT,
   typename Value,
   typename ProblemData>
-struct EdgeOffsetsFunctor
+struct EIdxFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
 
   /**
-   * @brief Vertex mapping condition function. Calculate new row_offsets
+   * @brief Filter Kernel condition function. Calculate new row_offsets
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
@@ -393,25 +489,23 @@ struct EdgeOffsetsFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
-    return true;
+    return problem->d_edge_flags[node] == 1;
   }
 
   /**
-   * @brief Vertex mapping apply function.
+   * @brief Filter Kernel apply function.
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v node value (if any)
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
-    if (problem->d_edge_flags[node] == 1)
-    {
-      problem->d_row_offsets[problem->d_temp_storage[node]] = node;
-    }
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      node, problem->d_row_offsets + problem->d_temp_storage[node]);
   }
 };
 
@@ -434,7 +528,7 @@ struct OrFunctor
   typedef typename ProblemData::DataSlice DataSlice;
 
   /**
-   * @brief Vertex mapping condition function.
+   * @brief Filter Kernel condition function.
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
@@ -444,30 +538,31 @@ struct OrFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     return true;
   }
 
   /**
-   * @brief Vertex mapping apply function.
+   * @brief Filter Kernel apply function.
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v node value (if any)
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
-    problem->d_edge_flags[node] =
-      problem->d_edge_flags[node] | problem->d_flags_array[node];
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      problem->d_edge_flags[node] | problem->d_flags_array[node],
+      problem->d_edge_flags + node);
   }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief Structure contains device functions in MST graph traverse.
- * used for remove duplicated edges between supervertices
+ *   used for remove duplicated edges between super-vertices
  *
  * @tparam VertexId    Type of signed integer to use as vertex id
  * @tparam SizeT       Type of unsigned integer to use for array indexing
@@ -479,13 +574,13 @@ template<
   typename SizeT,
   typename Value,
   typename ProblemData>
-struct SuEdgeRmFunctor
+struct SuRmFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
 
   /**
-   * @brief Vertex mapping condition function.
-   * Mark -1 for unselected edges / weights / keys / eId.
+   * @brief Filter Kernel condition function.
+   *   mark -1 for unselected edges / weights / keys / eId.
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
@@ -495,32 +590,29 @@ struct SuEdgeRmFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
-    return true;
+    return problem->d_edge_flags[node] == 0;
   }
 
   /**
-   * @brief Vertex mapping apply function.
+   * @brief Filter Kernel apply function.
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v node value (if any)
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
-    if (problem->d_edge_flags[node] == 0)
-    {
-      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        -1, problem->d_keys_array + node);
-      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        -1, problem->d_col_indices + node);
-      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        -1, problem->d_edge_weights + node);
-      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        -1, problem->d_origin_edges + node);
-    }
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      -1, problem->d_keys_array + node);
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      -1, problem->d_col_indices + node);
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      -1, problem->d_edge_weights + node);
+    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+      -1, problem->d_origin_edges + node);
   }
 };
 

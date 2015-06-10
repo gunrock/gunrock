@@ -20,6 +20,7 @@
 #else
     #include <time.h>
     #include <sys/resource.h>
+    #include <time.h>
 #endif
 
 #include <stdio.h>
@@ -226,7 +227,7 @@ struct CpuTimer
     timespec start;
     timespec stop;
 
-    void Start() 
+    void Start()
     {
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
     }

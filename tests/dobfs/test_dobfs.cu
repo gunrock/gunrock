@@ -12,7 +12,7 @@
  * @brief Simple test driver program for breadth-first search.
  */
 
-#include <stdio.h> 
+#include <stdio.h>
 #include <string>
 #include <deque>
 #include <vector>
@@ -48,7 +48,7 @@ using namespace gunrock::app::dobfs;
 
 
 /******************************************************************************
- * Defines, constants, globals 
+ * Defines, constants, globals
  ******************************************************************************/
 
 bool g_verbose;
@@ -61,44 +61,44 @@ float g_beta;
 /******************************************************************************
  * Housekeeping Routines
  ******************************************************************************/
- void Usage()
- {
- printf("\ntest_dobfs <graph type> <graph type args> [--device=<device_index>] "
-        "[--undirected] [--instrumented] [--src=<source index>] [--quick] "
-        "[--mark-pred] [--queue-sizing=<scale factor>]\n"
-        "[--v]\n"
-        "\n"
-        "Graph types and args:\n"
-        "  market [<file>]\n"
-        "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
-        "    edges from stdin (or from the optionally-specified file).\n"
-        "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
-        "  --undirected If set then treat the graph as undirected.\n"
-        "  --instrumented If set then kernels keep track of queue-search_depth\n"
-        "  and barrier duty (a relative indicator of load imbalance.)\n"
-        "  --src Begins BFS from the vertex <source index>. If set as randomize\n"
-        "  then will begin with a random source vertex.\n"
-        "  If set as largestdegree then will begin with the node which has\n"
-        "  largest degree.\n"
-        "  --quick If set will skip the CPU validation code.\n"
-        "  --mark-pred If set then keep not only label info but also predecessor info.\n"
-        "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
-        "  Default is 1.0\n"
+void Usage()
+{
+    printf("\ntest_dobfs <graph type> <graph type args> [--device=<device_index>] "
+           "[--undirected] [--instrumented] [--src=<source index>] [--quick] "
+           "[--mark-pred] [--queue-sizing=<scale factor>]\n"
+           "[--v]\n"
+           "\n"
+           "Graph types and args:\n"
+           "  market [<file>]\n"
+           "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
+           "    edges from stdin (or from the optionally-specified file).\n"
+           "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
+           "  --undirected If set then treat the graph as undirected.\n"
+           "  --instrumented If set then kernels keep track of queue-search_depth\n"
+           "  and barrier duty (a relative indicator of load imbalance.)\n"
+           "  --src Begins BFS from the vertex <source index>. If set as randomize\n"
+           "  then will begin with a random source vertex.\n"
+           "  If set as largestdegree then will begin with the node which has\n"
+           "  largest degree.\n"
+           "  --quick If set will skip the CPU validation code.\n"
+           "  --mark-pred If set then keep not only label info but also predecessor info.\n"
+           "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
+           "  Default is 1.0\n"
         );
- }
+}
 
- /**
-  * @brief Displays the BFS result (i.e., distance from source)
-  *
-  * @param[in] source_path Search depth from the source for each node.
-  * @param[in] preds Predecessor node id for each node.
-  * @param[in] nodes Number of nodes in the graph.
-  * @param[in] MARK_PREDECESSORS Whether to show predecessor of each node.
-  * @param[in] ENABLE_IDEMPOTENCE Whether to enable idempotence mode.
-  */
- template<typename VertexId, typename SizeT>
- void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes, bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE)
- {
+/**
+ * @brief Displays the BFS result (i.e., distance from source)
+ *
+ * @param[in] source_path Search depth from the source for each node.
+ * @param[in] preds Predecessor node id for each node.
+ * @param[in] nodes Number of nodes in the graph.
+ * @param[in] MARK_PREDECESSORS Whether to show predecessor of each node.
+ * @param[in] ENABLE_IDEMPOTENCE Whether to enable idempotence mode.
+ */
+template<typename VertexId, typename SizeT>
+void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes, bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE)
+{
     if (nodes > 40)
         nodes = 40;
     printf("[");
@@ -113,11 +113,11 @@ float g_beta;
         printf(" ");
     }
     printf("]\n");
- }
+}
 
- /**
-  * Performance/Evaluation statistics
-  */ 
+/**
+ * Performance/Evaluation statistics
+ */
 
 struct Stats {
     const char *name;
@@ -137,7 +137,7 @@ struct Stats {
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * 
+ *
  * @param[in] stats Reference to the Stats object defined in RunTests
  * @param[in] src Source node where BFS starts
  * @param[in] h_labels Host-side vector stores computed labels for validation
@@ -174,7 +174,8 @@ void DisplayStats(
 
     double redundant_work = 0.0;
     if (total_queued > 0) {
-        redundant_work = ((double) total_queued - edges_visited) / edges_visited;        // measure duplicate edges put through queue
+        redundant_work = ((double) total_queued - edges_visited) / edges_visited;
+        // measure duplicate edges put through queue
     }
     redundant_work *= 100;
 
@@ -187,13 +188,13 @@ void DisplayStats(
     } else {
         // Display the specific sample statistics
         double m_teps = (double) edges_visited / (elapsed * 1000.0);
-        printf(" elapsed: %.3f ms, rate: %.3f MiEdges/s", elapsed, m_teps);
+        printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed, m_teps);
         if (search_depth != 0) printf(", search_depth: %lld", (long long) search_depth);
         if (avg_duty != 0) {
             printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
         }
-        printf("\n src: %lld, nodes_visited: %lld, edges visited: %lld",
-            (long long) src, (long long) nodes_visited, (long long) edges_visited);
+        printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
+               (long long) src, (long long) nodes_visited, (long long) edges_visited);
         if (total_queued > 0) {
             printf(", total queued: %lld", total_queued);
         }
@@ -202,7 +203,7 @@ void DisplayStats(
         }
         printf("\n");
     }
-    
+
 }
 
 
@@ -212,18 +213,18 @@ void DisplayStats(
  * BFS Testing Routines
  *****************************************************************************/
 
- /**
-  * @brief A simple CPU-based reference BFS ranking implementation.
-  *
-  * @tparam VertexId
-  * @tparam Value
-  * @tparam SizeT
-  *
-  * @param[in] graph Reference to the CSR graph we process on
-  * @param[in] source_path Host-side vector to store CPU computed labels for each node
-  * @param[in] src Source node where BFS starts
-  */
- template<
+/**
+ * @brief A simple CPU-based reference BFS ranking implementation.
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] source_path Host-side vector to store CPU computed labels for each node
+ * @param[in] src Source node where BFS starts
+ */
+template<
     typename VertexId,
     typename Value,
     typename SizeT>
@@ -232,8 +233,9 @@ void SimpleReferenceBfs(
     VertexId                                *source_path,
     VertexId                                src)
 {
-    //initialize distances
-    for (VertexId i = 0; i < graph.nodes; ++i) {
+    // Initialize distances
+    for (VertexId i = 0; i < graph.nodes; ++i)
+    {
         source_path[i] = -1;
     }
     source_path[src] = 0;
@@ -249,8 +251,9 @@ void SimpleReferenceBfs(
 
     CpuTimer cpu_timer;
     cpu_timer.Start();
-    while (!frontier.empty()) {
-        
+    while (!frontier.empty())
+    {
+
         // Dequeue node from frontier
         VertexId dequeued_node = frontier.front();
         frontier.pop_front();
@@ -260,12 +263,15 @@ void SimpleReferenceBfs(
         int edges_begin = graph.row_offsets[dequeued_node];
         int edges_end = graph.row_offsets[dequeued_node + 1];
 
-        for (int edge = edges_begin; edge < edges_end; ++edge) {
+        for (int edge = edges_begin; edge < edges_end; ++edge)
+        {
             //Lookup neighbor and enqueue if undiscovered
             VertexId neighbor = graph.column_indices[edge];
-            if (source_path[neighbor] == -1) {
+            if (source_path[neighbor] == -1)
+            {
                 source_path[neighbor] = neighbor_dist;
-                if (search_depth < neighbor_dist) {
+                if (search_depth < neighbor_dist)
+                {
                     search_depth = neighbor_dist;
                 }
                 frontier.push_back(neighbor);
@@ -277,7 +283,8 @@ void SimpleReferenceBfs(
     float elapsed = cpu_timer.ElapsedMillis();
     search_depth++;
 
-    printf("CPU BFS finished in %lf msec. Search depth is:%d\n", elapsed, search_depth);
+    printf("CPU BFS finished in %lf msec. Search depth is: %d\n",
+           elapsed, search_depth);
 }
 
 /**
@@ -328,100 +335,113 @@ void RunTests(
         ENABLE_IDEMPOTENCE,
         (MARK_PREDECESSORS && ENABLE_IDEMPOTENCE)> Problem; // does not use double buffer
 
-        // Allocate host-side label array (for both reference and gpu-computed results)
-        VertexId    *reference_labels       = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-        VertexId    *h_labels               = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-        VertexId    *reference_check        = (g_quick) ? NULL : reference_labels;
-        VertexId    *h_preds                = NULL;
-        if (MARK_PREDECESSORS) {
-            h_preds = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-        }
+    // Allocate host-side label array (for both reference and gpu-computed results)
+    VertexId    *reference_labels       = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+    VertexId    *h_labels               = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+    VertexId    *reference_check        = (g_quick) ? NULL : reference_labels;
+    VertexId    *h_preds                = NULL;
+    if (MARK_PREDECESSORS)
+    {
+        h_preds = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+    }
 
 
-        // Allocate BFS enactor map
-        DOBFSEnactor<INSTRUMENT> dobfs_enactor(g_verbose);
+    // Allocate BFS enactor map
+    DOBFSEnactor<INSTRUMENT> dobfs_enactor(g_verbose);
 
-        // Allocate problem on GPU
-        Problem *csr_problem = new Problem;
+    // Allocate problem on GPU
+    Problem *csr_problem = new Problem;
 
-        util::GRError(csr_problem->Init(
-            g_stream_from_host,
-            g_undirected,
+    util::GRError(csr_problem->Init(
+                      g_stream_from_host,
+                      g_undirected,
+                      graph,
+                      inv_graph,
+                      num_gpus,
+                      alpha,
+                      beta),
+                  "Problem DOBFS Initialization Failed", __FILE__, __LINE__);
+
+    //
+    // Compute reference CPU BFS solution for source-distance
+    //
+    if (reference_check != NULL)
+    {
+        printf("Computing reference value ...\n");
+        SimpleReferenceBfs(
             graph,
-            inv_graph,
-            num_gpus,
-            alpha,
-            beta), "Problem DOBFS Initialization Failed", __FILE__, __LINE__);
+            reference_check,
+            src);
+        printf("\n");
+    }
 
-        //
-        // Compute reference CPU BFS solution for source-distance
-        //
-        if (reference_check != NULL)
+    Stats *stats = new Stats("GPU DOBFS");
+
+    long long           total_queued = 0;
+    VertexId            search_depth = 0;
+    double              avg_duty = 0.0;
+
+    // Perform BFS
+    GpuTimer gpu_timer;
+
+    float elapsed = 0.0f;
+
+    for (int iter=0; iter < iterations; ++iter)
+    {
+        util::GRError(
+            csr_problem->Reset(
+                src, dobfs_enactor.GetFrontierType(), max_queue_sizing),
+            "DOBFS Problem Data Reset Failed", __FILE__, __LINE__);
+        gpu_timer.Start();
+        util::GRError(
+            dobfs_enactor.template Enact<Problem>(
+                context, csr_problem, src, max_grid_size),
+            "DOBFS Problem Enact Failed", __FILE__, __LINE__);
+        gpu_timer.Stop();
+        elapsed += gpu_timer.ElapsedMillis();
+    }
+    elapsed /= iterations;
+
+    dobfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
+
+    // Copy out results
+    util::GRError(
+        csr_problem->Extract(h_labels, h_preds),
+        "DOBFS Problem Data Extraction Failed", __FILE__, __LINE__);
+
+    // Verify the result
+    if (reference_check != NULL)
+    {
+        if (!MARK_PREDECESSORS)
         {
-            printf("compute ref value\n");
-            SimpleReferenceBfs(
-                    graph,
-                    reference_check,
-                    src);
-            printf("\n");
+            printf("Validity: ");
+            CompareResults(h_labels, reference_check, graph.nodes, true);
         }
+    }
+    printf("\nFirst 40 labels of the GPU result.");
+    // Display Solution
+    DisplaySolution(
+        h_labels, h_preds, graph.nodes, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE);
 
-        Stats *stats = new Stats("GPU DOBFS");
-
-        long long           total_queued = 0;
-        VertexId            search_depth = 0;
-        double              avg_duty = 0.0;
-
-        // Perform BFS
-        GpuTimer gpu_timer;
-
-        float elapsed = 0.0f;
-
-        for (int iter=0; iter < iterations; ++iter)
-        {
-            util::GRError(csr_problem->Reset(src, dobfs_enactor.GetFrontierType(), max_queue_sizing), "DOBFS Problem Data Reset Failed", __FILE__, __LINE__);
-            gpu_timer.Start();
-            util::GRError(dobfs_enactor.template Enact<Problem>(context, csr_problem, src, max_grid_size), "DOBFS Problem Enact Failed", __FILE__, __LINE__);
-            gpu_timer.Stop();
-            elapsed += gpu_timer.ElapsedMillis();
-        }
-        elapsed /= iterations;
-
-        dobfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
-
-        // Copy out results
-        util::GRError(csr_problem->Extract(h_labels, h_preds), "DOBFS Problem Data Extraction Failed", __FILE__, __LINE__);
-
-        // Verify the result
-        if (reference_check != NULL) {
-            if (!MARK_PREDECESSORS) {
-                printf("Validity: ");
-                CompareResults(h_labels, reference_check, graph.nodes, true);
-            }
-        }
-        printf("\nFirst 40 labels of the GPU result."); 
-        // Display Solution
-        DisplaySolution(h_labels, h_preds, graph.nodes, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE);
-
-        DisplayStats<MARK_PREDECESSORS>(
-            *stats,
-            src,
-            h_labels,
-            graph,
-            elapsed,
-            search_depth,
-            total_queued,
-            avg_duty);
+    DisplayStats<MARK_PREDECESSORS>(
+        *stats,
+        src,
+        h_labels,
+        graph,
+        elapsed,
+        search_depth,
+        total_queued,
+        avg_duty);
 
 
-        // Cleanup
-        delete stats;
-        if (csr_problem) delete csr_problem;
-        if (reference_labels) free(reference_labels);
-        if (h_labels) free(h_labels);
-        if (h_preds) free(h_preds);
+    // Cleanup
+    delete stats;
+    if (csr_problem) delete csr_problem;
+    if (reference_labels) free(reference_labels);
+    if (h_labels) free(h_labels);
+    if (h_preds) free(h_preds);
 
-        cudaDeviceSynchronize();
+    cudaDeviceSynchronize();
 }
 
 /**
@@ -458,21 +478,26 @@ void RunTests(
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("src", src_str);
-    if (src_str.empty()) {
+    if (src_str.empty())
+    {
         src = 0;
-    } else if (src_str.compare("randomize") == 0) {
+    }
+    else if (src_str.compare("randomize") == 0)
+    {
         src = graphio::RandomNode(graph.nodes);
-    } else if (src_str.compare("largestdegree") == 0) {
+    }
+    else if (src_str.compare("largestdegree") == 0)
+    {
         int temp;
         src = graph.GetNodeWithHighestDegree(temp);
-    } else {
+    }
+    else
+    {
         args.GetCmdLineArgument("src", src);
     }
 
     args.GetCmdLineArgument("iteration-num", iterations);
-
     args.GetCmdLineArgument("grid-size", max_grid_size);
-
     g_quick = args.CheckCmdLineFlag("quick");
     mark_pred = args.CheckCmdLineFlag("mark-pred");
     idempotence = args.CheckCmdLineFlag("idempotence");
@@ -486,211 +511,232 @@ void RunTests(
     if (g_beta == 0.0f)
         g_beta = 6.0f;
 
-    printf("alpha:%5f, beta:%5f\n", g_alpha, g_beta);
+    // printf("alpha:%5f, beta:%5f\n", g_alpha, g_beta);
 
-    if (instrumented) {
-        if (mark_pred) {
-            if (idempotence) {
+    if (instrumented)
+    {
+        if (mark_pred)
+        {
+            if (idempotence)
+            {
                 RunTests<VertexId, Value, SizeT, true, true, true>(
-                        graph,
-                        inv_graph,
-                        src,
-                        max_grid_size,
-                        num_gpus,
-                        max_queue_sizing,
-                        g_alpha,
-                        g_beta,
-                        iterations,
-                        context);
-            } else {
-                RunTests<VertexId, Value, SizeT, true, true, false>(
-                        graph,
-                        inv_graph,
-                        src,
-                        max_grid_size,
-                        num_gpus,
-                        max_queue_sizing,
-                        g_alpha,
-                        g_beta,
-                        iterations,
-                        context);
+                    graph,
+                    inv_graph,
+                    src,
+                    max_grid_size,
+                    num_gpus,
+                    max_queue_sizing,
+                    g_alpha,
+                    g_beta,
+                    iterations,
+                    context);
             }
-        } else {
-            if (idempotence) {
-                RunTests<VertexId, Value, SizeT, true, false, true>(
-                        graph,
-                        inv_graph,
-                        src,
-                        max_grid_size,
-                        num_gpus,
-                        max_queue_sizing,
-                        g_alpha,
-                        g_beta,
-                        iterations,
-                        context);
-            } else {
-                RunTests<VertexId, Value, SizeT, true, false, false>(
-                        graph,
-                        inv_graph,
-                        src,
-                        max_grid_size,
-                        num_gpus,
-                        max_queue_sizing,
-                        g_alpha,
-                        g_beta,
-                        iterations,
-                        context);
+            else
+            {
+                RunTests<VertexId, Value, SizeT, true, true, false>(
+                    graph,
+                    inv_graph,
+                    src,
+                    max_grid_size,
+                    num_gpus,
+                    max_queue_sizing,
+                    g_alpha,
+                    g_beta,
+                    iterations,
+                    context);
             }
         }
-    } else {
-        if (mark_pred) {
-            if (idempotence) {
-                RunTests<VertexId, Value, SizeT, false, true, true>(
-                        graph,
-                        inv_graph,
-                        src,
-                        max_grid_size,
-                        num_gpus,
-                        max_queue_sizing,
-                        g_alpha,
-                        g_beta,
-                        iterations,
-                        context);
-            } else {
-                RunTests<VertexId, Value, SizeT, false, true, false>(
-                        graph,
-                        inv_graph,
-                        src,
-                        max_grid_size,
-                        num_gpus,
-                        max_queue_sizing,
-                        g_alpha,
-                        g_beta,
-                        iterations,
-                        context);
+        else
+        {
+            if (idempotence)
+            {
+                RunTests<VertexId, Value, SizeT, true, false, true>(
+                    graph,
+                    inv_graph,
+                    src,
+                    max_grid_size,
+                    num_gpus,
+                    max_queue_sizing,
+                    g_alpha,
+                    g_beta,
+                    iterations,
+                    context);
             }
-        } else {
-            if (idempotence) {
-                RunTests<VertexId, Value, SizeT, false, false, true>(
-                        graph,
-                        inv_graph,
-                        src,
-                        max_grid_size,
-                        num_gpus,
-                        max_queue_sizing,
-                        g_alpha,
-                        g_beta,
-                        iterations,
-                        context);
-            } else {
-                RunTests<VertexId, Value, SizeT, false, false, false>(
-                        graph,
-                        inv_graph,
-                        src,
-                        max_grid_size,
-                        num_gpus,
-                        max_queue_sizing,
-                        g_alpha,
-                        g_beta,
-                        iterations,
-                        context);
+            else
+            {
+                RunTests<VertexId, Value, SizeT, true, false, false>(
+                    graph,
+                    inv_graph,
+                    src,
+                    max_grid_size,
+                    num_gpus,
+                    max_queue_sizing,
+                    g_alpha,
+                    g_beta,
+                    iterations,
+                    context);
             }
         }
     }
-
-
+    else
+    {
+        if (mark_pred)
+        {
+            if (idempotence)
+            {
+                RunTests<VertexId, Value, SizeT, false, true, true>(
+                    graph,
+                    inv_graph,
+                    src,
+                    max_grid_size,
+                    num_gpus,
+                    max_queue_sizing,
+                    g_alpha,
+                    g_beta,
+                    iterations,
+                    context);
+            }
+            else
+            {
+                RunTests<VertexId, Value, SizeT, false, true, false>(
+                    graph,
+                    inv_graph,
+                    src,
+                    max_grid_size,
+                    num_gpus,
+                    max_queue_sizing,
+                    g_alpha,
+                    g_beta,
+                    iterations,
+                    context);
+            }
+        }
+        else
+        {
+            if (idempotence)
+            {
+                RunTests<VertexId, Value, SizeT, false, false, true>(
+                    graph,
+                    inv_graph,
+                    src,
+                    max_grid_size,
+                    num_gpus,
+                    max_queue_sizing,
+                    g_alpha,
+                    g_beta,
+                    iterations,
+                    context);
+            }
+            else
+            {
+                RunTests<VertexId, Value, SizeT, false, false, false>(
+                    graph,
+                    inv_graph,
+                    src,
+                    max_grid_size,
+                    num_gpus,
+                    max_queue_sizing,
+                    g_alpha,
+                    g_beta,
+                    iterations,
+                    context);
+            }
+        }
+    }
 }
 
-
-
 /******************************************************************************
-* Main
-******************************************************************************/
-
+ * Main
+ ******************************************************************************/
 int main( int argc, char** argv)
 {
-	CommandLineArgs args(argc, argv);
+    CommandLineArgs args(argc, argv);
 
-	if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
-		Usage();
-		return 1;
-	}
+    if ((argc < 2) || (args.CheckCmdLineFlag("help")))
+    {
+        Usage();
+        return 1;
+    }
 
-	//DeviceInit(args);
-	//cudaSetDeviceFlags(cudaDeviceMapHost);
+    //DeviceInit(args);
+    //cudaSetDeviceFlags(cudaDeviceMapHost);
 
     int dev = 0;
     args.GetCmdLineArgument("device", dev);
     ContextPtr context = mgpu::CreateCudaDevice(dev);
 
-	//srand(0);									// Presently deterministic
-	//srand(time(NULL));
+    //srand(0); // Presently deterministic
+    //srand(time(NULL));
 
-	// Parse graph-contruction params
-	g_undirected = args.CheckCmdLineFlag("undirected");
+    // Parse graph-contruction params
+    g_undirected = args.CheckCmdLineFlag("undirected");
 
-	std::string graph_type = argv[1];
-	int flags = args.ParsedArgc();
-	int graph_args = argc - flags - 1;
+    std::string graph_type = argv[1];
+    int flags = args.ParsedArgc();
+    int graph_args = argc - flags - 1;
 
-	if (graph_args < 1) {
-		Usage();
-		return 1;
-	}
-	
-	//
-	// Construct graph and perform search(es)
-	//
+    if (graph_args < 1)
+    {
+        Usage();
+        return 1;
+    }
 
-	if (graph_type == "market") {
+    //
+    // Construct graph and perform search(es)
+    //
 
-		// Matrix-market coordinate-formatted graph file
+    if (graph_type == "market")
+    {
+        // Matrix-market coordinate-formatted graph file
 
-		typedef int VertexId;							// Use as the node identifier type
-		typedef int Value;								// Use as the value type
-		typedef int SizeT;								// Use as the graph size type
-		Csr<VertexId, Value, SizeT> csr(false);         // default value for stream_from_host is false
+        typedef int VertexId;                   // Use as the node identifier
+        typedef int Value;                      // Use as the value type
+        typedef int SizeT;                      // Use as the graph size type
+        Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
 
-		Csr<VertexId, Value, SizeT> inv_csr(false);
+        Csr<VertexId, Value, SizeT> inv_csr(false);
 
-		if (graph_args < 1) { Usage(); return 1; }
-		char *market_filename = (graph_args == 2) ? argv[2] : NULL;
-		if (graphio::BuildMarketGraph<false>(
-			market_filename, 
-			csr, 
-			g_undirected,
-			false) != 0) 
-		{
-			return 1;
-		}
+        if (graph_args < 1) { Usage(); return 1; }
 
-        if (!g_undirected) {
+        char *market_filename = (graph_args == 2) ? argv[2] : NULL;
+        if (graphio::BuildMarketGraph<false>(
+                market_filename,
+                csr,
+                g_undirected,
+                false) != 0)
+        {
+            return 1;
+        }
+
+        if (!g_undirected)
+        {
             if (graphio::BuildMarketGraph<false>(
-			            market_filename, 
-			            inv_csr, 
-			            g_undirected,
-			            true) != 0) 
-		    {
-			    return 1;
-		    }
-		}
+                    market_filename,
+                    inv_csr,
+                    g_undirected,
+                    true) != 0)
+            {
+                return 1;
+            }
+        }
 
-		csr.PrintHistogram();
+        csr.PrintHistogram();
 
-        if (!g_undirected) {
-		    // Run tests
-		    RunTests(csr, inv_csr, args, *context);
-		} else {
-		    RunTests(csr, csr, args, *context);
-		}
+        if (!g_undirected)
+        {
+            // Run tests
+            RunTests(csr, inv_csr, args, *context);
+        }
+        else
+        {
+            RunTests(csr, csr, args, *context);
+        }
 
-	} else {
-
-		// Unknown graph type
-		fprintf(stderr, "Unspecified graph type\n");
-		return 1;
-
-	}
-
-	return 0;
+    }
+    else
+    {
+        fprintf(stderr, "Unspecified graph type\n");
+        return 1;
+    }
+    return 0;
 }

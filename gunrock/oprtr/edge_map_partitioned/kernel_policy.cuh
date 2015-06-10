@@ -69,6 +69,7 @@ struct KernelPolicy
     typedef _ProblemData                    ProblemData;
     typedef typename ProblemData::VertexId  VertexId;
     typedef typename ProblemData::SizeT     SizeT;
+    typedef typename ProblemData::Value     Value;
 
     enum {
 

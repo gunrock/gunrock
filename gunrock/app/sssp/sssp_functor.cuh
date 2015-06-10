@@ -20,6 +20,10 @@
 namespace gunrock { namespace app {
 namespace sssp {
 
+// TODO: 1) no atomics when in-degree is 1
+// 2) if out-degree is 0 (1 in undirected graph), no enqueue and relaxation
+// 3) first iteration no relaxation
+
 /**
  * @brief Structure contains device functions in SSSP graph traverse.
  *
@@ -88,7 +92,7 @@ struct SSSPFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, unsigned int v = 0)
+    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, unsigned int v =0, SizeT nid=0)
     {
         return (node != -1);
     }
@@ -101,7 +105,7 @@ struct SSSPFunctor
      * @param[in] v auxiliary value
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, unsigned int v = 0)
+    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, unsigned int v = 0, SizeT nid=0)
     {
         // Doing nothing here
     }

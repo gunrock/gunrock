@@ -10,7 +10,6 @@
 #include <gunrock/util/operators.cuh>
 
 #include <gunrock/util/test_utils.cuh>
-
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/app/enactor_base.cuh>
 
@@ -37,6 +36,7 @@ namespace advance {
  * @tparam KernelPolicy Kernel policy type for advance operator.
  * @tparam ProblemData Problem data type for advance operator.
  * @tparam Functor Functor type for the specific problem type.
+ * @tparam Op Operation for gather reduce. mgpu::plus<int> by default.
  *
  * @param[in] d_done                    Pointer of volatile int to the flag to set when we detect incoming frontier is empty
  * @param[in] enactor_stats             EnactorStats object to store enactor related variables and stast
@@ -50,7 +50,7 @@ namespace advance {
  * @param[in] d_out_key_queue           Device pointer of output key array to the outgoing frontier queue
  * @param[in] d_in_value_queue          Device pointer of input value array to the incoming frontier queue
  * @param[in] d_out_value_queue         Device pointer of output value array to the outgoing frontier queue
- * @param[in] d_row_offsets             Device pointer of SizeT to the row offsets queue  
+ * @param[in] d_row_offsets             Device pointer of SizeT to the row offsets queue
  * @param[in] d_column_indices          Device pointer of VertexId to the column indices queue
  * @param[in] d_column_offsets          Device pointer of SizeT to the row offsets queue for inverse graph
  * @param[in] d_row_indices             Device pointer of VertexId to the column indices queue for inverse graph
@@ -60,7 +60,16 @@ namespace advance {
  * @param[in] context                   CudaContext pointer for moderngpu APIs
  * @param[in] ADVANCE_TYPE              enumerator of advance type: V2V, V2E, E2V, or E2E
  * @param[in] inverse_graph             whether this iteration of advance operation is in the opposite direction to the previous iteration (false by default)
+ * @param[in] REDUCE_OP                 enumerator of available reduce operations: plus, multiplies, bit_or, bit_and, bit_xor, maximum, minimum. none by default.
+ * @param[in] REDUCE_TYPE               enumerator of available reduce types: EMPTY(do not do reduce) VERTEX(extract value from |V| array) EDGE(extract value from |E| array)
+ * @param[in] d_value_to_reduce         array to store values to reduce
+ * @param[out] d_reduce_frontier        neighbor list values for nodes in the output frontier
+ * @param[out] d_reduced_value          array to store reduced values
  */
+
+//TODO: Reduce by neighbor list now only supports LB advance mode.
+//TODO: Add a switch to enable advance+filter (like in BFS), pissibly moving idempotent ops from filter to advance?
+
 template <typename KernelPolicy, typename ProblemData, typename Functor>
     void LaunchKernel(
             volatile int                            *d_done,
@@ -84,7 +93,13 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             util::CtaWorkProgress                   work_progress,
             CudaContext                             &context,
             TYPE                                    ADVANCE_TYPE,
-            bool                                    inverse_graph = false)
+            bool                                    inverse_graph = false,
+            REDUCE_OP                               R_OP = gunrock::oprtr::advance::NONE,
+            REDUCE_TYPE                             R_TYPE = gunrock::oprtr::advance::EMPTY,
+            typename KernelPolicy::Value            *d_value_to_reduce = NULL,
+            typename KernelPolicy::Value            *d_reduce_frontier = NULL,
+            typename KernelPolicy::Value            *d_reduced_value = NULL)
+
 {
     switch (KernelPolicy::ADVANCE_MODE)
     {
@@ -132,16 +147,16 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         d_row_indices,
                                         d_in_key_queue,
                                         partitioned_scanned_edges,
-                                        frontier_attribute.queue_length,
+                                        frontier_attribute.queue_length+1,
                                         max_in,
                                         max_out,
                                         ADVANCE_TYPE);
 
-            Scan<mgpu::MgpuScanTypeInc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length, (int)0, mgpu::plus<int>(),
+            Scan<mgpu::MgpuScanTypeExc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length+1, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
 
             SizeT *temp = new SizeT[1];
-            cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToHost);
+            cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length, sizeof(SizeT), cudaMemcpyDeviceToHost);
             SizeT output_queue_len = temp[0];
             //printf("input queue:%d, output_queue:%d\n", frontier_attribute.queue_length, output_queue_len);
 
@@ -155,7 +170,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         d_column_offsets,
                         d_row_indices,
                         (VertexId*)NULL,
-                        partitioned_scanned_edges,
+                        &partitioned_scanned_edges[1],
                         d_done,
                         d_in_key_queue,
                         backward_frontier_map_in,
@@ -179,7 +194,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         d_column_offsets,
                         d_row_indices,
                         (VertexId*)NULL,
-                        partitioned_scanned_edges,
+                        &partitioned_scanned_edges[1],
                         d_done,
                         d_in_key_queue,
                         backward_frontier_map_out,
@@ -238,12 +253,13 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                             enactor_stats.advance_kernel_stats,
                             ADVANCE_TYPE);
             }
-            break;   
+            break;
         }
-        case LB2:
+        case LB:
         {
             typedef typename ProblemData::SizeT         SizeT;
             typedef typename ProblemData::VertexId      VertexId;
+            typedef typename ProblemData::Value         Value;
             typedef typename KernelPolicy::LOAD_BALANCED LBPOLICY;
             int num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
             gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
@@ -251,14 +267,14 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         d_row_offsets,
                                         d_column_indices,
                                         d_in_key_queue,
-                                        &partitioned_scanned_edges[1],
-                                        frontier_attribute.queue_length,
+                                        partitioned_scanned_edges,
+                                        frontier_attribute.queue_length+1,
                                         max_in,
                                         max_out,
                                         ADVANCE_TYPE);
 
-            Scan<mgpu::MgpuScanTypeInc>((int*)&partitioned_scanned_edges[1], frontier_attribute.queue_length, (int)0, mgpu::plus<int>(),
-            (int*)0, (int*)0, (int*)&partitioned_scanned_edges[1], context);
+            Scan<mgpu::MgpuScanTypeExc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length+1, (int)0, mgpu::plus<int>(),
+            (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
 
             SizeT *temp = new SizeT[1];
             cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length, sizeof(SizeT), cudaMemcpyDeviceToHost);
@@ -286,12 +302,16 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         work_progress,
                         enactor_stats.advance_kernel_stats,
                         ADVANCE_TYPE,
-                        inverse_graph);
+                        inverse_graph,
+                        R_TYPE,
+                        R_OP,
+                        d_value_to_reduce,
+                        d_reduce_frontier);
             }
             else
             {
                 unsigned int split_val = (output_queue_len + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
-                int num_block = (output_queue_len >= 256) ? KernelPolicy::LOAD_BALANCED::BLOCKS : 1;
+                int num_block = KernelPolicy::LOAD_BALANCED::BLOCKS;
                 int nb = (num_block + 1 + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
                 gunrock::oprtr::edge_map_partitioned::MarkPartitionSizes<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
                     <<<nb, KernelPolicy::LOAD_BALANCED::THREADS>>>(
@@ -299,16 +319,16 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                             split_val,
                             num_block+1,
                             output_queue_len);
-                util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.d_node_locks, KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
+                //util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.d_node_locks, KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
 
                 SortedSearch<MgpuBoundsLower>(
                         enactor_stats.d_node_locks,
                         KernelPolicy::LOAD_BALANCED::BLOCKS,
-                        partitioned_scanned_edges,
+                        &partitioned_scanned_edges[1],
                         frontier_attribute.queue_length,
                         enactor_stats.d_node_locks_out,
                         context);
-                
+
                 gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges2<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
                                         frontier_attribute.queue_reset,
@@ -317,7 +337,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         d_row_offsets,
                                         d_column_indices,
                                         d_row_indices,
-                                        partitioned_scanned_edges,
+                                        &partitioned_scanned_edges[1],
                                         enactor_stats.d_node_locks_out,
                                         KernelPolicy::LOAD_BALANCED::BLOCKS,
                                         d_done,
@@ -332,100 +352,46 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         work_progress,
                                         enactor_stats.advance_kernel_stats,
                                         ADVANCE_TYPE,
-                                        inverse_graph);
+                                        inverse_graph,
+                                        R_TYPE,
+                                        R_OP,
+                                        d_value_to_reduce,
+                                        d_reduce_frontier);
 
                 //util::DisplayDeviceResults(d_out_key_queue, output_queue_len);
             }
-        }
-        case LB:
-        {
-            typedef typename ProblemData::SizeT         SizeT;
-            typedef typename ProblemData::VertexId      VertexId;
-            typedef typename KernelPolicy::LOAD_BALANCED LBPOLICY;
-            // Load Load Balanced Kernel
-            // Get Rowoffsets
-            // Use scan to compute edge_offsets for each vertex in the frontier
-            // Use sorted sort to compute partition bound for each work-chunk
-            // load edge-expand-partitioned kernel
-            int num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
-            gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
-            <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
-                                        d_row_offsets,
-                                        d_column_indices,
-                                        d_in_key_queue,
-                                        &partitioned_scanned_edges[1],
-                                        frontier_attribute.queue_length,
-                                        max_in,
-                                        max_out,
-                                        ADVANCE_TYPE);
 
-            Scan<mgpu::MgpuScanTypeInc>((int*)&partitioned_scanned_edges[1], frontier_attribute.queue_length, (int)0, mgpu::plus<int>(),
-            (int*)0, (int*)0, (int*)&partitioned_scanned_edges[1], context);
-
-            SizeT *temp = new SizeT[1];
-            cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length, sizeof(SizeT), cudaMemcpyDeviceToHost);
-            SizeT output_queue_len = temp[0];
-            //printf("input_queue_len:%d\n", frontier_attribute.queue_length);
-            //printf("output_queue_len:%d\n", output_queue_len);
-
-            //if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
-            {
-                gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
-                <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
-                        frontier_attribute.queue_reset,
-                        frontier_attribute.queue_index,
-                        enactor_stats.iteration,
-                        d_row_offsets,
-                        d_column_indices,
-                        d_row_indices,
-                        &partitioned_scanned_edges[1],
-                        d_done,
-                        d_in_key_queue,
-                        d_out_key_queue,
-                        data_slice,
-                        frontier_attribute.queue_length,
-                        output_queue_len,
-                        max_in,
-                        max_out,
-                        work_progress,
-                        enactor_stats.advance_kernel_stats,
-                        ADVANCE_TYPE,
-                        inverse_graph);
+            // TODO: switch REDUCE_OP for different reduce operators
+            // Do segreduction using d_scanned_edges and d_reduce_frontier
+            if (R_TYPE != gunrock::oprtr::advance::EMPTY && d_value_to_reduce && d_reduce_frontier) {
+              switch (R_OP) {
+                case gunrock::oprtr::advance::PLUS: {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (Value)0, mgpu::plus<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                case gunrock::oprtr::advance::MULTIPLIES: {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (Value)1, mgpu::multiplies<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                case gunrock::oprtr::advance::MAXIMUM: {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (Value)INT_MIN, mgpu::maximum<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                case gunrock::oprtr::advance::MINIMUM: {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (Value)INT_MAX, mgpu::minimum<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                default:
+                    //default operator is plus
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (Value)0, mgpu::plus<typename KernelPolicy::Value>(), context);
+                      break;
+              }
             }
-            /*else
-            {
-                LoadBalanceSearch(output_queue_len, partitioned_scanned_edges, frontier_attribute.queue_length, d_out_key_queue, context);
-
-                //util::DisplayDeviceResults(enactor_stats.d_node_locks_out, KernelPolicy::LOAD_BALANCED::BLOCKS);
-                int num_block = (output_queue_len + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
-                //printf("block num:%d\n", num_block);
-
-                gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
-                <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
-                                        frontier_attribute.queue_reset,
-                                        frontier_attribute.queue_index,
-                                        enactor_stats.iteration,
-                                        d_row_offsets,
-                                        d_column_indices,
-                                        d_row_indices,
-                                        partitioned_scanned_edges,
-                                        enactor_stats.d_node_locks_out,
-                                        KernelPolicy::LOAD_BALANCED::BLOCKS,
-                                        d_done,
-                                        d_in_key_queue,
-                                        d_out_key_queue,
-                                        data_slice,
-                                        frontier_attribute.queue_length,
-                                        output_queue_len,
-                                        max_in,
-                                        max_out,
-                                        work_progress,
-                                        enactor_stats.advance_kernel_stats,
-                                        ADVANCE_TYPE,
-                                        inverse_graph);
-
-                //util::DisplayDeviceResults(d_out_key_queue, output_queue_len);
-            }*/
             break;
         }
     }
