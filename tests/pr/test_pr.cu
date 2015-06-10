@@ -42,7 +42,6 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/page_rank.hpp>
 
-
 using namespace gunrock;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
@@ -58,10 +57,11 @@ bool g_undirected;
 bool g_quick;
 bool g_stream_from_host;
 
-template <typename VertexId, typename Value>
-struct RankPair {
-    VertexId        vertex_id;
-    Value           page_rank;
+template<typename VertexId, typename Value>
+struct RankPair
+{
+    VertexId vertex_id;
+    Value    page_rank;
 
     RankPair(VertexId vertex_id, Value page_rank) :
         vertex_id(vertex_id), page_rank(page_rank) {}
@@ -78,21 +78,22 @@ bool PRCompare(
 /******************************************************************************
  * Housekeeping Routines
  ******************************************************************************/
+
 void Usage()
 {
-    printf("\ntest_pr <graph type> <graph type args> [--device=<device_index>] "
-           "[--undirected] [--instrumented] [--quick] "
-           "[--v]\n"
-           "\n"
-           "Graph types and args:\n"
-           "  market [<file>]\n"
-           "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
-           "    edges from stdin (or from the optionally-specified file).\n"
-           "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
-           "  --undirected If set then treat the graph as undirected.\n"
-           "  --instrumented If set then kernels keep track of queue-search_depth\n"
-           "  and barrier duty (a relative indicator of load imbalance.)\n"
-           "  --quick If set will skip the CPU validation code.\n"
+    printf(
+        "\ntest_pr <graph type> <graph type args> [--device=<device_index>] "
+        "[--undirected] [--instrumented] [--quick=<0|1>] [--v]\n"
+        "\n"
+        "Graph types and args:\n"
+        "  market [<file>]\n"
+        "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
+        "    edges from stdin (or from the optionally-specified file).\n"
+        "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
+        "  --undirected If set then treat the graph as undirected.\n"
+        "  --instrumented If set then kernels keep track of queue-search_depth\n"
+        "  and barrier duty (a relative indicator of load imbalance.)\n"
+        "  --quick If set will skip the CPU validation code. Default: 0\n"
         );
 }
 
@@ -104,14 +105,14 @@ void Usage()
  * @param[in] nodes Number of nodes in the graph.
  */
 template<typename VertexId, typename Value, typename SizeT>
-void DisplaySolution(VertexId *node_id, Value *rank, SizeT nodes)
+void DisplaySolution(VertexId *node, Value *rank, SizeT nodes)
 {
     // Print out at most top 10 ranked nodes
     int top = (nodes < 10) ? nodes : 10;
-    printf("\nTop %d Page Ranks:\n", top);
+    printf("\nTop %d Ranked Vertices and PageRanks:\n", top);
     for (int i = 0; i < top; ++i)
     {
-        printf("Vertex ID: %d, Page Rank: %5f\n", node_id[i], rank[i]);
+        printf("Vertex ID: %d, PageRank: %5f\n", node[i], rank[i]);
     }
 }
 
@@ -121,10 +122,10 @@ void DisplaySolution(VertexId *node_id, Value *rank, SizeT nodes)
 struct Stats
 {
     const char *name;
-    Statistic rate;
-    Statistic search_depth;
-    Statistic redundant_work;
-    Statistic duty;
+    Statistic  rate;
+    Statistic  search_depth;
+    Statistic  redundant_work;
+    Statistic  duty;
 
     Stats() : name(NULL), rate(), search_depth(), redundant_work(), duty() {}
     Stats(const char *name) :
@@ -139,10 +140,10 @@ struct Stats
  * @tparam SizeT
  *
  * @param[in] stats Reference to the Stats object defined in RunTests
- * @param[in] h_rank Host-side vector stores computed page rank values for validation
+ * @param[in] h_rank Host-side vector stores computed rank values for validation
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] elapsed Total elapsed kernel running time
- * @param[in] total_queued Total element queued in PageRank kernel running process
+ * @param[in] total_queued Total element queued in PR kernel running process
  * @param[in] avg_duty Average duty of the PageRankv kernels
  */
 template<
@@ -158,10 +159,7 @@ void DisplayStats(
     double              avg_duty,
     long long           num_iter)
 {
-    // Display test name
     printf("[%s] finished.", stats.name);
-
-    // Display the specific sample statistics
     printf("\n elapsed: %.4f ms", elapsed);
 
     if (avg_duty != 0)
@@ -170,7 +168,6 @@ void DisplayStats(
     }
 
     printf("\n num_iterations: %lld", num_iter);
-
     printf("\n");
 }
 
@@ -196,20 +193,20 @@ template<
     typename VertexId,
     typename Value,
     typename SizeT>
-void SimpleReferencePr(
-    const Csr<VertexId, Value, SizeT>       &graph,
-    VertexId                                *node_id,
-    Value                                   *rank,
-    Value                                   delta,
-    Value                                   error,
-    SizeT                                   max_iter,
-    bool                                    directed)
+void SimpleReferencePageRank(
+    const Csr<VertexId, Value, SizeT> &graph,
+    VertexId                          *node_id,
+    Value                             *rank,
+    Value                             delta,
+    Value                             error,
+    SizeT                             max_iter,
+    bool                              directed)
 {
     using namespace boost;
 
-    //Preparation
-    typedef adjacency_list<vecS, vecS, bidirectionalS,
-                           no_property, property<edge_index_t, int> > Graph;
+    // Preparation
+    typedef adjacency_list< vecS, vecS, bidirectionalS, no_property,
+                            property<edge_index_t, int> > Graph;
 
     Graph g;
 
@@ -223,23 +220,23 @@ void SimpleReferencePr(
         }
     }
 
-
     //
-    //compute page rank
+    // Compute PageRank
     //
 
     CpuTimer cpu_timer;
     cpu_timer.Start();
-
+    /*
     if (!directed)
     {
         remove_dangling_links(g);
-        printf("finished remove dangling links.\n");
+        printf("finished removing dangling links.\n");
     }
-
+    */
     std::vector<Value> ranks(num_vertices(g));
-    page_rank(g, make_iterator_property_map(ranks.begin(),
-                                            get(boost::vertex_index, g)),
+    page_rank(g, make_iterator_property_map(
+                  ranks.begin(),
+                  get(boost::vertex_index, g)),
               boost::graph::n_iterations(max_iter));
 
     cpu_timer.Stop();
@@ -250,7 +247,7 @@ void SimpleReferencePr(
         rank[i] = ranks[i];
     }
 
-    //sort the top page ranks
+    // Sort the top ranked vertices
     RankPair<SizeT, Value> *pr_list =
         (RankPair<SizeT, Value>*)malloc(
             sizeof(RankPair<SizeT, Value>) * num_vertices(g));
@@ -259,8 +256,8 @@ void SimpleReferencePr(
         pr_list[i].vertex_id = i;
         pr_list[i].page_rank = rank[i];
     }
-    std::stable_sort(
-        pr_list, pr_list + num_vertices(g), PRCompare<RankPair<SizeT, Value> >);
+    std::stable_sort(pr_list, pr_list + num_vertices(g),
+                     PRCompare<RankPair<SizeT, Value> >);
 
     for (int i = 0; i < num_vertices(g); ++i)
     {
@@ -269,7 +266,6 @@ void SimpleReferencePr(
     }
 
     free(pr_list);
-
     printf("CPU PageRank finished in %lf msec.\n", elapsed);
 }
 
@@ -299,28 +295,24 @@ template <
     bool INSTRUMENT>
 void RunTests(
     const Csr<VertexId, Value, SizeT> &graph,
-    VertexId src,
-    Value delta,
-    Value error,
-    SizeT max_iter,
-    int max_grid_size,
-    int num_gpus,
-    int iterations,
-    int traversal_mode,
+    VertexId     src,
+    Value        delta,
+    Value        error,
+    SizeT        max_iter,
+    int          max_grid_size,
+    int          num_gpus,
+    int          iterations,
+    int          traversal_mode,
     CudaContext& context)
 {
+    typedef PRProblem<VertexId, SizeT, Value> Problem;
 
-    typedef PRProblem<
-        VertexId,
-        SizeT,
-        Value> Problem;
-
-    // Allocate host-side label array (for both reference and gpu-computed results)
-    Value    *reference_rank    = (Value*)malloc(sizeof(Value) * graph.nodes);
-    Value    *h_rank            = (Value*)malloc(sizeof(Value) * graph.nodes);
-    VertexId *h_node_id         = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-    VertexId *reference_node_id = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-    Value    *reference_check   = (g_quick) ? NULL : reference_rank;
+    // Allocate host-side arrays (for both reference and gpu-computed results)
+    Value    *ref_rank    = (Value*)malloc(sizeof(Value) * graph.nodes);
+    Value    *h_rank      = (Value*)malloc(sizeof(Value) * graph.nodes);
+    VertexId *h_node_id   = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+    VertexId *ref_node_id = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+    Value    *ref_check   = (g_quick) ? NULL : ref_rank;
 
     // Allocate PageRank enactor map
     PREnactor<INSTRUMENT> pr_enactor(g_verbose);
@@ -336,8 +328,8 @@ void RunTests(
     Stats *stats = new Stats("GPU PageRank");
 
     long long total_queued = 0;
-    double    avg_duty     = 0.0;
     long long num_iter     = 0;
+    double    avg_duty     = 0.0;
 
     // Perform PageRank
     GpuTimer gpu_timer;
@@ -375,13 +367,13 @@ void RunTests(
     //
     // Compute reference CPU PR solution for source-distance
     //
-    if (reference_check != NULL && total_pr > 0)
+    if (ref_check != NULL && total_pr > 0)
     {
         printf("Computing reference value ...\n");
-        SimpleReferencePr(
+        SimpleReferencePageRank(
             graph,
-            reference_node_id,
-            reference_check,
+            ref_node_id,
+            ref_check,
             delta,
             error,
             max_iter,
@@ -390,10 +382,10 @@ void RunTests(
     }
 
     // Verify the result
-    if (reference_check != NULL && total_pr > 0)
+    if (ref_check != NULL && total_pr > 0)
     {
         printf("Validity: ");
-        CompareResults(h_rank, reference_check, graph.nodes, true);
+        CompareResults(h_rank, ref_check, graph.nodes, true);
     }
 
     // Display Solution
@@ -411,7 +403,7 @@ void RunTests(
     // Cleanup
     delete stats;
     if (csr_problem) delete csr_problem;
-    if (reference_check) free(reference_check);
+    if (ref_check) free(ref_check);
     if (h_rank) free(h_rank);
 
     cudaDeviceSynchronize();
@@ -446,8 +438,9 @@ void RunTests(
     VertexId src            = -1;    // Source vertex
     int      iterations     = 1;     // Number of runs for testing
     int      traversal_mode = -1;    // Load-balacned or Dynamic cooperative
+    g_quick                 = false; // Whether or not to skip ref validation
 
-    // traversal mode
+    // Determine traversal method according to graph topology
     args.GetCmdLineArgument("traversal-mode", traversal_mode);
     if (traversal_mode == -1)
     {
@@ -455,13 +448,14 @@ void RunTests(
     }
 
     instrumented = args.CheckCmdLineFlag("instrumented");
+    g_verbose = args.CheckCmdLineFlag("v");
+    g_quick = args.CheckCmdLineFlag("quick");
+
     args.GetCmdLineArgument("delta", delta);
     args.GetCmdLineArgument("error", error);
     args.GetCmdLineArgument("max-iter", max_iter);
     args.GetCmdLineArgument("src", src);
     args.GetCmdLineArgument("iteration-num", iterations);
-    g_quick = args.CheckCmdLineFlag("quick");
-    g_verbose = args.CheckCmdLineFlag("v");
 
     if (instrumented)
     {
@@ -507,18 +501,12 @@ int main( int argc, char** argv)
         return 1;
     }
 
-    //DeviceInit(args);
-    //cudaSetDeviceFlags(cudaDeviceMapHost);
     int dev = 0;
     args.GetCmdLineArgument("device", dev);
     ContextPtr context = mgpu::CreateCudaDevice(dev);
 
-    //srand(0); // Presently deterministic
-    //srand(time(NULL));
-
     // Parse graph-contruction params
-    //g_undirected = args.CheckCmdLineFlag("undirected");
-    g_undirected = true;
+    g_undirected = args.CheckCmdLineFlag("undirected");
 
     std::string graph_type = argv[1];
     int flags = args.ParsedArgc();
@@ -533,11 +521,9 @@ int main( int argc, char** argv)
     //
     // Construct graph and perform search(es)
     //
-
     if (graph_type == "market")
     {
         // Matrix-market coordinate-formatted graph file
-
         typedef int VertexId;                   // Use as the node identifier
         typedef float Value;                    // Use as the value type
         typedef int SizeT;                      // Use as the graph size type
@@ -554,9 +540,6 @@ int main( int argc, char** argv)
             return 1;
         }
 
-        csr.PrintHistogram();
-
-        // Run tests
         RunTests(csr, args, *context);
 
     }

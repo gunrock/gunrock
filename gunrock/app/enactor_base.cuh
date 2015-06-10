@@ -133,13 +133,11 @@ protected:
      * @param[in] node_lock_size The size of an auxiliary array used in enactor, 256 by default.
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
-    template <typename ProblemData>
     cudaError_t Setup(
-        ProblemData *problem,
         int max_grid_size,
         int advance_occupancy,
         int filter_occupancy,
-        int node_lock_size = 256)
+        int node_lock_size = 257)
     {
         cudaError_t retval = cudaSuccess;
 

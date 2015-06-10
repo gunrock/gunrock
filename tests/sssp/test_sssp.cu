@@ -64,27 +64,32 @@ bool g_stream_from_host;
 void Usage()
 {
     printf(
-        "\ntest_sssp <graph type> <graph type args> [--device=<device_index>] "
-        "[--undirected] [--instrumented] [--src=<source index>] [--quick] [--v]\n"
-        "[--mark-pred] [--queue-sizing=<scale factor>] [--traversal-mode=<mode>]\n"
+        " test_sssp <graph type> <graph type args> [--device=<device_index>]\n"
+        " [--undirected] [--instrumented] [--src=<source index>] [--quick=<0|1>]\n"
+        " [--mark-pred] [--queue-sizing=<scale factor>] [--traversal-mode=<0|1>]\n"
+        " [--v] [--iteration-num=<num>]\n"
         "\n"
         "Graph types and args:\n"
         "  market [<file>]\n"
-        "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
+        "    Reads a Matrix-Market coordinate-formatted graph of directed / undirected\n"
         "    edges from stdin (or from the optionally-specified file).\n"
-        "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
-        "  --undirected If set then treat the graph as undirected.\n"
-        "  --instrumented If set then kernels keep track of queue-search_depth\n"
-        "  and barrier duty (a relative indicator of load imbalance.)\n"
-        "  --src Begins SSSP from the vertex <source index>. If set as randomize\n"
-        "  then will begin with a random source vertex.\n"
-        "  If set as largestdegree then will begin with the node which has\n"
-        "  largest degree.\n"
-        "  --quick If set will skip the CPU validation code.\n"
-        "  --v Whether to show debug info.\n"
-        "  --mark-pred If set then keep not only label info but also predecessor info.\n"
-        "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
-        "  --traversal-mode 0 for Load-balanced, 1 for Dynamic cooperative\n"
+        "  --device=<device_index>   Set GPU device for running the test. [Default: 0].\n"
+        "  --undirected              Treat the graph as undirected (symmetric).\n"
+        "  --instrumented            Keep kernels statics [Default: Disable].\n"
+        "                            total_queued, search_depth and barrier duty\n"
+        "                            (a relative indicator of load imbalance.)\n"
+        "  --src=<source vertex id>  Begins SSSP from the source [Default: 0].\n"
+        "                            If randomize: from a random source vertex.\n"
+        "                            If largestdegree: from largest degree vertex.\n"
+        "  --quick=<0 or 1>          Skip the CPU validation: 1, or not: 0 [Default: 1].\n"
+        "  --mark-pred               Keep both label info and predecessor info.\n"
+        "  --queue-sizing=<factor>   Allocates a frontier queue sized at:\n"
+        "                            (graph-edges * <scale factor>) [Default: 1.0].\n"
+        "  --v                       Print verbose per iteration debug info.\n"
+        "  --iteration-num=<number>  Number of runs to perform the test [Default: 1].\n"
+        "  --traversal-mode=<0 or 1> Set traversal strategy, 0 for Load-Balanced,\n"
+        "                            1 for Dynamic-Cooperative [Default: dynamic\n"
+        "                            determine based on average degree].\n"
         );
 }
 
@@ -95,12 +100,12 @@ void Usage()
  * @param[in] nodes Number of nodes in the graph.
  */
 template<typename VertexId, typename SizeT>
-void DisplaySolution(VertexId *source_path, SizeT nodes)
+void DisplaySolution (VertexId *source_path, SizeT num_nodes)
 {
-    if (nodes > 40)
-        nodes = 40;
+    if (num_nodes > 40) num_nodes = 40;
+
     printf("[");
-    for (VertexId i = 0; i < nodes; ++i)
+    for (VertexId i = 0; i < num_nodes; ++i)
     {
         PrintValue(i);
         printf(":");
@@ -194,15 +199,15 @@ void DisplayStats(
             printf(", search_depth: %lld", (long long) search_depth);
         printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
                (long long) src, (long long) nodes_visited, (long long) edges_visited);
-        if (avg_duty != 0)
+        if (avg_duty != 0 && g_verbose)
         {
             printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
         }
-        if (total_queued > 0)
+        if (total_queued > 0 && g_verbose)
         {
             printf(", total queued: %lld", total_queued);
         }
-        if (redundant_work > 0)
+        if (redundant_work > 0 && g_verbose)
         {
             printf(", redundant work: %.2f%%", redundant_work);
         }
@@ -535,6 +540,7 @@ void RunTests(
     int         iterations       = 1;   // Number of runs for testing
     int         delta_factor     = 16;  // Delta factor for priority queue
     int         traversal_mode   = -1;  // traversal mode: 0 for LB, 1 for TWC
+    g_quick                      = false;   // Whether or not to skip ref validation
 
     // source vertex to start
     args.GetCmdLineArgument("src", src_str);
@@ -566,8 +572,9 @@ void RunTests(
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     mark_pred = args.CheckCmdLineFlag("mark-pred");
-    g_quick = args.CheckCmdLineFlag("quick");
     g_verbose = args.CheckCmdLineFlag("v");
+    g_quick   = args.CheckCmdLineFlag("quick");
+
     args.GetCmdLineArgument("iteration-num", iterations);
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
     args.GetCmdLineArgument("delta-factor", delta_factor);
@@ -634,7 +641,8 @@ int main( int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
 
-    if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
+    if ((argc < 2) || (args.CheckCmdLineFlag("help")))
+    {
         Usage();
         return 1;
     }

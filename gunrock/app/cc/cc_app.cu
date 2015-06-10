@@ -1,13 +1,12 @@
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 /**
- * @file
- * test_cc.cu
+ * @file cc_app.cu
  *
  * @brief connected component implementation.
  */
@@ -32,83 +31,6 @@ using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::cc;
 
-// functions for displaying stats
-template <typename VertexId>
-struct CcList {
-    VertexId     root;
-    unsigned int histogram;
-    CcList(VertexId root, unsigned int histogram) : root(root), histogram(histogram) {}
-};
-
-template<typename CcList>
-inline bool CCCompare(
-    CcList elem1,
-    CcList elem2)
-{
-    return elem1.histogram > elem2.histogram;
-}
-
-/**
- * @brief Displays the CC result (i.e., number of components)
- *
- * @tparam VertexId
- * @tparam SizeT
- *
- * @param[in] component_ids Host-side vector to store computed component id for each node
- * @param[in] num_nodes Number of nodes in the graph
- * @param[in] num_components Number of connected components in the graph
- * @param[in] roots Host-side vector stores the root for each node in the graph
- * @param[in] histogram Histogram of connected component ids
- */
-template<
-    typename VertexId,
-    typename SizeT>
-void DisplaySolution(
-    VertexId     *component_ids,
-    SizeT        num_nodes,
-    unsigned int num_components,
-    VertexId     *roots,
-    unsigned int *histogram)
-{
-    typedef CcList<VertexId> CcListType;
-    printf("Number of components: %d\n", num_components);
-
-    if (num_nodes <= 40)
-    {
-        printf("[");
-        for (VertexId i = 0; i < num_nodes; ++i)
-    {
-        PrintValue(i);
-        printf(":");
-        PrintValue(component_ids[i]);
-        printf(",");
-        printf(" ");
-    }
-    printf("]\n");
-}
-else
-{
-    //sort the components by size
-    CcListType *cclist = (CcListType*)malloc(sizeof(CcListType) * num_components);
-    for (int i = 0; i < num_components; ++i)
-    {
-        cclist[i].root = roots[i];
-        cclist[i].histogram = histogram[i];
-    }
-    std::stable_sort(cclist, cclist + num_components, CCCompare<CcListType>);
-
-    // Print out at most top 10 largest components
-    int top = (num_components < 10) ? num_components : 10;
-    printf("Top %d largest components:\n", top);
-    for (int i = 0; i < top; ++i)
-    {
-        printf("CC_ID: %d, CC_Root: %d, CC_Size: %d\n", i, cclist[i].root, cclist[i].histogram);
-    }
-
-    free(cclist);
-    }
-}
-
 /**
  * @brief Run tests for connected component algorithm
  *
@@ -124,19 +46,20 @@ else
 template <
     typename VertexId,
     typename Value,
-    typename SizeT>
+    typename SizeT >
 void run_cc(
     GunrockGraph *ggraph_out,
+    unsigned int *components,
     const Csr<VertexId, Value, SizeT> &csr_graph,
     const int    max_grid_size,
-    const int    num_gpus)
-{
+    const int    num_gpus) {
+
     // Define CCProblem
-    typedef CCProblem<
+    typedef CCProblem <
         VertexId,
         SizeT,
         Value,
-        true> Problem; //use double buffer
+        true > Problem; //use double buffer
 
     // Allocate host-side label array for gpu-computed results
     VertexId *h_component_ids
@@ -148,35 +71,33 @@ void run_cc(
     // Allocate problem on GPU
     Problem *csr_problem = new Problem;
     util::GRError(csr_problem->Init(
-        false,
-        csr_graph,
-        num_gpus),
-        "CC Problem Initialization Failed", __FILE__, __LINE__);
+                      false,
+                      csr_graph,
+                      num_gpus),
+                  "CC Problem Initialization Failed", __FILE__, __LINE__);
 
     // Reset CC Problem Data
     util::GRError(csr_problem->Reset(
-        cc_enactor.GetFrontierType()),
-        "CC Problem Data Reset Failed", __FILE__, __LINE__);
+                      cc_enactor.GetFrontierType()),
+                  "CC Problem Data Reset Failed", __FILE__, __LINE__);
 
     // Perform Connected Component
     GpuTimer gpu_timer;
     gpu_timer.Start();
     // Lunch CC Enactor
     util::GRError(cc_enactor.template Enact<Problem>(
-        csr_problem, max_grid_size),
-        "CC Problem Enact Failed", __FILE__, __LINE__);
+                      csr_problem, max_grid_size),
+                  "CC Problem Enact Failed", __FILE__, __LINE__);
     gpu_timer.Stop();
     float elapsed = gpu_timer.ElapsedMillis();
 
     // Copy out results back to Host Device
     util::GRError(csr_problem->Extract(h_component_ids),
-        "CC Problem Data Extraction Failed", __FILE__, __LINE__);
+                  "CC Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    // Compute size and root of each component
-    VertexId     *h_roots      = new VertexId[csr_problem->num_components];
-    unsigned int *h_histograms = new unsigned int[csr_problem->num_components];
-
-    csr_problem->ComputeCCHistogram(h_component_ids, h_roots, h_histograms);
+    // Compute number of components in graph
+    unsigned int temp = csr_problem->num_components;
+    *components = temp;
 
     // copy component_id per node to GunrockGraph struct
     ggraph_out->node_values = (int*)&h_component_ids[0];
@@ -184,10 +105,7 @@ void run_cc(
     printf("GPU Connected Component finished in %lf msec.\n", elapsed);
 
     // Cleanup
-    if (h_roots)      delete[] h_roots;
-    if (h_histograms) delete[] h_histograms;
-    if (csr_problem)  delete   csr_problem;
-    //if (h_component_ids) free(h_component_ids);
+    if (csr_problem)  delete csr_problem;
 
     cudaDeviceSynchronize();
 }
@@ -202,10 +120,10 @@ void run_cc(
  */
 void dispatch_cc(
     GunrockGraph          *ggraph_out,
+    unsigned int          *components,
     const GunrockGraph    *ggraph_in,
     const GunrockConfig   cc_config,
-    const GunrockDataType data_type)
-{
+    const GunrockDataType data_type) {
     switch (data_type.VTXID_TYPE) {
     case VTXID_INT: {
         switch (data_type.SIZET_TYPE) {
@@ -220,12 +138,13 @@ void dispatch_cc(
                 csr_graph.row_offsets    = (int*)ggraph_in->row_offsets;
                 csr_graph.column_indices = (int*)ggraph_in->col_indices;
 
-                int max_grid_size = 0; //!< 0: leave it up to the enactor)
+                int max_grid_size = 0; //!< 0: leave it up to the enactor
                 int num_gpus      = 1; //!< number of GPUs
 
                 // lunch cc dispatch function
                 run_cc<int, int, int>(
                     ggraph_out,
+                    (unsigned int*)components,
                     csr_graph,
                     max_grid_size,
                     num_gpus);
@@ -246,7 +165,7 @@ void dispatch_cc(
                 break;
             }
             }
-        break;
+            break;
         }
         }
         break;
@@ -255,21 +174,22 @@ void dispatch_cc(
 }
 
 /*
-* @brief gunrock_cc function
-*
-* @param[out] ggraph_out output subgraph of cc problem
-* @param[in]  ggraph_in  input graph need to process on
-* @param[in]  cc_configs primitive specific configurations
-* @param[in]  data_type  gunrock data_type struct
-*/
+ * @brief gunrock_cc function
+ *
+ * @param[out] ggraph_out output subgraph of cc problem
+ * @param[in]  ggraph_in  input graph need to process on
+ * @param[in]  cc_configs primitive specific configurations
+ * @param[in]  data_type  gunrock data_type struct
+ */
 void gunrock_cc_func(
     GunrockGraph          *ggraph_out,
+    unsigned int          *components,
     const GunrockGraph    *ggraph_in,
     const GunrockConfig   cc_configs,
-    const GunrockDataType data_type)
-{
+    const GunrockDataType data_type) {
+
     // lunch dispatch function
-    dispatch_cc(ggraph_out, ggraph_in, cc_configs, data_type);
+    dispatch_cc(ggraph_out, components, ggraph_in, cc_configs, data_type);
 }
 
 // Leave this at the end of the file

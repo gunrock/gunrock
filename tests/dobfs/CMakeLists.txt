@@ -18,7 +18,7 @@ else()
   message(SEND_ERROR "CUB include directory not set.")
 endif()
 
-CUDA_ADD_EXECUTABLE(direction-optimizing-bfs
+CUDA_ADD_EXECUTABLE(direction_optimizing_bfs
   test_dobfs.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/test_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu

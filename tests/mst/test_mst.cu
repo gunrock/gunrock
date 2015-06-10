@@ -323,6 +323,7 @@ void RunTests(
   bool instrumented  = false; // do not collect instrumentation from kernels
   int  max_grid_size = 0;     // maximum grid size (up to the enactor)
   int  num_gpus      = 1;     // number of GPUs for multi-gpu enactor to use
+  g_quick            = false; // Whether or not to skip ref validation
 
   instrumented = args.CheckCmdLineFlag("instrumented");
 

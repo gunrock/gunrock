@@ -63,27 +63,31 @@ float g_beta;
  ******************************************************************************/
 void Usage()
 {
-    printf("\ntest_dobfs <graph type> <graph type args> [--device=<device_index>] "
-           "[--undirected] [--instrumented] [--src=<source index>] [--quick] "
-           "[--mark-pred] [--queue-sizing=<scale factor>]\n"
-           "[--v]\n"
-           "\n"
-           "Graph types and args:\n"
-           "  market [<file>]\n"
-           "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
-           "    edges from stdin (or from the optionally-specified file).\n"
-           "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
-           "  --undirected If set then treat the graph as undirected.\n"
-           "  --instrumented If set then kernels keep track of queue-search_depth\n"
-           "  and barrier duty (a relative indicator of load imbalance.)\n"
-           "  --src Begins BFS from the vertex <source index>. If set as randomize\n"
-           "  then will begin with a random source vertex.\n"
-           "  If set as largestdegree then will begin with the node which has\n"
-           "  largest degree.\n"
-           "  --quick If set will skip the CPU validation code.\n"
-           "  --mark-pred If set then keep not only label info but also predecessor info.\n"
-           "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
-           "  Default is 1.0\n"
+    printf (
+        " test_dobfs <graph type> <graph type args> [--device=<device_index>]\n"
+        " [--src=<source_index>] [--instrumented] [--idempotence=<0|1>] [--v]\n"
+        " [--undirected] [--iteration-num=<num>] [--quick=<0|1>] [--mark-pred]\n"
+        " [--queue-sizing=<scale factor>]\n"
+        "\n"
+        "Graph types and args:\n"
+        "  market <file>\n"
+        "    Reads a Matrix-Market coordinate-formatted graph of directed / undirected\n"
+        "    edges from stdin (or from the optionally-specified file).\n"
+        "  --device=<device_index>   Set GPU device for running the test. [Default: 0].\n"
+        "  --undirected              Treat the graph as undirected (symmetric).\n"
+        "  --idempotence=<0 or 1>    Enable: 1, Disable: 0 [Default: Enable].\n"
+        "  --instrumented            Keep kernels statics [Default: Disable].\n"
+        "                            total_queued, search_depth and barrier duty\n"
+        "                            (a relative indicator of load imbalance.)\n"
+        "  --src=<source vertex id>  Begins BFS from the source [Default: 0].\n"
+        "                            If randomize: from a random source vertex.\n"
+        "                            If largestdegree: from largest degree vertex.\n"
+        "  --quick=<0 or 1>          Skip the CPU validation: 1, or not: 0 [Default: 1].\n"
+        "  --mark-pred               Keep both label info and predecessor info.\n"
+        "  --queue-sizing=<factor>   Allocates a frontier queue sized at: \n"
+        "                            (graph-edges * <scale factor>). [Default: 1.0]\n"
+        "  --v                       Print verbose per iteration debug info.\n"
+        "  --iteration-num=<number>  Number of runs to perform the test [Default: 1].\n"
         );
 }
 
@@ -97,10 +101,15 @@ void Usage()
  * @param[in] ENABLE_IDEMPOTENCE Whether to enable idempotence mode.
  */
 template<typename VertexId, typename SizeT>
-void DisplaySolution(VertexId *source_path, VertexId *preds, SizeT nodes, bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE)
+void DisplaySolution (VertexId *source_path,
+                      VertexId *preds,
+                      SizeT nodes,
+                      bool MARK_PREDECESSORS,
+                      bool ENABLE_IDEMPOTENCE)
 {
-    if (nodes > 40)
-        nodes = 40;
+    if (nodes > 40) nodes = 40;
+    printf("\nFirst %d labels of the GPU result.\n", nodes);
+
     printf("[");
     for (VertexId i = 0; i < nodes; ++i) {
         PrintValue(i);
@@ -418,7 +427,7 @@ void RunTests(
             CompareResults(h_labels, reference_check, graph.nodes, true);
         }
     }
-    printf("\nFirst 40 labels of the GPU result.");
+
     // Display Solution
     DisplaySolution(
         h_labels, h_preds, graph.nodes, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE);
@@ -432,7 +441,6 @@ void RunTests(
         search_depth,
         total_queued,
         avg_duty);
-
 
     // Cleanup
     delete stats;
@@ -466,15 +474,16 @@ void RunTests(
     CommandLineArgs &args,
     CudaContext& context)
 {
-    VertexId            src                 = -1;           // Use whatever the specified graph-type's default is
-    std::string         src_str;
-    bool                instrumented        = false;        // Whether or not to collect instrumentation from kernels
-    bool                mark_pred           = false;        // Whether or not to mark src-distance vs. parent vertices
-    bool                idempotence         = false;        // Whether or not to enable idempotence operation
-    int                 max_grid_size       = 0;            // maximum grid size (0: leave it up to the enactor)
-    int                 num_gpus            = 1;            // Number of GPUs for multi-gpu enactor to use
-    double              max_queue_sizing    = 1.0;          // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
-    int                 iterations          = 1;
+    VertexId    src              = -1;  // Use whatever the specified graph-type's default is
+    std::string src_str;
+    bool        instrumented     = 0;   // Whether or not to collect instrumentation from kernels
+    bool        mark_pred        = 0;   // Whether or not to mark src-distance vs. parent vertices
+    bool        idempotence      = 1;   // Whether or not to enable idempotence operation
+    int         max_grid_size    = 0;   // maximum grid size (0: leave it up to the enactor)
+    int         num_gpus         = 1;   // Number of GPUs for multi-gpu enactor to use
+    double      max_queue_sizing = 1.0; // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
+    int         iterations       = 1;   // Number of runs
+    g_quick                      = false; // Whether or not to skip reference validation
 
     instrumented = args.CheckCmdLineFlag("instrumented");
     args.GetCmdLineArgument("src", src_str);
@@ -496,22 +505,21 @@ void RunTests(
         args.GetCmdLineArgument("src", src);
     }
 
+    mark_pred = args.CheckCmdLineFlag("mark-pred");
+    g_verbose = args.CheckCmdLineFlag("v");
+    g_quick   = args.CheckCmdLineFlag("quick");
+
     args.GetCmdLineArgument("iteration-num", iterations);
     args.GetCmdLineArgument("grid-size", max_grid_size);
-    g_quick = args.CheckCmdLineFlag("quick");
-    mark_pred = args.CheckCmdLineFlag("mark-pred");
-    idempotence = args.CheckCmdLineFlag("idempotence");
+    args.GetCmdLineArgument("idempotence", idempotence);
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
-    g_verbose = args.CheckCmdLineFlag("v");
     args.GetCmdLineArgument("alpha", g_alpha);
     args.GetCmdLineArgument("beta", g_beta);
 
-    if (g_alpha == 0.0f)
-        g_alpha = 12.0f;
-    if (g_beta == 0.0f)
-        g_beta = 6.0f;
+    if (g_alpha == 0.0f) g_alpha = 12.0f;
+    if (g_beta == 0.0f)  g_beta  = 6.0f;
 
-    // printf("alpha:%5f, beta:%5f\n", g_alpha, g_beta);
+    // printf("alpha: %5f, beta: %5f\n", g_alpha, g_beta);
 
     if (instrumented)
     {

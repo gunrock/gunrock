@@ -1,8 +1,8 @@
 /**
- * @brief bfs test for bfs shared library
+ * @brief BFS test for shared library
  * @file test_bfs.c
  *
- * set input graph, configs and call function gunrock_bfs
+ * set input graph, configs and call function gunrock_bfs_func
  * return per node label values in graph_out node_values
  */
 

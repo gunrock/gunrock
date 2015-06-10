@@ -94,7 +94,7 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -Xptxas -v -Xcudafe -\#
+NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
@@ -123,15 +123,15 @@ endif
 # Dependency Lists
 #-------------------------------------------------------------------------------
 
-DEPS =			./Makefile \
-				$(wildcard ../gunrock/util/*.cuh) \
-				$(wildcard ../gunrock/util/**/*.cuh) \
-				$(wildcard ../gunrock/*.cuh) \
-				$(wildcard ../gunrock/graphio/*.cuh) \
-				$(wildcard ../gunrock/oprtr/*.cuh) \
-				$(wildcard ../gunrock/oprtr/**/*.cuh) \
-				$(wildcard ../gunrock/app/*.cuh) \
-				$(wildcard ../gunrock/app/**/*.cuh)
+DEPS = ./Makefile \
+	$(wildcard ../gunrock/util/*.cuh) \
+	(wildcard ../gunrock/util/**/*.cuh) \
+	$(wildcard ../gunrock/*.cuh) \
+	$(wildcard ../gunrock/graphio/*.cuh) \
+	$(wildcard ../gunrock/oprtr/*.cuh) \
+	$(wildcard ../gunrock/oprtr/**/*.cuh) \
+	$(wildcard ../gunrock/app/*.cuh) \
+	$(wildcard ../gunrock/app/**/*.cuh)
 
 #-------------------------------------------------------------------------------
 # (make simple) Simple example driver for three primitives: CC, BFS and BC
@@ -139,9 +139,9 @@ DEPS =			./Makefile \
 
 simple: bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX) : simple_example.cu ../externals/moderngpu/src/mgpucontext.cu ../externals/moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX) : simple_example.cu cpu_graph_lib.cpp ../gunrock/util/error_utils.cu ../externals/moderngpu/src/mgpucontext.cu ../externals/moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX) simple_example.cu ../externals/moderngpu/src/mgpucontext.cu ../externals/moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -lcuda -O3
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/simple_example_$(NVCC_VERSION)_$(ARCH_SUFFIX) simple_example.cu cpu_graph_lib.cpp ../gunrock/util/error_utils.cu ../externals/moderngpu/src/mgpucontext.cu ../externals/moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -lcuda -O3
 
 #-------------------------------------------------------------------------------
 # Clean

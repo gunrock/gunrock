@@ -1,8 +1,8 @@
 /**
- * @brief bc test for bc shared library
+ * @brief BC test for shared library
  * @file test_bc.c
  *
- * set input graph, configs and call function gunrock_bc
+ * set input graph, configs and call function gunrock_bc_func
  * return per node label values in graph_out node_values
  */
 
@@ -28,7 +28,8 @@ int main(int argc, char* argv[])
   size_t num_nodes = 7;
   size_t num_edges = 26;
   int row_offsets[8] = {0, 3, 6, 11, 15, 19, 23, 26};
-  int col_indices[26] = {1, 2, 3, 0, 2, 4, 0, 1, 3, 4, 5, 0, 2, 5, 6, 1, 2, 5, 6, 2, 3, 4, 6, 3, 4, 5};
+  int col_indices[26] = {1, 2, 3, 0, 2, 4, 0, 1, 3, 4, 5, 0, 2,
+                         5, 6, 1, 2, 5, 6, 2, 3, 4, 6, 3, 4, 5};
 
   // build graph as input
   struct GunrockGraph *graph_input =

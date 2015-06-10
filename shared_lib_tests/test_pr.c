@@ -1,8 +1,8 @@
 /**
- * @brief pr test for pr shared library
+ * @brief PR test for shared library
  * @file test_pr.c
  *
- * set input graph, configs and call function gunrock_pr
+ * set input graph, configs and call function gunrock_pr_func
  * return per node or per edge values in graph_out node_values
  */
 

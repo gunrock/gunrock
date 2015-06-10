@@ -512,6 +512,7 @@ void RunTests(
     int         num_gpus         = 1;     // Number of GPUs for multi-gpu enactor to use
     double      max_queue_sizing = 1.0;   // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
     int         iterations       = 1;
+    g_quick                      = false;   // Whether or not to skip ref validation
 
     args.GetCmdLineArgument("iteration-num", iterations);
     instrumented = args.CheckCmdLineFlag("instrumented");

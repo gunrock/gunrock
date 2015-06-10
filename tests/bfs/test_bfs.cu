@@ -23,6 +23,7 @@
 
 // Graph construction utils
 #include <gunrock/graphio/market.cuh>
+#include <gunrock/graphio/rmat.cuh>
 
 // BFS includes
 #include <gunrock/app/bfs/bfs_enactor.cuh>
@@ -55,31 +56,33 @@ bool g_stream_from_host;
 void Usage()
 {
     printf(
-        "\ntest_bfs <graph type> <graph type args> [--device=<device_index>]\n"
-        "[--undirected] [--idempotence] [--src=<source index>] [--quick]\n"
-        "[--mark-pred] [--queue-sizing=<scale factor>] [--instrumented]\n"
-        "[--v] [--iteration-num=<numbers>] [--traversal-mode=<mode>]\n"
+        " test_bfs <graph type> <graph type args> [--device=<device_index>]\n"
+        " [--undirected] [--src=<source_index>] [--idempotence=<0|1>] [--v]\n"
+        " [--instrumented] [--iteration-num=<num>] [--traversal-mode=<0|1>]\n"
+        " [--quick=<0|1>] [--mark-pred] [--queue-sizing=<scale factor>] "
         "\n"
         "Graph types and args:\n"
-        "  market [<file>]\n"
-        "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
+        "  market <file>\n"
+        "    Reads a Matrix-Market coordinate-formatted graph of directed / undirected\n"
         "    edges from stdin (or from the optionally-specified file).\n"
-        "  --device=<device_index>  Set GPU device for running the primitive.\n"
-        "  --undirected If set then treat the graph as undirected (symmetric).\n"
-        "  --idempotence If set then enable idempotence. Default: 1\n"
-        "  --instrumented If set then kernels keep track of queue-search_depth\n"
-        "  and barrier duty (a relative indicator of load imbalance.)\n"
-        "  --src Begins BFS from the vertex <source index>. If set as randomize\n"
-        "  then will begin with a random source vertex. If set as largestdegree\n"
-        "  then will begin with the node which has largest degree.\n"
-        "  --quick If set will skip the CPU validation code.\n"
-        "  --mark-pred If set then keep not only label info but also predecessor info.\n"
-        "  --queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
-        "  Default: 1.0\n"
-        "  --v If set then print verbose per iteration info.\n"
-        "  --iteration-num Set number of runs to perform the algorithm, default: 1.\n"
-        "  --traversal-mode Set traversal strategy. Default: automatic.\n"
-        "  0 for load-balanced, 1 for dynamic-cooperative.\n"
+        "  --device=<device_index>   Set GPU device for running the test. [Default: 0].\n"
+        "  --undirected              Treat the graph as undirected (symmetric).\n"
+        "  --idempotence=<0 or 1>    Enable: 1, Disable: 0 [Default: Enable].\n"
+        "  --instrumented            Keep kernels statics [Default: Disable].\n"
+        "                            total_queued, search_depth and barrier duty\n"
+        "                            (a relative indicator of load imbalance.)\n"
+        "  --src=<source vertex id>  Begins BFS from the source [Default: 0].\n"
+        "                            If randomize: from a random source vertex.\n"
+        "                            If largestdegree: from largest degree vertex.\n"
+        "  --quick=<0 or 1>          Skip the CPU validation: 1, or not: 0 [Default: 1].\n"
+        "  --mark-pred               Keep both label info and predecessor info.\n"
+        "  --queue-sizing=<factor>   Allocates a frontier queue sized at: \n"
+        "                            (graph-edges * <scale factor>). [Default: 1.0]\n"
+        "  --v                       Print verbose per iteration debug info.\n"
+        "  --iteration-num=<number>  Number of runs to perform the test [Default: 1].\n"
+        "  --traversal-mode=<0 or 1> Set traversal strategy, 0 for Load-Balanced, \n"
+        "                            1 for Dynamic-Cooperative [Default: dynamic\n"
+        "                            determine based on average degree].\n"
         );
 }
 
@@ -94,20 +97,22 @@ void Usage()
  */
 template<typename VertexId, typename SizeT>
 void DisplaySolution(
-    VertexId *source_path,
+    VertexId *labels,
     VertexId *preds,
-    SizeT nodes,
+    SizeT     num_nodes,
     bool MARK_PREDECESSORS,
     bool ENABLE_IDEMPOTENCE)
 {
-    if (nodes > 40)
-        nodes = 40;
+    if (num_nodes > 40) num_nodes = 40;
+
+    printf("\nFirst %d labels of the GPU result:\n", num_nodes);
+
     printf("[");
-    for (VertexId i = 0; i < nodes; ++i)
+    for (VertexId i = 0; i < num_nodes; ++i)
     {
         PrintValue(i);
         printf(":");
-        PrintValue(source_path[i]);
+        PrintValue(labels[i]);
         if (MARK_PREDECESSORS && !ENABLE_IDEMPOTENCE)
         {
             printf(",");
@@ -451,7 +456,6 @@ void RunTests(
         }
     }
 
-    printf("\nFirst 40 labels of the GPU result:\n");
     // Display Solution
     DisplaySolution(
         h_labels, h_preds, graph.nodes, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE);
@@ -500,13 +504,13 @@ void RunTests(
     std::string src_str;
     bool        instrumented     = 0;   // Whether or not to collect instrumentation from kernels
     bool        mark_pred        = 0;   // Whether or not to mark src-distance vs. parent vertices
-    bool        idempotence      = 0;   // Whether or not to enable idempotence operation
+    bool        idempotence      = 1;   // Whether or not to enable idempotence operation
     int         max_grid_size    = 0;   // Maximum grid size (0: leave it up to the enactor)
     int         num_gpus         = 1;   // Number of GPUs for multi-gpu enactor to use
     double      max_queue_sizing = 1.0; // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
     int         iterations       = 1;   // Number of runs for testing
     int         traversal_mode   = -1;  // Load-balacned or Dynamic cooperative
-
+    g_quick                      = false;   // Whether or not to skip reference validation
     // source vertex
     args.GetCmdLineArgument("src", src_str);
     if (src_str.empty())
@@ -535,18 +539,18 @@ void RunTests(
         traversal_mode = graph.GetAverageDegree() > 8 ? 0 : 1;
     }
 
-    args.GetCmdLineArgument("iteration-num", iterations);
-    args.GetCmdLineArgument("grid-size", max_grid_size);
-
     // printf("Display neighbor list of src:\n");
     // graph.DisplayNeighborList(src);
 
+    mark_pred    = args.CheckCmdLineFlag("mark-pred");
+    g_verbose    = args.CheckCmdLineFlag("v");
     instrumented = args.CheckCmdLineFlag("instrumented");
     g_quick = args.CheckCmdLineFlag("quick");
-    mark_pred = args.CheckCmdLineFlag("mark-pred");
-    idempotence = args.CheckCmdLineFlag("idempotence");
+
+    args.GetCmdLineArgument("iteration-num", iterations);
+    args.GetCmdLineArgument("grid-size", max_grid_size);
+    args.GetCmdLineArgument("idempotence", idempotence);
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
-    g_verbose = args.CheckCmdLineFlag("v");
 
     if (instrumented)
     {
@@ -667,7 +671,6 @@ void RunTests(
 /******************************************************************************
  * Main
  ******************************************************************************/
-
 int main( int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
@@ -705,17 +708,15 @@ int main( int argc, char** argv)
     // Construct graph and perform search(es)
     //
 
+    typedef int VertexId;                   // Use as the node identifier
+    typedef int Value;                      // Use as the value type
+    typedef int SizeT;                      // Use as the graph size type
+    Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
+    if (graph_args < 1) { Usage(); return 1; }
+
     if (graph_type == "market")
     {
-
         // Matrix-market coordinate-formatted graph file
-        typedef int VertexId;                   // Use as the node identifier
-        typedef int Value;                      // Use as the value type
-        typedef int SizeT;                      // Use as the graph size type
-        Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
-
-        if (graph_args < 1) { Usage(); return 1; }
-
         char *market_filename = (graph_args == 2) ? argv[2] : NULL;
         if (graphio::BuildMarketGraph<false>(
                 market_filename,
@@ -727,8 +728,33 @@ int main( int argc, char** argv)
         }
 
         csr.PrintHistogram();
+        RunTests(csr, args, *context);
+    }
 
-        // Run tests
+    else if (graph_type == "rmat")
+    {
+        // parse rmat parameters
+        SizeT rmat_nodes = 1 << 10;
+        SizeT rmat_edges = 1 << 10;
+        double rmat_a = 0.55;
+        double rmat_b = 0.2;
+        double rmat_c = 0.2;
+        double rmat_d = 0.05;
+
+        if (graphio::BuildRmatGraph<false>(
+                rmat_nodes,
+                rmat_edges,
+                csr,
+                g_undirected,
+                rmat_a,
+                rmat_b,
+                rmat_c,
+                rmat_d) != 0)
+        {
+            return 1;
+        }
+
+        csr.PrintHistogram();
         RunTests(csr, args, *context);
     }
     else

@@ -78,7 +78,7 @@ void Usage()
 {
     printf(
         "\ntest_cc <graph type> <graph type args> [--device=<device_index>] "
-        "[--instrumented] [--quick]\n"
+        "[--instrumented] [--quick=<0|1>]\n"
         "\n"
         "Graph types and args:\n"
         "  market [<file>]\n"
@@ -87,7 +87,7 @@ void Usage()
         "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
         "  --instrumented If set then kernels keep track of queue-search_depth\n"
         "  and barrier duty (a relative indicator of load imbalance.)\n"
-        "  --quick If set will skip the CPU validation code.\n"
+        "  --quick If set will skip the CPU validation code. Default: 0.\n"
         );
 }
 
@@ -228,9 +228,9 @@ void RunTests(
         true> Problem; //use double buffer for edgemap and vertexmap.
 
     // Allocate host-side label array (for both reference and gpu-computed results)
-    VertexId    *reference_component_ids        = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-    VertexId    *h_component_ids                = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-    VertexId    *reference_check                = (g_quick) ? NULL : reference_component_ids;
+    VertexId     *reference_component_ids        = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+    VertexId     *h_component_ids                = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
+    VertexId     *reference_check                = (g_quick) ? NULL : reference_component_ids;
     unsigned int ref_num_components             = 0;
 
     // Allocate CC enactor map
@@ -350,10 +350,11 @@ void RunTests(
     int  max_grid_size = 0;     // Maximum grid size (0: leave it up to the enactor)
     int  num_gpus      = 1;     // Number of GPUs for multi-gpu enactor to use
     int  iterations    = 1;     // Default run test times
+    g_quick            = false; // Whether or not to skip reference validation
 
     instrumented = args.CheckCmdLineFlag("instrumented");
-    g_quick      = args.CheckCmdLineFlag("quick");
     g_verbose    = args.CheckCmdLineFlag("v");
+    g_quick      = args.CheckCmdLineFlag("quick");
     args.GetCmdLineArgument("iteration-num", iterations);
 
     if (instrumented)

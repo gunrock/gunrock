@@ -59,24 +59,22 @@ public:
     // Constructor
     CommandLineArgs(int argc, char **argv)
     {
-        using namespace std;
-
         for (int i = 1; i < argc; i++)
         {
-            string arg = argv[i];
+            std::string arg = argv[i];
 
             if ((arg[0] != '-') || (arg[1] != '-')) {
                 continue;
             }
 
-            string::size_type pos;
-            string key, val;
-            if ((pos = arg.find( '=')) == string::npos) {
-                key = string(arg, 2, arg.length() - 2);
+            std::string::size_type pos;
+            std::string key, val;
+            if ((pos = arg.find('=')) == std::string::npos) {
+                key = std::string(arg, 2, arg.length() - 2);
                 val = "";
             } else {
-                key = string(arg, 2, pos - 2);
-                val = string(arg, pos + 1, arg.length() - 1);
+                key = std::string(arg, 2, pos - 2);
+                val = std::string(arg, pos + 1, arg.length() - 1);
             }
             pairs[key] = val;
         }
@@ -85,8 +83,7 @@ public:
     // Checks whether a flag "--<flag>" is present in the commandline
     bool CheckCmdLineFlag(const char* arg_name)
     {
-        using namespace std;
-        map<string, string>::iterator itr;
+        std::map<std::string, std::string>::iterator itr;
         if ((itr = pairs.find(arg_name)) != pairs.end()) {
             return true;
         }
@@ -115,10 +112,9 @@ void CommandLineArgs::GetCmdLineArgument(
     const char *arg_name,
     T &val)
 {
-    using namespace std;
-    map<string, string>::iterator itr;
+    std::map<std::string, std::string>::iterator itr;
     if ((itr = pairs.find(arg_name)) != pairs.end()) {
-        istringstream str_stream(itr->second);
+        std::istringstream str_stream(itr->second);
         str_stream >> val;
     }
 }
@@ -128,23 +124,21 @@ void CommandLineArgs::GetCmdLineArguments(
     const char *arg_name,
     std::vector<T> &vals)
 {
-    using namespace std;
-
-    // Recover multi-value string
-    map<string, string>::iterator itr;
+     // Recover multi-value string
+    std::map<std::string, std::string>::iterator itr;
     if ((itr = pairs.find(arg_name)) != pairs.end()) {
 
         // Clear any default values
         vals.clear();
 
-        string val_string = itr->second;
-        istringstream str_stream(val_string);
-        string::size_type old_pos = 0;
-        string::size_type new_pos = 0;
+        std::string val_string = itr->second;
+        std::istringstream str_stream(val_string);
+        std::string::size_type old_pos = 0;
+        std::string::size_type new_pos = 0;
 
         // Iterate comma-separated values
         T val;
-        while ((new_pos = val_string.find(',', old_pos)) != string::npos) {
+        while ((new_pos = val_string.find(',', old_pos)) != std::string::npos) {
 
             if (new_pos != old_pos) {
                 str_stream.width(new_pos - old_pos);

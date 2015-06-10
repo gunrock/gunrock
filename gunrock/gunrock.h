@@ -1,13 +1,12 @@
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 /**
- * @file
- * gunrock.h
+ * @file gunrock.h
  *
  * @brief Main Library header file. Defines public interface.
  * The Gunrock public interface is a C-only interface to enable linking
@@ -22,44 +21,39 @@
 /**
  * @brief VertexId data type enumerators.
  */
-enum VertexIdType
-{
+enum VertexIdType {
     VTXID_INT, //!< integer type
 };
 
 /**
  * @brief SizeT data type enumerators.
  */
-enum SizeTType
-{
+enum SizeTType {
     SIZET_INT, //!< unsigned integer type
 };
 
 /**
  * @brief Value data type enumerators.
  */
-enum ValueType
-{
+enum ValueType {
     VALUE_INT,   //!< integer type
     VALUE_UINT,  //!< unsigned int type
     VALUE_FLOAT, //!< float type
 };
 
 /**
- * @brief datatype configuration struct used to specify datatypes
+ * @brief data-type configuration used to specify data types
  */
-struct GunrockDataType
-{
-    enum VertexIdType VTXID_TYPE; //!< VertexId datatype
-    enum SizeTType    SIZET_TYPE; //!< SizeT    datatype
-    enum ValueType    VALUE_TYPE; //!< Value    datatype
+struct GunrockDataType {
+    enum VertexIdType VTXID_TYPE; //!< VertexId data-type
+    enum SizeTType    SIZET_TYPE; //!< SizeT    data-type
+    enum ValueType    VALUE_TYPE; //!< Value    data-type
 };
 
 /**
- * @brief GunrockGraph struct as a standard graph interface
+ * @brief GunrockGraph as a standard graph interface
  */
-struct GunrockGraph
-{
+struct GunrockGraph {
     size_t num_nodes;    //!< number of nodes in graph
     size_t num_edges;    //!< number of edges in graph
     void   *row_offsets; //!< C.S.R. row offsets
@@ -73,28 +67,26 @@ struct GunrockGraph
 /**
  * @brief Source Vertex Mode enumerators.
  */
-enum SrcMode
-{
+enum SrcMode {
     manually,       //!< manually set up source node
     randomize,      //!< random generate source node
     largest_degree, //!< set to largest-degree node
 };
 
 /**
- * @brief arguments configuration struct used to specify arguments
+ * @brief arguments configuration used to specify arguments
  */
-struct GunrockConfig
-{
-    bool  mark_pred;    //!< whether to mark predecessor or not
-    bool  idempotence;  //!< whether or not to enable idempotence
-    int   src_node;     //!< source vertex define where to start
-    int   device;       //!< setting which gpu device to use
-    int   max_iter;     //!< maximum mumber of iterations allowed
-    int   top_nodes;    //!< k value for topk / page_rank problem
-    int   delta_factor; //!< sssp delta-factor parameter
-    float delta;        //!< page rank specific value
-    float error;        //!< page rank specific value
-    float queue_size;   //!< setting frontier queue size
+struct GunrockConfig {
+    bool  mark_pred;        //!< whether to mark predecessor or not
+    bool  idempotence;      //!< whether or not to enable idempotent
+    int   src_node;         //!< source vertex define where to start
+    int   device;           //!< setting which gpu device to use
+    int   max_iter;         //!< maximum number of iterations allowed
+    int   top_nodes;        //!< k value for topk / page_rank problem
+    int   delta_factor;     //!< sssp delta-factor parameter
+    float delta;            //!< pagerank specific value
+    float error;            //!< pagerank specific value
+    float queue_size;       //!< setting frontier queue size
     enum  SrcMode src_mode; //!< source mode rand/largest_degree
 };
 
@@ -119,6 +111,7 @@ void gunrock_bc_func(
 // CC Function Define
 void gunrock_cc_func(
     struct GunrockGraph       *graph_out,
+    unsigned int              *components,
     const struct GunrockGraph *graph_in,
     struct GunrockConfig      configs,
     struct GunrockDataType    data_type);

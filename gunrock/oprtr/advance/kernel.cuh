@@ -92,10 +92,10 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             typename KernelPolicy::SizeT            max_out,
             util::CtaWorkProgress                   work_progress,
             CudaContext                             &context,
-            TYPE                                    ADVANCE_TYPE,
+            gunrock::oprtr::advance::TYPE           ADVANCE_TYPE,
             bool                                    inverse_graph = false,
-            REDUCE_OP                               R_OP = gunrock::oprtr::advance::NONE,
-            REDUCE_TYPE                             R_TYPE = gunrock::oprtr::advance::EMPTY,
+            gunrock::oprtr::advance::REDUCE_OP      R_OP = gunrock::oprtr::advance::NONE,
+            gunrock::oprtr::advance::REDUCE_TYPE    R_TYPE = gunrock::oprtr::advance::EMPTY,
             typename KernelPolicy::Value            *d_value_to_reduce = NULL,
             typename KernelPolicy::Value            *d_reduce_frontier = NULL,
             typename KernelPolicy::Value            *d_reduced_value = NULL)
@@ -125,7 +125,47 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     max_out,                 // max_out_queue
                     enactor_stats.advance_kernel_stats,
                     ADVANCE_TYPE,
-                    inverse_graph);
+                    inverse_graph,
+                    R_TYPE,
+                    R_OP,
+                    d_value_to_reduce,
+                    d_reduce_frontier);
+
+            // Do segreduction using d_scanned_edges and d_reduce_frontier
+            typedef typename ProblemData::SizeT         SizeT;
+            typedef typename ProblemData::VertexId      VertexId;
+            typedef typename ProblemData::Value         Value;
+            //TODO: For TWC_Forward, Find a way to get the output_queue_len,
+            //also, try to get the scanned_edges array too. Then the following code will work.
+            /*if (R_TYPE != gunrock::oprtr::advance::EMPTY && d_value_to_reduce && d_reduce_frontier) {
+              switch (R_OP) {
+                case gunrock::oprtr::advance::PLUS: {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (Value)0, mgpu::plus<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                case gunrock::oprtr::advance::MULTIPLIES: {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (Value)1, mgpu::multiplies<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                case gunrock::oprtr::advance::MAXIMUM: {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (Value)INT_MIN, mgpu::maximum<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                case gunrock::oprtr::advance::MINIMUM: {
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (Value)INT_MAX, mgpu::minimum<typename KernelPolicy::Value>(), context);
+                      break;
+                }
+                default:
+                    //default operator is plus
+                    SegReduceCsr(d_reduce_frontier, partitioned_scanned_edges, output_queue_len,frontier_attribute.queue_length,
+                      false, d_reduced_value, (Value)0, mgpu::plus<typename KernelPolicy::Value>(), context);
+                      break;
+              }
+            }*/
             break;
         }
         case LB_BACKWARD:

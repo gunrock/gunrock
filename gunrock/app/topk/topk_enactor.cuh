@@ -233,7 +233,7 @@ public:
       // initialization
       if (retval = Setup(problem)) break;
       if (retval = EnactorBase::Setup(
-        problem, max_grid_size,
+        max_grid_size,
         AdvanceKernelPolicy::CTA_OCCUPANCY,
         FilterKernelPolicy::CTA_OCCUPANCY)) break;
 
