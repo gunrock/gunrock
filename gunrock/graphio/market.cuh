@@ -141,7 +141,7 @@ int ReadMarketStream(
                     if (coo) free(coo);
                     return -1;
                 } else if (num_input == 2) {
-                    ll_value = 1;
+                    ll_value = rand() % 64;
                 }
             } else {
                 if (sscanf(line, "%lld %lld", &ll_col, &ll_row) != 2) {
