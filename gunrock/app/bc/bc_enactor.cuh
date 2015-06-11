@@ -242,8 +242,8 @@ class BCEnactor : public EnactorBase
 
             frontier_attribute.queue_reset          = true;
 
-            std::vector<SizeT> forward_queue_offsets(graph_slice->nodes);
-            forward_queue_offsets.push_back(0);
+            std::stack<SizeT> forward_queue_offsets;
+            forward_queue_offsets.push(0);
 
             if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
                 if (retval = util::GRError(cudaMalloc(
@@ -259,12 +259,12 @@ class BCEnactor : public EnactorBase
             while (done[0] < 0) {
 
                 if (frontier_attribute.queue_length > 0 && enactor_stats.iteration > 0) {
-                    SizeT cur_offset = forward_queue_offsets.back();
+                    SizeT cur_offset = forward_queue_offsets.top();
                     //printf("offset:%d, current length:%d\n", cur_offset, frontier_attribute.queue_length);
                     util::MemsetCopyVectorKernel<<<128, 128>>>(&problem->data_slices[0]->d_forward_output[cur_offset], graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
                     //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
                     //util::DisplayDeviceResults(&problem->data_slices[0]->d_forward_output[cur_offset], frontier_attribute.queue_length);
-                    forward_queue_offsets.push_back(frontier_attribute.queue_length+cur_offset);
+                    forward_queue_offsets.push(frontier_attribute.queue_length+cur_offset);
                 }
 
                 // Edge Map
@@ -351,15 +351,12 @@ class BCEnactor : public EnactorBase
                 if (/*DEBUG &&*/ (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
-
                 frontier_attribute.queue_index++;
                 frontier_attribute.selector ^= 1;
-                enactor_stats.iteration++;
 
                 if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
                     } 
-
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
                     if (DEBUG) printf(", %lld", (long long) frontier_attribute.queue_length);
@@ -372,6 +369,8 @@ class BCEnactor : public EnactorBase
                 }
                 // Check if done
                 if (done[0] == 0) break;
+
+                enactor_stats.iteration++;
 
                 if (DEBUG) printf("\n%lld", (long long) enactor_stats.iteration);
 
@@ -396,8 +395,12 @@ class BCEnactor : public EnactorBase
 
             if (DEBUG) printf("\nStart backward phase\n%lld", (long long) enactor_stats.iteration);
             // Backward BC iteration
-            for (int iter = forward_queue_offsets.size()-3; iter >=0; --iter) {
-                frontier_attribute.queue_length = forward_queue_offsets[iter+1]-forward_queue_offsets[iter];  
+            SizeT top_offset = forward_queue_offsets.top();
+            if (DEBUG) printf("top offsets:%d\n", top_offset);
+            forward_queue_offsets.pop();
+            while (!forward_queue_offsets.empty()) {
+                frontier_attribute.queue_length = top_offset-forward_queue_offsets.top();
+                printf("queue length:%d\n", frontier_attribute.queue_length);
                 /*frontier_attribute.queue_length        = graph_slice->nodes;
                 // Fill in the frontier_queues
                 util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[0], graph_slice->nodes);
@@ -460,7 +463,7 @@ class BCEnactor : public EnactorBase
                 // Check if done
                 if (done[0] == 0) break;*/
                 // Edge Map
-                if (iter > 0) {
+                if (forward_queue_offsets.top() > 0) {
                     gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, BCProblem, BackwardFunctor>(
                             d_done,
                             enactor_stats,
@@ -470,8 +473,8 @@ class BCEnactor : public EnactorBase
                             (bool*)NULL,
                             (bool*)NULL,
                             d_scanned_edges,
-                            &problem->data_slices[0]->d_forward_output[forward_queue_offsets[iter]],              // d_in_queue
-                            graph_slice->frontier_queues.d_keys[0],            // d_out_queue
+                            &problem->data_slices[0]->d_forward_output[forward_queue_offsets.top()],              // d_in_queue
+                            NULL,            // d_out_queue
                             (VertexId*)NULL,
                             (VertexId*)NULL,
                             graph_slice->d_row_offsets,
@@ -493,8 +496,8 @@ class BCEnactor : public EnactorBase
                             (bool*)NULL,
                             (bool*)NULL,
                             d_scanned_edges,
-                            &problem->data_slices[0]->d_forward_output[forward_queue_offsets[iter]],              // d_in_queue
-                            graph_slice->frontier_queues.d_keys[0],            // d_out_queue
+                            &problem->data_slices[0]->d_forward_output[0],              // d_in_queue
+                            NULL,            // d_out_queue
                             (VertexId*)NULL,
                             (VertexId*)NULL,
                             graph_slice->d_row_offsets,
@@ -508,7 +511,7 @@ class BCEnactor : public EnactorBase
                             gunrock::oprtr::advance::V2V);
                 }
 
-                if (/*DEBUG &&*/ (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
+                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
                 cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
                 //frontier_attribute.queue_index++;
@@ -518,7 +521,6 @@ class BCEnactor : public EnactorBase
 
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
-                    if (DEBUG) printf(", %lld", (long long) frontier_attribute.queue_length);
                     if (INSTRUMENT) {
                         if (retval = enactor_stats.filter_kernel_stats.Accumulate(
                             enactor_stats.filter_grid_size,
@@ -526,11 +528,9 @@ class BCEnactor : public EnactorBase
                             enactor_stats.total_lifetimes)) break;
                     }
                 }
-                // Check if done
-                if (done[0] == 0) break;
-
-                if (DEBUG) printf("\n%lld", (long long) enactor_stats.iteration-1);
-
+                top_offset = forward_queue_offsets.top();
+                forward_queue_offsets.pop();
+                if (DEBUG) printf("top offsets:%d\n", top_offset);
             }
             if (retval) break;
 
