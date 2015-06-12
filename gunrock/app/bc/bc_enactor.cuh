@@ -263,7 +263,6 @@ class BCEnactor : public EnactorBase
                     //printf("offset:%d, current length:%d\n", cur_offset, frontier_attribute.queue_length);
                     util::MemsetCopyVectorKernel<<<128, 128>>>(&problem->data_slices[0]->d_forward_output[cur_offset], graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
                     //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
-                    //util::DisplayDeviceResults(&problem->data_slices[0]->d_forward_output[cur_offset], frontier_attribute.queue_length);
                     forward_queue_offsets.push(frontier_attribute.queue_length+cur_offset);
                 }
 
@@ -400,7 +399,7 @@ class BCEnactor : public EnactorBase
             forward_queue_offsets.pop();
             while (!forward_queue_offsets.empty()) {
                 frontier_attribute.queue_length = top_offset-forward_queue_offsets.top();
-                printf("queue length:%d\n", frontier_attribute.queue_length);
+                util::DisplayDeviceResults(problem->data_slices[0]->d_sigmas, &problem->data_slices[0]->d_forward_output[forward_queue_offsets.top()], graph_slice->nodes, frontier_attribute.queue_length);
                 /*frontier_attribute.queue_length        = graph_slice->nodes;
                 // Fill in the frontier_queues
                 util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[0], graph_slice->nodes);

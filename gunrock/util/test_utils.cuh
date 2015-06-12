@@ -248,6 +248,44 @@ void DisplayDeviceResults(
     if (h_data) free(h_data);
 }
 
+/**
+ * Verify the contents of a device array match those
+ * of a host array
+ */
+template <typename DATATYPE, typename INDEXTYPE>
+void DisplayDeviceResults(
+    DATATYPE *d_data,
+    INDEXTYPE *d_indices,
+    size_t num_elements,
+    size_t num_indices)
+{
+    printf("num_elements:%d\n", num_elements);
+    printf("num_indices:%d\n", num_indices);
+    // Allocate array on host
+    DATATYPE *h_data = (DATATYPE*) malloc(num_elements * sizeof(DATATYPE));
+    INDEXTYPE *h_indices = (INDEXTYPE*) malloc(num_indices * sizeof(INDEXTYPE));
+
+    // Reduction data back
+    cudaMemcpy(h_data, d_data, sizeof(DATATYPE) * num_elements, cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_indices, d_indices, sizeof(INDEXTYPE) * num_indices, cudaMemcpyDeviceToHost);
+
+    // Display data
+    printf("\n\nData:\n");
+    for (int i = 0; i < num_indices; i++)
+    {
+        PrintValue(h_indices[i]);
+        printf(":");
+        assert(h_indices[i] < num_elements);
+        PrintValue(h_data[h_indices[i]]);
+        printf(", ");
+    }
+    printf("\n\n");
+
+    // Cleanup
+    if (h_data) free(h_data);
+    if (h_indices) free(h_indices);
+}
+
 /******************************************************************************
  * Timing
  ******************************************************************************/

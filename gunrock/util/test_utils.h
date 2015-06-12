@@ -26,6 +26,7 @@
 #include <math.h>
 #include <float.h>
 
+#include <cassert>
 #include <map>
 #include <string>
 #include <vector>
