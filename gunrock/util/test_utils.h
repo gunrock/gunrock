@@ -26,9 +26,11 @@
 #include <math.h>
 #include <float.h>
 
+#include <cassert>
 #include <map>
 #include <string>
 #include <vector>
+#include <stack>
 #include <sstream>
 #include <iostream>
 #include <fstream>
