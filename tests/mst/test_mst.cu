@@ -140,11 +140,10 @@ void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph, int *mst_output)
 template<typename VertexId, typename Value, typename SizeT>
 bool IsConnected(const Csr<VertexId, Value, SizeT> & graph)
 {
-  // malloc output graph
-  GunrockGraph *graph_output =
-    (GunrockGraph*)malloc(sizeof(GunrockGraph));
+  GunrockGraph *temp = (GunrockGraph*)malloc(sizeof(GunrockGraph));
   unsigned int *components = (unsigned int*)malloc(sizeof(unsigned int));
-  run_cc<int, int, int>(graph_output, components, graph, 0, 1);
+  run_cc<VertexId, Value, SizeT>(temp, components, graph, 0, 1);
+  if (temp) free(temp);
   return *components == 1;
 }
 
@@ -269,7 +268,7 @@ void RunTests(
     "MST Problem Data Reset Failed", __FILE__, __LINE__);
 
   // perform MST
-  GpuTimer gpu_timer; // record the kernel running time
+  GpuTimer gpu_timer;  // record the kernel running time
 
   gpu_timer.Start();
 
@@ -287,7 +286,7 @@ void RunTests(
   util::GRError(mst_problem->Extract(h_mst_output),
     "MST Problem Data Extraction Failed", __FILE__, __LINE__);
 
-  if (!g_quick) // run CPU reference test
+  if (!g_quick)  // run CPU reference test
   {
     // calculate GPU final number of selected edges
     int num_selected_gpu = 0;
@@ -342,17 +341,16 @@ void RunTests(
  */
 template <typename VertexId, typename Value, typename SizeT>
 void RunTests(
-  const Csr<VertexId, Value, SizeT> &graph,
-  CommandLineArgs                   &args,
-  mgpu::CudaContext&                context)
+  const Csr<VertexId, Value, SizeT> & graph,
+  CommandLineArgs                   & args,
+  mgpu::CudaContext                 & context)
 {
-  bool instrumented  = false; // do not collect instrumentation from kernels
-  int  max_grid_size = 0;     // maximum grid size (up to the enactor)
-  int  num_gpus      = 1;     // number of GPUs for multi-gpu enactor to use
-  g_quick            = false; // Whether or not to skip ref validation
+  bool instrumented  = 0;  // do not collect instrumentation from kernels
+  int  max_grid_size = 0;  // maximum grid size (up to the enactor)
+  int  num_gpus      = 1;  // number of GPUs for multi-gpu enactor to use
+  g_quick            = 0;  // Whether or not to skip ref validation
 
   instrumented = args.CheckCmdLineFlag("instrumented");
-
   g_quick = args.CheckCmdLineFlag("quick");
   g_verbose = args.CheckCmdLineFlag("v");
 
@@ -405,9 +403,9 @@ int main(int argc, char** argv)
 
     // matrix-market coordinate-formatted graph file
 
-    typedef int VertexId; // use as the vertex identifier type
-    typedef int Value;    // use as the value type
-    typedef int SizeT;    // use as the graph size type
+    typedef int VertexId;  // use as the vertex identifier type
+    typedef int Value;     // use as the value type
+    typedef int SizeT;     // use as the graph size type
 
     // default value for stream_from_host is false
     if (graph_args < 1)
@@ -427,17 +425,14 @@ int main(int argc, char** argv)
       g_undirected,
       false) != 0) { return 1; }
 
-    // display graph
+    // display input graph
     // csr.DisplayGraph();
 
-    /***************************************************************
-    * To make sure two graphs have same weight value for each edge *
-    * we have to change ll_value = rand()%64 in market.cuh file to *
-    * some NON-RANDOM value if the original graph does NOT contain *
-    * weight per edge. Note it only support FULLY-CONNECTED graphs *
-    ***************************************************************/
+    /**************************************************************************
+     * Note: Minimum Spanning Tree only supports undirected, connected graphs *
+     **************************************************************************/
 
-    // test graph connectivity and run test
+    // test graph connectivity
     if (IsConnected(csr))
     {
         RunTests(csr, args, *context);
