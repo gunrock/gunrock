@@ -28,6 +28,7 @@
 #include <gunrock/graphio/market.cuh>
 
 // MST includes
+#include <gunrock/app/cc/cc_app.cu>
 #include <gunrock/app/mst/mst_enactor.cuh>
 #include <gunrock/app/mst/mst_problem.cuh>
 #include <gunrock/app/mst/mst_functor.cuh>
@@ -83,6 +84,11 @@ void Usage()
 /**
  * @brief Displays the MST result
  *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] graph reference to the CSR graph we process on
  */
 ////////////////////////////////////////////////////////////////////////////////
 template<typename VertexId, typename Value, typename SizeT>
@@ -120,6 +126,26 @@ void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph, int *mst_output)
 
   // clean up if necessary
   if (source) { delete [] source; }
+}
+
+/**
+ * @brief A simple connnectivity check utility
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] graph reference to the CSR graph we process on
+ */
+template<typename VertexId, typename Value, typename SizeT>
+bool IsConnected(const Csr<VertexId, Value, SizeT> & graph)
+{
+  // malloc output graph
+  GunrockGraph *graph_output =
+    (GunrockGraph*)malloc(sizeof(GunrockGraph));
+  unsigned int *components = (unsigned int*)malloc(sizeof(unsigned int));
+  run_cc<int, int, int>(graph_output, components, graph, 0, 1);
+  return *components == 1;
 }
 
 /**
@@ -214,10 +240,10 @@ long long int SimpleReferenceMST(
 ////////////////////////////////////////////////////////////////////////////////
 template <typename VertexId, typename Value, typename SizeT, bool INSTRUMENT>
 void RunTests(
-  const Csr<VertexId, Value, SizeT> &graph,
+  const Csr<VertexId, Value, SizeT> & graph,
   int max_grid_size,
   int num_gpus,
-  mgpu::CudaContext& context)
+  mgpu::CudaContext & context)
 {
   printf("\nMINIMUM SPANNING TREE TEST\n");
 
@@ -411,13 +437,19 @@ int main(int argc, char** argv)
     * weight per edge. Note it only support FULLY-CONNECTED graphs *
     ***************************************************************/
 
-    // run GPU tests
-    RunTests(csr, args, *context);
-
+    // test graph connectivity and run test
+    if (IsConnected(csr))
+    {
+        RunTests(csr, args, *context);
+    }
+    else
+    {
+      fprintf(stderr, "Unsupported non-fully connected graph input.\n");
+    }
   }
   else
   {
-    fprintf(stderr, "Unspecified graph type\n");
+    fprintf(stderr, "Unspecified graph type.\n");
     return 1;
   }
 
