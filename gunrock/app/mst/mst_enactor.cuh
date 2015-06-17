@@ -215,10 +215,8 @@ public:
     typedef SuRmFunctor <VertexId, SizeT, VertexId, MSTProblem> SuRmFunctor;
     typedef EIdxFunctor <VertexId, SizeT, VertexId, MSTProblem> EIdxFunctor;
     typedef MarkFunctor <VertexId, SizeT, VertexId, MSTProblem> MarkFunctor;
-    //typedef OrFunctor   <VertexId, SizeT, VertexId, MSTProblem> OrFunctor;
 
     cudaError_t retval = cudaSuccess;
-
     unsigned int *d_scanned_edges = NULL;
 
     do
@@ -273,7 +271,7 @@ public:
         }
 
         // generate d_flags_array from d_row_offsets using MarkSegment kernel
-        util::MarkSegmentFromIndices<<<128, 128>>>(
+        util::MarkSegmentFromIndices<bool><<<128, 128>>>(
           problem->data_slices[0]->d_flags_array,
           graph_slice->d_row_offsets, graph_slice->nodes);
 
@@ -584,7 +582,7 @@ public:
 
         ////////////////////////////////////////////////////////////////////////
         // create a flag to mark the boundaries of representative vertices
-        util::MarkSegmentFromKeys<<<128, 128>>>(
+        util::MarkSegmentFromKeys<bool><<<128, 128>>>(
           problem->data_slices[0]->d_flags_array,
           problem->data_slices[0]->d_supervtx_ids,
           graph_slice->nodes);
@@ -790,8 +788,7 @@ public:
           graph_slice->edges);
 
         util::MemsetCopyVectorKernel<<<128, 128>>>(
-          //problem->data_slices[0]->d_temp_value,
-            problem->data_slices[0]->d_super_edges,  // used as temp_index
+          problem->data_slices[0]->d_super_edges,  // used as temp_index
           problem->data_slices[0]->d_keys_array,
           graph_slice->edges);
 
@@ -807,7 +804,6 @@ public:
 
         util::CUBRadixSort<VertexId, VertexId>(
           true, graph_slice->edges,
-          //problem->data_slices[0]->d_temp_value,
           problem->data_slices[0]->d_super_edges,  // used as temp_index
           problem->data_slices[0]->d_origin_edges);
 
