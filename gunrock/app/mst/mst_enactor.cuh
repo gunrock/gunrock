@@ -271,7 +271,7 @@ public:
         }
 
         // generate d_flags_array from d_row_offsets using MarkSegment kernel
-        util::MarkSegmentFromIndices<bool><<<128, 128>>>(
+        util::MarkSegmentFromIndices<<<128, 128>>>(
           problem->data_slices[0]->d_flags_array,
           graph_slice->d_row_offsets, graph_slice->nodes);
 
@@ -582,7 +582,7 @@ public:
 
         ////////////////////////////////////////////////////////////////////////
         // create a flag to mark the boundaries of representative vertices
-        util::MarkSegmentFromKeys<bool><<<128, 128>>>(
+        util::MarkSegmentFromKeys<<<128, 128>>>(
           problem->data_slices[0]->d_flags_array,
           problem->data_slices[0]->d_supervtx_ids,
           graph_slice->nodes);
