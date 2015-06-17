@@ -207,16 +207,19 @@ class SSSPEnactor : public EnactorBase
     double                              queue_sizing,
     int                                 max_grid_size = 0)
     {
-        typedef typename SSSPProblem::SizeT      SizeT;
-        typedef typename SSSPProblem::VertexId   VertexId;
+        typedef typename SSSPProblem::VertexId VertexId;
+        typedef typename SSSPProblem::Value    Value;
+        typedef typename SSSPProblem::SizeT    SizeT;
 
         typedef SSSPFunctor<
             VertexId,
+            Value,
             SizeT,
             SSSPProblem> SsspFunctor;
 
         typedef PQFunctor<
             VertexId,
+            Value,
             SizeT,
             SSSPProblem> PqFunctor;
 

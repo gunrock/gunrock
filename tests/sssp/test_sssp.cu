@@ -155,7 +155,7 @@ template<
 void DisplayStats(
     Stats               &stats,
     VertexId            src,
-    unsigned int        *h_labels,
+    Value               *h_labels,
     const Csr<VertexId, Value, SizeT> &graph,
     double              elapsed,
     VertexId            search_depth,
@@ -238,25 +238,24 @@ template<
     typename SizeT,
     bool     MARK_PREDECESSORS>
 void SimpleReferenceSssp(
-    const Csr<VertexId, Value, SizeT>       &graph,
-    unsigned int                            *node_values,
-    unsigned int                            *node_preds,
-    VertexId                                src)
+    const Csr<VertexId, Value, SizeT> &graph,
+    Value                             *node_values,
+    VertexId                          *node_preds,
+    VertexId                          src)
 {
     using namespace boost;
 
     // Prepare Boost Datatype and Data structure
     typedef adjacency_list<vecS, vecS, directedS, no_property,
-                           property <edge_weight_t, unsigned int> > Graph;
+                           property <edge_weight_t, float> > Graph;
 
     typedef graph_traits<Graph>::vertex_descriptor vertex_descriptor;
     typedef graph_traits<Graph>::edge_descriptor edge_descriptor;
 
-    typedef std::pair<unsigned int, unsigned int> Edge;
+    typedef std::pair<VertexId, VertexId> Edge;
 
-    Edge* edges = (Edge*)malloc(sizeof(Edge)*graph.edges);
-    unsigned int *weight =
-        (unsigned int*)malloc(sizeof(unsigned int)*graph.edges);
+    Edge   *edges = ( Edge*)malloc(sizeof( Edge)*graph.edges);
+    Value *weight = (Value*)malloc(sizeof(Value)*graph.edges);
 
     for (int i = 0; i < graph.nodes; ++i)
     {
@@ -269,7 +268,7 @@ void SimpleReferenceSssp(
 
     Graph g(edges, edges + graph.edges, weight, graph.nodes);
 
-    std::vector<unsigned int> d(graph.nodes);
+    std::vector<Value> d(graph.nodes);
     std::vector<vertex_descriptor> p(graph.nodes);
     vertex_descriptor s = vertex(src, g);
 
@@ -282,28 +281,30 @@ void SimpleReferenceSssp(
     CpuTimer cpu_timer;
     cpu_timer.Start();
 
-    if (MARK_PREDECESSORS)
-        dijkstra_shortest_paths(
-            g, s,
-            predecessor_map(boost::make_iterator_property_map(p.begin(), get(boost::vertex_index, g))).
-            distance_map(boost::make_iterator_property_map(d.begin(), get(boost::vertex_index, g))));
-    else
-        dijkstra_shortest_paths(
-            g, s,
-            distance_map(boost::make_iterator_property_map(d.begin(), get(boost::vertex_index, g))));
+    if (MARK_PREDECESSORS) {
+        dijkstra_shortest_paths(g, s,
+            predecessor_map(boost::make_iterator_property_map(
+                    p.begin(), get(boost::vertex_index, g))).distance_map(
+                        boost::make_iterator_property_map(
+                            d.begin(), get(boost::vertex_index, g))));
+    } else {
+        dijkstra_shortest_paths(g, s,
+            distance_map(boost::make_iterator_property_map(
+                    d.begin(), get(boost::vertex_index, g))));
+    }
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
 
     printf("CPU SSSP finished in %lf msec.\n", elapsed);
 
-    Coo<unsigned int, unsigned int>* sort_dist = NULL;
-    Coo<unsigned int, unsigned int>* sort_pred = NULL;
-    sort_dist = (Coo<unsigned int, unsigned int>*)malloc(
-        sizeof(Coo<unsigned int, unsigned int>) * graph.nodes);
-    if (MARK_PREDECESSORS)
-        sort_pred = (Coo<unsigned int, unsigned int>*)malloc(
-            sizeof(Coo<unsigned int, unsigned int>) * graph.nodes);
-
+    Coo<Value, Value>* sort_dist = NULL;
+    Coo<VertexId, VertexId>* sort_pred = NULL;
+    sort_dist = (Coo<Value, Value>*)malloc(
+        sizeof(Coo<Value, Value>) * graph.nodes);
+    if (MARK_PREDECESSORS) {
+        sort_pred = (Coo<VertexId, VertexId>*)malloc(
+            sizeof(Coo<VertexId, VertexId>) * graph.nodes);
+    }
     graph_traits < Graph >::vertex_iterator vi, vend;
     for (tie(vi, vend) = vertices(g); vi != vend; ++vi)
     {
@@ -312,7 +313,7 @@ void SimpleReferenceSssp(
     }
     std::stable_sort(
         sort_dist, sort_dist + graph.nodes,
-        RowFirstTupleCompare<Coo<unsigned int, unsigned int> >);
+        RowFirstTupleCompare<Coo<Value, Value> >);
 
     if (MARK_PREDECESSORS)
     {
@@ -323,21 +324,21 @@ void SimpleReferenceSssp(
         }
         std::stable_sort(
             sort_pred, sort_pred + graph.nodes,
-            RowFirstTupleCompare<Coo<unsigned int, unsigned int> >);
+            RowFirstTupleCompare< Coo<VertexId, VertexId> >);
     }
 
     for (int i = 0; i < graph.nodes; ++i)
     {
         node_values[i] = sort_dist[i].col;
     }
-    if (MARK_PREDECESSORS)
+    if (MARK_PREDECESSORS) {
         for (int i = 0; i < graph.nodes; ++i)
         {
             node_preds[i] = sort_pred[i].col;
         }
-
-    free(sort_dist);
-    if (MARK_PREDECESSORS) free(sort_pred);
+    }
+    if (sort_dist) free(sort_dist);
+    if (sort_pred) free(sort_pred);
 }
 
 /**
@@ -382,18 +383,17 @@ void RunTests(
         Value,
         MARK_PREDECESSORS> Problem;
 
-    // Allocate host-side label array (for both reference and gpu-computed results)
-    unsigned int    *reference_labels       = (unsigned int*)malloc(sizeof(unsigned int) * graph.nodes);
-    unsigned int    *h_labels               = (unsigned int*)malloc(sizeof(unsigned int) * graph.nodes);
-    unsigned int    *reference_check_label  = (g_quick) ? NULL : reference_labels;
-    unsigned int    *reference_preds        = NULL;
-    VertexId        *h_preds                = NULL;
-    unsigned int    *reference_check_pred   = NULL;
+    // Allocate host-side arrays (for both reference and gpu-computed results)
+    Value    *reference_labels = (Value*)malloc(sizeof(Value) * graph.nodes);
+    Value    *h_labels         = (Value*)malloc(sizeof(Value) * graph.nodes);
+    Value    *reference_check_label = (g_quick) ? NULL : reference_labels;
+    VertexId *reference_preds       = NULL;
+    VertexId *h_preds               = NULL;
+    VertexId *reference_check_pred  = NULL;
 
     if (MARK_PREDECESSORS)
     {
-        reference_preds =
-            (unsigned int*)malloc(sizeof(unsigned int) * graph.nodes);
+        reference_preds = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
         h_preds         = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
         reference_check_pred  = (g_quick) ? NULL : reference_preds;
     }
@@ -453,7 +453,6 @@ void RunTests(
     }
     elapsed /= iterations;
 
-
     sssp_enactor.GetStatistics(total_queued, search_depth, avg_duty);
 
     // Copy out results
@@ -499,13 +498,13 @@ void RunTests(
         avg_duty);
 
 
-    // Cleanup
-    delete stats;
-    if (csr_problem) delete csr_problem;
+    // Clean up
+    if (stats)            delete stats;
+    if (csr_problem)      delete csr_problem;
     if (reference_labels) free(reference_labels);
-    if (h_labels) free(h_labels);
-    if (reference_preds) free(reference_preds);
-    if (h_preds) free(h_preds);
+    if (h_labels)         free(h_labels);
+    if (reference_preds)  free(reference_preds);
+    if (h_preds)          free(h_preds);
 
     cudaDeviceSynchronize();
 }
@@ -540,7 +539,7 @@ void RunTests(
     int         iterations       = 1;   // Number of runs for testing
     int         delta_factor     = 16;  // Delta factor for priority queue
     int         traversal_mode   = -1;  // traversal mode: 0 for LB, 1 for TWC
-    g_quick                      = false;   // Whether or not to skip ref validation
+    g_quick                      = 0;   // Whether or not to skip ref validation
 
     // source vertex to start
     args.GetCmdLineArgument("src", src_str);
@@ -647,14 +646,9 @@ int main( int argc, char** argv)
         return 1;
     }
 
-    //DeviceInit(args);
-    //cudaSetDeviceFlags(cudaDeviceMapHost);
     int dev = 0;
     args.GetCmdLineArgument("device", dev);
     ContextPtr context = mgpu::CreateCudaDevice(dev);
-
-    //srand(0); // Presently deterministic
-    //srand(time(NULL));
 
     // Parse graph-contruction params
     g_undirected = args.CheckCmdLineFlag("undirected");
@@ -678,6 +672,7 @@ int main( int argc, char** argv)
         typedef int VertexId;                   // Use as the node identifier
         typedef unsigned int Value;             // Use as the value type
         typedef int SizeT;                      // Use as the graph size type
+
         Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
 
         if (graph_args < 1) { Usage(); return 1; }
@@ -692,7 +687,7 @@ int main( int argc, char** argv)
         }
 
         csr.PrintHistogram();
-        //csr.DisplayGraph(true); //print graph with edge_value
+        csr.DisplayGraph(true); //print graph with edge_value
         //csr.GetAverageEdgeValue();
         //csr.GetAverageDegree();
         //int max_degree;
