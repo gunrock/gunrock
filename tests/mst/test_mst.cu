@@ -161,18 +161,18 @@ bool IsConnected(const Csr<VertexId, Value, SizeT> & graph)
  */
 ////////////////////////////////////////////////////////////////////////////////
 template<typename VertexId, typename Value, typename SizeT>
-long long int SimpleReferenceMST(
+Value SimpleReferenceMST(
   const Value *edge_values, const Csr<VertexId, Value, SizeT> &graph)
 {
-  printf("\nREFERENCE TEST\n");
+  printf("\nMST CPU REFERENCE TEST\n");
 
   // Kruskal minimum spanning tree preparations
   using namespace boost;
-  typedef adjacency_list < vecS, vecS, undirectedS,
-    no_property, property < edge_weight_t, int > >  Graph;
+  typedef adjacency_list< vecS, vecS, undirectedS,
+    no_property, property<edge_weight_t, float> >   Graph;
   typedef graph_traits < Graph >::edge_descriptor   Edge;
   typedef graph_traits < Graph >::vertex_descriptor Vertex;
-  typedef std::pair<int, int> E;
+  typedef std::pair<VertexId, VertexId> E;
 
   E *edge_pairs = new E[graph.edges];
   int idx = 0;
@@ -190,16 +190,18 @@ long long int SimpleReferenceMST(
 
   CpuTimer cpu_timer; // record the kernel running time
   cpu_timer.Start();
+
   // compute reference using kruskal_min_spanning_tree algorithm
   kruskal_minimum_spanning_tree(g, std::back_inserter(spanning_tree));
+
   cpu_timer.Stop();
   float elapsed_cpu = cpu_timer.ElapsedMillis();
 
   // analyze reference results
-  SizeT         num_selected_cpu = 0;
-  long long int total_weight_cpu = 0;
+  SizeT num_selected_cpu = 0;
+  Value total_weight_cpu = 0;
 
-  if (graph.nodes <= 50) printf("CPU Minimum Spanning Tree\n");
+  if (graph.nodes <= 50) { printf("CPU Minimum Spanning Tree\n"); }
   for (std::vector < Edge >::iterator ei = spanning_tree.begin();
        ei != spanning_tree.end(); ++ei)
   {
@@ -207,7 +209,7 @@ long long int SimpleReferenceMST(
     {
       // print the edge pairs in the minimum spanning tree
       printf("%ld %ld\n", source(*ei, g), target(*ei, g));
-      // printf("  with weight of %d\n", weight[*ei]);
+      // printf("  with weight of %f\n", weight[*ei]);
     }
     ++num_selected_cpu;
     total_weight_cpu += weight[*ei];
@@ -297,27 +299,27 @@ void RunTests(
     // printf("\nGPU - Number of Edges in MST: %d\n", num_selected_gpu);
 
     // calculate GPU total selected MST weights for validation
-    long long int total_weight_gpu = 0;
+    Value total_weight_gpu = 0;
     for (int iter = 0; iter < graph.edges; ++iter)
     {
       total_weight_gpu += h_mst_output[iter] * graph.edge_values[iter];
     }
 
     // correctness validation
-    long long int total_weight_cpu =
-      SimpleReferenceMST(graph.edge_values, graph);
+    Value total_weight_cpu = SimpleReferenceMST(graph.edge_values, graph);
     if (total_weight_cpu == total_weight_gpu)
     {
       // print the edge pairs in the minimum spanning tree
       DisplaySolution(graph, h_mst_output);
       printf("\nCORRECT.\n");
+      std::cout << "CPU Computed Total Weight = " << total_weight_cpu << std::endl;
+      std::cout << "GPU Computed Total Weight = " << total_weight_gpu << std::endl;
     }
     else
     {
-      printf("INCORRECT. \n"
-             "CPU Computed Total Weight = %lld\n"
-             "GPU Computed Total Weight = %lld\n",
-             total_weight_cpu, total_weight_gpu);
+      printf("INCORRECT.\n");
+      std::cout << "CPU Computed Total Weight = " << total_weight_cpu << std::endl;
+      std::cout << "GPU Computed Total Weight = " << total_weight_gpu << std::endl;
     }
   }
 
@@ -400,12 +402,12 @@ int main(int argc, char** argv)
 
   if (graph_type == "market")
   {
-
     // matrix-market coordinate-formatted graph file
 
-    typedef int VertexId;  // use as the vertex identifier type
+    // currently support Value type: int, float, double
+    typedef int VertexId;  // use as the vertex identifier
     typedef int Value;     // use as the value type
-    typedef int SizeT;     // use as the graph size type
+    typedef int SizeT;     // use as the graph size
 
     // default value for stream_from_host is false
     if (graph_args < 1)
@@ -420,13 +422,10 @@ int main(int argc, char** argv)
     // template argument = true because the graph has edge values
     Csr<VertexId, Value, SizeT> csr(false);
     if (graphio::BuildMarketGraph<true>(
-      market_filename,
-      csr,
-      g_undirected,
-      false) != 0) { return 1; }
+      market_filename, csr, g_undirected, false) != 0) { return 1; }
 
     // display input graph
-    // csr.DisplayGraph();
+    // csr.DisplayGraph(true);
 
     /**************************************************************************
      * Note: Minimum Spanning Tree only supports undirected, connected graphs *
@@ -455,4 +454,4 @@ int main(int argc, char** argv)
 // Local Variables:
 // mode:c++
 // c-file-style: "NVIDIA"
-// End:
+// End
