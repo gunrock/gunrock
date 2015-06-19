@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <limits>
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/util/memset_kernel.cuh>
 
@@ -322,7 +323,7 @@ struct SSSPProblem : ProblemBase<_VertexId, _SizeT, false>
                 data_slices[gpu]->d_labels = d_labels;
             }
 
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_labels, UINT_MAX, nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_labels, std::numeric_limits<Value>::max(), nodes);
 
             if (!data_slices[gpu]->d_preds && MARK_PATHS) {
                 VertexId    *d_preds;

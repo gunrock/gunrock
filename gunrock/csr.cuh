@@ -34,8 +34,7 @@ namespace gunrock {
  * the graph as a sparse matrix.
  */
 template<typename VertexId, typename Value, typename SizeT>
-struct Csr
-{
+struct Csr {
     SizeT nodes;     /**< Number of nodes in the graph. */
     SizeT edges;     /**< Number of edges in the graph. */
     SizeT out_nodes; /**< Number of nodes which have outgoing edges. */
@@ -57,8 +56,7 @@ struct Csr
      * @param[in] pinned Use pinned memory for CSR data structure
      * (default: do not use pinned memory)
      */
-    Csr(bool pinned = false)
-    {
+    Csr(bool pinned = false) {
         nodes = 0;
         edges = 0;
         average_degree = 0;
@@ -79,8 +77,7 @@ struct Csr
      * @param[in] edges Number of edges in COO-format graph
      */
     template <bool LOAD_EDGE_VALUES, bool LOAD_NODE_VALUES>
-    void FromScratch(SizeT nodes, SizeT edges)
-    {
+    void FromScratch(SizeT nodes, SizeT edges) {
         this->nodes = nodes;
         this->edges = edges;
 
@@ -89,32 +86,32 @@ struct Csr
             // Put our graph in pinned memory
             int flags = cudaHostAllocMapped;
             if (gunrock::util::GRError(
-                    cudaHostAlloc((void **)&row_offsets,
-                                  sizeof(SizeT) * (nodes + 1), flags),
-                    "Csr cudaHostAlloc row_offsets failed", __FILE__, __LINE__))
+                        cudaHostAlloc((void **)&row_offsets,
+                                      sizeof(SizeT) * (nodes + 1), flags),
+                        "Csr cudaHostAlloc row_offsets failed", __FILE__, __LINE__))
                 exit(1);
             if (gunrock::util::GRError(
-                    cudaHostAlloc((void **)&column_indices,
-                                  sizeof(VertexId) * edges, flags),
-                    "Csr cudaHostAlloc column_indices failed",
-                    __FILE__, __LINE__))
+                        cudaHostAlloc((void **)&column_indices,
+                                      sizeof(VertexId) * edges, flags),
+                        "Csr cudaHostAlloc column_indices failed",
+                        __FILE__, __LINE__))
                 exit(1);
 
             if (LOAD_NODE_VALUES) {
                 if (gunrock::util::GRError(
-                        cudaHostAlloc((void **)&node_values,
-                                      sizeof(Value) * nodes, flags),
-                        "Csr cudaHostAlloc node_values failed",
-                        __FILE__, __LINE__))
+                            cudaHostAlloc((void **)&node_values,
+                                          sizeof(Value) * nodes, flags),
+                            "Csr cudaHostAlloc node_values failed",
+                            __FILE__, __LINE__))
                     exit(1);
             }
 
             if (LOAD_EDGE_VALUES) {
                 if (gunrock::util::GRError(
-                        cudaHostAlloc((void **)&edge_values,
-                                      sizeof(Value) * edges, flags),
-                        "Csr cudaHostAlloc edge_values failed",
-                        __FILE__, __LINE__))
+                            cudaHostAlloc((void **)&edge_values,
+                                          sizeof(Value) * edges, flags),
+                            "Csr cudaHostAlloc edge_values failed",
+                            __FILE__, __LINE__))
                     exit(1);
             }
 
@@ -124,41 +121,30 @@ struct Csr
             row_offsets = (SizeT*) malloc(sizeof(SizeT) * (nodes + 1));
             column_indices = (VertexId*) malloc(sizeof(VertexId) * edges);
             node_values = (LOAD_NODE_VALUES) ?
-                (Value*) malloc(sizeof(Value) * nodes) : NULL;
+                          (Value*) malloc(sizeof(Value) * nodes) : NULL;
             edge_values = (LOAD_EDGE_VALUES) ?
-                (Value*) malloc(sizeof(Value) * edges) : NULL;
+                          (Value*) malloc(sizeof(Value) * edges) : NULL;
         }
     }
 
     /**
      *
-     * @brief Store graph information into files
+     * @brief Store graph information into a file
      *
      */
-    void WriteToFile(
-        char     *file_name,
-        bool     undirected,
-        bool     reversed,
-        SizeT    num_nodes,
-        SizeT    num_edges,
-        SizeT    *row_offsets,
-        VertexId *col_indices,
-        Value    *edge_values = NULL)
-    {
-        std::ofstream output(file_name);
-        if (output.is_open())
-        {
-            output << num_nodes << " " << num_edges << " ";
-            std::copy(row_offsets, row_offsets + num_nodes + 1,
-                      std::ostream_iterator<int>(output, " "));
-            std::copy(column_indices, column_indices + num_edges,
-                      std::ostream_iterator<int>(output, " "));
-            if (edge_values != NULL)
-            {
-                std::copy(edge_values, edge_values + num_edges,
-                          std::ostream_iterator<int>(output, " "));
+    void WriteToFile(char  *file_name, SizeT v, SizeT e, SizeT *row,
+                     VertexId *col, Value *edge_values = NULL) {
+        std::ofstream fout(file_name);
+        if (fout.is_open()) {
+            fout.write(reinterpret_cast<const char*>(&v), sizeof(SizeT));
+            fout.write(reinterpret_cast<const char*>(&e), sizeof(SizeT));
+            fout.write(reinterpret_cast<const char*>(row), (v+1)*sizeof(SizeT));
+            fout.write(reinterpret_cast<const char*>(col), e*sizeof(VertexId));
+            if (edge_values != NULL) {
+                fout.write(reinterpret_cast<const char*>(edge_values),
+                           e * sizeof(Value));
             }
-            output.close();
+            fout.close();
         }
     }
 
@@ -168,58 +154,35 @@ struct Csr
      *
      */
     template <bool LOAD_EDGE_VALUES>
-    void FromCsr(char *f_in, bool undirected, bool reversed)
-    {
-        printf("  Reading directly from previously stored CSR arrays ...\n");
+    void FromCsr(char *f_in) {
+        printf("  Reading directly from stored binary CSR arrays ...\n");
+        time_t mark1 = time(NULL);
 
-        std::ifstream _file(f_in);
+        std::ifstream input(f_in);
+        SizeT v, e;
+        input.read(reinterpret_cast<char*>(&v), sizeof(SizeT));
+        input.read(reinterpret_cast<char*>(&e), sizeof(SizeT));
 
-        if (_file.is_open())
-        {
-            time_t mark1 = time(NULL);
+        FromScratch<LOAD_EDGE_VALUES, false>(v, e);
 
-            std::istream_iterator<int> start(_file), end;
-            std::vector<int> v(start, end);
-
-            SizeT csr_nodes = v.at(0);
-            SizeT csr_edges = v.at(1);
-
-            FromScratch<LOAD_EDGE_VALUES, false>(csr_nodes, csr_edges);
-
-            std::copy(v.begin() + 2, v.begin() + 3 + csr_nodes, row_offsets);
-            std::copy(v.begin() + 3 + csr_nodes,
-                      v.begin() + 3 + csr_nodes + csr_edges,
-                      column_indices);
-            if(LOAD_EDGE_VALUES)
-            {
-                std::copy(v.begin() + 3 + csr_nodes + csr_edges,
-                          v.end(), edge_values);
-            }
-
-            time_t mark2 = time(NULL);
-            printf("Done reading (%ds).\n", (int) (mark2 - mark1));
-
-            v.clear();
+        input.read(reinterpret_cast<char*>(row_offsets), (v + 1)*sizeof(SizeT));
+        input.read(reinterpret_cast<char*>(column_indices), e*sizeof(VertexId));
+        if (LOAD_EDGE_VALUES) {
+            input.read(reinterpret_cast<char*>(edge_values), e*sizeof(Value));
         }
-        else
-        {
-            perror("Unable To Open The File.");
-        }
+
+        time_t mark2 = time(NULL);
+        printf("Done reading (%ds).\n", (int) (mark2 - mark1));
 
         // compute out_nodes
         SizeT out_node = 0;
-        for (SizeT node = 0; node < nodes; node++)
-        {
-            if (row_offsets[node+1] - row_offsets[node] > 0)
-            {
+        for (SizeT node = 0; node < nodes; node++) {
+            if (row_offsets[node + 1] - row_offsets[node] > 0) {
                 ++out_node;
             }
         }
         out_nodes = out_node;
-
-        fflush(stdout);
     }
-
 
     /**
      * @brief Build CSR graph from COO graph, sorted or unsorted
@@ -241,8 +204,7 @@ struct Csr
         SizeT coo_edges,
         bool  ordered_rows = false,
         bool  undirected = false,
-        bool  reversed = false)
-    {
+        bool  reversed = false) {
         printf("  Converting %d vertices, %d directed edges (%s tuples) "
                "to CSR format...\n",
                coo_nodes, coo_edges, ordered_rows ? "ordered" : "unordered");
@@ -259,20 +221,18 @@ struct Csr
         Tuple *new_coo = (Tuple*) malloc(sizeof(Tuple) * coo_edges);
         SizeT real_edge = 0;
         if (coo[0].col != coo[0].row) {
-          new_coo[0].row = coo[0].row;
-          new_coo[0].col = coo[0].col;
-          new_coo[0].val = coo[0].val;
-          real_edge++;
+            new_coo[0].row = coo[0].row;
+            new_coo[0].col = coo[0].col;
+            new_coo[0].val = coo[0].val;
+            real_edge++;
         }
-        for (int i = 0; i < coo_edges-1; ++i)
-        {
-            if (((coo[i+1].col != coo[i].col) ||
-                 (coo[i+1].row != coo[i].row)) &&
-                (coo[i+1].col != coo[i+1].row))
-            {
-                new_coo[real_edge].col = coo[i+1].col;
-                new_coo[real_edge].row = coo[i+1].row;
-                new_coo[real_edge++].val = coo[i+1].val;
+        for (int i = 0; i < coo_edges - 1; ++i) {
+            if (((coo[i + 1].col != coo[i].col) ||
+                    (coo[i + 1].row != coo[i].row)) &&
+                    (coo[i + 1].col != coo[i + 1].row)) {
+                new_coo[real_edge].col = coo[i + 1].col;
+                new_coo[real_edge].row = coo[i + 1].row;
+                new_coo[real_edge++].val = coo[i + 1].val;
             }
         }
 
@@ -303,25 +263,20 @@ struct Csr
         printf("Done converting (%ds).\n", (int)(mark2 - mark1));
 
         // Write offsets, indices, node, edges etc. into file
-        if (LOAD_EDGE_VALUES)
-        {
-            WriteToFile(output_file, undirected, reversed, nodes, edges,
+        if (LOAD_EDGE_VALUES) {
+            WriteToFile(output_file, nodes, edges,
                         row_offsets, column_indices, edge_values);
-        }
-        else
-        {
-            WriteToFile(output_file, undirected, reversed, nodes, edges,
+        } else {
+            WriteToFile(output_file, nodes, edges,
                         row_offsets, column_indices);
         }
 
         if (new_coo) free(new_coo);
-        fflush(stdout);
 
         // Compute out_nodes
         SizeT out_node = 0;
         for (SizeT node = 0; node < nodes; node++) {
-            if (row_offsets[node+1] - row_offsets[node] > 0)
-            {
+            if (row_offsets[node + 1] - row_offsets[node] > 0) {
                 ++out_node;
             }
         }
@@ -336,8 +291,7 @@ struct Csr
     /**
      * @brief Print log-scale degree histogram of the graph.
      */
-    void PrintHistogram()
-    {
+    void PrintHistogram() {
         fflush(stdout);
 
         // Initialize
@@ -365,7 +319,6 @@ struct Csr
         }
         printf("\nDegree Histogram (%lld vertices, %lld edges):\n",
                (long long) nodes, (long long) edges);
-
         printf("    Degree   0: %d (%.2f%%)\n", log_counts[0],
                (float) log_counts[0] * 100.0 / nodes);
         for (int i = 0; i < max_log_length + 1; i++) {
@@ -380,20 +333,19 @@ struct Csr
     /**
      * @brief Display CSR graph to console
      */
-    void DisplayGraph(bool with_edge_value = false)
-    {
-        SizeT displayed_node_num = (nodes > 40) ? 40:nodes;
+    void DisplayGraph(bool with_edge_value = false) {
+        SizeT displayed_node_num = (nodes > 40) ? 40 : nodes;
         printf("First %d nodes's neighbor list of the input graph:\n",
                displayed_node_num);
         for (SizeT node = 0; node < displayed_node_num; node++) {
             util::PrintValue(node);
             printf(":");
             for (SizeT edge = row_offsets[node];
-                 edge < row_offsets[node + 1];
-                 edge++) {
-                 printf("[");
+                    edge < row_offsets[node + 1];
+                    edge++) {
+                printf("[");
                 util::PrintValue(column_indices[edge]);
-                if (with_edge_value) {
+                if (with_edge_value && edge_values != NULL) {
                     printf(",");
                     util::PrintValue(edge_values[edge]);
                 }
@@ -403,23 +355,22 @@ struct Csr
         }
     }
 
-    bool CheckValue()
-    {
+    bool CheckValue() {
         for (SizeT node = 0; node < nodes; ++node) {
             for (SizeT edge = row_offsets[node];
-                 edge < row_offsets[node+1];
-                 ++edge) {
-                 int src_node = node;
-                 int dst_node = column_indices[edge];
-                 int edge_value = edge_values[edge];
-                 for (SizeT r_edge = row_offsets[dst_node];
-                 r_edge < row_offsets[dst_node+1];
-                 ++r_edge) {
+                    edge < row_offsets[node + 1];
+                    ++edge) {
+                int src_node = node;
+                int dst_node = column_indices[edge];
+                int edge_value = edge_values[edge];
+                for (SizeT r_edge = row_offsets[dst_node];
+                        r_edge < row_offsets[dst_node + 1];
+                        ++r_edge) {
                     if (column_indices[r_edge] == src_node) {
                         if (edge_values[r_edge] != edge_value)
                             return false;
                     }
-                 }
+                }
             }
         }
         return true;
@@ -428,14 +379,12 @@ struct Csr
     /**
      * @brief Find node with largest neighbor list
      */
-    int GetNodeWithHighestDegree(int& max_degree)
-    {
+    int GetNodeWithHighestDegree(int& max_degree) {
         int degree = 0;
         int src = 0;
         for (SizeT node = 0; node < nodes; node++) {
-            if (row_offsets[node+1] - row_offsets[node] > degree)
-            {
-                degree = row_offsets[node+1]-row_offsets[node];
+            if (row_offsets[node + 1] - row_offsets[node] > degree) {
+                degree = row_offsets[node + 1] - row_offsets[node];
                 src = node;
             }
         }
@@ -446,16 +395,15 @@ struct Csr
     /**
      * @brief Display the neighbor list of a given node
      */
-    void DisplayNeighborList(VertexId node)
-    {
+    void DisplayNeighborList(VertexId node) {
         if (node < 0 || node >= nodes) return;
         for (SizeT edge = row_offsets[node];
-                 edge < row_offsets[node + 1];
-                 edge++) {
-                util::PrintValue(column_indices[edge]);
-                printf(", ");
-            }
-            printf("\n");
+                edge < row_offsets[node + 1];
+                edge++) {
+            util::PrintValue(column_indices[edge]);
+            printf(", ");
+        }
+        printf("\n");
     }
 
     /**
@@ -466,7 +414,7 @@ struct Csr
             double mean = 0, count = 0;
             for (SizeT node = 0; node < nodes; ++node) {
                 count += 1;
-                mean += (row_offsets[node+1]- row_offsets[node] - mean) / count;
+                mean += (row_offsets[node+1]-row_offsets[node]-mean)/count;
             }
             average_degree = static_cast<SizeT>(mean);
         }
@@ -512,8 +460,7 @@ struct Csr
     /**
      * @brief Deallocates CSR graph
      */
-    void Free()
-    {
+    void Free() {
         if (row_offsets) {
             if (pinned) {
                 gunrock::util::GRError(cudaFreeHost(row_offsets),
@@ -544,8 +491,7 @@ struct Csr
     /**
      * @brief CSR destructor
      */
-    ~Csr()
-    {
+    ~Csr() {
         Free();
     }
 };

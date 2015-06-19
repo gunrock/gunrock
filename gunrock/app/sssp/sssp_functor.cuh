@@ -32,7 +32,7 @@ namespace sssp {
  * @tparam ProblemData         Problem data type which contains data slice for SSSP problem
  *
  */
-template<typename VertexId, typename SizeT, typename ProblemData>
+template<typename VertexId, typename Value, typename SizeT, typename ProblemData>
 struct SSSPFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
@@ -51,7 +51,7 @@ struct SSSPFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        unsigned int label, weight;
+        Value label, weight;
 
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                         label, problem->d_labels + s_id);
@@ -111,7 +111,7 @@ struct SSSPFunctor
     }
 };
 
-template<typename VertexId, typename SizeT, typename ProblemData>
+template<typename VertexId, typename Value, typename SizeT, typename ProblemData>
 struct PQFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
@@ -126,15 +126,15 @@ struct PQFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ unsigned int ComputePriorityScore(VertexId node_id, DataSlice *problem)
+    static __device__ __forceinline__ Value ComputePriorityScore(VertexId node_id, DataSlice *problem)
     {
-        unsigned int weight;
+        Value weight;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                         weight, problem->d_labels + node_id);
         float delta;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                         delta, problem->d_delta);
-        return (delta == 0) ? weight : weight/delta;
+        return (delta == 0) ? weight : weight / delta;
     }
 };
  
