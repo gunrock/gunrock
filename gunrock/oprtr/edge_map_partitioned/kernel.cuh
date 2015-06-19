@@ -272,15 +272,12 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
                                     my_thread_start = bid * partition_size;
                                     my_thread_end = (bid+1)*partition_size < output_queue_len ? (bid+1)*partition_size : output_queue_len;
-                                    //printf("tid:%d, bid:%d, m_thread_start:%d, m_thread_end:%d\n",tid, bid, my_thread_start, my_thread_end); 
 
                                     if (my_thread_start >= output_queue_len)
                                         return;
 
                                     int my_start_partition = partition_starts[bid];
                                     int my_end_partition = partition_starts[bid+1] > input_queue_len ? partition_starts[bid+1] : input_queue_len;
-                                    //if (tid == 0 && bid == 252)
-                                    //    printf("bid(%d) < num_partitions-1(%d)?, partition_starts[bid+1]+1:%d\n", bid, num_partitions-1, partition_starts[bid+1]+1);
 
                                     __shared__ typename KernelPolicy::SmemStorage smem_storage;
                                     // smem_storage.s_edges[NT]
@@ -302,8 +299,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                         __syncthreads();
 
                                         s_edges[tid] = (my_start_partition + tid < my_end_partition ? d_scanned_edges[my_start_partition + tid] - pre_offset : max_edges);
-                                        //if (bid == 252 && tid == 2)
-                                        //    printf("start_partition+tid:%d < my_end_partition:%d ?, d_queue[%d]:%d\n", my_start_partition+tid, my_end_partition, my_start_partition+tid, d_queue[my_start_partition+tid]);
                                         if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
                                             s_vertices[tid] = my_start_partition + tid < my_end_partition ? d_queue[my_start_partition+tid] : -1;
                                             s_edge_ids[tid] = 0;
@@ -553,12 +548,12 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         }
 
         // Determine work decomposition
-        if (blockIdx.x == 0 && threadIdx.x == 0) {
+        if (blockIdx.x == 0 && threadIdx.x == 0) { 
 
             // obtain problem size
             if (queue_reset)
             {
-                work_progress.StoreQueueLength<SizeT>(input_queue_len, queue_index);
+                //work_progress.StoreQueueLength<SizeT>(input_queue_len, queue_index);
             }
             else
             {
@@ -568,17 +563,17 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 if (input_queue_len == 0) {
                     if (d_done) d_done[0] = input_queue_len;
                 }
-            }
+            } 
 
             work_progress.Enqueue(output_queue_len, queue_index+1);
 
             // Reset our next outgoing queue counter to zero
             work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
             work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
-        }
+        } 
 
         // Barrier to protect work decomposition
-        __syncthreads();
+        __syncthreads(); 
 
         unsigned int range = input_queue_len;
         int tid = threadIdx.x;
@@ -606,16 +601,16 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             else
                 s_vertices[tid] = (my_id < range ? d_column_indices[d_queue[my_id]] : max_vertices);
             s_edge_ids[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
-        }
+        } 
 
         __syncthreads();
-        unsigned int size = s_edges[end_id];
+        unsigned int size = s_edges[end_id]; 
 
         VertexId v, e, e_id;
         int v_index = BinarySearch<KernelPolicy::THREADS>(tid, s_edges);
         v = s_vertices[v_index];
         e_id = s_edge_ids[v_index];
-        int end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
+        int end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices); 
 
         for (int i = tid; i < size; i += KernelPolicy::THREADS)
         {
@@ -713,7 +708,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                         }
                     }
                 }
-            } else {
+            } else { 
                 //v:pre, u:neighbor, outoffset:offset+i
                 if (Functor::CondEdge(v, u, problem, lookup, e_id)) {
                     Functor::ApplyEdge(v, u, problem, lookup, e_id);

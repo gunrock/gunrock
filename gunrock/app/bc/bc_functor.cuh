@@ -162,7 +162,6 @@ struct BackwardFunctor
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-
         VertexId s_label;
         VertexId d_label;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
