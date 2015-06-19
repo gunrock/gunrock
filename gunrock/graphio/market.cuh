@@ -215,12 +215,9 @@ int ReadMarketStream(
  *
  */
 template <bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
-int ReadCsrArrays(
-    char *f_in,
-    Csr<VertexId, Value, SizeT> &csr_graph,
-    bool undirected,
-    bool reversed) {
-    csr_graph.template FromCsr<LOAD_VALUES>(f_in, undirected, reversed);
+int ReadCsrArrays(char *f_in, Csr<VertexId, Value, SizeT> &csr_graph,
+                  bool undirected, bool reversed) {
+    csr_graph.template FromCsr<LOAD_VALUES>(f_in);
     return 0;
 }
 
@@ -301,19 +298,19 @@ int BuildMarketGraph(
     char *file_name = basename(temp2);
 
     if (undirected) {
-        char ud[256];
-        sprintf(ud, "%s/.%s_undirected_csr", file_path, file_name);
-        if (BuildMarketGraph<true>(file_in, ud, graph, true, false) != 0)
+        char ud[256];  // undirected graph
+        sprintf(ud, "%s/.%s.ud.bin", file_path, file_name);
+        if (BuildMarketGraph<LOAD_VALUES>(file_in, ud, graph, true, false) != 0)
             return 1;
     } else if (!undirected && reversed) {
-        char rv[256];
-        sprintf(rv, "%s/.%s_reversed_csr", file_path, file_name);
-        if (BuildMarketGraph<true>(file_in, rv, graph, false, true) != 0)
+        char rv[256];  // reversed graph
+        sprintf(rv, "%s/.%s.rv.bin", file_path, file_name);
+        if (BuildMarketGraph<LOAD_VALUES>(file_in, rv, graph, false, true) != 0)
             return 1;
     } else if (!undirected && !reversed) {
-        char nr[256];
-        sprintf(nr, "%s/.%s_nonreversed_csr", file_path, file_name);
-        if (BuildMarketGraph<true>(file_in, nr, graph, false, false) != 0)
+        char di[256];  // directed graph
+        sprintf(di, "%s/.%s.di.bin", file_path, file_name);
+        if (BuildMarketGraph<LOAD_VALUES>(file_in, di, graph, false, false) != 0)
             return 1;
     } else {
         fprintf(stderr, "Unspecified Graph Type.\n");
