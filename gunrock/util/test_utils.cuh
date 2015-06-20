@@ -446,7 +446,8 @@ int CompareResults(
                 is_right = false;
             }
         }
-        if (!is_right && flag == 0)
+        
+        if (!is_right)
         {
             printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
             PrintValue<float>(computed[i]);
@@ -473,7 +474,7 @@ int CompareResults(
             flag += 1;
             //return flag;
         }
-        if (!is_right && flag > 0) flag += 1;
+        //if (!is_right && flag > 0) flag += 1;
     }
     printf("\n");
     if (!flag)

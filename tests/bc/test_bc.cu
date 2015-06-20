@@ -287,9 +287,12 @@ void RefCPUBC(
 
         for (int iter = search_depth - 2; iter > 0; --iter)
         {
+
+            int cur_level = 0;
             for (int node = 0; node < graph.nodes; ++node)
             {
                 if (source_path[node] == iter) {
+                    ++cur_level;
                     int edges_begin = graph.row_offsets[node];
                     int edges_end = graph.row_offsets[node+1];
 
@@ -306,9 +309,7 @@ void RefCPUBC(
         }
 
         for (int i = 0; i < graph.nodes; ++i)
-        {
             bc_values[i] *= 0.5f;
-        }
 
         cpu_timer.Stop();
         float elapsed = cpu_timer.ElapsedMillis();
@@ -433,6 +434,7 @@ void RunTests(
     gpu_timer.Start();
     for (VertexId i = start_src; i < end_src; ++i)
     {
+        printf("src:%d\n", i);
         util::GRError(csr_problem->Reset(i, bc_enactor.GetFrontierType(), max_queue_sizing), "BC Problem Data Reset Failed", __FILE__, __LINE__);
         util::GRError(bc_enactor.template Enact<Problem>(context, csr_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
     }
@@ -615,7 +617,9 @@ int main( int argc, char** argv)
 
         csr.PrintHistogram();
         //csr.DisplayGraph();
+        csr.DisplayNeighborList(1263);
         fflush(stdout);
+        printf("1263 row offsets:%d\n", csr.row_offsets[1263]);
 
         // Run tests
         RunTests(csr, args, *context);
