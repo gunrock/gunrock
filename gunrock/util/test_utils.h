@@ -19,7 +19,6 @@
     #undef small            // Windows is terrible for polluting macro namespace
 #else
     #include <sys/resource.h>
-    #include <time.h>
 #endif
 
 #include <stdio.h>
@@ -215,34 +214,6 @@ struct CpuTimer
         double stop  = double(ll_stop.QuadPart) / double(ll_freq.QuadPart);
 
         return (stop - start) * 1000;
-    }
-
-#elif defined(CLOCK_PROCESS_CPUTIME_ID)
-
-    timespec start;
-    timespec stop;
-
-    void Start()
-    {
-        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
-    }
-
-    void Stop()
-    {
-        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop);
-    }
-
-    float ElapsedMillis()
-    {
-        timespec temp;
-        if ((stop.tv_nsec-start.tv_nsec)<0) {
-            temp.tv_sec = stop.tv_sec-start.tv_sec-1;
-            temp.tv_nsec = 1000000000+stop.tv_nsec-start.tv_nsec;
-        } else {
-            temp.tv_sec = stop.tv_sec-start.tv_sec;
-            temp.tv_nsec = stop.tv_nsec-start.tv_nsec;
-        }
-        return temp.tv_nsec/1000000.0;
     }
 
 #else
