@@ -243,7 +243,7 @@ public:
             cudaEventCreate(&start);
             cudaEventCreate(&stop);
             cudaEventRecord(start, 0);
-            SizeT frontier_attribute_queue_length = graph_slice->nodes;
+            long long frontier_attribute_queue_length = graph_slice->nodes;
 
             // Step through PageRank iterations
             while (done[0] < 0) {
