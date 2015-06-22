@@ -553,7 +553,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             // obtain problem size
             if (queue_reset)
             {
-                //work_progress.StoreQueueLength<SizeT>(input_queue_len, queue_index);
+                work_progress.StoreQueueLength<SizeT>(input_queue_len, queue_index);
             }
             else
             {

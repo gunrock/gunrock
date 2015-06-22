@@ -225,7 +225,7 @@ void RefCPUBC(
 
         for (idx = 0; idx < graph.edges; ++idx) {
             //std::cout << coo[idx].row << "," << coo[idx].col << ":" << coo[idx].val << std::endl;
-            ebc_values[idx] = coo[idx].val;
+            //ebc_values[idx] = coo[idx].val;
         }
 
         printf("CPU BC finished in %lf msec.", elapsed);
@@ -369,7 +369,7 @@ void RunTests(
     Value *h_bc_values         = (Value*)malloc(sizeof(Value) * graph.nodes);
     Value *h_ebc_values         = (Value*)malloc(sizeof(Value) * graph.edges);
     Value *reference_check_bc_values = (g_quick) ? NULL : reference_bc_values;
-    Value *reference_check_ebc_values = (g_quick || (src != -1)) ? NULL : reference_ebc_values;
+    Value *reference_check_ebc_values = NULL;//(g_quick || (src != -1)) ? NULL : reference_ebc_values;
     Value *reference_check_sigmas = (g_quick || (src == -1)) ? NULL : reference_sigmas;
 
     // Allocate BC enactor map
@@ -434,7 +434,6 @@ void RunTests(
     gpu_timer.Start();
     for (VertexId i = start_src; i < end_src; ++i)
     {
-        printf("src:%d\n", i);
         util::GRError(csr_problem->Reset(i, bc_enactor.GetFrontierType(), max_queue_sizing), "BC Problem Data Reset Failed", __FILE__, __LINE__);
         util::GRError(bc_enactor.template Enact<Problem>(context, csr_problem, i, max_grid_size), "BC Problem Enact Failed", __FILE__, __LINE__);
     }
@@ -617,9 +616,6 @@ int main( int argc, char** argv)
 
         csr.PrintHistogram();
         //csr.DisplayGraph();
-        csr.DisplayNeighborList(1263);
-        fflush(stdout);
-        printf("1263 row offsets:%d\n", csr.row_offsets[1263]);
 
         // Run tests
         RunTests(csr, args, *context);
