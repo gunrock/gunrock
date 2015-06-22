@@ -143,6 +143,13 @@ void gunrock_topk_func(
     struct GunrockConfig      configs,
     struct GunrockDataType    data_type);
 
+// Minimum spanning tree
+void gunrock_mst(
+    struct GunrockGraph       *graph_out,
+    const struct GunrockGraph *graph_in,
+    struct GunrockConfig      configs,
+    struct GunrockDataType    data_type);
+
 // TODO: Add other algorithms
 
 #ifdef __cplusplus
