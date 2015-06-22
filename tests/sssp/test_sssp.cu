@@ -247,7 +247,7 @@ void SimpleReferenceSssp(
 
     // Prepare Boost Datatype and Data structure
     typedef adjacency_list<vecS, vecS, directedS, no_property,
-                           property <edge_weight_t, float> > Graph;
+                           property <edge_weight_t, unsigned int> > Graph;
 
     typedef graph_traits<Graph>::vertex_descriptor vertex_descriptor;
     typedef graph_traits<Graph>::edge_descriptor edge_descriptor;

@@ -169,7 +169,7 @@ Value SimpleReferenceMST(
   // Kruskal minimum spanning tree preparations
   using namespace boost;
   typedef adjacency_list< vecS, vecS, undirectedS,
-    no_property, property<edge_weight_t, float> >   Graph;
+    no_property, property<edge_weight_t, int> >   Graph;
   typedef graph_traits < Graph >::edge_descriptor   Edge;
   typedef graph_traits < Graph >::vertex_descriptor Vertex;
   typedef std::pair<VertexId, VertexId> E;
@@ -312,14 +312,14 @@ void RunTests(
       // print the edge pairs in the minimum spanning tree
       DisplaySolution(graph, h_mst_output);
       printf("\nCORRECT.\n");
-      std::cout << "CPU Computed Total Weight = " << total_weight_cpu << std::endl;
-      std::cout << "GPU Computed Total Weight = " << total_weight_gpu << std::endl;
+      std::cout << "CPU Total Weight = " << total_weight_cpu << std::endl;
+      std::cout << "GPU Total Weight = " << total_weight_gpu << std::endl;
     }
     else
     {
       printf("INCORRECT.\n");
-      std::cout << "CPU Computed Total Weight = " << total_weight_cpu << std::endl;
-      std::cout << "GPU Computed Total Weight = " << total_weight_gpu << std::endl;
+      std::cout << "CPU Total Weight = " << total_weight_cpu << std::endl;
+      std::cout << "GPU Total Weight = " << total_weight_gpu << std::endl;
     }
   }
 
