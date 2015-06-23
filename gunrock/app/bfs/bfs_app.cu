@@ -8,21 +8,19 @@
 /**
  * @file bfs_app.cu
  *
- * @brief Gunrock Breadth-First Search implementation
+ * @brief Gunrock breadth-first search (BFS) application
  */
 
-#include <stdio.h>
 #include <gunrock/gunrock.h>
 
-// Graph construction utils
+// graph construction utilities
 #include <gunrock/graphio/market.cuh>
 
-// BFS includes
+// breadth-first search includes
 #include <gunrock/app/bfs/bfs_enactor.cuh>
 #include <gunrock/app/bfs/bfs_problem.cuh>
 #include <gunrock/app/bfs/bfs_functor.cuh>
 
-// MGPU include
 #include <moderngpu.cuh>
 
 using namespace gunrock;
@@ -39,8 +37,8 @@ using namespace gunrock::app::bfs;
  * @tparam MARK_PREDECESSORS
  * @tparam ENABLE_IDEMPOTENCE
  *
- * @param[out] ggraph_out Pointer to the output CSR graph
- * @param[in] ggraph_in Reference to the CSR graph we process on
+ * @param[out] graph_o Pointer to the output CSR graph
+ * @param[in] graph_i Reference to the CSR graph we process on
  * @param[in] src Source node where BFS starts
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] num_gpus Number of GPUs
@@ -48,115 +46,87 @@ using namespace gunrock::app::bfs;
  * @param[in] context Reference to CudaContext used by moderngpu functions
  *
  */
-template <
-    typename VertexId,
-    typename Value,
-    typename SizeT,
-    bool MARK_PREDECESSORS,
-    bool ENABLE_IDEMPOTENCE >
+template<typename VertexId, typename Value, typename SizeT, 
+         bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE >
 void run_bfs(
-    GunrockGraph *ggraph_out,
-    const  Csr<VertexId, Value, SizeT> &ggraph_in,
-    const  VertexId src,
-    int    max_grid_size,
-    int    num_gpus,
-    double max_queue_sizing,
-    CudaContext& context) {
-    // Preparations
-    typedef BFSProblem <
-        VertexId,
-        SizeT,
-        Value,
-        MARK_PREDECESSORS,
-        ENABLE_IDEMPOTENCE,
-        (MARK_PREDECESSORS && ENABLE_IDEMPOTENCE) > Problem;
-
+    GRGraph      *graph_o,
+    const  Csr<VertexId, Value, SizeT> &csr,
+    const        VertexId src,
+    const int    max_grid_size,
+    const int    num_gpus,
+    const double max_queue_sizing,
+    CudaContext  &context) {
+    typedef BFSProblem<VertexId, SizeT, Value, MARK_PREDECESSORS, 
+        ENABLE_IDEMPOTENCE, (MARK_PREDECESSORS && ENABLE_IDEMPOTENCE)> Problem;
     // Allocate host-side label array for gpu-computed results
-    VertexId *h_labels = (VertexId*)malloc(sizeof(VertexId) * ggraph_in.nodes);
+    VertexId *h_labels = (VertexId*)malloc(sizeof(VertexId) * csr.nodes);
     VertexId *h_preds = NULL;
     if (MARK_PREDECESSORS) {
-        //h_preds = (VertexId*)malloc(sizeof(VertexId) * ggraph_in.nodes);
+        //h_preds = (VertexId*)malloc(sizeof(VertexId) * csr.nodes);
     }
 
-    // Allocate BFS enactor map
-    BFSEnactor<false> bfs_enactor(false);
+    BFSEnactor<false> enactor(false);  // Allocate BFS enactor map
+    Problem *problem = new Problem;    // Allocate problem on GPU
 
-    // Allocate problem on GPU
-    Problem *csr_problem = new Problem;
-    util::GRError(csr_problem->Init(
-                      false,
-                      ggraph_in,
-                      num_gpus),
-                  "Problem BFS Initialization Failed", __FILE__, __LINE__);
+    util::GRError(problem->Init(false, csr, num_gpus),
+                  "BFS Problem Initialization Failed", __FILE__, __LINE__);
 
-    // Perform BFS
-    GpuTimer gpu_timer;
-
-    util::GRError(csr_problem->Reset(
-                      src, bfs_enactor.GetFrontierType(), max_queue_sizing),
+    util::GRError(problem->Reset(
+                      src, enactor.GetFrontierType(), max_queue_sizing),
                   "BFS Problem Data Reset Failed", __FILE__, __LINE__);
 
-    gpu_timer.Start();
-    util::GRError(bfs_enactor.template Enact<Problem>(
-                      context, csr_problem, src, max_grid_size),
+    util::GRError(enactor.template Enact<Problem>(
+                      context, problem, src, max_grid_size),
                   "BFS Problem Enact Failed", __FILE__, __LINE__);
-    gpu_timer.Stop();
 
-    float elapsed = gpu_timer.ElapsedMillis();
-
-    // Copy out results back to Host
-    util::GRError(csr_problem->Extract(h_labels, h_preds),
+    util::GRError(problem->Extract(h_labels, h_preds),
                   "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    // label per node to GunrockGraph struct
-    ggraph_out->node_values = (int*)&h_labels[0];
+    graph_o->node_values = (int*)&h_labels[0];  // label per node to GRGraph struct
 
-    // Clean up
-    if (csr_problem) delete csr_problem;
+    if (problem) delete problem;
     //if (h_preds)     free(h_preds);
-
     cudaDeviceSynchronize();
 }
 
 /**
  * @brief dispatch function to handle data_types
  *
- * @param[out] ggraph_out GunrockGraph type output
- * @param[in]  ggraph_in  GunrockGraph type input graph
- * @param[in]  bfs_config bfs specific configurations
- * @param[in]  data_type  bfs data_type configurations
- * @param[in]  context    moderngpu context
+ * @param[out] graph_o  GRGraph type output
+ * @param[in]  graph_i  GRGraph type input graph
+ * @param[in]  config   Specific configurations
+ * @param[in]  data_t   Data type configurations
+ * @param[in]  context  ModernGPU context
  */
 void dispatch_bfs(
-    GunrockGraph       *ggraph_out,
-    const GunrockGraph *ggraph_in,
-    GunrockConfig      bfs_config,
-    GunrockDataType    data_type,
-    CudaContext&       context) {
-    switch (data_type.VTXID_TYPE) {
+    GRGraph       *graph_o,
+    const GRGraph *graph_i,
+    const GRSetup  config,
+    const GRTypes  data_t,
+    CudaContext   &context) {
+    switch (data_t.VTXID_TYPE) {
     case VTXID_INT: {
-        switch (data_type.SIZET_TYPE) {
+        switch (data_t.SIZET_TYPE) {
         case SIZET_INT: {
-            switch (data_type.VALUE_TYPE) {
-            case VALUE_INT: {
-                // template type = <int, int, int>
+            switch (data_t.VALUE_TYPE) {
+            case VALUE_INT: {  // template type = <int, int, int>
                 // build input csr format graph
                 Csr<int, int, int> csr_graph(false);
-                csr_graph.nodes = ggraph_in->num_nodes;
-                csr_graph.edges = ggraph_in->num_edges;
-                csr_graph.row_offsets    = (int*)ggraph_in->row_offsets;
-                csr_graph.column_indices = (int*)ggraph_in->col_indices;
+                csr_graph.nodes = graph_i->num_nodes;
+                csr_graph.edges = graph_i->num_edges;
+                csr_graph.row_offsets    = (int*)graph_i->row_offsets;
+                csr_graph.column_indices = (int*)graph_i->col_indices;
 
                 // default configurations
-                int   src_node      = 0;       //!< default source vertex to start
-                int   num_gpus      = 1;       //!< number of GPUs for multi-gpu enactor to use
-                int   max_grid_size = 0;       //!< maximum grid size (0: leave it up to the enactor)
-                bool  mark_pred     = false;   //!< whether to mark predecessor or not
-                bool  idempotence   = false;   //!< whether or not to enable idempotence
-                float max_queue_sizing = 1.0f; //!< maximum size scaling factor for work queues
+                int   src_node      = 0;  // default source vertex to start
+                int   num_gpus      = 1;  // number of GPUs for multi-gpu
+                int   max_grid_size = 0;  // leave it up to the enactor
+                bool  mark_pred     = 0;  // whether to mark predecessor or not
+                bool  idempotence   = 0;  // whether or not enable idempotence
+                float max_queue_sizing = 1.0f;  // maximum size scaling factor
 
                 // determine source vertex to start bfs
-                switch (bfs_config.src_mode) {
+                switch (config.src_mode) {
                 case randomize: {
                     src_node = graphio::RandomNode(csr_graph.nodes);
                     break;
@@ -167,7 +137,7 @@ void dispatch_bfs(
                     break;
                 }
                 case manually: {
-                    src_node = bfs_config.src_node;
+                    src_node = config.src_node;
                     break;
                 }
                 default: {
@@ -175,14 +145,14 @@ void dispatch_bfs(
                     break;
                 }
                 }
-                mark_pred        = bfs_config.mark_pred;
-                idempotence      = bfs_config.idempotence;
-                max_queue_sizing = bfs_config.queue_size;
+                mark_pred        = config.mark_pred;
+                idempotence      = config.idempotence;
+                max_queue_sizing = config.queue_size;
 
                 if (mark_pred) {
                     if (idempotence) {
                         run_bfs<int, int, int, true, true>(
-                            ggraph_out,
+                            graph_o,
                             csr_graph,
                             src_node,
                             max_grid_size,
@@ -191,7 +161,7 @@ void dispatch_bfs(
                             context);
                     } else {
                         run_bfs<int, int, int, true, false>(
-                            ggraph_out,
+                            graph_o,
                             csr_graph,
                             src_node,
                             max_grid_size,
@@ -202,7 +172,7 @@ void dispatch_bfs(
                 } else {
                     if (idempotence) {
                         run_bfs<int, int, int, false, true>(
-                            ggraph_out,
+                            graph_o,
                             csr_graph,
                             src_node,
                             max_grid_size,
@@ -211,7 +181,7 @@ void dispatch_bfs(
                             context);
                     } else {
                         run_bfs<int, int, int, false, false>(
-                            ggraph_out,
+                            graph_o,
                             csr_graph,
                             src_node,
                             max_grid_size,
@@ -225,14 +195,12 @@ void dispatch_bfs(
                 csr_graph.column_indices = NULL;
                 break;
             }
-            case VALUE_UINT: {
-                // template type = <int, uint, int>
+            case VALUE_UINT: {  // template type = <int, uint, int>
                 // not yet support
                 printf("Not Yet Support This DataType Combination.\n");
                 break;
             }
-            case VALUE_FLOAT: {
-                // template type = <int, float, int>
+            case VALUE_FLOAT: {  // template type = <int, float, int>
                 // not yet support
                 printf("Not Yet Support This DataType Combination.\n");
                 break;
@@ -249,24 +217,20 @@ void dispatch_bfs(
 /*
  * @brief gunrock_bfs function
  *
- * @param[out] ggraph_out output subgraph of bfs problem
- * @param[in]  ggraph_in  input graph need to process on
- * @param[in]  bfs_config gunrock primitive specific configurations
- * @param[in]  data_type  gunrock datatype struct
+ * @param[out] graph_o output subgraph of bfs problem
+ * @param[in]  graph_i input graph need to process on
+ * @param[in]  config  gunrock primitive specific configurations
+ * @param[in]  data_t  gunrock data_t struct
  */
-void gunrock_bfs_func(
-    GunrockGraph       *ggraph_out,
-    const GunrockGraph *ggraph_in,
-    GunrockConfig      bfs_config,
-    GunrockDataType    data_type) {
-
-    // moderngpu preparations
-    int device = 0;
-    device = bfs_config.device;
+void gunrock_bfs(
+    GRGraph       *graph_o,
+    const GRGraph *graph_i,
+    const GRSetup  config,
+    const GRTypes  data_t) {
+    unsigned int device = 0;
+    device = config.device;
     ContextPtr context = mgpu::CreateCudaDevice(device);
-
-    // launch dispatch function
-    dispatch_bfs(ggraph_out, ggraph_in, bfs_config, data_type, *context);
+    dispatch_bfs(graph_o, graph_i, config, data_t, *context);
 }
 
 // Leave this at the end of the file

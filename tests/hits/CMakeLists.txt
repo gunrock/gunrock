@@ -12,7 +12,7 @@ set (mgpu_SOURCE_FILES
   ${mgpu_SOURCE_DIRS}/mgpucontext.cu
   ${mgpu_SOURCE_DIRS}/mgpuutil.cpp)
 
-CUDA_ADD_EXECUTABLE(hyperlink_induced_topic_search
+CUDA_ADD_EXECUTABLE(HITS
   test_hits.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/test_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu

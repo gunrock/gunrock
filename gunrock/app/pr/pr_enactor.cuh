@@ -243,7 +243,7 @@ public:
             cudaEventCreate(&start);
             cudaEventCreate(&stop);
             cudaEventRecord(start, 0);
-            long long frontier_attribute_queue_length = graph_slice->nodes;
+            SizeT frontier_attribute_queue_length = graph_slice->nodes;
 
             // Step through PageRank iterations
             while (done[0] < 0) {
@@ -283,7 +283,7 @@ public:
                     if (retval = work_progress.GetQueueLength(
                             frontier_attribute.queue_index+1,
                             frontier_attribute_queue_length)) break;
-                    printf(", %lld",
+                    printf(", %d",
                            (long long) frontier_attribute_queue_length);
                 }
 
@@ -360,7 +360,7 @@ public:
                     enactor_stats.total_queued +=
                         frontier_attribute_queue_length;
                     if (DEBUG) {
-                        printf(", %lld", frontier_attribute_queue_length);
+                        printf(", %d", frontier_attribute_queue_length);
                     }
                     if (INSTRUMENT) {
                         if (retval=enactor_stats.filter_kernel_stats.Accumulate(

@@ -8,21 +8,19 @@
 /**
  * @file mst_app.cu
  *
- * @brief minimum spanning tree (MST) problem implementation
+ * @brief minimum spanning tree (MST) application
  */
 
-#include <stdio.h>
 #include <gunrock/gunrock.h>
 
-// Graph construction utils
+// graph construction utilities
 #include <gunrock/graphio/market.cuh>
 
-// Primitive-specific includes
+// primitive-specific includes
 #include <gunrock/app/mst/mst_enactor.cuh>
 #include <gunrock/app/mst/mst_problem.cuh>
 #include <gunrock/app/mst/mst_functor.cuh>
 
-// ModernGPU include
 #include <moderngpu.cuh>
 
 using namespace gunrock;
@@ -37,43 +35,37 @@ using namespace gunrock::app::mst;
  * @tparam Value
  * @tparam SizeT
  *
- * @param[out] graph_o GunrockGraph type output graph
- * @param[in]  csr Reference to the CSR graph we process on
- * @param[in]  max_grid_size Maximum CTA occupancy
- * @param[in]  num_gpus Number of GPUs
- * @param[in]  context moderngpu context
+ * @param[out] graph_o   GRGraph type output graph
+ * @param[in]  csr       Reference to the CSR graph we process on
+ * @param[in]  max_grid  Maximum CTA occupancy
+ * @param[in]  num_gpus  Number of GPUs
+ * @param[in]  context   Modern GPU context
  */
 template<typename VertexId, typename Value, typename SizeT>
 void run_mst(
-    GunrockGraph   *graph_o,
+    GRGraph *graph_o,
     const Csr<VertexId, Value, SizeT> &csr,
-    const int      max_grid_size,
-    const int      num_gpus,
-    CudaContext    &context) {
-    typedef MSTProblem<VertexId, SizeT, Value, true> Problem;  // preperations
+    const int    max_grid,
+    const int    num_gpus,
+    CudaContext  &context) {
+    typedef MSTProblem<VertexId, SizeT, Value, true> Problem;  // preparations
     MSTEnactor<false> enactor(false);                          // enactor map
-    VertexId  *h_mst = new VertexId[csr.edges];                // host array
+    VertexId *h_mst  = new VertexId[csr.edges];                // results array
     Problem *problem = new Problem;                            // problem on GPU
+
     util::GRError(problem->Init(false, csr, num_gpus),
-                  "MST Problem Data Initialization Failed", __FILE__, __LINE__);
+                  "MST Data Initialization Failed", __FILE__, __LINE__);
 
     util::GRError(problem->Reset(enactor.GetFrontierType()),
-                  "MST Problem Data Reset Failed", __FILE__, __LINE__);
+                  "MST Data Reset Failed", __FILE__, __LINE__);
 
-    CpuTimer gpu_timer;
-
-    gpu_timer.Start();
-    util::GRError(enactor.template Enact<Problem>(
-                      context, problem, max_grid_size),
-                  "MST Problem Enact Failed", __FILE__, __LINE__);
-    gpu_timer.Stop();
-    float elapsed = gpu_timer.ElapsedMillis();
+    util::GRError(enactor.template Enact<Problem>(context, problem, max_grid),
+                  "MST Enact Failed", __FILE__, __LINE__);
 
     util::GRError(problem->Extract(h_mst),
-                  "MST Problem Data Extraction Failed", __FILE__, __LINE__);
+                  "MST Data Extraction Failed", __FILE__, __LINE__);
 
-    // output mst results: 0 | 1 mask for all edges
-    graph_o->edge_values = (int*)&h_mst[0];
+    graph_o->edge_values = (int*)&h_mst[0];  // output: 0|1 mask for all edges
 
     if (problem) { delete problem; }
 
@@ -83,23 +75,23 @@ void run_mst(
 /**
  * @brief dispatch function to handle data types
  *
- * @param[out] graph_o  GunrockGraph type output graph
- * @param[in]  graph_i  GunrockGraph type input graph
- * @param[in]  configs  MST-specific configurations
- * @param[in]  datatype data type configurations
- * @param[in]  context  moderngpu context parameter
+ * @param[out] graph_o  GRGraph type output graph
+ * @param[in]  graph_i  GRGraph type input graph
+ * @param[in]  config   MST-specific configurations
+ * @param[in]  data_t   Data type configurations
+ * @param[in]  context  Modern GPU context parameter
  */
 void dispatch_mst(
-    GunrockGraph          *graph_o,
-    const GunrockGraph    *graph_i,
-    const GunrockConfig   configs,
-    const GunrockDataType datatype,
+    GRGraph          *graph_o,
+    const GRGraph    *graph_i,
+    const GRSetup   config,
+    const GRTypes data_t,
     CudaContext           &context) {
-    switch (datatype.VTXID_TYPE) {
+    switch (data_t.VTXID_TYPE) {
     case VTXID_INT: {
-        switch (datatype.SIZET_TYPE) {
+        switch (data_t.SIZET_TYPE) {
         case SIZET_INT: {
-            switch (datatype.VALUE_TYPE) {
+            switch (data_t.VALUE_TYPE) {
             case VALUE_INT: {  // template type = <int, int, int>
                 // create a CSR formatted graph
                 Csr<int, int, int> csr(false);
@@ -108,23 +100,42 @@ void dispatch_mst(
                 csr.row_offsets    = (int*)graph_i->row_offsets;
                 csr.column_indices = (int*)graph_i->col_indices;
                 csr.edge_values    = (int*)graph_i->edge_values;
+
                 // configurations if necessary
-                int num_gpus      = 1;  // number of GPU(s) to use
-                int max_grid_size = 0;  // leave it up tp the enactor
+                int num_gpus = 1;  // number of GPU(s) to use
+                int max_grid = 0;  // leave it up to the enactor
                 run_mst<int, int, int>(
-                    graph_o, csr, max_grid_size, num_gpus, context);
+                    graph_o, csr, max_grid, num_gpus, context);
+
                 // reset for free memory
-                csr.row_offsets = NULL;
+                csr.row_offsets    = NULL;
                 csr.column_indices = NULL;
-                csr.edge_values = NULL;
+                csr.edge_values    = NULL;
                 break;
             }
-            case VALUE_UINT: {  // template type = <int, uint, int>
+            case VALUE_UINT: {  // template type = <int, unsigned int, int>
                 printf("Not Yet Support This DataType Combination.\n");
                 break;
             }
             case VALUE_FLOAT: {  // template type = <int, float, int>
-                printf("Not Yet Support This DataType Combination.\n");
+                // create a CSR formatted graph
+                Csr<int, float, int> csr(false);
+                csr.nodes = graph_i->num_nodes;
+                csr.edges = graph_i->num_edges;
+                csr.row_offsets    = (int*)graph_i->row_offsets;
+                csr.column_indices = (int*)graph_i->col_indices;
+                csr.edge_values  = (float*)graph_i->edge_values;
+
+                // configurations if necessary
+                int num_gpus = 1;  // number of GPU(s) to use
+                int max_grid = 0;  // leave it up to the enactor
+                run_mst<int, float, int>(
+                    graph_o, csr, max_grid, num_gpus, context);
+
+                // reset for free memory
+                csr.row_offsets    = NULL;
+                csr.column_indices = NULL;
+                csr.edge_values    = NULL;
                 break;
             }
             }
@@ -143,20 +154,20 @@ void dispatch_mst(
  * @tparam Value
  * @tparam SizeT
  *
- * @param[out] graph_o  GunrockGraph type output graph
- * @param[in]  graph_i  GunrockGraph type input graph
- * @param[in]  configs  Gunrock primitive-specific configurations
- * @param[in]  datatype data type configurations
+ * @param[out] graph_o GRGraph type output graph
+ * @param[in]  graph_i GRGraph type input graph
+ * @param[in]  config  Primitive-specific configurations
+ * @param[in]  data_t  Data type configurations
  */
 void gunrock_mst(
-    GunrockGraph          *graph_o,
-    const GunrockGraph    *graph_i,
-    const GunrockConfig    configs,
-    const GunrockDataType  datatype) {
-    int device = 0;  // default use GPU 0
-    device = configs.device;
+    GRGraph       *graph_o,
+    const GRGraph *graph_i,
+    const GRSetup  config,
+    const GRTypes  data_t) {
+    unsigned int device = 0;
+    device = config.device;
     ContextPtr context = mgpu::CreateCudaDevice(device);
-    dispatch_mst(graph_o, graph_i, configs, datatype, *context);
+    dispatch_mst(graph_o, graph_i, config, data_t, *context);
 }
 
 // Leave this at the end of the file

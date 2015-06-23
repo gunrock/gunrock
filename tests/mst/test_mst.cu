@@ -140,7 +140,7 @@ void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph, int *mst_output)
 template<typename VertexId, typename Value, typename SizeT>
 bool IsConnected(const Csr<VertexId, Value, SizeT> & graph)
 {
-  GunrockGraph *temp = (GunrockGraph*)malloc(sizeof(GunrockGraph));
+  GRGraph *temp = (GRGraph*)malloc(sizeof(GRGraph));
   unsigned int *components = (unsigned int*)malloc(sizeof(unsigned int));
   run_cc<VertexId, Value, SizeT>(temp, components, graph, 0, 1);
   if (temp) free(temp);
