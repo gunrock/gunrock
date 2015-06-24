@@ -46,23 +46,23 @@ using namespace gunrock::app::bfs;
  * @param[in] context Reference to CudaContext used by moderngpu functions
  *
  */
-template<typename VertexId, typename Value, typename SizeT, 
-         bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE >
+template<typename VertexId, typename Value, typename SizeT,
+         bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE>
 void run_bfs(
     GRGraph      *graph_o,
-    const  Csr<VertexId, Value, SizeT> &csr,
-    const        VertexId src,
+    const Csr<VertexId, Value, SizeT> &csr,
+    const VertexId src,
     const int    max_grid_size,
     const int    num_gpus,
     const double max_queue_sizing,
     CudaContext  &context) {
-    typedef BFSProblem<VertexId, SizeT, Value, MARK_PREDECESSORS, 
+    typedef BFSProblem<VertexId, SizeT, Value, MARK_PREDECESSORS,
         ENABLE_IDEMPOTENCE, (MARK_PREDECESSORS && ENABLE_IDEMPOTENCE)> Problem;
     // Allocate host-side label array for gpu-computed results
     VertexId *h_labels = (VertexId*)malloc(sizeof(VertexId) * csr.nodes);
     VertexId *h_preds = NULL;
     if (MARK_PREDECESSORS) {
-        //h_preds = (VertexId*)malloc(sizeof(VertexId) * csr.nodes);
+        // h_preds = (VertexId*)malloc(sizeof(VertexId) * csr.nodes);
     }
 
     BFSEnactor<false> enactor(false);  // Allocate BFS enactor map
@@ -75,17 +75,23 @@ void run_bfs(
                       src, enactor.GetFrontierType(), max_queue_sizing),
                   "BFS Problem Data Reset Failed", __FILE__, __LINE__);
 
+    GpuTimer gpu_timer;
+    float elapsed = 0.0f;
+    gpu_timer.Start();
     util::GRError(enactor.template Enact<Problem>(
                       context, problem, src, max_grid_size),
                   "BFS Problem Enact Failed", __FILE__, __LINE__);
+    gpu_timer.Stop();
+    elapsed = gpu_timer.ElapsedMillis();
 
     util::GRError(problem->Extract(h_labels, h_preds),
                   "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    graph_o->node_values = (int*)&h_labels[0];  // label per node to GRGraph struct
+    graph_o->node_values = (int*)&h_labels[0];  // label per node to graph_o
+    printf(" elapsed time: %.4f ms\n", elapsed);
 
     if (problem) delete problem;
-    //if (h_preds)     free(h_preds);
+    // if (h_preds)     free(h_preds);
     cudaDeviceSynchronize();
 }
 
@@ -231,6 +237,43 @@ void gunrock_bfs(
     device = config.device;
     ContextPtr context = mgpu::CreateCudaDevice(device);
     dispatch_bfs(graph_o, graph_i, config, data_t, *context);
+}
+
+/*
+ * @brief bfs interface take in CSR arrays as input
+ */
+void bfs(
+    int       *bfs_label,
+    const int  num_nodes,
+    const int  num_edges,
+    const int *row_offsets,
+    const int *col_indices,
+    const int  source,
+    const int  device) {
+    printf("-------------------- setting --------------------\n");
+    struct GRTypes data_t;  // primitive-specific data types
+    data_t.VTXID_TYPE = VTXID_INT;  // integer
+    data_t.SIZET_TYPE = SIZET_INT;  // integer
+    data_t.VALUE_TYPE = VALUE_INT;  // integer
+    struct GRSetup config;  // primitive-specific configures
+    config.device      = device;  // setting device to run
+    config.src_node    = source;  // source vertex to begin
+    config.mark_pred   =  false;  // do not mark predecessors
+    config.idempotence =  false;  // wether enable idempotence
+    config.queue_size  =   1.0f;  // maximum queue size factor
+    struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *graph_i = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    graph_i->num_nodes   = num_nodes;
+    graph_i->num_edges   = num_edges;
+    graph_i->row_offsets = (void*)&row_offsets[0];
+    graph_i->col_indices = (void*)&col_indices[0];
+    printf(" loaded num nodes: %d, num edges: %d\n", num_nodes, num_edges);
+    printf("-------------------- running --------------------\n");
+    gunrock_bfs(graph_o, graph_i, config, data_t);
+    memcpy(bfs_label, (int*)graph_o->node_values, num_nodes * sizeof(int));
+    printf("-------------------- cleanup --------------------\n");
+    if (graph_i) free(graph_i);
+    if (graph_o) free(graph_o);
 }
 
 // Leave this at the end of the file

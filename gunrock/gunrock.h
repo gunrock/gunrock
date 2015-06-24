@@ -101,6 +101,15 @@ void gunrock_bfs(
     struct       GRSetup  config,
     struct       GRTypes  data_t);
 
+void bfs(
+    int       *bfs_label,
+    const int  num_nodes,
+    const int  num_edges,
+    const int *row,
+    const int *col,
+    const int  src,
+    const int  dev);
+
 // betweenness centrality
 void gunrock_bc(
     struct       GRGraph *graph_o,
