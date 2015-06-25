@@ -60,7 +60,7 @@ protected :
 
     // Seven pointer-sized counters in global device memory (we may not use
     // all of them, or may only use 32-bit versions of them)
-    size_t *d_counters;
+    void *d_counters;
 
     // Host-controlled selector for indexing into d_counters.
     int progress_selector;
@@ -256,6 +256,7 @@ public:
 
     // Sets up the progress counters for the next kernel launch (lazily
     // allocating and initializing them if necessary)
+    template <typename SizeT>
     cudaError_t Setup()
     {
         cudaError_t retval = cudaSuccess;
@@ -264,7 +265,7 @@ public:
             // Make sure that our progress counters are allocated
             if (!d_counters) {
 
-                size_t h_counters[COUNTERS];
+                SizeT h_counters[COUNTERS];
                 for (int i = 0; i < COUNTERS; i++) {
                     h_counters[i] = 0;
                 }
@@ -272,9 +273,9 @@ public:
                 // Allocate and initialize
                 if (retval = util::GRError(cudaGetDevice(&gpu),
                     "CtaWorkProgress cudaGetDevice failed: ", __FILE__, __LINE__)) break;
-                if (retval = util::GRError(cudaMalloc((void**) &d_counters, sizeof(size_t) * COUNTERS),
+                if (retval = util::GRError(cudaMalloc((void**) &d_counters, sizeof(SizeT) * COUNTERS),
                     "CtaWorkProgress cudaMalloc d_counters failed", __FILE__, __LINE__)) break;
-                if (retval = util::GRError(cudaMemcpy(d_counters, h_counters, sizeof(size_t) * COUNTERS, cudaMemcpyHostToDevice),
+                if (retval = util::GRError(cudaMemcpy(d_counters, h_counters, sizeof(SizeT) * COUNTERS, cudaMemcpyHostToDevice),
                     "CtaWorkProgress cudaMemcpy d_counters failed", __FILE__, __LINE__)) break;
             }
 

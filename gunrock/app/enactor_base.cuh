@@ -1213,7 +1213,7 @@ protected:
             cuda_props   [gpu].Setup(gpu_idx[gpu]);
             for (int peer=0;peer<num_gpus;peer++)
             {
-                work_progress     [gpu*num_gpus+peer].Setup();
+                work_progress     [gpu*num_gpus+peer].template Setup<SizeT>();
                 frontier_attribute[gpu*num_gpus+peer].output_length.Allocate(1, util::HOST | util::DEVICE);
             }
         }
