@@ -673,8 +673,8 @@ public:
         cudaStream_t                   stream)
     {
         //Print_Const<DataSlice><<<1,1,0,stream>>>(d_data_slice);
-        for (int i=0; i<3; i++)
-        {
+        //for (int i=0; i<3; i++)
+        //{
         if (enactor_stats -> iteration != 0 || i!=0)
         {
             frontier_attribute->queue_length = data_slice -> edge_map_queue_len;
@@ -798,7 +798,7 @@ public:
         //if (done[0] == 0 || frontier_attribute.queue_length == 0 || enactor_stats.iteration > max_iteration) break;
 
         //if (DEBUG) printf("\n%lld", (long long) enactor_stats.iteration);
-        }
+        //}
     }
 
     static cudaError_t Compute_OutputLength(
