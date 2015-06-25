@@ -45,13 +45,13 @@ using namespace gunrock::app::bc;
  */
 template<typename VertexId, typename Value, typename SizeT>
 void run_bc(
-    GRGraph        *graph_o,
-    const Csr<VertexId, Value, SizeT> &csr,
+    GRGraph*       graph_o,
+    const Csr<VertexId, Value, SizeT>& csr,
     const VertexId source,
     const int      max_grid_size,
     const int      num_gpus,
     const double   max_queue_sizing,
-    CudaContext    &context) {
+    CudaContext&   context) {
     typedef BCProblem<VertexId, SizeT, Value, true, false > Problem;
     // Allocate host-side array (for both reference and gpu-computed results)
     Value *h_sigmas     = (Value*)malloc(sizeof(Value) * csr.nodes);
@@ -62,6 +62,8 @@ void run_bc(
 
     util::GRError(problem->Init(false, csr, num_gpus),
                   "BC Problem Initialization Failed", __FILE__, __LINE__);
+
+    GpuTimer gpu_timer; float elapsed = 0.0f; gpu_timer.Start();  // start timer
 
     VertexId start_source;
     VertexId end_source;
@@ -84,6 +86,9 @@ void run_bc(
 
     util::MemsetScaleKernel <<< 128, 128>>>(
         problem->data_slices[0]->d_bc_values, (Value)0.5f, (int)csr.nodes);
+
+    gpu_timer.Stop(); elapsed = gpu_timer.ElapsedMillis();  // calculate elapsed
+    printf(" device elapsed time: %.4f ms\n", elapsed);
 
     util::GRError(problem->Extract(h_sigmas, h_bc_values, h_ebc_values),
                   "BC Problem Data Extraction Failed", __FILE__, __LINE__);
@@ -202,6 +207,53 @@ void gunrock_bc(
     device = config.device;
     ContextPtr context = mgpu::CreateCudaDevice(device);
     dispatch_bc(graph_o, graph_i, config, data_t, *context);
+}
+
+/*
+ * @brief Simple interface take in CSR arrays as input
+ * @param[out] bfs_label   Return BC node centrality per nodes
+ * @param[in]  num_nodes   Number of nodes of the input graph
+ * @param[in]  num_edges   Number of edges of the input graph
+ * @param[in]  row_offsets CSR-formatted graph input row offsets
+ * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[in]  source      Source to begin traverse
+ */
+void bc(
+    float*     bc_scores,
+    const int  num_nodes,
+    const int  num_edges,
+    const int* row_offsets,
+    const int* col_indices,
+    const int  source) {
+    printf("-------------------- setting --------------------\n");
+
+    struct GRTypes data_t;            // primitive-specific data types
+    data_t.VTXID_TYPE = VTXID_INT;    // integer
+    data_t.SIZET_TYPE = SIZET_INT;    // integer
+    data_t.VALUE_TYPE = VALUE_FLOAT;  // float BC scores
+
+    struct GRSetup config;          // primitive-specific configures
+    config.device      =      0;    // setting device to run
+    config.src_node    = source;    // source vertex to begin
+    config.queue_size  =   1.0f;    // maximum queue size factor
+
+    struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *graph_i = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    graph_i->num_nodes   = num_nodes;
+    graph_i->num_edges   = num_edges;
+    graph_i->row_offsets = (void*)&row_offsets[0];
+    graph_i->col_indices = (void*)&col_indices[0];
+
+    printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);    
+    
+    printf("-------------------- running --------------------\n");
+    gunrock_bc(graph_o, graph_i, config, data_t);
+    memcpy(bc_scores, (float*)graph_o->node_values, num_nodes * sizeof(float));
+    
+    if (graph_i) free(graph_i);
+    if (graph_o) free(graph_o);
+
+    printf("------------------- completed -------------------\n");
 }
 
 // Leave this at the end of the file

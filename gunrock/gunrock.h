@@ -93,43 +93,60 @@ struct GRSetup {
 extern "C" {
 #endif
 
-// breath-first search
+/**
+ * breath-first search
+ */
 void gunrock_bfs(
     struct GRGraph*       graph_o,
     const struct GRGraph* graph_i,
     const struct GRSetup  config,
     const struct GRTypes  data_t);
 
-// simple interface
 void bfs(
     int*       bfs_label,
     const int  num_nodes,
     const int  num_edges,
     const int* row_offsets,
     const int* col_indices,
-    const int  source,
-    const int  device);
+    const int  source);
 
-// betweenness centrality
+/**
+ * betweenness centrality
+ */
 void gunrock_bc(
     struct GRGraph*       graph_o,
     const struct GRGraph* graph_i,
     const struct GRSetup  config,
     const struct GRTypes  data_t);
 
-// connected component
+void bc(
+    float*     bc_scores,
+    const int  num_nodes,
+    const int  num_edges,
+    const int* row_offsets,
+    const int* col_indices,
+    const int  source);
+
+/**
+ * connected component
+ */
 void gunrock_cc(
     struct GRGraph*       graph_o,
     unsigned int*         components,
     const struct GRGraph* graph_i,
     const struct GRSetup  config,
     const struct GRTypes  data_t);
-/*
-int cc(int *component, const int  num_nodes, const int  num_edges,
-       const int *offsets, const int *indices, const int  device);
-*/
 
-// single-source shortest path
+int cc(
+    int*       component,
+    const int  num_nodes,
+    const int  num_edges,
+    const int* row_offsets,
+    const int* col_indices);
+
+/**
+ * single-source shortest path
+ */
 void gunrock_sssp(
     struct GRGraph*       graph_o,
     void*                 predecessor,
@@ -137,7 +154,15 @@ void gunrock_sssp(
     const struct GRSetup  config,
     const struct GRTypes  data_t);
 
-// page-rank
+void sssp(
+    int*       distances,
+    const int  num_nodes,
+    const int  num_edges,
+    const int* row_offsets,
+    const int* col_indices,
+    const int  source);
+
+// pagerank
 void gunrock_pagerank(
     struct GRGraph*       graph_o,
     void*                 node_ids,
@@ -145,6 +170,14 @@ void gunrock_pagerank(
     const struct GRGraph* graph_i,
     const struct GRSetup  config,
     const struct GRTypes  data_t);
+
+void pagerank(
+    int*       node_ids,
+    float*     pagerank,
+    const int  num_nodes,
+    const int  num_edges,
+    const int* row_offsets,
+    const int* col_indices);
 
 // degree centrality
 void gunrock_topk(
@@ -162,6 +195,13 @@ void gunrock_mst(
     const struct GRGraph* graph_i,
     const struct GRSetup  config,
     const struct GRTypes  data_t);
+
+void mst(
+    bool*      edge_mask,
+    const int  num_nodes,
+    const int  num_edges,
+    const int* row_offsets,
+    const int* col_indices);
 
 // TODO(ydwu): Add other primitives
 
