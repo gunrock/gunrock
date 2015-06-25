@@ -52,7 +52,6 @@ void run_bfs(
     GRGraph      *graph_o,
     const Csr<VertexId, Value, SizeT> &csr,
     const VertexId src,
-    const int    max_grid_size,
     const int    num_gpus,
     const double max_queue_sizing,
     CudaContext  &context) {
@@ -75,14 +74,12 @@ void run_bfs(
                       src, enactor.GetFrontierType(), max_queue_sizing),
                   "BFS Problem Data Reset Failed", __FILE__, __LINE__);
 
-    GpuTimer gpu_timer;
-    float elapsed = 0.0f;
-    gpu_timer.Start();
-    util::GRError(enactor.template Enact<Problem>(
-                      context, problem, src, max_grid_size),
+    GpuTimer gpu_timer; float elapsed = 0.0f; gpu_timer.Start();  // start timer
+
+    util::GRError(enactor.template Enact<Problem>(context, problem, src),
                   "BFS Problem Enact Failed", __FILE__, __LINE__);
-    gpu_timer.Stop();
-    elapsed = gpu_timer.ElapsedMillis();
+
+    gpu_timer.Stop(); elapsed = gpu_timer.ElapsedMillis();  // calculate elapsed
 
     util::GRError(problem->Extract(h_labels, h_preds),
                   "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
@@ -90,8 +87,8 @@ void run_bfs(
     graph_o->node_values = (int*)&h_labels[0];  // label per node to graph_o
     printf(" elapsed time: %.4f ms\n", elapsed);
 
-    if (problem) delete problem;
-    // if (h_preds)     free(h_preds);
+    if (problem) { delete problem; }
+    if (h_preds) {  free(h_preds); }
     cudaDeviceSynchronize();
 }
 
@@ -126,7 +123,6 @@ void dispatch_bfs(
                 // default configurations
                 int   src_node      = 0;  // default source vertex to start
                 int   num_gpus      = 1;  // number of GPUs for multi-gpu
-                int   max_grid_size = 0;  // leave it up to the enactor
                 bool  mark_pred     = 0;  // whether to mark predecessor or not
                 bool  idempotence   = 0;  // whether or not enable idempotence
                 float max_queue_sizing = 1.0f;  // maximum size scaling factor
@@ -161,7 +157,6 @@ void dispatch_bfs(
                             graph_o,
                             csr_graph,
                             src_node,
-                            max_grid_size,
                             num_gpus,
                             max_queue_sizing,
                             context);
@@ -170,7 +165,6 @@ void dispatch_bfs(
                             graph_o,
                             csr_graph,
                             src_node,
-                            max_grid_size,
                             num_gpus,
                             max_queue_sizing,
                             context);
@@ -181,7 +175,6 @@ void dispatch_bfs(
                             graph_o,
                             csr_graph,
                             src_node,
-                            max_grid_size,
                             num_gpus,
                             max_queue_sizing,
                             context);
@@ -190,7 +183,6 @@ void dispatch_bfs(
                             graph_o,
                             csr_graph,
                             src_node,
-                            max_grid_size,
                             num_gpus,
                             max_queue_sizing,
                             context);

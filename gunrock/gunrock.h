@@ -12,7 +12,6 @@
  * The Gunrock public interface is a C-only interface to enable linking
  * with code written in other languages. While the internals of Gunrock
  * are not limited to C.
- *
  */
 
 #include <stdlib.h>
@@ -54,14 +53,14 @@ struct GRTypes {
  * @brief GunrockGraph as a standard graph interface
  */
 struct GRGraph {
-    size_t num_nodes;     // number of nodes in graph
-    size_t num_edges;     // number of edges in graph
-    void   *row_offsets;  // CSR row offsets
-    void   *col_indices;  // CSR column indices
-    void   *col_offsets;  // CSC column offsets
-    void   *row_indices;  // CSC row indices
-    void   *node_values;  // associated values per node
-    void   *edge_values;  // associated values per edge
+    size_t  num_nodes;  // number of nodes in graph
+    size_t  num_edges;  // number of edges in graph
+    void *row_offsets;  // CSR row offsets
+    void *col_indices;  // CSR column indices
+    void *col_offsets;  // CSC column offsets
+    void *row_indices;  // CSC row indices
+    void *node_values;  // associated values per node
+    void *edge_values;  // associated values per edge
 };
 
 /**
@@ -77,17 +76,17 @@ enum SrcMode {
  * @brief arguments configuration used to specify arguments
  */
 struct GRSetup {
-    bool  mark_pred;         // whether to mark predecessor or not
-    bool  idempotence;       // whether or not to enable idempotent
-    int   src_node;          // source vertex define where to start
-    int   device;            // setting which device to use
-    int   max_iter;          // maximum number of iterations allowed
-    int   top_nodes;         // k value for top k / pagerank problem
-    int   delta_factor;      // sssp delta-factor parameter
-    float delta;             // pagerank specific value
-    float error;             // pagerank specific value
-    float queue_size;        // setting frontier queue size
-    enum  SrcMode src_mode;  // source mode rand/largest_degree
+    bool        mark_pred;  // whether to mark predecessor or not
+    bool      idempotence;  // whether or not to enable idempotent
+    int          src_node;  // source vertex define where to start
+    int            device;  // setting which device to use
+    int          max_iter;  // maximum number of iterations allowed
+    int         top_nodes;  // k value for top k / pagerank problem
+    int      delta_factor;  // sssp delta-factor parameter
+    float           delta;  // pagerank specific value
+    float           error;  // pagerank specific value
+    float      queue_size;  // setting frontier queue size
+    enum SrcMode src_mode;  // source mode rand/largest_degree
 };
 
 #ifdef __cplusplus
@@ -96,68 +95,73 @@ extern "C" {
 
 // breath-first search
 void gunrock_bfs(
-    struct       GRGraph *graph_o,
-    const struct GRGraph *graph_i,
-    struct       GRSetup  config,
-    struct       GRTypes  data_t);
+    struct GRGraph*       graph_o,
+    const struct GRGraph* graph_i,
+    const struct GRSetup  config,
+    const struct GRTypes  data_t);
 
+// simple interface
 void bfs(
-    int       *bfs_label,
+    int*       bfs_label,
     const int  num_nodes,
     const int  num_edges,
-    const int *row,
-    const int *col,
-    const int  src,
-    const int  dev);
+    const int* row_offsets,
+    const int* col_indices,
+    const int  source,
+    const int  device);
 
 // betweenness centrality
 void gunrock_bc(
-    struct       GRGraph *graph_o,
-    const struct GRGraph *graph_i,
-    struct       GRSetup  config,
-    struct       GRTypes  data_t);
+    struct GRGraph*       graph_o,
+    const struct GRGraph* graph_i,
+    const struct GRSetup  config,
+    const struct GRTypes  data_t);
 
 // connected component
 void gunrock_cc(
-    struct       GRGraph *graph_o,
-    unsigned int         *components,
-    const struct GRGraph *graph_i,
-    struct       GRSetup  config,
-    struct       GRTypes  data_t);
+    struct GRGraph*       graph_o,
+    unsigned int*         components,
+    const struct GRGraph* graph_i,
+    const struct GRSetup  config,
+    const struct GRTypes  data_t);
+/*
+int cc(int *component, const int  num_nodes, const int  num_edges,
+       const int *offsets, const int *indices, const int  device);
+*/
 
 // single-source shortest path
 void gunrock_sssp(
-    struct       GRGraph *graph_o,
-    void                 *predecessor,
-    const struct GRGraph *graph_i,
-    struct       GRSetup  config,
-    struct       GRTypes  data_t);
+    struct GRGraph*       graph_o,
+    void*                 predecessor,
+    const struct GRGraph* graph_i,
+    const struct GRSetup  config,
+    const struct GRTypes  data_t);
 
 // page-rank
 void gunrock_pagerank(
-    struct       GRGraph *graph_o,
-    void                 *node_ids,
-    void                 *pagerank,
-    const struct GRGraph *graph_i,
-    struct       GRSetup  config,
-    struct       GRTypes  data_t);
+    struct GRGraph*       graph_o,
+    void*                 node_ids,
+    void*                 pagerank,
+    const struct GRGraph* graph_i,
+    const struct GRSetup  config,
+    const struct GRTypes  data_t);
 
 // degree centrality
 void gunrock_topk(
-    struct       GRGraph *graph_o,
-    void                 *node_ids,
-    void                 *in_degrees,
-    void                 *out_degrees,
-    const struct GRGraph *graph_i,
-    struct       GRSetup  config,
-    struct       GRTypes  data_t);
+    struct  GRGraph*      graph_o,
+    void*                 node_ids,
+    void*                 in_degrees,
+    void*                 out_degrees,
+    const struct GRGraph* graph_i,
+    const struct GRSetup  config,
+    const struct GRTypes  data_t);
 
 // minimum spanning tree
 void gunrock_mst(
-    struct       GRGraph *graph_o,
-    const struct GRGraph *graph_i,
-    struct       GRSetup config,
-    struct       GRTypes data_t);
+    struct GRGraph*       graph_o,
+    const struct GRGraph* graph_i,
+    const struct GRSetup  config,
+    const struct GRTypes  data_t);
 
 // TODO(ydwu): Add other primitives
 

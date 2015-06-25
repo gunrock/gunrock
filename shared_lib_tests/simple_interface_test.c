@@ -14,7 +14,7 @@ int main(int argc, char* argv[]) {
 
     int *labels = (int*)malloc(sizeof(int) * num_nodes);
 
-    // test simple breath-first search interface
+    printf(" testing breath-first search ...\n");  // test bfs
     bfs(labels, num_nodes, num_edges, row_offsets, col_indices, 0, 0);
     printf("-------------------- outputs --------------------\n");
     int node; for (node = 0; node < num_nodes; ++node) {
