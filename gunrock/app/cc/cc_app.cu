@@ -49,7 +49,7 @@ void run_cc(
 
     // Allocate host-side label array for gpu-computed results
     VertexId *h_component_ids
-        = (VertexId*)malloc(sizeof(VertexId) * csr.nodes);    
+        = (VertexId*)malloc(sizeof(VertexId) * csr.nodes);
     CCEnactor<false> cc_enactor(false);  // Allocate CC enactor map
     Problem *problem = new Problem;  // Allocate problem on GPU
 
@@ -60,13 +60,13 @@ void run_cc(
                       cc_enactor.GetFrontierType()),
                   "CC Problem Data Reset Failed", __FILE__, __LINE__);
 
-    GpuTimer gpu_timer; float elapsed = 0.0f; gpu_timer.Start();  // start timer
+    GpuTimer gpu_timer; float elapsed = 0.0f; gpu_timer.Start();  // start
 
     util::GRError(cc_enactor.template Enact<Problem>(
                       problem, max_grid_size),
                   "CC Problem Enact Failed", __FILE__, __LINE__);
 
-    gpu_timer.Stop(); elapsed = gpu_timer.ElapsedMillis();  // calculate elapsed
+    gpu_timer.Stop(); elapsed = gpu_timer.ElapsedMillis();  // elapsed time
     printf(" device elapsed time: %.4f ms\n", elapsed);
 
     util::GRError(problem->Extract(h_component_ids),
@@ -187,17 +187,18 @@ int cc(
     unsigned int num_components = 0;
     struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graph_i = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+
     graph_i->num_nodes   = num_nodes;
     graph_i->num_edges   = num_edges;
     graph_i->row_offsets = (void*)&row_offsets[0];
     graph_i->col_indices = (void*)&col_indices[0];
 
-    printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);    
-    
+    printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
+
     printf("-------------------- running --------------------\n");
     gunrock_cc(graph_o, &num_components, graph_i, config, data_t);
     memcpy(components, (int*)graph_o->node_values, num_nodes * sizeof(int));
-    
+
     if (graph_i) free(graph_i);
     if (graph_o) free(graph_o);
 

@@ -283,7 +283,7 @@ public:
                     if (retval = work_progress.GetQueueLength(
                             frontier_attribute.queue_index+1,
                             frontier_attribute_queue_length)) break;
-                    printf(", %d",
+                    printf(", %lld",
                            (long long) frontier_attribute_queue_length);
                 }
 
@@ -390,10 +390,9 @@ public:
             if (retval) break;
 
             // sort according to the rank values
-            util::CUBRadixSort<Value, VertexId>(
-                false, graph_slice->nodes,
-                problem->data_slices[0]->d_rank_curr,
-                problem->data_slices[0]->d_node_ids);
+            MergesortPairs(problem->data_slices[0]->d_rank_curr,
+                           problem->data_slices[0]->d_node_ids,
+                           graph_slice->nodes, mgpu::greater<Value>(), context);
 
             if (d_scanned_edges) cudaFree(d_scanned_edges);
 

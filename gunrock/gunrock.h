@@ -155,12 +155,13 @@ void gunrock_sssp(
     const struct GRTypes  data_t);
 
 void sssp(
-    int*       distances,
-    const int  num_nodes,
-    const int  num_edges,
-    const int* row_offsets,
-    const int* col_indices,
-    const int  source);
+    unsigned int*       distances,
+    const int           num_nodes,
+    const int           num_edges,
+    const int*          row_offsets,
+    const int*          col_indices,
+    const unsigned int* edge_values,
+    const int           source);
 
 // pagerank
 void gunrock_pagerank(

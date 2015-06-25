@@ -46,18 +46,18 @@ using namespace gunrock::app::sssp;
  * @param[in]  delta_factor user set
  * @param[in]  context moderngpu context
  */
-template<typename VertexId, typename Value, typename SizeT, 
+template<typename VertexId, typename Value, typename SizeT,
          bool MARK_PREDECESSORS>
 void run_sssp(
-    GRGraph        *graph_o,
-    VertexId       *predecessor,
-    const Csr<VertexId, Value, SizeT> &csr,
+    GRGraph*       graph_o,
+    VertexId*      predecessor,
+    const Csr<VertexId, Value, SizeT>& csr,
     const VertexId src,
     const int      max_grid_size,
     const float    queue_sizing,
     const int      num_gpus,
     const int      delta_factor,
-    CudaContext    &context) {
+    CudaContext&   context) {
     typedef SSSPProblem<VertexId, SizeT, Value, MARK_PREDECESSORS> Problem;
     // Allocate host-side label array for gpu-computed results
     Value *h_labels = (Value*)malloc(sizeof(Value) * csr.nodes);
@@ -75,9 +75,14 @@ void run_sssp(
     util::GRError(problem->Reset(src, enactor.GetFrontierType(), queue_sizing),
                   "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
 
+    GpuTimer gpu_timer; float elapsed = 0.0f; gpu_timer.Start();  // start
+
     util::GRError(enactor.template Enact<Problem>(
                       context, problem, src, queue_sizing, max_grid_size),
                   "SSSP Problem Enact Failed", __FILE__, __LINE__);
+
+    gpu_timer.Stop(); elapsed = gpu_timer.ElapsedMillis();  // elapsed time
+    printf(" device elapsed time: %.4f ms\n", elapsed);
 
     util::GRError(problem->Extract(h_labels, predecessor),
                   "SSSP Problem Data Extraction Failed", __FILE__, __LINE__);
@@ -100,12 +105,12 @@ void run_sssp(
  * @param[in]  context     ModernGPU context
  */
 void dispatch_sssp(
-    GRGraph       *graph_o,
-    void          *predecessor,
-    const GRGraph *graph_i,
-    const GRSetup config,
-    const GRTypes data_t,
-    CudaContext   &context) {
+    GRGraph*       graph_o,
+    void*          predecessor,
+    const GRGraph* graph_i,
+    const GRSetup  config,
+    const GRTypes  data_t,
+    CudaContext&   context) {
     switch (data_t.VTXID_TYPE) {
     case VTXID_INT: {
         switch (data_t.SIZET_TYPE) {
@@ -289,15 +294,68 @@ void dispatch_sssp(
  * @param[in]  data_t      Data type configurations
  */
 void gunrock_sssp(
-    GRGraph       *graph_o,
-    void          *predecessor,
-    const GRGraph *graph_i,
-    const GRSetup config,
-    const GRTypes data_t) {
+    GRGraph*       graph_o,
+    void*          predecessor,
+    const GRGraph* graph_i,
+    const GRSetup  config,
+    const GRTypes  data_t) {
     unsigned int device = 0;
     device = config.device;
     ContextPtr context = mgpu::CreateCudaDevice(device);
     dispatch_sssp(graph_o, predecessor, graph_i, config, data_t, *context);
+}
+
+/*
+ * @brief Simple interface take in CSR arrays as input
+ * @param[out] distances   Return shortest distance to source per nodes
+ * @param[in]  num_nodes   Number of nodes of the input graph
+ * @param[in]  num_edges   Number of edges of the input graph
+ * @param[in]  row_offsets CSR-formatted graph input row offsets
+ * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[in]  source      Source to begin traverse
+ */
+void sssp(
+    unsigned int*       distances,
+    const int           num_nodes,
+    const int           num_edges,
+    const int*          row_offsets,
+    const int*          col_indices,
+    const unsigned int* edge_values,
+    const int           source) {
+    printf("-------------------- setting --------------------\n");
+
+    struct GRTypes data_t;           // primitive-specific data types
+    data_t.VTXID_TYPE = VTXID_INT;   // integer
+    data_t.SIZET_TYPE = SIZET_INT;   // integer
+    data_t.VALUE_TYPE = VALUE_UINT;  // unsigned integer
+
+    struct GRSetup config;          // primitive-specific configures
+    config.device      =      0;    // setting device to run
+    config.src_node    = source;    // source vertex to begin
+    config.mark_pred   =  false;    // do not mark predecessors
+    config.delta_factor =    32;    // delta factor for delta-stepping
+    config.queue_size  =   1.0f;    // maximum queue size factor
+
+    struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *graph_i = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+
+    graph_i->num_nodes   = num_nodes;
+    graph_i->num_edges   = num_edges;
+    graph_i->row_offsets = (void*)&row_offsets[0];
+    graph_i->col_indices = (void*)&col_indices[0];
+    graph_i->edge_values = (void*)&edge_values[0];
+
+    printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
+
+    printf("-------------------- running --------------------\n");
+    gunrock_sssp(graph_o, (void*)NULL, graph_i, config, data_t);
+    memcpy(distances, (unsigned int*)graph_o->node_values,
+           num_nodes * sizeof(unsigned int));
+
+    if (graph_i) free(graph_i);
+    if (graph_o) free(graph_o);
+
+    printf("------------------- completed -------------------\n");
 }
 
 // Leave this at the end of the file

@@ -63,7 +63,7 @@ void run_bc(
     util::GRError(problem->Init(false, csr, num_gpus),
                   "BC Problem Initialization Failed", __FILE__, __LINE__);
 
-    GpuTimer gpu_timer; float elapsed = 0.0f; gpu_timer.Start();  // start timer
+    GpuTimer gpu_timer; float elapsed = 0.0f; gpu_timer.Start();  // start
 
     VertexId start_source;
     VertexId end_source;
@@ -87,13 +87,13 @@ void run_bc(
     util::MemsetScaleKernel <<< 128, 128>>>(
         problem->data_slices[0]->d_bc_values, (Value)0.5f, (int)csr.nodes);
 
-    gpu_timer.Stop(); elapsed = gpu_timer.ElapsedMillis();  // calculate elapsed
+    gpu_timer.Stop(); elapsed = gpu_timer.ElapsedMillis();  // elapsed time
     printf(" device elapsed time: %.4f ms\n", elapsed);
 
     util::GRError(problem->Extract(h_sigmas, h_bc_values, h_ebc_values),
                   "BC Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    graph_o->node_values = (float*)&h_bc_values[0];   // h_bc_values per node 
+    graph_o->node_values = (float*)&h_bc_values[0];   // h_bc_values per node
     graph_o->edge_values = (float*)&h_ebc_values[0];  // h_ebc_values per edge
 
     if (problem) { delete problem; }
@@ -239,17 +239,18 @@ void bc(
 
     struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graph_i = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+
     graph_i->num_nodes   = num_nodes;
     graph_i->num_edges   = num_edges;
     graph_i->row_offsets = (void*)&row_offsets[0];
     graph_i->col_indices = (void*)&col_indices[0];
 
-    printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);    
-    
+    printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
+
     printf("-------------------- running --------------------\n");
     gunrock_bc(graph_o, graph_i, config, data_t);
     memcpy(bc_scores, (float*)graph_o->node_values, num_nodes * sizeof(float));
-    
+
     if (graph_i) free(graph_i);
     if (graph_o) free(graph_o);
 

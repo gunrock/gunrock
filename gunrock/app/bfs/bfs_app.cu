@@ -74,14 +74,14 @@ void run_bfs(
                       src, enactor.GetFrontierType(), max_queue_sizing),
                   "BFS Problem Data Reset Failed", __FILE__, __LINE__);
 
-    GpuTimer gpu_timer; float elapsed = 0.0f; gpu_timer.Start();  // start timer
+    GpuTimer gpu_timer; float elapsed = 0.0f; gpu_timer.Start();  // start
 
     util::GRError(enactor.template Enact<Problem>(context, problem, src),
                   "BFS Problem Enact Failed", __FILE__, __LINE__);
 
-    gpu_timer.Stop(); elapsed = gpu_timer.ElapsedMillis();  // calculate elapsed
+    gpu_timer.Stop(); elapsed = gpu_timer.ElapsedMillis();  // elapsed time
     printf(" device elapsed time: %.4f ms\n", elapsed);
-    
+
     util::GRError(problem->Extract(h_labels, h_preds),
                   "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
 
@@ -263,17 +263,18 @@ void bfs(
 
     struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graph_i = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+
     graph_i->num_nodes   = num_nodes;
     graph_i->num_edges   = num_edges;
     graph_i->row_offsets = (void*)&row_offsets[0];
     graph_i->col_indices = (void*)&col_indices[0];
 
-    printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);    
-    
+    printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
+
     printf("-------------------- running --------------------\n");
     gunrock_bfs(graph_o, graph_i, config, data_t);
     memcpy(bfs_label, (int*)graph_o->node_values, num_nodes * sizeof(int));
-    
+
     if (graph_i) free(graph_i);
     if (graph_o) free(graph_o);
 
