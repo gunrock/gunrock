@@ -148,6 +148,27 @@ struct Csr {
         }
     }
 
+    void WriteToLigraFile(char  *file_name, SizeT v, SizeT e, SizeT *row,
+                     VertexId *col, Value *edge_values = NULL) {
+        char adj_name[256];
+        sprintf(adj_name, "%s.adj", file_name);
+        printf("writing to ligra .adj file.\n");
+
+        std::ofstream fout3(adj_name);
+        if (fout3.is_open()) {
+            fout3 << v << " " << v << " " << e << std::endl;
+            for (int i = 0; i < v; ++i)
+                fout3 << row[i] << std::endl;
+            for (int i = 0; i < e; ++i)
+                fout3 << col[i] << std::endl;
+            if (edge_values != NULL) {
+                for (int i = 0; i < e; ++i)
+                    fout3 << edge_values[i] << std::endl;
+            }
+            fout3.close();
+        }
+    }
+
     /**
      *
      * @brief Read from stored row_offsets, column_indices arrays
@@ -265,6 +286,8 @@ struct Csr {
         // Write offsets, indices, node, edges etc. into file
         if (LOAD_EDGE_VALUES) {
             WriteToFile(output_file, nodes, edges,
+                        row_offsets, column_indices, edge_values);
+            WriteToLigraFile(output_file, nodes, edges,
                         row_offsets, column_indices, edge_values);
         } else {
             WriteToFile(output_file, nodes, edges,

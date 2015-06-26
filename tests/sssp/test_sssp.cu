@@ -566,7 +566,7 @@ void RunTests(
     args.GetCmdLineArgument("traversal-mode", traversal_mode);
     if (traversal_mode == -1)
     {
-        traversal_mode = graph.GetAverageDegree() > 8 ? 0 : 1;
+        traversal_mode = 0;
     }
 
     instrumented = args.CheckCmdLineFlag("instrumented");
@@ -687,7 +687,7 @@ int main( int argc, char** argv)
         }
 
         csr.PrintHistogram();
-        csr.DisplayGraph(true); //print graph with edge_value
+        //csr.DisplayGraph(true); //print graph with edge_value
         //csr.GetAverageEdgeValue();
         //csr.GetAverageDegree();
         //int max_degree;
