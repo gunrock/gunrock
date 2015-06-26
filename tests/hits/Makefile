@@ -11,7 +11,6 @@
 
 force64 = 1
 NVCC = "$(shell which nvcc)"
-#NVCC = "/usr/local/cuda-6.0/bin/nvcc"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
 KERNELS =
@@ -26,7 +25,7 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\" 
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\" 
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" 
-SM_TARGETS = $(GEN_SM35)
+SM_TARGETS = $(GEN_SM35) $(GEN_SM37)
 
 #-------------------------------------------------------------------------------
 # Libs
@@ -39,12 +38,11 @@ SM_TARGETS = $(GEN_SM35)
 
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
 MGPU_INC = "../../externals/moderngpu/include"
-CUB_INC = "../../.."
-BOOST_DIR = "../../../boost_1_53_0"
-BOOST_DEPS = -Xlinker $(BOOST_DIR)/bin.v2/libs/timer/build/gcc-4.6/release/link-static/threading-multi/cpu_timer.o -Xlinker $(BOOST_DIR)/bin.v2/libs/chrono/build/gcc-4.6/release/link-static/threading-multi/chrono.o -Xlinker $(BOOST_DIR)/bin.v2/libs/system/build/gcc-4.6/release/link-static/threading-multi/libboost_system.a -Xlinker -lrt
+CUB_INC = "../../externals/cub"
+BOOST_DEPS = -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer
 OMP_DEPS = -Xcompiler -fopenmp -Xlinker -lgomp
-METIS_DEPS = -Xlinker "/usr/local/lib/libmetis.a"
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) -I$(BOOST_DIR) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) -I.. -I../..
+METIS_DEPS = -Xlinker -lmetis
+INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -65,11 +63,12 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -Xptxas -v -Xcudafe -\#
+NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
 endif
+
 
 ifeq ($(verbose), 1)
     NVCCFLAGS += -v
@@ -87,7 +86,7 @@ endif
 # Dependency Lists
 #-------------------------------------------------------------------------------
 
-DEPS =			./Makefile \
+DEPS = 			./Makefile \
 				$(wildcard ../../gunrock/util/*.cuh) \
 				$(wildcard ../../gunrock/util/**/*.cuh) \
 				$(wildcard ../../gunrock/*.cuh) \
@@ -101,11 +100,12 @@ DEPS =			./Makefile \
 # (make test) Test driver for
 #-------------------------------------------------------------------------------
 
-test: bin/test_hits_$(NVCC_VERSION)_$(ARCH_SUFFIX)
+ALGO = hits
+test: bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_hits_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_hits.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_$(ALGO).cu  ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_hits_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_hits.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_$(ALGO).cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean
