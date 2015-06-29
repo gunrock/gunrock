@@ -51,7 +51,7 @@ struct ForwardFunctor
     {
         // Check if the destination node has been claimed as someone's child
         bool child_available = (atomicCAS(problem->preds + d_id, -2, s_id) == -2) ? true : false;
-       
+
         if (!child_available)
         {
             //Two conditions will lead the code here.
@@ -205,7 +205,7 @@ struct BackwardFunctor
         //atomicAdd(problem->ebc_values + e_id, result);
 
         if (s_id != problem->src_node[0]) {
-            atomicAdd(problem->deltas + s_id, result); 
+            atomicAdd(problem->deltas + s_id, result);
             atomicAdd(problem->bc_values + s_id, result);
         }
     }
@@ -303,13 +303,13 @@ struct BackwardFunctor2
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
             to_delta, problem->deltas + d_id);
 
-        Value result = from_sigma / to_sigma * (1.0 + to_delta);
+        //Value result = from_sigma / to_sigma * (1.0 + to_delta);
 
         //Accumulate delta value
 
         //Accumulate bc value
         //atomicAdd(problem->ebc_values + e_id, result);
-        
+
         /*if (s_id != problem->d_src_node[0]) {
             atomicAdd(&problem->d_deltas[s_id], result);
             atomicAdd(&problem->d_bc_values[s_id], result);
