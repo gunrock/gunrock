@@ -142,26 +142,26 @@ public:
     //g_quick                                 = false;        // Whether or not to skip ref validation
 
     Test_Parameter()
-    {   
+    {
         src       = 0;
         delta     = 0.85;
         alpha     = 0.2;
         error     = 0.01;
         max_iter  = 5;
-    }   
+    }
 
     ~Test_Parameter()
-    {   
-    }   
+    {
+    }
 
     void Init(CommandLineArgs &args)
-    {  
+    {
         TestParameter_Base::Init(args);
         args.GetCmdLineArgument("delta", delta);
         args.GetCmdLineArgument("alpha", alpha);
         args.GetCmdLineArgument("error", error);
         args.GetCmdLineArgument("max-iter", max_iter);
-    }   
+    }
 };
 
 /**
@@ -610,7 +610,7 @@ void RunTests(
         parameter->src = graph->GetNodeWithHighestDegree(temp);
     } else {
         args.GetCmdLineArgument("src", parameter->src);
-    }   
+    }
 
     RunTests_instrumented<VertexId, Value, SizeT>(parameter);
 }
@@ -689,4 +689,3 @@ int main( int argc, char** argv)
     }
     return 0;
 }
-

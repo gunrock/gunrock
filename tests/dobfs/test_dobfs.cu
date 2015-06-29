@@ -469,7 +469,6 @@ void RunTests(Test_Parameter *parameter)
             CompareResults(h_labels, reference_check, graph->nodes, true);
         }
     }
-    printf("\nFirst 40 labels of the GPU result."); 
     // Display Solution
     DisplaySolution(h_labels, h_preds, graph->nodes, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE);
 
@@ -587,8 +586,8 @@ void RunTests(
     cudaStream_t                *streams = NULL)
 {
     string src_str="";
-    Test_Parameter *parameter = new Test_Parameter;   
- 
+    Test_Parameter *parameter = new Test_Parameter;
+
     parameter -> Init(args);
     parameter -> graph              = graph;
     parameter -> inv_graph          = inv_graph;
@@ -607,7 +606,7 @@ void RunTests(
         parameter->src = graph->GetNodeWithHighestDegree(temp);
     } else {
         args.GetCmdLineArgument("src", parameter->src);
-    }   
+    }
     printf("src = %lld\n", (long long) parameter->src);
 
     RunTests_instrumented<VertexId, Value, SizeT>(parameter);
@@ -627,18 +626,12 @@ int main( int argc, char** argv)
         return 1;
     }
 
-    //DeviceInit(args);
-    //cudaSetDeviceFlags(cudaDeviceMapHost);
-
     int dev = 0;
     args.GetCmdLineArgument("device", dev);
     ContextPtr context = mgpu::CreateCudaDevice(dev);
 
-    //srand(0); // Presently deterministic
-    //srand(time(NULL));
-
-	// Parse graph-contruction params
-	bool g_undirected = args.CheckCmdLineFlag("undirected");
+    // Parse graph-contruction params
+    bool g_undirected = args.CheckCmdLineFlag("undirected");
 
     std::string graph_type = argv[1];
     int flags = args.ParsedArgc();

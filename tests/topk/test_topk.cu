@@ -12,7 +12,7 @@
  * @brief Simple test driver program for computing Topk.
  */
 
-#include <stdio.h> 
+#include <stdio.h>
 #include <string>
 #include <deque>
 #include <vector>
@@ -43,7 +43,7 @@ using namespace gunrock::oprtr;
 using namespace gunrock::app::topk;
 
 /******************************************************************************
- * Defines, constants, globals 
+ * Defines, constants, globals
  ******************************************************************************/
 //bool g_verbose;
 //bool g_undirected;
@@ -99,19 +99,19 @@ public:
     long long     top_nodes;
 
     Test_Parameter()
-    {   
+    {
         inv_graph          = NULL ;
         top_nodes          = 0;
-    }   
+    }
 
     ~Test_Parameter()
-    {   
-    }   
+    {
+    }
 
     void Init(CommandLineArgs &args)
-    {   
+    {
         TestParameter_Base::Init(args);
-   }   
+   }
 };
 
 /******************************************************************************
@@ -229,7 +229,7 @@ void RunTests(Test_Parameter *parameter)
 	      int                               top_nodes,
 	      CudaContext                       &context)*/
 {
-  
+
   // define the problem data structure for graph primitive
   typedef TOPKProblem<
     VertexId,
@@ -246,15 +246,15 @@ void RunTests(Test_Parameter *parameter)
     int          *gpu_idx               = parameter -> gpu_idx;
     bool          g_stream_from_host    = parameter -> g_stream_from_host;
     SizeT         top_nodes             = parameter -> top_nodes;
-  
+
   // INSTRUMENT specifies whether we want to keep such statistical data
-  // Allocate TOPK enactor map 
+  // Allocate TOPK enactor map
   TOPKEnactor<Problem, INSTRUMENT, DEBUG, SIZE_CHECK> topk_enactor(gpu_idx);
-  
+
   // allocate problem on GPU
-  // create a pointer of the TOPKProblem type 
+  // create a pointer of the TOPKProblem type
   Problem *topk_problem = new Problem;
-  
+
   // reset top_nodes if input k > total number of nodes
   if (top_nodes > graph_original->nodes) top_nodes = graph_original->nodes;
 
@@ -273,23 +273,23 @@ void RunTests(Test_Parameter *parameter)
     *graph_reversed,
     num_gpus),
     "Problem TOPK Initialization Failed", __FILE__, __LINE__);
-  
+
   // perform topk degree centrality calculations
   GpuTimer gpu_timer; // Record the kernel running time
-  
+
   // reset values in DataSlice for graph
-  util::GRError(topk_problem->Reset(topk_enactor.GetFrontierType()), 
+  util::GRError(topk_problem->Reset(topk_enactor.GetFrontierType()),
 		"TOPK Problem Data Reset Failed", __FILE__, __LINE__);
 
   gpu_timer.Start();
   // launch topk enactor
-  util::GRError(topk_enactor.template Enact<Problem>(*context, 
-						   topk_problem, 
-						   top_nodes, 
-						   max_grid_size), 
+  util::GRError(topk_enactor.template Enact<Problem>(*context,
+						   topk_problem,
+						   top_nodes,
+						   max_grid_size),
 		"TOPK Problem Enact Failed", __FILE__, __LINE__);
   gpu_timer.Stop();
-  
+
   float elapsed_gpu = gpu_timer.ElapsedMillis();
   printf("==> GPU TopK Degree Centrality finished in %lf msec.\n", elapsed_gpu);
 
@@ -406,8 +406,8 @@ void RunTests(
     cudaStream_t                *streams = NULL)
 {
     string src_str="";
-    Test_Parameter *parameter = new Test_Parameter;   
- 
+    Test_Parameter *parameter = new Test_Parameter;
+
     parameter -> Init(args);
     parameter -> graph              = graph;
     parameter -> inv_graph          = inv_graph;
@@ -426,45 +426,41 @@ void RunTests(
 int main(int argc, char** argv)
 {
   CommandLineArgs args(argc, argv);
-  
-  if ((argc < 2) || (args.CheckCmdLineFlag("help"))) 
+
+  if ((argc < 2) || (args.CheckCmdLineFlag("help")))
   {
     Usage();
     return 1;
   }
-  
-  //DeviceInit(args);
-  //cudaSetDeviceFlags(cudaDeviceMapHost);
+
   int dev = 0;
   int top_nodes;
 
   args.GetCmdLineArgument("device", dev);
   args.GetCmdLineArgument("top", top_nodes);
-  
+
   mgpu::ContextPtr context = mgpu::CreateCudaDevice(dev);
-  //srand(0);			// Presently deterministic
-  //srand(time(NULL));
-  
+
   // Parse graph-contruction params
   bool g_undirected = false;
-  
+
   std::string graph_type = argv[1];
   int flags = args.ParsedArgc();
   int graph_args = argc - flags - 1;
-  
-  if (graph_args < 1) 
+
+  if (graph_args < 1)
   {
     Usage();
     return 1;
   }
-  
+
   //
   // Construct graph and perform
   //
-  if (graph_type == "market") 
+  if (graph_type == "market")
   {
     // Matrix-market coordinate-formatted graph file
-    
+
     typedef int VertexId; //!< Use as the node identifier type
     typedef int Value;    //!< Use as the value type
     typedef int SizeT;    //!< Use as the graph size type
@@ -510,7 +506,7 @@ int main(int argc, char** argv)
     RunTests(&csr_original, &csr_reversed, args, top_nodes, 1, &context, &dev);
 
   }
-  else 
+  else
   {
     // unknown graph type
     fprintf(stderr, "Unspecified graph type\n");
@@ -525,4 +521,3 @@ int main(int argc, char** argv)
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-
