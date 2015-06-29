@@ -253,7 +253,7 @@ void RefCPUBC(
 
         for (idx = 0; idx < graph.edges; ++idx) {
             //std::cout << coo[idx].row << "," << coo[idx].col << ":" << coo[idx].val << std::endl;
-            ebc_values[idx] = coo[idx].val;
+            //ebc_values[idx] = coo[idx].val;
         }
 
         printf("CPU BC finished in %lf msec.", elapsed);
@@ -315,9 +315,12 @@ void RefCPUBC(
 
         for (int iter = search_depth - 2; iter > 0; --iter)
         {
+
+            int cur_level = 0;
             for (int node = 0; node < graph.nodes; ++node)
             {
                 if (source_path[node] == iter) {
+                    ++cur_level;
                     int edges_begin = graph.row_offsets[node];
                     int edges_end = graph.row_offsets[node+1];
 
@@ -334,9 +337,7 @@ void RefCPUBC(
         }
 
         for (int i = 0; i < graph.nodes; ++i)
-        {
             bc_values[i] *= 0.5f;
-        }
 
         cpu_timer.Stop();
         float elapsed = cpu_timer.ElapsedMillis();
@@ -847,6 +848,7 @@ int main( int argc, char** argv)
             return 1;
         }
 
+        csr.PrintHistogram();
 
     } else if (graph_type == "rmat")
     {   

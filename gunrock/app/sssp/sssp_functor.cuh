@@ -149,7 +149,7 @@ struct PQFunctor
         float delta;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                         delta, problem->delta);
-        return (delta == 0) ? weight : weight/delta;
+        return (delta == 0) ? weight : weight / delta;
     }
 };
  

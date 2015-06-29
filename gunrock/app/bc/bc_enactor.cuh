@@ -988,7 +988,7 @@ public:
         Problem,                            // Problem data type
         300,                                // CUDA_ARCH
         INSTRUMENT,                         // INSTRUMENT
-        8,                                  // MIN_CTA_OCCUPANCY
+        1,                                  // MIN_CTA_OCCUPANCY
         10,                                 // LOG_THREADS
         8,                                  // LOG_BLOCKS
         32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)

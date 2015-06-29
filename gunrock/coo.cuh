@@ -37,8 +37,7 @@ struct Coo {
 
     Coo(VertexId row, VertexId col, Value val) : row(row), col(col), val(val) {}
 
-    void Val(Value &value)
-    {
+    void Val(Value &value) {
         value = val;
     }
 };
@@ -71,8 +70,7 @@ struct Coo<VertexId, util::NullType> {
 template<typename Coo>
 bool RowFirstTupleCompare (
     Coo elem1,
-    Coo elem2)
-{
+    Coo elem2) {
     if (elem1.row < elem2.row) {
         // Sort edges by source node
         return true;
@@ -97,8 +95,7 @@ bool RowFirstTupleCompare (
 template<typename Coo>
 bool ColumnFirstTupleCompare (
     Coo elem1,
-    Coo elem2)
-{
+    Coo elem2) {
     if (elem1.col < elem2.col) {
         // Sort edges by source node
         return true;

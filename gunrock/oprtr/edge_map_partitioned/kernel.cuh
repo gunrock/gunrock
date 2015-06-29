@@ -564,7 +564,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         }
 
         // Determine work decomposition
-        if (blockIdx.x == 0 && threadIdx.x == 0) {
+        if (blockIdx.x == 0 && threadIdx.x == 0) { 
 
             // obtain problem size
             if (queue_reset)
@@ -586,10 +586,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             // Reset our next outgoing queue counter to zero
             work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
             work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
-        }
+        } 
 
         // Barrier to protect work decomposition
-        __syncthreads();
+        __syncthreads(); 
 
         unsigned int range = input_queue_len;
         int tid = threadIdx.x;
@@ -618,16 +618,16 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             else
                 s_vertices[tid] = (my_id < range ? d_column_indices[d_queue[my_id]] : max_vertices);
             s_edge_ids[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
-        }
+        } 
 
         __syncthreads();
-        unsigned int size = s_edges[end_id];
+        unsigned int size = s_edges[end_id]; 
 
         VertexId v, e, e_id;
         int v_index = BinarySearch<KernelPolicy::THREADS>(tid, s_edges);
         v = s_vertices[v_index];
         e_id = s_edge_ids[v_index];
-        int end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
+        int end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices); 
 
         for (int i = tid; i < size; i += KernelPolicy::THREADS)
         {
@@ -726,7 +726,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                         }
                     }
                 }
-            } else {
+            } else { 
                 //v:pre, u:neighbor, outoffset:offset+i
                 if (Functor::CondEdge(v, u, problem, lookup, e_id)) {
                     Functor::ApplyEdge(v, u, problem, lookup, e_id);

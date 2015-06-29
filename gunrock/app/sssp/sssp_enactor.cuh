@@ -575,28 +575,6 @@ public:
     {
         clock_t      start_time = clock();
         cudaError_t  retval     = cudaSuccess;
-        
-        /*typedef PQFunctor<
-            VertexId,
-            SizeT,
-            SSSPProblem> PqFunctor;
-
-        typedef gunrock::priority_queue::PriorityQueue<
-            VertexId,
-            SizeT> NearFarPriorityQueue;
-
-        typedef gunrock::priority_queue::KernelPolicy<
-            SSSPProblem,                        // Problem data type
-            300,                                // CUDA_ARCH
-            INSTRUMENT,                         // INSTRUMENT
-            8,                                  // MIN_CTA_OCCUPANCY
-            10>                                 // LOG_THREADS
-            PriorityQueueKernelPolicy;
-
-        NearFarPriorityQueue *pq = new NearFarPriorityQueue;
-        util::GRError(
-            pq->Init(problem->graph_slices[0]->edges, queue_sizing),
-            "Priority Queue SSSP Initialization Failed", __FILE__, __LINE__);*/
 
         do {
             for (int gpu=0;gpu<this->num_gpus;gpu++)

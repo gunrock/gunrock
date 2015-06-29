@@ -193,7 +193,7 @@ add_test(NAME TestSSSP COMMAND test_sssp)
 set_tests_properties(TestSSSP
   PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*1.*: Label.*39.*: Predecessor.*0")
 
-add_test(NAME TestPR COMMAND test_pr --undirected)
+add_test(NAME TestPR COMMAND test_pr)
 set_tests_properties(TestPR
   PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*2.*: Page Rank.*0.357069.")
 

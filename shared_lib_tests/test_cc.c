@@ -1,66 +1,55 @@
 /**
  * @brief CC test for shared library
  * @file test_cc.c
- *
- * set input graph, configs and call function gunrock_cc_func
- * return per node label values in graph_out node_values
  */
 
 #include <stdio.h>
 #include <gunrock/gunrock.h>
 
-int main(int argc, char* argv[])
-{
-  // define data types
-  struct GunrockDataType data_type;
-  data_type.VTXID_TYPE = VTXID_INT;
-  data_type.SIZET_TYPE = SIZET_INT;
-  data_type.VALUE_TYPE = VALUE_INT;
+int main(int argc, char* argv[]) {
+    // define data types
+    struct GRTypes data_t;
+    data_t.VTXID_TYPE = VTXID_INT;
+    data_t.SIZET_TYPE = SIZET_INT;
+    data_t.VALUE_TYPE = VALUE_INT;
 
-  // connected component configurations
-  struct GunrockConfig configs;
-  configs.device = 0;
+    // connected component configurations
+    struct GRSetup config;
+    config.device = 0;
 
-  // define graph
-  size_t num_nodes = 7;
-  size_t num_edges = 15;
-  int row_offsets[8] = {0,3,6,9,11,14,15,15};
-  int col_indices[15] = {1,2,3,0,2,4,3,4,5,5,6,2,5,6,6};
+    // define graph
+    size_t num_nodes    = 7;
+    size_t num_edges    = 15;
+    int row_offsets[8]  = {0, 3, 6, 9, 11, 14, 15, 15};
+    int col_indices[15] = {1, 2, 3, 0, 2, 4, 3, 4, 5, 5, 6, 2, 5, 6, 6};
 
-  // build graph as input
-  struct GunrockGraph *graph_input =
-    (struct GunrockGraph*)malloc(sizeof(struct GunrockGraph));
-  graph_input->num_nodes   = num_nodes;
-  graph_input->num_edges   = num_edges;
-  graph_input->row_offsets = (void*)&row_offsets[0];
-  graph_input->col_indices = (void*)&col_indices[0];
+    // build graph as input
+    struct GRGraph *graph_i = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    graph_i->num_nodes   = num_nodes;
+    graph_i->num_edges   = num_edges;
+    graph_i->row_offsets = (void*)&row_offsets[0];
+    graph_i->col_indices = (void*)&col_indices[0];
 
-  // malloc output graph
-  struct GunrockGraph *graph_output =
-    (struct GunrockGraph*)malloc(sizeof(struct GunrockGraph));
-  unsigned int *components = (unsigned int*)malloc(sizeof(unsigned int));
+    // malloc output graph
+    struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    unsigned int *components = (unsigned int*)malloc(sizeof(unsigned int));
 
-  // run connected component calculations
-  gunrock_cc_func(
-    graph_output,
-    components,
-    graph_input,
-    configs,
-    data_type);
+    // run connected component calculations
+    gunrock_cc(graph_o, components, graph_i, config, data_t);
 
-  // test print
-  int i;
-  printf("Number of Components: %d\n", components[0]);
-  printf("Demo Outputs:\n");
-  int *component_ids = (int*)malloc(sizeof(int) * graph_input->num_nodes);
-  component_ids = (int*)graph_output->node_values;
-  for (i = 0; i < graph_input->num_nodes; ++i)
-  {
-    printf("Node_ID [%d] : Component_ID [%d]\n", i, component_ids[i]);
-  }
+    // demo test print
+    printf("Number of Components: %d\n", components[0]);
+    printf("Demo Outputs:\n");
+    int *component_ids = (int*)malloc(sizeof(int) * graph_i->num_nodes);
+    component_ids = (int*)graph_o->node_values;
+    int node;
+    for (node = 0; node < graph_i->num_nodes; ++node) {
+        printf("Node_ID [%d] : Component_ID [%d]\n", node, component_ids[node]);
+    }
 
-  if (graph_input)  { free(graph_input);  }
-  if (graph_output) { free(graph_output); }
+    // clean up
+    if (graph_i) { free(graph_i); }
+    if (graph_o) { free(graph_o); }
 
-  return 0;
+    return 0;
 }

@@ -111,7 +111,8 @@ struct EdgeFunctor
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    return problem->d_successors[s_id] == d_id;
+    return problem->d_successors[s_id] == d_id &&
+      problem->d_reduced_vals[s_id] == problem->d_edge_weights[e_id];
   }
 
   /**
@@ -128,7 +129,7 @@ struct EdgeFunctor
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      problem->d_origin_edges[e_id], problem->d_temp_storage + s_id);
+      problem->d_origin_edges[e_id], problem->d_temp_index + s_id);
   }
 };
 
@@ -184,7 +185,7 @@ struct MarkFunctor
   {
     // mark minimum spanning tree output edges
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      1, problem->d_mst_output + problem->d_temp_storage[s_id]);
+      1, problem->d_mst_output + problem->d_temp_index[s_id]);
   }
 };
 
@@ -246,7 +247,7 @@ struct CyRmFunctor
 
     // remove some edges in the MST output result
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      0, problem->d_mst_output + problem->d_temp_storage[s_id]);
+      0, problem->d_mst_output + problem->d_temp_index[s_id]);
   }
 };
 
@@ -363,13 +364,14 @@ struct EgRmFunctor
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      -1, problem->d_keys_array + e_id);
+      (VertexId)-1, problem->d_keys_array + e_id);
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      -1, problem->d_col_indices + e_id);
+      (VertexId)-1, problem->d_col_indices + e_id);
+    //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+    //  (Value)-1, problem->d_edge_weights + e_id);
+    problem->d_edge_weights[e_id] = (Value) -1;
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      -1, problem->d_edge_weights + e_id);
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      -1, problem->d_origin_edges + e_id);
+      (VertexId)-1, problem->d_origin_edges + e_id);
   }
 
   /**
@@ -505,7 +507,7 @@ struct EIdxFunctor
     VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      node, problem->d_row_offsets + problem->d_temp_storage[node]);
+      node, problem->d_row_offsets + problem->d_temp_index[node]);
   }
 };
 
@@ -606,13 +608,13 @@ struct SuRmFunctor
     VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
   {
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      -1, problem->d_keys_array + node);
+      (VertexId)-1, problem->d_keys_array + node);
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      -1, problem->d_col_indices + node);
+      (VertexId)-1, problem->d_col_indices + node);
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      -1, problem->d_edge_weights + node);
+      (Value)   -1, problem->d_edge_weights + node);
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      -1, problem->d_origin_edges + node);
+      (VertexId)-1, problem->d_origin_edges + node);
   }
 };
 

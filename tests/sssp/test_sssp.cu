@@ -265,10 +265,10 @@ template<
     typename SizeT,
     bool     MARK_PREDECESSORS>
 void SimpleReferenceSssp(
-    const Csr<VertexId, Value, SizeT>       &graph,
-    Value                                   *node_values,
-    VertexId                                *node_preds,
-    VertexId                                src)
+    const Csr<VertexId, Value, SizeT> &graph,
+    Value                             *node_values,
+    VertexId                          *node_preds,
+    VertexId                          src)
 {
     using namespace boost;
 
@@ -279,11 +279,10 @@ void SimpleReferenceSssp(
     typedef graph_traits<Graph>::vertex_descriptor vertex_descriptor;
     typedef graph_traits<Graph>::edge_descriptor edge_descriptor;
 
-    typedef std::pair<unsigned int, unsigned int> Edge;
+    typedef std::pair<VertexId, VertexId> Edge;
 
-    Edge* edges = (Edge*)malloc(sizeof(Edge)*graph.edges);
-    unsigned int *weight =
-        (unsigned int*)malloc(sizeof(unsigned int)*graph.edges);
+    Edge   *edges = ( Edge*)malloc(sizeof( Edge)*graph.edges);
+    Value *weight = (Value*)malloc(sizeof(Value)*graph.edges);
 
     for (int i = 0; i < graph.nodes; ++i)
     {
@@ -296,7 +295,7 @@ void SimpleReferenceSssp(
 
     Graph g(edges, edges + graph.edges, weight, graph.nodes);
 
-    std::vector<unsigned int> d(graph.nodes);
+    std::vector<Value> d(graph.nodes);
     std::vector<vertex_descriptor> p(graph.nodes);
     vertex_descriptor s = vertex(src, g);
 
@@ -309,28 +308,30 @@ void SimpleReferenceSssp(
     CpuTimer cpu_timer;
     cpu_timer.Start();
 
-    if (MARK_PREDECESSORS)
-        dijkstra_shortest_paths(
-            g, s,
-            predecessor_map(boost::make_iterator_property_map(p.begin(), get(boost::vertex_index, g))).
-            distance_map(boost::make_iterator_property_map(d.begin(), get(boost::vertex_index, g))));
-    else
-        dijkstra_shortest_paths(
-            g, s,
-            distance_map(boost::make_iterator_property_map(d.begin(), get(boost::vertex_index, g))));
+    if (MARK_PREDECESSORS) {
+        dijkstra_shortest_paths(g, s,
+            predecessor_map(boost::make_iterator_property_map(
+                    p.begin(), get(boost::vertex_index, g))).distance_map(
+                        boost::make_iterator_property_map(
+                            d.begin(), get(boost::vertex_index, g))));
+    } else {
+        dijkstra_shortest_paths(g, s,
+            distance_map(boost::make_iterator_property_map(
+                    d.begin(), get(boost::vertex_index, g))));
+    }
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
 
     printf("CPU SSSP finished in %lf msec.\n", elapsed);
 
-    Coo<unsigned int, unsigned int>* sort_dist = NULL;
-    Coo<unsigned int, unsigned int>* sort_pred = NULL;
-    sort_dist = (Coo<unsigned int, unsigned int>*)malloc(
-        sizeof(Coo<unsigned int, unsigned int>) * graph.nodes);
-    if (MARK_PREDECESSORS)
-        sort_pred = (Coo<unsigned int, unsigned int>*)malloc(
-            sizeof(Coo<unsigned int, unsigned int>) * graph.nodes);
-
+    Coo<Value, Value>* sort_dist = NULL;
+    Coo<VertexId, VertexId>* sort_pred = NULL;
+    sort_dist = (Coo<Value, Value>*)malloc(
+        sizeof(Coo<Value, Value>) * graph.nodes);
+    if (MARK_PREDECESSORS) {
+        sort_pred = (Coo<VertexId, VertexId>*)malloc(
+            sizeof(Coo<VertexId, VertexId>) * graph.nodes);
+    }
     graph_traits < Graph >::vertex_iterator vi, vend;
     for (tie(vi, vend) = vertices(g); vi != vend; ++vi)
     {
@@ -339,7 +340,7 @@ void SimpleReferenceSssp(
     }
     std::stable_sort(
         sort_dist, sort_dist + graph.nodes,
-        RowFirstTupleCompare<Coo<unsigned int, unsigned int> >);
+        RowFirstTupleCompare<Coo<Value, Value> >);
 
     if (MARK_PREDECESSORS)
     {
@@ -350,21 +351,21 @@ void SimpleReferenceSssp(
         }
         std::stable_sort(
             sort_pred, sort_pred + graph.nodes,
-            RowFirstTupleCompare<Coo<unsigned int, unsigned int> >);
+            RowFirstTupleCompare< Coo<VertexId, VertexId> >);
     }
 
     for (int i = 0; i < graph.nodes; ++i)
     {
         node_values[i] = sort_dist[i].col;
     }
-    if (MARK_PREDECESSORS)
+    if (MARK_PREDECESSORS) {
         for (int i = 0; i < graph.nodes; ++i)
         {
             node_preds[i] = sort_pred[i].col;
         }
-
-    free(sort_dist);
-    if (MARK_PREDECESSORS) free(sort_pred);
+    }
+    if (sort_dist) free(sort_dist);
+    if (sort_pred) free(sort_pred);
 }
 
 
@@ -687,6 +688,7 @@ void RunTests(
     parameter -> gpu_idx            = gpu_idx;
     parameter -> streams            = streams;
 
+    // source vertex to start
     args.GetCmdLineArgument("src", src_str);
     if (src_str.empty()) {
         parameter->src = 0;
@@ -704,7 +706,7 @@ void RunTests(
     args.GetCmdLineArgument("traversal-mode", parameter->traversal_mode);
     if (parameter->traversal_mode == -1)
     {
-        parameter->traversal_mode = graph->GetAverageDegree() > 8 ? 0 : 1;
+        parameter->traversal_mode = 0;
     }
 
     printf("src = %lld\n", parameter->src);
@@ -780,8 +782,7 @@ int main( int argc, char** argv)
     if (graph_args < 1) { Usage(); return 1; }
 
     if (graph_type == "market") {
-    // Matrix-market coordinate-formatted graph file
-
+        // Matrix-market coordinate-formatted graph file
         char *market_filename = (graph_args == 2) ? argv[2] : NULL;
         if (graphio::BuildMarketGraph<true>(
             market_filename, 

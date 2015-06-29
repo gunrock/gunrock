@@ -19,16 +19,17 @@
     #undef small            // Windows is terrible for polluting macro namespace
 #else
     #include <sys/resource.h>
-    #include <time.h>
 #endif
 
 #include <stdio.h>
 #include <math.h>
 #include <float.h>
 
+#include <cassert>
 #include <map>
 #include <string>
 #include <vector>
+#include <stack>
 #include <sstream>
 #include <iostream>
 #include <fstream>
@@ -217,58 +218,7 @@ struct CpuTimer
         return (stop - start) * 1000;
     }
 
-/*#elif defined(CLOCK_PROCESS_CPUTIME_ID)
-
-    timespec start;
-    timespec stop;
-
-    void Start()
-    {
-        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
-    }
-
-    void Stop()
-    {
-        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop);
-    }
-
-    float ElapsedMillis()
-    {
-        timespec temp;
-        if ((stop.tv_nsec-start.tv_nsec)<0) {
-            temp.tv_sec = stop.tv_sec-start.tv_sec-1;
-            temp.tv_nsec = 1000000000+stop.tv_nsec-start.tv_nsec;
-        } else {
-            temp.tv_sec = stop.tv_sec-start.tv_sec;
-            temp.tv_nsec = stop.tv_nsec-start.tv_nsec;
-        }
-        return temp.tv_nsec/1000000.0;
-    }*/
-
 #else
-
-    /*
-    rusage start;
-    rusage stop;
-
-    void Start()
-    {
-        getrusage(RUSAGE_SELF, &start);
-    }
-
-    void Stop()
-    {
-        getrusage(RUSAGE_SELF, &stop);
-    }
-
-    float ElapsedMillis()
-    {
-        float sec = stop.ru_utime.tv_sec - start.ru_utime.tv_sec;
-        float usec = stop.ru_utime.tv_usec - start.ru_utime.tv_usec;
-
-        return (sec * 1000) + (usec / 1000);
-    }
-    */
 
     boost::timer::cpu_timer::cpu_timer cpu_t;
 
