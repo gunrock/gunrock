@@ -141,23 +141,23 @@ public:
     double max_queue_sizing1;
 
     Test_Parameter()
-    { 
+    {
         delta_factor = 16;
         mark_predecessors = false;
         max_queue_sizing1 = -1.0;
-    }   
+    }
 
     ~Test_Parameter()
-    {   
-    }   
+    {
+    }
 
     void Init(CommandLineArgs &args)
-    {   
+    {
         TestParameter_Base::Init(args);
         mark_predecessors = args.CheckCmdLineFlag("mark-pred");
         args.GetCmdLineArgument("delta-factor"    , delta_factor    );
         args.GetCmdLineArgument("queue-sizing1", max_queue_sizing1);
-    }   
+    }
 };
 
 /**
@@ -443,7 +443,7 @@ void RunTests(Test_Parameter *parameter)
         cudaSetDevice(gpu_idx[gpu]);
         cudaMemGetInfo(&(org_size[gpu]),&dummy);
     }
-        
+
     // Allocate SSSP enactor map
     Enactor* enactor = new Enactor(num_gpus, gpu_idx);
 
@@ -488,7 +488,7 @@ void RunTests(Test_Parameter *parameter)
 
     for (int iter = 0; iter < iterations; ++iter)
     {
-        util::GRError(problem->Reset(src, enactor->GetFrontierType(), max_queue_sizing), "SSSP Problem Data Reset Failed", __FILE__, __LINE__); 
+        util::GRError(problem->Reset(src, enactor->GetFrontierType(), max_queue_sizing), "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
         util::GRError(enactor->Reset(), "SSSP Enactor Reset failed", __FILE__, __LINE__);
 
         printf("__________________________\n");fflush(stdout);
@@ -509,25 +509,25 @@ void RunTests(Test_Parameter *parameter)
     if (reference_check_label[i]==-1) reference_check_label[i]=util::MaxValue<Value>();
 
     // Display Solution
-    printf("\nFirst 40 labels of the GPU result.\n"); 
+    printf("\nFirst 40 labels of the GPU result.\n");
     DisplaySolution(h_labels, graph->nodes);
- 
+
     // Verify the result
     if (reference_check_label != NULL) {
         printf("Label Validity: ");
         int error_num = CompareResults(h_labels, reference_check_label, graph->nodes, true);
         if (error_num > 0)
             printf("%d errors occurred.\n", error_num);
-        printf("\nFirst 40 labels of the reference CPU result.\n"); 
+        printf("\nFirst 40 labels of the reference CPU result.\n");
         DisplaySolution(reference_check_label, graph->nodes);
     }
-    
+
     if (MARK_PREDECESSORS) {
-        printf("\nFirst 40 preds of the GPU result.\n"); 
+        printf("\nFirst 40 preds of the GPU result.\n");
         DisplaySolution(h_preds, graph->nodes);
-        if (reference_check_label != NULL) 
+        if (reference_check_label != NULL)
         {
-            printf("\nFirst 40 preds of the reference CPU result (could be different because the paths are not unique).\n"); 
+            printf("\nFirst 40 preds of the reference CPU result (could be different because the paths are not unique).\n");
             DisplaySolution(reference_check_pred, graph->nodes);
         }
     }
@@ -550,32 +550,32 @@ void RunTests(Test_Parameter *parameter)
     printf("\n");
     double max_queue_sizing_[2] = {0,0}, max_in_sizing_=0;
     for (int gpu=0;gpu<num_gpus;gpu++)
-    {   
+    {
         size_t gpu_free,dummy;
         cudaSetDevice(gpu_idx[gpu]);
         cudaMemGetInfo(&gpu_free,&dummy);
         printf("GPU_%d\t %ld",gpu_idx[gpu],org_size[gpu]-gpu_free);
         for (int i=0;i<num_gpus;i++)
-        {   
+        {
             for (int j=0; j<2; j++)
-            {   
+            {
                 SizeT x=problem->data_slices[gpu]->frontier_queues[i].keys[j].GetSize();
-                printf("\t %lld", (long long) x); 
+                printf("\t %lld", (long long) x);
                 double factor = 1.0*x/(num_gpus>1?problem->graph_slices[gpu]->in_counter[i]:problem->graph_slices[gpu]->nodes);
                 if (factor > max_queue_sizing_[j]) max_queue_sizing_[j]=factor;
-            }   
+            }
             if (num_gpus>1 && i!=0 )
             for (int t=0;t<2;t++)
-            {   
+            {
                 SizeT x=problem->data_slices[gpu][0].keys_in[t][i].GetSize();
-                printf("\t %lld", (long long) x); 
+                printf("\t %lld", (long long) x);
                 double factor = 1.0*x/problem->graph_slices[gpu]->in_counter[i];
                 if (factor > max_in_sizing_) max_in_sizing_=factor;
-            }   
-        }   
+            }
+        }
         if (num_gpus>1) printf("\t %lld", (long long)(problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize()));
         printf("\n");
-    }   
+    }
     printf("\t queue_sizing =\t %lf \t %lf", max_queue_sizing_[0], max_queue_sizing_[1]);
     if (num_gpus>1) printf("\t in_sizing =\t %lf", max_in_sizing_);
     printf("\n");
@@ -680,7 +680,7 @@ void RunTests(
 {
     string src_str = "";
     Test_Parameter *parameter = new Test_Parameter;
-    
+
     parameter -> Init(args);
     parameter -> graph              = graph;
     parameter -> num_gpus           = num_gpus;
@@ -760,7 +760,7 @@ int main( int argc, char** argv)
         }
     }
     printf("\n"); fflush(stdout);
-    
+
     // Parse graph-contruction params
     g_undirected = args.CheckCmdLineFlag("undirected");
     std::string graph_type = argv[1];
@@ -771,7 +771,7 @@ int main( int argc, char** argv)
         Usage();
         return 1;
     }
-	
+
     //
     // Construct graph and perform search(es)
     //
@@ -785,8 +785,8 @@ int main( int argc, char** argv)
         // Matrix-market coordinate-formatted graph file
         char *market_filename = (graph_args == 2) ? argv[2] : NULL;
         if (graphio::BuildMarketGraph<true>(
-            market_filename, 
-            csr, 
+            market_filename,
+            csr,
             g_undirected,
             false) != 0) // no inverse graph
         {
@@ -794,12 +794,12 @@ int main( int argc, char** argv)
         }
 
     } else if (graph_type == "rmat")
-    {   
+    {
         // parse rmat parameters
-        SizeT rmat_nodes = 1 << 10; 
-        SizeT rmat_edges = 1 << 10; 
-        SizeT rmat_scale = 10; 
-        SizeT rmat_edgefactor = 48; 
+        SizeT rmat_nodes = 1 << 10;
+        SizeT rmat_edges = 1 << 10;
+        SizeT rmat_scale = 10;
+        SizeT rmat_edgefactor = 48;
         double rmat_a = 0.57;
         double rmat_b = 0.19;
         double rmat_c = 0.19;
@@ -838,22 +838,22 @@ int main( int argc, char** argv)
                 rmat_vmultipiler,
                 rmat_vmin,
                 rmat_seed) != 0)
-        {   
+        {
             return 1;
-        }   
+        }
         cpu_timer.Stop();
         float elapsed = cpu_timer.ElapsedMillis();
         printf("graph generated: %.3f ms, a = %.3f, b = %.3f, c = %.3f, d = %.3f\n", elapsed, rmat_a, rmat_b, rmat_c, rmat_d);
     } else if (graph_type == "rgg") {
-    
-        SizeT rgg_nodes = 1 << 10; 
-        SizeT rgg_scale = 10; 
+
+        SizeT rgg_nodes = 1 << 10;
+        SizeT rgg_scale = 10;
         double rgg_thfactor  = 0.55;
         double rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
         double rgg_vmultipiler = 20;
         double rgg_vmin = 1;
         int    rgg_seed = -1;
-    
+
         args.GetCmdLineArgument("rgg_scale", rgg_scale);
         rgg_nodes = 1 << rgg_scale;
         args.GetCmdLineArgument("rgg_nodes", rgg_nodes);
@@ -890,7 +890,7 @@ int main( int argc, char** argv)
     csr.DisplayGraph(true); //print graph with edge_value
     //util::cpu_mt::PrintCPUArray("row_offsets", csr.row_offsets,csr.nodes+1);
     //util::cpu_mt::PrintCPUArray("colum_indiece", csr.column_indices, csr.edges);
-    
+
     csr.GetAverageEdgeValue();
     csr.GetAverageDegree();
     int max_degree;

@@ -70,13 +70,13 @@ bool CCCompare(
 
 struct Test_Parameter : gunrock::app::TestParameter_Base {
 public:
-     Test_Parameter(){   }   
-    ~Test_Parameter(){   }   
+     Test_Parameter(){   }
+    ~Test_Parameter(){   }
 
     void Init(CommandLineArgs &args)
-    {   
+    {
         TestParameter_Base::Init(args);
-    }   
+    }
 };
 
 /******************************************************************************
@@ -186,7 +186,7 @@ void DisplaySolution(
  */
 template<
     typename VertexId,
-    typename Value, 
+    typename Value,
     typename SizeT>
 unsigned int RefCPUCC(
     const Csr<VertexId, Value, SizeT> &graph,
@@ -301,7 +301,7 @@ void RunTests(Test_Parameter *parameter)
     //}
 
     //util::cpu_mt::PrintCPUArray("row_offsets", graph->row_offsets, graph->nodes+1);
-    //util::cpu_mt::PrintCPUArray("colunm_indices", graph->column_indices, graph->edges); 
+    //util::cpu_mt::PrintCPUArray("colunm_indices", graph->column_indices, graph->edges);
     for (int gpu=0; gpu<num_gpus; gpu++)
     {
         size_t dummy;
@@ -346,7 +346,7 @@ void RunTests(Test_Parameter *parameter)
     for (SizeT iter = 0; iter < iterations; ++iter)
     {
         util::GRError(problem->Reset(enactor->GetFrontierType(), max_queue_sizing), "CC Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(enactor->Reset(), "CC Enactor Reset failed", __FILE__, __LINE__);   
+        util::GRError(enactor->Reset(), "CC Enactor Reset failed", __FILE__, __LINE__);
 
         printf("_________________________\n");fflush(stdout);
         cpu_timer.Start();
@@ -379,7 +379,7 @@ void RunTests(Test_Parameter *parameter)
         int error_num = CompareResults(h_component_ids, reference_check, graph->nodes, true);
         if (error_num>0)
             printf("%d errors occurred.\n", error_num);
-        else printf("\n"); 
+        else printf("\n");
     }
 
     //if (ref_num_components == csr_problem->num_components)
@@ -394,7 +394,7 @@ void RunTests(Test_Parameter *parameter)
 
         // Display Solution
         DisplaySolution(h_component_ids, graph->nodes, problem->num_components, h_roots, h_histograms);
-        
+
         if (h_roots     ) {delete[] h_roots     ; h_roots     =NULL;}
         if (h_histograms) {delete[] h_histograms; h_histograms=NULL;}
     }
@@ -445,7 +445,7 @@ void RunTests(Test_Parameter *parameter)
     if (num_gpus>1) printf("\t in_sizing =\t %lf", max_in_sizing_);
     printf("\n");
 
-    // Cleanup 
+    // Cleanup
     if (org_size               ) {delete[] org_size               ; org_size                = NULL;}
     if (problem                ) {delete   problem                ; problem                 = NULL;}
     if (enactor                ) {delete   enactor                ; enactor                 = NULL;}
@@ -590,7 +590,7 @@ int main( int argc, char** argv)
 		Usage();
 		return 1;
 	}
-	
+
 	//
 	// Construct graph and perform search(es)
 	//
@@ -605,8 +605,8 @@ int main( int argc, char** argv)
 		if (graph_args < 1) { Usage(); return 1; }
 		char *market_filename = (graph_args == 2) ? argv[2] : NULL;
 		if (graphio::BuildMarketGraph<false>(
-			market_filename, 
-			csr, 
+			market_filename,
+			csr,
 			g_undirected,
 			false) != 0) // no inverse graph
 		{
@@ -706,6 +706,5 @@ int main( int argc, char** argv)
 
     // Run tests
     RunTests(&csr, args, num_gpus, context, gpu_idx, streams);
-
-	return 0;
+    return 0;
 }

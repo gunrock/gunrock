@@ -432,7 +432,7 @@ void RunTests(Test_Parameter *parameter)
 
     // Allocate BC enactor map
     BcEnactor* enactor = new BcEnactor(num_gpus, gpu_idx);
-    
+
     // Allocate problem on GPU
     BcProblem *problem = new BcProblem;
     util::GRError(problem->Init(
@@ -589,7 +589,7 @@ void RunTests(Test_Parameter *parameter)
     // Verify the result
     if (reference_check_bc_values != NULL) {
         //util::cpu_mt::PrintCPUArray<SizeT, Value>("reference_check_bc_values", reference_check_bc_values, graph->nodes);
-        //util::cpu_mt::PrintCPUArray<SizeT, Value>("bc_values", h_bc_values, graph->nodes); 
+        //util::cpu_mt::PrintCPUArray<SizeT, Value>("bc_values", h_bc_values, graph->nodes);
         printf("Validity BC Value: ");
         int num_error = CompareResults(h_bc_values, reference_check_bc_values, graph->nodes,
                        true);
@@ -636,32 +636,32 @@ void RunTests(Test_Parameter *parameter)
     printf("\n");
     double max_queue_sizing_[2] = {0,0}, max_in_sizing_=0;
     for (int gpu=0;gpu<num_gpus;gpu++)
-    {   
+    {
         size_t gpu_free,dummy;
         cudaSetDevice(gpu_idx[gpu]);
         cudaMemGetInfo(&gpu_free,&dummy);
         printf("GPU_%d\t %ld",gpu_idx[gpu],org_size[gpu]-gpu_free);
         for (int i=0;i<num_gpus;i++)
-        {   
+        {
             for (int j=0; j<2; j++)
-            {   
+            {
                 SizeT x=problem->data_slices[gpu]->frontier_queues[i].keys[j].GetSize();
-                printf("\t %lld", (long long) x); 
+                printf("\t %lld", (long long) x);
                 double factor = 1.0*x/(num_gpus>1?problem->graph_slices[gpu]->in_counter[i]:problem->graph_slices[gpu]->nodes);
                 if (factor > max_queue_sizing_[j]) max_queue_sizing_[j]=factor;
-            }   
+            }
             if (num_gpus>1 && i!=0 )
             for (int t=0;t<2;t++)
-            {   
+            {
                 SizeT x=problem->data_slices[gpu][0].keys_in[t][i].GetSize();
-                printf("\t %lld", (long long) x); 
+                printf("\t %lld", (long long) x);
                 double factor = 1.0*x/problem->graph_slices[gpu]->in_counter[i];
                 if (factor > max_in_sizing_) max_in_sizing_=factor;
-            }   
-        }   
+            }
+        }
         if (num_gpus>1) printf("\t %lld", (long long)(problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize()));
         printf("\n");
-    }   
+    }
     printf("\t queue_sizing =\t %lf \t %lf", max_queue_sizing_[0], max_queue_sizing_[1]);
     if (num_gpus>1) printf("\t in_sizing =\t %lf", max_in_sizing_);
     printf("\n");
@@ -761,7 +761,7 @@ void RunTests(
         parameter->src = graph->GetNodeWithHighestDegree(temp);
     } else {
         args.GetCmdLineArgument("src", parameter->src);
-    }   
+    }
     printf("src = %lld\n", parameter->src);
 
     RunTests_instrumented<VertexId, Value, SizeT>(parameter);
@@ -811,7 +811,7 @@ int main( int argc, char** argv)
             int _i = gpu*num_gpus*2+i;
             util::GRError(cudaStreamCreate(&streams[_i]), "cudaStreamCreate failed.", __FILE__, __LINE__);
             if (i<num_gpus) context[gpu*num_gpus+i] = mgpu::CreateCudaDeviceAttachStream(gpu_idx[gpu], streams[_i]);
-        } 
+        }
     }
     printf("\n"); fflush(stdout);
 
@@ -851,17 +851,17 @@ int main( int argc, char** argv)
         csr.PrintHistogram();
 
     } else if (graph_type == "rmat")
-    {   
+    {
         // parse rmat parameters
-        SizeT rmat_nodes = 1 << 10; 
-        SizeT rmat_edges = 1 << 10; 
-        SizeT rmat_scale = 10; 
-        SizeT rmat_edgefactor = 48; 
+        SizeT rmat_nodes = 1 << 10;
+        SizeT rmat_edges = 1 << 10;
+        SizeT rmat_scale = 10;
+        SizeT rmat_edgefactor = 48;
         double rmat_a = 0.57;
         double rmat_b = 0.19;
         double rmat_c = 0.19;
         double rmat_d = 1-(rmat_a+rmat_b+rmat_c);
-        int    rmat_seed = -1; 
+        int    rmat_seed = -1;
 
         args.GetCmdLineArgument("rmat_scale", rmat_scale);
         rmat_nodes = 1 << rmat_scale;
@@ -887,18 +887,18 @@ int main( int argc, char** argv)
                 rmat_b,
                 rmat_c,
                 rmat_d,
-                1,  
-                1,  
+                1,
+                1,
                 rmat_seed) != 0)
-        {   
+        {
             return 1;
-        }   
+        }
         cpu_timer.Stop();
         float elapsed = cpu_timer.ElapsedMillis();
         printf("graph generated: %.3f ms, a = %.3f, b = %.3f, c = %.3f, d = %.3f\n", elapsed, rmat_a, rmat_b, rmat_c, rmat_d);
     } else if (graph_type == "rgg") {
-       SizeT rgg_nodes = 1 << 10; 
-        SizeT rgg_scale = 10; 
+       SizeT rgg_nodes = 1 << 10;
+        SizeT rgg_scale = 10;
         double rgg_thfactor  = 0.55;
         double rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
         double rgg_vmultipiler = 1;

@@ -369,12 +369,12 @@ void RunTests(Test_Parameter *parameter)
         Value,
         MARK_PREDECESSORS,
         ENABLE_IDEMPOTENCE,
-        (MARK_PREDECESSORS && ENABLE_IDEMPOTENCE)> 
+        (MARK_PREDECESSORS && ENABLE_IDEMPOTENCE)>
     BfsProblem; // does not use double buffer
 
-    typedef BFSEnactor<BfsProblem, 
-        INSTRUMENT, 
-        DEBUG, 
+    typedef BFSEnactor<BfsProblem,
+        INSTRUMENT,
+        DEBUG,
         SIZE_CHECK>
     BfsEnactor;
 
@@ -409,9 +409,9 @@ void RunTests(Test_Parameter *parameter)
         h_preds = new VertexId[graph->nodes];
         if (!g_quick) {
               reference_check_preds = reference_preds;
-        }            
+        }
     }
- 
+
     for (int gpu=0;gpu<num_gpus;gpu++)
     {
         size_t dummy;
@@ -420,7 +420,7 @@ void RunTests(Test_Parameter *parameter)
     }
     // Allocate BFS enactor map
     BfsEnactor *enactor= new BfsEnactor(num_gpus, gpu_idx);
-            
+
     // Allocate problem on GPU
     BfsProblem *problem = new BfsProblem;
     util::GRError(problem->Init(
@@ -454,7 +454,7 @@ void RunTests(Test_Parameter *parameter)
     Stats     *stats       = new Stats("GPU BFS");
     long long total_queued = 0;
     VertexId  search_depth = 0;
-    double    avg_duty     = 0.0; 
+    double    avg_duty     = 0.0;
     float     elapsed      = 0.0;
 
     // Perform BFS
@@ -498,7 +498,6 @@ void RunTests(Test_Parameter *parameter)
         }
     }
 
-    printf("\nFirst 40 labels of the GPU result."); 
     // Display Solution
     DisplaySolution<VertexId, SizeT, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE>
         (h_labels, h_preds, graph->nodes);
@@ -521,32 +520,32 @@ void RunTests(Test_Parameter *parameter)
     printf("\n");
     double max_queue_sizing_[2] = {0,0}, max_in_sizing_=0;
     for (int gpu=0;gpu<num_gpus;gpu++)
-    {   
+    {
         size_t gpu_free,dummy;
         cudaSetDevice(gpu_idx[gpu]);
         cudaMemGetInfo(&gpu_free,&dummy);
         printf("GPU_%d\t %ld",gpu_idx[gpu],org_size[gpu]-gpu_free);
         for (int i=0;i<num_gpus;i++)
-        {  
+        {
             for (int j=0; j<2; j++)
-            { 
+            {
                 SizeT x=problem->data_slices[gpu]->frontier_queues[i].keys[j].GetSize();
-                printf("\t %lld", (long long) x); 
+                printf("\t %lld", (long long) x);
                 double factor = 1.0*x/(num_gpus>1?problem->graph_slices[gpu]->in_counter[i]:problem->graph_slices[gpu]->nodes);
                 if (factor > max_queue_sizing_[j]) max_queue_sizing_[j]=factor;
             }
             if (num_gpus>1 && i!=0 )
             for (int t=0;t<2;t++)
-            {   
+            {
                 SizeT x=problem->data_slices[gpu][0].keys_in[t][i].GetSize();
-                printf("\t %lld", (long long) x); 
+                printf("\t %lld", (long long) x);
                 double factor = 1.0*x/problem->graph_slices[gpu]->in_counter[i];
                 if (factor > max_in_sizing_) max_in_sizing_=factor;
-            }   
-        }   
+            }
+        }
         if (num_gpus>1) printf("\t %lld", (long long)(problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize()));
         printf("\n");
-    }   
+    }
     printf("\t queue_sizing =\t %lf \t %lf", max_queue_sizing_[0], max_queue_sizing_[1]);
     if (num_gpus>1) printf("\t in_sizing =\t %lf", max_in_sizing_);
     printf("\n");
@@ -575,7 +574,7 @@ template <
 void RunTests_enable_idempotence(Test_Parameter *parameter)
 {
     if (parameter->enable_idempotence) RunTests
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK, MARK_PREDECESSORS, 
+        <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK, MARK_PREDECESSORS,
         true > (parameter);
    else RunTests
         <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK, MARK_PREDECESSORS,
@@ -595,7 +594,7 @@ void RunTests_mark_predecessors(Test_Parameter *parameter)
         <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
         true > (parameter);
    else RunTests_enable_idempotence
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK, 
+        <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
         false> (parameter);
 }
 
@@ -608,10 +607,10 @@ template <
 void RunTests_size_check(Test_Parameter *parameter)
 {
     if (parameter->size_check) RunTests_mark_predecessors
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG, 
+        <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
         true > (parameter);
    else RunTests_mark_predecessors
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG, 
+        <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
         false> (parameter);
 }
 
@@ -623,10 +622,10 @@ template <
 void RunTests_debug(Test_Parameter *parameter)
 {
     if (parameter->debug) RunTests_size_check
-        <VertexId, Value, SizeT, INSTRUMENT, 
+        <VertexId, Value, SizeT, INSTRUMENT,
         true > (parameter);
     else RunTests_size_check
-        <VertexId, Value, SizeT, INSTRUMENT, 
+        <VertexId, Value, SizeT, INSTRUMENT,
         false> (parameter);
 }
 
@@ -637,10 +636,10 @@ template <
 void RunTests_instrumented(Test_Parameter *parameter)
 {
     if (parameter->instrumented) RunTests_debug
-        <VertexId, Value, SizeT, 
+        <VertexId, Value, SizeT,
         true > (parameter);
     else RunTests_debug
-        <VertexId, Value, SizeT, 
+        <VertexId, Value, SizeT,
         false> (parameter);
 }
 
@@ -668,8 +667,8 @@ void RunTests(
     cudaStream_t                *streams)
 {
     string src_str="";
-    Test_Parameter *parameter = new Test_Parameter;   
- 
+    Test_Parameter *parameter = new Test_Parameter;
+
     parameter -> Init(args);
     parameter -> graph              = graph;
     parameter -> num_gpus           = num_gpus;
@@ -719,12 +718,12 @@ int main( int argc, char** argv)
     }
 
     if (args.CheckCmdLineFlag  ("device"))
-    {   
+    {
         std::vector<int> gpus;
         args.GetCmdLineArguments<int>("device",gpus);
         num_gpus   = gpus.size();
         gpu_idx    = new int[num_gpus];
-        for (int i=0;i<num_gpus;i++) 
+        for (int i=0;i<num_gpus;i++)
             gpu_idx[i] = gpus[i];
     } else {
         num_gpus   = 1;
@@ -734,7 +733,7 @@ int main( int argc, char** argv)
     streams  = new cudaStream_t[num_gpus * num_gpus *2];
     context  = new ContextPtr  [num_gpus * num_gpus];
     printf("Using %d gpus: ", num_gpus);
-    for (int gpu=0;gpu<num_gpus;gpu++) 
+    for (int gpu=0;gpu<num_gpus;gpu++)
     {
         printf(" %d ", gpu_idx[gpu]);
         util::SetDevice(gpu_idx[gpu]);
@@ -746,7 +745,7 @@ int main( int argc, char** argv)
         }
     }
     printf("\n"); fflush(stdout);
-    
+
     // Parse graph-contruction params
     g_undirected = args.CheckCmdLineFlag("undirected");
 
@@ -776,8 +775,8 @@ int main( int argc, char** argv)
 
         char *market_filename = (graph_args == 2) ? argv[2] : NULL;
         if (graphio::BuildMarketGraph<false>(
-            market_filename, 
-            csr, 
+            market_filename,
+            csr,
             g_undirected,
             false) != 0) // no inverse graph
         {
@@ -830,14 +829,14 @@ int main( int argc, char** argv)
         float elapsed = cpu_timer.ElapsedMillis();
         printf("graph generated: %.3f ms, a = %.3f, b = %.3f, c = %.3f, d = %.3f\n", elapsed, rmat_a, rmat_b, rmat_c, rmat_d);
     } else if (graph_type == "rgg") {
-        
+
         SizeT rgg_nodes = 1 << 10;
         SizeT rgg_scale = 10;
         double rgg_thfactor  = 0.55;
         double rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
         double rgg_vmultipiler = 1;
         int    rgg_seed        = -1;
-        
+
         args.GetCmdLineArgument("rgg_scale", rgg_scale);
         rgg_nodes = 1 << rgg_scale;
         args.GetCmdLineArgument("rgg_nodes", rgg_nodes);
@@ -874,4 +873,3 @@ int main( int argc, char** argv)
 
     return 0;
 }
-

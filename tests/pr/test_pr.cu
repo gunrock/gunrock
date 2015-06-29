@@ -77,25 +77,25 @@ public:
     float    error          ; //= 0.01f; // Error threshold
     int      max_iter       ; //= 50;    // Maximum number of iteration
     int      traversal_mode ; //= -1;    // Load-balacned or Dynamic cooperative
-    
+
     Test_Parameter() {
         delta = 0.85f;
         error = 0.01f;
         max_iter = 50;
         src      = -1;
         traversal_mode = -1;
-    }   
-    ~Test_Parameter(){   }   
+    }
+    ~Test_Parameter(){   }
 
     void Init(CommandLineArgs &args)
-    {   
+    {
         TestParameter_Base::Init(args);
         args.GetCmdLineArgument("delta", delta);
         args.GetCmdLineArgument("error", error);
         args.GetCmdLineArgument("max-iter", max_iter);
         args.GetCmdLineArgument("src", src);
         args.GetCmdLineArgument("traversal-mode", traversal_mode);
-   }   
+   }
 };
 
 /******************************************************************************
@@ -187,9 +187,9 @@ int CompareResults_(float* computed, float* reference, SizeT len, bool verbose =
         } else {
             if (fabs((computed[i] - reference[i])/reference[i]) > THRESHOLD)
                 is_right = false;
-        }   
+        }
         if (!is_right && flag == 0) {
-            printf("\nINCORRECT: [%lu]: ", (unsigned long) i); 
+            printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
             PrintValue<float>(computed[i]);
             printf(" != ");
             PrintValue<float>(reference[i]);
@@ -199,20 +199,20 @@ int CompareResults_(float* computed, float* reference, SizeT len, bool verbose =
                 for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
                     PrintValue<float>(computed[j]);
                     printf(", ");
-                }   
+                }
                 printf("...]");
                 printf("\nreference[...");
                 for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
                     PrintValue<float>(reference[j]);
                     printf(", ");
-                }   
+                }
                 printf("...]");
-            }   
+            }
             flag += 1;
             //return flag;
-        }   
+        }
         if (!is_right && flag > 0) flag += 1;
-    }   
+    }
     printf("\n");
     if (!flag)
         printf("CORRECT");
@@ -388,7 +388,7 @@ template <
     bool SIZE_CHECK>
 void RunTests(Test_Parameter *parameter)
 {
-    
+
     typedef PRProblem<
         VertexId,
         SizeT,
@@ -469,7 +469,7 @@ void RunTests(Test_Parameter *parameter)
     {
         util::GRError(problem->Reset(src, delta, error, max_iter, enactor->GetFrontierType(), max_queue_sizing), "pr Problem Data Reset Failed", __FILE__, __LINE__);
         util::GRError(enactor->Reset(), "PR Enactor Reset Reset failed", __FILE__, __LINE__);
-        
+
         printf("_________________________________________\n");fflush(stdout);
         cpu_timer.Start();
         util::GRError(enactor->Enact(traversal_mode), "pr Problem Enact Failed", __FILE__, __LINE__);
@@ -518,7 +518,7 @@ void RunTests(Test_Parameter *parameter)
         errors_count = CompareResults(h_node_id, reference_node_id, graph->nodes, true);
         if (errors_count > 0) printf("number of errors : %lld\n", (long long) errors_count);*/
     }
-    printf("\nFirst 40 labels of the GPU result."); 
+    printf("\nFirst 40 labels of the GPU result.");
     // Display Solution
     DisplaySolution(h_node_id, h_rank, graph->nodes);
 
@@ -539,32 +539,32 @@ void RunTests(Test_Parameter *parameter)
     printf("\n");
     double max_queue_sizing_[2] = {0,0}, max_in_sizing_=0;
     for (int gpu=0;gpu<num_gpus;gpu++)
-    {   
+    {
         size_t gpu_free,dummy;
         cudaSetDevice(gpu_idx[gpu]);
         cudaMemGetInfo(&gpu_free,&dummy);
         printf("GPU_%d\t %ld",gpu_idx[gpu],org_size[gpu]-gpu_free);
         for (int i=0;i<num_gpus;i++)
-        {   
+        {
             for (int j=0; j<2; j++)
-            {   
+            {
                 SizeT x=problem->data_slices[gpu]->frontier_queues[i].keys[j].GetSize();
-                printf("\t %lld", (long long) x); 
+                printf("\t %lld", (long long) x);
                 double factor = 1.0*x/(num_gpus>1?problem->graph_slices[gpu]->in_counter[i]:problem->graph_slices[gpu]->nodes);
                 if (factor > max_queue_sizing_[j]) max_queue_sizing_[j]=factor;
-            }   
+            }
             if (num_gpus>1 && i!=0 )
             for (int t=0;t<2;t++)
-            {   
+            {
                 SizeT x=problem->data_slices[gpu][0].keys_in[t][i].GetSize();
-                printf("\t %lld", (long long) x); 
+                printf("\t %lld", (long long) x);
                 double factor = 1.0*x/problem->graph_slices[gpu]->in_counter[i];
                 if (factor > max_in_sizing_) max_in_sizing_=factor;
-            }   
-        }   
+            }
+        }
         if (num_gpus>1) printf("\t %lld", (long long)(problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize()));
         printf("\n");
-    }   
+    }
     printf("\t queue_sizing =\t %lf \t %lf", max_queue_sizing_[0], max_queue_sizing_[1]);
     if (num_gpus>1) printf("\t in_sizing =\t %lf", max_in_sizing_);
     printf("\n");
@@ -649,15 +649,14 @@ int main( int argc, char** argv)
     int             *gpu_idx  = NULL;
     ContextPtr      *context  = NULL;
     cudaStream_t    *streams  = NULL;
-    //bool             g_undirected = false; //Does not make undirected graph
 
     if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
         Usage();
         return 1;
-    }   
+    }
 
     if (args.CheckCmdLineFlag  ("device"))
-    {   
+    {
         std::vector<int> gpus;
         args.GetCmdLineArguments<int>("device",gpus);
         num_gpus   = gpus.size();
@@ -668,21 +667,21 @@ int main( int argc, char** argv)
         num_gpus   = 1;
         gpu_idx    = new int[num_gpus];
         gpu_idx[0] = 0;
-    }   
-    streams  = new cudaStream_t[num_gpus * num_gpus * 2]; 
+    }
+    streams  = new cudaStream_t[num_gpus * num_gpus * 2];
     context  = new ContextPtr  [num_gpus * num_gpus];
     printf("Using %d gpus: ", num_gpus);
     for (int gpu=0;gpu<num_gpus;gpu++)
-    {   
+    {
         printf(" %d ", gpu_idx[gpu]);
         util::SetDevice(gpu_idx[gpu]);
         for (int i=0;i<num_gpus*2;i++)
-        {   
+        {
             int _i = gpu*num_gpus*2+i;
             util::GRError(cudaStreamCreate(&streams[_i]), "cudaStreamCreate failed.", __FILE__, __LINE__);
             if (i<num_gpus) context[gpu*num_gpus+i] = mgpu::CreateCudaDeviceAttachStream(gpu_idx[gpu], streams[_i]);
-        }   
-    }   
+        }
+    }
     printf("\n"); fflush(stdout);
 
     // Parse graph-contruction params
@@ -693,40 +692,40 @@ int main( int argc, char** argv)
     if (graph_args < 1) {
         Usage();
         return 1;
-    }   
+    }
 
-	//
-	// Construct graph and perform search(es)
-	//
+    //
+    // Construct graph and perform search(es)
+    //
     Test_Parameter *parameter = new Test_Parameter;
     parameter -> Init(args);
-    parameter -> num_gpus    = num_gpus;
-    parameter -> context     = context;
-    parameter -> gpu_idx     = gpu_idx;
-    parameter -> streams     = streams;
+    parameter -> num_gpus     = num_gpus;
+    parameter -> context      = context;
+    parameter -> gpu_idx      = gpu_idx;
+    parameter -> streams      = streams;
+    parameter -> g_undirected = true;
 
     typedef int VertexId;							// Use as the node identifier type
     typedef float Value;								// Use as the value type
     typedef int SizeT;								// Use as the graph size type
     Csr<VertexId, Value, SizeT> graph(false);         // default value for stream_from_host is false
 
-	if (graph_type == "market") {
+    if (graph_type == "market") {
 
-		// Matrix-market coordinate-formatted graph file
+      // Matrix-market coordinate-formatted graph file
 
-        if (graph_args < 1) { Usage(); return 1; }
-        char *market_filename = (graph_args == 2) ? argv[2] : NULL;
-        if (graphio::BuildMarketGraph<false>(
-			market_filename, 
-			graph, 
-			parameter->g_undirected,
-			false) != 0) // no inverse graph
-		{
-			return 1;
-		}
+      if (graph_args < 1) { Usage(); return 1; }
+      char *market_filename = (graph_args == 2) ? argv[2] : NULL;
+      if (graphio::BuildMarketGraph<false>(
+                        market_filename,
+                        graph,
+                        parameter->g_undirected,
+                        false) != 0) // no inverse graph
+        {
+          return 1;
+        }
 
-	} else if (graph_type == "rmat")
-    {
+    } else if (graph_type == "rmat") {
         // parse rmat parameters
         SizeT rmat_nodes = 1 << 10;
         SizeT rmat_edges = 1 << 10;
