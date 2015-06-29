@@ -361,6 +361,7 @@ void RunTests(Test_Parameter *parameter)
         csr_problem->Extract(h_hrank, h_arank),
         "HITS Problem Data Extraction Failed", __FILE__, __LINE__);
 
+    /*
     // Verify the result
     if (reference_check_a != NULL)
     {
@@ -368,8 +369,8 @@ void RunTests(Test_Parameter *parameter)
         CompareResults(h_hrank, reference_check_h, graph->nodes, true);
         CompareResults(h_arank, reference_check_a, graph->nodes, true);
     }
+    */
 
-    printf("\nFirst 40 labels of the GPU result.");
     // Display Solution
     DisplaySolution(h_hrank, h_arank, graph->nodes);
 
@@ -573,4 +574,3 @@ int main( int argc, char** argv)
     }
     return 0;
 }
- 
