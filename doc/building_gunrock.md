@@ -35,9 +35,9 @@ the `dataset/small` subdirectory, there are trivial graph datasets for testing
 the correctness of the graph primitives. All of them are ready to use.  Under
 the `dataset/large` subdirectory, there are large graph datasets for doing
 performance regression tests. To download them to your local machine, just type
-`make` in the dataset subdirectory. You can also choose to only download one
-specific dataset to your local machine by stepping into the subdirectory of
-that dataset and typing `make` inside that subdirectory.
+`make` in the `dataset/large` subdirectory. You can also choose to only
+download one specific dataset to your local machine by stepping into the
+subdirectory of that dataset and typing `make` inside that subdirectory.
 
 Running the Tests           {#running_tests}
 =================
