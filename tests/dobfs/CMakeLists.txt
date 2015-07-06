@@ -24,3 +24,6 @@ CUDA_ADD_EXECUTABLE(direction_optimizing_bfs
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
   ${mgpu_SOURCE_FILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
+
+target_link_libraries(direction_optimizing_bfs ${Boost_LIBRARIES})
+target_link_libraries(direction_optimizing_bfs ${METIS_LIBRARY})
