@@ -24,3 +24,6 @@ CUDA_ADD_EXECUTABLE(pagerank
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
   ${mgpu_SOURCE_FILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
+
+target_link_libraries(pagerank ${Boost_LIBRARIES})
+target_link_libraries(pagerank ${METIS_LIBRARY})

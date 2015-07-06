@@ -18,3 +18,6 @@ CUDA_ADD_EXECUTABLE(betweenness_centrality
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
   ${mgpu_SOURCE_FILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
+
+target_link_libraries(betweenness_centrality ${Boost_LIBRARIES})
+target_link_libraries(betweenness_centrality ${METIS_LIBRARY})
