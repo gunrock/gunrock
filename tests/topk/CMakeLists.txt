@@ -1,4 +1,4 @@
-# CMake file for WTF test
+# CMake file for degree centrality test
 
 # set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -g;-G)
 
@@ -18,12 +18,12 @@ else()
   message(SEND_ERROR "CUB include directory not set.")
 endif()
 
-CUDA_ADD_EXECUTABLE(who_to_follow
-  test_wtf.cu
+CUDA_ADD_EXECUTABLE(degree_centrality
+  test_topk.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/test_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
   ${mgpu_SOURCE_FILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
 
-target_link_libraries(who_to_follow ${Boost_LIBRARIES})
-target_link_libraries(who_to_follow ${METIS_LIBRARY})
+target_link_libraries(degree_centrality ${Boost_LIBRARIES})
+target_link_libraries(degree_centrality ${METIS_LIBRARY})
