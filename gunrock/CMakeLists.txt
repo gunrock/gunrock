@@ -20,13 +20,13 @@ set(HFILES_PUBLIC
   gunrock.h)
 
 set(CUFILES
-  app/topk/topk_app.cu
-  app/bfs/bfs_app.cu
-  app/bc/bc_app.cu
-  app/cc/cc_app.cu
-  app/sssp/sssp_app.cu
-  app/pr/pr_app.cu
-  app/mst/mst_app.cu
+  #app/topk/topk_app.cu
+  #app/bfs/bfs_app.cu
+  #app/bc/bc_app.cu
+  #app/cc/cc_app.cu
+  #app/sssp/sssp_app.cu
+  #app/pr/pr_app.cu
+  #app/mst/mst_app.cu
   util/test_utils.cu
   util/error_utils.cu
   ${mgpu_SOURCE_FILES})
