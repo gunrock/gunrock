@@ -94,6 +94,20 @@ extern "C" {
 #endif
 
 /**
+ * @brief R-MAT graph generator
+ */
+void rmat_graph(
+    int rows[],
+    int cols[],
+    unsigned int vals[],
+    int nodes,
+    int edges,
+    bool undirected,
+    float a,   // default for rmat 0.57
+    float b,   // default for rmat 0.19
+    float c);  // default for rmat 0.19
+
+/**
  * breath-first search
  */
 void gunrock_bfs(

@@ -27,6 +27,7 @@ set(CUFILES
   app/sssp/sssp_app.cu
   app/pr/pr_app.cu
   app/mst/mst_app.cu
+  graphio/generator.cu
   util/test_utils.cu
   util/error_utils.cu
   ${mgpu_SOURCE_FILES})

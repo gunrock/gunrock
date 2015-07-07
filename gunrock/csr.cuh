@@ -287,8 +287,8 @@ struct Csr {
         if (LOAD_EDGE_VALUES) {
             WriteToFile(output_file, nodes, edges,
                         row_offsets, column_indices, edge_values);
-            WriteToLigraFile(output_file, nodes, edges,
-                        row_offsets, column_indices, edge_values);
+            //WriteToLigraFile(output_file, nodes, edges,
+            //            row_offsets, column_indices, edge_values);
         } else {
             WriteToFile(output_file, nodes, edges,
                         row_offsets, column_indices);
