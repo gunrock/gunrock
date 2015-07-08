@@ -26,12 +26,11 @@ int main(int argc, char* argv[]) {
     float* top_ranks = (float*)malloc(sizeof(float) * nodes);
 
     ///////////////////////////////////////////////////////////////////////////
-    //bfs(bfs_label, nodes, edges, rows, cols, 0);        // breath-first search
-    //bc(bc_scores, nodes, edges, rows, cols, -1);     // betweenness centrality
+    bfs(bfs_label, nodes, edges, rows, cols, 0);        // breath-first search
+    bc(bc_scores, nodes, edges, rows, cols, -1);     // betweenness centrality
     int c = cc(conn_comp, nodes, edges, rows, cols);   // connected components
     sssp(sssp_dist, nodes, edges, rows, cols, vals, 0);       // shortest path
     pagerank(top_nodes, top_ranks, nodes, edges, rows, cols);      // pagerank
-    bfs(bfs_label, nodes, edges, rows, cols, 0);
 
     ///////////////////////////////////////////////////////////////////////////
     // example demo outputs
@@ -45,13 +44,13 @@ int main(int argc, char* argv[]) {
         printf(" node: [%d] | score: [%.4f]\n", node, bc_scores[node]);
 
     printf("\n connected components:\n");
-    //printf(" number of components: %d\n", c);
+    printf(" number of components: %d\n", c);
     for (node = 0; node < nodes; ++node)
         printf(" node: [%d] | component: [%d]\n", node, conn_comp[node]);
 
     printf("\n single-source shortest path:\n");
     for (node = 0; node < nodes; ++node)
-        printf(" node: [%d] | component: [%d]\n", node, sssp_dist[node]);
+        printf(" node: [%d] | distance: [%d]\n", node, sssp_dist[node]);
 
     printf("\n top pagerank:\n");
     for (node = 0; node < nodes; ++node)
