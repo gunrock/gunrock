@@ -55,11 +55,11 @@ void RemoveStandaloneNodes(
     memset(marker, 0, sizeof(int) * nodes);
     VertexId *column_indices = graph->column_indices;
     SizeT    *row_offsets    = graph->row_offsets;
-    SizeT    *displacements  = new SizeT   [nodes];
-    SizeT    *new_offsets    = new SizeT   [nodes+1];
+    SizeT    *displacements  = new SizeT   [graph->nodes];
+    SizeT    *new_offsets    = new SizeT   [graph->nodes+1];
     SizeT    *block_offsets  = NULL;
-    VertexId *new_nodes      = new VertexId[nodes];
-    Value    *new_values     = new Value   [nodes];
+    VertexId *new_nodes      = new VertexId[graph->nodes];
+    Value    *new_values     = new Value   [graph->nodes];
     Value    *values         = graph->node_values;
     int       num_threads    = 0;
 
@@ -79,7 +79,7 @@ void RemoveStandaloneNodes(
             marker[node] = 1;
         if (thread_num == 0) block_offsets = new SizeT[num_threads+1];
         #pragma omp barrier
-        
+
         displacements[node_start] = 0;
         for (VertexId node = node_start; node < node_end-1; node++)
             displacements[node+1] = displacements[node] + 1 - marker[node];
