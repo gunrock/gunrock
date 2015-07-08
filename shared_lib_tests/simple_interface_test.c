@@ -8,8 +8,8 @@
 
 int main(int argc, char* argv[]) {
     ///////////////////////////////////////////////////////////////////////////
-    int nodes = 2 << 9;   // number of nodes
-    int edges = 2 << 13;  // number of edges
+    int nodes = 2 <<  8;  // number of nodes
+    int edges = 2 << 12;  // number of edges
     // row_offsets, column_indices, and per edge values (weight)
     int rows[nodes + 1], cols[edges]; unsigned int vals[edges];
     // generate random R-MAT input graph with default parameters
@@ -26,11 +26,12 @@ int main(int argc, char* argv[]) {
     float* top_ranks = (float*)malloc(sizeof(float) * nodes);
 
     ///////////////////////////////////////////////////////////////////////////
-    bfs(bfs_label, nodes, edges, rows, cols, 0);        // breath-first search
-    bc(bc_scores, nodes, edges, rows, cols, -1);     // betweenness centrality
+    //bfs(bfs_label, nodes, edges, rows, cols, 0);        // breath-first search
+    //bc(bc_scores, nodes, edges, rows, cols, -1);     // betweenness centrality
     int c = cc(conn_comp, nodes, edges, rows, cols);   // connected components
     sssp(sssp_dist, nodes, edges, rows, cols, vals, 0);       // shortest path
     pagerank(top_nodes, top_ranks, nodes, edges, rows, cols);      // pagerank
+    bfs(bfs_label, nodes, edges, rows, cols, 0);
 
     ///////////////////////////////////////////////////////////////////////////
     // example demo outputs
@@ -44,7 +45,7 @@ int main(int argc, char* argv[]) {
         printf(" node: [%d] | score: [%.4f]\n", node, bc_scores[node]);
 
     printf("\n connected components:\n");
-    printf(" number of components: %d\n", c);
+    //printf(" number of components: %d\n", c);
     for (node = 0; node < nodes; ++node)
         printf(" node: [%d] | component: [%d]\n", node, conn_comp[node]);
 
