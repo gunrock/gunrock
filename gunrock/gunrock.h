@@ -59,8 +59,10 @@ struct GRGraph {
     void *col_indices;  // CSR column indices
     void *col_offsets;  // CSC column offsets
     void *row_indices;  // CSC row indices
-    void *node_values;  // associated values per node
-    void *edge_values;  // associated values per edge
+    void *node_value1;  // associated values per node
+    void *edge_value1;  // associated values per edge
+    void *node_value2;  // associated values per node
+    void *edge_value2;  // associated values per edge
 };
 
 /**
@@ -76,17 +78,18 @@ enum SrcMode {
  * @brief arguments configuration used to specify arguments
  */
 struct GRSetup {
-    bool        mark_pred;  // whether to mark predecessor or not
-    bool      idempotence;  // whether or not to enable idempotent
-    int          src_node;  // source vertex define where to start
-    int            device;  // setting which device to use
-    int          max_iter;  // maximum number of iterations allowed
-    int         top_nodes;  // k value for top k / pagerank problem
-    int      delta_factor;  // sssp delta-factor parameter
-    float           delta;  // pagerank specific value
-    float           error;  // pagerank specific value
-    float      queue_size;  // setting frontier queue size
-    enum SrcMode src_mode;  // source mode rand/largest_degree
+    bool   mark_predecessors;  // whether to mark predecessor or not
+    bool  enable_idempotence;  // whether or not to enable idempotent
+    int        source_vertex;  // source vertex define where to start
+    int         delta_factor;  // sssp delta-factor parameter
+    int*         device_list;  // setting which device(s) to use
+    unsigned int num_devices;  // number of devices for computation
+    unsigned int   max_iters;  // maximum number of iterations allowed
+    unsigned int   top_nodes;  // k value for top k / pagerank problem
+    float     pagerank_delta;  // pagerank specific value
+    float     pagerank_error;  // pagerank specific value
+    float   max_queue_sizing;  // setting frontier queue size
+    enum SrcMode source_mode;  // source mode rand/largest_degree
 };
 
 #ifdef __cplusplus
