@@ -160,7 +160,7 @@ void cutDestroyBarrier(CUTBarrier *barrier)
 
 #else
 //Create thread
-CUTThread cutStartThread(CUT_THREADROUTINE func, void *data)
+inline CUTThread cutStartThread(CUT_THREADROUTINE func, void *data)
 {
     pthread_t thread;
     pthread_create(&thread, NULL, func, data);
@@ -168,19 +168,19 @@ CUTThread cutStartThread(CUT_THREADROUTINE func, void *data)
 }
 
 //Wait for thread to finish
-void cutEndThread(CUTThread thread)
+inline void cutEndThread(CUTThread thread)
 {
     pthread_join(thread, NULL);
 }
 
 //Destroy thread
-void cutDestroyThread(CUTThread thread)
+inline void cutDestroyThread(CUTThread thread)
 {
     pthread_cancel(thread);
 }
 
 //Wait for multiple threads
-void cutWaitForThreads(const CUTThread *threads, int num)
+inline void cutWaitForThreads(const CUTThread *threads, int num)
 {
     for (int i = 0; i < num; i++)
     {
@@ -189,7 +189,7 @@ void cutWaitForThreads(const CUTThread *threads, int num)
 }
 
 //Create barrier.
-CUTBarrier cutCreateBarrier(int releaseCount)
+inline CUTBarrier cutCreateBarrier(int releaseCount)
 {
     CUTBarrier barrier;
 
@@ -204,7 +204,7 @@ CUTBarrier cutCreateBarrier(int releaseCount)
 }
 
 //Increment barrier. (excution continues)
-void cutIncrementBarrier(CUTBarrier *barrier)
+inline void cutIncrementBarrier(CUTBarrier *barrier)
 {
     int myBarrierCount;
     pthread_mutex_lock(&barrier->mutex);
@@ -218,7 +218,7 @@ void cutIncrementBarrier(CUTBarrier *barrier)
 }
 
 //Wait for barrier release.
-void cutWaitForBarrier(CUTBarrier *barrier)
+inline void cutWaitForBarrier(CUTBarrier *barrier)
 {
     pthread_mutex_lock(&barrier->mutex);
 
@@ -231,7 +231,7 @@ void cutWaitForBarrier(CUTBarrier *barrier)
 }
 
 //Destory barrier
-void cutDestroyBarrier(CUTBarrier *barrier)
+inline void cutDestroyBarrier(CUTBarrier *barrier)
 {
     pthread_mutex_destroy(&barrier->mutex);
     pthread_cond_destroy(&barrier->conditionVariable);
@@ -239,4 +239,3 @@ void cutDestroyBarrier(CUTBarrier *barrier)
 
 #endif
 #endif //MULTITHREADING_H
-
