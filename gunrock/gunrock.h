@@ -183,8 +183,6 @@ void sssp(
 // pagerank
 void gunrock_pagerank(
     struct GRGraph*       graph_o,
-    void*                 node_ids,
-    void*                 pagerank,
     const struct GRGraph* graph_i,
     const struct GRSetup  config,
     const struct GRTypes  data_t);
