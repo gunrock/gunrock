@@ -215,7 +215,7 @@ void RunTests(GRGraph* output, Test_Parameter *parameter) {
         enactor->Init(context, problem, max_grid_size, traversal_mode),
         "BFS Enactor init failed", __FILE__, __LINE__);
 
-    //CpuTimer cpu_timer;
+    CpuTimer cpu_timer;
 
     util::GRError(
         problem->Reset(src, enactor->GetFrontierType(),
@@ -225,15 +225,15 @@ void RunTests(GRGraph* output, Test_Parameter *parameter) {
         enactor->Reset(), "BFS Enactor Reset failed", __FILE__, __LINE__);
 
     printf("__________________________\n"); fflush(stdout);
-    //cpu_timer.Start();
+    cpu_timer.Start();
 
     util::GRError(
         enactor->Enact(src, traversal_mode),
         "BFS Problem Enact Failed", __FILE__, __LINE__);
 
-    //cpu_timer.Stop();
+    cpu_timer.Stop();
     printf("--------------------------\n"); fflush(stdout);
-    //float elapsed = cpu_timer.ElapsedMillis();
+    float elapsed = cpu_timer.ElapsedMillis();
 
     // Copy out results
     util::GRError(
