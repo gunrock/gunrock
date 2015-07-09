@@ -215,7 +215,7 @@ void RunTests(GRGraph* output, Test_Parameter *parameter) {
         enactor->Init(context, problem, max_grid_size, traversal_mode),
         "BFS Enactor init failed", __FILE__, __LINE__);
 
-    CpuTimer cpu_timer;
+    //CpuTimer cpu_timer;
 
     util::GRError(
         problem->Reset(src, enactor->GetFrontierType(),
@@ -225,23 +225,23 @@ void RunTests(GRGraph* output, Test_Parameter *parameter) {
         enactor->Reset(), "BFS Enactor Reset failed", __FILE__, __LINE__);
 
     printf("__________________________\n"); fflush(stdout);
-    cpu_timer.Start();
+    //cpu_timer.Start();
 
     util::GRError(
         enactor->Enact(src, traversal_mode),
         "BFS Problem Enact Failed", __FILE__, __LINE__);
 
-    cpu_timer.Stop();
+    //cpu_timer.Stop();
     printf("--------------------------\n"); fflush(stdout);
-    float elapsed = cpu_timer.ElapsedMillis();
+    //float elapsed = cpu_timer.ElapsedMillis();
 
     // Copy out results
     util::GRError(
         problem->Extract(h_labels, h_preds),
         "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    output->node_value1 = (int*)&h_labels[0];
-    if (MARK_PREDECESSORS) output->node_value2 = (int*)&h_preds[0];
+    output->node_value1 = (Value*)&h_labels[0];
+    if (MARK_PREDECESSORS) output->node_value2 = (VertexId*)&h_preds[0];
 
     // Clean up
     if (org_size) delete[] org_size; org_size = NULL;
@@ -259,7 +259,7 @@ void RunTests(GRGraph* output, Test_Parameter *parameter) {
  * @param[in]  context  ModernGPU context
  * @param[in]  stream   CudaStream
  */
-void dispatch(
+void dispatch_bfs(
     GRGraph*       graph_o,
     const GRGraph* graph_i,
     const GRSetup  config,
@@ -380,7 +380,7 @@ void gunrock_bfs(
     }
     printf("\n");
 
-    dispatch(graph_o, graph_i, config, data_t, context, streams);
+    dispatch_bfs(graph_o, graph_i, config, data_t, context, streams);
 }
 
 /*
@@ -412,8 +412,8 @@ void bfs(
     config.num_devices = sizeof(list) / sizeof(list[0]);
     config.source_mode = manually;      // manually setting source
     config.source_vertex = source;      // source vertex to start
-    config.mark_predecessors  = false;  // do not mark predecessors                                        
-    config.enable_idempotence = false;  // wether enable idempotence                                      
+    config.mark_predecessors  = false;  // do not mark predecessors
+    config.enable_idempotence = false;  // wether enable idempotence
     config.max_queue_sizing  = 1.0f;    // maximum queue size factor
 
     struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
