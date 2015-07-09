@@ -22,9 +22,9 @@ set(HFILES_PUBLIC
 set(CUFILES
   app/bfs/bfs_app.cu
   app/bc/bc_app.cu
-  #app/cc/cc_app.cu
-  #app/sssp/sssp_app.cu
+  app/cc/cc_app.cu
   #app/pr/pr_app.cu
+  #app/sssp/sssp_app.cu
   #graphio/generator.cu
   util/test_utils.cu
   util/error_utils.cu

@@ -63,6 +63,7 @@ struct GRGraph {
     void *edge_value1;  // associated values per edge
     void *node_value2;  // associated values per node
     void *edge_value2;  // associated values per edge
+    //void  aggregation;  // global reduced aggregation
 };
 
 /**
@@ -100,15 +101,15 @@ extern "C" {
  * @brief R-MAT graph generator
  */
 void rmat_graph(
-    int rows[],
-    int cols[],
-    unsigned int vals[],
-    int nodes,
-    int edges,
-    bool undirected,
-    float a,   // default for rmat 0.57
-    float b,   // default for rmat 0.19
-    float c);  // default for rmat 0.19
+    int          row_offsets[],
+    int          col_indices[],
+    unsigned int edge_values[],
+    int           number_nodes,
+    int           number_edges,
+    bool         is_undirected,
+    float     rmat_parameter_a,   // default for rmat 0.57
+    float     rmat_parameter_b,   // default for rmat 0.19
+    float     rmat_parameter_c);  // default for rmat 0.19
 
 /**
  * breath-first search
@@ -149,7 +150,6 @@ void bc(
  */
 void gunrock_cc(
     struct GRGraph*       graph_o,
-    unsigned int*         components,
     const struct GRGraph* graph_i,
     const struct GRSetup  config,
     const struct GRTypes  data_t);
