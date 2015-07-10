@@ -75,6 +75,7 @@ set(GENCODE_SM13 -gencode=arch=compute_13,code=sm_13 -gencode=arch=compute_13,co
 set(GENCODE_SM20 -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_20,code=compute_20)
 set(GENCODE_SM30 -gencode=arch=compute_30,code=sm_30 -gencode=arch=compute_30,code=compute_30)
 set(GENCODE_SM35 -gencode=arch=compute_35,code=sm_35 -gencode=arch=compute_35,code=compute_35)
+set(GENCODE_SM37 -gencode=arch=compute_37,code=sm_37 -gencode=arch=compute_37,code=compute_37)
 set(GENCODE_SM50 -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_50,code=compute_50)
 
 #set(GENCODE -gencode=arch=compute_10,code=compute_10) # at least generate PTX
@@ -111,6 +112,10 @@ option(GUNROCK_GENCODE_SM35
   "ON to generate code for Compute Capability 3.5 devices (e.g. Tesla K20)"
   OFF)
 
+option(GUNROCK_GENCODE_SM37
+  "ON to generate code for Compute Capability 3.7 devices (e.g. Tesla K80)"
+  OFF)
+
 option(GUNROCK_GENCODE_SM50
   "ON to generate code for Compute Capability 5.0 devices (e.g. GeForce GTX 750 TI)"
   OFF)
@@ -138,6 +143,10 @@ endif(GUNROCK_GENCODE_SM30)
 if (GUNROCK_GENCODE_SM35)
   set(GENCODE ${GENCODE} ${GENCODE_SM35})
 endif(GUNROCK_GENCODE_SM35)
+
+if (GUNROCK_GENCODE_SM37)
+  set(GENCODE ${GENCODE} ${GENCODE_SM37})
+endif(GUNROCK_GENCODE_SM37)
 
 if (GUNROCK_GENCODE_SM50)
   set(GENCODE ${GENCODE} ${GENCODE_SM50})
