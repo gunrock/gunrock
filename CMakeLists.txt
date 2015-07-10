@@ -193,34 +193,54 @@ endif(GUNROCK_BUILD_APPLICATIONS)
 
 enable_testing()
 
-add_test(NAME TestBFS COMMAND test_bfs)
-set_tests_properties(TestBFS
+### primitive tests with bips98_606 graph
+add_test(NAME TEST_BFS COMMAND breadth_first_search market
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
+set_tests_properties(TEST_BFS PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+add_test(NAME TEST_BC COMMAND betweenness_centrality market
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
+set_tests_properties(TEST_BC PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+add_test(NAME TEST_CC COMMAND connected_component market
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx)
+set_tests_properties(TEST_CC PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+add_test(NAME TEST_SSSP COMMAND single_source_shortest_path market
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
+set_tests_properties(TEST_SSSP PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+add_test(NAME TEST_PAGERANK COMMAND pagerank market
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
+set_tests_properties(TEST_PAGERANK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+### shared library application interface tests
+add_test(NAME SHARED_LIB_TEST_BFS COMMAND shared_lib_bfs)
+set_tests_properties(SHARED_LIB_TEST_BFS
   PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*2.*: Label.*1")
 
-add_test(NAME TestBC COMMAND test_bc)
-set_tests_properties(TestBC
-  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*0.*: BC.*0.500000")
+add_test(NAME SHARED_LIB_TEST_BC COMMAND shared_lib_bc)
+set_tests_properties(SHARED_LIB_TEST_BC
+  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*0.*: Score.*0.5000")
 
-add_test(NAME TestCC COMMAND test_cc)
-set_tests_properties(TestCC
-  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*1.*: Component_ID.*0")
+add_test(NAME SHARED_LIB_TEST_CC COMMAND shared_lib_cc)
+set_tests_properties(SHARED_LIB_TEST_CC
+  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*1.*: Component.*0")
 
-add_test(NAME TestSSSP COMMAND test_sssp)
-set_tests_properties(TestSSSP
-  PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*1.*: Label.*39.*: Predecessor.*0")
+add_test(NAME SHARED_LIB_TEST_SSSP COMMAND shared_lib_sssp)
+set_tests_properties(SHARED_LIB_TEST_SSSP
+  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*1.*: Label.*39.*")
 
-add_test(NAME TestPR COMMAND test_pr)
-set_tests_properties(TestPR
-  PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*2.*: Page Rank.*0.357069.")
+add_test(NAME SHARED_LIB_TEST_PAGERANK COMMAND shared_lib_pr)
+set_tests_properties(SHARED_LIB_TEST_PAGERANK
+  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*2.*: Score.*1.2*")
 
-add_test(NAME TestTopK COMMAND test_topk)
-set_tests_properties(TestTopK
-  PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*2.*: in_degrees.*3.*: out_degrees.*3.*")
+#add_test(NAME SimpleExample COMMAND simple_example market
+#    data/simple_example/bips98_606.mtx)
+#set_tests_properties(SimpleExample
+#    PROPERTIES PASS_REGULAR_EXPRESSION "TEST PASSED")
 
-add_test(NAME SimpleExample COMMAND simple_example market data/simple_example/bips98_606.mtx)
-set_tests_properties(SimpleExample
-  PROPERTIES PASS_REGULAR_EXPRESSION "TEST PASSED")
-
-#add_test(NAME TestBFS COMMAND test_bfs market data/simple_example/bips98_606.mtx --src=largestdegree)
+#add_test(NAME TestBFS COMMAND test_bfs market
+#    data/simple_example/bips98_606.mtx --src=largestdegree)
 #set_tests_properties(TestBFS
 #    PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
