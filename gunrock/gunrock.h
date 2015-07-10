@@ -59,6 +59,7 @@ struct GRGraph {
     void *col_indices;  // CSR column indices
     void *col_offsets;  // CSC column offsets
     void *row_indices;  // CSC row indices
+    void *edge_values;  // associated values per edge
     void *node_value1;  // associated values per node
     void *edge_value1;  // associated values per edge
     void *node_value2;  // associated values per node
@@ -90,6 +91,7 @@ struct GRSetup {
     float     pagerank_delta;  // pagerank specific value
     float     pagerank_error;  // pagerank specific value
     float   max_queue_sizing;  // setting frontier queue size
+    int       traversal_mode;  // traversal mode: 0 for LB, 1 TWC
     enum SrcMode source_mode;  // source mode rand/largest_degree
 };
 
@@ -166,7 +168,6 @@ int cc(
  */
 void gunrock_sssp(
     struct GRGraph*       graph_o,
-    void*                 predecessor,
     const struct GRGraph* graph_i,
     const struct GRSetup  config,
     const struct GRTypes  data_t);
