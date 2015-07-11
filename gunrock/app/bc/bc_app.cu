@@ -238,7 +238,7 @@ void RunTests(GRGraph* output, Test_Parameter *parameter) {
     output->node_value1 = (Value*)&h_bc_values[0];
     output->edge_value1 = (Value*)&h_ebc_values[0];
 
-    printf("GPU BC finished in %lf msec.\n", elapsed);
+    printf(" GPU Betweenness Centrality finished in %lf msec.\n", elapsed);
 
     // Clean up
     if (org_size    ) { delete[] org_size    ; org_size     = NULL; }
@@ -394,8 +394,6 @@ void bc(
     const int* row_offsets,
     const int* col_indices,
     const int  source) {
-    printf("-------------------- setting --------------------\n");
-
     struct GRTypes data_t;            // primitive-specific data types
     data_t.VTXID_TYPE = VTXID_INT;    // integer
     data_t.SIZET_TYPE = SIZET_INT;    // integer
@@ -419,14 +417,11 @@ void bc(
 
     printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
 
-    printf("-------------------- running --------------------\n");
     gunrock_bc(graph_o, graph_i, config, data_t);
     memcpy(bc_scores, (float*)graph_o->node_value1, num_nodes * sizeof(float));
 
     if (graph_i) free(graph_i);
     if (graph_o) free(graph_o);
-
-    printf("------------------- completed -------------------\n");
 }
 
 // Leave this at the end of the file

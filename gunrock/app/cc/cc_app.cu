@@ -179,9 +179,11 @@ void runCC(GRGraph* output, Test_Parameter *parameter) {
         problem->Extract(h_component_ids),
         "CC Problem Data Extraction Failed", __FILE__, __LINE__);
 
+    unsigned int num_components = problem->num_components;
+    output->aggregation = (unsigned int*)&num_components;
     output->node_value1 = (VertexId*)&h_component_ids[0];
 
-    printf("GPU Connected Component finished in %lf msec.\n", elapsed);
+    printf(" GPU Connected Component finished in %lf msec.\n", elapsed);
 
     // Clean up
     if (org_size) { delete[] org_size; org_size = NULL; }
@@ -311,19 +313,16 @@ int cc(
     const int  num_edges,
     const int* row_offsets,
     const int* col_indices) {
-    printf("-------------------- setting --------------------\n");
-
     struct GRTypes data_t;          // primitive-specific data types
     data_t.VTXID_TYPE = VTXID_INT;  // integer vertex identifier
     data_t.SIZET_TYPE = SIZET_INT;  // integer graph size type
     data_t.VALUE_TYPE = VALUE_INT;  // integer attributes type
 
     struct GRSetup config;          // primitive-specific configures
-    int list[] = {0};               // device to run algorithm
+    int list[] = {0, 1, 2, 3};      // device to run algorithm
     config.num_devices = sizeof(list) / sizeof(list[0]);  // number of devices
     config.device_list = list;      // device list to run algorithm
 
-    unsigned int num_components = 0;
     struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graph_i = (struct GRGraph*)malloc(sizeof(struct GRGraph));
 
@@ -334,15 +333,14 @@ int cc(
 
     printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
 
-    printf("-------------------- running --------------------\n");
     gunrock_cc(graph_o, graph_i, config, data_t);
+    int* num_components = (int*)graph_o->aggregation;
     memcpy(component, (int*)graph_o->node_value1, num_nodes * sizeof(int));
 
     if (graph_i) free(graph_i);
     if (graph_o) free(graph_o);
 
-    printf("------------------- completed -------------------\n");
-    return num_components;
+    return *num_components;
 }
 
 // Leave this at the end of the file

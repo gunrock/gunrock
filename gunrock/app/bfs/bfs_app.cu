@@ -243,6 +243,8 @@ void RunTests(GRGraph* output, Test_Parameter *parameter) {
     output->node_value1 = (Value*)&h_labels[0];
     if (MARK_PREDECESSORS) output->node_value2 = (VertexId*)&h_preds[0];
 
+    printf(" GPU Breath-First Search finished in %lf msec.\n", elapsed);
+
     // Clean up
     if (org_size) delete[] org_size; org_size = NULL;
     if (enactor ) delete   enactor ; enactor  = NULL;
@@ -399,16 +401,14 @@ void bfs(
     const int* row_offsets,
     const int* col_indices,
     const int  source) {
-    printf("-------------------- setting --------------------\n");
-
     struct GRTypes data_t;          // primitive-specific data types
     data_t.VTXID_TYPE = VTXID_INT;  // integer
     data_t.SIZET_TYPE = SIZET_INT;  // integer
     data_t.VALUE_TYPE = VALUE_INT;  // integer
 
     struct GRSetup config;          // primitive-specific configures
-    int list[] = {0};               // use GPU 0 as default device
-    config.device_list = list;
+    int list[] = {0, 1, 2, 3};      // default device to run algorithm
+    config.device_list = list;      // default device to run algorithm
     config.num_devices = sizeof(list) / sizeof(list[0]);
     config.source_mode = manually;      // manually setting source
     config.source_vertex = source;      // source vertex to start
@@ -426,14 +426,11 @@ void bfs(
 
     printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
 
-    printf("-------------------- running --------------------\n");
     gunrock_bfs(graph_o, graph_i, config, data_t);
     memcpy(bfs_label, (int*)graph_o->node_value1, num_nodes * sizeof(int));
 
     if (graph_i) free(graph_i);
     if (graph_o) free(graph_o);
-
-    printf("------------------- completed -------------------\n");
 }
 
 // Leave this at the end of the file

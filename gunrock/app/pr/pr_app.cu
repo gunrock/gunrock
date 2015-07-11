@@ -218,10 +218,12 @@ void runPageRank(GRGraph *output, Test_Parameter *parameter) {
     for (int i = 0; i < graph->nodes; ++i) {
         total_pr += h_rank[i];
     }
-    printf("Total rank : %f\n", total_pr);
+    printf(" Total rank : %lf\n", total_pr);
 
     output->node_value1 = (Value*)&h_rank[0];
     output->node_value2 = (VertexId*)&h_node_id[0];
+
+    printf(" GPU PageRank finished in %lf msec.\n", elapsed);
 
     // Clean up
     if (org_size) { delete org_size; org_size = NULL; }
@@ -361,8 +363,6 @@ void pagerank(
     const int           num_edges,
     const int*          row_offsets,
     const int*          col_indices) {
-    printf("-------------------- setting --------------------\n");
-
     struct GRTypes data_t;            // primitive-specific data types
     data_t.VTXID_TYPE = VTXID_INT;    // integer
     data_t.SIZET_TYPE = SIZET_INT;    // integer
@@ -387,13 +387,12 @@ void pagerank(
 
     printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
 
-    printf("-------------------- running --------------------\n");
     gunrock_pagerank(graph_o, graph_i, config, data_t);
+    memcpy(pagerank, (float*)graph_o->node_value1, num_nodes * sizeof(float));
+    memcpy(node_ids, (  int*)graph_o->node_value2, num_nodes * sizeof(  int));
 
     if (graph_i) free(graph_i);
     if (graph_o) free(graph_o);
-
-    printf("------------------- completed -------------------\n");
 }
 
 // Leave this at the end of the file
