@@ -53,6 +53,7 @@ struct GRTypes {
  * @brief GunrockGraph as a standard graph interface
  */
 struct GRGraph {
+
     size_t  num_nodes;  // number of nodes in graph
     size_t  num_edges;  // number of edges in graph
     void *row_offsets;  // CSR row offsets
@@ -60,11 +61,12 @@ struct GRGraph {
     void *col_offsets;  // CSC column offsets
     void *row_indices;  // CSC row indices
     void *edge_values;  // associated values per edge
+
     void *node_value1;  // associated values per node
     void *edge_value1;  // associated values per edge
     void *node_value2;  // associated values per node
     void *edge_value2;  // associated values per edge
-    //void  aggregation;  // global reduced aggregation
+    void *aggregation;  // global reduced aggregation
 };
 
 /**
@@ -196,6 +198,7 @@ void pagerank(
     const int* row_offsets,
     const int* col_indices);
 
+/*
 // degree centrality
 void gunrock_topk(
     struct  GRGraph*      graph_o,
@@ -219,6 +222,7 @@ void mst(
     const int  num_edges,
     const int* row_offsets,
     const int* col_indices);
+*/
 
 // TODO(ydwu): Add other primitives
 

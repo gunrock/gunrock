@@ -37,3 +37,6 @@ cuda_add_library(gunrock ${LIB_TYPE}
   ${HFILES_PUBLIC}
   ${CUFILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
+
+target_link_libraries(gunrock ${Boost_LIBRARIES})
+target_link_libraries(gunrock ${METIS_LIBRARY})
