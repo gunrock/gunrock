@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
     config.enable_idempotence = false;     // wether enable idempotence
     config.max_queue_sizing   =  1.0f;     // maximum queue sizing factor
 
-    size_t num_nodes = 7, num_edges = 15;  // number of nodes and edges
+    int num_nodes = 7, num_edges = 15;  // number of nodes and edges
     int row_offsets[8]  = {0, 3, 6, 9, 11, 14, 15, 15};
     int col_indices[15] = {1, 2, 3, 0, 2, 4, 3, 4, 5, 5, 6, 2, 5, 6, 6};
 
@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
     ////////////////////////////////////////////////////////////////////////////
     int *labels = (int*)malloc(sizeof(int) * graph_i->num_nodes);
     labels = (int*)graph_o->node_value1;
-    size_t node; for (node = 0; node < graph_i->num_nodes; ++node)
+    int node; for (node = 0; node < graph_i->num_nodes; ++node)
         printf("Node_ID [%d] : Label [%d]\n", node, labels[node]);
 
     if (graph_i) free(graph_i);

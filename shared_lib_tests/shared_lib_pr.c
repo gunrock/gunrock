@@ -22,8 +22,7 @@ int main(int argc, char* argv[]) {
     config.max_iters      =    50;         // maximum number of iterations
     config.top_nodes      =     7;         // number of top nodes
 
-    size_t num_nodes = 7;
-    size_t num_edges = 26;
+    int num_nodes = 7, num_edges = 26;
     int row_offsets[8]  = {0, 3, 6, 11, 15, 19, 23, 26};
     int col_indices[26] = {1, 2, 3, 0, 2, 4, 0, 1, 3, 4, 5, 0, 2,
                          5, 6, 1, 2, 5, 6, 2, 3, 4, 6, 3, 4, 5};
@@ -42,7 +41,7 @@ int main(int argc, char* argv[]) {
     float *top_ranks = (float*)malloc(sizeof(float) * graph_i->num_nodes);
     top_nodes = (  int*)graph_o->node_value2;
     top_ranks = (float*)graph_o->node_value1;
-    size_t node; for (node = 0; node < config.top_nodes; ++node)
+    int node; for (node = 0; node < config.top_nodes; ++node)
         printf("Node_ID [%d] : Score: [%f]\n", top_nodes[node],top_ranks[node]);
 
     if (graph_i) free(graph_i);
