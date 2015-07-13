@@ -102,20 +102,6 @@ extern "C" {
 #endif
 
 /**
- * @brief R-MAT graph generator
- */
-void rmat_graph(
-    int          row_offsets[],
-    int          col_indices[],
-    unsigned int edge_values[],
-    int           number_nodes,
-    int           number_edges,
-    bool         is_undirected,
-    float     rmat_parameter_a,   // default for rmat 0.57
-    float     rmat_parameter_b,   // default for rmat 0.19
-    float     rmat_parameter_c);  // default for rmat 0.19
-
-/**
  * breath-first search
  */
 void gunrock_bfs(
