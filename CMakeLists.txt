@@ -230,6 +230,14 @@ add_test(NAME TEST_PAGERANK COMMAND pagerank market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
 set_tests_properties(TEST_PAGERANK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
+add_test(NAME TEST_DOBFS COMMAND direction_optimizing_bfs market
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
+set_tests_properties(TEST_DOBFS PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+add_test(NAME TEST_TOPK COMMAND degree_centrality market
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
+set_tests_properties(TEST_TOPK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
 ### shared library application interface tests
 add_test(NAME SHARED_LIB_TEST_BFS COMMAND shared_lib_bfs)
 set_tests_properties(SHARED_LIB_TEST_BFS
