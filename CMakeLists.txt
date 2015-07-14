@@ -70,12 +70,20 @@ set(LIBRARY_OUTPUT_PATH
   CACHE PATH
   "Directory where all the libraries will be stored")
 
-set(GENCODE_SM10 -gencode=arch=compute_10,code=sm_10 -gencode=arch=compute_10,code=compute_10)
-set(GENCODE_SM13 -gencode=arch=compute_13,code=sm_13 -gencode=arch=compute_13,code=compute_13)
-set(GENCODE_SM20 -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_20,code=compute_20)
-set(GENCODE_SM30 -gencode=arch=compute_30,code=sm_30 -gencode=arch=compute_30,code=compute_30)
-set(GENCODE_SM35 -gencode=arch=compute_35,code=sm_35 -gencode=arch=compute_35,code=compute_35)
-set(GENCODE_SM50 -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_50,code=compute_50)
+set(GENCODE_SM10
+  -gencode=arch=compute_10,code=sm_10 -gencode=arch=compute_10,code=compute_10)
+set(GENCODE_SM13
+  -gencode=arch=compute_13,code=sm_13 -gencode=arch=compute_13,code=compute_13)
+set(GENCODE_SM20
+  -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_20,code=compute_20)
+set(GENCODE_SM30
+  -gencode=arch=compute_30,code=sm_30 -gencode=arch=compute_30,code=compute_30)
+set(GENCODE_SM35
+  -gencode=arch=compute_35,code=sm_35 -gencode=arch=compute_35,code=compute_35)
+set(GENCODE_SM37
+  -gencode=arch=compute_37,code=sm_37 -gencode=arch=compute_37,code=compute_37)
+set(GENCODE_SM50
+  -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_50,code=compute_50)
 
 #set(GENCODE -gencode=arch=compute_10,code=compute_10) # at least generate PTX
 
@@ -111,6 +119,10 @@ option(GUNROCK_GENCODE_SM35
   "ON to generate code for Compute Capability 3.5 devices (e.g. Tesla K20)"
   OFF)
 
+option(GUNROCK_GENCODE_SM37
+  "ON to generate code for Compute Capability 3.7 devices (e.g. Tesla K80)"
+  OFF)
+
 option(GUNROCK_GENCODE_SM50
   "ON to generate code for Compute Capability 5.0 devices (e.g. GeForce GTX 750 TI)"
   OFF)
@@ -138,6 +150,10 @@ endif(GUNROCK_GENCODE_SM30)
 if (GUNROCK_GENCODE_SM35)
   set(GENCODE ${GENCODE} ${GENCODE_SM35})
 endif(GUNROCK_GENCODE_SM35)
+
+if (GUNROCK_GENCODE_SM37)
+  set(GENCODE ${GENCODE} ${GENCODE_SM37})
+endif(GUNROCK_GENCODE_SM37)
 
 if (GUNROCK_GENCODE_SM50)
   set(GENCODE ${GENCODE} ${GENCODE_SM50})
@@ -174,51 +190,73 @@ if(GUNROCK_BUILD_LIB)
 endif(GUNROCK_BUILD_LIB)
 
 if(GUNROCK_BUILD_APPLICATIONS)
-  #add_subdirectory(shared_lib_tests)
+  add_subdirectory(shared_lib_tests)
   #add_subdirectory(simple_example)
   add_subdirectory(tests/bc)
   add_subdirectory(tests/bfs)
   add_subdirectory(tests/cc)
   add_subdirectory(tests/pr)
   add_subdirectory(tests/sssp)
-  #add_subdirectory(tests/mst)
   add_subdirectory(tests/dobfs)
   add_subdirectory(tests/hits)
   add_subdirectory(tests/salsa)
   add_subdirectory(tests/wtf)
   add_subdirectory(tests/topk)
+  #add_subdirectory(tests/mst)
+  #add_subdirectory(tests/mis)
+  #add_subdirectory(tests/vis)
 endif(GUNROCK_BUILD_APPLICATIONS)
 
 enable_testing()
 
-add_test(NAME TestBFS COMMAND test_bfs)
-set_tests_properties(TestBFS
+### primitive tests with bips98_606 graph
+add_test(NAME TEST_BFS COMMAND breadth_first_search market
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
+set_tests_properties(TEST_BFS PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+add_test(NAME TEST_BC COMMAND betweenness_centrality market
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
+set_tests_properties(TEST_BC PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+add_test(NAME TEST_CC COMMAND connected_component market
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx)
+set_tests_properties(TEST_CC PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+add_test(NAME TEST_SSSP COMMAND single_source_shortest_path market
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
+set_tests_properties(TEST_SSSP PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+add_test(NAME TEST_PAGERANK COMMAND pagerank market
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
+set_tests_properties(TEST_PAGERANK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+### shared library application interface tests
+add_test(NAME SHARED_LIB_TEST_BFS COMMAND shared_lib_bfs)
+set_tests_properties(SHARED_LIB_TEST_BFS
   PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*2.*: Label.*1")
 
-add_test(NAME TestBC COMMAND test_bc)
-set_tests_properties(TestBC
-  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*0.*: BC.*0.500000")
+add_test(NAME SHARED_LIB_TEST_BC COMMAND shared_lib_bc)
+set_tests_properties(SHARED_LIB_TEST_BC
+  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*0.*: Score.*0.5000")
 
-add_test(NAME TestCC COMMAND test_cc)
-set_tests_properties(TestCC
-  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*1.*: Component_ID.*0")
+add_test(NAME SHARED_LIB_TEST_CC COMMAND shared_lib_cc)
+set_tests_properties(SHARED_LIB_TEST_CC
+  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*1.*: Component.*0")
 
-add_test(NAME TestSSSP COMMAND test_sssp)
-set_tests_properties(TestSSSP
-  PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*1.*: Label.*39.*: Predecessor.*0")
+add_test(NAME SHARED_LIB_TEST_SSSP COMMAND shared_lib_sssp)
+set_tests_properties(SHARED_LIB_TEST_SSSP
+  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*1.*: Label.*39.*")
 
-add_test(NAME TestPR COMMAND test_pr)
-set_tests_properties(TestPR
-  PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*2.*: Page Rank.*0.357069.")
+add_test(NAME SHARED_LIB_TEST_PAGERANK COMMAND shared_lib_pr)
+set_tests_properties(SHARED_LIB_TEST_PAGERANK
+  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*2.*: Score.*1.2*")
 
-add_test(NAME TestTopK COMMAND test_topk)
-set_tests_properties(TestTopK
-  PROPERTIES PASS_REGULAR_EXPRESSION "Node ID.*2.*: in_degrees.*3.*: out_degrees.*3.*")
+#add_test(NAME SimpleExample COMMAND simple_example market
+#    data/simple_example/bips98_606.mtx)
+#set_tests_properties(SimpleExample
+#    PROPERTIES PASS_REGULAR_EXPRESSION "TEST PASSED")
 
-add_test(NAME SimpleExample COMMAND simple_example market data/simple_example/bips98_606.mtx)
-set_tests_properties(SimpleExample
-  PROPERTIES PASS_REGULAR_EXPRESSION "TEST PASSED")
-
-#add_test(NAME TestBFS COMMAND test_bfs market data/simple_example/bips98_606.mtx --src=largestdegree)
+#add_test(NAME TestBFS COMMAND test_bfs market
+#    data/simple_example/bips98_606.mtx --src=largestdegree)
 #set_tests_properties(TestBFS
 #    PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")

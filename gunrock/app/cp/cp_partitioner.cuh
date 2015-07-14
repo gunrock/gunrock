@@ -26,32 +26,32 @@
 namespace gunrock {
 namespace app {
 namespace cp {
-    
+
     template <typename SizeT>
     struct sort_node
-    {   
+    {
     public:
         SizeT posit;
         int   value;
-    
+
         bool operator==(const sort_node& node) const
-        {   
+        {
             return (node.value == value);
-        }   
+        }
 
         bool operator<(const sort_node& node) const
-        {   
+        {
             return (node.value < value);
-        }   
-    
+        }
+
         sort_node & operator=(const sort_node &rhs)
-        {   
+        {
             this->posit=rhs.posit;
             this->value=rhs.value;
             return *this;
-        }   
+        }
     };
-    
+
     template <typename SizeT>
     bool compare_sort_node(sort_node<SizeT> A, sort_node<SizeT> B)
     {
@@ -129,8 +129,8 @@ struct ClusterPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD
         int*        tpartition_table=this->partition_tables[0];
         SizeT       nodes  = this->graph->nodes;
         sort_node<SizeT> *sort_list = new sort_node<SizeT>[nodes];
-        VertexId    *t_queue = new VertexId[nodes];
-        VertexId    *marker = new VertexId[nodes];
+        VertexId    *t_queue = new VertexId[this->graph->nodes];
+        VertexId    *marker = new VertexId[this->graph->nodes];
         SizeT       total_count = 0, current=0, tail = 0, level = 0, target_level;
         SizeT       *counter = new SizeT[this->num_gpus+1];
         SizeT       n1 = 1, n2 = 1;
@@ -187,13 +187,13 @@ struct ClusterPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD
                         if (marker[neibor]==node) continue;
                         if (tpartition_table[neibor]<this->num_gpus)
                         {
-                            if (level < n1) 
+                            if (level < n1)
                             {
                                 counter[tpartition_table[neibor]]++;
                                 total_count++;
                             }
                         } else {
-                            if (level < n2) 
+                            if (level < n2)
                             {
                                 counter[this->num_gpus]++;
                                 tpartition_table[neibor]=this->num_gpus+1;
@@ -220,7 +220,7 @@ struct ClusterPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD
                 Max_GPU  =i;
             }
             //printf("Max_Count = %d, total_count = %d",Max_Count,total_count);
-            if (Max_GPU != -1 && 1.0*Max_Count/total_count > this->factor 
+            if (Max_GPU != -1 && 1.0*Max_Count/total_count > this->factor
             && current_count[Max_GPU]+counter[this->num_gpus] <= nodes*weitage[Max_GPU])
                 Set_GPU = Max_GPU;
             else {
@@ -233,11 +233,11 @@ struct ClusterPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD
                 }
                 //printf(", max_empty = %f", max_empty);
             }
-  
+
             //printf(", Set_GPU = %d, tail = %d\n", Set_GPU, level_tail[n2]);fflush(stdout);
             for (VertexId i=0;i<=level_tail[n2];i++)
             if (tpartition_table[t_queue[i]]==this->num_gpus+1)
-            { 
+            {
                 tpartition_table[t_queue[i]]=Set_GPU;
                 //printf("%d->%d \t",t_queue[i],Set_GPU);
             }

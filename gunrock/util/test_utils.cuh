@@ -262,8 +262,8 @@ void DisplayDeviceResults(
     size_t num_elements,
     size_t num_indices)
 {
-    printf("num_elements:%d\n", num_elements);
-    printf("num_indices:%d\n", num_indices);
+    printf("num_elements: %zu\n", num_elements);
+    printf("num_indices: %zu\n", num_indices);
     // Allocate array on host
     DATATYPE *h_data = (DATATYPE*) malloc(num_elements * sizeof(DATATYPE));
     INDEXTYPE *h_indices = (INDEXTYPE*) malloc(num_indices * sizeof(INDEXTYPE));
@@ -461,7 +461,7 @@ int CompareResults(
                 is_right = false;
             }
         }
-        
+
         if (!is_right)
         {
             printf("\nINCORRECT: [%lu]: ", (unsigned long) i);

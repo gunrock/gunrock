@@ -53,14 +53,20 @@ struct GRTypes {
  * @brief GunrockGraph as a standard graph interface
  */
 struct GRGraph {
+
     size_t  num_nodes;  // number of nodes in graph
     size_t  num_edges;  // number of edges in graph
     void *row_offsets;  // CSR row offsets
     void *col_indices;  // CSR column indices
     void *col_offsets;  // CSC column offsets
     void *row_indices;  // CSC row indices
-    void *node_values;  // associated values per node
     void *edge_values;  // associated values per edge
+
+    void *node_value1;  // associated values per node
+    void *edge_value1;  // associated values per edge
+    void *node_value2;  // associated values per node
+    void *edge_value2;  // associated values per edge
+    void *aggregation;  // global reduced aggregation
 };
 
 /**
@@ -76,17 +82,19 @@ enum SrcMode {
  * @brief arguments configuration used to specify arguments
  */
 struct GRSetup {
-    bool        mark_pred;  // whether to mark predecessor or not
-    bool      idempotence;  // whether or not to enable idempotent
-    int          src_node;  // source vertex define where to start
-    int            device;  // setting which device to use
-    int          max_iter;  // maximum number of iterations allowed
-    int         top_nodes;  // k value for top k / pagerank problem
-    int      delta_factor;  // sssp delta-factor parameter
-    float           delta;  // pagerank specific value
-    float           error;  // pagerank specific value
-    float      queue_size;  // setting frontier queue size
-    enum SrcMode src_mode;  // source mode rand/largest_degree
+    bool   mark_predecessors;  // whether to mark predecessor or not
+    bool  enable_idempotence;  // whether or not to enable idempotent
+    int        source_vertex;  // source vertex define where to start
+    int         delta_factor;  // sssp delta-factor parameter
+    int*         device_list;  // setting which device(s) to use
+    unsigned int num_devices;  // number of devices for computation
+    unsigned int   max_iters;  // maximum number of iterations allowed
+    unsigned int   top_nodes;  // k value for top k / pagerank problem
+    float     pagerank_delta;  // pagerank specific value
+    float     pagerank_error;  // pagerank specific value
+    float   max_queue_sizing;  // setting frontier queue size
+    int       traversal_mode;  // traversal mode: 0 for LB, 1 TWC
+    enum SrcMode source_mode;  // source mode rand/largest_degree
 };
 
 #ifdef __cplusplus
@@ -132,7 +140,6 @@ void bc(
  */
 void gunrock_cc(
     struct GRGraph*       graph_o,
-    unsigned int*         components,
     const struct GRGraph* graph_i,
     const struct GRSetup  config,
     const struct GRTypes  data_t);
@@ -149,7 +156,6 @@ int cc(
  */
 void gunrock_sssp(
     struct GRGraph*       graph_o,
-    void*                 predecessor,
     const struct GRGraph* graph_i,
     const struct GRSetup  config,
     const struct GRTypes  data_t);
@@ -166,8 +172,6 @@ void sssp(
 // pagerank
 void gunrock_pagerank(
     struct GRGraph*       graph_o,
-    void*                 node_ids,
-    void*                 pagerank,
     const struct GRGraph* graph_i,
     const struct GRSetup  config,
     const struct GRTypes  data_t);
@@ -180,6 +184,7 @@ void pagerank(
     const int* row_offsets,
     const int* col_indices);
 
+/*
 // degree centrality
 void gunrock_topk(
     struct  GRGraph*      graph_o,
@@ -203,6 +208,7 @@ void mst(
     const int  num_edges,
     const int* row_offsets,
     const int* col_indices);
+*/
 
 // TODO(ydwu): Add other primitives
 

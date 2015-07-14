@@ -19,7 +19,7 @@ edges = len(col_list)
 scores = pointer((c_float * nodes)())
 
 ### call gunrock function on device
-gunrock.bc(scores, nodes, edges, row, col, -1)
+gunrock.bc(scores, nodes, edges, row, col, 0)
 
 ### sample results
 print ' node bc scores:',
