@@ -278,12 +278,19 @@ template<
 void SimpleReferenceBfs(
     const Csr<VertexId, Value, SizeT>       &graph,
     VertexId                                *source_path,
-    VertexId                                src)
+    VertexId                                src,
+    bool                                    enable_idempotence)
 {
     // Initialize distances
+    if (enable_idempotence)
     for (VertexId i = 0; i < graph.nodes; ++i)
     {
         source_path[i] = -1;
+    }
+    else
+    for (VertexId i = 0; i < graph.nodes; ++i)
+    {
+        source_path[i] = util::MaxValue<VertexId>() -1;
     }
     source_path[src] = 0;
     VertexId search_depth = 0;
@@ -314,7 +321,7 @@ void SimpleReferenceBfs(
         {
             //Lookup neighbor and enqueue if undiscovered
             VertexId neighbor = graph.column_indices[edge];
-            if (source_path[neighbor] == -1)
+            if (source_path[neighbor] == -1 || source_path[neighbor] == util::MaxValue<VertexId>()-1)
             {
                 source_path[neighbor] = neighbor_dist;
                 if (search_depth < neighbor_dist)
@@ -433,7 +440,8 @@ void RunTests(Test_Parameter *parameter)
         SimpleReferenceBfs(
                 *graph,
                 reference_check,
-                src);
+                src,
+                ENABLE_IDEMPOTENCE);
         printf("\n");
     }
 
