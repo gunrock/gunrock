@@ -151,6 +151,42 @@ struct Csr {
         }
     }
 
+    void WriteCSR(char *file_name,
+                  SizeT v, SizeT e,
+                  SizeT    *row_offsets,
+                  VertexId *col_indices,
+                  Value    *edge_values = NULL) {
+        std::cout << file_name << std::endl;
+        char rows[256], cols[256], vals[256];
+
+        sprintf(rows, "%s.rows", file_name);
+        sprintf(cols, "%s.cols", file_name);
+        sprintf(vals, "%s.vals", file_name);
+
+        std::ofstream rows_output(rows);
+        if (rows_output.is_open()) {
+            std::copy(row_offsets, row_offsets + v + 1,
+                std::ostream_iterator<SizeT>(rows_output, "\n"));
+            rows_output.close();
+        }
+
+        std::ofstream cols_output(cols);
+        if (cols_output.is_open()) {
+            std::copy(col_indices, col_indices + e,
+                std::ostream_iterator<VertexId>(cols_output, "\n"));
+            cols_output.close();
+        }
+
+        if (edge_values != NULL) {
+            std::ofstream vals_output(vals);
+            if (vals_output.is_open()) {
+                std::copy(edge_values, edge_values + e,
+                    std::ostream_iterator<Value>(vals_output, "\n"));
+                vals_output.close();
+            }
+        }
+    }
+
     void WriteToLigraFile(char  *file_name, SizeT v, SizeT e, SizeT *row,
                      VertexId *col, Value *edge_values = NULL) {
         char adj_name[256];
@@ -327,12 +363,12 @@ struct Csr {
                     row_offsets[node] = row_offsets[node-1];
                 }
             if (thread_num == 0) edges = edge_offsets[num_threads];
-  
+
             free(new_coo); new_coo = NULL;
         }
 
         row_offsets[nodes] = edges;
-        
+
         time_t mark2 = time(NULL);
         printf("Done converting (%ds).\n", (int)(mark2 - mark1));
 
@@ -340,8 +376,10 @@ struct Csr {
         if (LOAD_EDGE_VALUES) {
             WriteToFile(output_file, nodes, edges,
                         row_offsets, column_indices, edge_values);
+            //WriteCSR(output_file, nodes, edges,
+            //         row_offsets, column_indices, edge_values);
             //WriteToLigraFile(output_file, nodes, edges,
-            //            row_offsets, column_indices, edge_values);
+            //                 row_offsets, column_indices, edge_values);
         } else {
             WriteToFile(output_file, nodes, edges,
                         row_offsets, column_indices);
@@ -430,32 +468,32 @@ struct Csr {
         }
     }
 
-    void DisplayGraph(const char name[], SizeT limit = 40) 
-    {   
+    void DisplayGraph(const char name[], SizeT limit = 40)
+    {
         SizeT displayed_node_num = (nodes > limit) ? limit: nodes;
         printf("%s : #nodes = ",name); util::PrintValue(nodes);
         printf(", #edges = "); util::PrintValue(edges);
         //printf("\n  row_offsets = ");
         printf("\n");
-        /*for (SizeT i=0;i<=displayed_node_num;i++) 
-        {   
+        /*for (SizeT i=0;i<=displayed_node_num;i++)
+        {
             if (i!=0) printf(", ");
             util::PrintValue(row_offsets[i]);
-        }   
+        }
 
         if (node_values != NULL)
-        {   
+        {
             printf("\n  node_values = ");
             for (SizeT i=0;i<displayed_node_num;i++)
-            {   
+            {
                 if (i!=0) printf(", ");
-                util::PrintValue(node_values[i]); 
-            }   
-        }*/   
- 
+                util::PrintValue(node_values[i]);
+            }
+        }*/
+
         //printf("\n  edges = ");
         for (SizeT i=0;i<displayed_node_num;i++)
-        {  
+        {
             util::PrintValue(i);
             printf(",");
             util::PrintValue(row_offsets[i]);
@@ -466,7 +504,7 @@ struct Csr {
             }
             printf(" (");
             for (SizeT j=row_offsets[i];j<row_offsets[i+1];j++)
-            {   
+            {
                 if (j!=row_offsets[i]) printf(" , ");
                 util::PrintValue(column_indices[j]);
                 if (edge_values != NULL)
@@ -474,27 +512,27 @@ struct Csr {
                     printf(",");
                     util::PrintValue(edge_values[j]);
                 }
-            }   
+            }
             printf(")\n");
-        }   
-    
+        }
+
         /*if (edge_values != NULL)
-        {   
+        {
             printf("\n edge_values = ");
             for (SizeT i=0;i<displayed_node_num;i++)
-            {   
+            {
                 printf("(");
                 for (SizeT j=row_offsets[i];j<row_offsets[i+1];j++)
-                {   
+                {
                     if (j!=row_offsets[i]) printf(", ");
                     util::PrintValue(edge_values[j]);
-                }   
+                }
                 printf(") ");
-            }   
-        }*/   
+            }
+        }*/
 
         printf("\n");
-    }   
+    }
 
     bool CheckValue()
     {
