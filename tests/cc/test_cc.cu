@@ -45,7 +45,6 @@ using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::cc;
 
-
 /******************************************************************************
  * Defines, constants, globals
  ******************************************************************************/
@@ -68,10 +67,13 @@ bool CCCompare(
     return elem1.histogram > elem2.histogram;
 }
 
+/**
+ * @brief Test_Parameter structure
+ */
 struct Test_Parameter : gunrock::app::TestParameter_Base {
 public:
-     Test_Parameter(){   }
-    ~Test_Parameter(){   }
+     Test_Parameter() { }
+    ~Test_Parameter() { }
 
     void Init(CommandLineArgs &args)
     {
@@ -177,9 +179,7 @@ void DisplaySolution(
  * @tparam VertexId
  * @tparam SizeT
  *
- * @param[in] row_offsets Host-side vector stores row offsets for each node in the graph
- * @param[in] column_indices Host-side vector stores column indices for each edge in the graph
- * @param[in] num_nodes
+ * @param[in]  graph  Reference to the CSR graph we process on
  * @param[out] labels Host-side vector to store the component id for each node in the graph
  *
  * \return Number of connected components in the graph
@@ -235,17 +235,16 @@ void ConvertIDs(
 }
 
 /**
- * @brief Run tests for connected component algorithm
+ * @brief RunTests entry
  *
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
  * @tparam INSTRUMENT
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] max_grid_size Maximum CTA occupancy for CC kernels
- * @param[in] iterations Number of iterations for running the test
- * @param[in] num_gpus Number of GPUs
+ * @param[in] parameter Pointer to test parameter settings
  */
 template <
     typename VertexId,
@@ -451,10 +450,19 @@ void RunTests(Test_Parameter *parameter)
     if (enactor                ) {delete   enactor                ; enactor                 = NULL;}
     if (reference_component_ids) {delete[] reference_component_ids; reference_component_ids = NULL;}
     if (h_component_ids        ) {delete[] h_component_ids        ; h_component_ids         = NULL;}
-
-    //cudaDeviceSynchronize();
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -471,6 +479,16 @@ void RunTests_size_check(Test_Parameter *parameter)
         false> (parameter);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -486,6 +504,15 @@ void RunTests_debug(Test_Parameter *parameter)
         false> (parameter);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -507,8 +534,12 @@ void RunTests_instrumented(Test_Parameter *parameter)
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] args Reference to the command line arguments
+ * @param[in] graph    Pointer to the CSR graph we process on
+ * @param[in] args     Reference to the command line arguments
+ * @param[in] num_gpus Number of GPUs to run algorithm
+ * @param[in] context  CudaContext pointer for ModernGPU APIs
+ * @param[in] gpu_idx  GPU(s) used to run algorithm
+ * @param[in] streams  CUDA streams
  */
 template <
     typename VertexId,

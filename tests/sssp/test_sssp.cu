@@ -50,16 +50,6 @@ using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::sssp;
 
-
-/******************************************************************************
- * Defines, constants, globals
- ******************************************************************************/
-
-//bool g_verbose;
-//bool g_undirected;
-//bool g_quick;
-//bool g_stream_from_host;
-
 /******************************************************************************
  * Housekeeping Routines
  ******************************************************************************/
@@ -100,8 +90,11 @@ void Usage()
 /**
  * @brief Displays the SSSP result (i.e., distance from source)
  *
+ * @tparam VertexId
+ * @tparam SizeT
+ *
  * @param[in] source_path Search depth from the source for each node.
- * @param[in] nodes Number of nodes in the graph.
+ * @param[in] num_nodes Number of nodes in the graph.
  */
 template<typename VertexId, typename SizeT>
 void DisplaySolution (VertexId *source_path, SizeT num_nodes)
@@ -122,7 +115,6 @@ void DisplaySolution (VertexId *source_path, SizeT num_nodes)
 /**
  * Performance/Evaluation statistics
  */
-
 struct Stats {
     const char *name;
     Statistic rate;
@@ -131,12 +123,16 @@ struct Stats {
     Statistic duty;
 
     Stats() : name(NULL), rate(), search_depth(), redundant_work(), duty() {}
-    Stats(const char *name) : name(name), rate(), search_depth(), redundant_work(), duty() {}
+    Stats(const char *name) :
+        name(name), rate(), search_depth(), redundant_work(), duty() {}
 };
 
+/**
+ * @brief Test_Parameter structure
+ */
 struct Test_Parameter : gunrock::app::TestParameter_Base {
 public:
-    //bool          mark_predecessors ;// Whether or not to mark src-distance vs. parent vertices
+    //bool mark_predecessors ;// Mark src-distance vs. parent vertices
     int delta_factor;
     double max_queue_sizing1;
 
@@ -378,15 +374,7 @@ void SimpleReferenceSssp(
  * @tparam INSTRUMENT
  * @tparam MARK_PREDECESSORS
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] src Source node where SSSP starts
- * @param[in] max_grid_size Maximum CTA occupancy
- * @param[in] queue_sizing Scaling factor used in edge mapping
- * @param[in] num_gpus Number of GPUs
- * @param[in] delta_factor Parameter to specify delta in delta-stepping SSSP
- * @param[in] iterations Number of iteration for running the test
- & @param[in] traversal_mode Load-balanced or Dynamic cooperative
- * @param[in] context CudaContext pointer for moderngpu APIs
+ * @param[in] parameter Pointer to test parameter settings
  */
 template <
     typename VertexId,
@@ -589,10 +577,20 @@ void RunTests(Test_Parameter *parameter)
     if (h_labels        ) {delete[] h_labels        ; h_labels         = NULL;}
     if (reference_preds ) {delete[] reference_preds ; reference_preds  = NULL;}
     if (h_preds         ) {delete[] h_preds         ; h_preds          = NULL;}
-
-    //cudaDeviceSynchronize();
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -610,6 +608,17 @@ void RunTests_mark_predecessors(Test_Parameter *parameter)
         false> (parameter);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -626,6 +635,16 @@ void RunTests_size_check(Test_Parameter *parameter)
         false> (parameter);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -641,6 +660,15 @@ void RunTests_debug(Test_Parameter *parameter)
         false> (parameter);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -662,9 +690,12 @@ void RunTests_instrumented(Test_Parameter *parameter)
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] args Reference to the command line arguments
- * @param[in] context CudaContext pointer for moderngpu APIs
+ * @param[in] graph    Pointer to the CSR graph we process on
+ * @param[in] args     Reference to the command line arguments
+ * @param[in] num_gpus Number of GPUs to run algorithm
+ * @param[in] context  CudaContext pointer for ModernGPU APIs
+ * @param[in] gpu_idx  GPU(s) used to run algorithm
+ * @param[in] streams  CUDA streams
  */
 template <
     typename VertexId,

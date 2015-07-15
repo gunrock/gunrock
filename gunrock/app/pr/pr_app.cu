@@ -28,6 +28,9 @@ using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::pr;
 
+/**
+ * @brief Test_Parameter structure
+ */
 struct Test_Parameter : gunrock::app::TestParameter_Base {
   public:
     float    delta          ;  // Delta value for PageRank
@@ -53,6 +56,18 @@ template <
     bool SIZE_CHECK >
 void runPageRank(GRGraph *output, Test_Parameter *parameter);
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ * @tparam DEBUG      Keep debug statics
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -68,6 +83,17 @@ void sizeCheckPageRank(GRGraph *output, Test_Parameter *parameter) {
                     false> (output, parameter);
 }
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -83,15 +109,14 @@ void debugPageRank(GRGraph *output, Test_Parameter *parameter) {
 }
 
 /**
- * @brief RunTests entry
+ * @brief Run test
  *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
+ * @tparam VertexId Vertex identifier type
+ * @tparam Value    Attribute type
+ * @tparam SizeT    Graph size type
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] args Reference to the command line arguments
- * @param[in] context CudaContext pointer for moderngpu APIs
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
  */
 template <
     typename VertexId,
@@ -105,23 +130,17 @@ void runPageRank(GRGraph *output, Test_Parameter* parameter) {
 }
 
 /**
- * @brief Run PR tests
+ * @brief Run test
  *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ * @tparam DEBUG      Keep debug statics
+ * @tparam SIZE_CHECK Enable size check
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] src Source node for personalized PageRank (if any)
- * @param[in] delta Delta value for computing PageRank, usually set to .85
- * @param[in] error Error threshold value
- * @param[in] max_iter Max iteration for Page Rank computing
- * @param[in] max_grid_size Maximum CTA occupancy
- * @param[in] num_gpus Number of GPUs
- * @param[in] iterations Number of iterations for running the test
- * @param[in] context CudaContext for moderngpu to use
- *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
  */
 template <
     typename VertexId,
@@ -232,19 +251,18 @@ void runPageRank(GRGraph *output, Test_Parameter *parameter) {
 }
 
 /**
- * @brief dispatch function to handle data_types
+ * @brief Dispatch function to handle configurations
  *
- * @param[out] graph_o    output of pr problem
- * @param[out] node_ids   output of pr problem
- * @param[out] page_rank  output of pr problem
- * @param[in]  graph_i    GRGraph type input graph
- * @param[in]  config     specific configurations
- * @param[in]  data_t     data type configurations
- * @param[in]  context    moderngpu context
+ * @param[out] grapho  Pointer to output graph structure of the problem
+ * @param[in]  graphi  Pointer to input graph we need to process on
+ * @param[in]  config  Primitive-specific configurations
+ * @param[in]  data_t  Data type configurations
+ * @param[in]  context ModernGPU context
+ * @param[in]  streams CUDA stream
  */
 void dispatchPageRank(
-    GRGraph       *graph_o,
-    const GRGraph *graph_i,
+    GRGraph       *grapho,
+    const GRGraph *graphi,
     const GRSetup  config,
     const GRTypes  data_t,
     ContextPtr*    context,
@@ -275,13 +293,13 @@ void dispatchPageRank(
             case VALUE_FLOAT: {  // template type = <int, float, int>
                 // build input csr format graph
                 Csr<int, int, int> csr(false);
-                csr.nodes = graph_i->num_nodes;
-                csr.edges = graph_i->num_edges;
-                csr.row_offsets    = (int*)graph_i->row_offsets;
-                csr.column_indices = (int*)graph_i->col_indices;
+                csr.nodes = graphi->num_nodes;
+                csr.edges = graphi->num_edges;
+                csr.row_offsets    = (int*)graphi->row_offsets;
+                csr.column_indices = (int*)graphi->col_indices;
                 parameter->graph = &csr;
 
-                runPageRank<int, float, int>(graph_o, parameter);
+                runPageRank<int, float, int>(grapho, parameter);
 
                 // reset for free memory
                 csr.row_offsets    = NULL;
@@ -297,19 +315,17 @@ void dispatchPageRank(
     }
 }
 
-/**
- * @brief run_pr entry
+/*
+ * @brief Entry of gunrock_pagerank function
  *
- * @param[out] graph_o    output of pr problem
- * @param[out] node_ids   output of pr problem
- * @param[out] page_rank  output of pr problem
- * @param[in]  graph_i    input graph need to process on
- * @param[in]  config     gunrock primitive specific configurations
- * @param[in]  data_t     gunrock data_t struct
+ * @param[out] grapho Pointer to output graph structure of the problem
+ * @param[in]  graphi Pointer to input graph we need to process on
+ * @param[in]  config Gunrock primitive specific configurations
+ * @param[in]  data_t Gunrock data type structure
  */
 void gunrock_pagerank(
-    GRGraph       *graph_o,
-    const GRGraph *graph_i,
+    GRGraph       *grapho,
+    const GRGraph *graphi,
     const GRSetup  config,
     const GRTypes  data_t) {
     // GPU-related configurations
@@ -344,11 +360,13 @@ void gunrock_pagerank(
     }
     printf("\n");
 
-    dispatchPageRank(graph_o, graph_i, config, data_t, context, streams);
+    dispatchPageRank(grapho, graphi, config, data_t, context, streams);
 }
 
 /*
  * @brief Simple interface take in CSR arrays as input
+ *
+ * @param[out] node_ids    Return top-ranked vertex IDs
  * @param[out] pagerank    Return PageRank scores per node
  * @param[in]  num_nodes   Number of nodes of the input graph
  * @param[in]  num_edges   Number of edges of the input graph
@@ -364,9 +382,9 @@ void pagerank(
     const int*          row_offsets,
     const int*          col_indices) {
     struct GRTypes data_t;            // primitive-specific data types
-    data_t.VTXID_TYPE = VTXID_INT;    // integer
-    data_t.SIZET_TYPE = SIZET_INT;    // integer
-    data_t.VALUE_TYPE = VALUE_FLOAT;  // float ranks
+    data_t.VTXID_TYPE = VTXID_INT;    // integer vertex identifier
+    data_t.SIZET_TYPE = SIZET_INT;    // integer graph size type
+    data_t.VALUE_TYPE = VALUE_FLOAT;  // float attributes type
 
     struct GRSetup config;            // primitive-specific configures
     int list[] = {0, 1, 2, 3};        // device to run algorithm
@@ -377,22 +395,21 @@ void pagerank(
     config.max_iters      =    50;    // maximum number of iterations
     config.top_nodes      =    10;    // number of top nodes
 
-    struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
-    struct GRGraph *graph_i = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));
 
-    graph_i->num_nodes   = num_nodes;
-    graph_i->num_edges   = num_edges;
-    graph_i->row_offsets = (void*)&row_offsets[0];
-    graph_i->col_indices = (void*)&col_indices[0];
-
+    graphi->num_nodes   = num_nodes;  // setting graph nodes
+    graphi->num_edges   = num_edges;  // setting graph edges
+    graphi->row_offsets = (void*)&row_offsets[0];  // setting row_offsets
+    graphi->col_indices = (void*)&col_indices[0];  // setting col_indices
     printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
 
-    gunrock_pagerank(graph_o, graph_i, config, data_t);
-    memcpy(pagerank, (float*)graph_o->node_value1, num_nodes * sizeof(float));
-    memcpy(node_ids, (  int*)graph_o->node_value2, num_nodes * sizeof(  int));
+    gunrock_pagerank(grapho, graphi, config, data_t);
+    memcpy(pagerank, (float*)grapho->node_value1, num_nodes * sizeof(float));
+    memcpy(node_ids, (  int*)grapho->node_value2, num_nodes * sizeof(  int));
 
-    if (graph_i) free(graph_i);
-    if (graph_o) free(graph_o);
+    if (graphi) free(graphi);
+    if (grapho) free(grapho);
 }
 
 // Leave this at the end of the file

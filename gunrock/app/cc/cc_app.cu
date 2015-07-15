@@ -26,6 +26,9 @@ using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::cc;
 
+/**
+ * @brief Test_Parameter structure
+ */
 struct Test_Parameter : gunrock::app::TestParameter_Base {
   public:
     Test_Parameter()  { }
@@ -41,6 +44,18 @@ template <
     bool SIZE_CHECK >
 void runCC(GRGraph* output, Test_Parameter *parameter);
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ * @tparam DEBUG      Keep debug statics
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -57,6 +72,17 @@ void sizeCheckCC(GRGraph* output, Test_Parameter *parameter) {
               false> (output, parameter);
 }
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -71,6 +97,16 @@ void debugCC(GRGraph* output, Test_Parameter *parameter) {
                     false> (output, parameter);
 }
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId Vertex identifier type
+ * @tparam Value    Attribute type
+ * @tparam SizeT    Graph size type
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -83,17 +119,17 @@ void instrumentedCC(GRGraph* output, Test_Parameter *parameter) {
 }
 
 /**
- * @brief Run tests for connected component algorithm
+ * @brief Run test
  *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ * @tparam DEBUG      Keep debug statics
+ * @tparam SIZE_CHECK Enable size check
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] max_grid_size Maximum CTA occupancy for CC kernels
- * @param[in] iterations Number of iterations for running the test
- * @param[in] num_gpus Number of GPUs
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
  */
 template <
     typename VertexId,
@@ -192,16 +228,18 @@ void runCC(GRGraph* output, Test_Parameter *parameter) {
 }
 
 /**
- * @brief dispatch function to handle data_types
+ * @brief Dispatch function to handle configurations
  *
- * @param[out] graph_o GRGraph type output
- * @param[in]  graph_i GRGraph type input graph
- * @param[in]  config  cc specific configurations
- * @param[in]  data_t  data type configurations
+ * @param[out] grapho  Pointer to output graph structure of the problem
+ * @param[in]  graphi  Pointer to input graph we need to process on
+ * @param[in]  config  Primitive-specific configurations
+ * @param[in]  data_t  Data type configurations
+ * @param[in]  context ModernGPU context
+ * @param[in]  streams CUDA stream
  */
 void dispatch_cc(
-    GRGraph*       graph_o,
-    const GRGraph* graph_i,
+    GRGraph*       grapho,
+    const GRGraph* graphi,
     const GRSetup  config,
     const GRTypes  data_t,
     ContextPtr*    context,
@@ -220,13 +258,13 @@ void dispatch_cc(
             case VALUE_INT: {  // template type = <int, int, int>
                 // build input CSR format graph
                 Csr<int, int, int> csr(false);
-                csr.nodes = graph_i->num_nodes;
-                csr.edges = graph_i->num_edges;
-                csr.row_offsets    = (int*)graph_i->row_offsets;
-                csr.column_indices = (int*)graph_i->col_indices;
+                csr.nodes = graphi->num_nodes;
+                csr.edges = graphi->num_edges;
+                csr.row_offsets    = (int*)graphi->row_offsets;
+                csr.column_indices = (int*)graphi->col_indices;
                 parameter->graph = &csr;
 
-                instrumentedCC<int, int, int>(graph_o, parameter);
+                instrumentedCC<int, int, int>(grapho, parameter);
 
                 // reset for free memory
                 csr.row_offsets    = NULL;
@@ -251,16 +289,16 @@ void dispatch_cc(
 }
 
 /*
- * @brief gunrock_cc function
+ * @brief Entry of gunrock_cc function
  *
- * @param[out] graph_o output subgraph of cc problem
- * @param[in]  graph_i input graph need to process on
- * @param[in]  config  primitive specific configurations
- * @param[in]  data_t  gunrock data_t struct
+ * @param[out] grapho Pointer to output graph structure of the problem
+ * @param[in]  graphi Pointer to input graph we need to process on
+ * @param[in]  config Gunrock primitive specific configurations
+ * @param[in]  data_t Gunrock data type structure
  */
 void gunrock_cc(
-    GRGraph       *graph_o,
-    const GRGraph *graph_i,
+    GRGraph       *grapho,
+    const GRGraph *graphi,
     const GRSetup  config,
     const GRTypes  data_t) {
     // GPU-related configurations
@@ -295,11 +333,12 @@ void gunrock_cc(
     }
     printf("\n");
 
-    dispatch_cc(graph_o, graph_i, config, data_t, context, streams);
+    dispatch_cc(grapho, graphi, config, data_t, context, streams);
 }
 
 /*
  * @brief Simple interface take in CSR arrays as input
+ *
  * @param[out] components  Return component ID for each node
  * @param[out] num_comps   Return number of components calculated
  * @param[in]  num_nodes   Number of nodes of the input graph
@@ -323,22 +362,21 @@ int cc(
     config.num_devices = sizeof(list) / sizeof(list[0]);  // number of devices
     config.device_list = list;      // device list to run algorithm
 
-    struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
-    struct GRGraph *graph_i = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));
 
-    graph_i->num_nodes   = num_nodes;
-    graph_i->num_edges   = num_edges;
-    graph_i->row_offsets = (void*)&row_offsets[0];
-    graph_i->col_indices = (void*)&col_indices[0];
-
+    graphi->num_nodes   = num_nodes;  // setting graph nodes
+    graphi->num_edges   = num_edges;  // setting graph edges
+    graphi->row_offsets = (void*)&row_offsets[0];  // setting row_offsets
+    graphi->col_indices = (void*)&col_indices[0];  // setting col_indices
     printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
 
-    gunrock_cc(graph_o, graph_i, config, data_t);
-    int* num_components = (int*)graph_o->aggregation;
-    memcpy(component, (int*)graph_o->node_value1, num_nodes * sizeof(int));
+    gunrock_cc(grapho, graphi, config, data_t);
+    int* num_components = (int*)grapho->aggregation;
+    memcpy(component, (int*)grapho->node_value1, num_nodes * sizeof(int));
 
-    if (graph_i) free(graph_i);
-    if (graph_o) free(graph_o);
+    if (graphi) free(graphi);
+    if (grapho) free(grapho);
 
     return *num_components;
 }

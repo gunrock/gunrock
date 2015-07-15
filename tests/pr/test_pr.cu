@@ -71,6 +71,9 @@ bool PRCompare(
     return elem1.page_rank > elem2.page_rank;
 }
 
+/**
+ * @brief Test_Parameter structure
+ */
 struct Test_Parameter : gunrock::app::TestParameter_Base {
 public:
     float    delta          ; //= 0.85f; // Use whatever the specified graph-type's default is
@@ -361,23 +364,16 @@ void SimpleReferencePageRank(
 }
 
 /**
- * @brief Run PR tests
+ * @brief RunTests entry
  *
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
  * @tparam INSTRUMENT
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] src Source node for personalized PageRank (if any)
- * @param[in] delta Delta value for computing PageRank, usually set to .85
- * @param[in] error Error threshold value
- * @param[in] max_iter Max iteration for Page Rank computing
- * @param[in] max_grid_size Maximum CTA occupancy
- * @param[in] num_gpus Number of GPUs
- * @param[in] iterations Number of iterations for running the test
- * @param[in] context CudaContext for moderngpu to use
- *
+ * @param[in] parameter Pointer to test parameter settings
  */
 template <
     typename VertexId,
@@ -578,10 +574,19 @@ void RunTests(Test_Parameter *parameter)
     if (ref_node_id) {delete[] ref_node_id; ref_node_id = NULL;}
     if (h_rank     ) {delete[] h_rank     ; h_rank      = NULL;}
     if (h_node_id  ) {delete[] h_node_id  ; h_node_id   = NULL;}
-
-    //cudaDeviceSynchronize();
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -598,6 +603,16 @@ void RunTests_size_check(Test_Parameter *parameter)
         false> (parameter);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -620,9 +635,7 @@ void RunTests_debug(Test_Parameter *parameter)
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] args Reference to the command line arguments
- * @param[in] context CudaContext pointer for moderngpu APIs
+ * @param[in] parameter Pointer to test parameter settings
  */
 template <
     typename VertexId,

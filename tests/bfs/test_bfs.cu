@@ -43,15 +43,6 @@ using namespace gunrock::oprtr;
 using namespace gunrock::app::bfs;
 
 /******************************************************************************
- * Defines, constants, globals
- ******************************************************************************/
-
-//bool g_verbose;
-//bool g_undirected;
-//bool g_quick;
-//bool g_stream_from_host;
-
-/******************************************************************************
  * Housekeeping Routines
  ******************************************************************************/
  void Usage()
@@ -92,13 +83,20 @@ using namespace gunrock::app::bfs;
 /**
  * @brief Displays the BFS result (i.e., distance from source)
  *
- * @param[in] source_path Search depth from the source for each node.
- * @param[in] preds Predecessor node id for each node.
- * @param[in] nodes Number of nodes in the graph.
- * @param[in] MARK_PREDECESSORS Whether to show predecessor of each node.
- * @param[in] ENABLE_IDEMPOTENCE Whether to enable idempotence mode.
+ * @tparam VertexId
+ * @tparam SizeT
+ * @tparam MARK_PREDECESSORS
+ * @tparam ENABLE_IDEMPOTENCE
+ *
+ * @param[in] labels    Search depth from the source for each node.
+ * @param[in] preds     Predecessor node id for each node.
+ * @param[in] num_nodes Number of nodes in the graph.
  */
-template<typename VertexId, typename SizeT, bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE>
+template <
+    typename VertexId,
+    typename SizeT,
+    bool MARK_PREDECESSORS,
+    bool ENABLE_IDEMPOTENCE>
 void DisplaySolution(
     VertexId *labels,
     VertexId *preds,
@@ -136,14 +134,18 @@ struct Stats
     Statistic duty;
 
     Stats() : name(NULL), rate(), search_depth(), redundant_work(), duty() {}
-    Stats(const char *name) : name(name), rate(), search_depth(), redundant_work(), duty() {}
+    Stats(const char *name) :
+        name(name), rate(), search_depth(), redundant_work(), duty() {}
 };
 
+/**
+ * @brief Test_Parameter structure
+ */
 struct Test_Parameter : gunrock::app::TestParameter_Base {
 public:
-    bool          mark_predecessors ;// Whether or not to mark src-distance vs. parent vertices
-    bool          enable_idempotence;// Whether or not to enable idempotence operation
-    double        max_queue_sizing1 ;
+    bool   mark_predecessors ;  // Mark src-distance vs. parent vertices
+    bool   enable_idempotence;  // Enable idempotence operation
+    double max_queue_sizing1 ;
 
     Test_Parameter()
     {
@@ -258,6 +260,8 @@ void DisplayStats(
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam MARK_PREDECESSORS
  *
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] source_path Host-side vector to store CPU computed labels for each node
@@ -276,11 +280,12 @@ void SimpleReferenceBfs(
     VertexId                                *predecessor,
     VertexId                                src)
 {
-    //initialize distances
+    // Initialize labels
     for (VertexId i = 0; i < graph->nodes; ++i) {
-        source_path[i] = ENABLE_IDEMPOTENCE? -1: util::MaxValue<VertexId>()-1;
-        if (MARK_PREDECESSORS)
+        source_path[i] = ENABLE_IDEMPOTENCE? -1: util::MaxValue<VertexId>() - 1;
+        if (MARK_PREDECESSORS) {
             predecessor[i] = -1;
+        }
     }
     source_path[src] = 0;
     VertexId search_depth = 0;
@@ -313,8 +318,7 @@ void SimpleReferenceBfs(
                 source_path[neighbor] = neighbor_dist;
                 if (MARK_PREDECESSORS)
                     predecessor[neighbor] = dequeued_node;
-                if (search_depth < neighbor_dist)
-                {
+                if (search_depth < neighbor_dist) {
                     search_depth = neighbor_dist;
                 }
                 frontier.push_back(neighbor);
@@ -550,7 +554,7 @@ void RunTests(Test_Parameter *parameter)
     if (num_gpus>1) printf("\t in_sizing =\t %lf", max_in_sizing_);
     printf("\n");
 
-    // Cleanup
+    // Clean up
     if (org_size        ) {delete[] org_size        ; org_size         = NULL;}
     if (stats           ) {delete   stats           ; stats            = NULL;}
     if (enactor         ) {delete   enactor         ; enactor          = NULL;}
@@ -563,6 +567,19 @@ void RunTests(Test_Parameter *parameter)
     //cudaDeviceSynchronize();
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
+ * @tparam MARK_PREDECESSORS
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -581,6 +598,18 @@ void RunTests_enable_idempotence(Test_Parameter *parameter)
         false> (parameter);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -598,6 +627,17 @@ void RunTests_mark_predecessors(Test_Parameter *parameter)
         false> (parameter);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -614,6 +654,16 @@ void RunTests_size_check(Test_Parameter *parameter)
         false> (parameter);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -629,6 +679,15 @@ void RunTests_debug(Test_Parameter *parameter)
         false> (parameter);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -650,9 +709,12 @@ void RunTests_instrumented(Test_Parameter *parameter)
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] args Reference to the command line arguments
- * @param[in] context CudaContext pointer for moderngpu APIs
+ * @param[in] graph    Pointer to the CSR graph we process on
+ * @param[in] args     Reference to the command line arguments
+ * @param[in] num_gpus Number of GPUs to run algorithm
+ * @param[in] context  CudaContext pointer for ModernGPU APIs
+ * @param[in] gpu_idx  GPU(s) used to run algorithm
+ * @param[in] streams  CUDA streams
  */
 template <
     typename VertexId,
@@ -661,7 +723,7 @@ template <
 void RunTests(
     Csr<VertexId, Value, SizeT> *graph,
     CommandLineArgs             &args,
-    int                          num_gpus,
+    int                         num_gpus,
     ContextPtr                  *context,
     int                         *gpu_idx,
     cudaStream_t                *streams)
@@ -762,10 +824,10 @@ int main( int argc, char** argv)
     // Construct graph and perform search(es)
     //
 
-    typedef int VertexId;                   // Use as the node identifier
-    typedef int Value;                      // Use as the value type
-    typedef int SizeT;                      // Use as the graph size type
-    Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
+    typedef int VertexId;                    // Use as the node identifier
+    typedef int Value;                       // Use as the value type
+    typedef int SizeT;                       // Use as the graph size type
+    Csr<VertexId, Value, SizeT> csr(false);  // default for stream_from_host
     if (graph_args < 1) { Usage(); return 1; }
 
     if (graph_type == "market")
@@ -778,7 +840,7 @@ int main( int argc, char** argv)
             market_filename,
             csr,
             g_undirected,
-            false) != 0) // no inverse graph
+            false) != 0)  // no inverse graph
         {
             return 1;
         }
@@ -862,7 +924,8 @@ int main( int argc, char** argv)
         cpu_timer.Stop();
         float elapsed = cpu_timer.ElapsedMillis();
         printf("graph generated: %.3f ms, threshold = %.3lf, vmultipiler = %.3lf\n", elapsed, rgg_threshold, rgg_vmultipiler);
-    }else
+    }
+    else
     {
         fprintf(stderr, "Unspecified graph type\n");
         return 1;

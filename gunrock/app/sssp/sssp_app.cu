@@ -28,6 +28,9 @@ using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::sssp;
 
+/**
+ * @brief Test_Parameter structure
+ */
 struct Test_Parameter : gunrock::app::TestParameter_Base {
   public:
     bool   mark_predecessors;
@@ -54,6 +57,19 @@ template <
     bool MARK_PREDECESSORS >
 void runSSSP(GRGraph* output, Test_Parameter *parameter);
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ * @tparam DEBUG      Keep debug statics
+ * @tparam SIZE_CHECK Enable size check
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -70,6 +86,18 @@ void markPredecessorsSSSP(GRGraph* output, Test_Parameter *parameter) {
                 DEBUG, SIZE_CHECK, false>(output, parameter);
 }
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ * @tparam DEBUG      Keep debug statics
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -85,6 +113,17 @@ void sizeCheckSSSP(GRGraph* output, Test_Parameter *parameter) {
                              DEBUG, false>(output, parameter);
 }
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -99,6 +138,16 @@ void debugSSSP(GRGraph* output, Test_Parameter *parameter) {
                       false>(output, parameter);
 }
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId Vertex identifier type
+ * @tparam Value    Attribute type
+ * @tparam SizeT    Graph size type
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -111,23 +160,18 @@ void instrumentedSSSP(GRGraph* output, Test_Parameter *parameter) {
 }
 
 /**
- * @brief Run SSSP tests
+ * @brief Run test
  *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam MARK_PREDECESSORS
+ * @tparam VertexId          Vertex identifier type
+ * @tparam Value             Attribute type
+ * @tparam SizeT             Graph size type
+ * @tparam INSTRUMENT        Keep kernels statics
+ * @tparam DEBUG             Keep debug statics
+ * @tparam SIZE_CHECK        Enable size check
+ * @tparam MARK_PREDECESSORS Enable mark predecessors
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] src Source node where SSSP starts
- * @param[in] max_grid_size Maximum CTA occupancy
- * @param[in] queue_sizing Scaling factor used in edge mapping
- * @param[in] num_gpus Number of GPUs
- * @param[in] delta_factor Parameter to specify delta in delta-stepping SSSP
- * @param[in] iterations Number of iteration for running the test
- & @param[in] traversal_mode Load-balanced or Dynamic cooperative
- * @param[in] context CudaContext pointer for moderngpu APIs
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
  */
 template <
     typename VertexId,
@@ -235,18 +279,18 @@ void runSSSP(GRGraph* output, Test_Parameter *parameter) {
 }
 
 /**
- * @brief dispatch function to handle data_types
+ * @brief Dispatch function to handle configurations
  *
- * @param[out] graph_o     GRGraph type output
- * @param[out] predecessor Return predeessor if mark_pred = true
- * @param[in]  graph_i     GRGraph type input graph
- * @param[in]  config      Primitive-specific configurations
- * @param[in]  data_t      Data type configurations
- * @param[in]  context     ModernGPU context
+ * @param[out] grapho  Pointer to output graph structure of the problem
+ * @param[in]  graphi  Pointer to input graph we need to process on
+ * @param[in]  config  Primitive-specific configurations
+ * @param[in]  data_t  Data type configurations
+ * @param[in]  context ModernGPU context
+ * @param[in]  streams CUDA stream
  */
 void dispatchSSSP(
-    GRGraph*       graph_o,
-    const GRGraph* graph_i,
+    GRGraph*       grapho,
+    const GRGraph* graphi,
     const GRSetup  config,
     const GRTypes  data_t,
     ContextPtr*    context,
@@ -267,11 +311,11 @@ void dispatchSSSP(
             switch (data_t.VALUE_TYPE) {
             case VALUE_INT: {  // template type = <int, int, int>
                 Csr<int, int, int> csr(false);
-                csr.nodes = graph_i->num_nodes;
-                csr.edges = graph_i->num_edges;
-                csr.row_offsets    = (int*)graph_i->row_offsets;
-                csr.column_indices = (int*)graph_i->col_indices;
-                csr.edge_values    = (int*)graph_i->edge_values;
+                csr.nodes = graphi->num_nodes;
+                csr.edges = graphi->num_edges;
+                csr.row_offsets    = (int*)graphi->row_offsets;
+                csr.column_indices = (int*)graphi->col_indices;
+                csr.edge_values    = (int*)graphi->edge_values;
                 parameter->graph = &csr;
 
                 // determine source vertex to start
@@ -295,7 +339,7 @@ void dispatchSSSP(
                 }
                 }
                 printf(" source: %lld\n", (long long) parameter->src);
-                instrumentedSSSP<int, int, int>(graph_o, parameter);
+                instrumentedSSSP<int, int, int>(grapho, parameter);
 
                 // reset for free memory
                 csr.row_offsets    = NULL;
@@ -323,21 +367,17 @@ void dispatchSSSP(
     }
 }
 
-/**
- * @brief run_sssp entry
+/*
+ * @brief Entry of gunrock_sssp function
  *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[out] graph_o     GRGraph type output
- * @param[in]  graph_i     GRGraph type input graph
- * @param[in]  config      Primitive specific configurations
- * @param[in]  data_t      Data type configurations
+ * @param[out] grapho Pointer to output graph structure of the problem
+ * @param[in]  graphi Pointer to input graph we need to process on
+ * @param[in]  config Gunrock primitive specific configurations
+ * @param[in]  data_t Gunrock data type structure
  */
 void gunrock_sssp(
-    GRGraph*       graph_o,
-    const GRGraph* graph_i,
+    GRGraph*       grapho,
+    const GRGraph* graphi,
     const GRSetup  config,
     const GRTypes  data_t) {
     // GPU-related configurations
@@ -372,11 +412,12 @@ void gunrock_sssp(
     }
     printf("\n");
 
-    dispatchSSSP(graph_o, graph_i, config, data_t, context, streams);
+    dispatchSSSP(grapho, graphi, config, data_t, context, streams);
 }
 
 /*
  * @brief Simple interface take in CSR arrays as input
+ *
  * @param[out] distances   Return shortest distance to source per nodes
  * @param[in]  num_nodes   Number of nodes of the input graph
  * @param[in]  num_edges   Number of edges of the input graph
@@ -392,10 +433,10 @@ void sssp(
     const int*          col_indices,
     const unsigned int* edge_values,
     const int           source) {
-    struct GRTypes data_t;           // primitive-specific data types
-    data_t.VTXID_TYPE = VTXID_INT;   // integer
-    data_t.SIZET_TYPE = SIZET_INT;   // integer
-    data_t.VALUE_TYPE = VALUE_INT;  // unsigned integer
+    struct GRTypes data_t;          // primitive-specific data types
+    data_t.VTXID_TYPE = VTXID_INT;  // integer vertex identifier
+    data_t.SIZET_TYPE = SIZET_INT;  // integer graph size type
+    data_t.VALUE_TYPE = VALUE_INT;  // integer attributes type
 
     struct GRSetup config;                // primitive-specific configures
     int list[] = {0, 1, 2, 3};            // device to run algorithm
@@ -408,22 +449,21 @@ void sssp(
     config.traversal_mode    =     0;     // 0 for Load balanced partition
     config.max_queue_sizing  =  1.0f;     // maximum queue sizing factor
 
-    struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
-    struct GRGraph *graph_i = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));
 
-    graph_i->num_nodes   = num_nodes;
-    graph_i->num_edges   = num_edges;
-    graph_i->row_offsets = (void*)&row_offsets[0];
-    graph_i->col_indices = (void*)&col_indices[0];
-    graph_i->edge_values = (void*)&edge_values[0];
-
+    graphi->num_nodes   = num_nodes;  // setting graph nodes
+    graphi->num_edges   = num_edges;  // setting graph edges
+    graphi->row_offsets = (void*)&row_offsets[0];  // setting row_offsets
+    graphi->col_indices = (void*)&col_indices[0];  // setting col_indices
+    graphi->edge_values = (void*)&edge_values[0];  // setting edge_values
     printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
 
-    gunrock_sssp(graph_o, graph_i, config, data_t);
-    memcpy(distances, (int*)graph_o->node_value1, num_nodes * sizeof(int));
+    gunrock_sssp(grapho, graphi, config, data_t);
+    memcpy(distances, (int*)grapho->node_value1, num_nodes * sizeof(int));
 
-    if (graph_i) free(graph_i);
-    if (graph_o) free(graph_o);
+    if (graphi) free(graphi);
+    if (grapho) free(grapho);
 }
 
 // Leave this at the end of the file

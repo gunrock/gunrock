@@ -28,6 +28,9 @@ using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::bfs;
 
+/**
+ * @brief Test_Parameter structure
+ */
 struct Test_Parameter : gunrock::app::TestParameter_Base {
   public:
     bool   mark_predecessors ;  // mark src-distance vs. parent vertices
@@ -47,8 +50,22 @@ struct Test_Parameter : gunrock::app::TestParameter_Base {
 template<typename VertexId, typename Value, typename SizeT,
     bool INSTRUMENT, bool DEBUG, bool SIZE_CHECK,
     bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE>
-void RunTests(GRGraph* output, Test_Parameter *parameter);
+void runBFS(GRGraph* output, Test_Parameter *parameter);
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId          Vertex identifier type
+ * @tparam Value             Attribute type
+ * @tparam SizeT             Graph size type
+ * @tparam INSTRUMENT        Keep kernels statics
+ * @tparam DEBUG             Keep debug statics
+ * @tparam SIZE_CHECK        Enable size check
+ * @tparam MARK_PREDECESSORS Enable mark predecessors
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -59,13 +76,26 @@ template <
     bool        MARK_PREDECESSORS >
 void RunTests_enable_idempotence(GRGraph* output, Test_Parameter *parameter) {
     if (parameter->enable_idempotence)
-        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
+        runBFS<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
                  SIZE_CHECK, MARK_PREDECESSORS,  true>(output, parameter);
     else
-        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
+        runBFS<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
                  SIZE_CHECK, MARK_PREDECESSORS, false>(output, parameter);
 }
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ * @tparam DEBUG      Keep debug statics
+ * @tparam SIZE_CHECK Enable size check
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -82,6 +112,18 @@ void RunTests_mark_predecessors(GRGraph* output, Test_Parameter *parameter) {
                                     SIZE_CHECK, false>(output, parameter);
 }
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ * @tparam DEBUG      Keep debug statics
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -97,6 +139,17 @@ void RunTests_size_check(GRGraph* output, Test_Parameter *parameter) {
                                    DEBUG, false>(output, parameter);
 }
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -111,6 +164,16 @@ void RunTests_debug(GRGraph* output, Test_Parameter *parameter) {
                             false>(output, parameter);
 }
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId Vertex identifier type
+ * @tparam Value    Attribute type
+ * @tparam SizeT    Graph size type
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -123,22 +186,19 @@ void RunTests_instrumented(GRGraph* output, Test_Parameter *parameter) {
 }
 
 /**
- * @brief Run BFS tests
+ * @brief Run test
  *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam MARK_PREDECESSORS
- * @tparam ENABLE_IDEMPOTENCE
+ * @tparam VertexId           Vertex identifier type
+ * @tparam Value              Attribute type
+ * @tparam SizeT              Graph size type
+ * @tparam INSTRUMENT         Keep kernels statics
+ * @tparam DEBUG              Keep debug statics
+ * @tparam SIZE_CHECK         Enable size check
+ * @tparam MARK_PREDECESSORS  Enable mark predecessors
+ * @tparam ENABLE_IDEMPOTENCE Enable idempotent operation
  *
- * @param[out] graph_o Pointer to the output CSR graph
- * @param[in] graph_i Reference to the CSR graph we process on
- * @param[in] src Source node where BFS starts
- * @param[in] max_grid_size Maximum CTA occupancy
- * @param[in] num_gpus Number of GPUs
- * @param[in] max_queue_sizing Scaling factor used in edge mapping
- * @param[in] context Reference to CudaContext used by moderngpu functions
- *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
  */
 template <
     typename    VertexId,
@@ -149,7 +209,7 @@ template <
     bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS,
     bool        ENABLE_IDEMPOTENCE >
-void RunTests(GRGraph* output, Test_Parameter *parameter) {
+void runBFS(GRGraph* output, Test_Parameter *parameter) {
     typedef BFSProblem < VertexId,
             SizeT,
             Value,
@@ -252,18 +312,18 @@ void RunTests(GRGraph* output, Test_Parameter *parameter) {
 }
 
 /**
- * @brief dispatch function to handle data_types
+ * @brief Dispatch function to handle configurations
  *
- * @param[out] graph_o  GRGraph type output
- * @param[in]  graph_i  GRGraph type input graph
- * @param[in]  config   Specific configurations
- * @param[in]  data_t   Data type configurations
- * @param[in]  context  ModernGPU context
- * @param[in]  stream   CudaStream
+ * @param[out] grapho  Pointer to output graph structure of the problem
+ * @param[in]  graphi  Pointer to input graph we need to process on
+ * @param[in]  config  Primitive-specific configurations
+ * @param[in]  data_t  Data type configurations
+ * @param[in]  context ModernGPU context
+ * @param[in]  streams CUDA stream
  */
 void dispatch_bfs(
-    GRGraph*       graph_o,
-    const GRGraph* graph_i,
+    GRGraph*       grapho,
+    const GRGraph* graphi,
     const GRSetup  config,
     const GRTypes  data_t,
     ContextPtr*    context,
@@ -284,10 +344,10 @@ void dispatch_bfs(
             case VALUE_INT: {  // template type = <int, int, int>
                 // build input CSR format graph
                 Csr<int, int, int> csr(false);
-                csr.nodes = graph_i->num_nodes;
-                csr.edges = graph_i->num_edges;
-                csr.row_offsets    = (int*)graph_i->row_offsets;
-                csr.column_indices = (int*)graph_i->col_indices;
+                csr.nodes = graphi->num_nodes;
+                csr.edges = graphi->num_edges;
+                csr.row_offsets    = (int*)graphi->row_offsets;
+                csr.column_indices = (int*)graphi->col_indices;
                 parameter->graph = &csr;
 
                 // determine source vertex to start
@@ -311,7 +371,7 @@ void dispatch_bfs(
                 }
                 }
                 printf(" source: %lld\n", (long long) parameter->src);
-                RunTests_instrumented<int, int, int>(graph_o, parameter);
+                RunTests_instrumented<int, int, int>(grapho, parameter);
 
                 // reset for free memory
                 csr.row_offsets    = NULL;
@@ -338,16 +398,16 @@ void dispatch_bfs(
 }
 
 /*
- * @brief gunrock_bfs function
+ * @brief Entry of gunrock_bfs function
  *
- * @param[out] graph_o output subgraph of the problem
- * @param[in]  graph_i input graph need to process on
- * @param[in]  config  gunrock primitive specific configurations
- * @param[in]  data_t  gunrock data_t struct
+ * @param[out] grapho Pointer to output graph structure of the problem
+ * @param[in]  graphi Pointer to input graph we need to process on
+ * @param[in]  config Gunrock primitive specific configurations
+ * @param[in]  data_t Gunrock data type structure
  */
 void gunrock_bfs(
-    GRGraph*       graph_o,
-    const GRGraph* graph_i,
+    GRGraph*       grapho,
+    const GRGraph* graphi,
     const GRSetup  config,
     const GRTypes  data_t) {
     // GPU-related configurations
@@ -382,12 +442,13 @@ void gunrock_bfs(
     }
     printf("\n");
 
-    dispatch_bfs(graph_o, graph_i, config, data_t, context, streams);
+    dispatch_bfs(grapho, graphi, config, data_t, context, streams);
 }
 
 /*
  * @brief Simple interface take in CSR arrays as input
- * @param[out] bfs_label   Return BFS labels per nodes
+ *
+ * @param[out] bfs_label   Return BFS label (depth) per nodes
  * @param[in]  num_nodes   Number of nodes of the input graph
  * @param[in]  num_edges   Number of edges of the input graph
  * @param[in]  row_offsets CSR-formatted graph input row offsets
@@ -402,9 +463,9 @@ void bfs(
     const int* col_indices,
     const int  source) {
     struct GRTypes data_t;          // primitive-specific data types
-    data_t.VTXID_TYPE = VTXID_INT;  // integer
-    data_t.SIZET_TYPE = SIZET_INT;  // integer
-    data_t.VALUE_TYPE = VALUE_INT;  // integer
+    data_t.VTXID_TYPE = VTXID_INT;  // integer vertex identifier
+    data_t.SIZET_TYPE = SIZET_INT;  // integer graph size type
+    data_t.VALUE_TYPE = VALUE_INT;  // integer attributes type
 
     struct GRSetup config;          // primitive-specific configures
     int list[] = {0, 1, 2, 3};      // default device to run algorithm
@@ -416,21 +477,20 @@ void bfs(
     config.enable_idempotence = false;  // wether enable idempotence
     config.max_queue_sizing  = 1.0f;    // maximum queue size factor
 
-    struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
-    struct GRGraph *graph_i = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));
 
-    graph_i->num_nodes   = num_nodes;
-    graph_i->num_edges   = num_edges;
-    graph_i->row_offsets = (void*)&row_offsets[0];
-    graph_i->col_indices = (void*)&col_indices[0];
-
+    graphi->num_nodes   = num_nodes;  // setting graph nodes
+    graphi->num_edges   = num_edges;  // setting graph edges
+    graphi->row_offsets = (void*)&row_offsets[0];  // setting row_offsets
+    graphi->col_indices = (void*)&col_indices[0];  // setting col_indices
     printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
 
-    gunrock_bfs(graph_o, graph_i, config, data_t);
-    memcpy(bfs_label, (int*)graph_o->node_value1, num_nodes * sizeof(int));
+    gunrock_bfs(grapho, graphi, config, data_t);
+    memcpy(bfs_label, (int*)grapho->node_value1, num_nodes * sizeof(int));
 
-    if (graph_i) free(graph_i);
-    if (graph_o) free(graph_o);
+    if (graphi) free(graphi);
+    if (grapho) free(grapho);
 }
 
 // Leave this at the end of the file

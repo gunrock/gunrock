@@ -28,6 +28,9 @@ using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::bc;
 
+/**
+ * @brief Test_Parameter structure
+ */
 struct Test_Parameter : gunrock::app::TestParameter_Base {
   public:
     std::string ref_filename;
@@ -56,8 +59,20 @@ template <
     bool INSTRUMENT,
     bool DEBUG,
     bool SIZE_CHECK >
-void RunTests(GRGraph* output, Test_Parameter *parameter);
+void runBC(GRGraph* output, Test_Parameter *parameter);
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ * @tparam DEBUG      Keep debug statics
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -66,13 +81,24 @@ template <
     bool          DEBUG >
 void RunTests_size_check(GRGraph* output, Test_Parameter *parameter) {
     if (parameter->size_check)
-        RunTests<VertexId, Value, SizeT, INSTRUMENT,
+        runBC<VertexId, Value, SizeT, INSTRUMENT,
                  DEBUG,  true>(output, parameter);
     else
-        RunTests<VertexId, Value, SizeT, INSTRUMENT,
+        runBC<VertexId, Value, SizeT, INSTRUMENT,
                  DEBUG, false>(output, parameter);
 }
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -87,6 +113,16 @@ void RunTests_debug(GRGraph* output, Test_Parameter *parameter) {
                             INSTRUMENT, false> (output, parameter);
 }
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId Vertex identifier type
+ * @tparam Value    Attribute type
+ * @tparam SizeT    Graph size type
+ *
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -99,21 +135,17 @@ void RunTests_instrumented(GRGraph* output, Test_Parameter *parameter) {
 }
 
 /**
- * @brief Run betweenness centrality tests
+ * @brief Run test
  *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ * @tparam DEBUG      Keep debug statics
+ * @tparam SIZE_CHECK Enable size check
  *
- * @param[in] graph Reference to the CSR graph object defined in main driver
- * @param[in] src
- * @param[in] ref_filename
- * @param[in] max_grid_size
- * @param[in] num_gpus
- * @param[in] max_queue_sizing
- * @param[in] iterations Number of iterations for running the test
- * @param[in] context CudaContext pointer for moderngpu APIs
+ * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
  */
 template <
     typename VertexId,
@@ -122,7 +154,7 @@ template <
     bool INSTRUMENT,
     bool DEBUG,
     bool SIZE_CHECK >
-void RunTests(GRGraph* output, Test_Parameter *parameter) {
+void runBC(GRGraph* output, Test_Parameter *parameter) {
     typedef BCProblem <VertexId,
             SizeT,
             Value,
@@ -241,25 +273,26 @@ void RunTests(GRGraph* output, Test_Parameter *parameter) {
     printf(" GPU Betweenness Centrality finished in %lf msec.\n", elapsed);
 
     // Clean up
-    if (org_size    ) { delete[] org_size    ; org_size     = NULL; }
-    if (problem     ) { delete   problem     ; problem      = NULL; }
-    if (enactor     ) { delete   enactor     ; enactor      = NULL; }
-    if (h_sigmas    ) { delete[] h_sigmas    ; h_sigmas     = NULL; }
-    if (h_labels    ) { delete[] h_labels    ; h_labels     = NULL; }
+    if (org_size) { delete[] org_size; org_size = NULL; }
+    if (problem ) { delete   problem ; problem  = NULL; }
+    if (enactor ) { delete   enactor ; enactor  = NULL; }
+    if (h_sigmas) { delete[] h_sigmas; h_sigmas = NULL; }
+    if (h_labels) { delete[] h_labels; h_labels = NULL; }
 }
 
 /**
- * @brief dispatch function to handle data_types
+ * @brief Dispatch function to handle configurations
  *
- * @param[out] graph_o  GRGraph type output
- * @param[in]  graph_i  GRGraph type input graph
- * @param[in]  config   Specific configurations
- * @param[in]  data_t   Data type configurations
- * @param[in]  context  ModernGPU context
+ * @param[out] grapho  Pointer to output graph structure of the problem
+ * @param[in]  graphi  Pointer to input graph we need to process on
+ * @param[in]  config  Primitive-specific configurations
+ * @param[in]  data_t  Data type configurations
+ * @param[in]  context ModernGPU context
+ * @param[in]  streams CUDA stream
  */
-void dispatch_bc(
-    GRGraph*        graph_o,
-    const GRGraph*  graph_i,
+void dispatchBC(
+    GRGraph*        grapho,
+    const GRGraph*  graphi,
     const GRSetup   config,
     const GRTypes   data_t,
     ContextPtr*     context,
@@ -288,10 +321,10 @@ void dispatch_bc(
             case VALUE_FLOAT: {  // template type = <int, float, int>
                 // build input csr format graph
                 Csr<int, int, int> csr(false);
-                csr.nodes = graph_i->num_nodes;
-                csr.edges = graph_i->num_edges;
-                csr.row_offsets    = (int*)graph_i->row_offsets;
-                csr.column_indices = (int*)graph_i->col_indices;
+                csr.nodes = graphi->num_nodes;
+                csr.edges = graphi->num_edges;
+                csr.row_offsets    = (int*)graphi->row_offsets;
+                csr.column_indices = (int*)graphi->col_indices;
                 parameter->graph = &csr;
 
                 // determine source vertex to start
@@ -315,7 +348,7 @@ void dispatch_bc(
                 }
                 }
                 printf(" source: %lld\n", (long long) parameter->src);
-                RunTests_instrumented<int, float, int>(graph_o, parameter);
+                RunTests_instrumented<int, float, int>(grapho, parameter);
 
                 csr.row_offsets    = NULL;
                 csr.column_indices = NULL;
@@ -331,16 +364,16 @@ void dispatch_bc(
 }
 
 /*
- * @brief gunrock_bc function
+ * @brief Entry of gunrock_bc function
  *
- * @param[out] graph_o output of bc problem
- * @param[in]  graph_i input graph need to process on
- * @param[in]  config  gunrock primitive specific configurations
- * @param[in]  data_t  gunrock data_t struct
+ * @param[out] grapho Pointer to output graph structure of the problem
+ * @param[in]  graphi Pointer to input graph we need to process on
+ * @param[in]  config Gunrock primitive specific configurations
+ * @param[in]  data_t Gunrock data type structure
  */
 void gunrock_bc(
-    GRGraph       *graph_o,
-    const GRGraph *graph_i,
+    GRGraph       *grapho,
+    const GRGraph *graphi,
     const GRSetup  config,
     const GRTypes  data_t) {
     // GPU-related configurations
@@ -375,17 +408,18 @@ void gunrock_bc(
     }
     printf("\n");
 
-    dispatch_bc(graph_o, graph_i, config, data_t, context, streams);
+    dispatchBC(grapho, graphi, config, data_t, context, streams);
 }
 
 /*
  * @brief Simple interface take in CSR arrays as input
- * @param[out] bfs_label   Return BC node centrality per nodes
+ *
+ * @param[out] bc_scores   Return BC node centrality per nodes
  * @param[in]  num_nodes   Number of nodes of the input graph
  * @param[in]  num_edges   Number of edges of the input graph
  * @param[in]  row_offsets CSR-formatted graph input row offsets
  * @param[in]  col_indices CSR-formatted graph input column indices
- * @param[in]  source      Source to begin traverse
+ * @param[in]  source      Source to begin traverse/computation
  */
 void bc(
     float*     bc_scores,
@@ -395,9 +429,9 @@ void bc(
     const int* col_indices,
     const int  source) {
     struct GRTypes data_t;            // primitive-specific data types
-    data_t.VTXID_TYPE = VTXID_INT;    // integer
-    data_t.SIZET_TYPE = SIZET_INT;    // integer
-    data_t.VALUE_TYPE = VALUE_FLOAT;  // float BC scores
+    data_t.VTXID_TYPE = VTXID_INT;    // integer vertex identifier
+    data_t.SIZET_TYPE = SIZET_INT;    // integer graph size type
+    data_t.VALUE_TYPE = VALUE_FLOAT;  // float attributes type
 
     struct GRSetup config;            // primitive-specific configures
     int list[] = {0, 1, 2, 3};        // device to run algorithm
@@ -407,21 +441,20 @@ void bc(
     config.source_vertex = source;    // source vertex to start
     config.max_queue_sizing = 1.0f;   // maximum queue sizing factor
 
-    struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
-    struct GRGraph *graph_i = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));
 
-    graph_i->num_nodes   = num_nodes;
-    graph_i->num_edges   = num_edges;
-    graph_i->row_offsets = (void*)&row_offsets[0];
-    graph_i->col_indices = (void*)&col_indices[0];
-
+    graphi->num_nodes   = num_nodes;  // setting graph nodes
+    graphi->num_edges   = num_edges;  // setting graph edges
+    graphi->row_offsets = (void*)&row_offsets[0];  // setting row_offsets
+    graphi->col_indices = (void*)&col_indices[0];  // setting col_indices
     printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
 
-    gunrock_bc(graph_o, graph_i, config, data_t);
-    memcpy(bc_scores, (float*)graph_o->node_value1, num_nodes * sizeof(float));
+    gunrock_bc(grapho, graphi, config, data_t);
+    memcpy(bc_scores, (float*)grapho->node_value1, num_nodes * sizeof(float));
 
-    if (graph_i) free(graph_i);
-    if (graph_o) free(graph_o);
+    if (graphi) free(graphi);
+    if (grapho) free(grapho);
 }
 
 // Leave this at the end of the file

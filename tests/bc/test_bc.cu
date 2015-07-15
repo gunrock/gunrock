@@ -52,16 +52,6 @@ using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::bc;
 
-
-/******************************************************************************
- * Defines, constants, globals
- ******************************************************************************/
-
-//bool g_verbose;
-//bool g_undirected;
-//bool g_quick;
-//bool g_stream_from_host;
-
 /******************************************************************************
  * Housekeeping Routines
  ******************************************************************************/
@@ -115,6 +105,9 @@ void DisplaySolution(Value *sigmas, Value *bc_values, SizeT nodes)
     }
 }
 
+/**
+ * @brief Test_Parameter structure
+ */
 struct Test_Parameter : gunrock::app::TestParameter_Base {
 public:
     std::string ref_filename;
@@ -351,21 +344,16 @@ void RefCPUBC(
 }
 
 /**
- * @brief Run betweenness centrality tests
+ * @brief RunTests entry
  *
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
  * @tparam INSTRUMENT
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
  *
- * @param[in] graph Reference to the CSR graph object defined in main driver
- * @param[in] src
- * @param[in] ref_filename
- * @param[in] max_grid_size
- * @param[in] num_gpus
- * @param[in] max_queue_sizing
- * @param[in] iterations Number of iterations for running the test
- * @param[in] context CudaContext pointer for moderngpu APIs
+ * @param[in] parameter Pointer to test parameter settings
  */
 template <
     typename VertexId,
@@ -678,11 +666,19 @@ void RunTests(Test_Parameter *parameter)
     if (h_bc_values         ) {delete[] h_bc_values         ; h_bc_values          = NULL;}
     if (h_ebc_values        ) {delete[] h_ebc_values        ; h_ebc_values         = NULL;}
     if (h_labels            ) {delete[] h_labels            ; h_labels             = NULL;}
-
-    //cudaDeviceSynchronize();
-
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -699,6 +695,16 @@ void RunTests_size_check(Test_Parameter *parameter)
         false> (parameter);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename    VertexId,
     typename    Value,
@@ -714,6 +720,15 @@ void RunTests_debug(Test_Parameter *parameter)
         false> (parameter);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
 template <
     typename      VertexId,
     typename      Value,
@@ -728,6 +743,20 @@ void RunTests_instrumented(Test_Parameter *parameter)
         false> (parameter);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] graph    Pointer to the CSR graph we process on
+ * @param[in] args     Reference to the command line arguments
+ * @param[in] num_gpus Number of GPUs to run algorithm
+ * @param[in] context  CudaContext pointer for ModernGPU APIs
+ * @param[in] gpu_idx  GPU(s) used to run algorithm
+ * @param[in] streams  CUDA streams
+ */
 template <
     typename VertexId,
     typename Value,
@@ -939,7 +968,7 @@ int main( int argc, char** argv)
     }
 
     csr.PrintHistogram();
-    //csr.DisplayGraph();
+    // csr.DisplayGraph();
     fflush(stdout);
 
     // Run tests

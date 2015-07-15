@@ -8,7 +8,7 @@
 /**
  * @file gunrock.h
  *
- * @brief Main Library header file. Defines public interface.
+ * @brief Main library header file. Defines public C interface.
  * The Gunrock public interface is a C-only interface to enable linking
  * with code written in other languages. While the internals of Gunrock
  * are not limited to C.
@@ -21,27 +21,27 @@
  * @brief VertexId data type enumerators.
  */
 enum VtxIdType {
-    VTXID_INT,  // integer type
+    VTXID_INT,  // Integer
 };
 
 /**
  * @brief SizeT data type enumerators.
  */
 enum SizeTType {
-    SIZET_INT,  // unsigned integer type
+    SIZET_INT,  // Unsigned integer
 };
 
 /**
  * @brief Value data type enumerators.
  */
 enum ValueType {
-    VALUE_INT,    // integer type
-    VALUE_UINT,   // unsigned int type
-    VALUE_FLOAT,  // float type
+    VALUE_INT,    // Integer
+    VALUE_UINT,   // Unsigned integer
+    VALUE_FLOAT,  // Float
 };
 
 /**
- * @brief data-type configuration used to specify data types
+ * @brief Data type configuration used to specify data types.
  */
 struct GRTypes {
     enum VtxIdType VTXID_TYPE;  // VertexId data type
@@ -50,51 +50,51 @@ struct GRTypes {
 };
 
 /**
- * @brief GunrockGraph as a standard graph interface
+ * @brief GunrockGraph as a standard graph interface.
  */
 struct GRGraph {
 
-    size_t  num_nodes;  // number of nodes in graph
-    size_t  num_edges;  // number of edges in graph
+    size_t  num_nodes;  // Number of nodes in graph
+    size_t  num_edges;  // Number of edges in graph
     void *row_offsets;  // CSR row offsets
     void *col_indices;  // CSR column indices
     void *col_offsets;  // CSC column offsets
     void *row_indices;  // CSC row indices
-    void *edge_values;  // associated values per edge
+    void *edge_values;  // Associated values per edge
 
-    void *node_value1;  // associated values per node
-    void *edge_value1;  // associated values per edge
-    void *node_value2;  // associated values per node
-    void *edge_value2;  // associated values per edge
-    void *aggregation;  // global reduced aggregation
+    void *node_value1;  // Associated values per node
+    void *edge_value1;  // Associated values per edge
+    void *node_value2;  // Associated values per node
+    void *edge_value2;  // Associated values per edge
+    void *aggregation;  // Global reduced aggregation
 };
 
 /**
  * @brief Source Vertex Mode enumerators.
  */
 enum SrcMode {
-    manually,        // manually set up source node
-    randomize,       // random generate source node
-    largest_degree,  // set to largest-degree node
+    manually,        // Manually set up source node
+    randomize,       // Random generate source node
+    largest_degree,  // Largest-degree node as source
 };
 
 /**
- * @brief arguments configuration used to specify arguments
+ * @brief arguments configuration used to specify arguments.
  */
 struct GRSetup {
-    bool   mark_predecessors;  // whether to mark predecessor or not
-    bool  enable_idempotence;  // whether or not to enable idempotent
-    int        source_vertex;  // source vertex define where to start
-    int         delta_factor;  // sssp delta-factor parameter
-    int*         device_list;  // setting which device(s) to use
-    unsigned int num_devices;  // number of devices for computation
-    unsigned int   max_iters;  // maximum number of iterations allowed
-    unsigned int   top_nodes;  // k value for top k / pagerank problem
-    float     pagerank_delta;  // pagerank specific value
-    float     pagerank_error;  // pagerank specific value
-    float   max_queue_sizing;  // setting frontier queue size
-    int       traversal_mode;  // traversal mode: 0 for LB, 1 TWC
-    enum SrcMode source_mode;  // source mode rand/largest_degree
+    bool   mark_predecessors;  // Whether to mark predecessor or not
+    bool  enable_idempotence;  // Whether or not to enable idempotent
+    int        source_vertex;  // Source node define where to start
+    int         delta_factor;  // SSSP delta-factor parameter
+    int*         device_list;  // Setting which device(s) to use
+    unsigned int num_devices;  // Number of devices for computation
+    unsigned int   max_iters;  // Maximum number of iterations allowed
+    unsigned int   top_nodes;  // K value for top k / pagerank problem
+    float     pagerank_delta;  // PageRank specific value
+    float     pagerank_error;  // PageRank specific value
+    float   max_queue_sizing;  // Setting frontier queue size
+    int       traversal_mode;  // Traversal mode: 0 for LB, 1 TWC
+    enum SrcMode source_mode;  // Source mode rand/largest_degree
 };
 
 #ifdef __cplusplus
@@ -102,115 +102,106 @@ extern "C" {
 #endif
 
 /**
- * breath-first search
+ * @brief Breath-first search public interface.
  */
 void gunrock_bfs(
-    struct GRGraph*       graph_o,
-    const struct GRGraph* graph_i,
-    const struct GRSetup  config,
-    const struct GRTypes  data_t);
-
-void bfs(
-    int*       bfs_label,
-    const int  num_nodes,
-    const int  num_edges,
-    const int* row_offsets,
-    const int* col_indices,
-    const int  source);
+    struct GRGraph*       graph_o,  // Output graph / results
+    const struct GRGraph* graph_i,  // Input graph structure
+    const struct GRSetup  config,   // Flag configurations
+    const struct GRTypes  data_t);  // Data type Configurations
 
 /**
- * betweenness centrality
+ * @brief Breath-first search simple public interface.
+ */
+void bfs(
+    int*       bfs_label,    // Return label (depth) per node
+    const int  num_nodes,    // Input graph number of nodes
+    const int  num_edges,    // Input graph number of edges
+    const int* row_offsets,  // Input graph row_offsets
+    const int* col_indices,  // Input graph col_indices
+    const int  source);      // Source vertex to start
+
+/**
+ * @brief Betweenness centrality public interface.
  */
 void gunrock_bc(
-    struct GRGraph*       graph_o,
-    const struct GRGraph* graph_i,
-    const struct GRSetup  config,
-    const struct GRTypes  data_t);
-
-void bc(
-    float*     bc_scores,
-    const int  num_nodes,
-    const int  num_edges,
-    const int* row_offsets,
-    const int* col_indices,
-    const int  source);
+    struct GRGraph*       graph_o,  // Output graph / results
+    const struct GRGraph* graph_i,  // Input graph structure
+    const struct GRSetup  config,   // Flag configurations
+    const struct GRTypes  data_t);  // Data type Configurations
 
 /**
- * connected component
+ * @brief Betweenness centrality simple public interface.
+ */
+void bc(
+    float*     bc_scores,    // Return centrality score per node
+    const int  num_nodes,    // Input graph number of nodes
+    const int  num_edges,    // Input graph number of edges
+    const int* row_offsets,  // Input graph row_offsets
+    const int* col_indices,  // Input graph col_indices
+    const int  source);      // Source vertex to start
+
+/**
+ * @brief Connected component public interface.
  */
 void gunrock_cc(
-    struct GRGraph*       graph_o,
-    const struct GRGraph* graph_i,
-    const struct GRSetup  config,
-    const struct GRTypes  data_t);
-
-int cc(
-    int*       component,
-    const int  num_nodes,
-    const int  num_edges,
-    const int* row_offsets,
-    const int* col_indices);
+    struct GRGraph*       graph_o,  // Output graph / results
+    const struct GRGraph* graph_i,  // Input graph structure
+    const struct GRSetup  config,   // Flag configurations
+    const struct GRTypes  data_t);  // Data type Configurations
 
 /**
- * single-source shortest path
+ * @brief Connected component simple public interface.
+ */
+int cc(
+    int*       component,     // Return component IDs per node
+    const int  num_nodes,     // Input graph number of nodes
+    const int  num_edges,     // Input graph number of edges
+    const int* row_offsets,   // Input graph row_offsets
+    const int* col_indices);  // Input graph col_indices
+
+/**
+ * @brief Single-source shortest path public interface.
  */
 void gunrock_sssp(
-    struct GRGraph*       graph_o,
-    const struct GRGraph* graph_i,
-    const struct GRSetup  config,
-    const struct GRTypes  data_t);
+    struct GRGraph*       graph_o,  // Output graph / results
+    const struct GRGraph* graph_i,  // Input graph structure
+    const struct GRSetup  config,   // Flag configurations
+    const struct GRTypes  data_t);  // Data type Configurations
 
+/**
+ * @brief Single-source shortest path simple public interface.
+ */
 void sssp(
-    unsigned int*       distances,
-    const int           num_nodes,
-    const int           num_edges,
-    const int*          row_offsets,
-    const int*          col_indices,
-    const unsigned int* edge_values,
-    const int           source);
+    unsigned int*       distances,    // Return shortest distances
+    const int           num_nodes,    // Input graph number of nodes
+    const int           num_edges,    // Input graph number of edges
+    const int*          row_offsets,  // Input graph row_offsets
+    const int*          col_indices,  // Input graph col_indices
+    const unsigned int* edge_values,  // Input graph edge weight
+    const int           source);      // Source node to start
 
-// pagerank
+/**
+ * @brief PageRank public interface.
+ */
 void gunrock_pagerank(
-    struct GRGraph*       graph_o,
-    const struct GRGraph* graph_i,
-    const struct GRSetup  config,
-    const struct GRTypes  data_t);
+    struct GRGraph*       graph_o,  // Output graph / results
+    const struct GRGraph* graph_i,  // Input graph structure
+    const struct GRSetup  config,   // Flag configurations
+    const struct GRTypes  data_t);  // Data type Configurations
 
+/**
+ * @brief PageRank simple public interface.
+ */
 void pagerank(
-    int*       node_ids,
-    float*     pagerank,
-    const int  num_nodes,
-    const int  num_edges,
-    const int* row_offsets,
-    const int* col_indices);
+    int*       node_ids,      // Return top-ranked vertice IDs
+    float*     pagerank,      // Return top-ranked PageRank scores
+    const int  num_nodes,     // Input graph number of nodes
+    const int  num_edges,     // Input graph number of edges
+    const int* row_offsets,   // Input graph row_offsets
+    const int* col_indices);  // Input graph col_indices
 
-/*
-// degree centrality
-void gunrock_topk(
-    struct  GRGraph*      graph_o,
-    void*                 node_ids,
-    void*                 in_degrees,
-    void*                 out_degrees,
-    const struct GRGraph* graph_i,
-    const struct GRSetup  config,
-    const struct GRTypes  data_t);
-
-// minimum spanning tree
-void gunrock_mst(
-    struct GRGraph*       graph_o,
-    const struct GRGraph* graph_i,
-    const struct GRSetup  config,
-    const struct GRTypes  data_t);
-
-void mst(
-    bool*      edge_mask,
-    const int  num_nodes,
-    const int  num_edges,
-    const int* row_offsets,
-    const int* col_indices);
-*/
-
-// TODO(ydwu): Add other primitives
+// TODO Add other primitives
 
 #ifdef __cplusplus
 }
