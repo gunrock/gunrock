@@ -27,25 +27,25 @@ int main(int argc, char* argv[]) {
     int col_indices[26] = {1, 2, 3, 0, 2, 4, 0, 1, 3, 4, 5, 0, 2,
                          5, 6, 1, 2, 5, 6, 2, 3, 4, 6, 3, 4, 5};
 
-    struct GRGraph *graph_o = (struct GRGraph*)malloc(sizeof(struct GRGraph));
-    struct GRGraph *graph_i = (struct GRGraph*)malloc(sizeof(struct GRGraph));
-    graph_i->num_nodes   = num_nodes;
-    graph_i->num_edges   = num_edges;
-    graph_i->row_offsets = (void*)&row_offsets[0];
-    graph_i->col_indices = (void*)&col_indices[0];
+    struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    graphi->num_nodes   = num_nodes;
+    graphi->num_edges   = num_edges;
+    graphi->row_offsets = (void*)&row_offsets[0];
+    graphi->col_indices = (void*)&col_indices[0];
 
-    gunrock_pagerank(graph_o, graph_i, config, data_t);
+    gunrock_pagerank(grapho, graphi, config, data_t);
 
     ////////////////////////////////////////////////////////////////////////////
-    int   *top_nodes = (  int*)malloc(sizeof(  int) * graph_i->num_nodes);
-    float *top_ranks = (float*)malloc(sizeof(float) * graph_i->num_nodes);
-    top_nodes = (  int*)graph_o->node_value2;
-    top_ranks = (float*)graph_o->node_value1;
+    int   *top_nodes = (  int*)malloc(sizeof(  int) * graphi->num_nodes);
+    float *top_ranks = (float*)malloc(sizeof(float) * graphi->num_nodes);
+    top_nodes = (  int*)grapho->node_value2;
+    top_ranks = (float*)grapho->node_value1;
     int node; for (node = 0; node < config.top_nodes; ++node)
         printf("Node_ID [%d] : Score: [%f]\n", top_nodes[node],top_ranks[node]);
 
-    if (graph_i) free(graph_i);
-    if (graph_o) free(graph_o);
+    if (graphi) free(graphi);
+    if (grapho) free(grapho);
     if (top_nodes) free(top_nodes);
     if (top_ranks) free(top_ranks);
 
