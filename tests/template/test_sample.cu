@@ -152,10 +152,17 @@ void SimpleReference(const Csr<VertexId, Value, SizeT> &graph) {
  * @tparam VertexId
  * @tparam SizeT
  * @tparam Value
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
  *
  * @param[in] parameter Test parameter settings.
  */
-template<typename VertexId, typename SizeT, typename Value>
+template <
+    typename VertexId,
+    typename SizeT,
+    typename Value,
+    bool DEBUG,
+    bool SIZE_CHECK >
 void RunTest(Test_Parameter *parameter) {
     typedef SampleProblem < VertexId, SizeT, Value,
         true,   // MARK_PREDECESSORS
@@ -242,6 +249,48 @@ void RunTest(Test_Parameter *parameter) {
 }
 
 /**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam DEBUG
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
+template <
+    typename      VertexId,
+    typename      Value,
+    typename      SizeT,
+    bool          DEBUG >
+void RunTests_size_check(Test_Parameter *parameter) {
+    if (parameter->size_check)
+        RunTest <VertexId, Value, SizeT, DEBUG,  true>(parameter);
+    else
+        RunTest <VertexId, Value, SizeT, DEBUG, false>(parameter);
+}
+
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
+template <
+    typename    VertexId,
+    typename    Value,
+    typename    SizeT >
+void RunTests_debug(Test_Parameter *parameter) {
+    if (parameter->debug)
+        RunTests_size_check <VertexId, Value, SizeT,  true>(parameter);
+    else
+        RunTests_size_check <VertexId, Value, SizeT, false>(parameter);
+}
+
+/**
  * @brief Sample test entry
  *
  * @tparam VertexId
@@ -275,7 +324,7 @@ void RunTest(
     parameter -> gpu_idx  = gpu_idx;
     parameter -> streams  = streams;
 
-    RunTest<VertexId, Value, SizeT>(parameter);
+    RunTests_debug<VertexId, Value, SizeT>(parameter);
 }
 
 // ----------------------------------------------------------------------------

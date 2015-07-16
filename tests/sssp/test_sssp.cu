@@ -728,7 +728,6 @@ void RunTests(
     } else if (src_str.compare("largestdegree") == 0) {
         int max_degree;
         parameter->src = graph->GetNodeWithHighestDegree(max_degree);
-        printf("Using highest degree (%d) vertex: %d\n", max_degree, parameter->src);
     } else {
         args.GetCmdLineArgument("src", parameter->src);
     }
