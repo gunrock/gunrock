@@ -975,24 +975,28 @@ public:
     void PrintParameters()
     {
         using namespace std;
-        cout << "g_quick:            " << g_quick            << endl;
-        cout << "g_stream_from_host: " << g_stream_from_host << endl;
-        cout << "g_undirected:       " << g_undirected       << endl;
-        cout << "instrumented:       " << instrumented       << endl;
-        cout << "debug:              " << debug              << endl;
-        cout << "size_check:         " << size_check         << endl;
-        cout << "mark_predecessors:  " << mark_predecessors  << endl;
-        cout << "enable_idempotence: " << enable_idempotence << endl;
-        cout << "src:                " << src                << endl;
-        cout << "max_grid_size:      " << max_grid_size      << endl;
-        cout << "num_gpus:           " << num_gpus           << endl;
-        cout << "max_queue_sizing:   " << max_queue_sizing   << endl;
-        cout << "max_in_sizing:      " << max_in_sizing      << endl;
-        cout << "partition_method:   " << partition_method   << endl;
-        cout << "partition_factor:   " << partition_factor   << endl;
-        cout << "partition_seed:     " << partition_seed     << endl;
-        cout << "iterations:         " << iterations         << endl;
-        cout << "traversal_mode:     " << traversal_mode     << endl;
+
+        cout << endl << "______________________________"       << endl;
+        cout << "==> Test Parameters:  "                       << endl;
+        cout << "g_quick:            \t" << g_quick            << endl;
+        cout << "g_stream_from_host: \t" << g_stream_from_host << endl;
+        cout << "g_undirected:       \t" << g_undirected       << endl;
+        cout << "instrumented:       \t" << instrumented       << endl;
+        cout << "debug:              \t" << debug              << endl;
+        cout << "size_check:         \t" << size_check         << endl;
+        cout << "mark_predecessors:  \t" << mark_predecessors  << endl;
+        cout << "enable_idempotence: \t" << enable_idempotence << endl;
+        cout << "src:                \t" << src                << endl;
+        cout << "max_grid_size:      \t" << max_grid_size      << endl;
+        cout << "num_gpus:           \t" << num_gpus           << endl;
+        cout << "max_queue_sizing:   \t" << max_queue_sizing   << endl;
+        cout << "max_in_sizing:      \t" << max_in_sizing      << endl;
+        cout << "partition_method:   \t" << partition_method   << endl;
+        cout << "partition_factor:   \t" << partition_factor   << endl;
+        cout << "partition_seed:     \t" << partition_seed     << endl;
+        cout << "iterations:         \t" << iterations         << endl;
+        cout << "traversal_mode:     \t" << traversal_mode     << endl;
+        cout << "------------------------------" << endl       << endl;
     }
 
     /**

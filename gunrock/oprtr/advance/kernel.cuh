@@ -33,8 +33,8 @@ namespace advance {
 
 template <typename KernelPolicy, typename Problem, typename Functor>
 cudaError_t ComputeOutputLength(
-    //                                 int                             num_block,
-    gunrock::app::FrontierAttribute<typename Problem::SizeT> 
+    // int                             num_block,
+    gunrock::app::FrontierAttribute<typename Problem::SizeT>
                                *frontier_attribute,
     typename Problem::SizeT    *d_offsets,
     typename Problem::VertexId *d_indices,
@@ -45,7 +45,7 @@ cudaError_t ComputeOutputLength(
     CudaContext                &context,
     cudaStream_t                stream,
     TYPE                        ADVANCE_TYPE,
-    bool                        express = false) 
+    bool                        express = false)
 {
     // Load Load Balanced Kernel
     // Get Rowoffsets
@@ -54,7 +54,7 @@ cudaError_t ComputeOutputLength(
     // load edge-expand-partitioned kernel
     //util::DisplayDeviceResults(d_in_key_queue, frontier_attribute.queue_length);
     typedef typename Problem::SizeT         SizeT;
-    if (frontier_attribute->queue_length ==0) 
+    if (frontier_attribute->queue_length ==0)
     {
         printf("setting output_length to 0");
         util::MemsetKernel<SizeT><<<1,1,0,stream>>>(frontier_attribute->output_length.GetPointer(util::DEVICE),0,1);
@@ -89,20 +89,20 @@ cudaError_t ComputeOutputLength(
                 max_out,
                 ADVANCE_TYPE);
     }
-    
+
     Scan<mgpu::MgpuScanTypeInc>(
-        (SizeT*)partitioned_scanned_edges, 
+        (SizeT*)partitioned_scanned_edges,
         frontier_attribute->queue_length, // TODO: +1?
-        (int )0, 
+        (int )0,
         mgpu::plus<SizeT>(),
-        (int*)0, 
-        (int*)0, 
-        (SizeT*)partitioned_scanned_edges, 
+        (int*)0,
+        (int*)0,
+        (SizeT*)partitioned_scanned_edges,
         context);
 
     return util::GRError(cudaMemcpyAsync(
          frontier_attribute->output_length.GetPointer(util::DEVICE),
-         partitioned_scanned_edges + frontier_attribute->queue_length - 1, // TODO: +1? 
+         partitioned_scanned_edges + frontier_attribute->queue_length - 1, // TODO: +1?
          sizeof(SizeT), cudaMemcpyDeviceToDevice, stream), "cudaMemcpyAsync failed", __FILE__, __LINE__);
 }
 
@@ -148,7 +148,7 @@ cudaError_t ComputeOutputLength(
 template <typename KernelPolicy, typename ProblemData, typename Functor>
     void LaunchKernel(
         gunrock::app::EnactorStats              &enactor_stats,
-        gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>         
+        gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                                 &frontier_attribute,
         typename ProblemData::DataSlice         *data_slice,
         typename ProblemData::VertexId          *backward_index_queue,

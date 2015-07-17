@@ -19,7 +19,7 @@ namespace cc {
             if (node == node_to_track[i]) return true;
         return false;
     }
- 
+
 /**
  * @brief Structure contains device functions for doing mask update.
  *
@@ -62,7 +62,7 @@ struct UpdateMaskFunctor
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                 parent, problem->component_ids + node);
         if (TO_TRACK)
-        if (to_track(node)) 
+        if (to_track(node))
             printf("UpdateMask [%d]: %d->%d\n", node, problem->masks[node], (parent == node)?0:1);
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                 (parent == node)?0:1, problem->masks + node);
@@ -93,7 +93,7 @@ struct HookInitFunctor
      */
     static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
-        return true; 
+        return true;
     }
 
     /**
@@ -140,7 +140,7 @@ struct HookMinFunctor
      * @brief Vertex mapping condition function. The vertex id is always valid.
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object 
+     * @param[in] problem Data slice object
      * @param[in] v auxiliary value
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -155,7 +155,7 @@ struct HookMinFunctor
 
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object 
+     * @param[in] problem Data slice object
      * @param[in] v auxiliary value
      */
     static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
@@ -208,14 +208,14 @@ struct HookMaxFunctor
      * @brief Vertex mapping condition function. The vertex id is always valid.
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object 
+     * @param[in] problem Data slice object
      * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
-       return true; 
+       return true;
     }
 
     /**
@@ -224,7 +224,7 @@ struct HookMaxFunctor
 
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object 
+     * @param[in] problem Data slice object
      * @param[in] v auxiliary value
      */
     static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
@@ -232,7 +232,7 @@ struct HookMaxFunctor
         bool mark;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                 mark, problem->marks + node);
-        if (!mark) 
+        if (!mark)
         {
             VertexId from_node;
             VertexId to_node;
@@ -250,15 +250,15 @@ struct HookMaxFunctor
             VertexId min_node = parent_from + parent_to - max_node;
             if (max_node == min_node) {
                 if (TO_TRACK)
-                if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node)) 
-                    printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d==\n", node, from_node, to_node, parent_from, parent_to, max_node, min_node); 
+                if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node))
+                    printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d==\n", node, from_node, to_node, parent_from, parent_to, max_node, min_node);
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         true, problem->marks + node);
-            } else //if (problem->component_ids[max_node] > min_node) 
+            } else //if (problem->component_ids[max_node] > min_node)
             {
                 if (TO_TRACK)
-                if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node)) 
-                    printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d->%d\n", node, from_node, to_node, parent_from, parent_to, max_node, problem->component_ids[max_node], min_node); 
+                if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node))
+                    printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d->%d\n", node, from_node, to_node, parent_from, parent_to, max_node, problem->component_ids[max_node], min_node);
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         min_node, problem->component_ids + max_node);
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -317,7 +317,7 @@ struct PtrJumpFunctor
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         0, problem->vertex_flag + 0);
             if (TO_TRACK)
-            if (to_track(node)) 
+            if (to_track(node))
                 printf("PtrJump [%d]: %d->%d\n", node, problem->component_ids[node], grand_parent);
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         grand_parent, problem->component_ids + node);
@@ -349,7 +349,7 @@ struct PtrJumpMaskFunctor
      */
     static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
     {
-        return true; 
+        return true;
     }
 
     /**
@@ -376,18 +376,18 @@ struct PtrJumpMaskFunctor
             if (parent != grand_parent) {
                 problem->vertex_flag[0] = 0;
                 if (TO_TRACK)
-                if (to_track(node)) 
+                if (to_track(node))
                     printf("PtrJumpMask [%d]: %d->%d\n", node, problem->component_ids[node], grand_parent);
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         grand_parent, problem->component_ids + node);
             } else {
                 if (TO_TRACK)
-                if (to_track(node)) 
+                if (to_track(node))
                     printf("PtrJumpMask mask[%d]: %d->%d\n", node, problem->masks[node], -1);
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         -1, problem->masks + node);
             }
-        } //else if (to_track(node)) 
+        } //else if (to_track(node))
         //printf("PtrJumpMask mask[%d] = %d\n", node, mask);
     }
 };
@@ -409,7 +409,7 @@ struct PtrJumpUnmaskFunctor
      * @brief Vertex mapping condition function. The vertex id is always valid.
      *
      * @param[in] node Vertex Id
-     * @param[in] problem Data slice object 
+     * @param[in] problem Data slice object
      * @param[in] v auxiliary value
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
@@ -441,7 +441,7 @@ struct PtrJumpUnmaskFunctor
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                     grand_parent, problem->component_ids + parent);
             if (TO_TRACK)
-            if (to_track(node)) 
+            if (to_track(node))
                 printf("PtrJumpUnMask [%d]: %d->%d\t", node, parent, grand_parent);
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                     grand_parent, problem->component_ids + node);

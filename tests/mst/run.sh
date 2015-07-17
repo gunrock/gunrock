@@ -1,6 +1,6 @@
 #!/bin/sh
 
-OPTION="--quick"
+OPTION=""
 
 # --quick running without CPU reference algorithm, if you want to test CPU
 # reference algorithm, delete $OPTION2 in some lines. Warning: for large

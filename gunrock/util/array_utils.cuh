@@ -179,8 +179,11 @@ public:
 
             if (ARRAY_DEBUG)
             {
-                printf("%s\t allocated on DEVICE, length =\t %lld, size =\t %lld bytes, pointer =\t %p\n",
-                       name.c_str(), (long long) size, (long long) size*sizeof(Value), d_pointer);fflush(stdout);
+                printf("%s\t allocating on DEVICE, length =\t %lld,"
+                       "size =\t %lld bytes, pointer =\t %p\n",
+                       name.c_str(), (long long) size,
+                       (long long) size*sizeof(Value), d_pointer);
+                fflush(stdout);
             }
             if (size!=0)
                 if (retval = GRError(cudaMalloc((void**)&(d_pointer), sizeof(Value) * size),
@@ -219,19 +222,24 @@ public:
             } else if ((target & HOST)==HOST && (setted & HOST) == HOST) {
                 UnSetPointer(HOST);
             }
-        //}
 
         if (((target & DEVICE) == DEVICE)&&((allocated & DEVICE) ==DEVICE))
         {
-            if (retval = GRError(cudaFree(d_pointer),name+" cudaFree failed", __FILE__, __LINE__)) return retval;
+            if (ARRAY_DEBUG)
+            {
+                printf("%s\t releasing on DEVICE, length =\t %lld\n",
+                       name.c_str(), (long long) size);
+                fflush(stdout);
+            }
+            if (retval = GRError(cudaFree(d_pointer),name + " cudaFree failed",
+                                 __FILE__, __LINE__)) return retval;
             d_pointer = NULL;
             allocated = allocated - DEVICE + TARGETBASE;
-            if (ARRAY_DEBUG)
-                {printf("%s\t released on DEVICE, length =\t %lld\n", name.c_str(), (long long) size);fflush(stdout);}
-        } else if ((target & DEVICE) == DEVICE && (setted & DEVICE) == DEVICE) {
+        }
+        else if ((target & DEVICE) == DEVICE && (setted & DEVICE) == DEVICE)
+        {
             UnSetPointer(DEVICE);
         }
-        //}
 
         return retval;
     } // Release(...)

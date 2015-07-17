@@ -72,14 +72,14 @@ namespace cc {
                 if (TO_TRACK)
                 if (to_track(key))
                     printf("Expand_Incoming [%d]: %d->%d\n", key, s_vertex_associate_org[0][key], s_vertex_associate_in[0][x]);
-                s_vertex_associate_org[0][key] = s_vertex_associate_in[0][x]; 
+                s_vertex_associate_org[0][key] = s_vertex_associate_in[0][x];
             }
             x+=STRIDE;
         }
     }
 
     template <
-        typename VertexId, 
+        typename VertexId,
         typename SizeT>
     __global__ void Mark_Difference_Queue (
         const SizeT           num_elements,
@@ -117,7 +117,7 @@ namespace cc {
         {
             SizeT Mx = marker[x];
             if ((x!=0 && marker[x-1]!=Mx)
-               ||(x==0 && Mx==1)) 
+               ||(x==0 && Mx==1))
             {
                 keys_out[Mx-1]=x;
                 c_ids_out[Mx-1]=c_ids[x];
@@ -197,15 +197,15 @@ public:
         }
 
         if (data_slice->num_gpus > 1)
-        { 
+        {
             if (data_slice->turn==0)
                 util::MemsetIdxKernel<<<128, 128, 0, stream>>> (
                 data_slice->old_c_ids.GetPointer(util::DEVICE),
                 graph_slice->nodes);
             else util::MemsetCopyVectorKernel
                 <<<128, 128, 0, stream>>>(
-                data_slice->old_c_ids.GetPointer(util::DEVICE), 
-                data_slice->component_ids.GetPointer(util::DEVICE), 
+                data_slice->old_c_ids.GetPointer(util::DEVICE),
+                data_slice->component_ids.GetPointer(util::DEVICE),
                 graph_slice->nodes);
         }
         data_slice->turn++;
@@ -263,7 +263,7 @@ public:
             Value,
             Problem> PtrJumpUnmaskFunctor;
 
-        enactor_stats->iteration=0; 
+        enactor_stats->iteration=0;
         frontier_attribute->queue_index  = 0;
         frontier_attribute->selector     = 0;
         frontier_attribute->queue_length = graph_slice->nodes;
@@ -328,7 +328,7 @@ public:
 
         enactor_stats->iteration = 1;
         data_slice->edge_flag[0] = 0;
-        while (!data_slice->edge_flag[0]) 
+        while (!data_slice->edge_flag[0])
         {
             frontier_attribute->queue_index  = 0;        // Work queue index
             frontier_attribute->queue_length = graph_slice->edges;
@@ -384,7 +384,7 @@ public:
             if (data_slice->edge_flag[0]) break; //|| enactor_stats->iteration>5) break;
 
             ///////////////////////////////////////////
-            // Pointer Jumping 
+            // Pointer Jumping
             frontier_attribute->queue_index  = 0;
             frontier_attribute->selector     = 0;
             frontier_attribute->queue_length = graph_slice->nodes;
@@ -392,7 +392,7 @@ public:
 
             // First Pointer Jumping Round
             data_slice->vertex_flag[0] = 0;
-            while (!data_slice->vertex_flag[0]) 
+            while (!data_slice->vertex_flag[0])
             {
                 data_slice->vertex_flag[0] = 1;
                 data_slice->vertex_flag.Move(util::HOST, util::DEVICE, 1, 0, stream);
@@ -484,7 +484,7 @@ public:
         bool                           express = false)
     {
         util::MemsetKernel<SizeT><<<1,1,0,stream>>>(frontier_attribute->output_length.GetPointer(util::DEVICE), frontier_attribute->queue_length ==0?0:1/*frontier_attribute->queue_length*/, 1);
-        return cudaSuccess;  
+        return cudaSuccess;
     }
 
     template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
@@ -520,7 +520,7 @@ public:
         FrontierAttribute<SizeT>      *frontier_attribute,
         EnactorStats                  *enactor_stats,
         GraphSlice                    *graph_slice
-        )    
+        )
     {
     }
 
@@ -539,14 +539,14 @@ public:
         }
 
         if (num_gpus < 2 && data_slice[0]->turn>0) return true;
-        
+
         for (int gpu=0; gpu<num_gpus; gpu++)
             if (data_slice[gpu]->turn==0)
         {
             //printf("data_slice[%d]->turn==0\n", gpu);fflush(stdout);
             return false;
         }
-        
+
         for (int gpu=0; gpu<num_gpus; gpu++)
         for (int peer=1; peer<num_gpus; peer++)
         for (int i=0; i<2; i++)
@@ -558,7 +558,7 @@ public:
 
         for (int gpu=0; gpu<num_gpus; gpu++)
         for (int peer=0; peer<num_gpus; peer++)
-        if (data_slice[gpu]->out_length[peer]!=0) 
+        if (data_slice[gpu]->out_length[peer]!=0)
         {
             //printf("data_slice[%d]->out_length[%d] = %d\n", gpu, peer, data_slice[gpu]->out_length[peer]); fflush(stdout);
             return false;
@@ -693,7 +693,7 @@ public:
                 data_slice->vertex_associate_orgs[0]=data_slice->component_ids.GetPointer(util::DEVICE);
                 data_slice->vertex_associate_orgs.Move(util::HOST, util::DEVICE);
             }
-            
+
             gunrock::app::Iteration_Loop
                 <1,0, CcEnactor, CcFunctor, CCIteration<AdvanceKernelPolicy, FilterKernelPolicy, CcEnactor> > (thread_data);
 
@@ -718,7 +718,7 @@ class CCEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHE
 {
     // Members
     _Problem    *problem      ;
-    ThreadSlice *thread_slices;    
+    ThreadSlice *thread_slices;
     CUTThread   *thread_Ids   ;
 
     // Methods
@@ -752,7 +752,7 @@ public:
         cutWaitForThreads(thread_Ids, this->num_gpus);
         delete[] thread_Ids   ; thread_Ids    = NULL;
         delete[] thread_slices; thread_slices = NULL;
-        problem = NULL;        
+        problem = NULL;
     }
 
     /**
@@ -775,7 +775,7 @@ public:
         unsigned long long total_lifetimes = 0;
         unsigned long long total_runtimes  = 0;
         total_queued = 0;
-        
+
         for (int gpu=0; gpu<this->num_gpus; gpu++)
         {
             if (util::SetDevice(this->gpu_idx[gpu])) return;
@@ -845,7 +845,7 @@ public:
     {
         return EnactorBase<SizeT, DEBUG, SIZE_CHECK>::Reset();
     }
- 
+
     template<
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy>

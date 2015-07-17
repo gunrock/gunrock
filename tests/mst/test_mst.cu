@@ -1,9 +1,9 @@
-// -----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
-// -----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// -----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 /**
  * @file
@@ -14,7 +14,6 @@
 
 #include <stdio.h>
 #include <string>
-#include <deque>
 #include <vector>
 #include <utility>
 #include <iostream>
@@ -48,51 +47,62 @@ using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::mst;
 
-////////////////////////////////////////////////////////////////////////////////
-// defines, constants, globals
-bool g_verbose;
-bool g_undirected;
-bool g_quick;
-bool g_stream_from_host;
-
-////////////////////////////////////////////////////////////////////////////////
-// housekeeping routines
+///////////////////////////////////////////////////////////////////////////////
+// Housekeeping and utility routines
+///////////////////////////////////////////////////////////////////////////////
 void Usage()
 {
   printf(
-    "\ntest_mst <graph type> <graph type args> [--device=<device_index>] "
-    "[--instrumented] [--quick] "
-    "[--v]\n"
-    "\n"
+    " ------------------------------------------------------------------\n"
+    " test_mst <graph type> <graph type args> [--device=<device_index>]\n"
+    " [--instrumented] [--quick] [--v]\n\n"
     "Graph types and args:\n"
     "  market [<file>]\n"
     "    Reads a Matrix-Market coordinate-format graph of directed/undirected\n"
-    "    edges from stdin (or from the optionally-specified file)\n"
+    "    edges from STDIN (or from the optionally-specified file)\n"
     "  --device=<device_index> Set GPU device for running the graph primitive\n"
     "  --instrumented If set then kernels keep track of queue-search_depth\n"
-    "  and barrier duty (a relative indicator of load imbalance)\n"
+    "      and barrier duty (a relative indicator of load imbalance)\n"
     "  --quick If set will skip the CPU validation code\n"
-    "  --v If set will enable DEBUG mode\n\n"
-    " --------------------------------------------------------------\n"
-    "  To make sure two graphs have same weight value for each edge \n"
-    "  we have to change ll_value = rand()%%64 in market.cuh file to \n"
-    "  some NON-RANDOM value if the original graph does NOT contain \n"
-    "  weight per edge. Note it only support FULLY-CONNECTED graphs \n"
-    " --------------------------------------------------------------\n");
+    "  --v If set will enable debug mode\n\n"
+    " ------------------------------------------------------------------\n");
 }
 
 /**
- * @brief Displays the MST result
+ * @brief Test_Parameter structure.
+ */
+struct MST_Test_Parameter : gunrock::app::TestParameter_Base
+{
+ public:
+  MST_Test_Parameter()
+  {
+
+  }
+
+  ~MST_Test_Parameter()
+  {
+
+  }
+
+  void Init(CommandLineArgs &args)
+  {
+    TestParameter_Base::Init(args);
+  }
+};
+
+/**
+ * @brief Displays the MST result.
  *
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] graph reference to the CSR graph we process on
+ * @param[in] graph Reference to the CSR graph.
+ * @param[in] mst_output Pointer to the MST edge mask.
  */
-////////////////////////////////////////////////////////////////////////////////
 template<typename VertexId, typename Value, typename SizeT>
-void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph, int *mst_output)
+void DisplaySolution(
+  const Csr<VertexId, Value, SizeT> &graph, int *mst_output)
 {
   fflush(stdout);
   int count = 0;
@@ -128,24 +138,9 @@ void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph, int *mst_output)
   if (source) { delete [] source; }
 }
 
-/**
- * @brief A simple connnectivity check utility
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] graph reference to the CSR graph we process on
- */
-template<typename VertexId, typename Value, typename SizeT>
-bool IsConnected(const Csr<VertexId, Value, SizeT> & graph)
-{
-  GRGraph *temp = (GRGraph*)malloc(sizeof(GRGraph));
-  unsigned int *components = (unsigned int*)malloc(sizeof(unsigned int));
-  run_cc<VertexId, Value, SizeT>(temp, components, graph, 0, 1);
-  if (temp) free(temp);
-  return *components == 1;
-}
+///////////////////////////////////////////////////////////////////////////////
+// CPU validation routines
+///////////////////////////////////////////////////////////////////////////////
 
 /**
  * @brief A simple CPU-based reference MST implementation.
@@ -154,22 +149,21 @@ bool IsConnected(const Csr<VertexId, Value, SizeT> & graph)
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] edge_values weight value associated with per edge
- * @param[in] graph reference to the CSR graph we process on
+ * @param[in] edge_values Weight value associated with each edge.
+ * @param[in] graph Reference to the CSR graph we process on.
  *
- *  \return long long int variable which indicates the total weight of the graph
+ *  \return long long int which indicates the total weight of the graph.
  */
-////////////////////////////////////////////////////////////////////////////////
 template<typename VertexId, typename Value, typename SizeT>
 Value SimpleReferenceMST(
   const Value *edge_values, const Csr<VertexId, Value, SizeT> &graph)
 {
   printf("\nMST CPU REFERENCE TEST\n");
 
-  // Kruskal minimum spanning tree preparations
+  // Kruskal's minimum spanning tree preparations
   using namespace boost;
   typedef adjacency_list< vecS, vecS, undirectedS,
-    no_property, property<edge_weight_t, int> >   Graph;
+    no_property, property<edge_weight_t, int> > Graph;
   typedef graph_traits < Graph >::edge_descriptor   Edge;
   typedef graph_traits < Graph >::vertex_descriptor Vertex;
   typedef std::pair<VertexId, VertexId> E;
@@ -201,7 +195,10 @@ Value SimpleReferenceMST(
   SizeT num_selected_cpu = 0;
   Value total_weight_cpu = 0;
 
-  if (graph.nodes <= 50) { printf("CPU Minimum Spanning Tree\n"); }
+  if (graph.nodes <= 50)
+  {
+    printf("CPU Minimum Spanning Tree\n");
+  }
   for (std::vector < Edge >::iterator ei = spanning_tree.begin();
        ei != spanning_tree.end(); ++ei)
   {
@@ -224,64 +221,97 @@ Value SimpleReferenceMST(
   return total_weight_cpu;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// GPU MST test routines
+///////////////////////////////////////////////////////////////////////////////
+
 /**
- * @brief Run MST tests
+ * @brief Sample test entry
  *
  * @tparam VertexId
- * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
+ * @tparam Value
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
  *
- * @param[in] graph the CSR graph we send to GPU to process
- * @param[in] max_grid_size Maximum CTA occupancy
- * @param[in] num_gpus Number of GPUs
- * @param[in] context CudaContext for moderngpu to use
- *
+ * @param[in] parameter Test parameter settings.
  */
-////////////////////////////////////////////////////////////////////////////////
-template <typename VertexId, typename Value, typename SizeT, bool INSTRUMENT>
-void RunTests(
-  const Csr<VertexId, Value, SizeT> & graph,
-  int max_grid_size,
-  int num_gpus,
-  mgpu::CudaContext & context)
+template <
+  typename VertexId,
+  typename SizeT,
+  typename Value,
+  bool     DEBUG,
+  bool     SIZE_CHECK >
+void RunTest(MST_Test_Parameter *parameter)
 {
   printf("\nMINIMUM SPANNING TREE TEST\n");
 
   // define the problem data structure for graph primitive
-  typedef MSTProblem<VertexId, SizeT, Value, true> Problem;
+  typedef MSTProblem<
+    VertexId,
+    SizeT,
+    Value,
+    true,    // MARK_PREDECESSORS
+    false,   // ENABLE_IDEMPOTENCE
+    true >   // USE_DOUBLE_BUFFER
+    Problem;
 
-  // INSTRUMENT specifies whether we want to keep such statistical data
+  Csr<VertexId, Value, SizeT>* graph =
+        (Csr<VertexId, Value, SizeT>*)parameter->graph;
+  ContextPtr* context            = (ContextPtr*)parameter -> context;
+  std::string partition_method   = parameter -> partition_method;
+  int         max_grid_size      = parameter -> max_grid_size;
+  int         num_gpus           = parameter -> num_gpus;
+  int*        gpu_idx            = parameter -> gpu_idx;
+  int         iterations         = parameter -> iterations;
+  bool        g_quick            = parameter -> g_quick;
+  bool        g_stream_from_host = parameter -> g_stream_from_host;
+  double      max_queue_sizing   = parameter -> max_queue_sizing;
+
   // allocate MST enactor map
-  MSTEnactor<INSTRUMENT> mst_enactor(g_verbose);
+  MSTEnactor<
+    Problem,
+    false,        // INSTRUMENT
+    DEBUG,        // DEBUG
+    SIZE_CHECK >  // SIZE_CHECK
+    mst_enactor(gpu_idx);
 
   // allocate problem on GPU create a pointer of the MSTProblem type
   Problem * mst_problem = new Problem;
 
   // host results spaces
-  VertexId * h_mst_output = new VertexId[graph.edges];
+  VertexId * h_mst_output = new VertexId[graph->edges];
 
   // copy data from CPU to GPU initialize data members in DataSlice
-  util::GRError(mst_problem->Init(g_stream_from_host, graph, num_gpus),
+  util::GRError(mst_problem->Init(g_stream_from_host, *graph, num_gpus),
     "Problem MST Initialization Failed", __FILE__, __LINE__);
 
-  // reset values in DataSlice
-  util::GRError(mst_problem->Reset(mst_enactor.GetFrontierType()),
-    "MST Problem Data Reset Failed", __FILE__, __LINE__);
+  //
+  // perform calculations
+  //
 
-  // perform MST
   GpuTimer gpu_timer;  // record the kernel running time
+  float elapsed_gpu = 0.0f;  // device elapsed running time
 
-  gpu_timer.Start();
+  for (int iter = 0; iter < iterations; ++iter)
+  {
+    // reset values in DataSlice
+    util::GRError(mst_problem->Reset(
+      mst_enactor.GetFrontierType(), max_queue_sizing),
+      "MST Problem Data Reset Failed", __FILE__, __LINE__);
 
-  // launch MST Enactor
-  util::GRError(mst_enactor.template Enact<Problem>(
-    context, mst_problem, max_grid_size),
-    "MST Problem Enact Failed", __FILE__, __LINE__);
+    gpu_timer.Start();
 
-  gpu_timer.Stop();
+    // launch MST enactor
+    util::GRError(mst_enactor.template Enact<Problem>(
+      *context, mst_problem, max_grid_size),
+      "MST Problem Enact Failed", __FILE__, __LINE__);
 
-  float elapsed_gpu = gpu_timer.ElapsedMillis();
+    gpu_timer.Stop();
+    elapsed_gpu += gpu_timer.ElapsedMillis();
+  }
+
+  elapsed_gpu /= iterations;
   printf("GPU - Computation Complete in %lf msec.\n", elapsed_gpu);
 
   // copy results back to CPU from GPU using Extract
@@ -292,7 +322,7 @@ void RunTests(
   {
     // calculate GPU final number of selected edges
     int num_selected_gpu = 0;
-    for (int iter = 0; iter < graph.edges; ++iter)
+    for (int iter = 0; iter < graph->edges; ++iter)
     {
       num_selected_gpu += h_mst_output[iter];
     }
@@ -300,17 +330,17 @@ void RunTests(
 
     // calculate GPU total selected MST weights for validation
     Value total_weight_gpu = 0;
-    for (int iter = 0; iter < graph.edges; ++iter)
+    for (int iter = 0; iter < graph->edges; ++iter)
     {
-      total_weight_gpu += h_mst_output[iter] * graph.edge_values[iter];
+      total_weight_gpu += h_mst_output[iter] * graph->edge_values[iter];
     }
 
     // correctness validation
-    Value total_weight_cpu = SimpleReferenceMST(graph.edge_values, graph);
+    Value total_weight_cpu = SimpleReferenceMST(graph->edge_values, *graph);
     if (total_weight_cpu == total_weight_gpu)
     {
       // print the edge pairs in the minimum spanning tree
-      DisplaySolution(graph, h_mst_output);
+      DisplaySolution(*graph, h_mst_output);
       printf("\nCORRECT.\n");
       std::cout << "CPU Total Weight = " << total_weight_cpu << std::endl;
       std::cout << "GPU Total Weight = " << total_weight_gpu << std::endl;
@@ -326,8 +356,33 @@ void RunTests(
   // clean up if necessary
   if (mst_problem)  delete     mst_problem;
   if (h_mst_output) delete [] h_mst_output;
+}
 
-  cudaDeviceSynchronize();
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam DEBUG
+ *
+ * @param[in] parameter Pointer to test parameter settings
+ */
+template <
+  typename VertexId,
+  typename Value,
+  typename SizeT,
+  bool     DEBUG >
+void RunTests_size_check(MST_Test_Parameter *parameter)
+{
+  if (parameter->size_check)
+  {
+    RunTest <VertexId, Value, SizeT, DEBUG,  true>(parameter);
+  }
+  else
+  {
+    RunTest <VertexId, Value, SizeT, DEBUG, false>(parameter);
+  }
 }
 
 /**
@@ -337,38 +392,99 @@ void RunTests(
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] graph the CSR graph we process on
- * @param[in] args Reference to the command line arguments
- * @param[in] context modern GPU CUDA context
+ * @param[in] parameter Pointer to test parameter settings
  */
-template <typename VertexId, typename Value, typename SizeT>
-void RunTests(
-  const Csr<VertexId, Value, SizeT> & graph,
-  CommandLineArgs                   & args,
-  mgpu::CudaContext                 & context)
+template <
+  typename VertexId,
+  typename Value,
+  typename SizeT >
+void RunTests_debug(MST_Test_Parameter *parameter)
 {
-  bool instrumented  = 0;  // do not collect instrumentation from kernels
-  int  max_grid_size = 0;  // maximum grid size (up to the enactor)
-  int  num_gpus      = 1;  // number of GPUs for multi-gpu enactor to use
-  g_quick            = 0;  // Whether or not to skip ref validation
-
-  instrumented = args.CheckCmdLineFlag("instrumented");
-  g_quick = args.CheckCmdLineFlag("quick");
-  g_verbose = args.CheckCmdLineFlag("v");
-
-  if (instrumented)
+  if (parameter->debug)
   {
-    RunTests<VertexId, Value, SizeT, true>(
-      graph, max_grid_size, num_gpus, context);
+    RunTests_size_check <VertexId, Value, SizeT,  true>(parameter);
   }
   else
   {
-    RunTests<VertexId, Value, SizeT, false>(
-      graph, max_grid_size, num_gpus, context);
+    RunTests_size_check <VertexId, Value, SizeT, false>(parameter);
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] graph    Pointer to the CSR graph we process on.
+ * @param[in] args     Reference to the command line arguments.
+ * @param[in] num_gpus Number of GPUs.
+ * @param[in] context  CudaContext pointer for ModernGPU APIs.
+ * @param[in] gpu_idx  GPU index to run algorithm.
+ * @param[in] streams  CUDA streams.
+ */
+template <typename VertexId, typename Value, typename SizeT>
+void RunTest(
+  Csr<VertexId, Value, SizeT>* graph,
+  CommandLineArgs&             args,
+  int                          num_gpus,
+  ContextPtr*                  context,
+  int*                         gpu_idx,
+  cudaStream_t*                streams = NULL)
+{
+  /*
+  // test graph connectivity because MST
+  // only supports fully-connected graph
+
+  Test_Parameter *cc_parameters = new Test_Parameter;
+  cc_parameters -> Init(args);
+  cc_parameters -> g_quick  = true;
+  cc_parameters -> graph    = graph;
+  cc_parameters -> num_gpus = num_gpus;
+  cc_parameters -> context  = context;
+  cc_parameters -> gpu_idx  = gpu_idx;
+  cc_parameters -> streams  = streams;
+
+  cc_parameters->PrintParameters();
+
+  // temporary storage for connected component algorithm
+  GRGraph *temp_storage = (GRGraph*)malloc(sizeof(GRGraph));
+
+  // perform connected component
+  runCC < VertexId, Value, SizeT,
+    false,  // INSTRUMENT
+    false,  // DEBUG
+    true >  // SIZE_CHECK
+    (temp_storage, cc_parameters);
+
+  // run test only if the graph is fully-connected
+  int* numcomponent = (int*)temp_storage->aggregation;
+  if (*numcomponent != 1)
+  {
+    fprintf(stderr, "Unsupported non-fully connected graph input.\n");
+    exit(1);
+  }
+
+  if (temp_storage) free(temp_storage);
+  */
+  // perform minimum spanning tree test
+  MST_Test_Parameter *parameter = new MST_Test_Parameter;
+
+  parameter -> Init(args);
+  parameter -> graph    = graph;
+  parameter -> num_gpus = num_gpus;
+  parameter -> context  = context;
+  parameter -> gpu_idx  = gpu_idx;
+  parameter -> streams  = streams;
+
+  RunTests_debug<VertexId, Value, SizeT>(parameter);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Main function
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv)
 {
   CommandLineArgs args(argc, argv);
@@ -379,12 +495,11 @@ int main(int argc, char** argv)
     return 1;
   }
 
-  int dev = 0;
-  args.GetCmdLineArgument("device", dev);
-  mgpu::ContextPtr context = mgpu::CreateCudaDevice(dev);
+  int device = 0;
+  args.GetCmdLineArgument("device", device);
+  mgpu::ContextPtr context = mgpu::CreateCudaDevice(device);
 
-  // parse graph-construction parameters
-  g_undirected = true;
+  bool g_undirected = true;  // graph-construction parameters
 
   std::string graph_type = argv[1];
   int flags = args.ParsedArgc();
@@ -422,24 +537,19 @@ int main(int argc, char** argv)
     // template argument = true because the graph has edge values
     Csr<VertexId, Value, SizeT> csr(false);
     if (graphio::BuildMarketGraph<true>(
-      market_filename, csr, g_undirected, false) != 0) { return 1; }
+      market_filename, csr, g_undirected, false) != 0)
+    {
+      return 1;
+    }
 
-    // display input graph
+    // display input graph with weights
     // csr.DisplayGraph(true);
 
-    /**************************************************************************
-     * Note: Minimum Spanning Tree only supports undirected, connected graphs *
-     **************************************************************************/
+    //
+    // Minimum Spanning Tree only supports undirected, connected graph
+    //
 
-    // test graph connectivity
-    if (IsConnected(csr))
-    {
-        RunTests(csr, args, *context);
-    }
-    else
-    {
-      fprintf(stderr, "Unsupported non-fully connected graph input.\n");
-    }
+    RunTest<VertexId, Value, SizeT>(&csr, args, 1, &context, &device);
   }
   else
   {

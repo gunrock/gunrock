@@ -32,51 +32,61 @@ namespace mst {
  * Type of unsigned integer to use for array indexing. (e.g., uint32)
  * @tparam _Value
  * Type of float or double to use for computing MST value.
- * @tparam _USE_DOUBLE_BUFFER
- * Boolean type parameter which defines whether to use double buffer.
+ * @tparam _MARK_PREDECESSORS  Whether to mark predecessor value for each node.
+ * @tparam _ENABLE_IDEMPOTENCE Whether to enable idempotent operation.
+ * @tparam _USE_DOUBLE_BUFFER  Defines whether to use double buffer.
  *
  */
 template <
-  typename _VertexId,
-  typename _SizeT,
-  typename _Value,
-  bool     _USE_DOUBLE_BUFFER>
-struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
+  typename VertexId,
+  typename SizeT,
+  typename Value,
+  bool _MARK_PREDECESSORS,
+  bool _ENABLE_IDEMPOTENCE,
+  bool _USE_DOUBLE_BUFFER>
+struct MSTProblem : ProblemBase <
+  VertexId, SizeT, Value,
+  _MARK_PREDECESSORS,
+  _ENABLE_IDEMPOTENCE,
+  _USE_DOUBLE_BUFFER,
+  false,                // _ENABLE_BACKWARD
+  false,                // _KEEP_ORDER
+  false >               // _KEEP_NODE_NUM
 {
-  typedef _VertexId VertexId;
-  typedef _SizeT    SizeT;
-  typedef _Value    Value;
-
-  static const bool MARK_PREDECESSORS  =  true;
-  static const bool ENABLE_IDEMPOTENCE = false;
+  static const bool MARK_PREDECESSORS  =  _MARK_PREDECESSORS;
+  static const bool ENABLE_IDEMPOTENCE = _ENABLE_IDEMPOTENCE;
 
   // helper structures
 
   /**
    * @brief Data slice structure which contains MST problem specific data.
+   *
+   * @tparam VertexId Type of signed integer to use as vertex IDs.
+   * @tparam SizeT    Type of int / uint to use for array indexing.
+   * @tparam Value    Type of float or double to use for attributes.
    */
-  struct DataSlice
+  struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
   {
-    SizeT    *d_labels;
+    util::Array1D<SizeT, VertexId> labels;
 
     // device storage arrays
-    int          *d_vertex_flag;  // finish flag for per-vertex kernels
-    int          *d_mst_output;   // mark selected edges with 1
-    unsigned int *d_flags_array;  // flags 1 start of segment, 0 otherwise
-    unsigned int *d_edge_flags;   // flags from the output of segment sort
-    VertexId     *d_keys_array;   // keys array - scan of the flags array
-    VertexId     *d_reduced_keys; // reduced keys array
-    VertexId     *d_successors;   // destination vertices that have min weight
-    VertexId     *d_origin_nodes; // used to track origin vertex ids
-    VertexId     *d_origin_edges; // origin edge list keep track of e_ids
-    VertexId     *d_super_edges;  // super edge list for next iteration
-    VertexId     *d_col_indices;  // column indices of CSR graph (edges)
-    VertexId     *d_temp_index;   // used for storing temp index
-    Value        *d_temp_value;   // used for storing temp value
-    Value        *d_reduced_vals; // store reduced minimum weights
-    Value        *d_edge_weights; // store weights per edge
-    SizeT        *d_supervtx_ids; // super vertex ids scanned from flags
-    SizeT        *d_row_offsets;  // row offsets of CSR graph
+    int          *d_vertex_flag;   // finish flag for per-vertex kernels
+    int          *d_mst_output;    // mark selected edges with 1
+    unsigned int *d_flags_array;   // flags 1 start of segment, 0 otherwise
+    unsigned int *d_edge_flags;    // flags from the output of segment sort
+    VertexId     *d_keys_array;    // keys array - scan of the flags array
+    VertexId     *d_reduced_keys;  // reduced keys array
+    VertexId     *d_successors;    // destination vertices that have min weight
+    VertexId     *d_origin_nodes;  // used to track origin vertex ids
+    VertexId     *d_origin_edges;  // origin edge list keep track of e_ids
+    VertexId     *d_super_edges;   // super edge list for next iteration
+    VertexId     *d_col_indices;   // column indices of CSR graph (edges)
+    VertexId     *d_temp_index;    // used for storing temp index
+    Value        *d_temp_value;    // used for storing temp value
+    Value        *d_reduced_vals;  // store reduced minimum weights
+    Value        *d_edge_weights;  // store weights per edge
+    SizeT        *d_supervtx_ids;  // super vertex ids scanned from flags
+    SizeT        *d_row_offsets;   // row offsets of CSR graph
   };
 
   // Members
@@ -87,9 +97,6 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
   // Size of the graph
   SizeT          nodes;
   SizeT          edges;
-
-  // Selector
-  SizeT          selector;
 
   // Set of data slices (one for each GPU)
   DataSlice      **data_slices;
@@ -134,6 +141,8 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
       if (util::GRError(
         cudaSetDevice(gpu_idx[i]),
         "~MSTProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
+
+      data_slices[i]->labels.Release();
 
       if (data_slices[i]->d_col_indices)
         util::GRError(cudaFree(data_slices[i]->d_col_indices),
@@ -211,7 +220,6 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
    *\return cudaError_t object which indicates the success of
    * all CUDA function calls.
    */
-  //TODO: write extract function
   cudaError_t Extract(SizeT *h_mst_output)
   {
     cudaError_t retval = cudaSuccess;
@@ -248,28 +256,38 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
    */
   cudaError_t Init(
     bool  stream_from_host,
-    const Csr<VertexId, Value, SizeT> &graph,
-    int   _num_gpus)
+    Csr<VertexId, Value, SizeT> &graph,
+    int   _num_gpus,
+    cudaStream_t* streams = NULL)
   {
     num_gpus = _num_gpus;
 
     nodes = graph.nodes;
     edges = graph.edges;
 
-    VertexId *h_row_offsets = graph.row_offsets;
-    VertexId *h_col_indices = graph.column_indices;
-
-    ProblemBase<VertexId, SizeT, _USE_DOUBLE_BUFFER>::Init(stream_from_host,
-      nodes, edges, h_row_offsets, h_col_indices, NULL, NULL, num_gpus);
+    ProblemBase < VertexId, SizeT, Value,
+      _MARK_PREDECESSORS,
+      _ENABLE_IDEMPOTENCE,
+      _USE_DOUBLE_BUFFER,
+      false,  // _ENABLE_BACKWARD
+      false,  // _KEEP_ORDER
+      false >::Init(stream_from_host, &graph, NULL, num_gpus, NULL, "random");
 
     // No data in DataSlice needs to be copied from host
 
-    /**
-     * Allocate output labels / predecessors
-     */
+    //
+    // Allocate output labels.
+    //
+
     cudaError_t retval = cudaSuccess;
-    data_slices   = new DataSlice*[num_gpus];
-    d_data_slices = new DataSlice*[num_gpus];
+    data_slices   = new DataSlice * [num_gpus];
+    d_data_slices = new DataSlice * [num_gpus];
+
+    if (streams == NULL)
+    {
+      streams = new cudaStream_t[num_gpus];
+      streams[0] = 0;
+    }
 
     do
     {
@@ -290,6 +308,16 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
           sizeof(DataSlice)),
           "MSTProblem cudaMalloc d_data_slices failed",
           __FILE__, __LINE__)) return retval;
+
+        data_slices[0][0].streams.SetPointer(streams, 1);
+        data_slices[0]->Init(
+          1,           // Number of GPUs
+          gpu_idx[0],  // GPU indices
+          0,           // Number of vertex associate
+          0,           // Number of value associate
+          &graph,      // Pointer to CSR graph
+          NULL,        // Number of in vertices
+          NULL);       // Number of out vertices
 
         // create SoA on device
         VertexId *d_col_indices;
@@ -480,7 +508,11 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
         util::MemsetKernel<<<128, 128>>>(
           data_slices[0]->d_temp_value, (Value)0, edges);
 
-        data_slices[0]->d_labels = NULL;
+        data_slices[0]->labels.SetName("labels");
+        if (retval = data_slices[0]->labels.Allocate(nodes, util::DEVICE))
+        {
+          return retval;
+        }
       }
     } while (0);
     return retval;
@@ -495,13 +527,8 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
    *  \return cudaError_t object which indicates the success of
    * all CUDA function calls.
    */
-  cudaError_t Reset(FrontierType frontier_type)
+  cudaError_t Reset(FrontierType frontier_type, double queue_sizing)
   {
-    typedef ProblemBase<VertexId, SizeT, _USE_DOUBLE_BUFFER> BaseProblem;
-
-    // load ProblemBase Reset
-    BaseProblem::Reset(frontier_type, 1.0f); // default queue sizing is 1.0
-
     cudaError_t retval = cudaSuccess;
 
     for (int gpu = 0; gpu < num_gpus; ++gpu)
@@ -511,6 +538,12 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
         cudaSetDevice(gpu_idx[gpu]),
         "MSTProblem cudaSetDevice failed",
         __FILE__, __LINE__)) return retval;
+
+      data_slices[gpu]->Reset(
+        frontier_type,
+        this->graph_slices[gpu],
+        queue_sizing,
+        queue_sizing);
 
       // Allocate output if necessary
       if (!data_slices[gpu]->d_col_indices)
@@ -692,24 +725,31 @@ struct MSTProblem : ProblemBase<_VertexId, _SizeT, _USE_DOUBLE_BUFFER>
         data_slices[gpu]->d_temp_value = d_temp_value;
       }
 
-      data_slices[0]->d_labels = NULL;
+      if (data_slices[gpu]->labels.GetPointer(util::DEVICE) == NULL)
+      {
+        if (retval = data_slices[gpu]->labels.Allocate(nodes, util::DEVICE))
+        {
+          return retval;
+        }
+      }
+
+      // put every vertex frontier queue used for mappings
+      util::MemsetIdxKernel<<<128, 128>>>(
+        data_slices[gpu]->frontier_queues[0].keys[0].GetPointer(util::DEVICE),
+        nodes);
+
+      // put every edges frontier queue used for mappings
+      util::MemsetIdxKernel<<<128, 128>>>(
+        data_slices[gpu]->frontier_queues[0].values[0].GetPointer(util::DEVICE),
+        edges);
 
       if (retval = util::GRError(cudaMemcpy(d_data_slices[gpu],
-        data_slices[gpu], sizeof(DataSlice), cudaMemcpyHostToDevice),
-        "MSTProblem cudaMemcpy data_slices to d_data_slices failed",
-        __FILE__, __LINE__)) return retval;
+          data_slices[gpu], sizeof(DataSlice), cudaMemcpyHostToDevice),
+          "MSTProblem cudaMemcpy data_slices to d_data_slices failed",
+          __FILE__, __LINE__)) return retval;
 
     }
-
-    // put every vertex / edges in frontier queue used for mappings
-    util::MemsetIdxKernel<<<128, 128>>>(
-      BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], nodes);
-
-    util::MemsetIdxKernel<<<128, 128>>>(
-      BaseProblem::graph_slices[0]->frontier_queues.d_values[0], edges);
-
     return retval;
-
   }
 
   /** @} */

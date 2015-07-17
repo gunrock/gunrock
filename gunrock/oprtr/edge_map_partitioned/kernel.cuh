@@ -97,7 +97,7 @@ struct Dispatch
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
-                                bool &inverse_graph, 
+                                bool &inverse_graph,
                                 gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
                                 gunrock::oprtr::advance::REDUCE_OP R_OP,
                                 Value *&d_value_to_reduce,
@@ -124,7 +124,7 @@ struct Dispatch
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
-                                bool &inverse_graph, 
+                                bool &inverse_graph,
                                 gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
                                 gunrock::oprtr::advance::REDUCE_OP R_OP,
                                 Value *&d_value_to_reduce,
@@ -180,7 +180,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             //printf("my_id = %d returned\t",my_id);
             return;
         }
-        
+
         VertexId v_id = d_queue[my_id];
         if (v_id < 0 || v_id > max_vertex) {
             d_scanned_edges[my_id] = 0;
@@ -259,7 +259,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             else
             {
                 input_queue_len = work_progress.template LoadQueueLength<SizeT>(queue_index);
-                
+
                 // Signal to host that we're done
                 //if (input_queue_len == 0) {
                 //    if (d_done) d_done[0] = input_queue_len;
@@ -283,7 +283,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         my_thread_start = bid * partition_size;
         my_thread_end = (bid+1)*partition_size < output_queue_len[0] ? (bid+1)*partition_size : output_queue_len[0];
-        //printf("tid:%d, bid:%d, m_thread_start:%d, m_thread_end:%d\n",tid, bid, my_thread_start, my_thread_end); 
+        //printf("tid:%d, bid:%d, m_thread_start:%d, m_thread_end:%d\n",tid, bid, my_thread_start, my_thread_end);
 
         if (my_thread_start >= output_queue_len[0])
             return;
@@ -371,7 +371,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
                                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                             u,
-                                            d_out + out_index); 
+                                            d_out + out_index);
                                 } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
                                          ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
                                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -390,7 +390,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                             d_value_to_reduce[lookup],
                                             d_reduce_frontier + out_index);
                                 }
-                            } else if (R_TYPE != gunrock::oprtr::advance::EMPTY) { 
+                            } else if (R_TYPE != gunrock::oprtr::advance::EMPTY) {
                                 // use user-specified function to generate value to reduce
                             }
                         } else {
@@ -445,14 +445,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 }
                             }
                         }
-                    } else {  // if (ProblemData::MARK_PREDECESSORS) 
+                    } else {  // if (ProblemData::MARK_PREDECESSORS)
                         if (Functor::CondEdge(v, u, problem, lookup, e_id)) {
                             Functor::ApplyEdge(v, u, problem, lookup, e_id);
                             if (d_out != NULL) {
                                 if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
                                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                             u,
-                                            d_out + out_index); 
+                                            d_out + out_index);
                                 } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
                                          ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
                                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -510,7 +510,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             }
                         }
                     } // end if
-                } // empty 
+                } // empty
             } // for
 
             edges_processed += e_last;
@@ -544,7 +544,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
-                                bool &inverse_graph, 
+                                bool &inverse_graph,
                                 gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
                                 gunrock::oprtr::advance::REDUCE_OP R_OP,
                                 Value *&d_value_to_reduce,
@@ -564,7 +564,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         }
 
         // Determine work decomposition
-        if (blockIdx.x == 0 && threadIdx.x == 0) { 
+        if (blockIdx.x == 0 && threadIdx.x == 0) {
 
             // obtain problem size
             if (queue_reset)
@@ -574,7 +574,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             else
             {
                 input_queue_len = work_progress.template LoadQueueLength<SizeT>(queue_index);
-                
                 // Signal to host that we're done
                 //if (input_queue_len == 0) {
                 //    if (d_done) d_done[0] = input_queue_len;
@@ -586,10 +585,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             // Reset our next outgoing queue counter to zero
             work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
             work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
-        } 
+        }
 
         // Barrier to protect work decomposition
-        __syncthreads(); 
+        __syncthreads();
 
         unsigned int range = input_queue_len;
         int tid = threadIdx.x;
@@ -613,21 +612,21 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             s_edge_ids[tid] = 0;
         }
         if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
-            if (inverse_graph) 
+            if (inverse_graph)
                 s_vertices[tid] = (my_id < range ? d_inverse_column_indices[d_queue[my_id]] : max_vertices);
             else
                 s_vertices[tid] = (my_id < range ? d_column_indices[d_queue[my_id]] : max_vertices);
             s_edge_ids[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
-        } 
+        }
 
         __syncthreads();
-        unsigned int size = s_edges[end_id]; 
+        unsigned int size = s_edges[end_id];
 
         VertexId v, e, e_id;
         int v_index = BinarySearch<KernelPolicy::THREADS>(tid, s_edges);
         v = s_vertices[v_index];
         e_id = s_edge_ids[v_index];
-        int end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices); 
+        int end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
 
         for (int i = tid; i < size; i += KernelPolicy::THREADS)
         {
@@ -653,7 +652,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                         if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                     u,
-                                    d_out + offset+i); 
+                                    d_out + offset+i);
                         } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
                                  ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -671,7 +670,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                     d_value_to_reduce[lookup],
                                     d_reduce_frontier + offset + i);
                         }
-                    } else if (R_TYPE != gunrock::oprtr::advance::EMPTY) { 
+                    } else if (R_TYPE != gunrock::oprtr::advance::EMPTY) {
                         // use user-specified function to generate value to reduce
                     }
                 }
@@ -726,7 +725,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                         }
                     }
                 }
-            } else { 
+            } else {
                 //v:pre, u:neighbor, outoffset:offset+i
                 if (Functor::CondEdge(v, u, problem, lookup, e_id)) {
                     Functor::ApplyEdge(v, u, problem, lookup, e_id);
@@ -734,7 +733,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                         if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                     u,
-                                    d_out + offset+i); 
+                                    d_out + offset+i);
                         } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
                                  ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -753,7 +752,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                     d_value_to_reduce[lookup],
                                     d_reduce_frontier + offset+i);
                         }
-                    } else if (R_TYPE != gunrock::oprtr::advance::EMPTY) { 
+                    } else if (R_TYPE != gunrock::oprtr::advance::EMPTY) {
                         // use user-specified function to generate value to reduce
                     }
                 }
@@ -763,7 +762,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 -1,
                                 d_out + offset+i);
                     }
-                    
+
                     if (d_value_to_reduce != NULL) {
                         switch (R_OP) {
                             case gunrock::oprtr::advance::PLUS :
@@ -953,7 +952,7 @@ void RelaxLightEdges(
         util::CtaWorkProgress           work_progress,
         util::KernelRuntimeStats        kernel_stats,
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
-        bool                            inverse_graph = false, 
+        bool                            inverse_graph = false,
         gunrock::oprtr::advance::REDUCE_TYPE R_TYPE = gunrock::oprtr::advance::EMPTY,
         gunrock::oprtr::advance::REDUCE_OP R_OP = gunrock::oprtr::advance::NONE,
         typename KernelPolicy::Value    *d_value_to_reduce = NULL,

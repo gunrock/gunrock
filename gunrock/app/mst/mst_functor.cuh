@@ -26,8 +26,9 @@ namespace mst {
  * @brief Structure contains device functions in MST graph traverse.
  *   find the successor of each vertex / super-vertex
  *
- * @tparam VertexId    Type of signed integer use as vertex id
- * @tparam SizeT       Type of unsigned integer for array indexing
+ * @tparam VertexId    Type of signed integer use as vertex identifier
+ * @tparam SizeT       Type of integer / unsigned integer for array indexing
+ * @tparam Value       Type of integer / float / double to attributes
  * @tparam ProblemData Problem data type contains data slice for MST problem
  */
 template<
@@ -82,8 +83,9 @@ struct SuccFunctor
  * @brief Structure contains device functions in MST graph traverse.
  *   find original edge ids for marking MST outputs
  *
- * @tparam VertexId    Type of signed integer use as vertex id
- * @tparam SizeT       Type of unsigned integer for array indexing
+ * @tparam VertexId    Type of signed integer use as vertex identifier
+ * @tparam SizeT       Type of integer / unsigned integer for array indexing
+ * @tparam Value       Type of integer / float / double to attributes
  * @tparam ProblemData Problem data type contains data slice for MST problem
  */
 template<
@@ -138,8 +140,9 @@ struct EdgeFunctor
  * @brief Structure contains device functions in MST graph traverse.
  *   used for marking MST output array
  *
- * @tparam VertexId    Type of signed integer to use as vertex id
- * @tparam SizeT       Type of unsigned integer to use for array indexing
+ * @tparam VertexId    Type of signed integer use as vertex identifier
+ * @tparam SizeT       Type of integer / unsigned integer for array indexing
+ * @tparam Value       Type of integer / float / double to attributes
  * @tparam ProblemData Problem data type contains data slice for MST problem
  */
 template<
@@ -194,8 +197,9 @@ struct MarkFunctor
  * @brief Structure contains device functions in MST graph traverse.
  *   used for removing cycles in successors
  *
- * @tparam VertexId    Type of signed integer to use as vertex id
- * @tparam SizeT       Type of unsigned integer to use for array indexing
+ * @tparam VertexId    Type of signed integer use as vertex identifier
+ * @tparam SizeT       Type of integer / unsigned integer for array indexing
+ * @tparam Value       Type of integer / float / double to attributes
  * @tparam ProblemData Problem data type contains data slice for MST problem
  */
 template<
@@ -255,8 +259,9 @@ struct CyRmFunctor
 /**
  * @brief Structure contains device functions for pointer jumping operation.
  *
- * @tparam VertexId    Type of signed integer to use as vertex id
- * @tparam SizeT       Type of unsigned integer to use for array indexing
+ * @tparam VertexId    Type of signed integer use as vertex identifier
+ * @tparam SizeT       Type of integer / unsigned integer for array indexing
+ * @tparam Value       Type of integer / float / double to attributes
  * @tparam ProblemData Problem data type contains data slice for MST problem
  */
 template<
@@ -293,7 +298,7 @@ struct PJmpFunctor
    * @param[in] v Vertex value
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
   {
     VertexId parent;
     util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -316,8 +321,9 @@ struct PJmpFunctor
  * @brief Structure contains device functions in MST graph traverse.
  *   used for remove redundant edges in one super-vertex
  *
- * @tparam VertexId    Type of signed integer to use as vertex id
- * @tparam SizeT       Type of unsigned integer to use for array indexing
+ * @tparam VertexId    Type of signed integer use as vertex identifier
+ * @tparam SizeT       Type of integer / unsigned integer for array indexing
+ * @tparam Value       Type of integer / float / double to attributes
  * @tparam ProblemData Problem data type contains data slice for MST problem
  */
 template<
@@ -330,7 +336,7 @@ struct EgRmFunctor
   typedef typename ProblemData::DataSlice DataSlice;
 
   /**
-   * @brief Forward Advance Kerenl condition function.
+   * @brief Forward Advance Kernel condition function.
    *
    * @param[in] s_id Vertex Id of the edge source node
    * @param[in] d_id Vertex Id of the edge destination node
@@ -415,8 +421,9 @@ struct EgRmFunctor
  * @brief Structure contains device functions in MST graph traverse.
  *   used for calculating row_offsets array for next iteration
  *
- * @tparam VertexId    Type of signed integer to use as vertex id
- * @tparam SizeT       Type of unsigned integer to use for array indexing
+ * @tparam VertexId    Type of signed integer use as vertex identifier
+ * @tparam SizeT       Type of integer / unsigned integer for array indexing
+ * @tparam Value       Type of integer / float / double to attributes
  * @tparam ProblemData Problem data type contains data slice for MST problem
  *
  */
@@ -430,7 +437,7 @@ struct RIdxFunctor
   typedef typename ProblemData::DataSlice DataSlice;
 
   /**
-   * @brief Filter Kerenel condition function.
+   * @brief Filter Kernel condition function.
    *   calculate new row_offsets
    *
    * @param[in] node Vertex Id
@@ -467,8 +474,9 @@ struct RIdxFunctor
  * @brief Structure contains device functions in MST graph traverse.
  *   used for generate edge flags
  *
- * @tparam VertexId    Type of signed integer to use as vertex id
- * @tparam SizeT       Type of unsigned integer to use for array indexing
+ * @tparam VertexId    Type of signed integer use as vertex identifier
+ * @tparam SizeT       Type of integer / unsigned integer for array indexing
+ * @tparam Value       Type of integer / float / double to attributes
  * @tparam ProblemData Problem data type contains data slice for MST problem
  */
 template<
@@ -508,56 +516,6 @@ struct EIdxFunctor
   {
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
       node, problem->d_row_offsets + problem->d_temp_index[node]);
-  }
-};
-
-////////////////////////////////////////////////////////////////////////////////
-/**
- * @brief Structure contains device functions in MST graph traverse.
- * used for generate edge flags
- *
- * @tparam VertexId    Type of signed integer to use as vertex id
- * @tparam SizeT       Type of unsigned integer to use for array indexing
- * @tparam ProblemData Problem data type contains data slice for MST problem
- */
-template<
-  typename VertexId,
-  typename SizeT,
-  typename Value,
-  typename ProblemData>
-struct OrFunctor
-{
-  typedef typename ProblemData::DataSlice DataSlice;
-
-  /**
-   * @brief Filter Kernel condition function.
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   * @param[in] v node value (if any)
-   *
-   * \return Whether to load the apply function for the node and include
-   * it in the outgoing vertex frontier.
-   */
-  static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-  {
-    return true;
-  }
-
-  /**
-   * @brief Filter Kernel apply function.
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   * @param[in] v node value (if any)
-   */
-  static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-  {
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      problem->d_edge_flags[node] | problem->d_flags_array[node],
-      problem->d_edge_flags + node);
   }
 };
 

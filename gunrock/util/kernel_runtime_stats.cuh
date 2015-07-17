@@ -224,10 +224,10 @@ public:
                 if (retval = util::GRError(cudaSetDevice(gpu),
                     "KernelRuntimeStatsLifetime cudaSetDevice failed: ", __FILE__, __LINE__)) break;
             }
-             
+
             // Copy out stats
             if (stream == 0)
-            {    
+            {
                 if (retval = util::GRError(cudaMemcpy(h_stat, d_stat, stat_bytes, cudaMemcpyDeviceToHost),
                     "KernelRuntimeStatsLifetime d_stat failed", __FILE__, __LINE__)) break;
             } else {
@@ -284,9 +284,5 @@ public:
     }
 };
 
-
-
-
 } // namespace util
 } // namespace gunrock
-
