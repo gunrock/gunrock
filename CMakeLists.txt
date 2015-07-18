@@ -203,9 +203,9 @@ if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(tests/wtf)
   add_subdirectory(tests/topk)
   add_subdirectory(tests/template)
-  #add_subdirectory(tests/mst)
-  #add_subdirectory(tests/mis)
+  add_subdirectory(tests/mst)
   #add_subdirectory(tests/vis)
+  #add_subdirectory(tests/mis)
 endif(GUNROCK_BUILD_APPLICATIONS)
 
 enable_testing()
@@ -238,6 +238,10 @@ set_tests_properties(TEST_DOBFS PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 add_test(NAME TEST_TOPK COMMAND degree_centrality market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
 set_tests_properties(TEST_TOPK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+add_test(NAME TEST_MST COMMAND minimum_spanning_tree market
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx)
+set_tests_properties(TEST_MST PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
 ### shared library application interface tests
 add_test(NAME SHARED_LIB_TEST_BFS COMMAND shared_lib_bfs)

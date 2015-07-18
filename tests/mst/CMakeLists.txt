@@ -24,3 +24,6 @@ CUDA_ADD_EXECUTABLE(minimum_spanning_tree
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
   ${mgpu_SOURCE_FILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
+
+target_link_libraries(minimum_spanning_tree ${Boost_LIBRARIES})
+target_link_libraries(minimum_spanning_tree ${METIS_LIBRARY})
