@@ -84,10 +84,11 @@ public:
         int dev = 0;            /* currently assumes GPU 0 */
         cudaGetDeviceProperties(&devProps, dev);
         info["name"] = devProps.name;
-        info["total_global_mem"] = int(devProps.totalGlobalMem);
+        info["total_global_mem"] = int64_t(devProps.totalGlobalMem);
         info["major"] = devProps.major;
         info["minor"] = devProps.minor;
         info["clock_rate"] = devProps.clockRate;
+        info["multi_processor_count"] = devProps.multiProcessorCount;
 
         int runtimeVersion, driverVersion;
         cudaRuntimeGetVersion(&runtimeVersion);
