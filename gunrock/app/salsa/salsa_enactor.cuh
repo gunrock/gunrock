@@ -344,15 +344,16 @@ class SALSAEnactor : public EnactorBase
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],            // d_out_queue
                     (VertexId*)NULL,
                     (VertexId*)NULL,
+                    graph_slice->d_row_offsets,
+                    graph_slice->d_column_indices,
                     graph_slice->d_column_offsets,
-                    graph_slice->d_row_indices,
-                    (SizeT*)NULL,
-                    (VertexId*)graph_slice->d_column_indices,
+                    graph_slice->d_row_indices,                    
                     graph_slice->nodes,//graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
                     graph_slice->edges,//graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
                     this->work_progress,
                     context,
                     gunrock::oprtr::advance::E2V,
+                    false,
                     true);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
@@ -385,15 +386,16 @@ class SALSAEnactor : public EnactorBase
                     graph_slice->frontier_queues.d_keys[frontier_attribute.selector^1],            // d_out_queue
                     (VertexId*)NULL,
                     (VertexId*)NULL,
+                    graph_slice->d_column_offsets,
+                    graph_slice->d_row_indices,
                     graph_slice->d_row_offsets,
-                    graph_slice->d_column_indices,
-                    (SizeT*)NULL,
-                    (VertexId*)graph_slice->d_row_indices,
+                    graph_slice->d_column_indices, 
                     graph_slice->nodes,//graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
                     graph_slice->edges,//graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
                     this->work_progress,
                     context,
                     gunrock::oprtr::advance::E2V,
+                    false,
                     true);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;

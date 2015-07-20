@@ -110,6 +110,7 @@ struct Dispatch
                                 VertexId &queue_index,
                                 int &label,
                                 SizeT *&d_row_offsets,
+                                SizeT *&d_inverse_row_offsets,
                                 VertexId *&d_column_indices,
                                 VertexId *&d_inverse_column_indices,
                                 unsigned int *&d_scanned_edges,
@@ -124,7 +125,8 @@ struct Dispatch
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
-                                bool &inverse_graph, 
+                                bool &input_inverse_graph, 
+                                bool &output_inverse_graph, 
                                 gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
                                 gunrock::oprtr::advance::REDUCE_OP R_OP,
                                 Value *&d_value_to_reduce,
@@ -183,6 +185,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         // add a zero length neighbor list to the end (this for getting both exclusive and inclusive scan in one array)
         SizeT ncount = GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
+        printf("vid:%d, ncount:%d\n", v_id, ncount);
         SizeT num_edges = (my_id == num_elements) ? 0 : ncount;
         d_scanned_edges[my_id] = num_edges;
     }
@@ -518,6 +521,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 VertexId &queue_index,
                                 int &label,
                                 SizeT *&d_row_offsets,
+                                SizeT *&d_inverse_row_offsets,
                                 VertexId *&d_column_indices,
                                 VertexId *&d_inverse_column_indices,
                                 unsigned int *&d_scanned_edges,
@@ -532,7 +536,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 util::CtaWorkProgress &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
-                                bool &inverse_graph, 
+                                bool &input_inverse_graph, 
+                                bool &output_inverse_graph, 
                                 gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
                                 gunrock::oprtr::advance::REDUCE_OP R_OP,
                                 Value *&d_value_to_reduce,
@@ -601,7 +606,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             s_edge_ids[tid] = 0;
         }
         if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
-            if (inverse_graph) 
+            if (input_inverse_graph) 
                 s_vertices[tid] = (my_id < range ? d_inverse_column_indices[d_queue[my_id]] : max_vertices);
             else
                 s_vertices[tid] = (my_id < range ? d_column_indices[d_queue[my_id]] : max_vertices);
@@ -630,9 +635,16 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             int internal_offset = v_index > 0 ? s_edges[v_index-1] : 0;
             e = i - internal_offset;
 
-            int lookup = d_row_offsets[v] + e;
-            //printf("tid:%d, bid:%d, s_vertices[tid]:%d, v_index:%d, lookup:%d, i:%d, internal_offset:%d, v:%d, row_offset[v]:%d end_id:%d, range:%d, size:%d\n", threadIdx.x, blockIdx.x, s_vertices[tid], v_index, lookup, i, internal_offset, v, d_row_offsets[v], end_id, range, size);
-            VertexId u = d_column_indices[lookup];
+            int lookup;
+            VertexId u;
+            if (output_inverse_graph) {
+                lookup = d_inverse_row_offsets[v] + e;
+                u = d_inverse_column_indices[lookup];
+                printf("tid:%d, bid:%d, s_vertices[tid]:%d, v_index:%d, lookup:%d, i:%d, internal_offset:%d, v:%d, u:%d, row_offset[v]:%d end_id:%d, range:%d, size:%d\n", threadIdx.x, blockIdx.x, s_vertices[tid], v_index, lookup, i, internal_offset, v, u, d_inverse_row_offsets[v], end_id, range, size);
+            } else {
+                lookup = d_row_offsets[v] + e;
+                u = d_column_indices[lookup];
+            }
           
             if (!ProblemData::MARK_PREDECESSORS) {
                 if (Functor::CondEdge(label, u, problem, lookup, e_id)) {
@@ -932,6 +944,7 @@ void RelaxLightEdges(
         typename KernelPolicy::VertexId queue_index,
         int                             label,
         typename KernelPolicy::SizeT    *d_row_offsets,
+        typename KernelPolicy::SizeT    *d_inverse_row_offsets,
         typename KernelPolicy::VertexId *d_column_indices,
         typename KernelPolicy::VertexId *d_inverse_column_indices,
         unsigned int    *d_scanned_edges,
@@ -944,7 +957,8 @@ void RelaxLightEdges(
         util::CtaWorkProgress           work_progress,
         util::KernelRuntimeStats        kernel_stats,
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
-        bool                            inverse_graph = false, 
+        bool                            input_inverse_graph = false, 
+        bool                            output_inverse_graph = false, 
         gunrock::oprtr::advance::REDUCE_TYPE R_TYPE = gunrock::oprtr::advance::EMPTY,
         gunrock::oprtr::advance::REDUCE_OP R_OP = gunrock::oprtr::advance::NONE,
         typename KernelPolicy::Value    *d_value_to_reduce = NULL,
@@ -955,6 +969,7 @@ void RelaxLightEdges(
                                 queue_index,
                                 label,
                                 d_row_offsets,
+                                d_inverse_row_offsets,
                                 d_column_indices,
                                 d_inverse_column_indices,
                                 d_scanned_edges,
@@ -969,7 +984,8 @@ void RelaxLightEdges(
                                 work_progress,
                                 kernel_stats,
                                 ADVANCE_TYPE,
-                                inverse_graph,
+                                input_inverse_graph,
+                                output_inverse_graph,
                                 R_TYPE,
                                 R_OP,
                                 d_value_to_reduce,

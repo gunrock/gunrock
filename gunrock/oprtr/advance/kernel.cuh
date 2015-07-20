@@ -93,7 +93,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             util::CtaWorkProgress                   work_progress,
             CudaContext                             &context,
             gunrock::oprtr::advance::TYPE           ADVANCE_TYPE,
-            bool                                    inverse_graph = false,
+            bool                                    input_inverse_graph = false,
+            bool                                    output_inverse_graph = false,
             gunrock::oprtr::advance::REDUCE_OP      R_OP = gunrock::oprtr::advance::NONE,
             gunrock::oprtr::advance::REDUCE_TYPE    R_TYPE = gunrock::oprtr::advance::EMPTY,
             typename KernelPolicy::Value            *d_value_to_reduce = NULL,
@@ -126,7 +127,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     max_out,                 // max_out_queue
                     enactor_stats.advance_kernel_stats,
                     ADVANCE_TYPE,
-                    inverse_graph,
+                    input_inverse_graph,
                     R_TYPE,
                     R_OP,
                     d_value_to_reduce,
@@ -224,7 +225,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         work_progress,
                         enactor_stats.advance_kernel_stats,
                         ADVANCE_TYPE,
-                        inverse_graph);
+                        input_inverse_graph);
             } else {
                 // Edge Map
                 gunrock::oprtr::edge_map_partitioned_backward::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
@@ -248,7 +249,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         work_progress,
                         enactor_stats.advance_kernel_stats,
                         ADVANCE_TYPE,
-                        inverse_graph);
+                        input_inverse_graph);
+
             }
             break;
         }
@@ -303,16 +305,33 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             typedef typename ProblemData::Value         Value;
             typedef typename KernelPolicy::LOAD_BALANCED LBPOLICY;
             int num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
-            gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
-            <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
-                                        d_row_offsets,
-                                        d_column_indices,
-                                        d_in_key_queue,
-                                        partitioned_scanned_edges,
-                                        frontier_attribute.queue_length+1,
-                                        max_in,
-                                        max_out,
-                                        ADVANCE_TYPE);
+            //input inverse graph:false, to get the right edge, output inverse graph:true to get right neighbor list
+            if (!output_inverse_graph)
+                gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
+                    <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
+                            d_row_offsets,
+                            d_column_indices,
+                            d_in_key_queue,
+                            partitioned_scanned_edges,
+                            frontier_attribute.queue_length+1,
+                            max_in,
+                            max_out,
+                            ADVANCE_TYPE);
+            else {
+                gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
+                    <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
+                            d_column_offsets,
+                            d_row_indices,
+                            d_in_key_queue,
+                            partitioned_scanned_edges,
+                            frontier_attribute.queue_length+1,
+                            max_in,
+                            max_out,
+                            ADVANCE_TYPE);
+
+            util::DisplayDeviceResults(d_row_indices, max_out);
+            util::DisplayDeviceResults(d_column_offsets, max_in);
+            }
 
 
             Scan<mgpu::MgpuScanTypeExc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length+1, (int)0, mgpu::plus<int>(),
@@ -324,6 +343,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length, sizeof(SizeT), cudaMemcpyDeviceToHost);
             SizeT output_queue_len = temp[0];
 
+            printf("output queue len:%d\n", output_queue_len);
 
             if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
             {
@@ -333,6 +353,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         frontier_attribute.queue_index,
                         enactor_stats.iteration,
                         d_row_offsets,
+                        d_column_offsets,
                         d_column_indices,
                         d_row_indices,
                         &partitioned_scanned_edges[1],
@@ -347,7 +368,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         work_progress,
                         enactor_stats.advance_kernel_stats,
                         ADVANCE_TYPE,
-                        inverse_graph,
+                        input_inverse_graph,
+                        output_inverse_graph,
                         R_TYPE,
                         R_OP,
                         d_value_to_reduce,
@@ -397,7 +419,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         work_progress,
                                         enactor_stats.advance_kernel_stats,
                                         ADVANCE_TYPE,
-                                        inverse_graph,
+                                        input_inverse_graph,
                                         R_TYPE,
                                         R_OP,
                                         d_value_to_reduce,
