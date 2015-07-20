@@ -250,7 +250,7 @@ void DisplayStats(
                 printf(", total queued: %lld", total_queued);
             }
         }
-        info["total_queued"] = total_queued;
+        info["total_queued"] = int64_t(total_queued);
         if (redundant_work > 0)
         {
             if (!g_quiet)
