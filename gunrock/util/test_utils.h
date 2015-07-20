@@ -113,7 +113,7 @@ public:
         std::string commandLineStr = "";
         for (int i = 0; i < argc; i++)
         {
-            commandLineStr.append(std::string(argv[i]).append(" "));
+            commandLineStr.append(std::string(argv[i]).append((i < argc - 1) ? " " : ""));
         }
         return commandLineStr;
     }
