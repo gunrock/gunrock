@@ -118,7 +118,8 @@ int BuildRmatGraph (
     double a0 = 0.55,
     double b0 = 0.2,
     double c0 = 0.2,
-    double d0 = 0.05)
+    double d0 = 0.05,
+    bool quiet = false)
 {
     typedef Coo<VertexId, Value> EdgeTupleType;
 

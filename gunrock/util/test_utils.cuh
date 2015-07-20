@@ -361,44 +361,54 @@ inline bool EnoughDeviceMemory(unsigned int mem_needed)
  *
  */
 template <typename T, typename SizeT>
-int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
+int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true,
+                   bool quiet = false)
 {
     int flag = 0;
     for (SizeT i = 0; i < len; i++)
     {
         if (computed[i] != reference[i] && flag == 0)
         {
-            printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
-            PrintValue<T>(computed[i]);
-            printf(" != ");
-            PrintValue<T>(reference[i]);
-
-            if (verbose)
+            if (~quiet)
             {
-                printf("\nresult[...");
-                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
+                PrintValue<T>(computed[i]);
+                printf(" != ");
+                PrintValue<T>(reference[i]);
+
+                if (verbose)
                 {
-                    PrintValue<T>(computed[j]);
-                    printf(", ");
+                    printf("\nresult[...");
+                    for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                    {
+                        PrintValue<T>(computed[j]);
+                        printf(", ");
+                    }
+                    printf("...]");
+                    printf("\nreference[...");
+                    for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                    {
+                        PrintValue<T>(reference[j]);
+                        printf(", ");
+                    }
+                    printf("...]");
                 }
-                printf("...]");
-                printf("\nreference[...");
-                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
-                {
-                    PrintValue<T>(reference[j]);
-                    printf(", ");
-                }
-                printf("...]");
             }
             flag += 1;
             //return flag;
         }
         if (computed[i] != reference[i] && flag > 0) flag+=1;
     }
-    printf("\n");
+    if (!quiet)
+    {
+        printf("\n");
+    }
     if (flag == 0)
     {
-        printf("CORRECT");
+        if (!quiet)
+        {
+            printf("CORRECT");
+        }
     }
     return flag;
 }
@@ -424,7 +434,8 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
  */
 template <typename SizeT>
 int CompareResults(
-    float* computed, float* reference, SizeT len, bool verbose = true)
+    float* computed, float* reference, SizeT len, bool verbose = true,
+    bool quiet = false)
 {
     float THRESHOLD = 0.05f;
     int flag = 0;
@@ -449,36 +460,44 @@ int CompareResults(
 
         if (!is_right)
         {
-            printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
-            PrintValue<float>(computed[i]);
-            printf(" != ");
-            PrintValue<float>(reference[i]);
-
-            if (verbose)
+            if (!quiet)
             {
-                printf("\nresult[...");
-                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
+                PrintValue<float>(computed[i]);
+                printf(" != ");
+                PrintValue<float>(reference[i]);
+
+                if (verbose)
                 {
-                    PrintValue<float>(computed[j]);
-                    printf(", ");
+                    printf("\nresult[...");
+                    for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                    {
+                        PrintValue<float>(computed[j]);
+                        printf(", ");
+                    }
+                    printf("...]");
+                    printf("\nreference[...");
+                    for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                    {
+                        PrintValue<float>(reference[j]);
+                        printf(", ");
+                    }
+                    printf("...]");
                 }
-                printf("...]");
-                printf("\nreference[...");
-                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
-                {
-                    PrintValue<float>(reference[j]);
-                    printf(", ");
-                }
-                printf("...]");
             }
             flag += 1;
         }
         if (!is_right && flag > 0) flag += 1;
     }
-    printf("\n");
+    if (!quiet) {
+        printf("\n");
+    }
     if (!flag)
     {
-        printf("CORRECT");
+        if (!quiet)
+        {
+            printf("CORRECT");
+        }
     }
     return flag;
 }

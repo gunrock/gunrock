@@ -1,0 +1,100 @@
+// ----------------------------------------------------------------
+// Gunrock -- Fast and Efficient GPU Graph Library
+// ----------------------------------------------------------------
+// This source code is distributed under the terms of LICENSE.TXT
+// in the root directory of this source distribution.
+// ----------------------------------------------------------------
+
+/**
+ * @file
+ * sysinfo.h
+ *
+ * @brief Reports information about your system (CPU/OS, GPU)
+ */
+
+#pragma once
+
+#include <gunrock/util/json_spirit_writer_template.h>
+#include <sys/utsname.h>        /* for Cpuinfo */
+#include <cuda.h>               /* for Gpuinfo */
+#include <cuda_runtime_api.h>   /* for Gpuinfo */
+
+
+namespace gunrock {
+namespace util {
+
+class Sysinfo {
+private:
+    struct utsname uts;
+public:
+    Sysinfo()
+    {
+        uname(&uts);
+    }
+
+    std::string sysname() const
+    {
+        return std::string(uts.sysname);
+    }
+    std::string release() const
+    {
+        return std::string(uts.release);
+    }
+    std::string version() const
+    {
+        return std::string(uts.version);
+    }
+    std::string machine() const
+    {
+        return std::string(uts.machine);
+    }
+
+    json_spirit::mObject getSysinfo() const
+    {
+        json_spirit::mObject json_sysinfo;
+
+        json_sysinfo["sysname"] = sysname();
+        json_sysinfo["release"] = release();
+        json_sysinfo["version"] = version();
+        json_sysinfo["machine"] = machine();
+        return json_sysinfo;
+    }
+
+};
+
+class Gpuinfo {
+private:
+public:
+    json_spirit::mObject getGpuinfo() const
+    {
+        json_spirit::mObject info;
+        cudaDeviceProp devProps;
+
+        int deviceCount;
+        cudaGetDeviceCount(&deviceCount);
+        if (deviceCount == 0)   /* no valid devices */
+        {
+            return info;        /* empty */
+        }
+        int dev = 0;            /* currently assumes GPU 0 */
+        cudaGetDeviceProperties(&devProps, dev);
+        info["name"] = devProps.name;
+        info["total_global_mem"] = int(devProps.totalGlobalMem);
+        info["major"] = devProps.major;
+        info["minor"] = devProps.minor;
+        info["clock_rate"] = devProps.clockRate;
+
+        int runtimeVersion, driverVersion;
+        cudaRuntimeGetVersion(&runtimeVersion);
+        cudaDriverGetVersion(&driverVersion);
+        info["driver_api"] = CUDA_VERSION;
+        info["driver_version"] = driverVersion;
+        info["runtime_version"] = runtimeVersion;
+        info["compute_version"] = devProps.major * 10 + devProps.minor;
+        return info;
+    }
+};
+
+
+} //util
+} //gunrock
