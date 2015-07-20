@@ -888,7 +888,7 @@ int main( int argc, char** argv)
     {
         std::string ofname;
         args.GetCmdLineArgument("jsonfile", ofname);
-        std::ofstream of(ofname);
+        std::ofstream of(ofname.data());
         json_spirit::write_stream(json_spirit::mValue(info), of,
                                   json_spirit::pretty_print);
     }
@@ -908,7 +908,7 @@ int main( int argc, char** argv)
                 std::remove(filename.begin(), filename.end(), badchars[i]),
                 filename.end());
         }
-        std::ofstream of(filename);
+        std::ofstream of(filename.data());
         json_spirit::write_stream(json_spirit::mValue(info), of,
                                   json_spirit::pretty_print);
     }
