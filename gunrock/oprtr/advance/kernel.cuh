@@ -101,6 +101,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             typename KernelPolicy::Value            *d_reduced_value = NULL)
 
 {
+
     switch (KernelPolicy::ADVANCE_MODE)
     {
         case TWC_FORWARD:
@@ -313,12 +314,16 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         max_out,
                                         ADVANCE_TYPE);
 
+
             Scan<mgpu::MgpuScanTypeExc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length+1, (int)0, mgpu::plus<int>(),
             (int*)0, (int*)0, (int*)partitioned_scanned_edges, context);
+
+            //util::DisplayDeviceResults(partitioned_scanned_edges, frontier_attribute.queue_length+1);
 
             SizeT *temp = new SizeT[1];
             cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length, sizeof(SizeT), cudaMemcpyDeviceToHost);
             SizeT output_queue_len = temp[0];
+
 
             if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
             {

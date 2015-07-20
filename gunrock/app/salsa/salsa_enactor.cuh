@@ -225,20 +225,20 @@ class SALSAEnactor : public EnactorBase
             if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
                 if (retval = util::GRError(cudaMalloc(
                                 (void**)&d_scanned_edges,
-                                graph_slice->edges * sizeof(unsigned int)),
+                                (graph_slice->edges+1) * sizeof(unsigned int)),
                                 "SALSAProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
             }
 
             // Step through SALSA iterations 
             {
 
-                if (retval = util::GRError(cudaBindTexture(
+                /*if (retval = util::GRError(cudaBindTexture(
                     0,
                     gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
                     graph_slice->d_row_offsets,
                     row_offsets_desc,
                     (graph_slice->nodes + 1) * sizeof(SizeT)),
-                        "SALSAEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
+                        "SALSAEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;*/
 
 
                 util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], graph_slice->nodes);
@@ -271,13 +271,13 @@ class SALSAEnactor : public EnactorBase
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
 
-                if (retval = util::GRError(cudaBindTexture(
+                /*if (retval = util::GRError(cudaBindTexture(
                                 0,
                                 gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
                                 graph_slice->d_column_offsets,
                                 row_offsets_desc,
                                 (graph_slice->nodes + 1) * sizeof(SizeT)),
-                            "SALSAEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
+                            "SALSAEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;*/
 
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SALSAProblem, AForwardFunctor>(
@@ -309,22 +309,27 @@ class SALSAEnactor : public EnactorBase
             //util::DisplayDeviceResults(problem->data_slices[0]->d_hub_predecessors, graph_slice->edges);
             //util::DisplayDeviceResults(problem->data_slices[0]->d_auth_predecessors, graph_slice->edges);
 
-            while (true) { 
+            frontier_attribute.queue_length     = graph_slice->edges;
 
+            /*util::DisplayDeviceResults(graph_slice->d_column_offsets, graph_slice->nodes);
+            util::DisplayDeviceResults(graph_slice->d_row_indices, graph_slice->edges);
+
+            util::DisplayDeviceResults(graph_slice->d_row_offsets, graph_slice->nodes);
+            util::DisplayDeviceResults(graph_slice->d_column_indices, graph_slice->edges);*/
+            while (true) { 
 
                 util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], graph_slice->edges);
 
-                if (retval = util::GRError(cudaBindTexture(
+                /*if (retval = util::GRError(cudaBindTexture(
                     0,
                     gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
                     graph_slice->d_column_offsets,
                     row_offsets_desc,
                     (graph_slice->nodes + 1) * sizeof(SizeT)),
-                        "SALSAEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
+                        "SALSAEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;*/
 
                 frontier_attribute.queue_length     = graph_slice->edges;
                 if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
-
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SALSAProblem, HBackwardFunctor>(
                     d_done,
@@ -343,8 +348,8 @@ class SALSAEnactor : public EnactorBase
                     graph_slice->d_row_indices,
                     (SizeT*)NULL,
                     (VertexId*)graph_slice->d_column_indices,
-                    graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
-                    graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
+                    graph_slice->nodes,//graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
+                    graph_slice->edges,//graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
                     this->work_progress,
                     context,
                     gunrock::oprtr::advance::E2V,
@@ -358,13 +363,13 @@ class SALSAEnactor : public EnactorBase
 
                 NormalizeRank<SALSAProblem>(problem, context, 0, graph_slice->nodes);
 
-                if (retval = util::GRError(cudaBindTexture(
+                /*if (retval = util::GRError(cudaBindTexture(
                     0,
                     gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
                     graph_slice->d_row_offsets,
                     row_offsets_desc,
                     (graph_slice->nodes + 1) * sizeof(SizeT)),
-                        "SALSAEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
+                        "SALSAEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;*/
 
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SALSAProblem, ABackwardFunctor>(
@@ -384,8 +389,8 @@ class SALSAEnactor : public EnactorBase
                     graph_slice->d_column_indices,
                     (SizeT*)NULL,
                     (VertexId*)graph_slice->d_row_indices,
-                    graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
-                    graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
+                    graph_slice->nodes,//graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
+                    graph_slice->edges,//graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
                     this->work_progress,
                     context,
                     gunrock::oprtr::advance::E2V,

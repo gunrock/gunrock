@@ -40,6 +40,7 @@ using namespace gunrock;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::hits;
+using namespace std;
 
 
 /******************************************************************************
@@ -98,7 +99,7 @@ void Usage()
  * @param[in] nodes Number of nodes in the graph.
  */
 template<typename Value, typename SizeT>
-void DisplaySolution(Value *hrank, Value *arank, SizeT nodes)
+void DisplaySolution(Value *hrank, Value *arank, SizeT nodes, ofstream &f_hub, ofstream &f_auth)
 {
     //sort the top page ranks
     RankPair<SizeT, Value> *hr_list =
@@ -120,14 +121,17 @@ void DisplaySolution(Value *hrank, Value *arank, SizeT nodes)
 
     // Print out at most top 10 largest components
     int top = (nodes < 10) ? nodes : 10;
-    printf("Top %d Ranks:\n", top);
     for (int i = 0; i < top; ++i)
     {
-        printf("Vertex ID: %d, Hub Rank: %5f\n",
+        /*printf("Vertex ID: %d, Hub Rank: %5f\n",
                hr_list[i].vertex_id, hr_list[i].page_rank);
         printf("Vertex ID: %d, Authority Rank: %5f\n",
-               ar_list[i].vertex_id, ar_list[i].page_rank);
+               ar_list[i].vertex_id, ar_list[i].page_rank);*/
+        f_hub << hr_list[i].vertex_id << ":" << hr_list[i].page_rank << ",";
+        f_auth << ar_list[i].vertex_id << ":" << ar_list[i].page_rank << ",";
     }
+    f_hub << endl;
+    f_auth << endl;
 
     free(hr_list);
     free(ar_list);
@@ -304,44 +308,55 @@ void RunTests(
     long long           total_queued = 0;
     double              avg_duty = 0.0;
 
+    ofstream f_hub;
+    ofstream f_auth;
+    f_hub.open("hub.txt");
+    f_auth.open("auth.txt");
+
     // Perform HITS
     GpuTimer gpu_timer;
 
-    util::GRError(
-        csr_problem->Reset(src, delta, hits_enactor.GetFrontierType()),
-        "HITS Problem Data Reset Failed", __FILE__, __LINE__);
     gpu_timer.Start();
-    util::GRError(
-        hits_enactor.template Enact<Problem>(
-            context, csr_problem, max_iter, max_grid_size),
-        "HITS Problem Enact Failed", __FILE__, __LINE__);
-    gpu_timer.Stop();
+    for (int i = 0; i < graph.nodes; ++i) {
+        util::GRError(
+                csr_problem->Reset(i, delta, hits_enactor.GetFrontierType()),
+                "HITS Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(
+                hits_enactor.template Enact<Problem>(
+                    context, csr_problem, max_iter, max_grid_size),
+                "HITS Problem Enact Failed", __FILE__, __LINE__);
+
+        // Copy out results
+        util::GRError(
+                csr_problem->Extract(h_hrank, h_arank),
+                "HITS Problem Data Extraction Failed", __FILE__, __LINE__);
+
+    
+        DisplaySolution(h_hrank, h_arank, graph.nodes, f_hub, f_auth);
+    }
 
     hits_enactor.GetStatistics(total_queued, avg_duty);
 
-    double elapsed = gpu_timer.ElapsedMillis();
+    gpu_timer.Stop();
 
-    // Copy out results
-    util::GRError(
-        csr_problem->Extract(h_hrank, h_arank),
-        "HITS Problem Data Extraction Failed", __FILE__, __LINE__);
+    double elapsed = gpu_timer.ElapsedMillis(); 
 
     // Verify the result
-    if (reference_check_a != NULL)
+    /*if (reference_check_a != NULL)
     {
         printf("Validity: ");
         CompareResults(h_hrank, reference_check_h, graph.nodes, true);
         CompareResults(h_arank, reference_check_a, graph.nodes, true);
-    }
+    }*/
 
-    printf("\nFirst 40 labels of the GPU result.");
+    //printf("\nFirst 40 labels of the GPU result.");
     // Display Solution
-    DisplaySolution(h_hrank, h_arank, graph.nodes);
+    //DisplaySolution(h_hrank, h_arank, graph.nodes);
 
-    DisplayStats(
+    /*DisplayStats(
         *stats,
         elapsed,
-        avg_duty);
+        avg_duty);*/
 
     // Cleanup
     delete stats;
@@ -351,6 +366,9 @@ void RunTests(
 
     if (h_hrank) free(h_hrank);
     if (h_arank) free(h_arank);
+
+    f_hub.close();
+    f_auth.close();
 
     cudaDeviceSynchronize();
 }

@@ -171,7 +171,11 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         int my_id = bid*blockDim.x + tid;
         if (my_id > num_elements || my_id >= max_edge)
             return;
-        VertexId v_id = d_queue[my_id];
+        VertexId v_id;
+        if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E || ADVANCE_TYPE == gunrock::oprtr::advance::V2V)
+            v_id = (my_id >= num_elements)? -1:d_queue[my_id];
+        else
+            v_id = (my_id >= num_elements)? -1:d_column_indices[my_id];
         if (v_id < 0 || v_id > max_vertex) {
             d_scanned_edges[my_id] = 0;
             return;
@@ -298,7 +302,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
                                         __syncthreads();
 
-                                        s_edges[tid] = (my_start_partition + tid < my_end_partition ? d_scanned_edges[my_start_partition + tid] - pre_offset : max_edges);
+                                        s_edges[tid] = (my_start_partition + tid < my_end_partition ? d_scanned_edges[my_start_partition + tid] - pre_offset : UINT_MAX);
                                         if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
                                             s_vertices[tid] = my_start_partition + tid < my_end_partition ? d_queue[my_start_partition+tid] : -1;
                                             s_edge_ids[tid] = 0;
@@ -589,7 +593,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         int end_id = (KernelPolicy::THREADS*(bid+1)) >= range ? range - 1 : KernelPolicy::THREADS*(bid+1) - 1;
 
         end_id = end_id % KernelPolicy::THREADS;
-        s_edges[tid] = (my_id < range ? d_scanned_edges[my_id] - offset : max_edges);
+        
+        s_edges[tid] = (my_id < range ? d_scanned_edges[my_id] - offset : UINT_MAX);
 
         if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
             s_vertices[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
@@ -626,6 +631,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             e = i - internal_offset;
 
             int lookup = d_row_offsets[v] + e;
+            //printf("tid:%d, bid:%d, s_vertices[tid]:%d, v_index:%d, lookup:%d, i:%d, internal_offset:%d, v:%d, row_offset[v]:%d end_id:%d, range:%d, size:%d\n", threadIdx.x, blockIdx.x, s_vertices[tid], v_index, lookup, i, internal_offset, v, d_row_offsets[v], end_id, range, size);
             VertexId u = d_column_indices[lookup];
           
             if (!ProblemData::MARK_PREDECESSORS) {
