@@ -20,6 +20,7 @@
 
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
+#include <gunrock/util/json_spirit_writer_template.h>
 
 // Graph construction utils
 #include <gunrock/graphio/market.cuh>
@@ -59,7 +60,8 @@ void Usage()
         " test_bfs <graph type> <graph type args> [--device=<device_index>]\n"
         " [--undirected] [--src=<source_index>] [--idempotence=<0|1>] [--v]\n"
         " [--instrumented] [--iteration-num=<num>] [--traversal-mode=<0|1>]\n"
-        " [--quick=<0|1>] [--mark-pred] [--queue-sizing=<scale factor>] "
+        " [--quick=<0|1>] [--mark-pred] [--queue-sizing=<scale factor>]\n"
+        " [--json]"
         "\n"
         "Graph types and args:\n"
         "  market <file>\n"
@@ -83,6 +85,7 @@ void Usage()
         "  --traversal-mode=<0 or 1> Set traversal strategy, 0 for Load-Balanced, \n"
         "                            1 for Dynamic-Cooperative [Default: dynamic\n"
         "                            determine based on average degree].\n"
+        " --json                     Output JSON-format statistics to stdout\n"
         );
 }
 
@@ -163,6 +166,7 @@ template<
     typename SizeT>
 void DisplayStats(
     Stats               &stats,
+    json_spirit::mObject & info,
     VertexId            src,
     VertexId            *h_labels,
     const Csr<VertexId, Value, SizeT> &graph,
@@ -193,6 +197,7 @@ void DisplayStats(
 
     // Display test name
     printf("[%s] finished. ", stats.name);
+    info["name"] = stats.name;
 
     // Display statistics
     if (nodes_visited < 5)
@@ -204,22 +209,30 @@ void DisplayStats(
         // Display the specific sample statistics
         double m_teps = (double) edges_visited / (elapsed * 1000.0);
         printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed, m_teps);
+        info["elapsed"] = elapsed;
+        info["m_teps"] = m_teps;
         if (search_depth != 0)
             printf(", search_depth: %lld", (long long) search_depth);
+        info["search_depth"] = search_depth;
         if (avg_duty != 0)
         {
             printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
         }
+        info["avg_duty"] = avg_duty;
         printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
                (long long) src, (long long) nodes_visited, (long long) edges_visited);
+        info["nodes_visited"] = nodes_visited;
+        info["edges_visited"] = edges_visited;
         if (total_queued > 0)
         {
             printf(", total queued: %lld", total_queued);
         }
+        info["total_queued"] = total_queued;
         if (redundant_work > 0)
         {
             printf(", redundant work: %.2f%%", redundant_work);
         }
+        info["redundant_work"] = redundant_work;
         printf("\n");
     }
 }
@@ -345,6 +358,7 @@ void RunTests(
     double max_queue_sizing,
     int iterations,
     int traversal_mode,
+    json_spirit::mObject & info,
     CudaContext& context)
 {
     typedef BFSProblem<
@@ -354,6 +368,14 @@ void RunTests(
         MARK_PREDECESSORS,
         ENABLE_IDEMPOTENCE,
         (MARK_PREDECESSORS && ENABLE_IDEMPOTENCE)> Problem; // does not use double buffer
+
+    // Put arguments into info data structure
+    info["num_gpus"] = num_gpus;
+    info["iterations"] = iterations;
+    info["instrument"] = INSTRUMENT;
+    info["mark_predecessors"] = MARK_PREDECESSORS;
+    info["enable_idempotence"] = ENABLE_IDEMPOTENCE;
+    info["vertex_id"] = src;
 
     // Allocate host-side label array (for both reference and gpu-computed results)
     VertexId    *reference_labels       = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
@@ -462,6 +484,7 @@ void RunTests(
 
     DisplayStats<MARK_PREDECESSORS>(
         *stats,
+        info,
         src,
         h_labels,
         graph,
@@ -498,6 +521,7 @@ template <
 void RunTests(
     Csr<VertexId, Value, SizeT> &graph,
     CommandLineArgs &args,
+    json_spirit::mObject & info,
     CudaContext& context)
 {
     VertexId    src              = -1;  // Use whatever the specified graph-type's default is
@@ -566,6 +590,7 @@ void RunTests(
                     max_queue_sizing,
                     iterations,
                     traversal_mode,
+                    info,
                     context);
             }
             else
@@ -578,6 +603,7 @@ void RunTests(
                     max_queue_sizing,
                     iterations,
                     traversal_mode,
+                    info,
                     context);
             }
         }
@@ -593,6 +619,7 @@ void RunTests(
                     max_queue_sizing,
                     iterations,
                     traversal_mode,
+                    info,
                     context);
             }
             else
@@ -605,6 +632,7 @@ void RunTests(
                     max_queue_sizing,
                     iterations,
                     traversal_mode,
+                    info,
                     context);
             }
         }
@@ -623,6 +651,7 @@ void RunTests(
                     max_queue_sizing,
                     iterations,
                     traversal_mode,
+                    info,
                     context);
             }
             else
@@ -635,6 +664,7 @@ void RunTests(
                     max_queue_sizing,
                     iterations,
                     traversal_mode,
+                    info,
                     context);
             }
         }
@@ -650,6 +680,7 @@ void RunTests(
                     max_queue_sizing,
                     iterations,
                     traversal_mode,
+                    info,
                     context);
             }
             else
@@ -662,6 +693,7 @@ void RunTests(
                     max_queue_sizing,
                     iterations,
                     traversal_mode,
+                    info,
                     context);
             }
         }
@@ -704,6 +736,9 @@ int main( int argc, char** argv)
         return 1;
     }
 
+    json_spirit::mObject info;
+    info["command_line"] = json_spirit::mValue(args.GetEntireCommandLine());
+
     //
     // Construct graph and perform search(es)
     //
@@ -728,7 +763,7 @@ int main( int argc, char** argv)
         }
 
         csr.PrintHistogram();
-        RunTests(csr, args, *context);
+        RunTests(csr, args, info, *context);
     }
 
     else if (graph_type == "rmat")
@@ -755,12 +790,17 @@ int main( int argc, char** argv)
         }
 
         csr.PrintHistogram();
-        RunTests(csr, args, *context);
+        RunTests(csr, args, info, *context);
     }
     else
     {
         fprintf(stderr, "Unspecified graph type\n");
         return 1;
     }
+
+    json_spirit::write_stream(json_spirit::mValue(info), std::cout,
+                              json_spirit::pretty_print);
+
+
     return 0;
 }
