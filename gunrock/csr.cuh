@@ -175,8 +175,11 @@ struct Csr {
      *
      */
     template <bool LOAD_EDGE_VALUES>
-    void FromCsr(char *f_in) {
-        printf("  Reading directly from stored binary CSR arrays ...\n");
+    void FromCsr(char *f_in, bool quiet=false) {
+        if (!quiet)
+        {
+            printf("  Reading directly from stored binary CSR arrays ...\n");
+        }
         time_t mark1 = time(NULL);
 
         std::ifstream input(f_in);
@@ -193,7 +196,10 @@ struct Csr {
         }
 
         time_t mark2 = time(NULL);
-        printf("Done reading (%ds).\n", (int) (mark2 - mark1));
+        if (!quiet)
+        {
+            printf("Done reading (%ds).\n", (int) (mark2 - mark1));
+        }
 
         // compute out_nodes
         SizeT out_node = 0;
@@ -225,10 +231,14 @@ struct Csr {
         SizeT coo_edges,
         bool  ordered_rows = false,
         bool  undirected = false,
-        bool  reversed = false) {
-        printf("  Converting %d vertices, %d directed edges (%s tuples) "
-               "to CSR format...\n",
-               coo_nodes, coo_edges, ordered_rows ? "ordered" : "unordered");
+        bool  reversed = false,
+        bool  quiet = false) {
+        if (!quiet)
+        {
+            printf("  Converting %d vertices, %d directed edges (%s tuples) "
+                   "to CSR format...\n", coo_nodes, coo_edges,
+                   ordered_rows ? "ordered" : "unordered");
+        }
         time_t mark1 = time(NULL);
         fflush(stdout);
 
@@ -281,7 +291,9 @@ struct Csr {
         edges = real_edge;
 
         time_t mark2 = time(NULL);
-        printf("Done converting (%ds).\n", (int)(mark2 - mark1));
+        if (!quiet) {
+            printf("Done converting (%ds).\n", (int)(mark2 - mark1));
+        }
 
         // Write offsets, indices, node, edges etc. into file
         if (LOAD_EDGE_VALUES) {

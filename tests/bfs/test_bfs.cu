@@ -20,6 +20,7 @@
 
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
+#include <gunrock/util/sysinfo.h>
 #include <gunrock/util/json_spirit_writer_template.h>
 
 // Graph construction utils
@@ -47,6 +48,7 @@ using namespace gunrock::app::bfs;
  ******************************************************************************/
 
 bool g_verbose;
+bool g_quiet;
 bool g_undirected;
 bool g_quick;
 bool g_stream_from_host;
@@ -61,7 +63,7 @@ void Usage()
         " [--undirected] [--src=<source_index>] [--idempotence=<0|1>] [--v]\n"
         " [--instrumented] [--iteration-num=<num>] [--traversal-mode=<0|1>]\n"
         " [--quick=<0|1>] [--mark-pred] [--queue-sizing=<scale factor>]\n"
-        " [--json]"
+        " [--quiet] [--json]"
         "\n"
         "Graph types and args:\n"
         "  market <file>\n"
@@ -85,6 +87,7 @@ void Usage()
         "  --traversal-mode=<0 or 1> Set traversal strategy, 0 for Load-Balanced, \n"
         "                            1 for Dynamic-Cooperative [Default: dynamic\n"
         "                            determine based on average degree].\n"
+        " --quiet                    No output (unless --json is specified)\n"
         " --json                     Output JSON-format statistics to stdout\n"
         );
 }
@@ -100,12 +103,15 @@ void Usage()
  */
 template<typename VertexId, typename SizeT>
 void DisplaySolution(
-    VertexId *labels,
-    VertexId *preds,
+    const VertexId *labels,
+    const VertexId *preds,
     SizeT     num_nodes,
     bool MARK_PREDECESSORS,
     bool ENABLE_IDEMPOTENCE)
 {
+    if (g_quiet) return;        // careful: if later code in this
+                                // function changes something, this
+                                // return is the wrong thing to do
     if (num_nodes > 40) num_nodes = 40;
 
     printf("\nFirst %d labels of the GPU result:\n", num_nodes);
@@ -165,15 +171,15 @@ template<
     typename Value,
     typename SizeT>
 void DisplayStats(
-    Stats               &stats,
-    json_spirit::mObject & info,
-    VertexId            src,
-    VertexId            *h_labels,
+    Stats                &stats,
+    json_spirit::mObject &info,
+    VertexId             src,
+    const VertexId       *h_labels,
     const Csr<VertexId, Value, SizeT> &graph,
-    double              elapsed,
-    VertexId            search_depth,
-    long long           total_queued,
-    double              avg_duty)
+    double               elapsed,
+    VertexId             search_depth,
+    long long            total_queued,
+    double               avg_duty)
 {
     // Compute nodes and edges visited
     SizeT edges_visited = 0;
@@ -196,44 +202,67 @@ void DisplayStats(
     redundant_work *= 100;
 
     // Display test name
-    printf("[%s] finished. ", stats.name);
+    if (!g_quiet) printf("[%s] finished. ", stats.name);
     info["name"] = stats.name;
 
     // Display statistics
     if (nodes_visited < 5)
     {
-        printf("Fewer than 5 vertices visited.\n");
+        if (!g_quiet) printf("Fewer than 5 vertices visited.\n");
     }
     else
     {
         // Display the specific sample statistics
         double m_teps = (double) edges_visited / (elapsed * 1000.0);
-        printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed, m_teps);
+        if (!g_quiet) {
+            printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed, m_teps);
+        }
         info["elapsed"] = elapsed;
         info["m_teps"] = m_teps;
         if (search_depth != 0)
-            printf(", search_depth: %lld", (long long) search_depth);
+        {
+            if (!g_quiet)
+            {
+                printf(", search_depth: %lld", (long long) search_depth);
+            }
+        }
         info["search_depth"] = search_depth;
         if (avg_duty != 0)
         {
-            printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
+            if (!g_quiet)
+            {
+                printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
+            }
         }
         info["avg_duty"] = avg_duty;
-        printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
-               (long long) src, (long long) nodes_visited, (long long) edges_visited);
+        if (!g_quiet)
+        {
+            printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
+                   (long long) src, (long long) nodes_visited,
+                   (long long) edges_visited);
+        }
         info["nodes_visited"] = nodes_visited;
         info["edges_visited"] = edges_visited;
         if (total_queued > 0)
         {
-            printf(", total queued: %lld", total_queued);
+            if (!g_quiet)
+            {
+                printf(", total queued: %lld", total_queued);
+            }
         }
         info["total_queued"] = total_queued;
         if (redundant_work > 0)
         {
-            printf(", redundant work: %.2f%%", redundant_work);
+            if (!g_quiet)
+            {
+                printf(", redundant work: %.2f%%", redundant_work);
+            }
         }
         info["redundant_work"] = redundant_work;
-        printf("\n");
+        if (!g_quiet)
+        {
+            printf("\n");
+        }
     }
 }
 
@@ -320,8 +349,11 @@ void SimpleReferenceBfs(
     float elapsed = cpu_timer.ElapsedMillis();
     search_depth++;
 
-    printf("CPU BFS finished in %lf msec. cpu_search_depth: %d\n",
-           elapsed, search_depth);
+    if (!g_quiet)
+    {
+        printf("CPU BFS finished in %lf msec. cpu_search_depth: %d\n",
+               elapsed, search_depth);
+    }
 }
 
 /**
@@ -409,13 +441,19 @@ void RunTests(
     //
     if (reference_check_label != NULL)
     {
-        printf("Computing reference value ...\n");
+        if (!g_quiet)
+        {
+            printf("Computing reference value ...\n");
+        }
         SimpleReferenceBfs<VertexId, Value, SizeT, MARK_PREDECESSORS>(
             graph,
             reference_check_label,
             reference_check_preds,
             src);
-        printf("\n");
+        if (!g_quiet)
+        {
+            printf("\n");
+        }
     }
 
     Stats *stats = new Stats("GPU BFS");
@@ -459,21 +497,36 @@ void RunTests(
     {
         if (!ENABLE_IDEMPOTENCE)
         {
-            printf("Label Validity: ");
+            if (!g_quiet)
+            {
+                printf("Label Validity: ");
+            }
             int error_num = CompareResults(
-                h_labels, reference_check_label, graph.nodes, true);
+                h_labels, reference_check_label, graph.nodes, true, g_quiet);
             if (error_num > 0)
-                printf("%d errors occurred.\n", error_num);
+            {
+                if (!g_quiet)
+                {
+                    printf("%d errors occurred.\n", error_num);
+                }
+            }
         }
         else
         {
             if (!MARK_PREDECESSORS)
             {
-                printf("Label Validity: ");
+                if (!g_quiet)
+                {
+                    printf("Label Validity: ");
+                }
                 int error_num = CompareResults(
-                    h_labels, reference_check_label, graph.nodes, true);
+                    h_labels, reference_check_label, graph.nodes, true,
+                    g_quiet);
                 if (error_num > 0)
-                    printf("%d errors occurred.\n", error_num);
+                    if (!g_quiet)
+                    {
+                        printf("%d errors occurred.\n", error_num);
+                    }
             }
         }
     }
@@ -549,7 +602,10 @@ void RunTests(
     {
         int max_degree;
         src = graph.GetNodeWithHighestDegree(max_degree);
-        printf("Using highest degree (%d) vertex: %d\n", max_degree, src);
+        if (!g_quiet)
+        {
+            printf("Using highest degree (%d) vertex: %d\n", max_degree, src);
+        }
     }
     else
     {
@@ -720,6 +776,9 @@ int main( int argc, char** argv)
     args.GetCmdLineArgument("device", dev);
     ContextPtr context = mgpu::CreateCudaDevice(dev);
 
+    // don't print anything unless specifically directed
+    g_quiet      = args.CheckCmdLineFlag("quiet");
+
     //srand(0); // Presently deterministic
     //srand(time(NULL));
 
@@ -739,6 +798,12 @@ int main( int argc, char** argv)
     json_spirit::mObject info;
     info["command_line"] = json_spirit::mValue(args.GetEntireCommandLine());
 
+    // get machine/OS info
+    Sysinfo sysinfo;
+    info["sysinfo"] = sysinfo.getSysinfo();
+    Gpuinfo gpuinfo;
+    info["gpuinfo"] = gpuinfo.getGpuinfo();
+
     //
     // Construct graph and perform search(es)
     //
@@ -757,12 +822,16 @@ int main( int argc, char** argv)
                 market_filename,
                 csr,
                 g_undirected,
-                false) != 0) // no inverse graph
+                false,  // no inverse graph
+                g_quiet) != 0)
         {
             return 1;
         }
 
-        csr.PrintHistogram();
+        if (!g_quiet)
+        {
+            csr.PrintHistogram();
+        }
         RunTests(csr, args, info, *context);
     }
 
@@ -789,7 +858,10 @@ int main( int argc, char** argv)
             return 1;
         }
 
-        csr.PrintHistogram();
+        if (!g_quiet)
+        {
+            csr.PrintHistogram();
+        }
         RunTests(csr, args, info, *context);
     }
     else
@@ -798,9 +870,11 @@ int main( int argc, char** argv)
         return 1;
     }
 
-    json_spirit::write_stream(json_spirit::mValue(info), std::cout,
+    if (args.CheckCmdLineFlag("json"))
+    {
+        json_spirit::write_stream(json_spirit::mValue(info), std::cout,
                               json_spirit::pretty_print);
-
+    }
 
     return 0;
 }
