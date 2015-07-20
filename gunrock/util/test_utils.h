@@ -50,6 +50,9 @@ namespace util {
  */
 class CommandLineArgs
 {
+private:
+    int argc;
+    char ** argv;
 protected:
 
     std::map<std::string, std::string> pairs;
@@ -57,7 +60,7 @@ protected:
 public:
 
     // Constructor
-    CommandLineArgs(int argc, char **argv)
+    CommandLineArgs(int _argc, char **_argv) : argc(_argc), argv(_argv)
     {
         for (int i = 1; i < argc; i++)
         {
@@ -102,6 +105,16 @@ public:
     int ParsedArgc()
     {
         return pairs.size();
+    }
+
+    std::string GetEntireCommandLine() const
+    {
+        std::string commandLineStr = "";
+        for (int i = 0; i < argc; i++)
+        {
+            commandLineStr.append(std::string(argv[i]).append(" "));
+        }
+        return commandLineStr;
     }
 };
 
