@@ -68,6 +68,9 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
         bool has_change;
         //util::CtaWorkProgressLifetime *work_progress;
 
+        /*
+         * @brief Default constructor
+         */
         DataSlice()
         {
             component_ids.SetName("component_ids");
@@ -86,6 +89,9 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             //labels       .SetName("labels"       );
         }
 
+        /*
+         * @brief Default destructor
+         */
         ~DataSlice()
         {
             if (util::SetDevice(this->gpu_idx)) return;
@@ -103,6 +109,22 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             //labels       .Release();
         }
 
+        /**
+         * @brief initialization function.
+         *
+         * @param[in] num_gpus Number of the GPUs used.
+         * @param[in] gpu_idx GPU index used for testing.
+         * @param[in] num_vertex_associate Number of vertices associated.
+         * @param[in] num_value__associate Number of value associated.
+         * @param[in] graph Pointer to the graph we process on.
+         * @param[in] num_in_nodes
+         * @param[in] num_out_nodes
+         * @param[in] original_vertex
+         * @param[in] queue_sizing Maximum queue sizing factor.
+         * @param[in] in_sizing
+         *
+         * \return cudaError_t object Indicates the success of all CUDA calls.
+         */
         cudaError_t Init(
             int   num_gpus,
             int   gpu_idx,
@@ -233,7 +255,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
      *
      * @param[out] h_component_ids host-side vector to store computed component ids.
      *
-     *\return cudaError_t object which indicates the success of all CUDA function calls.
+     *\return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Extract(VertexId *h_component_ids)
     {
@@ -341,13 +363,21 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
     }
 
     /**
-     * @brief CCProblem initialization
+     * @brief initialization function.
      *
      * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on. @see Csr
-     * @param[in] _num_gpus Number of the GPUs used.
+     * @param[in] graph Pointer to the CSR graph object we process on. @see Csr
+     * @param[in] graph Pointer to the inversed CSR graph object we process on.
+     * @param[in] num_gpus Number of the GPUs used.
+     * @param[in] gpu_idx GPU index used for testing.
+     * @param[in] partition_method Partition method to partition input graph.
+     * @param[in] streams CUDA stream.
+     * @param[in] queue_sizing Maximum queue sizing factor.
+     * @param[in] in_sizing
+     * @param[in] partition_factor Partition factor for partitioner.
+     * @param[in] partition_seed Partition seed used for partitioner.
      *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     * \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Init(
             bool          stream_from_host,       // Only meaningful for single-GPU
@@ -410,15 +440,15 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
     }
 
     /**
-     *  @brief Performs any initialization work needed for CC problem type. Must be called prior to each CC run.
+     * @brief Reset problem function. Must be called prior to each run.
      *
-     *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
+     * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
+     * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
      *
-     *  \return cudaError_t object which indicates the success of all CUDA function calls.
+     *  \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Reset(
         FrontierType frontier_type,   // The frontier type (i.e., edge/vertex/mixed)
-
         double       queue_sizing)
     {
         cudaError_t retval = cudaSuccess;

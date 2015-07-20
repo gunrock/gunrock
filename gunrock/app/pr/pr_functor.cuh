@@ -22,27 +22,27 @@ namespace pr {
 
 #define TO_TRACK false
 
-    template <typename VertexId>
-    static __device__ __host__ bool to_track(VertexId node)
-    {   
-        const int num_to_track = 4;
-        const VertexId node_to_track[] = {0, 1, 2, 3};
-        for (int i=0; i<num_to_track; i++)
-            if (node == node_to_track[i]) return true;
-        return false;
-    }   
+template <typename VertexId>
+static __device__ __host__ bool to_track(VertexId node) {
+    const int num_to_track = 4;
+    const VertexId node_to_track[] = {0, 1, 2, 3};
+    for (int i = 0; i < num_to_track; i++)
+        if (node == node_to_track[i]) return true;
+    return false;
+}
 
 /**
  * @brief Structure contains device functions in PR graph traverse.
  *
- * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam ProblemData         Problem data type which contains data slice for PR problem
+ * @tparam VertexId    Type of signed integer to use as vertex identifier.
+ * @tparam SizeT       Type of unsigned integer to use for array indexing.
+ * @tparam Value       Type of float or double to use for computed values.
+ * @tparam ProblemData Problem data type which contains data slice for problem.
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct PRMarkerFunctor
-{
+template <
+    typename VertexId, typename SizeT, typename Value, typename ProblemData >
+struct PRMarkerFunctor {
     typedef typename ProblemData::DataSlice DataSlice;
 
     /**
@@ -55,8 +55,9 @@ struct PRMarkerFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-    {
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId s_id, VertexId d_id, DataSlice *problem,
+        VertexId e_id = 0, VertexId e_id_in = 0) {
         return (problem->degrees[d_id] > 0 && problem->degrees[s_id] > 0);
     }
 
@@ -70,8 +71,9 @@ struct PRMarkerFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-    {
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId s_id, VertexId d_id, DataSlice *problem,
+        VertexId e_id = 0, VertexId e_id_in = 0) {
         //atomicAdd(problem->rank_next + d_id, problem->rank_curr[s_id]/problem->degrees[s_id]);
         problem->markers[d_id] = 1;
     }
@@ -80,15 +82,15 @@ struct PRMarkerFunctor
 /**
  * @brief Structure contains device functions in PR graph traverse.
  *
- * @tparam VertexId    Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam SizeT       Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam ProblemData Problem data type which contains data slice for PR problem
+ * @tparam VertexId    Type of signed integer to use as vertex identifier.
+ * @tparam SizeT       Type of unsigned integer to use for array indexing.
+ * @tparam Value       Type of float or double to use for computed values.
+ * @tparam ProblemData Problem data type which contains data slice for problem.
  *
  */
-template<
-    typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct PRFunctor
-{
+template <
+    typename VertexId, typename SizeT, typename Value, typename ProblemData >
+struct PRFunctor {
     typedef typename ProblemData::DataSlice DataSlice;
 
     /**
@@ -106,8 +108,7 @@ struct PRFunctor
      */
     static __device__ __forceinline__ bool CondEdge(
         VertexId s_id, VertexId d_id, DataSlice *problem,
-        VertexId e_id = 0, VertexId e_id_in = 0)
-    {
+        VertexId e_id = 0, VertexId e_id_in = 0) {
         //return (problem->degrees[d_id] > 0 && problem->degrees[s_id] > 0);
         return true;
     }
@@ -126,12 +127,11 @@ struct PRFunctor
      */
     static __device__ __forceinline__ void ApplyEdge(
         VertexId s_id, VertexId d_id, DataSlice *problem,
-        VertexId e_id = 0, VertexId e_id_in = 0)
-    {
+        VertexId e_id = 0, VertexId e_id_in = 0) {
         //if (TO_TRACK)
         //if (to_track(d_id)) printf("%d \tr[%d] \t+= %f\t from %d,%f\n", problem->gpu_idx, d_id, problem->rank_curr[s_id] / problem->degrees[s_id], s_id, problem->rank_curr[s_id]);
-        atomicAdd(problem->rank_next + d_id, 
-            problem->rank_curr[s_id]/problem->degrees[s_id]);
+        atomicAdd(problem->rank_next + d_id,
+                  problem->rank_curr[s_id] / problem->degrees[s_id]);
     }
 
     /**
@@ -139,16 +139,16 @@ struct PRFunctor
      *        is valid (not equal to -1). Personal PageRank feature will
      *        be activated when a source node ID is set.
      *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     * @param[in] v auxiliary value
+     * @param[in] node Vertex identifier.
+     * @param[in] problem Data slice object.
+     * @param[in] v auxiliary value.
+     * @param[in] nid Vertex index.
      *
      * \return Whether to load the apply function for the node and
      *         include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-    {
+        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         Value    delta     = problem->delta    ;
         //VertexId src_node  = problem->src_node ;
         //Value    old_value = problem->rank_next[node];
@@ -157,21 +157,21 @@ struct PRFunctor
         Value diff = fabs(problem->rank_next[node] - problem->rank_curr[node]);
 
         //if (TO_TRACK)
-        //if (to_track(node)) printf("%d \tr[%d] \t%f \t-> %f \t(%f)\n", problem->gpu_idx, node, problem->rank_curr[node], problem->rank_next[node], old_value); 
+        //if (to_track(node)) printf("%d \tr[%d] \t%f \t-> %f \t(%f)\n", problem->gpu_idx, node, problem->rank_curr[node], problem->rank_next[node], old_value);
         return (diff >= problem->threshold);
     }
 
     /**
      * @brief Vertex mapping apply function. Doing nothing for PR problem.
      *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     * @param[in] v auxiliary value
+     * @param[in] node Vertex identifier.
+     * @param[in] problem Data slice object.
+     * @param[in] v auxiliary value.
+     * @param[in] nid Vertex index.
      *
      */
     static __device__ __forceinline__ void ApplyFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-    {
+        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         // Doing nothing here
     }
 };
@@ -179,14 +179,15 @@ struct PRFunctor
 /**
  * @brief Structure contains device functions to remove zero degree node
  *
- * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam ProblemData         Problem data type which contains data slice for PR problem
+ * @tparam VertexId    Type of signed integer to use as vertex identifier.
+ * @tparam SizeT       Type of unsigned integer to use for array indexing.
+ * @tparam Value       Type of float or double to use for computed values.
+ * @tparam ProblemData Problem data type which contains data slice for problem.
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct RemoveZeroDegreeNodeFunctor
-{
+template <
+    typename VertexId, typename SizeT, typename Value, typename ProblemData >
+struct RemoveZeroDegreeNodeFunctor {
     typedef typename ProblemData::DataSlice DataSlice;
 
     /**
@@ -199,8 +200,9 @@ struct RemoveZeroDegreeNodeFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-    {
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId s_id, VertexId d_id, DataSlice *problem,
+        VertexId e_id = 0, VertexId e_id_in = 0) {
         return (problem->degrees[d_id] == 0);
     }
 
@@ -214,21 +216,24 @@ struct RemoveZeroDegreeNodeFunctor
      * @param[in] problem Data slice object
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-    {
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId s_id, VertexId d_id, DataSlice *problem,
+        VertexId e_id = 0, VertexId e_id_in = 0) {
         atomicAdd(problem->degrees_pong + s_id, -1);
     }
 
     /**
      * @brief Vertex mapping condition function. Check if the Vertex Id is valid (not equal to -1).
      *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
+     * @param[in] node Vertex identifier.
+     * @param[in] problem Data slice object.
+     * @param[in] v auxiliary value.
+     * @param[in] nid Vertex index.
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
-    {
+    static __device__ __forceinline__ bool CondFilter(
+        VertexId node, DataSlice *problem, Value v = 0) {
         //SizeT degree = problem->degrees[node];
         //if (degree == 0)
         //    problem -> degrees_pong[node] = -1;
@@ -239,13 +244,14 @@ struct RemoveZeroDegreeNodeFunctor
     /**
      * @brief Vertex mapping apply function. Doing nothing for PR problem.
      *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
+     * @param[in] node Vertex identifier.
+     * @param[in] problem Data slice object.
+     * @param[in] v auxiliary value.
+     * @param[in] nid Vertex index.
      *
      */
     static __device__ __forceinline__ void ApplyFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-    {
+        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         // Doing nothing here
     }
 };

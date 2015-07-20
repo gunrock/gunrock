@@ -33,16 +33,16 @@ namespace bfs {
  * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer.
  */
 template <
-    typename    VertexId,                       
-    typename    SizeT,                          
-    typename    Value,                          
-    bool        _MARK_PREDECESSORS,             
+    typename    VertexId,
+    typename    SizeT,
+    typename    Value,
+    bool        _MARK_PREDECESSORS,
     bool        _ENABLE_IDEMPOTENCE,
     bool        _USE_DOUBLE_BUFFER>
 struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
-    _MARK_PREDECESSORS, 
-    _ENABLE_IDEMPOTENCE, 
-    _USE_DOUBLE_BUFFER, 
+    _MARK_PREDECESSORS,
+    _ENABLE_IDEMPOTENCE,
+    _USE_DOUBLE_BUFFER,
     false, // _ENABLE_BACKWARD
     false, // _KEEP_ORDER
     false> // _KEEP_NODE_NUM
@@ -54,17 +54,23 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
      */
     struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
     {
-        util::Array1D<SizeT, VertexId      > labels        ;   
+        util::Array1D<SizeT, VertexId      > labels        ;
         util::Array1D<SizeT, unsigned char > visited_mask  ;
         util::Array1D<SizeT, unsigned int  > temp_marker   ;
 
+        /*
+         * @brief Default constructor
+         */
         DataSlice()
-        {   
-            labels          .SetName("labels"          );  
+        {
+            labels          .SetName("labels"          );
             visited_mask    .SetName("visited_mask"    );
             temp_marker     .SetName("temp_marker"     );
         }
 
+        /*
+         * @brief Default destructor
+         */
         ~DataSlice()
         {
             if (util::SetDevice(this->gpu_idx)) return;
@@ -73,6 +79,22 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             temp_marker   .Release();
         }
 
+        /**
+         * @brief initialization function.
+         *
+         * @param[in] num_gpus Number of the GPUs used.
+         * @param[in] gpu_idx GPU index used for testing.
+         * @param[in] num_vertex_associate Number of vertices associated.
+         * @param[in] num_value__associate Number of value associated.
+         * @param[in] graph Pointer to the graph we process on.
+         * @param[in] num_in_nodes
+         * @param[in] num_out_nodes
+         * @param[in] original_vertex
+         * @param[in] queue_sizing Maximum queue sizing factor.
+         * @param[in] in_sizing
+         *
+         * \return cudaError_t object Indicates the success of all CUDA calls.
+         */
         cudaError_t Init(
             int   num_gpus,
             int   gpu_idx,
@@ -91,7 +113,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 gpu_idx,
                 num_vertex_associate,
                 num_value__associate,
-                graph, 
+                graph,
                 num_in_nodes,
                 num_out_nodes,
                 in_sizing)) return retval;
@@ -105,10 +127,10 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = this->temp_preds.Allocate(graph->nodes,util::DEVICE)) return retval;
             }
 
-            if (_ENABLE_IDEMPOTENCE) 
+            if (_ENABLE_IDEMPOTENCE)
             {
                 if (retval = visited_mask.Allocate((graph->nodes +7)/8, util::DEVICE)) return retval;
-            } 
+            }
 
             if (num_gpus > 1)
             {
@@ -121,12 +143,22 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             return retval;
         } // end Init
 
+        /**
+         * @brief Reset problem function. Must be called prior to each run.
+         *
+         * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
+         * @param[in] graph_slice Pointer to the graph slice we process on.
+         * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+         * @param[in] queue_sizing1 Size scaling factor for work queue allocation.
+         *
+         * \return cudaError_t object Indicates the success of all CUDA calls.
+         */
         cudaError_t Reset(
-            FrontierType frontier_type,     // The frontier type (i.e., edge/vertex/mixed)
+            FrontierType frontier_type,
             GraphSlice<SizeT, VertexId, Value>  *graph_slice,
             double queue_sizing = 2.0,
             double queue_sizing1 = -1.0)
-        {         
+        {
             cudaError_t retval = cudaSuccess;
             SizeT nodes = graph_slice->nodes;
             SizeT edges = graph_slice->edges;
@@ -135,13 +167,13 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
 
             for (int peer=0; peer<this->num_gpus; peer++)
                 this->out_length[peer] = 1;
- 
-            if (this->num_gpus>1) 
-                util::cpu_mt::PrintCPUArray<int, SizeT>("in_counter", graph_slice->in_counter.GetPointer(util::HOST), this->num_gpus+1, this->gpu_idx); 
+
+            if (this->num_gpus>1)
+                util::cpu_mt::PrintCPUArray<int, SizeT>("in_counter", graph_slice->in_counter.GetPointer(util::HOST), this->num_gpus+1, this->gpu_idx);
 
             for (int peer=0;peer<(this->num_gpus > 1 ? this->num_gpus+1 : 1);peer++)
             for (int i=0; i < 2; i++)
-            {    
+            {
                 double queue_sizing_ = i==0?queue_sizing : queue_sizing1;
                 switch (frontier_type) {
                     case VERTEX_FRONTIERS :
@@ -161,7 +193,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                         new_frontier_elements[0] = double(this->num_gpus>1? graph_slice->in_counter[peer]:graph_slice->nodes) * queue_sizing_ +2;
                         new_frontier_elements[1] = double(graph_slice->edges) * queue_sizing_ +2;
                         break;
-                }    
+                }
 
                 // Iterate through global frontier queue setups
                 //for (int i = 0; i < 2; i++) {
@@ -212,7 +244,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             {
                 if (this->preds.GetPointer(util::DEVICE)==NULL)
                     if (retval = this->preds.Allocate(nodes, util::DEVICE)) return retval;
-                util::MemsetKernel<<<128,128>>>(this->preds.GetPointer(util::DEVICE), -2, nodes); 
+                util::MemsetKernel<<<128,128>>>(this->preds.GetPointer(util::DEVICE), -2, nodes);
             }
 
             if (_ENABLE_IDEMPOTENCE) {
@@ -220,14 +252,14 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 SizeT visited_mask_elements = visited_mask_bytes * sizeof(unsigned char);
                 util::MemsetKernel<<<128, 128>>>(this->visited_mask.GetPointer(util::DEVICE), (unsigned char)0, visited_mask_elements);
             }
-            
+
             return retval;
-        } 
+        }
     }; // DataSlice
 
     // Members
     util::Array1D<SizeT, DataSlice> *data_slices;
-    
+
     // Methods
 
     /**
@@ -263,12 +295,12 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[out] h_labels host-side vector to store computed node labels (distances from the source).
      * @param[out] h_preds host-side vector to store predecessor vertex ids.
      *
-     *\return cudaError_t object which indicates the success of all CUDA function calls.
+     *\return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Extract(VertexId *h_labels, VertexId *h_preds)
     {
         cudaError_t retval = cudaSuccess;
- 
+
         do {
             if (this->num_gpus == 1) {
 
@@ -296,14 +328,14 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                         th_preds[gpu]=data_slices[gpu]->preds.GetPointer(util::HOST);
                     }
                 } //end for(gpu)
-                
+
                 for (VertexId node=0;node<this->nodes;node++)
                 if (this-> partition_tables[0][node]>=0 && this-> partition_tables[0][node]<this->num_gpus &&
                     this->convertion_tables[0][node]>=0 && this->convertion_tables[0][node]<data_slices[this->partition_tables[0][node]]->labels.GetSize())
                     h_labels[node]=th_labels[this->partition_tables[0][node]][this->convertion_tables[0][node]];
                 else {
                     printf("OutOfBound: node = %d, partition = %d, convertion = %d\n",
-                           node, this->partition_tables[0][node], this->convertion_tables[0][node]); 
+                           node, this->partition_tables[0][node], this->convertion_tables[0][node]);
                     fflush(stdout);
                 }
                 if (_MARK_PREDECESSORS)
@@ -323,13 +355,21 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
     }
 
     /**
-     * @brief BFSProblem initialization
+     * @brief initialization function.
      *
      * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on. @see Csr
-     * @param[in] _num_gpus Number of the GPUs used.
+     * @param[in] graph Pointer to the CSR graph object we process on. @see Csr
+     * @param[in] graph Pointer to the inversed CSR graph object we process on.
+     * @param[in] num_gpus Number of the GPUs used.
+     * @param[in] gpu_idx GPU index used for testing.
+     * @param[in] partition_method Partition method to partition input graph.
+     * @param[in] streams CUDA stream.
+     * @param[in] queue_sizing Maximum queue sizing factor.
+     * @param[in] in_sizing
+     * @param[in] partition_factor Partition factor for partitioner.
+     * @param[in] partition_seed Partition seed used for partitioner.
      *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     * \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Init(
             bool        stream_from_host,       // Only meaningful for single-GPU
@@ -370,7 +410,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 _data_slice->streams.SetPointer(&streams[gpu*num_gpus*2],num_gpus*2);
                 if (retval = _data_slice->Init(
                         this->num_gpus,
-                        this->gpu_idx[gpu], 
+                        this->gpu_idx[gpu],
                         this->num_gpus > 1? ((_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE)? 2 : 1) : 0,
                         0,
                         &(this->sub_graphs[gpu]),
@@ -381,18 +421,19 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                         in_sizing)) return retval;
             } //end for(gpu)
         } while (0);
-        
+
         return retval;
     }
 
     /**
-     *  @brief Performs any initialization work needed for BFS problem type. Must be called prior to each BFS run.
+     * @brief Reset problem function. Must be called prior to each run.
      *
-     *  @param[in] src Source node for one BFS computing pass.
-     *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
-     *  @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
-     * 
-     *  \return cudaError_t object which indicates the success of all CUDA function calls.
+     * @param[in] src Source node to start.
+     * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
+     * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+     * @param[in] queue_sizing1 Size scaling factor for work queue allocation.
+     *
+     *  \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Reset(
             VertexId    src,
@@ -411,7 +452,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, queue_sizing1)) return retval;
             if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;
         }
- 
+
         // Fillin the initial input_queue for BFS problem
         int gpu;
         VertexId tsrc;

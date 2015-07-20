@@ -28,12 +28,13 @@ namespace bc {
  * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
  * @tparam _Value               Type of float or double to use for computing BC value.
- * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer
+ * @tparam _MARK_PREDECESSORS   Whether to mark predecessor value for each node.
+ * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer.
  */
 template <
-    typename    VertexId,                      
-    typename    SizeT,                        
-    typename    Value,                       
+    typename    VertexId,
+    typename    SizeT,
+    typename    Value,
     bool        _MARK_PREDECESSORS,
     bool        _USE_DOUBLE_BUFFER>
 struct BCProblem : ProblemBase<VertexId, SizeT, Value,
@@ -49,7 +50,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
     //static const bool USE_DOUBLE_BUFFER     = _USE_DOUBLE_BUFFER;
     //Helper structures
 
-    /** 
+    /**
      * @brief Data slice structure which contains BC problem specific data.
      */
     struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
@@ -64,8 +65,11 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, VertexId  >  *forward_output;     /**< Used to store output noe IDs by the forward pass */
         std::vector<SizeT>                *forward_queue_offsets;
 
+        /*
+         * @brief Default constructor
+         */
         DataSlice()
-        {   
+        {
             labels      .SetName("labels"      );
             bc_values   .SetName("bc_values"   );
             ebc_values  .SetName("ebc_values"  );
@@ -76,6 +80,9 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             forward_queue_offsets = NULL;
         }
 
+        /*
+         * @brief Default destructor
+         */
         ~DataSlice()
         {
             if (util::SetDevice(this->gpu_idx)) return;
@@ -94,6 +101,21 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             delete[] forward_queue_offsets; forward_queue_offsets = NULL;
         }
 
+        /**
+         * @brief initialization function.
+         *
+         * @param[in] num_gpus Number of the GPUs used.
+         * @param[in] gpu_idx GPU index used for testing.
+         * @param[in] num_vertex_associate Number of vertices associated.
+         * @param[in] num_value__associate Number of value associated.
+         * @param[in] graph Pointer to the graph we process on.
+         * @param[in] num_in_nodes
+         * @param[in] num_out_nodes
+         * @param[in] queue_sizing Maximum queue sizing factor.
+         * @param[in] in_sizing
+         *
+         * \return cudaError_t object Indicates the success of all CUDA calls.
+         */
         cudaError_t Init(
             int   num_gpus,
             int   gpu_idx,
@@ -115,7 +137,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                 num_in_nodes,
                 num_out_nodes,
                 in_sizing)) return retval;
-           
+
             // Create SoA on device
             if (retval = labels    .Allocate(graph->nodes, util::DEVICE | util::HOST)) return retval;
             if (retval = this->preds     .Allocate(graph->nodes, util::DEVICE)) return retval;
@@ -124,7 +146,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = ebc_values.Allocate(graph->edges, util::DEVICE)) return retval;
             if (retval = sigmas    .Allocate(graph->nodes, util::DEVICE | util::HOST)) return retval;
             if (retval = deltas    .Allocate(graph->nodes, util::DEVICE)) return retval;
-            if (retval = src_node  .Allocate(1           , util::DEVICE)) return retval; 
+            if (retval = src_node  .Allocate(1           , util::DEVICE)) return retval;
             util::MemsetKernel<<<128, 128>>>( bc_values.GetPointer(util::DEVICE), (Value)0.0f, graph->nodes);
             util::MemsetKernel<<<128, 128>>>(ebc_values.GetPointer(util::DEVICE), (Value)0.0f, graph->edges);
 
@@ -140,6 +162,16 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             return retval;
         } // Init
 
+        /**
+         * @brief Reset problem function. Must be called prior to each run.
+         *
+         * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
+         * @param[in] graph_slice Pointer to the graph slice we process on.
+         * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+         * @param[in] queue_sizing1 Size scaling factor for work queue allocation.
+         *
+         * \return cudaError_t object Indicates the success of all CUDA calls.
+         */
         cudaError_t Reset(
             FrontierType frontier_type,     // The frontier type (i.e., edge/vertex/mixed)
             GraphSlice<SizeT, VertexId, Value>  *graph_slice,
@@ -223,7 +255,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             util::SetDevice(this->gpu_idx[i]);
             data_slices[i].Release();
         }
-        delete[] data_slices;data_slices=NULL;   
+        delete[] data_slices;data_slices=NULL;
     }
 
     /**
@@ -236,10 +268,10 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
      *
      * @param[out] h_sigmas host-side vector to store computed sigma values. (Meaningful only in single-pass BC)
      * @param[out] h_bc_values host-side vector to store Node BC_values.
-     *
      * @param[out] h_ebc_values host-side vector to store Edge BC_values.
+     * @param[out] h_labels host-side vector to store BC labels
      *
-     *\return cudaError_t object which indicates the success of all CUDA function calls.
+     *\return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Extract(Value *h_sigmas, Value *h_bc_values, Value *h_ebc_values, VertexId *h_labels)
     {
@@ -276,7 +308,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                 Value **th_sigmas     = new Value*[this->num_gpus];
                 SizeT **th_row_offsets= new SizeT*[this->num_gpus];
                 VertexId **th_labels  = new VertexId*[this->num_gpus];
-                
+
                 for (int gpu=0; gpu< this->num_gpus; gpu++)
                 {
                     if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
@@ -337,19 +369,27 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
     }
 
     /**
-     * @brief BCProblem initialization
+     * @brief initialization function.
      *
      * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on. @see Csr
-     * @param[in] _num_gpus Number of the GPUs used.
+     * @param[in] graph Pointer to the CSR graph object we process on. @see Csr
+     * @param[in] graph Pointer to the inversed CSR graph object we process on.
+     * @param[in] num_gpus Number of the GPUs used.
+     * @param[in] gpu_idx GPU index used for testing.
+     * @param[in] partition_method Partition method to partition input graph.
+     * @param[in] streams CUDA stream.
+     * @param[in] queue_sizing Maximum queue sizing factor.
+     * @param[in] in_sizing
+     * @param[in] partition_factor Partition factor for partitioner.
+     * @param[in] partition_seed Partition seed used for partitioner.
      *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     * \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Init(
         bool          stream_from_host,       // Only meaningful for single-GPU
-        Csr<VertexId, Value, SizeT> 
+        Csr<VertexId, Value, SizeT>
                      *graph,
-        Csr<VertexId, Value, SizeT> 
+        Csr<VertexId, Value, SizeT>
                      *inversgraph      = NULL,
         int           num_gpus         = 1,
         int          *gpu_idx          = NULL,
@@ -405,7 +445,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                         NULL,
                         queue_sizing,
                         in_sizing);
-                
+
                 if (retval) return retval;
             }
         } while (0);
@@ -414,13 +454,14 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
     }
 
     /**
-     *  @brief Performs any initialization work needed for BC problem type. Must be called prior to each BC run.
+     * @brief Reset problem function. Must be called prior to each run.
      *
-     *  @param[in] src Source node for one BC computing pass. If equals to -1 then compute BC value for each node.
-     *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
-     *  @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
-     * 
-     *  \return cudaError_t object which indicates the success of all CUDA function calls.
+     * @param[in] src Source node to start. (If -1 BC value for each node.).
+     * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
+     * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+     * @param[in] queue_sizing1 Size scaling factor for work queue allocation.
+     *
+     *  \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Reset(
         VertexId     src,
@@ -443,11 +484,11 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
 
             if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, queue_sizing1)) return retval;
-            
+
             if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;
         }
-        
-        // Fillin the initial input_queue for BC problem
+
+        // Fill in the initial input_queue for BC problem
         int gpu;
         VertexId tsrc;
         if (this->num_gpus <= 1)
@@ -474,22 +515,22 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                         cudaMemcpyHostToDevice),
                     "BCProblem cudaMemcpy src node failed", __FILE__, __LINE__)) return retval;
 
-        VertexId src_label = 0; 
+        VertexId src_label = 0;
         if (retval = util::GRError(cudaMemcpy(
                         data_slices[gpu]->labels.GetPointer(util::DEVICE) + tsrc,
                         &src_label,
                         sizeof(VertexId),
                         cudaMemcpyHostToDevice),
                     "BCProblem cudaMemcpy labels failed", __FILE__, __LINE__)) return retval;
-        
-        VertexId src_pred = -1; 
+
+        VertexId src_pred = -1;
         if (retval = util::GRError(cudaMemcpy(
                         data_slices[gpu]->preds.GetPointer(util::DEVICE) + tsrc,
                         &src_pred,
                         sizeof(VertexId),
                         cudaMemcpyHostToDevice),
                     "BCProblem cudaMemcpy preds failed", __FILE__, __LINE__)) return retval;
-        
+
         Value src_sigma = 1.0f;
         if (retval = util::GRError(cudaMemcpy(
                         data_slices[gpu]->sigmas.GetPointer(util::DEVICE) + tsrc,

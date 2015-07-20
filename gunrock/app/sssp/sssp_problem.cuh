@@ -28,13 +28,15 @@ namespace sssp {
  *
  * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam _Value               Type of value used for computed values.
+ * @tparam _MARK_PREDECESSORS   Whether to mark predecessor value for each node.
  */
 template <
-    typename    VertexId,                       
+    typename    VertexId,
     typename    SizeT,
     typename    Value,
     bool        _MARK_PATHS>
-struct SSSPProblem : ProblemBase<VertexId, SizeT, Value, 
+struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
     true, //MARK_PREDECESSORS
     false, //ENABLE_IDEMPOTENCE
     false, //USE_DOUBLE_BUFFER
@@ -58,15 +60,21 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, float       >    delta;
         util::Array1D<SizeT, int         >    sssp_marker;
 
+        /*
+         * @brief Default constructor
+         */
         DataSlice()
         {
-            labels          .SetName("labels"          );  
+            labels          .SetName("labels"          );
             weights         .SetName("weights"         );
             visit_lookup    .SetName("visit_lookup"    );
             delta           .SetName("delta"           );
             sssp_marker     .SetName("sssp_marker"     );
         }
 
+        /*
+         * @brief Default destructor
+         */
         ~DataSlice()
         {
             if (util::SetDevice(this->gpu_idx)) return;
@@ -77,6 +85,23 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             sssp_marker   .Release();
         }
 
+        /**
+         * @brief initialization function.
+         *
+         * @param[in] num_gpus Number of the GPUs used.
+         * @param[in] gpu_idx GPU index used for testing.
+         * @param[in] num_vertex_associate Number of vertices associated.
+         * @param[in] num_value__associate Number of value associated.
+         * @param[in] graph Pointer to the graph we process on.
+         * @param[in] num_in_nodes
+         * @param[in] num_out_nodes
+         * @param[in] original_vertex
+         * @param[in] dealta_factor Delta factor for delta-stepping.
+         * @param[in] queue_sizing Maximum queue sizing factor.
+         * @param[in] in_sizing
+         *
+         * \return cudaError_t object Indicates the success of all CUDA calls.
+         */
         cudaError_t Init(
             int   num_gpus,
             int   gpu_idx,
@@ -106,10 +131,10 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = delta       .Allocate(1           ,util::DEVICE)) return retval;
             if (retval = visit_lookup.Allocate(graph->nodes,util::DEVICE)) return retval;
             if (retval = sssp_marker .Allocate(graph->nodes,util::DEVICE)) return retval;
- 
+
             weights.SetPointer(graph->edge_values, graph->edges, util::HOST);
             if (retval = weights.Move(util::HOST, util::DEVICE)) return retval;
-            
+
             float _delta = EstimatedDelta(graph)*delta_factor;
             printf("estimated delta:%5f\n", _delta);
             delta.SetPointer(&_delta, util::HOST);
@@ -137,19 +162,36 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             //util::cpu_mt::PrintMessage("DataSlice Init() end.");
             return retval;
         } // Init
-        
+
+        /*
+         * @brief Estimate delta factor for delta-stepping.
+         *
+         * @param[in] graph Reference to the graph we process on.
+         *
+         * \return float Delta factor.
+         */
         float EstimatedDelta(const Csr<VertexId, Value, SizeT> &graph) {
             double  avgV = graph.average_edge_value;
             int     avgD = graph.average_degree;
             return avgV * 32 / avgD;
         }
 
+        /**
+         * @brief Reset problem function. Must be called prior to each run.
+         *
+         * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
+         * @param[in] graph_slice Pointer to the graph slice we process on.
+         * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+         * @param[in] queue_sizing1 Size scaling factor for work queue allocation.
+         *
+         * \return cudaError_t object Indicates the success of all CUDA calls.
+         */
         cudaError_t Reset(
-            FrontierType frontier_type,     // The frontier type (i.e., edge/vertex/mixed)
+            FrontierType frontier_type,
             GraphSlice<SizeT, VertexId, Value>  *graph_slice,
             double queue_sizing = 2.0,
             double queue_sizing1 = -1.0)
-        {   
+        {
             cudaError_t retval = cudaSuccess;
             SizeT nodes = graph_slice -> nodes;
             SizeT edges = graph_slice -> edges;
@@ -187,7 +229,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                 }
 
                 // Iterate through global frontier queue setups
-                //for (int i = 0; i < 2; i++) 
+                //for (int i = 0; i < 2; i++)
                 {
                     if (peer == this->num_gpus && i == 1) continue;
                     if (new_frontier_elements[i] > edges + 2 && queue_sizing_ > 10) new_frontier_elements[i] = edges + 2;
@@ -224,7 +266,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                     if (retval = this->scanned_edges[peer].Allocate(max_elements, util::DEVICE)) return retval;
                 }
             }
-           
+
             // Allocate output labels if necessary
             if (this->labels      .GetPointer(util::DEVICE) == NULL)
                 if (retval = this->labels      .Allocate(nodes, util::DEVICE)) return retval;
@@ -234,7 +276,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
 
             if (this->visit_lookup.GetPointer(util::DEVICE) == NULL)
                 if (retval = this->visit_lookup.Allocate(nodes, util::DEVICE)) return retval;
-            
+
             if (MARK_PATHS) util::MemsetIdxKernel<<<128, 128>>>(this->preds.GetPointer(util::DEVICE), nodes);
             util::MemsetKernel<<<128, 128>>>(this->labels      .GetPointer(util::DEVICE), util::MaxValue<Value>(), nodes);
             util::MemsetKernel<<<128, 128>>>(this->visit_lookup.GetPointer(util::DEVICE), -1, nodes);
@@ -243,10 +285,10 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
         }
     }; // DataSlice
 
-    // Members   
+    // Members
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice>          *data_slices;
-   
+
     // Methods
 
     /**
@@ -269,7 +311,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             util::SetDevice(this->gpu_idx[i]);
             data_slices[i].Release();
         }
-        delete[] data_slices;data_slices=NULL;   
+        delete[] data_slices;data_slices=NULL;
     }
 
     /**
@@ -283,7 +325,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[out] h_labels host-side vector to store computed node labels (distances from the source).
      * @param[out] h_preds host-side vector to store computed node predecessors (used for extracting the actual shortest path).
      *
-     *\return cudaError_t object which indicates the success of all CUDA function calls.
+     *\return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Extract(Value *h_labels, VertexId *h_preds)
     {
@@ -301,20 +343,20 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                 if (MARK_PATHS) {
                     data_slices[0]->preds.SetPointer(h_preds);
                     if (retval = data_slices[0]->preds.Move(util::DEVICE,util::HOST)) return retval;
-                }   
+                }
 
             } else {
                 Value    **th_labels=new Value*[this->num_gpus];
                 VertexId **th_preds =new VertexId*[this->num_gpus];
                 for (int gpu=0;gpu<this->num_gpus;gpu++)
-                {   
+                {
                     if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
                     if (retval = data_slices[gpu]->labels.Move(util::DEVICE,util::HOST)) return retval;
                     th_labels[gpu]=data_slices[gpu]->labels.GetPointer(util::HOST);
                     if (MARK_PATHS) {
                         if (retval = data_slices[gpu]->preds.Move(util::DEVICE,util::HOST)) return retval;
                         th_preds[gpu]=data_slices[gpu]->preds.GetPointer(util::HOST);
-                    }   
+                    }
                 } //end for(gpu)
 
                 for (VertexId node=0;node<this->nodes;node++)
@@ -323,19 +365,19 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                     h_labels[node]=th_labels[this->partition_tables[0][node]][this->convertion_tables[0][node]];
                 else {
                     printf("OutOfBound: node = %d, partition = %d, convertion = %d\n",
-                           node, this->partition_tables[0][node], this->convertion_tables[0][node]); 
+                           node, this->partition_tables[0][node], this->convertion_tables[0][node]);
                            //data_slices[this->partition_tables[0][node]]->labels.GetSize());
                     fflush(stdout);
-                }   
+                }
 
                if (MARK_PATHS)
                     for (VertexId node=0;node<this->nodes;node++)
                         h_preds[node]=th_preds[this->partition_tables[0][node]][this->convertion_tables[0][node]];
                 for (int gpu=0;gpu<this->num_gpus;gpu++)
-                {   
+                {
                     if (retval = data_slices[gpu]->labels.Release(util::HOST)) return retval;
                     if (retval = data_slices[gpu]->preds.Release(util::HOST)) return retval;
-                }   
+                }
                 delete[] th_labels;th_labels=NULL;
                 delete[] th_preds ;th_preds =NULL;
             } //end if (data_slices.size() ==1)
@@ -345,14 +387,21 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
     }
 
     /**
-     * @brief SSSPProblem initialization
+     * @brief initialization function.
      *
      * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on. @see Csr
-     * @param[in] _num_gpus Number of the GPUs used.
-     * @param[in] delta_factor Parameter for delta-stepping SSSP
+     * @param[in] graph Pointer to the CSR graph object we process on. @see Csr
+     * @param[in] graph Pointer to the inversed CSR graph object we process on.
+     * @param[in] num_gpus Number of the GPUs used.
+     * @param[in] gpu_idx GPU index used for testing.
+     * @param[in] partition_method Partition method to partition input graph.
+     * @param[in] streams CUDA stream.
+     * @param[in] queue_sizing Maximum queue sizing factor.
+     * @param[in] in_sizing
+     * @param[in] partition_factor Partition factor for partitioner.
+     * @param[in] partition_seed Partition seed used for partitioner.
      *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     * \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Init(
             bool          stream_from_host,       // Only meaningful for single-GPU
@@ -412,18 +461,18 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
     }
 
     /**
-     *  @brief Performs any initialization work needed for SSSP problem type. Must be called prior to each SSSP run.
+     * @brief Reset problem function. Must be called prior to each run.
      *
-     *  @param[in] src Source node for one SSSP computing pass.
-     *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
-     *  @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+     * @param[in] src Source node to start.
+     * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
+     * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
      *
-     *  \return cudaError_t object which indicates the success of all CUDA function calls.
+     *  \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Reset(
             VertexId    src,
-            FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
-            double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
+            FrontierType frontier_type,
+            double queue_sizing)
     {
 
         cudaError_t retval = cudaSuccess;
@@ -452,7 +501,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                         sizeof(VertexId),
                         cudaMemcpyHostToDevice),
                     "SSSPProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
-        Value src_label = 0; 
+        Value src_label = 0;
         if (retval = util::GRError(cudaMemcpy(
                         data_slices[gpu]->labels.GetPointer(util::DEVICE)+tsrc,
                         &src_label,

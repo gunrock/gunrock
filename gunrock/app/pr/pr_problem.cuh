@@ -29,8 +29,8 @@ namespace pr {
  * @tparam _Value               Type of float or double to use for computing PR value.
  */
 template <
-    typename    VertexId,                       
-    typename    SizeT,                          
+    typename    VertexId,
+    typename    SizeT,
     typename    Value>
 struct PRProblem : ProblemBase<VertexId, SizeT, Value,
     true,  // _MARK_PREDECESSORS
@@ -52,7 +52,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
     {
         // device storage arrays
         util::Array1D<SizeT, Value   > rank_curr;           /**< Used for ping-pong page rank value */
-        util::Array1D<SizeT, Value   > rank_next;           /**< Used for ping-pong page rank value */       
+        util::Array1D<SizeT, Value   > rank_next;           /**< Used for ping-pong page rank value */
         util::Array1D<SizeT, SizeT   > degrees;             /**< Used for keeping out-degree for each vertex */
         util::Array1D<SizeT, SizeT   > degrees_pong;
         util::Array1D<SizeT, SizeT   > labels;
@@ -70,6 +70,9 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
         int      PR_queue_selector;
         bool     final_event_set;
 
+        /*
+         * @brief Default constructor
+         */
         DataSlice()
         {
             rank_curr   .SetName("rank_curr"   );
@@ -92,6 +95,9 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             PR_queue_selector  = 0;
         }
 
+        /*
+         * @brief Default destructor
+         */
         ~DataSlice()
         {
             if (util::SetDevice(this->gpu_idx)) return;
@@ -105,6 +111,21 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             delete[] temp_keys_out; temp_keys_out = NULL;
         }
 
+        /**
+         * @brief initialization function.
+         *
+         * @param[in] num_gpus Number of the GPUs used.
+         * @param[in] gpu_idx GPU index used for testing.
+         * @param[in] num_vertex_associate Number of vertices associated.
+         * @param[in] num_value__associate Number of value associated.
+         * @param[in] graph Pointer to the graph we process on.
+         * @param[in] num_in_nodes
+         * @param[in] num_out_nodes
+         * @param[in] queue_sizing Maximum queue sizing factor.
+         * @param[in] in_sizing
+         *
+         * \return cudaError_t object Indicates the success of all CUDA calls.
+         */
         cudaError_t Init(
             int   num_gpus,
             int   gpu_idx,
@@ -118,7 +139,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
         {
             cudaError_t retval = cudaSuccess;
             SizeT       nodes  = graph->nodes;
-                    
+
             /*if (num_gpus > 1)
             {
                 //_num_in_nodes = new  SizeT[num_gpus+1];
@@ -159,13 +180,13 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
                 this->keys_out [peer_] = this->keys_out[1];
                 //this->keys_out [peer_].SetPointer(this->keys_out[1].GetPointer(util::DEVICE), this->keys_out[1].GetSize(), util::DEVICE);
                 this->keys_outs[peer_] = this->keys_out[1].GetPointer(util::DEVICE);
-                
+
                 //this->value__associate_out[peer_][0].SetPointer(this->value__associate_out[1][0].GetPointer(util::DEVICE), this->value__associate_out[1][0].GetSize(), util::DEVICE);
                 //this->value__associate_outs[peer_][0] = this->value__associate_out[1][0].GetPointer(util::DEVICE);
                 //if (retval = this->value__associate_outs[peer_].Move(util::HOST, util::DEVICE)) return retval;
             }
             this->keys_outs.Move(util::HOST, util::DEVICE);
-    
+
             // Create SoA on device
             if (retval = rank_curr   .Allocate(nodes, util::DEVICE)) return retval;
             if (retval = rank_next   .Allocate(nodes, util::DEVICE)) return retval;
@@ -178,17 +199,16 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
     };
 
     // Members
-    
+
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice> *data_slices;
-   
+
     // Methods
 
     /**
      * @brief PRProblem default constructor
      */
-    PRProblem():
-    data_slices(NULL) {}
+    PRProblem(): data_slices(NULL) {}
 
     /**
      * @brief PRProblem default destructor
@@ -215,7 +235,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[out] h_rank host-side vector to store page rank values.
      * @param[out] h_node_id host-side vector to store node Vertex ID.
      *
-     *\return cudaError_t object which indicates the success of all CUDA function calls.
+     *\return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Extract(Value *h_rank, VertexId *h_node_id)
     {
@@ -233,17 +253,25 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
     }
 
     /**
-     * @brief PRProblem initialization
+     * @brief initialization function.
      *
      * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on. @see Csr
-     * @param[in] _num_gpus Number of the GPUs used.
+     * @param[in] graph Pointer to the CSR graph object we process on. @see Csr
+     * @param[in] graph Pointer to the inversed CSR graph object we process on.
+     * @param[in] num_gpus Number of the GPUs used.
+     * @param[in] gpu_idx GPU index used for testing.
+     * @param[in] partition_method Partition method to partition input graph.
+     * @param[in] streams CUDA stream.
+     * @param[in] queue_sizing Maximum queue sizing factor.
+     * @param[in] in_sizing
+     * @param[in] partition_factor Partition factor for partitioner.
+     * @param[in] partition_seed Partition seed used for partitioner.
      *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     * \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Init(
             bool          stream_from_host,       // Only meaningful for single-GPU
-            Csr<VertexId, Value, SizeT> 
+            Csr<VertexId, Value, SizeT>
                          *graph,
             Csr<VertexId, Value, SizeT>
                          *inversgraph      = NULL,
@@ -254,7 +282,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             float         queue_sizing     = 2.0f,
             float         in_sizing        = 1.0f,
             float         partition_factor = -1.0f,
-            int           partition_seed   = -1) 
+            int           partition_seed   = -1)
     {
         ProblemBase<VertexId, SizeT, Value, true, false, false, false, false, true> :: Init(
             stream_from_host,
@@ -321,14 +349,16 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
     }
 
     /**
-     *  @brief Performs any initialization work needed for PR problem type. Must be called prior to each PR iteration.
+     * @brief Reset problem function. Must be called prior to each run.
      *
-     *  @param[in] src Source node for one PR computing pass.
-     *  @param[in] delta Tuning parameter for switching to backward BFS
-     *  @param[in] threshold Threshold for remove node from PR computation process.
-     *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
-     * 
-     *  \return cudaError_t object which indicates the success of all CUDA function calls.
+     * @param[in] src Source node to start.
+     * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
+     * @param[in] delta PageRank delta factor
+     * @param[in] threshold Threshold for remove node from PR computation process.
+     * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
+     * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+     *
+     *  \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Reset(
             VertexId src,
@@ -361,7 +391,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
 
             if (data_slices[gpu]->rank_curr.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->rank_curr.Allocate(nodes, util::DEVICE)) return retval;
-            
+
             if (data_slices[gpu]->rank_next.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->rank_next.Allocate(nodes, util::DEVICE)) return retval;
 
@@ -373,25 +403,25 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = data_slices[gpu]->degrees  .Allocate(nodes, util::DEVICE)) return retval;
             // Allocate degrees_pong if necessary
             if (data_slices[gpu]->degrees_pong.GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->degrees_pong.Allocate(nodes+1, util::DEVICE)) return retval; 
+                if (retval = data_slices[gpu]->degrees_pong.Allocate(nodes+1, util::DEVICE)) return retval;
 
-            // Initial rank_next = 0 
+            // Initial rank_next = 0
             //util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_rank_curr,
             //    (Value)1.0/nodes, nodes);
             util::MemsetKernel<<<128, 128>>>(
                 data_slices[gpu]->rank_next.GetPointer(util::DEVICE), (Value)(1.0 - delta), nodes);
             util::MemsetKernel<<<128, 128>>>(
                 data_slices[gpu]->rank_curr.GetPointer(util::DEVICE), (Value)(1.0 - delta), nodes);
-            
+
             // Compute degrees
             util::MemsetKernel<<<128, 128>>>(
                 data_slices[gpu]->degrees  .GetPointer(util::DEVICE), 0, nodes);
-            
+
             if (this->num_gpus == 1)
             {
                 util::MemsetMadVectorKernel <<<128, 128>>>(
-                    data_slices[gpu]->degrees.GetPointer(util::DEVICE), 
-                    this->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE), 
+                    data_slices[gpu]->degrees.GetPointer(util::DEVICE),
+                    this->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
                     this->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE)+1, -1, nodes);
                 data_slices[gpu]->local_nodes = nodes;
 
@@ -406,7 +436,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
                     data_slices[gpu]->degrees_pong.GetPointer(util::DEVICE)+1, -1, nodes);
                 data_slices[gpu]->degrees_pong.UnSetPointer(util::HOST);
 
-                if (retval = data_slices[gpu]->frontier_queues[0].keys[0].EnsureSize(data_slices[gpu]->local_nodes)) return retval; 
+                if (retval = data_slices[gpu]->frontier_queues[0].keys[0].EnsureSize(data_slices[gpu]->local_nodes)) return retval;
                 VertexId *temp_keys = new VertexId[data_slices[gpu]->frontier_queues[0].keys[0].GetSize()];
                 SizeT counter = 0;
                 for (VertexId v=0; v<nodes; v++)
@@ -416,14 +446,14 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
                     counter++;
                 }
                 data_slices[gpu]->local_nodes = counter;
-                
+
                 data_slices[gpu]->frontier_queues[0].keys[0].SetPointer(temp_keys);
                 data_slices[gpu]->frontier_queues[0].keys[0].Move(util::HOST, util::DEVICE);
                 data_slices[gpu]->frontier_queues[0].keys[0].UnSetPointer(util::HOST);
-                delete[] temp_keys;temp_keys=NULL; 
+                delete[] temp_keys;temp_keys=NULL;
             }
             util::MemsetCopyVectorKernel<<<128, 128>>>(
-                data_slices[gpu]->degrees_pong.GetPointer(util::DEVICE), 
+                data_slices[gpu]->degrees_pong.GetPointer(util::DEVICE),
                 data_slices[gpu]->degrees     .GetPointer(util::DEVICE), nodes);
             util::MemsetIdxKernel       <<<128, 128>>>(
                 data_slices[gpu]->node_ids    .GetPointer(util::DEVICE), nodes);
