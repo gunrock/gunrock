@@ -18,6 +18,7 @@
 #include <sys/utsname.h>        /* for Cpuinfo */
 #include <cuda.h>               /* for Gpuinfo */
 #include <cuda_runtime_api.h>   /* for Gpuinfo */
+#include <unistd.h>             /* for Userinfo */
 
 
 namespace gunrock {
@@ -48,6 +49,10 @@ public:
     {
         return std::string(uts.machine);
     }
+    std::string nodename() const
+    {
+        return std::string(uts.nodename);
+    }
 
     json_spirit::mObject getSysinfo() const
     {
@@ -57,13 +62,13 @@ public:
         json_sysinfo["release"] = release();
         json_sysinfo["version"] = version();
         json_sysinfo["machine"] = machine();
+        json_sysinfo["nodename"] = nodename();
         return json_sysinfo;
     }
 
 };
 
 class Gpuinfo {
-private:
 public:
     json_spirit::mObject getGpuinfo() const
     {
@@ -95,6 +100,15 @@ public:
     }
 };
 
+class Userinfo {
+public:
+    json_spirit::mObject getUserinfo() const
+    {
+        json_spirit::mObject info;
+        info["login"] = getlogin();
+        return info;
+    }
+};
 
 } //util
 } //gunrock

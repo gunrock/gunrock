@@ -798,11 +798,15 @@ int main( int argc, char** argv)
     json_spirit::mObject info;
     info["command_line"] = json_spirit::mValue(args.GetEntireCommandLine());
 
-    // get machine/OS info
+    // get machine/OS/user/time info
     Sysinfo sysinfo;
     info["sysinfo"] = sysinfo.getSysinfo();
     Gpuinfo gpuinfo;
     info["gpuinfo"] = gpuinfo.getGpuinfo();
+    Userinfo userinfo;
+    info["userinfo"] = userinfo.getUserinfo();
+    time_t now = time(NULL);
+    info["time"] = ctime(&now);
 
     //
     // Construct graph and perform search(es)
