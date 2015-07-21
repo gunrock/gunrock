@@ -20,11 +20,14 @@ endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-find_package(BoostHeaders ${gunrock_REQUIRED_BOOST_VERSION} REQUIRED)
+find_package(Boost ${gunrock_REQUIRED_BOOST_VERSION}
+  REQUIRED system filesystem timer chrono)
 if (Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
-endif (Boost_FOUND)
-
+  link_directories(${Boost_LIBRARY_DIRS})
+else()
+  message(WARNING "Boost was requested but support was not found")
+endif ()
 
 set(gunrock_INCLUDE_DIRS
   ${CMAKE_SOURCE_DIR})
