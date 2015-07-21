@@ -23,6 +23,7 @@
 #include <gunrock/util/test_utils.cuh>
 #include <gunrock/util/sysinfo.h>
 #include <gunrock/util/json_spirit_writer_template.h>
+#include <boost/filesystem.hpp>
 
 // Graph construction utils
 #include <gunrock/graphio/market.cuh>
@@ -822,10 +823,13 @@ int main( int argc, char** argv)
     Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
     if (graph_args < 1) { Usage(); return 1; }
 
+    std::string file_stem;
     if (graph_type == "market")
     {
         // Matrix-market coordinate-formatted graph file
         char *market_filename = (graph_args == 2) ? argv[2] : NULL;
+        boost::filesystem::path market_filename_path(market_filename);
+        file_stem = market_filename_path.stem().string();
         if (graphio::BuildMarketGraph<false>(
                 market_filename,
                 csr,
@@ -896,9 +900,10 @@ int main( int argc, char** argv)
     {
         std::string dir;
         args.GetCmdLineArgument("jsondir", dir);
+
         std::string filename =
             dir + "/" + info["name"].get_str() + "_" +
-            // info["time"].get_str().substr(0, info["time"].get_str().size() - 1) +
+            ((file_stem != "") ? (file_stem + "_") : "") +
             info["time"].get_str() + ".json";
         // now filter out bad chars (the list in badchars)
         char badchars[] = ":\n";
