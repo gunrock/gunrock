@@ -9,7 +9,7 @@
  * @file
  * problem_base.cuh
  *
- * @brief Base struct for all the application types
+ * @brief Base structure for all the application types
  */
 
 #pragma once
@@ -77,7 +77,7 @@ struct GraphSlice
     util::Array1D<SizeT, SizeT   > in_counter         ; // Incoming vertices counter from peers
     util::Array1D<SizeT, SizeT   > out_offset         ; // Outgoing vertices offsets
     util::Array1D<SizeT, SizeT   > out_counter        ; // Outgoing vertices counter
-    util::Array1D<SizeT, SizeT   > backward_offset    ; // Backward offsets for partition and convertion tables
+    util::Array1D<SizeT, SizeT   > backward_offset    ; // Backward offsets for partition and conversion tables
     util::Array1D<SizeT, int     > backward_partition ; // Remote peers having the same vertices
     util::Array1D<SizeT, VertexId> backward_convertion; // IDs of vertices in remote peers
 
@@ -108,7 +108,7 @@ struct GraphSlice
         backward_offset    .SetName("backward_offset"    );
         backward_partition .SetName("backward_partition" );
         backward_convertion.SetName("backward_convertion");
-    } // end GraphSlice(int index)
+    }  // end GraphSlice(int index)
 
     /**
      * @brief GraphSlice Destructor to free all device memories.
@@ -137,22 +137,22 @@ struct GraphSlice
     } // end ~GraphSlice()
 
    /**
-     * @brief Initalize graph slice
+     * @brief Initialize graph slice
      *
      * @param[in] stream_from_host    Whether to stream data from host
-     * @param[in] num_gpus            Number of gpus
+     * @param[in] num_gpus            Number of GPUs
      * @param[in] graph               Pointer to the sub graph
-     * @param[in] inverstgraph        Pointer to the inverst graph
+     * @param[in] inverstgraph        Pointer to the invert graph
      * @param[in] partition_table     The partition table
-     * @param[in] convertion_table    The convertion table
+     * @param[in] convertion_table    The conversion table
      * @param[in] original_vertex     The original vertex table
      * @param[in] in_counter          In_counters
      * @param[in] out_offset          Out_offsets
      * @param[in] out_counter         Out_counters
      * @param[in] backward_offsets    Backward_offsets
      * @param[in] backward_partition  The backward partition table
-     * @param[in] backward_convertion The backward convertion table
-     * \return cudaError_t            Object incidating the success of all CUDA function calls
+     * @param[in] backward_convertion The backward conversion table
+     * \return cudaError_t            Object indicating the success of all CUDA function calls
      */
     cudaError_t Init(
         bool                       stream_from_host,
@@ -236,35 +236,35 @@ struct GraphSlice
             // For multi-GPU cases
             if (num_gpus > 1)
             {
-                // Allocate and initalize convertion_table
+                // Allocate and initialize convertion_table
                 if (retval = this->partition_table.Allocate (nodes     ,util::DEVICE)) break;
                 if (partition_table  != NULL)
                     if (retval = this->partition_table.Move (util::HOST,util::DEVICE)) break;
 
-                // Allocate and initalize convertion_table
+                // Allocate and initialize convertion_table
                 if (retval = this->convertion_table.Allocate(nodes     ,util::DEVICE)) break;
                 if (convertion_table != NULL)
                     if (retval = this->convertion_table.Move(util::HOST,util::DEVICE)) break;
 
-                // Allocate and initalize original_vertex
+                // Allocate and initialize original_vertex
                 if (retval = this->original_vertex .Allocate(nodes     ,util::DEVICE)) break;
                 if (original_vertex  != NULL)
                     if (retval = this->original_vertex .Move(util::HOST,util::DEVICE)) break;
 
-                // If need backward information progation
+                // If need backward information proration
                 if (backward_offsets!=NULL)
                 {
-                    // Allocate and initalize backward_offset
+                    // Allocate and initialize backward_offset
                     this->backward_offset    .SetPointer(backward_offsets     , nodes+1);
                     if (retval = this->backward_offset    .Allocate(nodes+1, util::DEVICE)) break;
                     if (retval = this->backward_offset    .Move(util::HOST, util::DEVICE)) break;
 
-                    // Allocate and initalize backward_partition
+                    // Allocate and initialize backward_partition
                     this->backward_partition .SetPointer(backward_partition   , backward_offsets[nodes]);
                     if (retval = this->backward_partition .Allocate(backward_offsets[nodes], util::DEVICE)) break;
                     if (retval = this->backward_partition .Move(util::HOST, util::DEVICE)) break;
 
-                    // Allocate and initalize backward_convertion
+                    // Allocate and initialize backward_convertion
                     this->backward_convertion.SetPointer(backward_convertion  , backward_offsets[nodes]);
                     if (retval = this->backward_convertion.Allocate(backward_offsets[nodes], util::DEVICE)) break;
                     if (retval = this->backward_convertion.Move(util::HOST, util::DEVICE)) break;
@@ -307,7 +307,7 @@ struct GraphSlice
 }; // end GraphSlice
 
 /**
- * @brief Baase data slice structure which contains common data structural needed for permitives.
+ * @brief Base data slice structure which contains common data structural needed for primitives.
  *
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
@@ -321,12 +321,12 @@ struct DataSliceBase
 {
     int    num_gpus            ; // Number of GPUs
     int    gpu_idx             ; // GPU index
-    int    wait_counter        ; // Wait counter for interation loop control
-    int    gpu_mallocing       ; // Whether gpu is in malloc
+    int    wait_counter        ; // Wait counter for iteration loop control
+    int    gpu_mallocing       ; // Whether GPU is in malloc
     int    num_vertex_associate; // Number of associate values in VertexId type for each vertex
     int    num_value__associate; // Number of associate values in Value type for each vertex
     int    num_stages          ; // Number of stages
-    SizeT  nodes               ; // Numver of vertices
+    SizeT  nodes               ; // Number of vertices
     util::Array1D<SizeT, VertexId    > **vertex_associate_in  [2]; // Incoming VertexId type associate values
     util::Array1D<SizeT, VertexId*   >  *vertex_associate_ins [2]; // Device pointers to incoming VertexId type associate values
     util::Array1D<SizeT, VertexId    > **vertex_associate_out    ; // Outgoing VertexId type associate values
@@ -334,9 +334,9 @@ struct DataSliceBase
     util::Array1D<SizeT, VertexId**  >   vertex_associate_outss  ; // Device pointers to device points to outgoing VertexId type associate values
     util::Array1D<SizeT, VertexId*   >   vertex_associate_orgs   ; // Device pointers to original VertexId type associate values
     util::Array1D<SizeT, Value       > **value__associate_in  [2]; // Incoming Value type associate values
-    util::Array1D<SizeT, Value*      >  *value__associate_ins [2]; // Device pointers to incomnig Value type associate values
+    util::Array1D<SizeT, Value*      >  *value__associate_ins [2]; // Device pointers to incoming Value type associate values
     util::Array1D<SizeT, Value       > **value__associate_out    ; // Outgoing Value type associate values
-    util::Array1D<SizeT, Value*      >  *value__associate_outs   ; // Device pointers to outgoing Value type assocaite values
+    util::Array1D<SizeT, Value*      >  *value__associate_outs   ; // Device pointers to outgoing Value type associate values
     util::Array1D<SizeT, Value**     >   value__associate_outss  ; // Device pointers to device pointers to outgoing Value type associate values
     util::Array1D<SizeT, Value*      >   value__associate_orgs   ; // Device pointers to original Value type associate values
     util::Array1D<SizeT, SizeT       >   out_length              ; // Number of outgoing vertices to peers
@@ -355,7 +355,7 @@ struct DataSliceBase
     util::Array1D<SizeT, char        >   make_out_array          ; // compressed data structure for make_out kernel
     util::Array1D<SizeT, char        >  *expand_incoming_array   ; // compressed data structure for expand_incoming kernel
     util::Array1D<SizeT, VertexId    >   preds                   ; // predecessors of vertices
-    util::Array1D<SizeT, VertexId    >   temp_preds              ; // tempory storages for predecessors
+    util::Array1D<SizeT, VertexId    >   temp_preds              ; // temporary storages for predecessors
 
     //Frontier queues. Used to track working frontier.
     util::DoubleBuffer<SizeT, VertexId, Value>  *frontier_queues ; // frontier queues
@@ -610,12 +610,12 @@ struct DataSliceBase
      * @param[in] num_gpus             Number of GPUs
      * @param[in] gpu_idx              GPU index
      * @param[in] num_vertex_associate Number of VertexId type associate values
-     * @param[in] num_value__associate Numver of Value type associate values
+     * @param[in] num_value__associate Number of Value type associate values
      * @param[in] graph                Pointer to the CSR formated sub-graph
      * @param[in] num_in_nodes         Number of incoming vertices from peers
      * @param[in] num_out_nodes        Number of outgoing vertices to peers
      * @param[in] in_sizing            Preallocation factor for incoming / outgoing vertices
-     * \return                         Error occured if any, otherwise cudaSuccess
+     * \return                         Error occurred if any, otherwise cudaSuccess
      */
     cudaError_t Init(
         int    num_gpus            ,
@@ -808,7 +808,7 @@ struct DataSliceBase
      * @brief Performs reset work needed for DataSliceBase. Must be called prior to each search
      *
      * @param[in] frontier_type      The frontier type (i.e., edge/vertex/mixed)
-     * @param[in] graph_slice        Pointer to the correspoding graph slice
+     * @param[in] graph_slice        Pointer to the corresponding graph slice
      * @param[in] queue_sizing       Sizing scaling factor for work queue allocation. 1.0 by default. Reserved for future use.
      * @param[in] _USE_DOUBLE_BUFFER Whether to use double buffer
      * @param[in] queue_sizing1      Scaling factor for frontier_queue1
@@ -913,21 +913,21 @@ public:
     bool          debug             ; // Whether or not to use debug mode
     bool          size_check        ; // Whether or not to enable size_check
     bool          mark_predecessors ; // Whether or not to mark src-distance vs. parent vertices
-    bool          enable_idempotence; // Whether or not to enable idempotence operation
+    bool          enable_idempotence; // Whether or not to enable idempotent operation
     void         *graph             ; // Pointer to the input CSR graph
     long long     src               ; // Source vertex ID
     int           max_grid_size     ; // maximum grid size (0: leave it up to the enactor)
-    int           num_gpus          ; // Number of GPUs for multi-gpu enactor to use
+    int           num_gpus          ; // Number of GPUs for multi-GPU enactor to use
     double        max_queue_sizing  ; // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
     double        max_in_sizing     ; // Maximum size scaling factor for data communication
-    void         *context           ; // GPU context array used by morden gpu
+    void         *context           ; // GPU context array used by MordernGPU
     std::string   partition_method  ; // Partition method
     int          *gpu_idx           ; // Array of GPU indices
     cudaStream_t *streams           ; // Array of GPU streams
     float         partition_factor  ; // Partition factor
     int           partition_seed    ; // Partition seed
     int           iterations        ; // Number of repeats
-    int           traversal_mode    ; // Load-balacned or Dynamic cooperative
+    int           traversal_mode    ; // Load-balanced or Dynamic cooperative
 
     /**
      * @brief TestParameter_Base constructor
@@ -1033,9 +1033,9 @@ public:
  * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
  * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer
  * @tparam _MARK_PREDCESSORS    Whether or not to mark predecessors for vertices
- * @tparam _ENABLE_IDEMPOTENCE  Whether or not to use idempotence
+ * @tparam _ENABLE_IDEMPOTENCE  Whether or not to use idempotent
  * @tparam _USE_DOUBLE_BUFFER   Whether or not to use double buffer for frontier queues
- * @tparam _ENABLE_BACKWARD     Whether or not to use backward propergation
+ * @tparam _ENABLE_BACKWARD     Whether or not to use backward propagation
  * @tparam _KEEP_ORDER          Whether or not to keep vertices order after partitioning
  * @tparam _KEEP_NODE_NUM       Whether or not to keep vertex IDs after partitioning
  */
@@ -1076,19 +1076,19 @@ struct ProblemBase
     SizeT               edges                 ; // Number of edges in the graph
     GraphSlice<SizeT, VertexId, Value>
                         **graph_slices        ; // Set of graph slices (one for each GPU)
-    Csr<VertexId,Value,SizeT> *sub_graphs     ; // Subgraphs for multi-gpu implementation
+    Csr<VertexId,Value,SizeT> *sub_graphs     ; // Subgraphs for multi-GPU implementation
     Csr<VertexId,Value,SizeT> *org_graph      ; // Original graph
     PartitionerBase<VertexId,SizeT,Value,_ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                         *partitioner          ; // Partitioner
     int                 **partition_tables    ; // Partition tables indicating which GPU the vertices are hosted
-    VertexId            **convertion_tables   ; // Convertions tables indicating vertex IDs on local / remote GPUs
+    VertexId            **convertion_tables   ; // Conversions tables indicating vertex IDs on local / remote GPUs
     VertexId            **original_vertexes   ; // Vertex IDs in the original graph
     SizeT               **in_counter          ; // Number of in vertices
     SizeT               **out_offsets         ; // Out offsets for data communication
     SizeT               **out_counter         ; // Number of out vertices
-    SizeT               **backward_offsets    ; // Offsets for backward propergation
-    int                 **backward_partitions ; // Partition tables for backward propergation
-    VertexId            **backward_convertions; // Convertion tables for backward propergation
+    SizeT               **backward_offsets    ; // Offsets for backward propagation
+    int                 **backward_partitions ; // Partition tables for backward propagation
+    VertexId            **backward_convertions; // Conversion tables for backward propagation
 
     // Methods
 
@@ -1132,14 +1132,14 @@ struct ProblemBase
         }
         delete[] graph_slices; graph_slices = NULL;
         delete[] gpu_idx;      gpu_idx      = NULL;
-    } // end ~ProblemBase()
+    }  // end ~ProblemBase()
 
     /**
      * @brief Get the GPU index for a specified vertex id.
      *
      * @tparam VertexId Type of signed integer to use as vertex id
      * @param[in] vertex Vertex Id to search
-     * \return Index of the gpu that owns the neighbor list of the specified vertex
+     * \return Index of the GPU that owns the neighbor list of the specified vertex
      */
     template <typename VertexId>
     int GpuIndex(VertexId vertex)
@@ -1178,14 +1178,14 @@ struct ProblemBase
      * @param[in] stream_from_host Whether to stream data from host.
      * @param[in] graph            Pointer to the input CSR graph.
      * @param[in] inverse_graph    Pointer to the inversed input CSR graph.
-     * @param[in] num_gpus         Number of gpus
-     * @param[in] gpu_idx          Array of gpu indices
+     * @param[in] num_gpus         Number of GPUs
+     * @param[in] gpu_idx          Array of GPU indices
      * @param[in] partition_method Partition methods
      * @param[in] queue_sizing     Queue sizing
      * @param[in] partition_factor Partition factor
      * @param[in] partition_seed   Partition seed
      *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
+     * \return cudaError_t object indicates the success of all CUDA calls.
      */
     cudaError_t Init(
         bool        stream_from_host,
@@ -1338,7 +1338,7 @@ struct ProblemBase
                         NULL,
                         NULL);
                if (retval) break;
-            }// end for (gpu)
+            }  // end for (gpu)
 
        } while (0);
 

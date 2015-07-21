@@ -23,6 +23,11 @@
 namespace gunrock {
 namespace graphio {
 
+/**
+ * @brief Utility function.
+ *
+ * @param[in] rand_data
+ */
 inline double Sprng (struct drand48_data *rand_data)
 {
     double result;
@@ -30,11 +35,28 @@ inline double Sprng (struct drand48_data *rand_data)
     return result;
 }
 
+/**
+ * @brief Utility function.
+ *
+ * @param[in] rand_data
+ */
 inline bool Flip (struct drand48_data *rand_data)
 {
     return Sprng(rand_data) >= 0.5;
 }
 
+/**
+ * @brief Utility function to choose partitions.
+ *
+ * @param[in] u
+ * @param[in] v
+ * @param[in] step
+ * @param[in] a
+ * @param[in] b
+ * @param[in] c
+ * @param[in] d
+ * @param[in] rand_data
+ */
 template <typename VertexId>
 void ChoosePartition (
     VertexId *u, VertexId *v, VertexId step,
@@ -56,13 +78,23 @@ void ChoosePartition (
         *u = *u + step;
     }
     else if ((a + b + c < p) && (p < a + b + c + d))
-    {   
+    {
         *u = *u + step;
         *v = *v + step;
-    }   
+    }
 }
 
-void VaryParams (double *a, double *b, double *c, double *d, drand48_data *rand_data)
+/**
+ * @brief Utility function to very parameters.
+ *
+ * @param[in] a
+ * @param[in] b
+ * @param[in] c
+ * @param[in] d
+ * @param[in] rand_data
+ */
+void VaryParams(
+    double *a, double *b, double *c, double *d, drand48_data *rand_data)
 {
     double v, S;
 
@@ -70,39 +102,39 @@ void VaryParams (double *a, double *b, double *c, double *d, drand48_data *rand_
     v = 0.05;
 
     if (Flip(rand_data))
-    {   
+    {
         *a += *a * v * Sprng(rand_data);
-    }   
+    }
     else
-    {   
+    {
         *a -= *a * v * Sprng(rand_data);
-    }   
+    }
     if (Flip(rand_data))
-    {   
+    {
         *b += *b * v * Sprng(rand_data);
-    }   
+    }
     else
-    {   
+    {
         *b -= *b * v * Sprng(rand_data);
-    }   
+    }
     if (Flip(rand_data))
-    {   
+    {
         *c += *c * v * Sprng(rand_data);
-    }   
+    }
     else
-    {   
+    {
         *c -= *c * v * Sprng(rand_data);
-    }   
+    }
     if (Flip(rand_data))
-    {   
+    {
         *d += *d * v * Sprng(rand_data);
-    }   
+    }
     else
-    {   
+    {
         *d -= *d * v * Sprng(rand_data);
-    }   
+    }
 
-    S = *a + *b + *c + *d; 
+    S = *a + *b + *c + *d;
 
     *a = *a / S;
     *b = *b / S;
@@ -111,7 +143,24 @@ void VaryParams (double *a, double *b, double *c, double *d, drand48_data *rand_
 }
 
 /**
- * @brief Builds a R-MAT CSR graph
+ * @brief Builds a R-MAT CSR graph.
+ *
+ * @tparam WITH_VALUES Whether or not associate with per edge weight values.
+ * @tparam VertexId Vertex identifier.
+ * @tparam Value Value type.
+ * @tparam SizeT Graph size type.
+ *
+ * @param[in] nodes
+ * @param[in] edges
+ * @param[in] graph
+ * @param[in] undirected
+ * @param[in] a0
+ * @param[in] b0
+ * @param[in] c0
+ * @param[in] d0
+ * @param[in] vmultipiler
+ * @param[in] vmin
+ * @param[in] seed
  */
 template <bool WITH_VALUES, typename VertexId, typename Value, typename SizeT>
 int BuildRmatGraph (
@@ -147,20 +196,20 @@ int BuildRmatGraph (
     #pragma omp parallel
     {
         struct drand48_data rand_data;
-        int thread_num    = omp_get_thread_num();
-        int num_threads   = omp_get_num_threads();
-        SizeT i_start     = (long long )(edges) * thread_num / num_threads;
-        SizeT i_end       = (long long )(edges) * (thread_num + 1) / num_threads;
+        int thread_num  = omp_get_thread_num();
+        int num_threads = omp_get_num_threads();
+        SizeT i_start   = (long long )(edges) * thread_num / num_threads;
+        SizeT i_end     = (long long )(edges) * (thread_num + 1) / num_threads;
         unsigned int seed_ = seed + 616 * thread_num;
         srand48_r(seed_, &rand_data);
 
         for (SizeT i = i_start; i < i_end; i++)
         {
-            /*if ((i%10000)==0) 
+            /*if ((i%10000)==0)
             {
                 int thread_num = omp_get_thread_num();
                 printf("%d:%d \t",thread_num, i);//fflush(stdout);
-            }*/ 
+            }*/
             EdgeTupleType *coo_p = coo + i;
             double a = a0;
             double b = b0;
@@ -205,7 +254,7 @@ int BuildRmatGraph (
     }
 
     // convert COO to CSR
-    char *out_file = NULL; // TODO: currently does not support write CSR file
+    char *out_file = NULL;  // TODO: currently does not support write CSR file
     graph.template FromCoo<WITH_VALUES, EdgeTupleType>(
         out_file, coo, nodes, directed_edges);
 

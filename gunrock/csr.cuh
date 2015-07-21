@@ -151,6 +151,17 @@ struct Csr {
         }
     }
 
+    /*
+     * @brief Write human-readable CSR arrays into 3 files.
+     * Can be easily used for python interface.
+     *
+     * @param[in] file_name Original graph file path and name.
+     * @param[in] v Number of vertices in input graph.
+     * @param[in] e Number of edges in input graph.
+     * @param[in] row_offsets Row-offsets array store row pointers.
+     * @param[in] col_indices Column-indices array store destinations.
+     * @param[in] edge_values Per edge weight values associated.
+     */
     void WriteCSR(char *file_name,
                   SizeT v, SizeT e,
                   SizeT    *row_offsets,
@@ -187,8 +198,23 @@ struct Csr {
         }
     }
 
-    void WriteToLigraFile(char  *file_name, SizeT v, SizeT e, SizeT *row,
-                     VertexId *col, Value *edge_values = NULL) {
+    /*
+     * @brief Write Ligra input CSR arrays into .adj file.
+     * Can be easily used for python interface.
+     *
+     * @param[in] file_name Original graph file path and name.
+     * @param[in] v Number of vertices in input graph.
+     * @param[in] e Number of edges in input graph.
+     * @param[in] row Row-offsets array store row pointers.
+     * @param[in] col Column-indices array store destinations.
+     * @param[in] edge_values Per edge weight values associated.
+     */
+    void WriteToLigraFile(
+        char  *file_name,
+        SizeT v, SizeT e,
+        SizeT *row,
+        VertexId *col,
+        Value *edge_values = NULL) {
         char adj_name[256];
         sprintf(adj_name, "%s.adj", file_name);
         printf("writing to ligra .adj file.\n");
@@ -209,9 +235,9 @@ struct Csr {
     }
 
     /**
+     * @brief Read from stored row_offsets, column_indices arrays.
      *
-     * @brief Read from stored row_offsets, column_indices arrays
-     *
+     * @tparam LOAD_EDGE_VALUES Whether or not to load edge values.
      */
     template <bool LOAD_EDGE_VALUES>
     void FromCsr(char *f_in) {
@@ -468,6 +494,9 @@ struct Csr {
         }
     }
 
+    /**
+     * @brief Display CSR graph to console
+     */
     void DisplayGraph(const char name[], SizeT limit = 40)
     {
         SizeT displayed_node_num = (nodes > limit) ? limit: nodes;
@@ -534,6 +563,9 @@ struct Csr {
         printf("\n");
     }
 
+    /**
+     * @brief Check values.
+     */
     bool CheckValue()
     {
         for (SizeT node = 0; node < nodes; ++node) {

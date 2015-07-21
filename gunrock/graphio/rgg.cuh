@@ -69,6 +69,22 @@ bool PureTwoFactor(T x)
     return true;
 }
 
+/*
+ * @brief Build random geometry graph (RGG).
+ *
+ * @tparam WITH_VALUES Whether or not associate with per edge weight values.
+ * @tparam VertexId Vertex identifier.
+ * @tparam Value Value type.
+ * @tparam SizeT Graph size type.
+ *
+ * @param[in] nodes
+ * @param[in] graph
+ * @param[in] threshould
+ * @param[in] undirected
+ * @param[in] value_multipiler
+ * @param[in] value_min
+ * @param[in] seed
+ */
 template <bool WITH_VALUES, typename VertexId, typename Value, typename SizeT>
 int BuildRggGraph(
     SizeT nodes,
@@ -95,7 +111,7 @@ int BuildRggGraph(
     VertexId *col_index_    = new VertexId[reserved_size * nodes];
     Value    *values_       = WITH_VALUES ? new Value[reserved_size * nodes] : NULL;
     SizeT    *offsets       = NULL;
-    if (threshold < 0) 
+    if (threshold < 0)
               threshold     = 0.55 * sqrt(log(nodes)/nodes);
     SizeT     edges         = 0;
     long long row_length    = 1.0 / threshold + 1;
@@ -107,7 +123,7 @@ int BuildRggGraph(
     EdgeTupleType *coo      = NULL;
     long long reserved_factor2 = 8;
     long long initial_length   = reserved_factor2 * nodes / row_length / row_length;
-    
+
     if (seed == -1) seed = time(NULL);
     printf("rgg seed = %lld\n", (long long)seed);
     if (initial_length <4) initial_length = 4;
@@ -140,10 +156,10 @@ int BuildRggGraph(
         for (VertexId node = node_start; node < node_end; node++)
         {
             double t_value;
-            drand48_r(&rand_data, &t_value); 
-            points[node].x = t_value; 
-            drand48_r(&rand_data, &t_value); 
-            points[node].y = t_value; 
+            drand48_r(&rand_data, &t_value);
+            points[node].x = t_value;
+            drand48_r(&rand_data, &t_value);
+            points[node].y = t_value;
             points[node].node = node;
         }
 
@@ -166,7 +182,7 @@ int BuildRggGraph(
         #pragma omp single
         {
             for (SizeT i=0; i<row_length * row_length; i++)
-            if (block_size[i] != 0) 
+            if (block_size[i] != 0)
                 blocks[i] = new VertexId[block_size[i]];
         }
 
@@ -189,7 +205,7 @@ int BuildRggGraph(
             }
             blocks[block_index][pos] = node;
         }
-        
+
         #pragma omp barrier
 
         for (VertexId node = node_start; node < node_end; node++)
@@ -199,7 +215,7 @@ int BuildRggGraph(
             double co_y0 = points[node].y;
             SizeT x_index = co_x0 / threshold;
             SizeT y_index = co_y0 / threshold;
- 
+
             for (SizeT x1 = x_index-2; x1 <= x_index+2; x1++)
             for (SizeT y1 = y_index-2; y1 <= y_index+2; y1++)
             {
@@ -220,10 +236,10 @@ int BuildRggGraph(
                     if (fabs(dis_x) > threshold || fabs(dis_y) > threshold) continue;
                     double   dis   = SqrtSum(dis_x, dis_y);
                     if (dis > threshold) continue;
-                   
+
                     col_index[counter] = peer;
                     //if (WITH_VALUES) values[counter] = dis * value_multipiler;
-                    if (WITH_VALUES) 
+                    if (WITH_VALUES)
                     {
                         double t_value;
                         drand48_r(&rand_data, &t_value);
@@ -245,7 +261,7 @@ int BuildRggGraph(
             edges = offsets[num_threads] * (undirected ? 2 : 1);
             coo = (EdgeTupleType*) malloc (sizeof(EdgeTupleType) * edges);
         }
-        
+
         /*memcpy(graph.column_indices + offsets[thread_num], col_index, sizeof(VertexId) * counter);
         if (WITH_VALUES) memcpy(graph.edge_values + offsets[thread_num], values, sizeof(VertexId) * counter);
         SizeT offset = offsets[thread_num];
@@ -272,12 +288,12 @@ int BuildRggGraph(
                     EdgeTupleType *coo_p = coo + offset + edge;
                     //double rand_v;
                     //drand48_r(&rand_data, &rand_v);
-                    //if (rand_v > 0.5) 
+                    //if (rand_v > 0.5)
                     //{
-                        coo_p -> row = node; 
+                        coo_p -> row = node;
                         coo_p -> col = peer;
                     //} else {
-                    //    coo_p -> row = peer; 
+                    //    coo_p -> row = peer;
                     //    coo_p -> col = node;
                     //}
                     coo_p -> val = WITH_VALUES ? values[edge] : 1;
@@ -326,4 +342,3 @@ int BuildRggGraph(
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-          

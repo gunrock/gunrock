@@ -44,9 +44,11 @@ namespace graphio {
  *
  * Indices are 1-based i.2. A(1,1) is the first element.
  *
- * @param[in] f_in          Input MARKET graph file
- * @param[in] csr_graph     Csr graph object to store the graph data
+ * @param[in] f_in          Input MARKET graph file.
+ * @param[in] output_file   Output file name for binary i/o.
+ * @param[in] csr_graph     Csr graph object to store the graph data.
  * @param[in] undirected    Is the graph undirected or not?
+ * @param[in] reversed      Whether or not the graph is inversed.
  *
  * \return If there is any File I/O error along the way.
  */
@@ -212,7 +214,10 @@ int ReadMarketStream(
 
 /**
  * @brief Read csr arrays directly instead of transfer from coo format
- *
+ * @param[in] f_in          Input graph file name.
+ * @param[in] csr_graph     Csr graph object to store the graph data.
+ * @param[in] undirected    Is the graph undirected or not?
+ * @param[in] reversed      Whether or not the graph is inversed.
  */
 template <bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
 int ReadCsrArrays(char *f_in, Csr<VertexId, Value, SizeT> &csr_graph,
@@ -223,15 +228,15 @@ int ReadCsrArrays(char *f_in, Csr<VertexId, Value, SizeT> &csr_graph,
 
 
 /**
- * \defgroup PublicInterface Gunrock Public Interface
+ * \defgroup Public Interface
  * @{
  */
 
 /**
  * @brief Loads a MARKET-formatted CSR graph from the specified file.
  *
- * @param[in] mm_filename Graph file name, if empty, it is loaded from stdin.
- * @param[in] output_file Output file to store the computed graph topology info.
+ * @param[in] mm_filename Graph file name, if empty, it is loaded from STDIN.
+ * @param[in] output_file Output file name for binary i/o.
  * @param[in] csr_graph Reference to CSR graph object. @see Csr
  * @param[in] undirected Is the graph undirected or not?
  * @param[in] reversed Is the graph reversed or not?
@@ -282,8 +287,12 @@ int BuildMarketGraph(
 }
 
 /**
- * @brief read in graph function read in graph according to it's type
+ * @brief read in graph function read in graph according to its type.
  *
+ * @param[in] file_in    Input MARKET graph file.
+ * @param[in] graph      CSR graph object to store the graph data.
+ * @param[in] undirected Is the graph undirected or not?
+ * @param[in] reversed   Whether or not the graph is inversed.
  */
 template <bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
 int BuildMarketGraph(
@@ -291,7 +300,7 @@ int BuildMarketGraph(
     Csr<VertexId, Value, SizeT> &graph,
     bool undirected,
     bool reversed) {
-    // seperate the graph path and the file name
+    // separate the graph path and the file name
     char *temp1 = strdup(file_in);
     char *temp2 = strdup(file_in);
     char *file_path = dirname (temp1);

@@ -9,7 +9,7 @@
  * @file
  * partitioner_base.cuh
  *
- * @brief Base struct for all the partitioner types
+ * @brief Base structure for all the partitioner types
  */
 
 #pragma once
@@ -27,8 +27,14 @@ namespace app {
 /**
  * @brief Base partitioner structure.
  *
+ * @tparam _VertexId
+ * @tparam _SizeT
+ * @tparam _Value
+ * @tparam ENABLE_BACKWARD
+ * @tparam KEEP_ORDER
+ * @tparam KEEP_NODE_NUM
+ *
  */
-
 template <
     typename   _VertexId,
     typename   _SizeT,
@@ -54,7 +60,7 @@ public:
     // Original graph
     const GraphT *graph;
 
-    // Partioned graphs
+    // Partitioned graphs
     GraphT *sub_graphs;
 
     int           **partition_tables;
@@ -67,8 +73,15 @@ public:
     SizeT         **out_offsets;
     SizeT         **out_counter;
 
-    //Mthods
+    // Methods
 
+    /*
+     * @brief ThreadSlice data structure.
+     *
+     * @tparam VertexId
+     * @tparam SizeT
+     * @tparam Value
+     */
     template <
         typename VertexId,
         typename SizeT,
@@ -98,7 +111,7 @@ public:
     };
 
     /**
-     * @brief PartitionerBase default constructor
+     * @brief PartitionerBase default constructor.
      */
     PartitionerBase()
     {
@@ -117,15 +130,24 @@ public:
         backward_offsets     = NULL;
     }
 
+    /*
+     * @brief PartitionerBase default destructor.
+     */
     virtual ~PartitionerBase()
     {
-        Release();        
-    } 
+        Release();
+    }
 
+    /*
+     * @brief Initialization function.
+     *
+     * @param[in] graph
+     * @param[in] num_gpus
+     */
     cudaError_t Init(
         const GraphT &graph,
         int   num_gpus)
-    {   
+    {
         cudaError_t retval= cudaSuccess;
         this->num_gpus    = num_gpus;
         this->graph       = &graph;
@@ -144,7 +166,7 @@ public:
             backward_convertions = new VertexId* [num_gpus];
             backward_offsets     = new SizeT*    [num_gpus];
         }
-        
+
         for (int i=0;i<num_gpus+1;i++)
         {
             partition_tables [i] = NULL;
@@ -169,7 +191,7 @@ public:
             out_offsets  [i] = new SizeT [num_gpus+1];
             out_counter  [i] = new SizeT [num_gpus+1];
             memset(in_counter   [i], 0, sizeof(SizeT) * (num_gpus+1));
-            memset(out_offsets  [i], 0, sizeof(SizeT) * (num_gpus+1)); 
+            memset(out_offsets  [i], 0, sizeof(SizeT) * (num_gpus+1));
             memset(out_counter  [i], 0, sizeof(SizeT) * (num_gpus+1));
         }
         Status = 1;
@@ -177,6 +199,9 @@ public:
         return retval;
     }
 
+    /*
+     * @breif Release function.
+     */
     void Release()
     {
         if (Status==0) return;
@@ -211,7 +236,12 @@ public:
         }
         Status = 0;
     }
-    
+
+    /**
+     * @brief MakeSubGraph_Thread function.
+     *
+     * @param[in] thread_data_
+     */
     static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
     {
         ThreadSlice<VertexId,SizeT,Value> *thread_data = (ThreadSlice<VertexId,SizeT,Value> *) thread_data_;
@@ -278,24 +308,24 @@ public:
         out_offsets[gpu][num_gpus]=node_counter;
         util::cpu_mt::PrintCPUArray<SizeT, SizeT>("out_offsets",out_offsets[gpu],num_gpus+1,gpu);
         util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,gpu);
-        
+
         node_counter=0;
         for (int peer=0;peer<num_gpus;peer++)
         {
             if (peer==gpu) continue;
             int peer_ = peer < gpu ? peer+1 : peer;
-            int gpu_  = gpu  < peer? gpu +1 : gpu ; 
+            int gpu_  = gpu  < peer? gpu +1 : gpu ;
             in_counter[peer_]=out_offsets[peer][gpu_+1]-out_offsets[peer][gpu_];
             node_counter+=in_counter[peer_];
         }
         in_counter[num_gpus]=node_counter;
 
-        if (KEEP_NODE_NUM) num_nodes = graph->nodes; 
-        if      (graph->node_values == NULL && graph->edge_values == NULL) 
+        if (KEEP_NODE_NUM) num_nodes = graph->nodes;
+        if      (graph->node_values == NULL && graph->edge_values == NULL)
              sub_graph->template FromScratch < false , false  >(num_nodes,num_edges);
-        else if (graph->node_values != NULL && graph->edge_values == NULL) 
+        else if (graph->node_values != NULL && graph->edge_values == NULL)
              sub_graph->template FromScratch < false , true   >(num_nodes,num_edges);
-        else if (graph->node_values == NULL && graph->edge_values != NULL) 
+        else if (graph->node_values == NULL && graph->edge_values != NULL)
              sub_graph->template FromScratch < true  , false  >(num_nodes,num_edges);
         else sub_graph->template FromScratch < true  , true   >(num_nodes,num_edges);
 
@@ -349,7 +379,7 @@ public:
                 int      peer_   = peer < gpu ? peer+1 : peer;
                 if (peer == gpu) peer_ = 0;
                 VertexId neibor_ = KEEP_NODE_NUM ? neibor : tconvertion_table[neibor] + out_offsets[gpu][peer_];
-                
+
                 sub_graph->column_indices[edge_counter] = neibor_;
                 if (graph->edge_values !=NULL) sub_graph->edge_values[edge_counter]=graph->edge_values[edge];
                 if (peer != gpu && !KEEP_NODE_NUM)
@@ -360,7 +390,7 @@ public:
                     original_vertexes[0][neibor_] = neibor;
                 }
                 edge_counter++;
-            }   
+            }
         } else if (KEEP_NODE_NUM) {
             sub_graph->row_offsets[node] = edge_counter;
             partition_table1 [0][node] = partition_table0 [node] < gpu? partition_table0[node]+1: partition_table0[node];
@@ -373,12 +403,12 @@ public:
         {
             in_counter_ = 0;
             util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,gpu);
-            if (!KEEP_NODE_NUM) 
+            if (!KEEP_NODE_NUM)
             {
                 for (VertexId node_=0; node_<num_nodes; node_++)
                 {
                     backward_offsets[gpu][node_]=in_counter_;
-                    if (partition_table1[0][node_]!=0) 
+                    if (partition_table1[0][node_]!=0)
                     {
                         continue;
                     }
@@ -392,7 +422,7 @@ public:
                         for (SizeT edge=sub_graphs[peer].row_offsets[neibor_]; edge<sub_graphs[peer].row_offsets[neibor_+1];edge++)
                         {
                             VertexId _node = sub_graphs[peer].column_indices[edge];
-                            if (convertion_tables[peer+1][_node] == node_ && 
+                            if (convertion_tables[peer+1][_node] == node_ &&
                                 partition_tables [peer+1][_node] == gpu_)
                             {
                                 backward_convertions[gpu][in_counter_]= _node;
@@ -419,7 +449,7 @@ public:
                 backward_offsets[gpu][num_nodes]=num_nodes*(num_gpus-1);
             }
             delete[] marker;marker=NULL;
-        } 
+        }
         out_counter[num_gpus]=0;
         in_counter[num_gpus]=0;
         for (int peer=0;peer<num_gpus;peer++)
@@ -438,6 +468,11 @@ public:
         CUT_THREADEND;
     }
 
+    /**
+     * @brief Make subgraph function.
+     *
+     * \return cudaError_t object indicates the success of all CUDA calls.
+     */
     cudaError_t MakeSubGraph()
     {
         cudaError_t retval = cudaSuccess;
@@ -482,6 +517,20 @@ public:
         return retval;
     }
 
+    /**
+     * @brief Partition function.
+     *
+     * @param[in] sub_graphs
+     * @param[in] partition_tables
+     * @param[in] convertion_tables
+     * @param[in] original_vertexes
+     * @param[in] out_offsets
+     * @param[in] cross_counter
+     * @param[in] factor
+     * @param[in] seed
+     *
+     * \return cudaError_t object indicates the success of all CUDA calls.
+     */
     cudaError_t Partition(
         GraphT*    &sub_graphs,
         int**      &partition_tables,
@@ -491,7 +540,7 @@ public:
         SizeT**    &cross_counter,
         float      factor = -1,
         int        seed = -1)
-    {   
+    {
         SizeT**    backward_offsets     = NULL;
         int**      backward_partitions  = NULL;
         VertexId** backward_convertions = NULL;
@@ -508,8 +557,26 @@ public:
                    backward_convertions,
                    factor,
                    seed);
-    }   
+    }
 
+    /**
+     * @brief Partition function.
+     *
+     * @param[in] sub_graphs
+     * @param[in] partition_tables
+     * @param[in] convertion_tables
+     * @param[in] original_vertexes
+     * @param[in] in_counter
+     * @param[in] out_offsets
+     * @param[in] out_counter
+     * @param[in] backward_offsets
+     * @param[in] backward_partitions
+     * @param[in] backward_convertions
+     * @param[in] factor
+     * @param[in] seed
+     *
+     * \return cudaError_t object indicates the success of all CUDA calls.
+     */
     virtual cudaError_t Partition(
         GraphT*    &sub_graphs,
         int**      &partition_tables,
