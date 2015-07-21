@@ -56,7 +56,8 @@ int ReadMarketStream(
     char *output_file,
     Csr<VertexId, Value, SizeT> &csr_graph,
     bool undirected,
-    bool reversed) {
+    bool reversed,
+    bool quiet=false) {
     typedef Coo<VertexId, Value> EdgeTupleType;
 
     SizeT edges_read = -1;
@@ -65,7 +66,10 @@ int ReadMarketStream(
     EdgeTupleType *coo = NULL; // read in COO format
 
     time_t mark0 = time(NULL);
-    printf("  Parsing MARKET COO format");
+    if (!quiet)
+    {
+        printf("  Parsing MARKET COO format");
+    }
     fflush(stdout);
 
     char line[1024];
@@ -103,10 +107,13 @@ int ReadMarketStream(
             nodes = ll_nodes_x;
             edges = (undirected) ? ll_edges * 2 : ll_edges;
 
-            printf(" (%lld nodes, %lld directed edges)... ",
-                   (unsigned long long) ll_nodes_x,
-                   (unsigned long long) ll_edges);
-            fflush(stdout);
+            if (!quiet)
+            {
+                printf(" (%lld nodes, %lld directed edges)... ",
+                       (unsigned long long) ll_nodes_x,
+                       (unsigned long long) ll_edges);
+                fflush(stdout);
+            }
 
             // Allocate coo graph
             coo = (EdgeTupleType*)malloc(sizeof(EdgeTupleType) * edges);
@@ -196,13 +203,16 @@ int ReadMarketStream(
     }
 
     time_t mark1 = time(NULL);
-    printf("Done parsing (%ds).\n", (int) (mark1 - mark0));
-    fflush(stdout);
+    if (!quiet)
+    {
+        printf("Done parsing (%ds).\n", (int) (mark1 - mark0));
+        fflush(stdout);
+    }
 
     // Convert COO to CSR
     csr_graph.template FromCoo<LOAD_VALUES>(output_file, coo,
                                             nodes, edges, ordered_rows,
-                                            undirected, reversed);
+                                            undirected, reversed, quiet);
 
     free(coo);
     fflush(stdout);
