@@ -343,7 +343,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length, sizeof(SizeT), cudaMemcpyDeviceToHost);
             SizeT output_queue_len = temp[0];
 
-            printf("output queue len:%d\n", output_queue_len);
+            //printf("output queue len:%d\n", output_queue_len);
 
             if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
             {

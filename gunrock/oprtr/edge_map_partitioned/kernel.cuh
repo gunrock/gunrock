@@ -185,7 +185,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         // add a zero length neighbor list to the end (this for getting both exclusive and inclusive scan in one array)
         SizeT ncount = GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
-        printf("vid:%d, ncount:%d\n", v_id, ncount);
+        //printf("vid:%d, ncount:%d\n", v_id, ncount);
         SizeT num_edges = (my_id == num_elements) ? 0 : ncount;
         d_scanned_edges[my_id] = num_edges;
     }
@@ -640,7 +640,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             if (output_inverse_graph) {
                 lookup = d_inverse_row_offsets[v] + e;
                 u = d_inverse_column_indices[lookup];
-                printf("tid:%d, bid:%d, s_vertices[tid]:%d, v_index:%d, lookup:%d, i:%d, internal_offset:%d, v:%d, u:%d, row_offset[v]:%d end_id:%d, range:%d, size:%d\n", threadIdx.x, blockIdx.x, s_vertices[tid], v_index, lookup, i, internal_offset, v, u, d_inverse_row_offsets[v], end_id, range, size);
+                //printf("tid:%d, bid:%d, s_vertices[tid]:%d, v_index:%d, lookup:%d, i:%d, internal_offset:%d, v:%d, u:%d, row_offset[v]:%d end_id:%d, range:%d, size:%d\n", threadIdx.x, blockIdx.x, s_vertices[tid], v_index, lookup, i, internal_offset, v, u, d_inverse_row_offsets[v], end_id, range, size);
             } else {
                 lookup = d_row_offsets[v] + e;
                 u = d_column_indices[lookup];
