@@ -17,6 +17,8 @@
 #if defined(_WIN32) || defined(_WIN64)
     #include <windows.h>
     #undef small            // Windows is terrible for polluting macro namespace
+#elif defined(CLOCK_PROCESS_CPUTIME_ID)
+    #include <sys/time.h>
 #else
     #include <sys/resource.h>
 #endif
@@ -217,6 +219,32 @@ struct CpuTimer
 
         return (stop - start) * 1000;
     }
+
+#elif defined(CLOCK_PROCESS_CPUTIME_ID)
+
+	double start;
+	double stop;
+
+	void Start()
+	{
+		static struct timeval tv;
+		static struct timezone tz;
+		gettimeofday(&tv, &tz);
+		start = tv.tv_sec + 1.e-6*tv.tv_usec;
+	}
+
+	void Stop()
+	{
+		static struct timeval tv;
+		static struct timezone tz;
+		gettimeofday(&tv, &tz);
+		stop = tv.tv_sec + 1.e-6*tv.tv_usec;
+	}
+
+	double ElapsedMillis()
+	{
+		return 1000*(stop - start);
+	}
 
 #else
 
