@@ -58,12 +58,16 @@ struct Dispatch
     static __device__ __forceinline__ void GetEdgeCounts(
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
+                                SizeT *&d_column_offsets,
+                                VertexId *&d_row_indices,
                                 VertexId *&d_queue,
                                 unsigned int *&d_scanned_edges,
                                 SizeT &num_elements,
                                 SizeT &max_vertex,
                                 SizeT &max_edge,
-                                gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
+                                gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
+                                bool in_inv,
+                                bool out_inv)
     {
     }
 
@@ -160,12 +164,16 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     static __device__ __forceinline__ void GetEdgeCounts(
                                 SizeT *&d_row_offsets,
                                 VertexId *&d_column_indices,
+                                SizeT *&d_column_offsets,
+                                VertexId *&d_row_indices,
                                 VertexId *&d_queue,
                                 unsigned int *&d_scanned_edges,
                                 SizeT &num_elements,
                                 SizeT &max_vertex,
                                 SizeT &max_edge,
-                                gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
+                                gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
+                                bool in_inv,
+                                bool out_inv)
     {
         int tid = threadIdx.x;
         int bid = blockIdx.x;
@@ -174,17 +182,19 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         if (my_id > num_elements || my_id >= max_edge)
             return;
         VertexId v_id;
+        VertexId column_index = (in_inv) ? d_row_indices[my_id] : d_column_indices[my_id];
         if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E || ADVANCE_TYPE == gunrock::oprtr::advance::V2V)
             v_id = (my_id >= num_elements)? -1:d_queue[my_id];
         else
-            v_id = (my_id >= num_elements)? -1:d_column_indices[my_id];
+            v_id = (my_id >= num_elements)? -1:column_index;
         if (v_id < 0 || v_id > max_vertex) {
             d_scanned_edges[my_id] = 0;
             return;
         }
 
         // add a zero length neighbor list to the end (this for getting both exclusive and inclusive scan in one array)
-        SizeT ncount = GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
+        SizeT ncount = (!out_inv) ? GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE) :
+                                    GetNeighborListLength(d_column_offsets, d_row_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
         //printf("vid:%d, ncount:%d\n", v_id, ncount);
         SizeT num_edges = (my_id == num_elements) ? 0 : ncount;
         d_scanned_edges[my_id] = num_edges;
@@ -728,8 +738,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 }
             } else { 
                 //v:pre, u:neighbor, outoffset:offset+i
-                if (Functor::CondEdge(v, u, problem, lookup, e_id)) {
-                    Functor::ApplyEdge(v, u, problem, lookup, e_id);
+                if (Functor::CondEdge(v, u, problem, lookup, i)) {
+                    Functor::ApplyEdge(v, u, problem, lookup, i);
                     if (d_out != NULL) {
                         if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -1014,24 +1024,32 @@ __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
 void GetEdgeCounts(
                                 typename KernelPolicy::SizeT *d_row_offsets,
                                 typename KernelPolicy::VertexId *d_column_indices,
+                                typename KernelPolicy::SizeT *d_column_offsets,
+                                typename KernelPolicy::VertexId *d_row_indices,
                                 typename KernelPolicy::VertexId *d_queue,
                                 unsigned int *d_scanned_edges,
                                 typename KernelPolicy::SizeT num_elements,
                                 typename KernelPolicy::SizeT max_vertex,
                                 typename KernelPolicy::SizeT max_edge,
-                                gunrock::oprtr::advance::TYPE ADVANCE_TYPE)
+                                gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
+                                bool in_inv,
+                                bool out_inv)
 
 
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::GetEdgeCounts(
                                     d_row_offsets,
                                     d_column_indices,
+                                    d_column_offsets,
+                                    d_row_indices,
                                     d_queue,
                                     d_scanned_edges,
                                     num_elements,
                                     max_vertex,
                                     max_edge,
-                                    ADVANCE_TYPE);
+                                    ADVANCE_TYPE,
+                                    in_inv,
+                                    out_inv);
 }
 
 template<typename KernelPolicy, typename ProblemData, typename Functor>

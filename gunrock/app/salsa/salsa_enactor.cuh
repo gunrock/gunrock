@@ -310,12 +310,7 @@ class SALSAEnactor : public EnactorBase
             //util::DisplayDeviceResults(problem->data_slices[0]->d_auth_predecessors, graph_slice->edges);
 
             frontier_attribute.queue_length     = graph_slice->edges;
-
-            /*util::DisplayDeviceResults(graph_slice->d_column_offsets, graph_slice->nodes);
-            util::DisplayDeviceResults(graph_slice->d_row_indices, graph_slice->edges);
-
-            util::DisplayDeviceResults(graph_slice->d_row_offsets, graph_slice->nodes);
-            util::DisplayDeviceResults(graph_slice->d_column_indices, graph_slice->edges);*/
+ 
             while (true) { 
 
                 util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], graph_slice->edges);

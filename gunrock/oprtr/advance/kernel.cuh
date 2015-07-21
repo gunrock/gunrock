@@ -306,20 +306,10 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             typedef typename KernelPolicy::LOAD_BALANCED LBPOLICY;
             int num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
             //input inverse graph:false, to get the right edge, output inverse graph:true to get right neighbor list
-            if (!output_inverse_graph)
                 gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
                     <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
                             d_row_offsets,
                             d_column_indices,
-                            d_in_key_queue,
-                            partitioned_scanned_edges,
-                            frontier_attribute.queue_length+1,
-                            max_in,
-                            max_out,
-                            ADVANCE_TYPE);
-            else {
-                gunrock::oprtr::edge_map_partitioned::GetEdgeCounts<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
-                    <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
                             d_column_offsets,
                             d_row_indices,
                             d_in_key_queue,
@@ -327,11 +317,16 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                             frontier_attribute.queue_length+1,
                             max_in,
                             max_out,
-                            ADVANCE_TYPE);
+                            ADVANCE_TYPE,
+                            input_inverse_graph,
+                            output_inverse_graph);
 
-            util::DisplayDeviceResults(d_row_indices, max_out);
+            /*util::DisplayDeviceResults(d_row_indices, max_out);
             util::DisplayDeviceResults(d_column_offsets, max_in);
-            }
+            util::DisplayDeviceResults(d_column_indices, max_out);
+            util::DisplayDeviceResults(d_row_offsets, max_in);*/
+            
+
 
 
             Scan<mgpu::MgpuScanTypeExc>((int*)partitioned_scanned_edges, frontier_attribute.queue_length+1, (int)0, mgpu::plus<int>(),
