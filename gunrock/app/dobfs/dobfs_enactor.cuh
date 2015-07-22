@@ -43,7 +43,7 @@ class DOBFSEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_
 public:
     typedef _Problem                   Problem;
     typedef typename Problem::SizeT    SizeT   ;
-    typedef typename Problem::VertexId VertexId;   
+    typedef typename Problem::VertexId VertexId;
     typedef typename Problem::Value    Value   ;
     static const bool INSTRUMENT = _INSTRUMENT;
     static const bool DEBUG      = _DEBUG;
@@ -73,15 +73,14 @@ public:
     cudaError_t Setup(
         ProblemData *problem)
     {
-        printf("Dobfs setuping...\n");
         typedef typename ProblemData::SizeT         SizeT;
         typedef typename ProblemData::VertexId      VertexId;
-        
+
         cudaError_t retval = cudaSuccess;
 
         do {
             //initialize the host-mapped "done"
-            //if (!done) 
+            //if (!done)
             {
                 //int flags = cudaHostAllocMapped;
 
@@ -138,7 +137,7 @@ public:
                             graph_slice->edges * sizeof(VertexId)),
                         "BFSEnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;*/
         } while (0);
-        
+
         return retval;
     }
 
@@ -261,7 +260,7 @@ public:
         FrontierAttribute<SizeT>
                      *frontier_attribute = &this->frontier_attribute[0];
         EnactorStats *enactor_stats      = &this->enactor_stats     [0];
-        typename DOBFSProblem::DataSlice    
+        typename DOBFSProblem::DataSlice
                      *data_slice         =  problem->data_slices    [0];
         util::DoubleBuffer<SizeT, VertexId, Value>
                      *frontier_queue     = &data_slice->frontier_queues[0];
@@ -269,9 +268,8 @@ public:
                      *work_progress      = &this->work_progress     [0];
         cudaStream_t  stream             =  data_slice->streams[0];
         cudaError_t   retval             = cudaSuccess;
-        SizeT *d_scanned_edges    = NULL; 
+        SizeT *d_scanned_edges    = NULL;
 
-        printf("Dobfs enacting...\n");
         do {
             // Determine grid size(s)
             if (DEBUG) {
@@ -305,7 +303,7 @@ public:
                 frontier_attribute->queue_length         = 1;
                 frontier_attribute->queue_index          = 0;        // Work queue index
                 frontier_attribute->selector             = 0;
-                frontier_attribute->queue_reset          = true; 
+                frontier_attribute->queue_reset          = true;
 
 
                 fflush(stdout);
@@ -347,7 +345,7 @@ public:
                         frontier_attribute->queue_reset = false;
 
                     if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "Advance::LaunchKernel failed", __FILE__, __LINE__))) break;
-                    //cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates 
+                    //cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates
 
 
                     frontier_attribute->queue_index++;
@@ -404,7 +402,7 @@ public:
 
                     frontier_attribute->queue_index++;
                     frontier_attribute->selector ^= 1;
-                    
+
                     if (retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
 
                     if (INSTRUMENT || DEBUG) {
@@ -434,18 +432,18 @@ public:
                 if (retval) break;
             }
             if (DEBUG) printf("iter: %lld\n, alpha %f\n", enactor_stats->iteration, problem->alpha);
-              
+
             // Reverse BFS
             //if (done[0] < 0) {
             if (frontier_attribute->queue_length != 0) {
-            if (DEBUG) printf("in RBFS.\n");
+                if (DEBUG) { printf("in RBFS.\n"); }
 
             //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[0], graph_slice->nodes);
             frontier_attribute->queue_length         = current_frontier_size;
             frontier_attribute->queue_index          = 0;        // Work queue index
             frontier_attribute->selector             = 0;
             frontier_attribute->queue_reset          = true;
-            
+
             // Prepare unvisited queue
             gunrock::oprtr::filter::Kernel<FilterKernelPolicy, DOBFSProblem, InputFrontierFunctor>
                 <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS>>>(
@@ -466,7 +464,7 @@ public:
                 enactor_stats->filter_kernel_stats);
 
             if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_prepare_input_frontier::Kernel failed", __FILE__, __LINE__))) break;
- 
+
             frontier_attribute->queue_length            = graph_slice->nodes;
             frontier_attribute->queue_index             = 0;        // Work queue index
             frontier_attribute->selector                = 0;
@@ -501,11 +499,11 @@ public:
             SizeT last_queue_length = 0;
             //while (done[0] < 0) {
             while (frontier_attribute->queue_length != 0) {
-                if (last_queue_length == frontier_attribute->queue_length) 
-                { 
-                    //done[0] = 0; 
+                if (last_queue_length == frontier_attribute->queue_length)
+                {
+                    //done[0] = 0;
                     frontier_attribute->queue_length = 0;
-                    break; 
+                    break;
                 }
                 last_queue_length = frontier_attribute->queue_length;
 
@@ -537,10 +535,10 @@ public:
                     true);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_backward::Kernel failed", __FILE__, __LINE__))) break;
-                //cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates  
+                //cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates
 
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_frontier_map_out, graph_slice->nodes);
-                
+
                 if (retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
                 if (DEBUG) {
                     //if (retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
@@ -666,7 +664,7 @@ public:
 
             // Step through BFS iterations
             frontier_attribute->queue_index = 0;
-            
+
             //while (done[0] < 0) {
             while (frontier_attribute -> queue_length !=0) {
 
@@ -702,13 +700,13 @@ public:
                     frontier_attribute->queue_reset = false;
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                //cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates 
+                //cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates
 
 
                 frontier_attribute->queue_index++;
                 frontier_attribute->selector ^= 1;
                 if (retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
-                
+
                 if (DEBUG) {
                     //if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
                     printf(", %lld", (long long) frontier_attribute->queue_length);
@@ -772,7 +770,7 @@ public:
                             enactor_stats->total_lifetimes)) break;
                     }
                 }
-                
+
                 // Check if done
                 //if (done[0] == 0) break;
                 if (frontier_attribute -> queue_length == 0) break;
@@ -782,7 +780,7 @@ public:
             }
             if (retval) break;
             }
-            
+
         } while(0);
         if (d_scanned_edges) cudaFree(d_scanned_edges);
 
@@ -814,11 +812,11 @@ public:
         typename DOBFSProblem::VertexId    src,
         int                             max_grid_size = 0)
     {
-        int min_sm_version = -1; 
+        int min_sm_version = -1;
         for (int i=0;i<this->num_gpus;i++)
             if (min_sm_version == -1 || this->cuda_props[i].device_sm_version < min_sm_version)
                 min_sm_version = this->cuda_props[i].device_sm_version;
- 
+
             if (min_sm_version >= 300) {
                 typedef gunrock::oprtr::filter::KernelPolicy<
                     DOBFSProblem,                         // Problem data type

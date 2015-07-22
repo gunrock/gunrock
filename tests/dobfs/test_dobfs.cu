@@ -176,7 +176,7 @@ public:
         if (beta == 0.0f)
             beta = 6.0f;
 
-        printf("alpha:%5f, beta:%5f\n", alpha, beta);
+        printf(" alpha:%5f, beta:%5f\n", alpha, beta);
    }
 };
 
@@ -436,7 +436,7 @@ void RunTests(Test_Parameter *parameter)
     //
     if (reference_check != NULL)
     {
-        printf("compute ref value\n");
+        printf(" computing reference value ...\n");
         SimpleReferenceBfs(
                 *graph,
                 reference_check,
