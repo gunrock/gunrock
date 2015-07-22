@@ -38,6 +38,8 @@ cudaError_t ComputeOutputLength(
                                *frontier_attribute,
     typename Problem::SizeT    *d_offsets,
     typename Problem::VertexId *d_indices,
+    typename Problem::SizeT    *d_inv_offsets,
+    typename Problem::VertexId *d_inv_indices,
     typename Problem::VertexId *d_in_key_queue,
     typename Problem::SizeT    *partitioned_scanned_edges,
     typename Problem::SizeT     max_in,
@@ -45,7 +47,9 @@ cudaError_t ComputeOutputLength(
     CudaContext                &context,
     cudaStream_t                stream,
     TYPE                        ADVANCE_TYPE,
-    bool                        express = false)
+    bool                        express = false,
+    bool                        in_inv = false,
+    bool                        out_inv = false)
 {
     // Load Load Balanced Kernel
     // Get Rowoffsets
@@ -82,12 +86,16 @@ cudaError_t ComputeOutputLength(
             <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(
                 d_offsets,
                 d_indices,
+                d_inv_offsets,
+                d_inv_indices,
                 d_in_key_queue,
                 partitioned_scanned_edges,
                 frontier_attribute->queue_length, // TODO: +1?
                 max_in,
                 max_out,
-                ADVANCE_TYPE);
+                ADVANCE_TYPE,
+                in_inv,
+                out_inv);
     }
 
     Scan<mgpu::MgpuScanTypeInc>(
@@ -169,7 +177,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         CudaContext                             &context,
         cudaStream_t                             stream,
         TYPE                                     ADVANCE_TYPE,
-        bool                                     inverse_graph     = false,
+        bool                                     input_inverse_graph     = false,
+        bool                                     output_inverse_graph = false,
         bool                                     get_output_length = true,
         REDUCE_OP                                R_OP              = gunrock::oprtr::advance::NONE,
         REDUCE_TYPE                              R_TYPE            = gunrock::oprtr::advance::EMPTY,
@@ -203,7 +212,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                 max_out,                 // max_out_queue
                 enactor_stats.advance_kernel_stats,
                 ADVANCE_TYPE,
-                inverse_graph,
+                input_inverse_graph,
                 R_TYPE,
                 R_OP,
                 d_value_to_reduce,
@@ -256,6 +265,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             if (get_output_length)
                 ComputeOutputLength<KernelPolicy, ProblemData, Functor>(
                     &frontier_attribute,
+                    d_row_offsets,
+                    d_column_indices,
                     d_column_offsets,
                     d_row_indices,
                     d_in_key_queue,
@@ -264,7 +275,10 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     max_out,
                     context,
                     stream,
-                    ADVANCE_TYPE);
+                    ADVANCE_TYPE,
+                    false,
+                    input_inverse_graph,
+                    output_inverse_graph);
 
             // Edge Map
             gunrock::oprtr::edge_map_partitioned_backward::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
@@ -287,7 +301,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     work_progress,
                     enactor_stats.advance_kernel_stats,
                     ADVANCE_TYPE,
-                    inverse_graph);
+                    input_inverse_graph);
             break;
         }
         case TWC_BACKWARD:
@@ -320,7 +334,6 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             typedef typename ProblemData::VertexId      VertexId;
             typedef typename ProblemData::Value         Value;
             typedef typename KernelPolicy::LOAD_BALANCED LBPOLICY;
-//<<<<<<< HEAD
             // load edge-expand-partitioned kernel
             SizeT num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
              if (get_output_length)
@@ -328,13 +341,18 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     &frontier_attribute,
                     d_row_offsets,
                     d_column_indices,
+                    d_column_offsets,
+                    d_row_indices,
                     d_in_key_queue,
                     partitioned_scanned_edges,
                     max_in,
                     max_out,
                     context,
                     stream,
-                    ADVANCE_TYPE);
+                    ADVANCE_TYPE,
+                    false,
+                    input_inverse_graph,
+                    output_inverse_graph);
 
             //if (frontier_attribute.output_length < LBPOLICY::LIGHT_EDGE_THRESHOLD)
             //if (frontier_attribute.output_length !=0) {
@@ -344,15 +362,15 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
 //            cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length, sizeof(SizeT), cudaMemcpyDeviceToHost);
 //            SizeT output_queue_len = temp[0];
 //
-//            if (output_queue_len < LBPOLICY::LIGHT_EDGE_THRESHOLD)
-//            {
-//>>>>>>> master-dev
+            //if (frontier_attribute.output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD)
+            {
                 gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(
                         frontier_attribute.queue_reset,
                         frontier_attribute.queue_index,
                         enactor_stats.iteration,
                         d_row_offsets,
+                        d_column_offsets,
                         d_column_indices,
                         d_row_indices,
                         partitioned_scanned_edges, // TODO: +1?
@@ -366,24 +384,24 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         work_progress,
                         enactor_stats.advance_kernel_stats,
                         ADVANCE_TYPE,
-                        inverse_graph,
+                        input_inverse_graph,
+                        output_inverse_graph,
                         R_TYPE,
                         R_OP,
                         d_value_to_reduce,
                         d_reduce_frontier);
-//<<<<<<< HEAD
-           //}
-            //else
-            //{
-            //    unsigned int split_val = (frontier_attribute.output_length + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
-            //    util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.d_node_locks, KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
-            //    SortedSearch<MgpuBoundsLower>(
-            //    enactor_stats.d_node_locks,
-            //    KernelPolicy::LOAD_BALANCED::BLOCKS,
-            //    partitioned_scanned_edges,
-            //    frontier_attribute.queue_length,
-            //    enactor_stats.d_node_locks_out,
-            //    context);
+           }
+            /*else
+            {
+                unsigned int split_val = (frontier_attribute.output_length[0] + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
+                util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.d_node_locks.GetPointer(util::DEVICE), KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
+                SortedSearch<MgpuBoundsLower>(
+                enactor_stats.d_node_locks.GetPointer(util::DEVICE),
+                KernelPolicy::LOAD_BALANCED::BLOCKS,
+                partitioned_scanned_edges,
+                frontier_attribute.queue_length,
+                enactor_stats.d_node_locks_out.GetPointer(util::DEVICE),
+                context);*/
 /*=======
             }
             else

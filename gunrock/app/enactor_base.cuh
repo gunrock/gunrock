@@ -1069,13 +1069,15 @@ void Iteration_Loop(
                         frontier_attribute_,
                         graph_slice    ->row_offsets     .GetPointer(util::DEVICE),
                         graph_slice    ->column_indices  .GetPointer(util::DEVICE),
+                        graph_slice    ->column_offsets     .GetPointer(util::DEVICE),
+                        graph_slice    ->row_indices  .GetPointer(util::DEVICE),
                         frontier_queue_->keys[selector]  .GetPointer(util::DEVICE),
                         scanned_edges_,
                         graph_slice    ->nodes,
                         graph_slice    ->edges,
                         context          [peer_][0],
                         streams          [peer_],
-                        gunrock::oprtr::advance::V2V, true)) break;
+                        gunrock::oprtr::advance::V2V, true, false, false)) break;
 
                     frontier_attribute_->output_length.Move(util::DEVICE, util::HOST,1,0,streams[peer_]);
                     if (Enactor::SIZE_CHECK)
@@ -1292,13 +1294,15 @@ void Iteration_Loop(
                         frontier_attribute_,
                         graph_slice    ->row_offsets     .GetPointer(util::DEVICE),
                         graph_slice    ->column_indices  .GetPointer(util::DEVICE),
+                    graph_slice    ->column_offsets     .GetPointer(util::DEVICE),
+                        graph_slice    ->row_indices  .GetPointer(util::DEVICE),
                         frontier_queue_->keys[selector].GetPointer(util::DEVICE),
                         scanned_edges_,
                         graph_slice    ->nodes,
                         graph_slice    ->edges,
                         context          [peer_][0],
                         streams          [peer_],
-                        gunrock::oprtr::advance::V2V, true);
+                        gunrock::oprtr::advance::V2V, true, false, false);
                     if (enactor_stats_->retval) break;
 
                     frontier_attribute_->output_length.Move(util::DEVICE, util::HOST, 1, 0, streams[peer_]);

@@ -397,6 +397,8 @@ public:
         FrontierAttribute<SizeT>       *frontier_attribute,
         SizeT                          *d_offsets,
         VertexId                       *d_indices,
+        SizeT                          *d_inv_offsets,
+        VertexId                       *d_inv_indices,
         VertexId                       *d_in_key_queue,
         util::Array1D<SizeT, SizeT>    *partitioned_scanned_edges,
         SizeT                          max_in,
@@ -404,7 +406,9 @@ public:
         CudaContext                    &context,
         cudaStream_t                   stream,
         gunrock::oprtr::advance::TYPE  ADVANCE_TYPE,
-        bool                           express = false)
+        bool                           express = false,
+        bool                            in_inv = false,
+        bool                            out_inv = false)
     {
         cudaError_t retval = cudaSuccess;
         bool over_sized = false;
@@ -415,6 +419,8 @@ public:
             frontier_attribute,
             d_offsets,
             d_indices,
+            d_inv_offsets,
+            d_inv_indices,
             d_in_key_queue,
             partitioned_scanned_edges->GetPointer(util::DEVICE),
             max_in,
@@ -422,7 +428,9 @@ public:
             context,
             stream,
             ADVANCE_TYPE,
-            express);
+            express,
+            in_inv,
+            out_inv);
         return retval;
     }
 
@@ -760,6 +768,8 @@ public:
         FrontierAttribute<SizeT>       *frontier_attribute,
         SizeT                          *d_offsets,
         VertexId                       *d_indices,
+        SizeT                          *d_inv_offsets,
+        VertexId                       *d_inv_indices,
         VertexId                       *d_in_key_queue,
         util::Array1D<SizeT, SizeT>    *partitioned_scanned_edges,
         SizeT                          max_in,
@@ -767,7 +777,9 @@ public:
         CudaContext                    &context,
         cudaStream_t                   stream,
         gunrock::oprtr::advance::TYPE  ADVANCE_TYPE,
-        bool                           express = false)
+        bool                           express = false,
+        bool                           in_inv = false,
+        bool                           out_inv = false)
     {
         cudaError_t retval = cudaSuccess;
         bool over_sized = false;
@@ -778,6 +790,8 @@ public:
             frontier_attribute,
             d_offsets,
             d_indices,
+            d_inv_offsets,
+            d_inv_indices,
             d_in_key_queue,
             partitioned_scanned_edges->GetPointer(util::DEVICE),
             max_in,
@@ -785,7 +799,9 @@ public:
             context,
             stream,
             ADVANCE_TYPE,
-            express);
+            express,
+            in_inv,
+            out_inv);
         return retval;
     }
 
