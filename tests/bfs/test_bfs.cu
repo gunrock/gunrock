@@ -824,8 +824,8 @@ int main( int argc, char** argv)
 
     /* Gunrock and git commit */
     info["gunrock_version"] = XSTR(GUNROCKVERSION);
-    info["git_commit_sha1"] = XSTR(GIT_SHA1);
-    // info["git_commit_sha1"] = g_GIT_SHA1;
+    // info["git_commit_sha1"] = XSTR(GIT_SHA1);
+    info["git_commit_sha1"] = g_GIT_SHA1;
 
     //
     // Construct graph and perform search(es)

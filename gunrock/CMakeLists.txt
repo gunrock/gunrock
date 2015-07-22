@@ -30,10 +30,10 @@ set(CUFILES
   graphio/generator.cu
   util/test_utils.cu
   util/error_utils.cu
-  ${mgpu_SOURCE_FILES})
+  ${mgpu_SOURCE_FILES}
+  util/gitsha1.c)
 
 cuda_add_library(gunrock ${LIB_TYPE}
-  ${CCFILES}
   ${HFILES}
   ${CUHFILES}
   ${HFILES_PUBLIC}

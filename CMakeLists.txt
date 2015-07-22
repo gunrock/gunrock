@@ -35,7 +35,6 @@ endif ()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 include(GetGitRevisionDescription)
 get_git_head_revision(GIT_REFSPEC GIT_SHA1)
-add_definitions("-DGIT_SHA1=${GIT_SHA1}")
 # end /* How can I pass git SHA1 to compiler as definition using cmake? */
 
 set(gunrock_INCLUDE_DIRS
@@ -170,8 +169,8 @@ if(GUNROCK_BUILD_LIB)
   #    ${CMAKE_CURRENT_SOURCE_DIR}/gunrock/gunrock_config.h)
 
   configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/gunrock/util/gitsha1.cpp.in"
-    "${CMAKE_CURRENT_SOURCE_DIR}/gunrock/util/gitsha1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gunrock/util/gitsha1.c.in"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gunrock/util/gitsha1.c"
     @ONLY)
   add_subdirectory(gunrock)
 endif(GUNROCK_BUILD_LIB)
