@@ -211,7 +211,8 @@ void DisplayStats(
     if (total_queued > 0)
     {
         // measure duplicate edges put through queue
-        redundant_work = ((double)total_queued - edges_visited) / edges_visited;
+        redundant_work =
+            ((double)total_queued - edges_visited) / edges_visited;
     }
     redundant_work *= 100;
 
@@ -229,7 +230,8 @@ void DisplayStats(
         // Display the specific sample statistics
         double m_teps = (double) edges_visited / (elapsed * 1000.0);
         if (!g_quiet) {
-            printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed, m_teps);
+            printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed,
+                   m_teps);
         }
         info["elapsed"] = elapsed;
         info["m_teps"] = m_teps;
@@ -417,11 +419,8 @@ void RunTests(
 
     // Put arguments into info data structure
     info["num_gpus"] = num_gpus;
-    info["iterations"] = iterations;
-    info["instrument"] = INSTRUMENT;
-    info["mark_predecessors"] = MARK_PREDECESSORS;
-    info["enable_idempotence"] = ENABLE_IDEMPOTENCE;
     info["vertex_id"] = src;
+    info["traversal_mode"] = traversal_mode;
 
     // Allocate host-side label array (for both reference and gpu-computed results)
     VertexId    *reference_labels       = (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
@@ -641,10 +640,20 @@ void RunTests(
     instrumented = args.CheckCmdLineFlag("instrumented");
     g_quick = args.CheckCmdLineFlag("quick");
 
+    info["mark_predecessors"] = mark_pred;
+    info["verbose"] = g_verbose;
+    info["instrumented"] = instrumented;
+    info["quick"] = g_quick;
+
     args.GetCmdLineArgument("iteration-num", iterations);
     args.GetCmdLineArgument("grid-size", max_grid_size);
     args.GetCmdLineArgument("idempotence", idempotence);
     args.GetCmdLineArgument("queue-sizing", max_queue_sizing);
+
+    info["iterations"] = iterations;
+    info["max_grid_size"] = max_grid_size;
+    info["idempotence"] = idempotence;
+    info["max_queue_sizing"] = max_queue_sizing;
 
     if (instrumented)
     {
@@ -796,9 +805,6 @@ int main( int argc, char** argv)
     //srand(0); // Presently deterministic
     //srand(time(NULL));
 
-    // Parse graph-contruction params
-    g_undirected = args.CheckCmdLineFlag("undirected");
-
     std::string graph_type = argv[1];
     int flags = args.ParsedArgc();
     int graph_args = argc - flags - 1;
@@ -810,6 +816,7 @@ int main( int argc, char** argv)
     }
 
     json_spirit::mObject info;
+    info["engine"] = "Gunrock";
     info["command_line"] = json_spirit::mValue(args.GetEntireCommandLine());
 
     // get machine/OS/user/time info
@@ -826,6 +833,10 @@ int main( int argc, char** argv)
     info["gunrock_version"] = XSTR(GUNROCKVERSION);
     // info["git_commit_sha1"] = XSTR(GIT_SHA1);
     info["git_commit_sha1"] = g_GIT_SHA1;
+
+    // Parse graph-contruction params
+    g_undirected = args.CheckCmdLineFlag("undirected");
+    info["undirected"] = g_undirected;
 
     //
     // Construct graph and perform search(es)
