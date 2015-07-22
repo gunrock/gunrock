@@ -1,0 +1,51 @@
+{
+    "avg_duty" : 0,
+    "command_line" : "../../gunrock-build/bin/breadth_first_search market ../dataset/large/kron_g500-logn21/kron_g500-logn21.mtx --src=0 --mark-pred --idempotence --iteration-num=10 --quiet --jsondir=.",
+    "dataset" : "kron_g500-logn21",
+    "edges_visited" : 86132859,
+    "elapsed" : 29.747390747070312,
+    "engine" : "Gunrock",
+    "git_commit_sha1" : "6f775b82359c3c8529b8878cdae80e9dfbaf5330",
+    "gpuinfo" : {
+        "clock_rate" : 745000,
+        "compute_version" : 35,
+        "driver_api" : 7000,
+        "driver_version" : 7000,
+        "major" : 3,
+        "minor" : 5,
+        "multi_processor_count" : 15,
+        "name" : "Tesla K40c",
+        "runtime_version" : 7000,
+        "total_global_mem" : 12079136768
+    },
+    "gunrock_version" : "0.1.0",
+    "idempotence" : true,
+    "instrumented" : false,
+    "iterations" : 10,
+    "m_teps" : 2895.4761018319846,
+    "mark_predecessors" : true,
+    "max_grid_size" : 0,
+    "max_queue_sizing" : 1,
+    "name" : "GPU BFS",
+    "nodes_visited" : 1243901,
+    "num_gpus" : 1,
+    "quick" : false,
+    "redundant_work" : 0,
+    "search_depth" : 8,
+    "sysinfo" : {
+        "machine" : "x86_64",
+        "nodename" : "mario",
+        "release" : "3.8.0-29-generic",
+        "sysname" : "Linux",
+        "version" : "#42~precise1-Ubuntu SMP Wed Aug 14 16:19:23 UTC 2013"
+    },
+    "time" : "Wed Jul 22 09:06:13 2015\n",
+    "total_queued" : 0,
+    "traversal_mode" : 0,
+    "undirected" : false,
+    "userinfo" : {
+        "login" : "jowens"
+    },
+    "verbose" : false,
+    "vertex_id" : 0
+}
