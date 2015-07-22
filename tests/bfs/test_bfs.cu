@@ -23,6 +23,7 @@
 #include <gunrock/util/test_utils.cuh>
 #include <gunrock/util/sysinfo.h>
 #include <gunrock/util/json_spirit_writer_template.h>
+#include <gunrock/util/gitsha1.h>
 #include <boost/filesystem.hpp>
 
 // Graph construction utils
@@ -54,6 +55,14 @@ bool g_quiet;
 bool g_undirected;
 bool g_quick;
 bool g_stream_from_host;
+
+/******************************************************************************
+ * Macros
+ ******************************************************************************/
+
+/* this is the "stringize macro macro" hack */
+#define STR(x) #x
+#define XSTR(x) STR(x)
 
 /******************************************************************************
  * Housekeeping Routines
@@ -813,6 +822,11 @@ int main( int argc, char** argv)
     time_t now = time(NULL);
     info["time"] = ctime(&now);
 
+    /* Gunrock and git commit */
+    info["gunrock_version"] = XSTR(GUNROCKVERSION);
+    info["git_commit_sha1"] = XSTR(GIT_SHA1);
+    // info["git_commit_sha1"] = g_GIT_SHA1;
+
     //
     // Construct graph and perform search(es)
     //
@@ -830,6 +844,7 @@ int main( int argc, char** argv)
         char *market_filename = (graph_args == 2) ? argv[2] : NULL;
         boost::filesystem::path market_filename_path(market_filename);
         file_stem = market_filename_path.stem().string();
+        info["dataset"] = file_stem;
         if (graphio::BuildMarketGraph<false>(
                 market_filename,
                 csr,

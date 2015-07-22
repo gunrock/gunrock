@@ -38,6 +38,8 @@
 #include <gunrock/util/random_bits.h>
 #include <gunrock/util/basic_utils.h>
 
+// #include <gunrock/util/gitsha1.cpp>
+
 
 namespace gunrock {
 namespace util {
