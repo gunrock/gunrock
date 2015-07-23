@@ -10,7 +10,7 @@
  * @file
  * kernel.cuh
  *
- * @brief Load balanced Edge Map Kernel Entrypoint
+ * @brief Load balanced Edge Map Kernel Entry point
  */
 
 #pragma once
@@ -32,6 +32,11 @@ namespace edge_map_partitioned {
 
 /**
  * Not valid for this arch (default)
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
+ * @tparam VALID
  */
 template<
     typename    KernelPolicy,
@@ -139,6 +144,14 @@ struct Dispatch
     }
 
 };
+
+/*
+ * @brief Dispatch data structure.
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
+ */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 {
@@ -1021,7 +1034,9 @@ void RelaxLightEdges(
  * @param[in] num_elements      Length of the current frontier queue
  * @param[in] max_vertices      Maximum number of elements we can place into the incoming frontier
  * @param[in] max_edges         Maximum number of elements we can place into the outgoing frontier
- * @param[in] ADVANCE_TYPE      enumerator which shows the advance type: V2V, V2E, E2V, or E2E
+ * @param[in] ADVANCE_TYPE      Enumerator which shows the advance type: V2V, V2E, E2V, or E2E
+ * @param[in] in_inv            Input inverse.
+ * @param[in] our_inv           Output inverse.
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
@@ -1057,6 +1072,18 @@ void GetEdgeCounts(
                                     out_inv);
 }
 
+/*
+ * @brief Mark partition size function.
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
+ *
+ * @param[in] d_needles
+ * @param[in] split_val
+ * @param[in] num_elements Number of elements.
+ * @param[in] output_queue_len Output frontier queue length.
+ */
 template<typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
     __global__
@@ -1073,9 +1100,9 @@ void MarkPartitionSizes(
                                 output_queue_len);
     }
 
-} //edge_map_partitioned
-} //oprtr
-} //gunrock
+}  // edge_map_partitioned
+}  // oprtr
+}  // gunrock
 
 // Leave this at the end of the file
 // Local Variables:

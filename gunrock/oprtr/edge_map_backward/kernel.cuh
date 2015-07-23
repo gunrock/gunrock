@@ -28,6 +28,10 @@ namespace edge_map_backward {
 
 /**
  * @brief Structure for invoking CTA processing tile over all elements.
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Sweep
@@ -95,6 +99,11 @@ struct Sweep
 
 /**
  * Not valid for this arch (default)
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
+ * @tparam VALID
  */
 template<
     typename    KernelPolicy,
@@ -128,7 +137,11 @@ struct Dispatch
 };
 
 /**
- * @brief Kernel dispatch code for different architectures
+ * @brief Kernel dispatch code for different architectures.
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Dispatch<KernelPolicy, ProblemData, Functor, true>

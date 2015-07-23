@@ -31,6 +31,29 @@ namespace gunrock {
 namespace oprtr {
 namespace advance {
 
+/*
+ * @brief Compute output frontier queue length.
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
+ *
+ * @param[in] frontier_attribute Pointer to the frontier attribute.
+ * @param[in] d_offsets Pointer to the offsets.
+ * @param[in] d_indices Pointer to the indices.
+ * @param[in] d_in_key_queue Pointer to the input mapping queue.
+ * @param[in] partitioned_scanned_edges Pointer to the scanned edges.
+ * @param[in] max_in Maximum input queue size.
+ * @param[in] max_out Maximum output queue size.
+ * @param[in] context CudaContext for ModernGPU API.
+ * @param[in] stream CUDA stream.
+ * @param[in] ADVANCE_TYPE Advance kernel mode.
+ * @param[in] express Whether or not enable express mode.
+ * @param[in] in_inv Input inverse.
+ * @param[in] out_inv Output inverse.
+ *
+ * \return cudaError_t object Indicates the success of all CUDA calls.
+ */
 template <typename KernelPolicy, typename Problem, typename Functor>
 cudaError_t ComputeOutputLength(
     // int                             num_block,

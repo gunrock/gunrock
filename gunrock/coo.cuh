@@ -28,6 +28,10 @@ namespace gunrock {
 /**
  * @brief COO sparse format edge. (A COO graph is just a
  * list/array/vector of these.)
+ *
+ * @tparam VertexId Vertex identifiler type.
+ * @tparam Value Attribute value type.
+ *
  */
 template<typename VertexId, typename Value>
 struct Coo {
@@ -43,6 +47,11 @@ struct Coo {
 };
 
 
+/*
+ * @brief Coo data structure.
+ *
+ * @tparam VertexId Vertex identifier type.
+ */
 template<typename VertexId>
 struct Coo<VertexId, util::NullType> {
     VertexId row;
@@ -60,6 +69,7 @@ struct Coo<VertexId, util::NullType> {
  * @brief Comparator for sorting COO sparse format edges first by row
  *
  * @tparam Coo COO Datatype
+ *
  * @param[in] elem1 First element to compare
  * @param[in] elem2 Second element to compare
  * @returns true if first element comes before second element in (r,c)
@@ -84,6 +94,8 @@ bool RowFirstTupleCompare (
 
 /**
  * @brief Comparator for sorting COO sparse format edges first by column
+ *
+ * @tparam Coo COO Datatype
  *
  * @param[in] elem1 First element to compare
  * @param[in] elem2 Second element to compare

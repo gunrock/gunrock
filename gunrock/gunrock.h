@@ -89,7 +89,7 @@ struct GRSetup {
     int*         device_list;  // Setting which device(s) to use
     unsigned int num_devices;  // Number of devices for computation
     unsigned int   max_iters;  // Maximum number of iterations allowed
-    unsigned int   top_nodes;  // K value for top k / pagerank problem
+    unsigned int   top_nodes;  // K value for top k / PageRank problem
     float     pagerank_delta;  // PageRank specific value
     float     pagerank_error;  // PageRank specific value
     float   max_queue_sizing;  // Setting frontier queue size
@@ -103,15 +103,27 @@ extern "C" {
 
 /**
  * @brief Breath-first search public interface.
+ *
+ * @param[out] grapho Output data structure contains results.
+ * @param[in]  graphi Input data structure contains graph.
+ * @param[in]  config Primitive-specific configurations.
+ * @param[in]  data_t Primitive-specific data type setting.
  */
 void gunrock_bfs(
-    struct GRGraph*       graph_o,  // Output graph / results
-    const struct GRGraph* graph_i,  // Input graph structure
+    struct GRGraph*       grapho,   // Output graph / results
+    const struct GRGraph* graphi,   // Input graph structure
     const struct GRSetup  config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
 /**
  * @brief Breath-first search simple public interface.
+ *
+ * @param[out] Return bfs labels (depth).
+ * @param[in] Input graph number of nodes.
+ * @param[in] Input graph number of edges.
+ * @param[in] Input graph row_offsets.
+ * @param[in] Input graph col_indices.
+ * @param[in] Source node to start.
  */
 void bfs(
     int*       bfs_label,    // Return label (depth) per node
@@ -123,15 +135,27 @@ void bfs(
 
 /**
  * @brief Betweenness centrality public interface.
+ *
+ * @param[out] grapho Output data structure contains results.
+ * @param[in]  graphi Input data structure contains graph.
+ * @param[in]  config Primitive-specific configurations.
+ * @param[in]  data_t Primitive-specific data type setting.
  */
 void gunrock_bc(
-    struct GRGraph*       graph_o,  // Output graph / results
-    const struct GRGraph* graph_i,  // Input graph structure
+    struct GRGraph*       grapho,   // Output graph / results
+    const struct GRGraph* graphi,   // Input graph structure
     const struct GRSetup  config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
 /**
  * @brief Betweenness centrality simple public interface.
+ *
+ * @param[out] Return betweenness centralities.
+ * @param[in] Input graph number of nodes.
+ * @param[in] Input graph number of edges.
+ * @param[in] Input graph row_offsets.
+ * @param[in] Input graph col_indices.
+ * @param[in] Source node to start.
  */
 void bc(
     float*     bc_scores,    // Return centrality score per node
@@ -143,15 +167,26 @@ void bc(
 
 /**
  * @brief Connected component public interface.
+ *
+ * @param[out] grapho Output data structure contains results.
+ * @param[in]  graphi Input data structure contains graph.
+ * @param[in]  config Primitive-specific configurations.
+ * @param[in]  data_t Primitive-specific data type setting.
  */
 void gunrock_cc(
-    struct GRGraph*       graph_o,  // Output graph / results
-    const struct GRGraph* graph_i,  // Input graph structure
+    struct GRGraph*       grapho,   // Output graph / results
+    const struct GRGraph* graphi,   // Input graph structure
     const struct GRSetup  config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
 /**
  * @brief Connected component simple public interface.
+ *
+ * @param[out] Return per-node component IDs.
+ * @param[in] Input graph number of nodes.
+ * @param[in] Input graph number of edges.
+ * @param[in] Input graph row_offsets.
+ * @param[in] Input graph col_indices.
  */
 int cc(
     int*       component,     // Return component IDs per node
@@ -162,15 +197,28 @@ int cc(
 
 /**
  * @brief Single-source shortest path public interface.
+ *
+ * @param[out] grapho Output data structure contains results.
+ * @param[in]  graphi Input data structure contains graph.
+ * @param[in]  config Primitive-specific configurations.
+ * @param[in]  data_t Primitive-specific data type setting.
  */
 void gunrock_sssp(
-    struct GRGraph*       graph_o,  // Output graph / results
-    const struct GRGraph* graph_i,  // Input graph structure
+    struct GRGraph*       grapho,   // Output graph / results
+    const struct GRGraph* graphi,   // Input graph structure
     const struct GRSetup  config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
 /**
  * @brief Single-source shortest path simple public interface.
+ *
+ * @param[out] Return shortest distances.
+ * @param[in] Input graph number of nodes.
+ * @param[in] Input graph number of edges.
+ * @param[in] Input graph row_offsets.
+ * @param[in] Input graph col_indices.
+ * @param[in] Input graph edge weight.
+ * @param[in] Source node to start.
  */
 void sssp(
     unsigned int*       distances,    // Return shortest distances
@@ -183,18 +231,30 @@ void sssp(
 
 /**
  * @brief PageRank public interface.
+ *
+ * @param[out] grapho Output data structure contains results.
+ * @param[in]  graphi Input data structure contains graph.
+ * @param[in]  config Primitive-specific configurations.
+ * @param[in]  data_t Primitive-specific data type setting.
  */
 void gunrock_pagerank(
-    struct GRGraph*       graph_o,  // Output graph / results
-    const struct GRGraph* graph_i,  // Input graph structure
+    struct GRGraph*       grapho,   // Output graph / results
+    const struct GRGraph* graphi,   // Input graph structure
     const struct GRSetup  config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
 /**
  * @brief PageRank simple public interface.
+ *
+ * @param[out] Return top-ranked vertex IDs.
+ * @param[out] Return top-ranked PageRank scores.
+ * @param[in] Input graph number of nodes.
+ * @param[in] Input graph number of edges.
+ * @param[in] Input graph row_offsets.
+ * @param[in] Input graph col_indices.
  */
 void pagerank(
-    int*       node_ids,      // Return top-ranked vertice IDs
+    int*       node_ids,      // Return top-ranked vertex IDs
     float*     pagerank,      // Return top-ranked PageRank scores
     const int  num_nodes,     // Input graph number of nodes
     const int  num_edges,     // Input graph number of edges
