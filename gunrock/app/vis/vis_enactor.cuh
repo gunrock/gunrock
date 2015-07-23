@@ -224,7 +224,8 @@ class VISEnactor :
                 printf("filter queue length: %lld",
                        (long long) frontier_attribute->queue_length);
                 util::DisplayDeviceResults(
-                    problem->data_slices[0]->d_bitmask, graph_slice->nodes);
+                    problem->data_slices[0]->mask.GetPointer(util::DEVICE),
+                    graph_slice->nodes);
                 printf("input queue for advance:\n");
                 util::DisplayDeviceResults(
                     frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE),

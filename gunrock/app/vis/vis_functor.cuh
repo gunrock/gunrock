@@ -48,7 +48,7 @@ struct VISFunctor {
     static __device__ __forceinline__ bool
     CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem,
              VertexId e_id = 0, VertexId e_id_in = 0) {
-        return problem->d_bitmask[d_id];
+        return problem->mask[d_id];
     }
 
     /**
@@ -93,7 +93,7 @@ struct VISFunctor {
     static __device__ __forceinline__ void
     ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-            true, problem->d_bitmask + node);
+            true, problem->mask + node);
     }
 };
 
