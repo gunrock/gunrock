@@ -182,6 +182,7 @@ struct BFSIteration : public IterationBase <
             stream,
             gunrock::oprtr::advance::V2V,
             false,
+            false,
             false);
 
         // Only need to reset queue for once

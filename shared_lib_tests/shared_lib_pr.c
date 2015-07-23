@@ -14,7 +14,7 @@ int main(int argc, char* argv[]) {
     data_t.VALUE_TYPE = VALUE_FLOAT;       // attributes type
 
     struct GRSetup config;                 // gunrock configurations
-    int list[] = {0};             // device to run algorithm
+    int list[] = {0,1,2,3};             // device to run algorithm
     config.num_devices = sizeof(list) / sizeof(list[0]);  // number of devices
     config.device_list    =  list;         // device list to run algorithm
     config.pagerank_delta = 0.85f;         // default delta value

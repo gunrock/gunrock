@@ -191,6 +191,7 @@ struct SSSPIteration : public IterationBase <
             stream,
             gunrock::oprtr::advance::V2V,
             false,
+            false,
             false);
 
         frontier_attribute->queue_reset = false;

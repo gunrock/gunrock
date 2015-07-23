@@ -475,6 +475,7 @@ static void FullQueue_Core(
         stream,
         gunrock::oprtr::advance::V2V,
         false,
+        false,
         false);
 
     //if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
@@ -955,6 +956,7 @@ static void FullQueue_Core(
         stream,
         gunrock::oprtr::advance::V2V,
         false,
+        false,
         false);
 
     if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index+1, frontier_attribute->queue_length, false, stream, true)) return;
@@ -1157,6 +1159,7 @@ static void Make_Output(
             context[0],
             stream,
             gunrock::oprtr::advance::V2V,
+            false,
             false,
             true);
         //printf("Advance end.\n");fflush(stdout);

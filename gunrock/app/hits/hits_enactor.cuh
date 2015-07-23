@@ -276,6 +276,7 @@ public:
                     stream,
                     gunrock::oprtr::advance::V2V,
                     false,
+                    false,
                     true);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
@@ -318,6 +319,7 @@ public:
                     context[0],
                     stream,
                     gunrock::oprtr::advance::V2V,
+                    false,
                     false,
                     true);
 

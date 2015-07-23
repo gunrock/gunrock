@@ -297,6 +297,7 @@ public:
             stream,
             gunrock::oprtr::advance::V2V,
             false,
+            false,
             false);
 
         frontier_attribute->queue_reset = false;
@@ -673,6 +674,7 @@ public:
                 stream,
                 gunrock::oprtr::advance::V2V,
                 false,
+                false,
                 false);
         } else {
             gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, BackwardFunctor2>(
@@ -697,6 +699,7 @@ public:
                 context[0],
                 stream,
                 gunrock::oprtr::advance::V2V,
+                false,
                 false,
                 false);
         }
