@@ -293,7 +293,7 @@ void RunTests(Test_Parameter *parameter)
     ContextPtr   *context               = (ContextPtr*)parameter -> context;
     int          *gpu_idx               = parameter -> gpu_idx;
     //cudaStream_t *streams               = parameter -> streams;
-    bool          g_quick               = parameter -> g_quick;
+    bool          g_quick               = true;//parameter -> g_quick; no CPU ref code yet, so quick be true by default
     bool          g_stream_from_host    = parameter -> g_stream_from_host;
 
     // Allocate host-side label array (for both reference and gpu-computed results)

@@ -79,7 +79,7 @@ cudaError_t ComputeOutputLength(
                 max_in,
                 max_out,
                 ADVANCE_TYPE);
-        util::DisplayDeviceResults(partitioned_scanned_edges, frontier_attribute->queue_length);
+        //util::DisplayDeviceResults(partitioned_scanned_edges, frontier_attribute->queue_length);
     } else if (KernelPolicy::ADVANCE_MODE == LB)
     {
         gunrock::oprtr::edge_map_partitioned::GetEdgeCounts
@@ -97,7 +97,7 @@ cudaError_t ComputeOutputLength(
                 ADVANCE_TYPE,
                 in_inv,
                 out_inv);
-        util::DisplayDeviceResults(partitioned_scanned_edges, frontier_attribute->queue_length);
+        //util::DisplayDeviceResults(partitioned_scanned_edges, frontier_attribute->queue_length);
     }
 
     Scan<mgpu::MgpuScanTypeInc>(

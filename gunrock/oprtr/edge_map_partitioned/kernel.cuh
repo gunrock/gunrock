@@ -155,9 +155,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             SizeT       &max_edge,
                             gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
     {
-        if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
-            d_vertex_id = d_column_indices[d_vertex_id];
-        }
         SizeT first = d_vertex_id >= max_vertex ? max_edge : d_row_offsets[d_vertex_id];
         SizeT second = (d_vertex_id + 1) >= max_vertex ? max_edge : d_row_offsets[d_vertex_id+1];
 
@@ -189,17 +186,20 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         VertexId v_id;
         VertexId column_index = (in_inv)? d_row_indices[my_id] : d_column_indices[my_id];
+        //printf("in_inv:%d, my_id:%d, column_idx:%d\n", in_inv, my_id, column_index);
         if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E || ADVANCE_TYPE == gunrock::oprtr::advance::V2V)
-        v_id = (my_id >= num_elements)?-1:d_queue[my_id];
+            v_id = (my_id >= num_elements)?-1:d_queue[my_id];
         else
-        v_id = (my_id >= num_elements)?-1:column_index;
+            v_id = (my_id >= num_elements)?-1:column_index;
         if (v_id < 0 || v_id > max_vertex) {
             d_scanned_edges[my_id] = 0;
             return;
         }
 
+        //printf("my_id:%d, vid bef:%d\n", my_id, v_id);
         // add a zero length neighbor list to the end (this for getting both exclusive and inclusive scan in one array)
         SizeT ncount = (!out_inv) ? GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE): GetNeighborListLength(d_column_offsets, d_row_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
+        //printf("my_id:%d, out_inv:%d, vid:%d, ncount:%d\n", my_id, out_inv, v_id, ncount);
         SizeT num_edges = (my_id == num_elements) ? 0 : ncount;
         d_scanned_edges[my_id] = num_edges;
     }

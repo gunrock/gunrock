@@ -282,14 +282,12 @@ public:
                     graph_slice->column_indices.GetPointer(util::DEVICE),
                     (SizeT*   )NULL,
                     (VertexId*)NULL,
-                    graph_slice->nodes,//graph_slice->frontier_elements[frontier_attribute.selector],
-                    graph_slice->edges,//graph_slice->frontier_elements[frontier_attribute.selector^1],
+                    graph_slice->nodes,
+                    graph_slice->edges,
                     work_progress[0],
                     context[0],
                     stream,
-                    gunrock::oprtr::advance::V2E,
-                    false,
-                    true);
+                    gunrock::oprtr::advance::V2E);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
 
@@ -319,14 +317,12 @@ public:
                     graph_slice->row_indices.GetPointer(util::DEVICE),
                     (SizeT*   )NULL,
                     (VertexId*)NULL,
-                    graph_slice->nodes,//graph_slice->frontier_elements[frontier_attribute.selector],
-                    graph_slice->edges,//graph_slice->frontier_elements[frontier_attribute.selector^1],
+                    graph_slice->nodes,
+                    graph_slice->edges,
                     work_progress[0],
                     context[0],
                     stream,
-                    gunrock::oprtr::advance::V2E,
-                    false,
-                    true);
+                    gunrock::oprtr::advance::V2E);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
             }
@@ -338,14 +334,6 @@ public:
 
 
                 util::MemsetIdxKernel<<<128, 128>>>(frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), graph_slice->edges);
-
-                /*if (retval = util::GRError(cudaBindTexture(
-                    0,
-                    gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
-                    graph_slice->d_column_offsets,
-                    row_offsets_desc,
-                    (graph_slice->nodes + 1) * sizeof(SizeT)),
-                        "SALSAEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;*/
 
                 frontier_attribute->queue_length     = graph_slice->edges;
                 if (retval = work_progress->SetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
@@ -364,17 +352,17 @@ public:
                     frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),            // d_out_queue
                     (VertexId*)NULL,
                     (VertexId*)NULL,
+                    graph_slice->row_offsets.GetPointer(util::DEVICE),
+                    graph_slice->column_indices.GetPointer(util::DEVICE),
                     graph_slice->column_offsets.GetPointer(util::DEVICE),
                     graph_slice->row_indices.GetPointer(util::DEVICE),
-                    (SizeT*   )NULL,
-                    (VertexId*)graph_slice->column_indices.GetPointer(util::DEVICE),
                     graph_slice->edges,//graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
-                    frontier_queue->keys[frontier_attribute->selector^1].GetSize() * 10000,//graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
+                    graph_slice->edges * 10000,//graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
                     work_progress[0],
                     context[0],
                     stream,
                     gunrock::oprtr::advance::E2V,
-                    true,
+                    false,
                     true);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
@@ -407,17 +395,17 @@ public:
                     frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),            // d_out_queue
                     (VertexId*)NULL,
                     (VertexId*)NULL,
+                    graph_slice->column_offsets.GetPointer(util::DEVICE),
+                    graph_slice->row_indices.GetPointer(util::DEVICE),
                     graph_slice->row_offsets.GetPointer(util::DEVICE),
-                    graph_slice->column_indices.GetPointer(util::DEVICE),
-                    (SizeT*   )NULL,
-                    (VertexId*)graph_slice->row_indices.GetPointer(util::DEVICE),
+                    graph_slice->column_indices.GetPointer(util::DEVICE), 
                     graph_slice->edges,//frontier_queue->keys[frontier_attribute->selector  ].GetSize(),//graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
-                    frontier_queue->keys[frontier_attribute->selector^1].GetSize() * 10000,//graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
+                    graph_slice->edges * 10000,//graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
                     work_progress[0],
                     context[0],
                     stream,
                     gunrock::oprtr::advance::E2V,
-                    true,
+                    false,
                     true);
 
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
