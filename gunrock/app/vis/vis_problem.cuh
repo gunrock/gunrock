@@ -57,20 +57,34 @@ struct VISProblem : ProblemBase<VertexId, SizeT, Value,
     struct DataSlice : DataSliceBase<SizeT, VertexId, Value> {
         // device storage arrays
         util::Array1D<SizeT, VertexId> labels;  // Used for ...
-        bool *d_bitmask;  // used for indicating if vertex is in subgraph
+        util::Array1D<SizeT, bool> mask;  // indicate if vertex is in subgraph
+
+        /*
+         * @brief DataSlice default constructor
+         */
+        DataSlice() {
+            mask.SetName("mask");
+        }
+
+        /*
+         * @brief Default destructor
+         */
+        ~DataSlice() {
+            mask.Release();
+        }
     };
 
     int       num_gpus;
     SizeT     nodes;
     SizeT     edges;
 
-// data slices (one for each GPU)
+    // data slices (one for each GPU)
     DataSlice **data_slices;
 
-// putting structure on device while keeping the SoA structure
+    // putting structure on device while keeping the SoA structure
     DataSlice **d_data_slices;
 
-// device index for each data slice
+    // device index for each data slice
     int       *gpu_idx;
 
     /**
@@ -103,10 +117,6 @@ struct VISProblem : ProblemBase<VertexId, SizeT, Value,
                         __FILE__, __LINE__)) break;
 
             data_slices[i]->labels.Release();
-
-            if (data_slices[i]->d_bitmask)
-                util::GRError(cudaFree(data_slices[i]->d_bitmask),
-                "DataSlice cudaFree d_bitmask failed", __FILE__, __LINE__);
 
             if (d_data_slices[i]) {
                 util::GRError(cudaFree(d_data_slices[i]),
@@ -238,14 +248,15 @@ struct VISProblem : ProblemBase<VertexId, SizeT, Value,
                     return retval;
                 }
 
-                bool *d_bitmask;
-                if (retval = util::GRError(
-                    cudaMalloc((void**)&d_bitmask, nodes * sizeof(bool)),
-                    "Problem cudaMalloc d_bitmask failed",
-                    __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_bitmask = d_bitmask;
+                // allocate mask to indicate whether the vertex is in subgraph
+                if (retval = data_slices[0]->mask.Allocate(edges, util::DEVICE)) {
+                    return retval;
+                }
+
+                // initialize mask to false of length graph.nodes
                 util::MemsetKernel<<<128, 128>>>(
-                    data_slices[0]->d_bitmask, (bool)false, nodes);
+                    data_slices[0]->mask.GetPointer(util::DEVICE),
+                    false, edges);
 
                 // TODO(developer): code to initialize other device arrays here
             }
@@ -294,13 +305,17 @@ struct VISProblem : ProblemBase<VertexId, SizeT, Value,
                 _ENABLE_IDEMPOTENCE ? -1 : (util::MaxValue<Value>() - 1), nodes);
 
             // TODO(developer): code to for other allocations here
-            if (!data_slices[gpu]->d_bitmask) {
-                bool *d_bitmask;
-                if (retval = util::GRError(cudaMalloc(
-                    (void**)&d_bitmask, nodes * sizeof(bool)),
-                    "MSTProblem cudaMalloc d_temp_value Failed",
-                    __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_bitmask = d_bitmask;
+
+            if (data_slices[0]->mask.GetPointer(util::DEVICE) == NULL) {
+                // allocate mask to indicate whether the vertex is in subgraph
+                if (retval = data_slices[0]->mask.Allocate(edges, util::DEVICE)) {
+                    return retval;
+                }
+
+                // initialize mask to false of length graph.nodes
+                util::MemsetKernel<<<128, 128>>>(
+                    data_slices[0]->mask.GetPointer(util::DEVICE),
+                    false, edges);
             }
 
             if (retval = util::GRError(
