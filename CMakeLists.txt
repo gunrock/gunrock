@@ -3,6 +3,7 @@ project(gunrock)
 set(gunrock_VERSION_MAJOR 0)
 set(gunrock_VERSION_MINOR 1)
 set(gunrock_VERSION_PATCH 0)
+add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MINOR}.${gunrock_VERSION_PATCH}")
 
 set(gunrock_REQUIRED_BOOST_VERSION 1.53)
 
@@ -21,7 +22,7 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 find_package(Boost ${gunrock_REQUIRED_BOOST_VERSION}
-  REQUIRED system timer chrono)
+  REQUIRED system filesystem timer chrono)
 if (Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
   link_directories(${Boost_LIBRARY_DIRS})
@@ -38,6 +39,13 @@ else()
 endif()
 
 find_package(Metis 5.0 REQUIRED)
+
+# begin /* How can I pass git SHA1 to compiler as definition using cmake? */
+# http://stackoverflow.com/questions/1435953/how-can-i-pass-git-sha1-to-compiler-as-definition-using-cmake/4318642#4318642
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
+include(GetGitRevisionDescription)
+get_git_head_revision(GIT_REFSPEC GIT_SHA1)
+# end /* How can I pass git SHA1 to compiler as definition using cmake? */
 
 set(gunrock_INCLUDE_DIRS
   ${CMAKE_SOURCE_DIR})
@@ -186,6 +194,10 @@ if(GUNROCK_BUILD_LIB)
   #    ${CMAKE_CURRENT_SOURCE_DIR}/gunrock/gunrock_config.h.in
   #    ${CMAKE_CURRENT_SOURCE_DIR}/gunrock/gunrock_config.h)
 
+  configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/gunrock/util/gitsha1.c.in"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gunrock/util/gitsha1.c"
+    @ONLY)
   add_subdirectory(gunrock)
 endif(GUNROCK_BUILD_LIB)
 

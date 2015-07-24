@@ -173,7 +173,8 @@ int BuildRmatGraph (
     double d0 = 0.05,
     double vmultipiler = 1.00,
     double vmin = 1.00,
-    int    seed = -1)
+    int    seed = -1,
+    bool quiet = false)
 {
     typedef Coo<VertexId, Value> EdgeTupleType;
 
@@ -256,7 +257,7 @@ int BuildRmatGraph (
     // convert COO to CSR
     char *out_file = NULL;  // TODO: currently does not support write CSR file
     graph.template FromCoo<WITH_VALUES, EdgeTupleType>(
-        out_file, coo, nodes, directed_edges);
+        out_file, coo, nodes, directed_edges, quiet);
 
     free(coo);
 

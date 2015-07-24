@@ -41,6 +41,9 @@
 #include <gunrock/util/random_bits.h>
 #include <gunrock/util/basic_utils.h>
 
+// #include <gunrock/util/gitsha1.cpp>
+
+
 namespace gunrock {
 namespace util {
 
@@ -115,7 +118,7 @@ public:
         std::string commandLineStr = "";
         for (int i = 0; i < argc; i++)
         {
-            commandLineStr.append(std::string(argv[i]).append(" "));
+            commandLineStr.append(std::string(argv[i]).append((i < argc - 1) ? " " : ""));
         }
         return commandLineStr;
     }
