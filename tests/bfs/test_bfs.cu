@@ -1150,7 +1150,7 @@ int main( int argc, char** argv)
     else if (src_str.compare("largestdegree") == 0)
     {
         int maximum_degree;
-        parameter->src = csr.GetNodeWithHighestDegree(temp);
+        parameter->src = csr.GetNodeWithHighestDegree(maximum_degree);
         if (!parameter->g_quiet)
         {
             printf("Using highest degree (%d) vertex: %d\n", 
