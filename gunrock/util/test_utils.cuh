@@ -334,7 +334,7 @@ inline bool EnoughDeviceMemory(unsigned int mem_needed)
 {
     size_t free_mem, total_mem;
     if (util::GRError(cudaMemGetInfo(&free_mem, &total_mem),
-                "cudaMemGetInfo failed", __FILE__, __LINE__)) return false;
+                      "cudaMemGetInfo failed", __FILE__, __LINE__)) return false;
     return (mem_needed <= free_mem);
 }
 
@@ -368,23 +368,28 @@ __device__ __host__ __forceinline__ int MaxValue<int>()
  * @tparam SizeT datatype of the array length.
  *
  * @param[in] computed Vector of values to be compared.
- * @param[in] reference Vector of reference values
- * @param[in] len Vector length
+ * @param[in] reference Vector of reference values.
+ * @param[in] len Vector length.
  * @param[in] verbose Whether to print values around the incorrect one.
+ * @param[in] quiet Don't print out anything unless specified. 
  *
  * \return Zero if two vectors are exactly the same, non-zero if there is any difference.
  *
  */
 template <typename T, typename SizeT>
-int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true,
-                   bool quiet = false)
+int CompareResults(
+    T* computed, 
+    T* reference, 
+    SizeT len, 
+    bool verbose = true,
+    bool quiet = false)
 {
     int flag = 0;
     for (SizeT i = 0; i < len; i++)
     {
         if (computed[i] != reference[i] && flag == 0)
         {
-            if (~quiet)
+            if (!quiet)
             {
                 printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
                 PrintValue<T>(computed[i]);
@@ -412,7 +417,7 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true,
             flag += 1;
             //return flag;
         }
-        if (computed[i] != reference[i] && flag > 0) flag+=1;
+        if (computed[i] != reference[i] && flag > 0) flag += 1;
     }
     if (!quiet)
     {
@@ -434,13 +439,13 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true,
  * float type. If incorrect, print the location of the first incorrect value
  * appears, the incorrect value, and the reference value.
  *
- * @tparam T datatype of the values being compared with.
  * @tparam SizeT datatype of the array length.
  *
  * @param[in] computed Vector of values to be compared.
  * @param[in] reference Vector of reference values
  * @param[in] len Vector length
  * @param[in] verbose Whether to print values around the incorrect one.
+ * @param[in] quiet Don't print out anything unless specified. 
  *
  * \return Zero if difference between each element of the two vectors are less
  * than a certain threshold, non-zero if any difference is equal to or larger
@@ -449,7 +454,10 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true,
  */
 template <typename SizeT>
 int CompareResults(
-    float* computed, float* reference, SizeT len, bool verbose = true,
+    float* computed, 
+    float* reference, 
+    SizeT len, 
+    bool verbose = true,
     bool quiet = false)
 {
     float THRESHOLD = 0.05f;
@@ -467,7 +475,7 @@ int CompareResults(
         }
         else
         {
-            if (fabs((computed[i] - reference[i])/reference[i]) > THRESHOLD)
+            if (fabs((computed[i] - reference[i]) / reference[i]) > THRESHOLD)
             {
                 is_right = false;
             }
@@ -504,7 +512,8 @@ int CompareResults(
         }
         if (!is_right && flag > 0) flag += 1;
     }
-    if (!quiet) {
+    if (!quiet)
+    {
         printf("\n");
     }
     if (!flag)

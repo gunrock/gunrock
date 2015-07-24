@@ -34,7 +34,8 @@ namespace gunrock {
 namespace app {
 namespace bfs {
 
-template <typename Problem, bool INSTRUMENT, bool DEBUG, bool SIZE_CHECK> class Enactor;
+template <
+typename Problem, bool INSTRUMENT, bool DEBUG, bool SIZE_CHECK> class Enactor;
 
 /*
  * @brief Expand incoming function.
@@ -414,8 +415,7 @@ static CUT_THREADPROC BFSThread(
 
         gunrock::app::Iteration_Loop
             <Problem::MARK_PREDECESSORS?2:1,0, BfsEnactor, BfsFunctor, BFSIteration<AdvanceKernelPolicy, FilterKernelPolicy, BfsEnactor> > (thread_data);
-        printf("BFS_Thread finished\n");fflush(stdout);
-
+        // printf("BFS_Thread finished\n");fflush(stdout);
     } while(0);
 
     thread_data->stats = 4;

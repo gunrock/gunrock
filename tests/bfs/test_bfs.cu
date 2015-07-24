@@ -444,7 +444,7 @@ void SimpleReferenceBfs(
  * @param[in] num_gpus Number of GPUs
  * @param[in] max_queue_sizing Scaling factor used in edge mapping
  * @param[in] iterations Number of iterations for running the test
- * @param[in] traversal_mode Graph traversal mode: Load-balanced or Dynamic cooperative
+ * @param[in] traversal_mode Advance mode: Load-balanced or Dynamic cooperative
  * @param[in] context CudaContext pointer for moderngpu APIs
  *
  */
@@ -498,6 +498,9 @@ void RunTests(Test_Parameter *parameter)
     parameter->info["num_gpus"] = num_gpus;
     parameter->info["vertex_id"] = src;
     parameter->info["traversal_mode"] = traversal_mode;
+    parameter->info["partition_method"] = partition_method;
+    parameter->info["partition_factor"] = partition_factor;
+    parameter->info["partition_seed"] = partition_seed;
 
     // Allocate host-side label array (for both reference and GPU results)
     VertexId     *reference_labels      = new VertexId[graph->nodes];
@@ -623,7 +626,8 @@ void RunTests(Test_Parameter *parameter)
                 printf("Label Validity: ");
             }
             int error_num = CompareResults(
-                                h_labels, reference_check_label, graph->nodes, true);
+                                h_labels, reference_check_label, 
+                                graph->nodes, true, parameter->g_quiet);
             if (error_num > 0)
             {
                 if (!parameter->g_quiet)
@@ -641,7 +645,8 @@ void RunTests(Test_Parameter *parameter)
                     printf("Label Validity: ");
                 }
                 int error_num = CompareResults(
-                                    h_labels, reference_check_label, graph->nodes, true);
+                                    h_labels, reference_check_label, 
+                                    graph->nodes, true, parameter->g_quiet);
                 if (error_num > 0)
                 {
                     if (!parameter->g_quiet)
@@ -681,7 +686,8 @@ void RunTests(Test_Parameter *parameter)
             {
                 if (gpu != 0)
                 {
-                    printf(" #keys%d,0\t #keys%d,1\t #ins%d,0\t #ins%d,1", gpu, gpu, gpu, gpu);
+                    printf(" #keys%d,0\t #keys%d,1\t #ins%d,0\t #ins%d,1", 
+                        gpu, gpu, gpu, gpu);
                 }
                 else
                 {
@@ -959,7 +965,10 @@ int main( int argc, char** argv)
             }
         }
     }
-    printf("\n"); fflush(stdout);
+    if (!parameter->g_quiet)
+    {
+         printf("\n"); fflush(stdout);
+    }
 
     std::string graph_type = argv[1];
     int flags = args.ParsedArgc();

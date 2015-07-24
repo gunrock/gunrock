@@ -306,7 +306,7 @@ public:
             node_counter+=out_counter[peer];
         }
         out_offsets[gpu][num_gpus]=node_counter;
-        util::cpu_mt::PrintCPUArray<SizeT, SizeT>("out_offsets",out_offsets[gpu],num_gpus+1,gpu);
+        // util::cpu_mt::PrintCPUArray<SizeT, SizeT>("out_offsets",out_offsets[gpu],num_gpus+1,gpu);
         util::cpu_mt::IncrementnWaitBarrier(cpu_barrier,gpu);
 
         node_counter=0;
@@ -462,8 +462,8 @@ public:
             in_counter[peer_]=out_offsets[peer][gpu_+1]-out_offsets[peer][gpu_];
             in_counter[num_gpus]+=in_counter[peer_];
         }
-        util::cpu_mt::PrintCPUArray<SizeT, SizeT>("out_counter",out_counter,num_gpus+1,gpu);
-        util::cpu_mt::PrintCPUArray<SizeT, SizeT>("in_counter ", in_counter,num_gpus+1,gpu);
+        //util::cpu_mt::PrintCPUArray<SizeT, SizeT>("out_counter",out_counter,num_gpus+1,gpu);
+        //util::cpu_mt::PrintCPUArray<SizeT, SizeT>("in_counter ", in_counter,num_gpus+1,gpu);
         delete[] tconvertion_table; tconvertion_table = NULL;
         CUT_THREADEND;
     }

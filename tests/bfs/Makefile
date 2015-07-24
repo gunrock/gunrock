@@ -22,9 +22,9 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 # Gen targets
 #-------------------------------------------------------------------------------
 
-GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\" 
-GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\" 
-GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" 
+GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\"
+GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
+GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
 SM_TARGETS = $(GEN_SM35) $(GEN_SM37)
 
 #-------------------------------------------------------------------------------
@@ -39,7 +39,7 @@ SM_TARGETS = $(GEN_SM35) $(GEN_SM37)
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
 MGPU_INC = "../../externals/moderngpu/include"
 CUB_INC = "../../externals/cub"
-BOOST_DEPS = -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer
+BOOST_DEPS = -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -lboost_filesystem
 OMP_DEPS = -Xcompiler -fopenmp -Xlinker -lgomp
 METIS_DEPS = -Xlinker -lmetis
 INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) -I.. -I../..

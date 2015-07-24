@@ -169,7 +169,11 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 this->out_length[peer] = 1;
 
             if (this->num_gpus>1)
-                util::cpu_mt::PrintCPUArray<int, SizeT>("in_counter", graph_slice->in_counter.GetPointer(util::HOST), this->num_gpus+1, this->gpu_idx);
+            {
+                // util::cpu_mt::PrintCPUArray<int, SizeT>("in_counter", 
+                // graph_slice->in_counter.GetPointer(util::HOST), 
+                // this->num_gpus+1, this->gpu_idx);
+            }
 
             for (int peer=0;peer<(this->num_gpus > 1 ? this->num_gpus+1 : 1);peer++)
             for (int i=0; i < 2; i++)

@@ -35,10 +35,8 @@
 
 #include <moderngpu.cuh>
 
-namespace gunrock
-{
-namespace app
-{
+namespace gunrock {
+namespace app {
 
 /**
  * @brief Enumeration of global frontier queue configurations
@@ -1248,7 +1246,8 @@ struct ProblemBase
         {
             if (num_gpus == 1 && gpu_idx == NULL)
             {
-                if (retval = util::GRError(cudaGetDevice(&(this->gpu_idx[0])), "ProblemBase cudaGetDevice failed", __FILE__, __LINE__)) break;
+                if (retval = util::GRError(cudaGetDevice(&(this->gpu_idx[0])), 
+                    "ProblemBase cudaGetDevice failed", __FILE__, __LINE__)) break;
             }
             else
             {
@@ -1262,7 +1261,8 @@ struct ProblemBase
             {
                 util::CpuTimer cpu_timer;
 
-                printf("partition_method = %s\n", partition_method.c_str());
+                // printf("partition_method = %s\n", partition_method.c_str());
+
                 if (partition_method == "random")
                     partitioner = new rp::RandomPartitioner   <VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                     (*graph, num_gpus);
@@ -1294,7 +1294,8 @@ struct ProblemBase
                              partition_factor,
                              partition_seed);
                 cpu_timer.Stop();
-                printf("partition end. (%f ms)\n", cpu_timer.ElapsedMillis()); fflush(stdout);
+
+                // printf("partition end. (%f ms)\n", cpu_timer.ElapsedMillis());
 
                 /*graph->DisplayGraph("org_graph",graph->nodes);
                 util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);

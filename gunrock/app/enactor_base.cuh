@@ -532,7 +532,7 @@ __global__ void Make_Out_Backward(
 }
 
 /*
- * @brief Make output function.
+ * @brief Mark_Queue function.
  *
  * @tparam VertexId
  * @tparam SizeT
@@ -566,6 +566,7 @@ __global__ void Mark_Queue (
  * @param[in] iteration
  * @param[in] peer_
  * @param[in] keep_content
+ *
  * \return cudaError_t object Indicates the success of all CUDA calls.
  */
 template <
@@ -587,10 +588,8 @@ cudaError_t Check_Size(
 
     if (target_length > array->GetSize())
     {
-        printf("%d\t %d\t %d\t %s \t oversize :\t %d ->\t %d\n",
-            thread_num, iteration, peer_, name,
-            array->GetSize(), target_length);
-        fflush(stdout);
+        // printf("%d\t %d\t %d\t %s \t oversize :\t %d ->\t %d\n",
+        // thread_num, iteration, peer_, name, array->GetSize(), target_length);
         oversized=true;
         if (SIZE_CHECK)
         {
@@ -912,7 +911,10 @@ void Iteration_Loop(
     int           peer, peer_, peer__, gpu_, i, iteration_, wait_count;
     bool          over_sized;
 
-    printf("Iteration entered\n");fflush(stdout);
+    if (Enactor::DEBUG) 
+    {
+        printf("Iteration entered\n");fflush(stdout);
+    } 
     while (!Iteration::Stop_Condition(s_enactor_stats, s_frontier_attribute, s_data_slice, num_gpus))
     {
         Total_Length             = 0;
@@ -1141,7 +1143,7 @@ void Iteration_Loop(
                         if (to_show[peer_] == false) break;
                     }
 
-                    if (!Enactor::SIZE_CHECK)
+                    if (!Enactor::SIZE_CHECK && Enactor::DEBUG)
                     {
                         if (Iteration::HAS_SUBQ)
                         {
@@ -1215,7 +1217,13 @@ void Iteration_Loop(
                 }
             }
 
-            if (Enactor::DEBUG) {printf("%d\t %lld\t \t Subqueue finished. Total_Length= %d\n", thread_num, enactor_stats[0].iteration, Total_Length);fflush(stdout);}
+            if (Enactor::DEBUG) 
+            {
+                printf("%d\t %lld\t \t Subqueue finished. Total_Length= %d\n", 
+                    thread_num, enactor_stats[0].iteration, Total_Length);
+                fflush(stdout);
+            }
+
             grid_size = Total_Length/256+1;
             if (grid_size > 512) grid_size = 512;
 
@@ -1348,7 +1356,12 @@ void Iteration_Loop(
                     for (peer__=0;peer__<num_gpus;peer__++)
                         data_slice->out_length[peer__]=0;
                 }
-                if (Enactor::DEBUG) {printf("%d\t %lld\t \t Fullqueue finished. Total_Length= %d\n", thread_num, enactor_stats[0].iteration, Total_Length);fflush(stdout);}
+                if (Enactor::DEBUG) 
+                {
+                    printf("%d\t %lld\t \t Fullqueue finished. Total_Length= %d\n", 
+                        thread_num, enactor_stats[0].iteration, Total_Length);
+                    fflush(stdout);
+                }
                 frontier_queue_ = &(data_slice->frontier_queues[Enactor::SIZE_CHECK?0:num_gpus]);
                 if (num_gpus==1) data_slice->out_length[0]=Total_Length;
             }
@@ -1375,7 +1388,11 @@ void Iteration_Loop(
                     &work_progress[0],
                     context[0],
                     streams[0]);
-            } else data_slice->out_length[0]= Total_Length;
+            } 
+            else 
+            {
+                data_slice->out_length[0]= Total_Length;
+            }
 
             for (peer_=0;peer_<num_gpus;peer_++)
                 frontier_attribute[peer_].queue_length = data_slice->out_length[peer_];
