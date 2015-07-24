@@ -59,7 +59,7 @@ int ReadMarketStream(
     Csr<VertexId, Value, SizeT> &csr_graph,
     bool undirected,
     bool reversed,
-    bool quiet=false) {
+    bool quiet = false) {
     typedef Coo<VertexId, Value> EdgeTupleType;
 
     SizeT edges_read = -1;
@@ -290,7 +290,7 @@ int BuildMarketGraph(
                 }
                 if (ReadMarketStream<LOAD_VALUES>(
                             f_in, output_file, csr_graph,
-                            undirected, reversed) != 0) {
+                            undirected, reversed, quiet) != 0) {
                     fclose(f_in);
                     return -1;
                 }
