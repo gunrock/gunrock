@@ -593,7 +593,7 @@ void RunTests(
     int                         *gpu_idx,
     cudaStream_t                *streams = NULL)
 {
-    string src_str="";
+    std::string src_str="";
     Test_Parameter *parameter = new Test_Parameter;
 
     parameter -> Init(args);

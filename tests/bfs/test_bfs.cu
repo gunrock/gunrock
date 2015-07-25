@@ -626,7 +626,7 @@ void RunTests(Test_Parameter *parameter)
                 printf("Label Validity: ");
             }
             int error_num = CompareResults(
-                                h_labels, reference_check_label, 
+                                h_labels, reference_check_label,
                                 graph->nodes, true, parameter->g_quiet);
             if (error_num > 0)
             {
@@ -645,7 +645,7 @@ void RunTests(Test_Parameter *parameter)
                     printf("Label Validity: ");
                 }
                 int error_num = CompareResults(
-                                    h_labels, reference_check_label, 
+                                    h_labels, reference_check_label,
                                     graph->nodes, true, parameter->g_quiet);
                 if (error_num > 0)
                 {
@@ -686,7 +686,7 @@ void RunTests(Test_Parameter *parameter)
             {
                 if (gpu != 0)
                 {
-                    printf(" #keys%d,0\t #keys%d,1\t #ins%d,0\t #ins%d,1", 
+                    printf(" #keys%d,0\t #keys%d,1\t #ins%d,0\t #ins%d,1",
                         gpu, gpu, gpu, gpu);
                 }
                 else
@@ -1137,7 +1137,7 @@ int main( int argc, char** argv)
         return 1;
     }
 
-    string src_str = "";
+    std::string src_str = "";
 
     parameter->Init(args);
     parameter->graph    = &csr;
@@ -1162,7 +1162,7 @@ int main( int argc, char** argv)
         parameter->src = csr.GetNodeWithHighestDegree(maximum_degree);
         if (!parameter->g_quiet)
         {
-            printf("Using highest degree (%d) vertex: %d\n", 
+            printf("Using highest degree (%d) vertex: %d\n",
                 maximum_degree, parameter->src);
         }
     }
@@ -1198,7 +1198,7 @@ int main( int argc, char** argv)
 
     if (args.CheckCmdLineFlag("json"))
     {
-        json_spirit::write_stream(json_spirit::mValue(parameter->info), 
+        json_spirit::write_stream(json_spirit::mValue(parameter->info),
                                   std::cout,
                                   json_spirit::pretty_print);
     }

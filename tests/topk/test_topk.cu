@@ -222,12 +222,12 @@ template <
   bool SIZE_CHECK>
 void RunTests(Test_Parameter *parameter)
           /*const Csr<VertexId, Value, SizeT> &graph,
-	      const Csr<VertexId, Value, SizeT> &graph_inv,
-	      CommandLineArgs                   &args,
- 	      int                               max_grid_size,
-	      int                               num_gpus,
-	      int                               top_nodes,
-	      CudaContext                       &context)*/
+              const Csr<VertexId, Value, SizeT> &graph_inv,
+              CommandLineArgs                   &args,
+              int                               max_grid_size,
+              int                               num_gpus,
+              int                               top_nodes,
+              CudaContext                       &context)*/
 {
 
   // define the problem data structure for graph primitive
@@ -279,15 +279,15 @@ void RunTests(Test_Parameter *parameter)
 
   // reset values in DataSlice for graph
   util::GRError(topk_problem->Reset(topk_enactor.GetFrontierType()),
-		"TOPK Problem Data Reset Failed", __FILE__, __LINE__);
+                "TOPK Problem Data Reset Failed", __FILE__, __LINE__);
 
   gpu_timer.Start();
   // launch topk enactor
   util::GRError(topk_enactor.template Enact<Problem>(*context,
-						   topk_problem,
-						   top_nodes,
-						   max_grid_size),
-		"TOPK Problem Enact Failed", __FILE__, __LINE__);
+                                                   topk_problem,
+                                                   top_nodes,
+                                                   max_grid_size),
+                "TOPK Problem Enact Failed", __FILE__, __LINE__);
   gpu_timer.Stop();
 
   float elapsed_gpu = gpu_timer.ElapsedMillis();
@@ -405,7 +405,7 @@ void RunTests(
     int                         *gpu_idx,
     cudaStream_t                *streams = NULL)
 {
-    string src_str="";
+    std::string src_str="";
     Test_Parameter *parameter = new Test_Parameter;
 
     parameter -> Init(args);

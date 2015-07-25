@@ -151,21 +151,21 @@ public:
     void*                 inv_graph    ;
 
     Test_Parameter()
-    {  
-        src       = 0; 
+    {
+        src       = 0;
         max_iter  = 5;
         inv_graph = NULL;
-    }   
+    }
 
     ~Test_Parameter()
-    {   
-    }   
+    {
+    }
 
     void Init(CommandLineArgs &args)
-    {   
+    {
         TestParameter_Base::Init(args);
         args.GetCmdLineArgument("max-iter", max_iter);
-    }   
+    }
 };
 
 /**
@@ -457,7 +457,7 @@ void RunTests(
     int                         *gpu_idx,
     cudaStream_t                *streams = NULL)
 {
-    string src_str="";
+    std::string src_str="";
     Test_Parameter *parameter = new Test_Parameter;
 
     parameter -> Init(args);
@@ -574,4 +574,3 @@ int main( int argc, char** argv)
     }
     return 0;
 }
-
