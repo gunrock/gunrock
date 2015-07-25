@@ -995,7 +995,8 @@ public:
      */
     void PrintParameters()
     {
-        using namespace std;
+        using std::cout;
+        using std::endl;
 
         cout << endl << "______________________________"       << endl;
         cout << "==> Test Parameters:  "                       << endl;
@@ -1246,7 +1247,7 @@ struct ProblemBase
         {
             if (num_gpus == 1 && gpu_idx == NULL)
             {
-                if (retval = util::GRError(cudaGetDevice(&(this->gpu_idx[0])), 
+                if (retval = util::GRError(cudaGetDevice(&(this->gpu_idx[0])),
                     "ProblemBase cudaGetDevice failed", __FILE__, __LINE__)) break;
             }
             else

@@ -16,8 +16,6 @@
 
 #include <omp.h>
 
-using namespace std;
-
 namespace gunrock {
 namespace util {
 
@@ -75,7 +73,7 @@ void omp_sort(
         }
 
         std::stable_sort(elements + start_pos, elements + end_pos, comp);
-        
+
         SizeT step = (end_pos - start_pos) / (num_threads * pivot_multi);
         for (int i=0; i< num_threads * pivot_multi; i++)
             table2[i*num_threads + thread_num] = elements[start_pos + int((i+0.1)*step)];
@@ -83,9 +81,9 @@ void omp_sort(
         #pragma omp barrier
         #pragma omp single
         {
-            stable_sort(table2, table2 + num_threads * num_threads * pivot_multi, comp);
+            std::stable_sort(table2, table2 + num_threads * num_threads * pivot_multi, comp);
             for (int i=0; i<num_threads-1; i++)
-                pivots[i] = table2[(i+1) * num_threads * pivot_multi]; 
+                pivots[i] = table2[(i+1) * num_threads * pivot_multi];
         }
 
         for (int i=0; i<num_threads-1; i++)
@@ -100,7 +98,7 @@ void omp_sort(
         for (int i=0; i<thread_num; i++)
         for (int t=0; t<num_threads; t++)
         {
-            SizeT end_p = (i == num_threads-1) ? (num_elements * (t+1) / num_threads) : (pivot_pos[t*num_threads + i]); 
+            SizeT end_p = (i == num_threads-1) ? (num_elements * (t+1) / num_threads) : (pivot_pos[t*num_threads + i]);
             SizeT start_p = i == 0 ? (num_elements * t / num_threads) : pivot_pos[t*num_threads+i-1];
             offset += end_p - start_p;
             //printf("thread %d: i=%d, t=%d, offset+=(%d - %d)\n", thread_num, i, t, end_p, start_p);
@@ -109,13 +107,13 @@ void omp_sort(
         {
             SizeT start_p = thread_num==0 ? num_elements * t / num_threads : pivot_pos[t * num_threads + thread_num -1];
             SizeT end_p = thread_num==num_threads-1 ? num_elements * (t+1) / num_threads : pivot_pos[t*num_threads + thread_num];
-            if (end_p > start_p) 
+            if (end_p > start_p)
             {
                 //printf("thread %d: moving elements[ %d ~] @ %p to table3[ %d ~] @ %p, size = %d\n",
                 //    thread_num, start_p, elements + start_p, offset + counter, table3 + offset + counter, end_p - start_p);
                 memcpy(table3 + offset + counter, elements + start_p, sizeof(T) * (end_p - start_p));
             }
-            counter += end_p - start_p; 
+            counter += end_p - start_p;
         }
         std::stable_sort(table3 + offset, table3 + offset + counter, comp);
         #pragma omp barrier
@@ -137,4 +135,3 @@ void omp_sort(
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-
