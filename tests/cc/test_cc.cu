@@ -70,9 +70,10 @@ bool CCCompare(
 /**
  * @brief Test_Parameter structure
  */
-struct Test_Parameter : gunrock::app::TestParameter_Base {
+struct Test_Parameter : gunrock::app::TestParameter_Base
+{
 public:
-     Test_Parameter() { }
+    Test_Parameter() { }
     ~Test_Parameter() { }
 
     void Init(CommandLineArgs &args)
@@ -87,10 +88,11 @@ public:
 void Usage()
 {
     printf(
-        "\ntest_cc <graph type> <graph type args> [--device=<device_index>] "
-        "[--instrumented] [--quick=<0|1>] [--v]\n"
-        "[--queue-sizing=<scale factor>] [--in-sizing=<in/out queue scale factor>] [--disable-size-check]\n"
-        "[--grid-sizing=<grid size>] [--partition_method=<random|biasrandom|clustered|metis] [--partition_seed=<seed>]\n"
+        "\n test_cc <graph type> <graph type args> [--device=<device_index>]\n"
+        " [--instrumented] [--quick] [--v] [--queue-sizing=<scale factor>]\n"
+        " [--in-sizing=<in/out queue scale factor>] [--disable-size-check]\n"
+        " [--partition_method=<random|biasrandom|clustered|metis]\n"
+        " [--grid-sizing=<grid size>] [--partition_seed=<seed>]\n"
         "\n"
         "Graph types and args:\n"
         "  market [<file>]\n"
@@ -100,7 +102,7 @@ void Usage()
         "  --instrumented If set then kernels keep track of queue-search_depth\n"
         "  and barrier duty (a relative indicator of load imbalance.)\n"
         "  --quick If set will skip the CPU validation code. Default: 0.\n"
-        );
+    );
 }
 
 /**
@@ -184,13 +186,14 @@ void DisplaySolution(
  *
  * \return Number of connected components in the graph
  */
-template<
+template <
     typename VertexId,
     typename Value,
-    typename SizeT>
+    typename SizeT >
 unsigned int RefCPUCC(
     const Csr<VertexId, Value, SizeT> &graph,
-    int *labels)
+    int *labels,
+    bool quiet = false)
 {
     using namespace boost;
     SizeT    *row_offsets    = graph.row_offsets;
@@ -201,7 +204,7 @@ unsigned int RefCPUCC(
     Graph G;
     for (int i = 0; i < num_nodes; ++i)
     {
-        for (int j = row_offsets[i]; j < row_offsets[i+1]; ++j)
+        for (int j = row_offsets[i]; j < row_offsets[i + 1]; ++j)
         {
             add_edge(i, column_indices[j], G);
         }
@@ -211,13 +214,14 @@ unsigned int RefCPUCC(
     int num_components = connected_components(G, &labels[0]);
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
-    printf("CPU CC finished in %lf msec.\n", elapsed);
+
+    if (!quiet) { printf("CPU CC finished in %lf msec.\n", elapsed); }
     return num_components;
 }
 
 template <
     typename VertexId,
-    typename SizeT>
+    typename SizeT >
 void ConvertIDs(
     VertexId *labels,
     SizeT    num_nodes,
@@ -225,12 +229,12 @@ void ConvertIDs(
 {
     VertexId *min_nodes = new VertexId[num_nodes];
 
-    for (int cc=0;cc<num_nodes;cc++)
-        min_nodes[cc]=num_nodes;
-    for (int node=0;node<num_nodes;node++)
-        if (min_nodes[labels[node]]>node) min_nodes[labels[node]]=node;
-    for (int node=0;node<num_nodes;node++)
-        labels[node]=min_nodes[labels[node]];
+    for (int cc = 0; cc < num_nodes; cc++)
+        min_nodes[cc] = num_nodes;
+    for (int node = 0; node < num_nodes; node++)
+        if (min_nodes[labels[node]] > node) min_nodes[labels[node]] = node;
+    for (int node = 0; node < num_nodes; node++)
+        labels[node] = min_nodes[labels[node]];
     delete[] min_nodes; min_nodes = NULL;
 }
 
@@ -252,23 +256,24 @@ template <
     typename SizeT,
     bool INSTRUMENT,
     bool DEBUG,
-    bool SIZE_CHECK>
+    bool SIZE_CHECK >
 void RunTests(Test_Parameter *parameter)
 {
-    typedef CCProblem<
-        VertexId,
-        SizeT,
-        Value,
-        false> CcProblem; //use double buffer for edgemap and vertexmap.
+    typedef CCProblem <
+    VertexId,
+    SizeT,
+    Value,
+    false > CcProblem;  // use double buffer for advance and filter
 
-    typedef CCEnactor<
-        CcProblem,
-        INSTRUMENT,
-        DEBUG,
-        SIZE_CHECK> CcEnactor;
+    typedef CCEnactor <
+    CcProblem,
+    INSTRUMENT,
+    DEBUG,
+    SIZE_CHECK > CcEnactor;
 
     Csr<VertexId, Value, SizeT>
-                 *graph                 = (Csr<VertexId, Value, SizeT>*)parameter->graph;
+    *graph                 = (Csr<VertexId, Value, SizeT>*)parameter->graph;
+    bool          quiet                 = parameter -> g_quiet;
     int           max_grid_size         = parameter -> max_grid_size;
     int           num_gpus              = parameter -> num_gpus;
     double        max_queue_sizing      = parameter -> max_queue_sizing;
@@ -287,7 +292,7 @@ void RunTests(Test_Parameter *parameter)
     size_t       *org_size              = new size_t  [num_gpus];
 
     // Allocate host-side label array (for both reference and gpu-computed results)
-    VertexId    *reference_component_ids= new VertexId[graph->nodes];
+    VertexId    *reference_component_ids = new VertexId[graph->nodes];
     VertexId    *h_component_ids        = new VertexId[graph->nodes];
     VertexId    *reference_check        = (g_quick) ? NULL : reference_component_ids;
     unsigned int ref_num_components     = 0;
@@ -301,7 +306,7 @@ void RunTests(Test_Parameter *parameter)
 
     //util::cpu_mt::PrintCPUArray("row_offsets", graph->row_offsets, graph->nodes+1);
     //util::cpu_mt::PrintCPUArray("colunm_indices", graph->column_indices, graph->edges);
-    for (int gpu=0; gpu<num_gpus; gpu++)
+    for (int gpu = 0; gpu < num_gpus; gpu++)
     {
         size_t dummy;
         cudaSetDevice(gpu_idx[gpu]);
@@ -313,29 +318,29 @@ void RunTests(Test_Parameter *parameter)
     // Allocate problem on GPU
     CcProblem* problem = new CcProblem;
     util::GRError(problem->Init(
-        g_stream_from_host,
-        graph,
-        NULL,
-        num_gpus,
-        gpu_idx,
-        partition_method,
-        streams,
-        max_queue_sizing,
-        max_in_sizing,
-        partition_factor,
-        partition_seed), "CC Problem Initialization Failed", __FILE__, __LINE__);
-    util::GRError(enactor->Init(context, problem, max_grid_size), "BC Enactor Init failed", __FILE__, __LINE__);
+                      g_stream_from_host,
+                      graph,
+                      NULL,
+                      num_gpus,
+                      gpu_idx,
+                      partition_method,
+                      streams,
+                      max_queue_sizing,
+                      max_in_sizing,
+                      partition_factor,
+                      partition_seed),
+                  "CC Problem Initialization Failed", __FILE__, __LINE__);
+    util::GRError(enactor->Init(context, problem, max_grid_size),
+                  "BC Enactor Init failed", __FILE__, __LINE__);
 
     //
     // Compute reference CPU CC
     //
     if (reference_check != NULL)
     {
-        printf("Computing reference value ...\n");
-        ref_num_components = RefCPUCC(
-            *graph,
-            reference_check);
-        printf("\n");
+        if (!quiet) { printf("Computing reference value ...\n"); }
+        ref_num_components = RefCPUCC(*graph, reference_check, quiet);
+        if (!quiet) { printf("\n"); }
     }
 
     // Perform CC
@@ -344,105 +349,148 @@ void RunTests(Test_Parameter *parameter)
 
     for (SizeT iter = 0; iter < iterations; ++iter)
     {
-        util::GRError(problem->Reset(enactor->GetFrontierType(), max_queue_sizing), "CC Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(enactor->Reset(), "CC Enactor Reset failed", __FILE__, __LINE__);
+        util::GRError(problem->Reset(
+                          enactor->GetFrontierType(), max_queue_sizing),
+                      "CC Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(enactor->Reset(),
+                      "CC Enactor Reset failed", __FILE__, __LINE__);
 
-        printf("_________________________\n");fflush(stdout);
+        if (!quiet) { printf("_________________________\n"); fflush(stdout); }
         cpu_timer.Start();
-        util::GRError(enactor->Enact(), "CC Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(enactor->Enact(),
+                      "CC Problem Enact Failed", __FILE__, __LINE__);
         cpu_timer.Stop();
-        printf("-------------------------\n");fflush(stdout);
+        if (!quiet) { printf("-------------------------\n"); fflush(stdout); }
         elapsed += cpu_timer.ElapsedMillis();
     }
     elapsed /= iterations;
 
     // Copy out results
-    util::GRError(problem->Extract(h_component_ids), "CC Problem Data Extraction Failed", __FILE__, __LINE__);
+    util::GRError(problem->Extract(h_component_ids),
+                  "CC Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // Validity
     if (reference_check != NULL)
     {
         if (ref_num_components == problem->num_components)
         {
-            printf("CORRECT. Component Count: %d\n", ref_num_components);
-        } else
-            printf("INCORRECT. Ref Component Count: %d, GPU Computed Component Count: %d\n", ref_num_components, problem->num_components);
-    } else {
-        printf("Component Count: %lld\n", (long long) problem->num_components);
+            if (!quiet)
+            {
+                printf("CORRECT. Component Count: %d\n", ref_num_components);
+            }
+        }
+        else
+        {
+            if (!quiet)
+            {
+                printf(
+                    "INCORRECT. Ref Component Count: %d, "
+                    "GPU Computed Component Count: %d\n",
+                    ref_num_components, problem->num_components);
+            }
+        }
+    }
+    else
+    {
+        if (!quiet)
+        {
+            printf("Component Count: %lld\n", (long long) problem->num_components);
+        }
     }
     if (reference_check != NULL)
     {
         ConvertIDs<VertexId, SizeT>(reference_check, graph->nodes, ref_num_components);
         ConvertIDs<VertexId, SizeT>(h_component_ids, graph->nodes, problem->num_components);
-        printf("Label Validity: ");
-        int error_num = CompareResults(h_component_ids, reference_check, graph->nodes, true);
-        if (error_num>0)
-            printf("%d errors occurred.\n", error_num);
-        else printf("\n");
+        if (!quiet)
+        {
+            printf("Label Validity: ");
+        }
+        int error_num = CompareResults(
+                            h_component_ids, reference_check, graph->nodes, true, quiet);
+        if (error_num > 0)
+        {
+            if (!quiet) { printf("%d errors occurred.\n", error_num); }
+        }
+        else
+        {
+            if (!quiet) { printf("\n"); }
+        }
     }
 
     //if (ref_num_components == csr_problem->num_components)
     {
         // Compute size and root of each component
-        VertexId        *h_roots            = new VertexId    [problem->num_components];
-        unsigned int    *h_histograms       = new unsigned int[problem->num_components];
+        VertexId     *h_roots      = new VertexId    [problem->num_components];
+        unsigned int *h_histograms = new unsigned int[problem->num_components];
 
         //printf("num_components = %d\n", problem->num_components);
         problem->ComputeCCHistogram(h_component_ids, h_roots, h_histograms);
         //printf("num_components = %d\n", problem->num_components);
 
-        // Display Solution
-        DisplaySolution(h_component_ids, graph->nodes, problem->num_components, h_roots, h_histograms);
+        if (!quiet)
+        {
+            // Display Solution
+            DisplaySolution(h_component_ids, graph->nodes,
+                            problem->num_components, h_roots, h_histograms);
+        }
 
-        if (h_roots     ) {delete[] h_roots     ; h_roots     =NULL;}
-        if (h_histograms) {delete[] h_histograms; h_histograms=NULL;}
+        if (h_roots     ) {delete[] h_roots     ; h_roots     = NULL;}
+        if (h_histograms) {delete[] h_histograms; h_histograms = NULL;}
     }
 
-    printf("GPU Connected Component finished in %lf msec.\n", elapsed);
     long long total_queued = 0;
-    for (int i=0; i<num_gpus * num_gpus; i++)
+    for (int i = 0; i < num_gpus * num_gpus; i++)
         total_queued += enactor->enactor_stats[i].total_queued[0];
-    printf("Total number of elements processed: %lld .\n", total_queued);
-    printf("Rate: %.3lf MEPS\n", total_queued / 1000.0 / elapsed);
 
-    printf("\n\tMemory Usage(B)\t");
-    for (int gpu=0;gpu<num_gpus;gpu++)
-    if (num_gpus>1)
+    if (!quiet)
     {
-        if (gpu!=0) printf(" #keys%d\t #ins%d,0\t #ins%d,1",gpu,gpu,gpu);
-        else printf(" $keys%d", gpu);
-    } else printf(" #keys%d", gpu);
-    if (num_gpus>1) printf(" #keys%d",num_gpus);
-    printf("\n");
+        printf("GPU Connected Component finished in %lf msec.\n", elapsed);
+        printf("Total number of elements processed: %lld .\n", total_queued);
+        printf("Rate: %.3lf MEPS\n", total_queued / 1000.0 / elapsed);
+    }
 
-    double max_key_sizing=0, max_in_sizing_=0;
-    for (int gpu=0;gpu<num_gpus;gpu++)
+    if (!quiet)
     {
-        size_t gpu_free,dummy;
-        cudaSetDevice(gpu_idx[gpu]);
-        cudaMemGetInfo(&gpu_free,&dummy);
-        printf("GPU_%d\t %ld",gpu_idx[gpu],org_size[gpu]-gpu_free);
-        for (int i=0;i<num_gpus;i++)
-        {
-            SizeT x=problem->data_slices[gpu]->frontier_queues[i].keys[0].GetSize();
-            printf("\t %d", x);
-            double factor = 1.0*x/(num_gpus>1?problem->graph_slices[gpu]->in_counter[i]:problem->graph_slices[gpu]->nodes);
-            if (factor > max_key_sizing) max_key_sizing=factor;
-            if (num_gpus>1 && i!=0 )
-            for (int t=0;t<2;t++)
+        printf("\n\tMemory Usage(B)\t");
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+            if (num_gpus > 1)
             {
-                x=problem->data_slices[gpu][0].keys_in[t][i].GetSize();
-                printf("\t %d", x);
-                factor = 1.0*x/problem->graph_slices[gpu]->in_counter[i];
-                if (factor > max_in_sizing_) max_in_sizing_=factor;
+                if (gpu != 0) printf(" #keys%d\t #ins%d,0\t #ins%d,1", gpu, gpu, gpu);
+                else printf(" $keys%d", gpu);
             }
+            else printf(" #keys%d", gpu);
+        if (num_gpus > 1) printf(" #keys%d", num_gpus);
+        printf("\n");
+
+        double max_key_sizing = 0, max_in_sizing_ = 0;
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            size_t gpu_free, dummy;
+            cudaSetDevice(gpu_idx[gpu]);
+            cudaMemGetInfo(&gpu_free, &dummy);
+            printf("GPU_%d\t %ld", gpu_idx[gpu], org_size[gpu] - gpu_free);
+            for (int i = 0; i < num_gpus; i++)
+            {
+                SizeT x = problem->data_slices[gpu]->frontier_queues[i].keys[0].GetSize();
+                printf("\t %d", x);
+                double factor = 1.0 * x / (num_gpus > 1 ? problem->graph_slices[gpu]->in_counter[i] : problem->graph_slices[gpu]->nodes);
+                if (factor > max_key_sizing) max_key_sizing = factor;
+                if (num_gpus > 1 && i != 0 )
+                    for (int t = 0; t < 2; t++)
+                    {
+                        x = problem->data_slices[gpu][0].keys_in[t][i].GetSize();
+                        printf("\t %d", x);
+                        factor = 1.0 * x / problem->graph_slices[gpu]->in_counter[i];
+                        if (factor > max_in_sizing_) max_in_sizing_ = factor;
+                    }
+            }
+            if (num_gpus > 1) printf("\t %d", problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
+            printf("\n");
         }
-        if (num_gpus>1) printf("\t %d",problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
+        printf("\t key_sizing =\t %lf", max_key_sizing);
+        if (num_gpus > 1) printf("\t in_sizing =\t %lf", max_in_sizing_);
         printf("\n");
     }
-    printf("\t key_sizing =\t %lf", max_key_sizing);
-    if (num_gpus>1) printf("\t in_sizing =\t %lf", max_in_sizing_);
-    printf("\n");
 
     // Cleanup
     if (org_size               ) {delete[] org_size               ; org_size                = NULL;}
@@ -468,13 +516,13 @@ template <
     typename      Value,
     typename      SizeT,
     bool          INSTRUMENT,
-    bool          DEBUG>
+    bool          DEBUG >
 void RunTests_size_check(Test_Parameter *parameter)
 {
     if (parameter->size_check) RunTests
         <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
         true > (parameter);
-   else RunTests
+    else RunTests
         <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
         false> (parameter);
 }
@@ -493,7 +541,7 @@ template <
     typename    VertexId,
     typename    Value,
     typename    SizeT,
-    bool        INSTRUMENT>
+    bool        INSTRUMENT >
 void RunTests_debug(Test_Parameter *parameter)
 {
     if (parameter->debug) RunTests_size_check
@@ -516,7 +564,7 @@ void RunTests_debug(Test_Parameter *parameter)
 template <
     typename      VertexId,
     typename      Value,
-    typename      SizeT>
+    typename      SizeT >
 void RunTests_instrumented(Test_Parameter *parameter)
 {
     if (parameter->instrumented) RunTests_debug
@@ -527,125 +575,106 @@ void RunTests_instrumented(Test_Parameter *parameter)
         false> (parameter);
 }
 
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] graph    Pointer to the CSR graph we process on
- * @param[in] args     Reference to the command line arguments
- * @param[in] num_gpus Number of GPUs to run algorithm
- * @param[in] context  CudaContext pointer for ModernGPU APIs
- * @param[in] gpu_idx  GPU(s) used to run algorithm
- * @param[in] streams  CUDA streams
- */
-template <
-    typename VertexId,
-    typename Value,
-    typename SizeT>
-void RunTests(
-    Csr<VertexId, Value, SizeT> *graph,
-    CommandLineArgs             &args,
-    int                          num_gpus,
-    ContextPtr                  *context,
-    int                         *gpu_idx,
-    cudaStream_t                *streams)
-{
-    Test_Parameter *parameter = new Test_Parameter;
-    parameter -> Init(args);
-    parameter -> graph        = graph;
-    parameter -> num_gpus     = num_gpus;
-    parameter -> context      = context;
-    parameter -> gpu_idx      = gpu_idx;
-    parameter -> streams      = streams;
-
-    RunTests_instrumented<VertexId, Value, SizeT>(parameter);
-}
-
-
 /******************************************************************************
  * Main
  ******************************************************************************/
 
-int main( int argc, char** argv)
+int main(int argc, char** argv)
 {
-	CommandLineArgs  args(argc, argv);
+    CommandLineArgs  args(argc, argv);
     int              num_gpus = 0;
     int             *gpu_idx  = NULL;
     ContextPtr      *context  = NULL;
     cudaStream_t    *streams  = NULL;
-    bool             g_undirected = false; //Does not make undirected graph
 
-	if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
-		Usage();
-		return 1;
-	}
+    if ((argc < 2) || (args.CheckCmdLineFlag("help")))
+    {
+        Usage();
+        return 1;
+    }
 
-    if (args.CheckCmdLineFlag  ("device"))
+    Test_Parameter *parameter = new Test_Parameter;
+    parameter -> Init(args);
+    parameter -> g_undirected = false;  // does not make undirected graph
+    // don't print anything unless specifically directed
+    parameter->g_quiet = args.CheckCmdLineFlag("quiet");
+
+    if (args.CheckCmdLineFlag("device"))
     {
         std::vector<int> gpus;
-        args.GetCmdLineArguments<int>("device",gpus);
+        args.GetCmdLineArguments<int>("device", gpus);
         num_gpus   = gpus.size();
         gpu_idx    = new int[num_gpus];
-        for (int i=0;i<num_gpus;i++)
+        for (int i = 0; i < num_gpus; i++)
             gpu_idx[i] = gpus[i];
-    } else {
+    }
+    else
+    {
         num_gpus   = 1;
         gpu_idx    = new int[num_gpus];
         gpu_idx[0] = 0;
     }
     streams  = new cudaStream_t[num_gpus * num_gpus * 2];
     context  = new ContextPtr  [num_gpus * num_gpus];
-    printf("Using %d gpus: ", num_gpus);
-    for (int gpu=0;gpu<num_gpus;gpu++)
+    if (!parameter->g_quiet)
     {
-        printf(" %d ", gpu_idx[gpu]);
+        printf("Using %d gpus: ", num_gpus);
+    }
+    for (int gpu = 0; gpu < num_gpus; gpu++)
+    {
+        if (!parameter->g_quiet) { printf(" %d ", gpu_idx[gpu]); }
         util::SetDevice(gpu_idx[gpu]);
-        for (int i=0;i<num_gpus*2;i++)
+        for (int i = 0; i < num_gpus * 2; i++)
         {
-            int _i = gpu*num_gpus*2+i;
-            util::GRError(cudaStreamCreate(&streams[_i]), "cudaStreamCreate failed.", __FILE__, __LINE__);
-            if (i<num_gpus) context[gpu*num_gpus+i] = mgpu::CreateCudaDeviceAttachStream(gpu_idx[gpu], streams[_i]);
+            int _i = gpu * num_gpus * 2 + i;
+            util::GRError(cudaStreamCreate(&streams[_i]),
+                          "cudaStreamCreate failed.", __FILE__, __LINE__);
+            if (i < num_gpus)
+            {
+                context[gpu * num_gpus + i] = mgpu::CreateCudaDeviceAttachStream(gpu_idx[gpu], streams[_i]);
+            }
         }
     }
-    printf("\n"); fflush(stdout);
+    if (!parameter->g_quiet) { printf("\n"); fflush(stdout); }
 
-	// Parse graph-contruction params
-	std::string graph_type = argv[1];
-	int flags = args.ParsedArgc();
-	int graph_args = argc - flags - 1;
+    // Parse graph-contruction params
+    std::string graph_type = argv[1];
+    int flags = args.ParsedArgc();
+    int graph_args = argc - flags - 1;
 
-	if (graph_args < 1) {
-		Usage();
-		return 1;
-	}
+    if (graph_args < 1)
+    {
+        Usage();
+        return 1;
+    }
 
-	//
-	// Construct graph and perform search(es)
-	//
-    typedef int VertexId;							// Use as the node identifier type
-    typedef int Value;								// Use as the value type
-    typedef int SizeT;								// Use as the graph size type
-    Csr<VertexId, Value, SizeT> csr(false);         // default value for stream_from_host is false
+    //
+    // Construct graph and perform search(es)
+    //
+    typedef int VertexId;                    // Use as the node identifier type
+    typedef int Value;                       // Use as the value type
+    typedef int SizeT;                       // Use as the graph size type
+    Csr<VertexId, Value, SizeT> csr(false);  // default value false
 
-	if (graph_type == "market") {
+    if (graph_type == "market")
+    {
 
         // Matrix-market coordinate-formatted graph file
-		if (graph_args < 1) { Usage(); return 1; }
-		char *market_filename = (graph_args == 2) ? argv[2] : NULL;
-		if (graphio::BuildMarketGraph<false>(
-			market_filename,
-			csr,
-			g_undirected,
-			false) != 0) // no inverse graph
-		{
-			return 1;
-		}
+        if (graph_args < 1) { Usage(); return 1; }
+        char *market_filename = (graph_args == 2) ? argv[2] : NULL;
+        if (graphio::BuildMarketGraph<false>(
+                    market_filename,
+                    csr,
+                    parameter->g_undirected,
+                    false,  // no inverse graph
+                    parameter->g_quiet) != 0)
+        {
+            return 1;
+        }
 
 
-	} else if (graph_type == "rmat")
+    }
+    else if (graph_type == "rmat")
     {
         // parse rmat parameters
         SizeT rmat_nodes = 1 << 10;
@@ -655,7 +684,7 @@ int main( int argc, char** argv)
         double rmat_a = 0.57;
         double rmat_b = 0.19;
         double rmat_c = 0.19;
-        double rmat_d = 1-(rmat_a+rmat_b+rmat_c);
+        double rmat_d = 1 - (rmat_a + rmat_b + rmat_c);
         int    rmat_seed = -1;
 
         args.GetCmdLineArgument("rmat_scale", rmat_scale);
@@ -667,31 +696,33 @@ int main( int argc, char** argv)
         args.GetCmdLineArgument("rmat_a", rmat_a);
         args.GetCmdLineArgument("rmat_b", rmat_b);
         args.GetCmdLineArgument("rmat_c", rmat_c);
-        rmat_d = 1-(rmat_a+rmat_b+rmat_c);
+        rmat_d = 1 - (rmat_a + rmat_b + rmat_c);
         args.GetCmdLineArgument("rmat_d", rmat_d);
         args.GetCmdLineArgument("rmat_seed", rmat_seed);
 
         CpuTimer cpu_timer;
         cpu_timer.Start();
         if (graphio::BuildRmatGraph<false>(
-                rmat_nodes,
-                rmat_edges,
-                csr,
-                g_undirected,
-                rmat_a,
-                rmat_b,
-                rmat_c,
-                rmat_d,
-                1,
-                1,
-                rmat_seed) != 0)
+                    rmat_nodes,
+                    rmat_edges,
+                    csr,
+                    parameter->g_undirected,
+                    rmat_a,
+                    rmat_b,
+                    rmat_c,
+                    rmat_d,
+                    1,
+                    1,
+                    rmat_seed) != 0)
         {
             return 1;
         }
         cpu_timer.Stop();
         float elapsed = cpu_timer.ElapsedMillis();
         printf("graph generated: %.3f ms, a = %.3f, b = %.3f, c = %.3f, d = %.3f\n", elapsed, rmat_a, rmat_b, rmat_c, rmat_d);
-    } else if (graph_type == "rgg") {
+    }
+    else if (graph_type == "rgg")
+    {
 
         SizeT rgg_nodes = 1 << 10;
         SizeT rgg_scale = 10;
@@ -712,30 +743,46 @@ int main( int argc, char** argv)
         CpuTimer cpu_timer;
         cpu_timer.Start();
         if (graphio::BuildRggGraph<false>(
-            rgg_nodes,
-            csr,
-            rgg_threshold,
-            g_undirected,
-            rgg_vmultipiler,
-            1,
-            rgg_seed) !=0)
+                    rgg_nodes,
+                    csr,
+                    rgg_threshold,
+                    parameter->g_undirected,
+                    rgg_vmultipiler,
+                    1,
+                    rgg_seed) != 0)
         {
             return 1;
         }
         cpu_timer.Stop();
         float elapsed = cpu_timer.ElapsedMillis();
         printf("graph generated: %.3f ms, threshold = %.3lf, vmultipiler = %.3lf\n", elapsed, rgg_threshold, rgg_vmultipiler);
-    } else {
+    }
+    else
+    {
         // Unknown graph type
         fprintf(stderr, "Unspecified graph type\n");
         return 1;
     }
 
     graphio::RemoveStandaloneNodes<VertexId, Value, SizeT>(&csr);
-    csr.PrintHistogram();
-    fflush(stdout);
 
-    // Run tests
-    RunTests(&csr, args, num_gpus, context, gpu_idx, streams);
+    if (!parameter->g_quiet)
+    {
+        csr.PrintHistogram();
+        fflush(stdout);
+    }
+
+    //
+    // Run test
+    //
+
+    parameter -> graph        = &csr;
+    parameter -> num_gpus     = num_gpus;
+    parameter -> context      = context;
+    parameter -> gpu_idx      = gpu_idx;
+    parameter -> streams      = streams;
+
+    RunTests_instrumented<VertexId, Value, SizeT>(parameter);
+
     return 0;
 }

@@ -839,7 +839,7 @@ struct DataSliceBase
 
         // Determine frontier queue sizes
         SizeT new_frontier_elements[2] = {0, 0};
-        if (num_gpus > 1) util::cpu_mt::PrintCPUArray<int, SizeT>("in_counter", graph_slice->in_counter.GetPointer(util::HOST), num_gpus + 1, gpu_idx);
+        // if (num_gpus > 1) util::cpu_mt::PrintCPUArray<int, SizeT>("in_counter", graph_slice->in_counter.GetPointer(util::HOST), num_gpus + 1, gpu_idx);
 
         for (int peer = 0; peer < (num_gpus > 1 ? num_gpus + 1 : 1); peer++)
             for (int i = 0; i < 2; i++)

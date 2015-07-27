@@ -82,6 +82,7 @@ enum SrcMode {
  * @brief arguments configuration used to specify arguments.
  */
 struct GRSetup {
+    bool               quiet;  // Whether to print out to stdout
     bool   mark_predecessors;  // Whether to mark predecessor or not
     bool  enable_idempotence;  // Whether or not to enable idempotent
     int        source_vertex;  // Source node define where to start

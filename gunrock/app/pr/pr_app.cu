@@ -31,19 +31,22 @@ using namespace gunrock::app::pr;
 /**
  * @brief Test_Parameter structure
  */
-struct Test_Parameter : gunrock::app::TestParameter_Base {
-  public:
+struct Test_Parameter : gunrock::app::TestParameter_Base
+{
+public:
     float    delta          ;  // Delta value for PageRank
     float    error          ;  // Error threshold PageRank
     int      max_iter       ;  // Maximum number of iteration
 
-    Test_Parameter() {
+    Test_Parameter()
+    {
         delta    = 0.85f;
         error    = 0.01f;
         max_iter =    50;
         src      =    -1;
     }
-    ~Test_Parameter() {
+    ~Test_Parameter()
+    {
     }
 };
 
@@ -74,7 +77,8 @@ template <
     typename      SizeT,
     bool          INSTRUMENT,
     bool          DEBUG >
-void sizeCheckPageRank(GRGraph *output, Test_Parameter *parameter) {
+void sizeCheckPageRank(GRGraph *output, Test_Parameter *parameter)
+{
     if (parameter->size_check)
         runPageRank<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
                     true > (output, parameter);
@@ -99,7 +103,8 @@ template <
     typename    Value,
     typename    SizeT,
     bool        INSTRUMENT >
-void debugPageRank(GRGraph *output, Test_Parameter *parameter) {
+void debugPageRank(GRGraph *output, Test_Parameter *parameter)
+{
     if (parameter->debug)
         sizeCheckPageRank<VertexId, Value, SizeT, INSTRUMENT,
                           true > (output, parameter);
@@ -122,7 +127,8 @@ template <
     typename VertexId,
     typename Value,
     typename SizeT >
-void runPageRank(GRGraph *output, Test_Parameter* parameter) {
+void runPageRank(GRGraph *output, Test_Parameter* parameter)
+{
     if (parameter->instrumented)
         debugPageRank<VertexId, Value, SizeT,  true>(output, parameter);
     else
@@ -149,7 +155,8 @@ template <
     bool INSTRUMENT,
     bool DEBUG,
     bool SIZE_CHECK >
-void runPageRank(GRGraph *output, Test_Parameter *parameter) {
+void runPageRank(GRGraph *output, Test_Parameter *parameter)
+{
     typedef PRProblem < VertexId,
             SizeT,
             Value > PrProblem;
@@ -161,6 +168,7 @@ void runPageRank(GRGraph *output, Test_Parameter *parameter) {
 
     Csr<VertexId, Value, SizeT>
     *graph              = (Csr<VertexId, Value, SizeT>*)parameter->graph;
+    bool          quiet              = parameter -> g_quiet;
     int           max_grid_size      = parameter -> max_grid_size;
     int           num_gpus           = parameter -> num_gpus;
     double        max_queue_sizing   = parameter -> max_queue_sizing;
@@ -182,7 +190,8 @@ void runPageRank(GRGraph *output, Test_Parameter *parameter) {
     Value        *h_rank             = new Value   [graph->nodes];
     VertexId     *h_node_id          = new VertexId[graph->nodes];
 
-    for (int gpu = 0; gpu < num_gpus; gpu++) {
+    for (int gpu = 0; gpu < num_gpus; gpu++)
+    {
         size_t dummy;
         cudaSetDevice(gpu_idx[gpu]);
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
@@ -204,7 +213,7 @@ void runPageRank(GRGraph *output, Test_Parameter *parameter) {
             max_in_sizing,
             partition_factor,
             partition_seed),
-        "Problem pr Initialization Failed", __FILE__, __LINE__);
+        "PR Initialization Failed", __FILE__, __LINE__);
     util::GRError(
         enactor->Init(context, problem, traversal_mode, max_grid_size),
         "PR Enactor Init failed", __FILE__, __LINE__);
@@ -215,34 +224,41 @@ void runPageRank(GRGraph *output, Test_Parameter *parameter) {
     util::GRError(
         problem->Reset(src, delta, error, max_iter,
                        enactor->GetFrontierType(), max_queue_sizing),
-        "pr Problem Data Reset Failed", __FILE__, __LINE__);
+        "PR Problem Data Reset Failed", __FILE__, __LINE__);
     util::GRError(
         enactor->Reset(), "PR Enactor Reset Reset failed", __FILE__, __LINE__);
 
-    printf("_________________________________________\n"); fflush(stdout);
+    if (!quiet)
+    {
+        printf("_________________________________________\n"); fflush(stdout);
+    }
     cpu_timer.Start();
     util::GRError(
         enactor->Enact(traversal_mode),
         "PR Problem Enact Failed", __FILE__, __LINE__);
     cpu_timer.Stop();
-    printf("-----------------------------------------\n"); fflush(stdout);
+    if (!quiet)
+    {
+        printf("-----------------------------------------\n"); fflush(stdout);
+    }
     float elapsed = cpu_timer.ElapsedMillis();
 
     // Copy out results
     util::GRError(
         problem->Extract(h_rank, h_node_id),
-        "PageRank Problem Data Extraction Failed", __FILE__, __LINE__);
+        "PR Problem Data Extraction Failed", __FILE__, __LINE__);
 
     float total_pr = 0;
-    for (int i = 0; i < graph->nodes; ++i) {
+    for (int i = 0; i < graph->nodes; ++i)
+    {
         total_pr += h_rank[i];
     }
-    printf(" Total rank : %lf\n", total_pr);
+    if (!quiet) { printf(" Total rank : %lf\n", total_pr); }
 
     output->node_value1 = (Value*)&h_rank[0];
     output->node_value2 = (VertexId*)&h_node_id[0];
 
-    printf(" GPU PageRank finished in %lf msec.\n", elapsed);
+    if (!quiet) { printf(" GPU PageRank finished in %lf msec.\n", elapsed); }
 
     // Clean up
     if (org_size) { delete org_size; org_size = NULL; }
@@ -266,10 +282,12 @@ void dispatchPageRank(
     const GRSetup  config,
     const GRTypes  data_t,
     ContextPtr*    context,
-    cudaStream_t*  streams) {
+    cudaStream_t*  streams)
+{
     Test_Parameter *parameter = new Test_Parameter;
     parameter->context      =  context;
     parameter->streams      =  streams;
+    parameter->g_quiet      = config.quiet;
     parameter->num_gpus     = config.num_devices;
     parameter->gpu_idx      = config.device_list;
     parameter->delta        = config.pagerank_delta;
@@ -277,20 +295,28 @@ void dispatchPageRank(
     parameter->max_iter     = config.max_iters;
     parameter->g_undirected = true;
 
-    switch (data_t.VTXID_TYPE) {
-    case VTXID_INT: {
-        switch (data_t.SIZET_TYPE) {
-        case SIZET_INT: {
-            switch (data_t.VALUE_TYPE) {
-            case VALUE_INT: {  // template type = <int, int, int>
+    switch (data_t.VTXID_TYPE)
+    {
+    case VTXID_INT:
+    {
+        switch (data_t.SIZET_TYPE)
+        {
+        case SIZET_INT:
+        {
+            switch (data_t.VALUE_TYPE)
+            {
+            case VALUE_INT:    // template type = <int, int, int>
+            {
                 printf("Not Yet Support This DataType Combination.\n");
                 break;
             }
-            case VALUE_UINT: {  // template type = <int, uint, int>
+            case VALUE_UINT:    // template type = <int, uint, int>
+            {
                 printf("Not Yet Support This DataType Combination.\n");
                 break;
             }
-            case VALUE_FLOAT: {  // template type = <int, float, int>
+            case VALUE_FLOAT:    // template type = <int, float, int>
+            {
                 // build input csr format graph
                 Csr<int, int, int> csr(false);
                 csr.nodes = graphi->num_nodes;
@@ -327,7 +353,8 @@ void gunrock_pagerank(
     GRGraph       *grapho,
     const GRGraph *graphi,
     const GRSetup  config,
-    const GRTypes  data_t) {
+    const GRTypes  data_t)
+{
     // GPU-related configurations
     int           num_gpus =    0;
     int           *gpu_idx = NULL;
@@ -336,29 +363,33 @@ void gunrock_pagerank(
 
     num_gpus = config.num_devices;
     gpu_idx  = new int [num_gpus];
-    for (int i = 0; i < num_gpus; ++i) {
+    for (int i = 0; i < num_gpus; ++i)
+    {
         gpu_idx[i] = config.device_list[i];
     }
 
     // Create streams and MordernGPU context for each GPU
     streams = new cudaStream_t[num_gpus * num_gpus * 2];
     context = new ContextPtr[num_gpus * num_gpus];
-    printf(" using %d GPUs:", num_gpus);
-    for (int gpu = 0; gpu < num_gpus; ++gpu) {
-        printf(" %d ", gpu_idx[gpu]);
+    if (!config.quiet) { printf(" using %d GPUs:", num_gpus); }
+    for (int gpu = 0; gpu < num_gpus; ++gpu)
+    {
+        if (!config.quiet) { printf(" %d ", gpu_idx[gpu]); }
         util::SetDevice(gpu_idx[gpu]);
-        for (int i = 0; i < num_gpus * 2; ++i) {
+        for (int i = 0; i < num_gpus * 2; ++i)
+        {
             int _i = gpu * num_gpus * 2 + i;
             util::GRError(cudaStreamCreate(&streams[_i]),
                           "cudaStreamCreate fialed.", __FILE__, __LINE__);
-            if (i < num_gpus) {
+            if (i < num_gpus)
+            {
                 context[gpu * num_gpus + i] =
                     mgpu::CreateCudaDeviceAttachStream(gpu_idx[gpu],
                                                        streams[_i]);
             }
         }
     }
-    printf("\n");
+    if (!config.quiet) { printf("\n"); }
 
     dispatchPageRank(grapho, graphi, config, data_t, context, streams);
 }
@@ -380,7 +411,8 @@ void pagerank(
     const int           num_nodes,
     const int           num_edges,
     const int*          row_offsets,
-    const int*          col_indices) {
+    const int*          col_indices)
+{
     struct GRTypes data_t;            // primitive-specific data types
     data_t.VTXID_TYPE = VTXID_INT;    // integer vertex identifier
     data_t.SIZET_TYPE = SIZET_INT;    // integer graph size type

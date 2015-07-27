@@ -1291,7 +1291,7 @@ static CUT_THREADPROC PRThread(
     EnactorStats *enactor_stats      = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
 
     do {
-        printf("CCThread entered\n");fflush(stdout);
+        // printf("PRThread entered\n");fflush(stdout);
         if (enactor_stats[0].retval = util::SetDevice(gpu_idx)) break;
         thread_data->stats = 1;
         while (thread_data->stats !=2) sleep(0);
@@ -1404,7 +1404,7 @@ static CUT_THREADPROC PRThread(
 
     } while(0);
 
-    printf("PR_Thread finished\n");fflush(stdout);
+    // printf("PR_Thread finished\n");fflush(stdout);
     thread_data->stats = 4;
     CUT_THREADEND;
 }

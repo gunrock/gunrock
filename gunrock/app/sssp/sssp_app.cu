@@ -31,19 +31,22 @@ using namespace gunrock::app::sssp;
 /**
  * @brief Test_Parameter structure
  */
-struct Test_Parameter : gunrock::app::TestParameter_Base {
-  public:
+struct Test_Parameter : gunrock::app::TestParameter_Base
+{
+public:
     bool   mark_predecessors;
     int    delta_factor;
     double max_queue_sizing1;
 
-    Test_Parameter() {
+    Test_Parameter()
+    {
         delta_factor      =    32;
         mark_predecessors = false;
         max_queue_sizing1 =  -1.0;
     }
 
-    ~Test_Parameter() {
+    ~Test_Parameter()
+    {
     }
 };
 
@@ -77,7 +80,8 @@ template <
     bool        INSTRUMENT,
     bool        DEBUG,
     bool        SIZE_CHECK >
-void markPredecessorsSSSP(GRGraph* output, Test_Parameter *parameter) {
+void markPredecessorsSSSP(GRGraph* output, Test_Parameter *parameter)
+{
     if (parameter->mark_predecessors)
         runSSSP<VertexId, Value, SizeT, INSTRUMENT,
                 DEBUG, SIZE_CHECK,  true>(output, parameter);
@@ -104,7 +108,8 @@ template <
     typename      SizeT,
     bool          INSTRUMENT,
     bool          DEBUG >
-void sizeCheckSSSP(GRGraph* output, Test_Parameter *parameter) {
+void sizeCheckSSSP(GRGraph* output, Test_Parameter *parameter)
+{
     if (parameter->size_check)
         markPredecessorsSSSP<VertexId, Value, SizeT, INSTRUMENT,
                              DEBUG,  true>(output, parameter);
@@ -129,7 +134,8 @@ template <
     typename    Value,
     typename    SizeT,
     bool        INSTRUMENT >
-void debugSSSP(GRGraph* output, Test_Parameter *parameter) {
+void debugSSSP(GRGraph* output, Test_Parameter *parameter)
+{
     if (parameter->debug)
         sizeCheckSSSP<VertexId, Value, SizeT, INSTRUMENT,
                       true>(output, parameter);
@@ -152,7 +158,8 @@ template <
     typename      VertexId,
     typename      Value,
     typename      SizeT >
-void instrumentedSSSP(GRGraph* output, Test_Parameter *parameter) {
+void instrumentedSSSP(GRGraph* output, Test_Parameter *parameter)
+{
     if (parameter->instrumented)
         debugSSSP<VertexId, Value, SizeT,  true>(output, parameter);
     else
@@ -181,7 +188,8 @@ template <
     bool DEBUG,
     bool SIZE_CHECK,
     bool MARK_PREDECESSORS >
-void runSSSP(GRGraph* output, Test_Parameter *parameter) {
+void runSSSP(GRGraph* output, Test_Parameter *parameter)
+{
     typedef SSSPProblem < VertexId,
             SizeT,
             Value,
@@ -194,6 +202,7 @@ void runSSSP(GRGraph* output, Test_Parameter *parameter) {
 
     Csr<VertexId, Value, SizeT>
     *graph = (Csr<VertexId, Value, SizeT>*)parameter->graph;
+    bool          quiet              = parameter -> g_quiet;
     VertexId      src                = (VertexId)parameter -> src;
     int           max_grid_size      = parameter -> max_grid_size;
     int           num_gpus           = parameter -> num_gpus;
@@ -213,7 +222,8 @@ void runSSSP(GRGraph* output, Test_Parameter *parameter) {
     Value    *h_labels = new Value[graph->nodes];
     VertexId *h_preds  = MARK_PREDECESSORS ? new VertexId[graph->nodes] : NULL;
 
-    for (int gpu = 0; gpu < num_gpus; gpu++) {
+    for (int gpu = 0; gpu < num_gpus; gpu++)
+    {
         size_t dummy;
         cudaSetDevice(gpu_idx[gpu]);
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
@@ -251,13 +261,13 @@ void runSSSP(GRGraph* output, Test_Parameter *parameter) {
     util::GRError(
         enactor->Reset(), "SSSP Enactor Reset failed", __FILE__, __LINE__);
 
-    printf("__________________________\n"); fflush(stdout);
+    if (!quiet) { printf("__________________________\n"); fflush(stdout); }
     cpu_timer.Start();
     util::GRError(
         enactor->Enact(src, traversal_mode),
         "SSSP Problem Enact Failed", __FILE__, __LINE__);
     cpu_timer.Stop();
-    printf("--------------------------\n"); fflush(stdout);
+    if (!quiet) { printf("--------------------------\n"); fflush(stdout); }
     float elapsed = cpu_timer.ElapsedMillis();
 
     // Copy out results
@@ -268,14 +278,15 @@ void runSSSP(GRGraph* output, Test_Parameter *parameter) {
     output->node_value1 = (Value*)&h_labels[0];
     if (MARK_PREDECESSORS) output->node_value2 = (VertexId*)&h_preds[0];
 
-    printf(" GPU Single-Source Shortest Path finished in %lf msec.\n", elapsed);
+    if (!quiet)
+    {
+        printf(" GPU Single-Source Shortest Path finished in %lf msec.\n", elapsed);
+    }
 
     // Clean up
     if (org_size) { delete[] org_size; org_size = NULL; }
     if (enactor ) { delete   enactor ; enactor  = NULL; }
     if (problem ) { delete   problem ; problem  = NULL; }
-    // if (h_labels) { delete[] h_labels; h_labels = NULL; }
-    // if (h_preds ) { delete[] h_preds ; h_preds  = NULL; }
 }
 
 /**
@@ -294,22 +305,30 @@ void dispatchSSSP(
     const GRSetup  config,
     const GRTypes  data_t,
     ContextPtr*    context,
-    cudaStream_t*  streams) {
+    cudaStream_t*  streams)
+{
     Test_Parameter *parameter = new Test_Parameter;
     parameter->context  = context;
     parameter->streams  = streams;
+    parameter->g_quiet  = config.quiet;
     parameter->num_gpus = config.num_devices;
     parameter->gpu_idx  = config.device_list;
     parameter->delta_factor = config.delta_factor;
     parameter->traversal_mode = config.traversal_mode;
     parameter->mark_predecessors  = config.mark_predecessors;
 
-    switch (data_t.VTXID_TYPE) {
-    case VTXID_INT: {
-        switch (data_t.SIZET_TYPE) {
-        case SIZET_INT: {
-            switch (data_t.VALUE_TYPE) {
-            case VALUE_INT: {  // template type = <int, int, int>
+    switch (data_t.VTXID_TYPE)
+    {
+    case VTXID_INT:
+    {
+        switch (data_t.SIZET_TYPE)
+        {
+        case SIZET_INT:
+        {
+            switch (data_t.VALUE_TYPE)
+            {
+            case VALUE_INT:    // template type = <int, int, int>
+            {
                 Csr<int, int, int> csr(false);
                 csr.nodes = graphi->num_nodes;
                 csr.edges = graphi->num_edges;
@@ -319,26 +338,35 @@ void dispatchSSSP(
                 parameter->graph = &csr;
 
                 // determine source vertex to start
-                switch (config.source_mode) {
-                case randomize: {
+                switch (config.source_mode)
+                {
+                case randomize:
+                {
                     parameter->src = graphio::RandomNode(csr.nodes);
                     break;
                 }
-                case largest_degree: {
+                case largest_degree:
+                {
                     int max_deg = 0;
                     parameter->src = csr.GetNodeWithHighestDegree(max_deg);
                     break;
                 }
-                case manually: {
+                case manually:
+                {
                     parameter->src = config.source_vertex;
                     break;
                 }
-                default: {
+                default:
+                {
                     parameter->src = 0;
                     break;
                 }
                 }
-                printf(" source: %lld\n", (long long) parameter->src);
+                if (!parameter->g_quiet)
+                {
+                    printf(" source: %lld\n", (long long) parameter->src);
+                }
+                
                 instrumentedSSSP<int, int, int>(grapho, parameter);
 
                 // reset for free memory
@@ -347,12 +375,14 @@ void dispatchSSSP(
                 csr.edge_values    = NULL;
                 break;
             }
-            case VALUE_UINT: {  // template type = <int, uint, int>
+            case VALUE_UINT:    // template type = <int, uint, int>
+            {
                 // not support yet
                 printf("Not Yet Support This DataType Combination.\n");
                 break;
             }
-            case VALUE_FLOAT: {
+            case VALUE_FLOAT:
+            {
                 // template type = <int, float, int>
                 // not support yet
                 printf("Not Yet Support This DataType Combination.\n");
@@ -379,7 +409,8 @@ void gunrock_sssp(
     GRGraph*       grapho,
     const GRGraph* graphi,
     const GRSetup  config,
-    const GRTypes  data_t) {
+    const GRTypes  data_t)
+{
     // GPU-related configurations
     int           num_gpus =    0;
     int           *gpu_idx = NULL;
@@ -388,29 +419,33 @@ void gunrock_sssp(
 
     num_gpus = config.num_devices;
     gpu_idx  = new int [num_gpus];
-    for (int i = 0; i < num_gpus; ++i) {
+    for (int i = 0; i < num_gpus; ++i)
+    {
         gpu_idx[i] = config.device_list[i];
     }
 
     // Create streams and MordernGPU context for each GPU
     streams = new cudaStream_t[num_gpus * num_gpus * 2];
     context = new ContextPtr[num_gpus * num_gpus];
-    printf(" using %d GPUs:", num_gpus);
-    for (int gpu = 0; gpu < num_gpus; ++gpu) {
-        printf(" %d ", gpu_idx[gpu]);
+    if (!config.quiet) { printf(" using %d GPUs:", num_gpus); }
+    for (int gpu = 0; gpu < num_gpus; ++gpu)
+    {
+        if (!config.quiet) { printf(" %d ", gpu_idx[gpu]); }
         util::SetDevice(gpu_idx[gpu]);
-        for (int i = 0; i < num_gpus * 2; ++i) {
+        for (int i = 0; i < num_gpus * 2; ++i)
+        {
             int _i = gpu * num_gpus * 2 + i;
             util::GRError(cudaStreamCreate(&streams[_i]),
                           "cudaStreamCreate fialed.", __FILE__, __LINE__);
-            if (i < num_gpus) {
+            if (i < num_gpus)
+            {
                 context[gpu * num_gpus + i] =
                     mgpu::CreateCudaDeviceAttachStream(gpu_idx[gpu],
                                                        streams[_i]);
             }
         }
     }
-    printf("\n");
+    if (!config.quiet) { printf("\n"); }
 
     dispatchSSSP(grapho, graphi, config, data_t, context, streams);
 }
@@ -432,7 +467,8 @@ void sssp(
     const int*          row_offsets,
     const int*          col_indices,
     const unsigned int* edge_values,
-    const int           source) {
+    const int           source)
+{
     struct GRTypes data_t;          // primitive-specific data types
     data_t.VTXID_TYPE = VTXID_INT;  // integer vertex identifier
     data_t.SIZET_TYPE = SIZET_INT;  // integer graph size type

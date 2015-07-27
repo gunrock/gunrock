@@ -442,6 +442,7 @@ void RunTest(
   struct GRSetup config;          // gunrock configurations
   config.num_devices = num_gpus;  // number of devices
   config.device_list = gpu_idx;   // device used for run
+  config.quiet       = true;      // don't print out anything
 
   struct GRGraph *grapho = (GRGraph*)malloc(sizeof(GRGraph));
   struct GRGraph *graphi = (GRGraph*)malloc(sizeof(GRGraph));

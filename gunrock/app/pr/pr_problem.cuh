@@ -164,7 +164,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             temp_keys_out = new util::Array1D<SizeT, VertexId>[num_gpus];
             if (num_gpus > 1)
             {
-                printf("Allocating keys_out[0] %d\n", local_nodes);fflush(stdout);
+                // printf("Allocating keys_out[0] %d\n", local_nodes);fflush(stdout);
                 if (retval = this->keys_out[0].Allocate(local_nodes, util::DEVICE)) return retval;
                 this->keys_outs[0] = this->keys_out[0].GetPointer(util::DEVICE);
                 for (int peer_ = 0; peer_ < num_gpus; peer_++)
