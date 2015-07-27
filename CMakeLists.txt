@@ -251,8 +251,9 @@ add_test(NAME TEST_TOPK COMMAND degree_centrality market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
 set_tests_properties(TEST_TOPK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
+# bips98_606.mtx is not fully-connected graph so use largest small graph instead
 add_test(NAME TEST_MST COMMAND minimum_spanning_tree market
-  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx)
+  ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx)
 set_tests_properties(TEST_MST PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
 ### shared library application interface tests
