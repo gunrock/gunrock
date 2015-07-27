@@ -433,52 +433,49 @@ void RunTest(
   int*                         gpu_idx,
   cudaStream_t*                streams = NULL)
 {
-  /*
-  // test graph connectivity because MST
-  // only supports fully-connected graph
+  // test graph connectivity because MST only supports fully-connected graph
+  struct GRTypes data_t;          // data type structure
+  data_t.VTXID_TYPE = VTXID_INT;  // vertex identifier
+  data_t.SIZET_TYPE = SIZET_INT;  // graph size type
+  data_t.VALUE_TYPE = VALUE_INT;  // attributes type
 
-  Test_Parameter *cc_parameters = new Test_Parameter;
-  cc_parameters -> Init(args);
-  cc_parameters -> g_quick  = true;
-  cc_parameters -> graph    = graph;
-  cc_parameters -> num_gpus = num_gpus;
-  cc_parameters -> context  = context;
-  cc_parameters -> gpu_idx  = gpu_idx;
-  cc_parameters -> streams  = streams;
+  struct GRSetup config;          // gunrock configurations
+  config.num_devices = num_gpus;  // number of devices
+  config.device_list = gpu_idx;   // device used for run
 
-  cc_parameters->PrintParameters();
+  struct GRGraph *grapho = (GRGraph*)malloc(sizeof(GRGraph));
+  struct GRGraph *graphi = (GRGraph*)malloc(sizeof(GRGraph));
 
-  // temporary storage for connected component algorithm
-  GRGraph *temp_storage = (GRGraph*)malloc(sizeof(GRGraph));
+  graphi->num_nodes   = graph->nodes;
+  graphi->num_edges   = graph->edges;
+  graphi->row_offsets = (void*)&graph->row_offsets[0];
+  graphi->col_indices = (void*)&graph->column_indices[0];
 
-  // perform connected component
-  runCC < VertexId, Value, SizeT,
-    false,  // INSTRUMENT
-    false,  // DEBUG
-    true >  // SIZE_CHECK
-    (temp_storage, cc_parameters);
+  gunrock_cc(grapho, graphi, config, data_t);
 
   // run test only if the graph is fully-connected
-  int* numcomponent = (int*)temp_storage->aggregation;
-  if (*numcomponent != 1)
+  int* num_cc = (int*)grapho->aggregation;
+  if (*num_cc == 1)  // perform minimum spanning tree test
+  {
+    MST_Test_Parameter *parameter = new MST_Test_Parameter;
+
+    parameter -> Init(args);
+    parameter -> graph    = graph;
+    parameter -> num_gpus = num_gpus;
+    parameter -> context  = context;
+    parameter -> gpu_idx  = gpu_idx;
+    parameter -> streams  = streams;
+
+    RunTests_debug<VertexId, Value, SizeT>(parameter);
+  }
+  else  // more than one connected components in the graph
   {
     fprintf(stderr, "Unsupported non-fully connected graph input.\n");
     exit(1);
   }
 
-  if (temp_storage) free(temp_storage);
-  */
-  // perform minimum spanning tree test
-  MST_Test_Parameter *parameter = new MST_Test_Parameter;
-
-  parameter -> Init(args);
-  parameter -> graph    = graph;
-  parameter -> num_gpus = num_gpus;
-  parameter -> context  = context;
-  parameter -> gpu_idx  = gpu_idx;
-  parameter -> streams  = streams;
-
-  RunTests_debug<VertexId, Value, SizeT>(parameter);
+  if (graphi) free(graphi);
+  if (grapho) free(grapho);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
