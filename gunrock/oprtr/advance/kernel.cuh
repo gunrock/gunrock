@@ -387,7 +387,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
 //            cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length, sizeof(SizeT), cudaMemcpyDeviceToHost);
 //            SizeT output_queue_len = temp[0];
 //
-            //if (frontier_attribute.output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD)
+            if (!get_output_length || (get_output_length && frontier_attribute.output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD))
             {
                 gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(
@@ -416,40 +416,17 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         d_value_to_reduce,
                         d_reduce_frontier);
            }
-            /*else
+            else if (/*get_output_length &&*/ frontier_attribute.output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
             {
                 unsigned int split_val = (frontier_attribute.output_length[0] + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
-                util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.d_node_locks.GetPointer(util::DEVICE), KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
+                util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.node_locks.GetPointer(util::DEVICE), KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
                 SortedSearch<MgpuBoundsLower>(
-                enactor_stats.d_node_locks.GetPointer(util::DEVICE),
+                enactor_stats.node_locks.GetPointer(util::DEVICE),
                 KernelPolicy::LOAD_BALANCED::BLOCKS,
                 partitioned_scanned_edges,
                 frontier_attribute.queue_length,
-                enactor_stats.d_node_locks_out.GetPointer(util::DEVICE),
-                context);*/
-/*=======
-            }
-            else
-            {
-                unsigned int split_val = (output_queue_len + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
-                int num_block = KernelPolicy::LOAD_BALANCED::BLOCKS;
-                int nb = (num_block + 1 + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
-                gunrock::oprtr::edge_map_partitioned::MarkPartitionSizes<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
-                    <<<nb, KernelPolicy::LOAD_BALANCED::THREADS>>>(
-                            enactor_stats.d_node_locks,
-                            split_val,
-                            num_block+1,
-                            output_queue_len);
-                //util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.d_node_locks, KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
->>>>>>> master-dev
-
-                SortedSearch<MgpuBoundsLower>(
-                        enactor_stats.d_node_locks,
-                        KernelPolicy::LOAD_BALANCED::BLOCKS,
-                        &partitioned_scanned_edges[1],
-                        frontier_attribute.queue_length,
-                        enactor_stats.d_node_locks_out,
-                        context);
+                enactor_stats.node_locks_out.GetPointer(util::DEVICE),
+                context);
 
                 gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges2<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
@@ -457,24 +434,26 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         frontier_attribute.queue_index,
                                         enactor_stats.iteration,
                                         d_row_offsets,
+                                        d_column_offsets,
                                         d_column_indices,
                                         d_row_indices,
-                                        &partitioned_scanned_edges[1],
-                                        enactor_stats.d_node_locks_out,
+                                        partitioned_scanned_edges,
+                                        enactor_stats.node_locks_out.GetPointer(util::DEVICE),
                                         KernelPolicy::LOAD_BALANCED::BLOCKS,
                                         //d_done,
                                         d_in_key_queue,
                                         d_out_key_queue,
                                         data_slice,
                                         frontier_attribute.queue_length,
-                                        frontier_attribute.output_length,
+                                        frontier_attribute.output_length.GetPointer(util::DEVICE),
                                         split_val,
                                         max_in,
                                         max_out,
                                         work_progress,
                                         enactor_stats.advance_kernel_stats,
                                         ADVANCE_TYPE,
-                                        inverse_graph,
+                                        input_inverse_graph,
+                                        output_inverse_graph,
                                         R_TYPE,
                                         R_OP,
                                         d_value_to_reduce,
@@ -482,7 +461,6 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
 
                 //util::DisplayDeviceResults(d_out_key_queue, output_queue_len);
             }
-*/
             // TODO: switch REDUCE_OP for different reduce operators
             // Do segreduction using d_scanned_edges and d_reduce_frontier
             /*if (R_TYPE != gunrock::oprtr::advance::EMPTY && d_value_to_reduce && d_reduce_frontier) {
