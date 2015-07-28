@@ -457,10 +457,9 @@ template <
     bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS,
     bool        ENABLE_IDEMPOTENCE >
-void RunTests(gunrock::app::InfoBase *info, Test_Parameter *parameter)
+void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
 {
-    info->json();
-
+    // info->json();
     typedef BFSProblem < VertexId,
             SizeT,
             Value,
@@ -491,25 +490,21 @@ void RunTests(gunrock::app::InfoBase *info, Test_Parameter *parameter)
     int traversal_mode           = info->info["traversal_mode"].get_int();
     int iterations               = info->info["iterations"].get_int();
 
-//    int* gpu_idx = info->info["gpu_idx"].get_array();
-//    for (int i = 0; i < num_gpus; ++i) std::cout << gpu_idx[i] << std::endl;
+    json_spirit::mArray device_list = info->info["device_list"].get_array();
+    int* gpu_idx = new int[num_gpus];
+    for (int i = 0; i < num_gpus; i++)
+    {
+        gpu_idx[i] = device_list[i].get_int();
+    }
 
-//    VertexId      src                   = (VertexId)parameter -> src;
-//    int           max_grid_size         = parameter -> max_grid_size;
-//    int           num_gpus              = parameter -> num_gpus;
-//    double        max_queue_sizing      = parameter -> max_queue_sizing;
-//    double        max_queue_sizing1     = parameter -> max_queue_sizing1;
-//    double        max_in_sizing         = parameter -> max_in_sizing;
+    for (int i = 0; i < num_gpus; ++i)
+    {
+        std::cout << std::endl << gpu_idx[i] << std::endl;
+    }
+
     ContextPtr   *context               = (ContextPtr*)parameter -> context;  // TODO: remove after merge mgpu-cq
-//    std::string   partition_method      = parameter -> partition_method;
-    int          *gpu_idx               = parameter -> gpu_idx;
     cudaStream_t *streams               = parameter -> streams;  // TODO: remove after merge mgpu-cq
-//    float         partition_factor      = parameter -> partition_factor;
-//    int           partition_seed        = parameter -> partition_seed;
-//    bool          g_quick               = parameter -> g_quick;
-//    bool          g_stream_from_host    = parameter -> g_stream_from_host;
-//    int           traversal_mode        = parameter -> traversal_mode;
-//    SizeT         iterations            = parameter -> iterations;
+
     size_t       *org_size              = new size_t  [num_gpus];
 
     // Allocate host-side label array (for both reference and GPU results)
@@ -792,7 +787,7 @@ template <
     bool        DEBUG,
     bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS >
-void RunTests_enable_idempotence(gunrock::app::InfoBase *info, Test_Parameter *parameter)
+void RunTests_enable_idempotence(gunrock::app::Info *info, Test_Parameter *parameter)
 {
     if (parameter->enable_idempotence) RunTests
         <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
@@ -821,7 +816,7 @@ template <
     bool        INSTRUMENT,
     bool        DEBUG,
     bool        SIZE_CHECK >
-void RunTests_mark_predecessors(gunrock::app::InfoBase *info, Test_Parameter *parameter)
+void RunTests_mark_predecessors(gunrock::app::Info *info, Test_Parameter *parameter)
 {
     if (parameter->mark_predecessors) RunTests_enable_idempotence
         <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
@@ -848,7 +843,7 @@ template <
     typename      SizeT,
     bool          INSTRUMENT,
     bool          DEBUG >
-void RunTests_size_check(gunrock::app::InfoBase *info, Test_Parameter *parameter)
+void RunTests_size_check(gunrock::app::Info *info, Test_Parameter *parameter)
 {
     if (parameter->size_check) RunTests_mark_predecessors
         <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
@@ -873,7 +868,7 @@ template <
     typename    Value,
     typename    SizeT,
     bool        INSTRUMENT >
-void RunTests_debug(gunrock::app::InfoBase *info, Test_Parameter *parameter)
+void RunTests_debug(gunrock::app::Info *info, Test_Parameter *parameter)
 {
     if (parameter->debug) RunTests_size_check
         <VertexId, Value, SizeT, INSTRUMENT,
@@ -896,7 +891,7 @@ template <
     typename      VertexId,
     typename      Value,
     typename      SizeT >
-void RunTests_instrumented(gunrock::app::InfoBase *info, Test_Parameter *parameter)
+void RunTests_instrumented(gunrock::app::Info *info, Test_Parameter *parameter)
 {
     if (parameter->instrumented) RunTests_debug
         <VertexId, Value, SizeT,
@@ -926,15 +921,14 @@ int main( int argc, char** argv)
     }
 
     Test_Parameter *parameter = new Test_Parameter;
-    gunrock::app::InfoBase *info = new gunrock::app::InfoBase;
-    info->json();
-    info->Init(args);
-    printf("\n\n\n");
+    gunrock::app::Info *info = new gunrock::app::Info;
 
-    parameter->Init(args);
+    info->Init(args);
+
+    parameter->Init(args);  // TODO: remove this after finish Info class.
 
     // don't print anything unless specifically directed
-    parameter->g_quiet = args.CheckCmdLineFlag("quiet");
+    parameter->g_quiet = args.CheckCmdLineFlag("quiet");  // TODO: remove this after finish Info class.
 
     if (args.CheckCmdLineFlag  ("device"))
     {
@@ -997,6 +991,7 @@ int main( int argc, char** argv)
         return 1;
     }
 
+     // TODO: remove this after finish Info class.
     parameter->info["engine"] = "Gunrock";
     parameter->info["command_line"] = json_spirit::mValue(args.GetEntireCommandLine());
 
@@ -1154,6 +1149,7 @@ int main( int argc, char** argv)
         return 1;
     }
 
+     // TODO: remove this after finish Info class.
     std::string src_str = "";
     parameter->graph    = &csr;
     parameter->num_gpus = num_gpus;
@@ -1200,6 +1196,7 @@ int main( int argc, char** argv)
     // printf("Display neighbor list of src:\n");
     // graph.DisplayNeighborList(src);
 
+     // TODO: remove this after finish Info class.
     parameter->info["mark_predecessors"] = parameter -> mark_predecessors;
     parameter->info["verbose"] = parameter -> debug;
     parameter->info["instrumented"] = parameter -> instrumented;
@@ -1210,44 +1207,6 @@ int main( int argc, char** argv)
     parameter->info["max_queue_sizing"] = parameter -> max_queue_sizing;
 
     RunTests_instrumented<VertexId, Value, SizeT>(info, parameter);
-
-    if (args.CheckCmdLineFlag("json"))
-    {
-        json_spirit::write_stream(json_spirit::mValue(parameter->info),
-                                  std::cout,
-                                  json_spirit::pretty_print);
-    }
-
-    if (args.CheckCmdLineFlag("jsonfile"))
-    {
-        std::string ofname;
-        args.GetCmdLineArgument("jsonfile", ofname);
-        std::ofstream of(ofname.data());
-        json_spirit::write_stream(json_spirit::mValue(parameter->info), of,
-                                  json_spirit::pretty_print);
-    }
-
-    if (args.CheckCmdLineFlag("jsondir"))
-    {
-        std::string dir;
-        args.GetCmdLineArgument("jsondir", dir);
-
-        std::string filename =
-            dir + "/" + parameter->info["name"].get_str() + "_" +
-            ((file_stem != "") ? (file_stem + "_") : "") +
-            parameter->info["time"].get_str() + ".json";
-        // now filter out bad chars (the list in badchars)
-        char badchars[] = ":\n";
-        for (unsigned int i = 0; i < strlen(badchars); ++i)
-        {
-            filename.erase(
-                std::remove(filename.begin(), filename.end(), badchars[i]),
-                filename.end());
-        }
-        std::ofstream of(filename.data());
-        json_spirit::write_stream(json_spirit::mValue(parameter->info), of,
-                                  json_spirit::pretty_print);
-    }
 
     return 0;
 }

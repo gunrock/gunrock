@@ -1072,7 +1072,7 @@ public:
  * @brief Info data structure contains test parameter and running statistics.
  * All test parameters and running statistics stored in json_spirit::mObject.
  */
-struct InfoBase
+struct Info
 {
  private:
     int         num_invoke; // Number of times invoke primitive test
@@ -1098,9 +1098,9 @@ struct InfoBase
 
 
     /**
-     * @brief InfoBase default constructor
+     * @brief Info default constructor
      */
-    InfoBase()
+    Info()
     {
         // Assign default values
         info["quiet_mode"]         = false;
@@ -1124,7 +1124,10 @@ struct InfoBase
         info["idempotent"] = false;  // BFS
         info["mark_preds"] = false;  // BFS
         info["queue_sizing1"] = 1.0f;  // BFS
-    }  // end InfoBase()
+        info["json"] = false;
+        info["jsonfile"] = false;
+        info["jsondir"] = false;
+    }  // end Info()
 
     /**
      * @brief Initialization process for Info
@@ -1139,10 +1142,13 @@ struct InfoBase
         info["quiet_mode"] =  args.CheckCmdLineFlag("quiet");
         info["quick_mode"] =  args.CheckCmdLineFlag("quick");
         info["undirected"] =  args.CheckCmdLineFlag("undirected");
-        info["par_method"] =  args.CheckCmdLineFlag("partition-method");
 
         info["idempotent"] =  args.CheckCmdLineFlag("idempotence");  // BFS
         info["mark_preds"] =  args.CheckCmdLineFlag("mark-pred");    // BFS
+
+        info["json"]     = args.CheckCmdLineFlag("json");
+        info["jsonfile"] = args.CheckCmdLineFlag("jsonfile");
+        info["jsondir"]  = args.CheckCmdLineFlag("jsondir");
 
         args.GetCmdLineArgument("src", srcvertex);
         args.GetCmdLineArgument("queue-sizing", q_sizing);
@@ -1154,32 +1160,13 @@ struct InfoBase
         args.GetCmdLineArgument("max_iter", iterations);
         args.GetCmdLineArgument("queue-sizing1", q_sizing1);  // BFS
 
-        if (info["par_method"].get_bool()) 
+        if (args.CheckCmdLineFlag("partition_method")) 
         {
-            args.GetCmdLineArgument("partition-method", par_method);
+            args.GetCmdLineArgument("partition_method", par_method);
         }
 
         // parse device count and device list
-        if (args.CheckCmdLineFlag("device"))
-        {
-            std::vector<int> gpus;
-            args.GetCmdLineArguments<int>("device", gpus);
-            num_device = gpus.size();
-            device_idx = new int[num_device];
-            for (int i = 0; i < num_device; i++)
-            {
-                device_idx[i] = gpus[i];
-            }
-        }
-        else
-        {
-            num_device = 1;
-            device_idx = new int[num_device];
-            device_idx[0] = 0;
-        }
-
-        info["device_list"] = getDeviceList();
-//        info["GPUs"] = json_spirit::Array();
+        info["device_list"] = getDeviceList(args);
 
         args.GetCmdLineArgument("jsonfile", ofname);
         args.GetCmdLineArgument("jsondir", dir);
@@ -1210,19 +1197,44 @@ struct InfoBase
         info["traversal_mode"] = traversal;
         info["num_gpus"] = num_device;
         info["vertex_id"] = srcvertex;
-        info["partition_method"] = par_method;
         info["partition_factor"] = par_factor;
         info["partition_seed"] = par_seed;
 
         // running statistics
+
+
+        // output JSON if user specified
+        if (args.CheckCmdLineFlag("json"))
+        {
+            json();
+        }
+        if (args.CheckCmdLineFlag("jsonfile"))
+        {
+            jsonFile();   
+        }
+        if (args.CheckCmdLineFlag("jsondir"))
+        {
+            jsonDir();
+        }
     }
     
-    json_spirit::mObject getDeviceList() const
+    json_spirit::mArray getDeviceList(util::CommandLineArgs &args)
     {
-        json_spirit::mObject devices;
-        for (size_t i = 0; i < num_device; ++i)
+        json_spirit::mArray devices;
+        if (args.CheckCmdLineFlag("device"))
         {
-            devices["device"] = device_idx[i];
+            std::vector<int> gpus;
+            args.GetCmdLineArguments<int>("device", gpus);
+            num_device = gpus.size();
+            for (int i = 0; i < num_device; i++)
+            {
+                devices.push_back(gpus[i]);
+            }
+        }
+        else
+        {
+            num_device = 1;
+            devices.push_back(0);
         }
         return devices;
     }
