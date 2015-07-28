@@ -21,8 +21,10 @@
 #include <gunrock/util/test_utils.h>
 #include <gunrock/util/error_utils.cuh>
 
-namespace gunrock {
-namespace util {
+namespace gunrock
+{
+namespace util
+{
 
 /******************************************************************************
  * Templated routines for printing keys/values to the console
@@ -334,7 +336,8 @@ inline bool EnoughDeviceMemory(unsigned int mem_needed)
 {
     size_t free_mem, total_mem;
     if (util::GRError(cudaMemGetInfo(&free_mem, &total_mem),
-                      "cudaMemGetInfo failed", __FILE__, __LINE__)) return false;
+                      "cudaMemGetInfo failed", __FILE__, __LINE__))
+        return false;
     return (mem_needed <= free_mem);
 }
 
@@ -360,9 +363,9 @@ __device__ __host__ __forceinline__ int MaxValue<int>()
  */
 
 /**
- * @brief Compares the equivalence of two arrays. If incorrect, print the location
- * of the first incorrect value appears, the incorrect value, and the reference
- * value.
+ * @brief Compares the equivalence of two arrays. If incorrect, print the
+ * location of the first incorrect value appears, the incorrect value, and
+ * the reference value.
  *
  * @tparam T datatype of the values being compared with.
  * @tparam SizeT datatype of the array length.
@@ -371,16 +374,17 @@ __device__ __host__ __forceinline__ int MaxValue<int>()
  * @param[in] reference Vector of reference values.
  * @param[in] len Vector length.
  * @param[in] verbose Whether to print values around the incorrect one.
- * @param[in] quiet Don't print out anything unless specified. 
+ * @param[in] quiet Don't print out anything unless specified.
  *
- * \return Zero if two vectors are exactly the same, non-zero if there is any difference.
+ * \return Zero if two vectors are exactly the same, non-zero if there is any
+ * difference.
  *
  */
 template <typename T, typename SizeT>
 int CompareResults(
-    T* computed, 
-    T* reference, 
-    SizeT len, 
+    T* computed,
+    T* reference,
+    SizeT len,
     bool verbose = true,
     bool quiet = false)
 {
@@ -445,7 +449,7 @@ int CompareResults(
  * @param[in] reference Vector of reference values
  * @param[in] len Vector length
  * @param[in] verbose Whether to print values around the incorrect one.
- * @param[in] quiet Don't print out anything unless specified. 
+ * @param[in] quiet Don't print out anything unless specified.
  *
  * \return Zero if difference between each element of the two vectors are less
  * than a certain threshold, non-zero if any difference is equal to or larger
@@ -454,9 +458,9 @@ int CompareResults(
  */
 template <typename SizeT>
 int CompareResults(
-    float* computed, 
-    float* reference, 
-    SizeT len, 
+    float* computed,
+    float* reference,
+    SizeT len,
     bool verbose = true,
     bool quiet = false)
 {
@@ -528,5 +532,11 @@ int CompareResults(
 
 /** @} */
 
-}// namespace util
-}// namespace gunrock
+}  // namespace util
+}  // namespace gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

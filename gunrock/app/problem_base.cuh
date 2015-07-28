@@ -14,6 +14,14 @@
 
 #pragma once
 
+#include <vector>
+#include <string>
+
+#include <boost/filesystem.hpp>
+#include <gunrock/util/sysinfo.h>
+#include <gunrock/util/gitsha1.h>
+#include <gunrock/util/json_spirit_writer_template.h>
+
 #include <gunrock/util/basic_utils.h>
 #include <gunrock/util/cuda_properties.cuh>
 #include <gunrock/util/memset_kernel.cuh>
@@ -24,16 +32,18 @@
 #include <gunrock/util/io/modified_store.cuh>
 #include <gunrock/util/array_utils.cuh>
 #include <gunrock/util/test_utils.cuh>
+
 #include <gunrock/app/rp/rp_partitioner.cuh>
 #include <gunrock/app/cp/cp_partitioner.cuh>
 #include <gunrock/app/brp/brp_partitioner.cuh>
 #include <gunrock/app/metisp/metis_partitioner.cuh>
-#include <gunrock/util/json_spirit_writer_template.h>
 #include <gunrock/app/sp/sp_partitioner.cuh>
-#include <vector>
-#include <string>
 
 #include <moderngpu.cuh>
+
+// this is the "stringize macro macro" hack
+#define STR(x) #x
+#define XSTR(x) STR(x)
 
 namespace gunrock {
 namespace app {
@@ -1059,6 +1069,201 @@ public:
 };
 
 /**
+ * @brief Info data structure contains test parameter and running statistics.
+ * All test parameters and running statistics stored in json_spirit::mObject.
+ */
+struct InfoBase
+{
+ private:
+    int         num_invoke; // Number of times invoke primitive test
+    int         num_device; // Number of GPUs for multi-GPU enactor to use
+    int         iterations; // Maximum number of super-steps allowed
+    int*        device_idx; // Array of GPU indices
+    int          grid_size; // Maximum grid size (0 leave it up to the enactor)
+    int          traversal; // Load-balanced or Dynamic cooperative
+    double        q_sizing; // Maximum size scaling factor for work queues
+    double       q_sizing1; // Value of max_queue_sizing1
+    double        i_sizing; // Maximum size scaling factor for communication
+    int64_t      srcvertex; // Source vertex ID
+    std::string  file_stem; // Market filename path stem
+    std::string     ofname; // Used for jsonfile command
+    std::string        dir; // Used for jsondir command
+    std::string par_method; // Partition method
+    float       par_factor; // Partition factor
+    int           par_seed; // Partition seed
+
+ public:
+    // Storing test parameters and running stats
+    json_spirit::mObject info;
+
+
+    /**
+     * @brief InfoBase default constructor
+     */
+    InfoBase()
+    {
+        // Assign default values
+        info["quiet_mode"]         = false;
+        info["quick_mode"]         = false;
+        info["stream_from_host"]   = false;
+        info["undirected"]         = false;
+        info["instrument"]         = false;
+        info["debug_mode"]         = false;
+        info["size_check"]         = true;
+        info["vertex_id"]          = -1;
+        info["max_grid_size"]      = 0;
+        info["num_gpus"]           = 1;
+//        info["gpu_idx"]            = vector(0);
+        info["max_in_sizing"]      = 1.0f;
+        info["queue_sizing"]       = 1.0f;
+        info["partition_method"]   = "random";
+        info["partition_factor"]   = -1;
+        info["partition_seed"]     = -1;
+        info["iterations"]         = 1;
+        info["traversal_mode"]     = -1;
+        info["idempotent"] = false;  // BFS
+        info["mark_preds"] = false;  // BFS
+        info["queue_sizing1"] = 1.0f;  // BFS
+    }  // end InfoBase()
+
+    /**
+     * @brief Initialization process for Info
+     * @param[in] args Command line arguments
+     */
+    void Init(util::CommandLineArgs &args)
+    {
+        // Get configuration parameters from command line arguments
+        info["instrument"] =  args.CheckCmdLineFlag("instrumented");
+        info["size_check"] = !args.CheckCmdLineFlag("disable-size-check");
+        info["debug_mode"] =  args.CheckCmdLineFlag("v");
+        info["quiet_mode"] =  args.CheckCmdLineFlag("quiet");
+        info["quick_mode"] =  args.CheckCmdLineFlag("quick");
+        info["undirected"] =  args.CheckCmdLineFlag("undirected");
+        info["par_method"] =  args.CheckCmdLineFlag("partition-method");
+
+        info["idempotent"] =  args.CheckCmdLineFlag("idempotence");  // BFS
+        info["mark_preds"] =  args.CheckCmdLineFlag("mark-pred");    // BFS
+
+        args.GetCmdLineArgument("src", srcvertex);
+        args.GetCmdLineArgument("queue-sizing", q_sizing);
+        args.GetCmdLineArgument("in-sizing", i_sizing);
+        args.GetCmdLineArgument("grid-size", grid_size);
+        args.GetCmdLineArgument("partition-factor", par_factor);
+        args.GetCmdLineArgument("partition-seed", par_seed);
+        args.GetCmdLineArgument("iteration-num", num_invoke);
+        args.GetCmdLineArgument("max_iter", iterations);
+        args.GetCmdLineArgument("queue-sizing1", q_sizing1);  // BFS
+
+        if (info["par_method"].get_bool()) 
+        {
+            args.GetCmdLineArgument("partition-method", par_method);
+        }
+
+        // parse device count and device list
+        if (args.CheckCmdLineFlag("device"))
+        {
+            std::vector<int> gpus;
+            args.GetCmdLineArguments<int>("device", gpus);
+            num_device = gpus.size();
+            device_idx = new int[num_device];
+            for (int i = 0; i < num_device; i++)
+            {
+                device_idx[i] = gpus[i];
+            }
+        }
+        else
+        {
+            num_device = 1;
+            device_idx = new int[num_device];
+            device_idx[0] = 0;
+        }
+
+        info["device_list"] = getDeviceList();
+//        info["GPUs"] = json_spirit::Array();
+
+        args.GetCmdLineArgument("jsonfile", ofname);
+        args.GetCmdLineArgument("jsondir", dir);
+
+        //
+        // Put everything into the json_spirit::mObject info
+        //
+
+        // system information
+        info["engine"] = "Gunrock";
+        info["command_line"] = json_spirit::mValue(args.GetEntireCommandLine());
+        char *market_filename = args.GetCmdLineArgvDataset();
+        boost::filesystem::path market_filename_path(market_filename);
+        file_stem = market_filename_path.stem().string();
+        info["dataset"] = file_stem;
+        gunrock::util::Sysinfo sysinfo;  // get machine / OS / user / time info
+        info["sysinfo"] = sysinfo.getSysinfo();
+        gunrock::util::Gpuinfo gpuinfo;
+        info["gpuinfo"] = gpuinfo.getGpuinfo();
+        gunrock::util::Userinfo userinfo;
+        info["userinfo"] = userinfo.getUserinfo();
+        time_t now = time(NULL); info["time"] = ctime(&now);
+        info["gunrock_version"] = XSTR(GUNROCKVERSION);
+        info["git_commit_sha1"] = g_GIT_SHA1;
+
+        // parsed testing parameters
+        info["max_grid_size"] = grid_size;
+        info["traversal_mode"] = traversal;
+        info["num_gpus"] = num_device;
+        info["vertex_id"] = srcvertex;
+        info["partition_method"] = par_method;
+        info["partition_factor"] = par_factor;
+        info["partition_seed"] = par_seed;
+
+        // running statistics
+    }
+    
+    json_spirit::mObject getDeviceList() const
+    {
+        json_spirit::mObject devices;
+        for (size_t i = 0; i < num_device; ++i)
+        {
+            devices["device"] = device_idx[i];
+        }
+        return devices;
+    }
+
+    void json()
+    {
+        json_spirit::write_stream(
+            json_spirit::mValue(info), std::cout,
+            json_spirit::pretty_print);
+    }
+
+    void jsonFile()
+    {
+        std::ofstream of(ofname.data());
+        json_spirit::write_stream(
+            json_spirit::mValue(info), of,
+            json_spirit::pretty_print);
+    }
+
+    void jsonDir()
+    {
+        std::string filename =
+            dir + "/" + info["name"].get_str() + "_" +
+            ((file_stem != "") ? (file_stem + "_") : "") +
+            info["time"].get_str() + ".json";
+        // now filter out bad chars (the list in badchars)
+        char badchars[] = ":\n";
+        for (unsigned int i = 0; i < strlen(badchars); ++i)
+        {
+            filename.erase(
+                std::remove(filename.begin(), filename.end(), badchars[i]),
+                filename.end());
+        }
+        std::ofstream of(filename.data());
+        json_spirit::write_stream(
+            json_spirit::mValue(info), of,
+            json_spirit::pretty_print);
+    }
+};
+
+/**
  * @brief Base problem structure.
  *
  * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
@@ -1264,22 +1469,35 @@ struct ProblemBase
 
                 // printf("partition_method = %s\n", partition_method.c_str());
 
-                if (partition_method == "random")
-                    partitioner = new rp::RandomPartitioner   <VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
+                if (partition_method == "random") 
+                {
+                    partitioner = new rp::RandomPartitioner<VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                     (*graph, num_gpus);
+                }
                 else if (partition_method == "metis")
+                {
                     partitioner = new metisp::MetisPartitioner<VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                     (*graph, num_gpus);
+                }
                 else if (partition_method == "static")
+                {
                     partitioner = new sp::StaticPartitioner<VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                     (*graph, num_gpus);
+                }
                 else if (partition_method == "cluster")
-                    partitioner = new cp::ClusterPartitioner  <VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
+                {
+                   partitioner = new cp::ClusterPartitioner<VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                     (*graph, num_gpus);
+                }
                 else if (partition_method == "biasrandom")
-                    partitioner = new brp::BiasRandomPartitioner <VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
+                {
+                    partitioner = new brp::BiasRandomPartitioner<VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                     (*graph, num_gpus);
-                else util::GRError("partition_method invalid", __FILE__, __LINE__);
+                }
+                else 
+                {
+                    util::GRError("partition_method invalid", __FILE__, __LINE__);
+                }
                 cpu_timer.Start();
                 retval = partitioner->Partition(
                              sub_graphs,
@@ -1339,7 +1557,8 @@ struct ProblemBase
                 graph_slices[gpu] = new GraphSlice<SizeT, VertexId, Value>(this->gpu_idx[gpu]);
                 if (num_gpus > 1)
                 {
-                    if (_ENABLE_BACKWARD)
+                    if (_ENABLE_BACKWARD) 
+                    {
                         retval = graph_slices[gpu]->Init(
                                      stream_from_host,
                                      num_gpus,
@@ -1354,7 +1573,9 @@ struct ProblemBase
                                      backward_offsets    [gpu],
                                      backward_partitions [gpu],
                                      backward_convertions[gpu]);
+                    }
                     else
+                    {
                         retval = graph_slices[gpu]->Init(
                                      stream_from_host,
                                      num_gpus,
@@ -1369,8 +1590,11 @@ struct ProblemBase
                                      NULL,
                                      NULL,
                                      NULL);
+                    }
                 }
-                else retval = graph_slices[gpu]->Init(
+                else 
+                {
+                    retval = graph_slices[gpu]->Init(
                                       stream_from_host,
                                       num_gpus,
                                       &(sub_graphs[gpu]),
@@ -1384,6 +1608,7 @@ struct ProblemBase
                                       NULL,
                                       NULL,
                                       NULL);
+                }
                 if (retval) break;
             }  // end for (gpu)
 
