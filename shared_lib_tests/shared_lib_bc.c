@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
     data_t.SIZET_TYPE = SIZET_INT;         // graph size type
     data_t.VALUE_TYPE = VALUE_FLOAT;       // attributes type
 
-    struct GRSetup config;                 // gunrock configurations
+    struct GRSetup config = InitSetup();   // gunrock configurations
     int list[] = {0};                      // device to run algorithm
     config.num_devices = sizeof(list) / sizeof(list[0]);  // number of devices
     config.device_list = list;             // device list to run algorithm
