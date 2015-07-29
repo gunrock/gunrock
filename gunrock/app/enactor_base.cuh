@@ -108,7 +108,7 @@ struct EnactorStats
 template<typename VertexId, typename Value, typename SizeT>
 struct Info
 {
- private:
+private:
     int         num_invoke; // Number of times invoke primitive test
     int         iterations; // Maximum number of super-steps allowed
     int*        device_idx; // Array of GPU indices
@@ -126,18 +126,19 @@ struct Info
     int           par_seed; // Partition seed
     int           num_gpus; // Number of GPUs used
 
- public:
+public:
     json_spirit::mObject info;  // test parameters and running statistics
     Csr<VertexId, Value, SizeT> *graph;  // pointer to CSR input graph
     void         *context;  // pointer to context array used by MordernGPU
     cudaStream_t *streams;  // pointer to array of GPU streams
-    
+
     /**
      * @brief Info default constructor
      */
     Info()
     {
         // Assign default values
+        info["name"]               = "";
         info["quiet_mode"]         = false;
         info["quick_mode"]         = false;
         info["stream_from_host"]   = false;
@@ -190,7 +191,7 @@ struct Info
 
         // determine which source to start search
         if (args.CheckCmdLineFlag("src"))
-        { 
+        {
             std::string source_type;
             args.GetCmdLineArgument("src", source_type);
             if (source_type.empty())
@@ -235,9 +236,10 @@ struct Info
         args.GetCmdLineArgument("max_iter", iterations);
         args.GetCmdLineArgument("queue-sizing1", q_sizing1);  // BFS
 
-        if (args.CheckCmdLineFlag("partition_method")) 
+        if (args.CheckCmdLineFlag("partition_method"))
         {
             args.GetCmdLineArgument("partition_method", par_method);
+            info["partition_method"] = par_method;
         }
 
         // parse device count and device list
@@ -258,7 +260,7 @@ struct Info
             num_gpus = 1;
             temp_devices.push_back(0);
         }
-        
+
         cudaStream_t*     streams_ = new cudaStream_t[num_gpus * num_gpus * 2];
         mgpu::ContextPtr* context_ = new mgpu::ContextPtr[num_gpus * num_gpus];
 
@@ -310,6 +312,10 @@ struct Info
         info["partition_factor"] = par_factor;
         info["partition_seed"] = par_seed;
         info["graph_type"] = args.GetCmdLineArgvGraphType();
+        info["queue_sizing"] = q_sizing;
+        info["queue_sizing1"] = q_sizing1;
+        info["iteration_num"] = num_invoke;
+        info["max_iteration"] = iterations;
 
         // running statistics
 
@@ -320,14 +326,14 @@ struct Info
         }
         if (args.CheckCmdLineFlag("jsonfile"))
         {
-            JsonFile();   
+            JsonFile();
         }
         if (args.CheckCmdLineFlag("jsondir"))
         {
             JsonDir();
         }
     }
-    
+
     /**
      * @brief Utility function to parse device list.
      *
@@ -346,9 +352,9 @@ struct Info
             if (!args.CheckCmdLineFlag("quiet"))
             {
                 printf("Using %d GPU(s): [", num_gpus);
-                for (int i = 0; i < num_gpus; ++i) 
-                { 
-                    printf(" %d", devices[i]); 
+                for (int i = 0; i < num_gpus; ++i)
+                {
+                    printf(" %d", devices[i]);
                 }
                 printf(" ].\n");
             }
@@ -378,6 +384,7 @@ struct Info
         json_spirit::write_stream(
             json_spirit::mValue(info), std::cout,
             json_spirit::pretty_print);
+        printf("\n");
     }
 
     /*
@@ -425,11 +432,11 @@ struct Info
         util::CommandLineArgs &args, Csr<VertexId, Value, SizeT> &csr)
     {
         std::string graph_type = args.GetCmdLineArgvGraphType();
-        if (graph_type == "market") 
+        if (graph_type == "market")
         {
-            if (!args.CheckCmdLineFlag("quiet")) 
+            if (!args.CheckCmdLineFlag("quiet"))
             {
-                printf("Loading Market-Matrix graph ...\n"); 
+                printf("Loading Market-Matrix graph ...\n");
             }
             // Matrix-market coordinate-formatted graph file
             char *market_filename = args.GetCmdLineArgvDataset();
@@ -446,14 +453,14 @@ struct Info
                         csr,
                         args.CheckCmdLineFlag("undirected"),
                         false,  // no inverse graph
-                        args.CheckCmdLineFlag("quiet")) != 0)   
+                        args.CheckCmdLineFlag("quiet")) != 0)
             {
                 return 1;
             }
         }
         else if (graph_type == "rmat")
         {
-            if (!args.CheckCmdLineFlag("quiet")) 
+            if (!args.CheckCmdLineFlag("quiet"))
             {
                 printf("Generating R-MAT graph ...\n");
             }
@@ -521,7 +528,7 @@ struct Info
         }
         else if (graph_type == "rgg")
         {
-            if (!args.CheckCmdLineFlag("quiet")) 
+            if (!args.CheckCmdLineFlag("quiet"))
             {
                 printf("Generating RGG (Random Geometry Graph) ...\n");
             }
@@ -586,11 +593,11 @@ struct Info
         return 0;
     }
 
-    void computeCommonStats(
-                EnactorStats *enactor_stats,
-                float elapsed,
-                const VertexId *h_labels,
-                bool get_traversal_stats = false)
+    void ComputeCommonStats(
+        EnactorStats *enactor_stats,
+        float elapsed,
+        const VertexId *h_labels,
+        bool get_traversal_stats = false)
     {
         double total_lifetimes = 0;
         double total_runtimes = 0;
@@ -604,10 +611,11 @@ struct Info
         double redundant_work = 0.0f;
 
         json_spirit::mArray device_list = info["device_list"].get_array();
+
         for (int gpu = 0; gpu < num_gpus; ++gpu)
         {
             int my_gpu_idx = device_list[gpu].get_int();
-            if (num_gpus != 1) 
+            if (num_gpus != 1)
             {
                 if (util::SetDevice(my_gpu_idx)) return;
             }
@@ -615,22 +623,22 @@ struct Info
 
             for (int peer = 0; peer < num_gpus; ++peer)
             {
-                EnactorStats *enactor_stats = 0;
-                enactor_stats = enactor_stats + gpu * num_gpus + peer;
+                EnactorStats *estats = enactor_stats + gpu * num_gpus + peer;
                 if (get_traversal_stats)
                 {
-                    enactor_stats->total_queued.Move(util::DEVICE, util::HOST);
-                    total_queued += enactor_stats->total_queued[0];
-                    if (enactor_stats->iteration > search_depth) 
+                    estats->total_queued.Move(util::DEVICE, util::HOST);
+                    total_queued += estats->total_queued[0];
+                    if (estats->iteration > search_depth)
                     {
-                        search_depth = enactor_stats->iteration;
+                        search_depth = estats->iteration;
                     }
                 }
-                total_lifetimes += enactor_stats->total_lifetimes;
-                total_runtimes += enactor_stats->total_runtimes;
+                total_lifetimes += estats->total_lifetimes;
+                total_runtimes  += estats->total_runtimes;
             }
         }
-        double avg_duty = (total_lifetimes > 0) ? 
+
+        double avg_duty = (total_lifetimes > 0) ?
             double(total_runtimes) / total_lifetimes * 100.0 : 0.0;
 
         info["elapsed"] = elapsed;
@@ -642,7 +650,7 @@ struct Info
             info["search_depth"] = search_depth;
         }
 
-        //TODO: compute traversal stats.
+        // TODO: compute traversal stats.
         if (get_traversal_stats)
         {
             for (VertexId i = 0; i < graph->nodes; ++i)
@@ -650,7 +658,8 @@ struct Info
                 if (h_labels[i] < util::MaxValue<VertexId>() && h_labels[i] != -1)
                 {
                     ++nodes_visited;
-                    edges_visited += graph->row_offsets[i+1]-graph->row_offsets[i];
+                    edges_visited +=
+                        graph->row_offsets[i + 1] - graph->row_offsets[i];
                 }
                 if (info["name"].get_str().compare("GPU BC") == 0)
                 {
@@ -661,7 +670,8 @@ struct Info
             if (total_queued > 0)
             {
                 // measure duplicate edges put through queue
-                redundant_work = ((double)total_queued - edges_visited) / edges_visited;
+                redundant_work =
+                    ((double)total_queued - edges_visited) / edges_visited;
             }
             redundant_work *= 100;
 
@@ -675,19 +685,19 @@ struct Info
         }
     }
 
-    void computeTraversalStats(
-                    EnactorStats *enactor_stats,
-                    float elapsed,
-                    const VertexId *h_labels)
+    void ComputeTraversalStats(
+        EnactorStats *enactor_stats,
+        float elapsed,
+        const VertexId *h_labels)
     {
-        computeCommonStats(
-                    enactor_stats,
-                    elapsed,
-                    h_labels,
-                    true);
+        ComputeCommonStats(
+            enactor_stats,
+            elapsed,
+            h_labels,
+            true);
     }
 
-    void displayStats( bool quiet = false)
+    void DisplayStats(bool verbose = true)
     {
         int64_t nodes_visited = info["nodes_visited"].get_int();
         int64_t edges_visited = info["edges_visited"].get_int();
@@ -697,21 +707,22 @@ struct Info
         double avg_duty = info["avg_duty"].get_real();
         int64_t total_queued = info["total_queued"].get_int();
         double redundant_work = info["redundant_work"].get_real();
-        if (!quiet)
-        {
-            printf("[%s] finished. ", info["name"].get_str().c_str());
+        
+        printf("\n[%s] finished. ", info["name"].get_str().c_str());
 
+        if (verbose)
+        {
             if (nodes_visited < 5)
             {
                 printf("Fewer than 5 vertices visited.\n");
             }
             else
             {
-                printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed,
-                                   m_teps);
+                printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s",
+                       elapsed, m_teps);
                 if (search_depth != 0)
                 {
-                    printf(", search_depth: %lld", search_depth);      
+                    printf(", search_depth: %lld", search_depth);
                 }
                 if (avg_duty > 0.01)
                 {
@@ -719,7 +730,7 @@ struct Info
                 }
 
                 printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
-                        source, nodes_visited, edges_visited);
+                       source, nodes_visited, edges_visited);
 
                 if (total_queued > 0)
                 {
@@ -732,7 +743,7 @@ struct Info
                 }
             }
             printf("\n");
-        } 
+        }
 
     }
 };
@@ -1549,10 +1560,10 @@ void Iteration_Loop(
     int           peer, peer_, peer__, gpu_, i, iteration_, wait_count;
     bool          over_sized;
 
-    if (Enactor::DEBUG) 
+    if (Enactor::DEBUG)
     {
         printf("Iteration entered\n");fflush(stdout);
-    } 
+    }
     while (!Iteration::Stop_Condition(s_enactor_stats, s_frontier_attribute, s_data_slice, num_gpus))
     {
         Total_Length             = 0;
@@ -1855,9 +1866,9 @@ void Iteration_Loop(
                 }
             }
 
-            if (Enactor::DEBUG) 
+            if (Enactor::DEBUG)
             {
-                printf("%d\t %lld\t \t Subqueue finished. Total_Length= %d\n", 
+                printf("%d\t %lld\t \t Subqueue finished. Total_Length= %d\n",
                     thread_num, enactor_stats[0].iteration, Total_Length);
                 fflush(stdout);
             }
@@ -1994,9 +2005,9 @@ void Iteration_Loop(
                     for (peer__=0;peer__<num_gpus;peer__++)
                         data_slice->out_length[peer__]=0;
                 }
-                if (Enactor::DEBUG) 
+                if (Enactor::DEBUG)
                 {
-                    printf("%d\t %lld\t \t Fullqueue finished. Total_Length= %d\n", 
+                    printf("%d\t %lld\t \t Fullqueue finished. Total_Length= %d\n",
                         thread_num, enactor_stats[0].iteration, Total_Length);
                     fflush(stdout);
                 }
@@ -2026,8 +2037,8 @@ void Iteration_Loop(
                     &work_progress[0],
                     context[0],
                     streams[0]);
-            } 
-            else 
+            }
+            else
             {
                 data_slice->out_length[0]= Total_Length;
             }

@@ -38,6 +38,7 @@
 #include <moderngpu.cuh>
 
 using namespace gunrock;
+using namespace gunrock::app;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::bfs;
@@ -140,157 +141,6 @@ void DisplaySolution(
         printf(" ");
     }
     printf("]\n");
-}
-
-/**
- * Performance/Evaluation statistics
- */
-struct Stats
-{
-    const char *name;
-    Statistic rate;
-    Statistic search_depth;
-    Statistic redundant_work;
-    Statistic duty;
-
-    Stats() : name(NULL), rate(), search_depth(), redundant_work(), duty() {}
-    Stats(const char *name) :
-        name(name), rate(), search_depth(), redundant_work(), duty() {}
-};
-
-/**
- * @brief Displays timing and correctness statistics
- *
- * @tparam MARK_PREDECESSORS
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] stats Reference to the Stats object defined in RunTests
- * @param[in] src Source node where BFS starts
- * @param[in] h_labels Host-side vector stores computed labels for validation
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] elapsed Total elapsed kernel running time
- * @param[in] search_depth Maximum search depth of the BFS algorithm
- * @param[in] total_queued Total element queued in BFS kernel running process
- * @param[in] avg_duty Average duty of the BFS kernels
- */
-template <
-    bool MARK_PREDECESSORS,
-    typename VertexId,
-    typename Value,
-    typename SizeT >
-void DisplayStats(
-    Stats                &stats,
-    json_spirit::mObject &info,
-    VertexId             src,
-    const VertexId       *h_labels,
-    const Csr<VertexId, Value, SizeT> *graph,
-    double               elapsed,
-    VertexId             search_depth,
-    long long            total_queued,
-    double               avg_duty,
-    bool                 quiet = false)
-{
-    // Compute nodes and edges visited
-    SizeT edges_visited = 0;
-    SizeT nodes_visited = 0;
-    for (VertexId i = 0; i < graph->nodes; ++i)
-    {
-        if (h_labels[i] < util::MaxValue<VertexId>() && h_labels[i] != -1)
-        {
-            ++nodes_visited;
-            edges_visited += graph->row_offsets[i + 1] - graph->row_offsets[i];
-        }
-    }
-
-    double redundant_work = 0.0;
-    if (total_queued > 0)
-    {
-        // measure duplicate edges put through queue
-        redundant_work =
-            ((double)total_queued - edges_visited) / edges_visited;
-    }
-    redundant_work *= 100;
-
-    // Display test name
-    if (!quiet)
-    {
-        printf("[%s] finished. ", stats.name);
-    }
-
-    // Display statistics
-    if (nodes_visited < 5)
-    {
-        if (!quiet)
-        {
-            printf("Fewer than 5 vertices visited.\n");
-        }
-    }
-    else
-    {
-        // Display the specific sample statistics
-        double m_teps = (double) edges_visited / (elapsed * 1000.0);
-        if (!quiet)
-        {
-            printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed,
-                   m_teps);
-        }
-
-        if (search_depth != 0)
-        {
-            if (!quiet)
-            {
-                printf(", search_depth: %lld", (long long) search_depth);
-            }
-        }
-
-        if (avg_duty != 0)
-        {
-            if (!quiet)
-            {
-                printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
-            }
-        }
-
-        if (!quiet)
-        {
-            printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
-                   (long long) src, (long long) nodes_visited,
-                   (long long) edges_visited);
-        }
-
-        if (total_queued > 0)
-        {
-            if (!quiet)
-            {
-                printf(", total queued: %lld", total_queued);
-            }
-        }
-
-        if (redundant_work > 0)
-        {
-            if (!quiet)
-            {
-                printf(", redundant work: %.2f%%", redundant_work);
-            }
-        }
-
-        info["name"] = stats.name;
-        info["elapsed"] = elapsed;
-        info["m_teps"] = m_teps;
-        info["search_depth"] = search_depth;
-        info["avg_duty"] = avg_duty;
-        info["nodes_visited"] = nodes_visited;
-        info["edges_visited"] = edges_visited;
-        info["total_queued"] = int64_t(total_queued);
-        info["redundant_work"] = redundant_work;
-
-        if (!quiet)
-        {
-            printf("\n");
-        }
-    }
 }
 
 /******************************************************************************
@@ -421,7 +271,7 @@ template <
     bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS,
     bool        ENABLE_IDEMPOTENCE >
-void RunTests(app::Info<VertexId, Value, SizeT> *info)
+void RunTests(Info<VertexId, Value, SizeT> *info)
 {
     // info->json();
     typedef BFSProblem < VertexId,
@@ -532,16 +382,13 @@ void RunTests(app::Info<VertexId, Value, SizeT> *info)
         }
     }
 
-    Stats     *stats       = new Stats("GPU BFS");
-    long long total_queued = 0;
-    VertexId  search_depth = 0;
-    double    avg_duty     = 0.0;
-    float     elapsed      = 0.0;
+    info->info["name"] = "GPU BFS";
 
     //
     // Perform BFS
     //
 
+    double elapsed = 0.0f;
     CpuTimer cpu_timer;
 
     for (int iter = 0; iter < iterations; ++iter)
@@ -571,8 +418,6 @@ void RunTests(app::Info<VertexId, Value, SizeT> *info)
     }
 
     elapsed /= iterations;
-
-    enactor->GetStatistics(total_queued, search_depth, avg_duty);
 
     // Copy out results
     util::GRError(problem->Extract(h_labels, h_preds),
@@ -628,19 +473,12 @@ void RunTests(app::Info<VertexId, Value, SizeT> *info)
         (h_labels, h_preds, graph->nodes, quiet_mode);
     }
 
-//    info->computeTraversalStats(stats, elapsed, h_labels, graph);
-
-    DisplayStats<MARK_PREDECESSORS, VertexId, Value, SizeT>(
-        *stats,
-        info->info,
-        src,
-        h_labels,
-        graph,
-        elapsed,
-        search_depth,
-        total_queued,
-        avg_duty,
-        quiet_mode);
+    info->ComputeTraversalStats(
+        enactor->enactor_stats.GetPointer(), elapsed, h_labels);
+    if (!quiet_mode) 
+    { 
+        info->DisplayStats(); 
+    }
 
     if (!quiet_mode)
     {
@@ -716,7 +554,6 @@ void RunTests(app::Info<VertexId, Value, SizeT> *info)
 
     // Clean up
     if (org_size        ) {delete[] org_size        ; org_size         = NULL;}
-    if (stats           ) {delete   stats           ; stats            = NULL;}
     if (enactor         ) {delete   enactor         ; enactor          = NULL;}
     if (problem         ) {delete   problem         ; problem          = NULL;}
     if (reference_labels) {delete[] reference_labels; reference_labels = NULL;}
@@ -746,7 +583,7 @@ template <
     bool        DEBUG,
     bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS >
-void RunTests_enable_idempotence(app::Info<VertexId, Value, SizeT> *info)
+void RunTests_enable_idempotence(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["idempotent"].get_bool())
     {
@@ -779,7 +616,7 @@ template <
     bool        INSTRUMENT,
     bool        DEBUG,
     bool        SIZE_CHECK >
-void RunTests_mark_predecessors(app::Info<VertexId, Value, SizeT> *info)
+void RunTests_mark_predecessors(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["mark_preds"].get_bool())
     {
@@ -810,7 +647,7 @@ template <
     typename      SizeT,
     bool          INSTRUMENT,
     bool          DEBUG >
-void RunTests_size_check(app::Info<VertexId, Value, SizeT> *info)
+void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["size_check"].get_bool())
     {
@@ -839,7 +676,7 @@ template <
     typename    Value,
     typename    SizeT,
     bool        INSTRUMENT >
-void RunTests_debug(app::Info<VertexId, Value, SizeT> *info)
+void RunTests_debug(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["debug_mode"].get_bool())
     {
@@ -864,7 +701,7 @@ template <
     typename      VertexId,
     typename      Value,
     typename      SizeT >
-void RunTests_instrumented(app::Info<VertexId, Value, SizeT> *info)
+void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["instrument"].get_bool())
     {
@@ -897,7 +734,7 @@ int main(int argc, char** argv)
     typedef int SizeT;     // Use int as the graph size type
 
     Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
-    app::Info<VertexId, Value, SizeT> *info = new app::Info<VertexId, Value, SizeT>;
+    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
     info->Init(args, csr);  // initialize Info structure
 
