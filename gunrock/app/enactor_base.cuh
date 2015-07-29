@@ -590,7 +590,6 @@ struct Info
                 EnactorStats *enactor_stats,
                 float elapsed,
                 const VertexId *h_labels,
-                const Csr<VertexId, Value, SizeT> *graph,
                 bool get_traversal_stats = false)
     {
         double total_lifetimes = 0;
@@ -601,7 +600,7 @@ struct Info
         int64_t search_depth = 0;
         int64_t nodes_visited = 0;
         int64_t edges_visited = 0;
-        // float m_teps = 0.0f;
+        float m_teps = 0.0f;
         double redundant_work = 0.0f;
 
         json_spirit::mArray device_list = info["device_list"].get_array();
@@ -616,7 +615,8 @@ struct Info
 
             for (int peer = 0; peer < num_gpus; ++peer)
             {
-                EnactorStats *enactor_stats = enactor_stats + gpu * num_gpus + peer;
+                EnactorStats *enactor_stats = 0;
+                enactor_stats = enactor_stats + gpu * num_gpus + peer;
                 if (get_traversal_stats)
                 {
                     enactor_stats->total_queued.Move(util::DEVICE, util::HOST);
@@ -678,14 +678,12 @@ struct Info
     void computeTraversalStats(
                     EnactorStats *enactor_stats,
                     float elapsed,
-                    const VertexId *h_labels,
-                    const Csr<VertexId, Value, SizeT> *graph)
+                    const VertexId *h_labels)
     {
         computeCommonStats(
                     enactor_stats,
                     elapsed,
                     h_labels,
-                    graph,
                     true);
     }
 
