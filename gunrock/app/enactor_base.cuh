@@ -100,6 +100,315 @@ struct EnactorStats
 };
 
 /**
+ * @brief Info data structure contains test parameter and running statistics.
+ * All test parameters and running statistics stored in json_spirit::mObject.
+ */
+struct Info
+{
+ private:
+    int         num_invoke; // Number of times invoke primitive test
+    int         num_device; // Number of GPUs for multi-GPU enactor to use
+    int         iterations; // Maximum number of super-steps allowed
+    int*        device_idx; // Array of GPU indices
+    int          grid_size; // Maximum grid size (0 leave it up to the enactor)
+    int          traversal; // Load-balanced or Dynamic cooperative
+    double        q_sizing; // Maximum size scaling factor for work queues
+    double       q_sizing1; // Value of max_queue_sizing1
+    double        i_sizing; // Maximum size scaling factor for communication
+    int64_t      srcvertex; // Source vertex ID
+    std::string  file_stem; // Market filename path stem
+    std::string     ofname; // Used for jsonfile command
+    std::string        dir; // Used for jsondir command
+    std::string par_method; // Partition method
+    float       par_factor; // Partition factor
+    int           par_seed; // Partition seed
+
+ public:
+    // Storing test parameters and running stats
+    json_spirit::mObject info;
+
+
+    /**
+     * @brief Info default constructor
+     */
+    Info()
+    {
+        // Assign default values
+        info["quiet_mode"]         = false;
+        info["quick_mode"]         = false;
+        info["stream_from_host"]   = false;
+        info["undirected"]         = false;
+        info["instrument"]         = false;
+        info["debug_mode"]         = false;
+        info["size_check"]         = true;
+        info["vertex_id"]          = -1;
+        info["max_grid_size"]      = 0;
+        info["num_gpus"]           = 1;
+//        info["gpu_idx"]            = vector(0);
+        info["max_in_sizing"]      = 1.0f;
+        info["queue_sizing"]       = 1.0f;
+        info["partition_method"]   = "random";
+        info["partition_factor"]   = -1;
+        info["partition_seed"]     = -1;
+        info["iterations"]         = 1;
+        info["traversal_mode"]     = -1;
+        info["idempotent"] = false;  // BFS
+        info["mark_preds"] = false;  // BFS
+        info["queue_sizing1"] = 1.0f;  // BFS
+        info["json"] = false;
+        info["jsonfile"] = false;
+        info["jsondir"] = false;
+    }  // end Info()
+
+    /**
+     * @brief Initialization process for Info
+     * @param[in] args Command line arguments
+     */
+    void Init(util::CommandLineArgs &args)
+    {
+        // Get configuration parameters from command line arguments
+        info["instrument"] =  args.CheckCmdLineFlag("instrumented");
+        info["size_check"] = !args.CheckCmdLineFlag("disable-size-check");
+        info["debug_mode"] =  args.CheckCmdLineFlag("v");
+        info["quiet_mode"] =  args.CheckCmdLineFlag("quiet");
+        info["quick_mode"] =  args.CheckCmdLineFlag("quick");
+        info["undirected"] =  args.CheckCmdLineFlag("undirected");
+
+        info["idempotent"] =  args.CheckCmdLineFlag("idempotence");  // BFS
+        info["mark_preds"] =  args.CheckCmdLineFlag("mark-pred");    // BFS
+
+        info["json"]     = args.CheckCmdLineFlag("json");
+        info["jsonfile"] = args.CheckCmdLineFlag("jsonfile");
+        info["jsondir"]  = args.CheckCmdLineFlag("jsondir");
+
+        args.GetCmdLineArgument("src", srcvertex);
+        args.GetCmdLineArgument("queue-sizing", q_sizing);
+        args.GetCmdLineArgument("in-sizing", i_sizing);
+        args.GetCmdLineArgument("grid-size", grid_size);
+        args.GetCmdLineArgument("partition-factor", par_factor);
+        args.GetCmdLineArgument("partition-seed", par_seed);
+        args.GetCmdLineArgument("iteration-num", num_invoke);
+        args.GetCmdLineArgument("max_iter", iterations);
+        args.GetCmdLineArgument("queue-sizing1", q_sizing1);  // BFS
+
+        if (args.CheckCmdLineFlag("partition_method")) 
+        {
+            args.GetCmdLineArgument("partition_method", par_method);
+        }
+
+        // parse device count and device list
+        info["device_list"] = getDeviceList(args);
+
+        args.GetCmdLineArgument("jsonfile", ofname);
+        args.GetCmdLineArgument("jsondir", dir);
+
+        //
+        // Put everything into the json_spirit::mObject info
+        //
+
+        // system information
+        info["engine"] = "Gunrock";
+        info["command_line"] = json_spirit::mValue(args.GetEntireCommandLine());
+        char *market_filename = args.GetCmdLineArgvDataset();
+        boost::filesystem::path market_filename_path(market_filename);
+        file_stem = market_filename_path.stem().string();
+        info["dataset"] = file_stem;
+        gunrock::util::Sysinfo sysinfo;  // get machine / OS / user / time info
+        info["sysinfo"] = sysinfo.getSysinfo();
+        gunrock::util::Gpuinfo gpuinfo;
+        info["gpuinfo"] = gpuinfo.getGpuinfo();
+        gunrock::util::Userinfo userinfo;
+        info["userinfo"] = userinfo.getUserinfo();
+        time_t now = time(NULL); info["time"] = ctime(&now);
+        info["gunrock_version"] = XSTR(GUNROCKVERSION);
+        info["git_commit_sha1"] = g_GIT_SHA1;
+
+        // parsed testing parameters
+        info["max_grid_size"] = grid_size;
+        info["traversal_mode"] = traversal;
+        info["num_gpus"] = num_device;
+        info["vertex_id"] = srcvertex;
+        info["partition_factor"] = par_factor;
+        info["partition_seed"] = par_seed;
+
+        // running statistics
+
+
+        // output JSON if user specified
+        if (args.CheckCmdLineFlag("json"))
+        {
+            json();
+        }
+        if (args.CheckCmdLineFlag("jsonfile"))
+        {
+            jsonFile();   
+        }
+        if (args.CheckCmdLineFlag("jsondir"))
+        {
+            jsonDir();
+        }
+    }
+    
+    json_spirit::mArray getDeviceList(util::CommandLineArgs &args)
+    {
+        json_spirit::mArray devices;
+        if (args.CheckCmdLineFlag("device"))
+        {
+            std::vector<int> gpus;
+            args.GetCmdLineArguments<int>("device", gpus);
+            num_device = gpus.size();
+            for (int i = 0; i < num_device; i++)
+            {
+                devices.push_back(gpus[i]);
+            }
+        }
+        else
+        {
+            num_device = 1;
+            devices.push_back(0);
+        }
+        return devices;
+    }
+
+template<
+    typename VertexId,
+    typename Value,
+    typename SizeT>
+    void computeCommonStats(
+                EnactorStats *enactor_stats,
+                float elapsed,
+                const VertexId *h_labels,
+                const Csr<VertexId, Value, SizeT> *graph,
+                bool get_traversal_stats = false)
+    {
+        int64_t total_lifetimes = 0;
+        int64_t total_runtimes = 0;
+
+        //traversal stats
+        int64_t total_queued = 0;
+        int64_t search_depth = 0;
+        int64_t nodes_visited = 0;
+        int64_t edges_visited = 0;
+        float m_teps = 0.0f;
+        double redundant_work = 0.0f;
+
+        json_spirit::mArray device_list = info["device_list"].get_array();
+        for (int gpu = 0; gpu < num_device; ++gpu)
+        {
+            int my_gpu_idx = device_list[gpu].get_int();
+            if (num_device != 1)
+                if (util::SetDevice(my_gpu_idx)) return;
+            cudaThreadSynchronize();
+
+            for (int peer = 0; peer < num_device; ++peer)
+            {
+                EnactorStats *enactor_stats = enactor_stats + gpu*num_device + peer;
+                if (get_traversal_stats)
+                {
+                    enactor_stats->total_queued.Move(util::DEVICE, util::HOST);
+                    total_queued += enactor_stats->total_queued[0];
+                    if (enactor_stats->iteration > search_depth)
+                        search_depth = enactor_stats->iteration;
+                }
+                total_lifetimes += enactor_stats->total_lifetimes;
+                total_runtimes += enactor_stats->total_runtimes;
+            }
+        }
+        double avg_duty = (total_lifetimes > 0)? double(total_runtimes)/total_lifetimes : 0.0;
+        info["elapsed"] = elapsed;
+        info["avg_duty"] = avg_duty;
+
+        if (get_traversal_stats)
+        {
+            info["total_queued"] = total_queued;
+            info["search_depth"] = search_depth;
+        }
+
+        //TODO: compute traversal stats.
+        if (get_traversal_stats)
+        {
+            for (VertexId i = 0; i < graph->nodes; ++i)
+            {
+                if (h_labels[i] < util::MaxValue<VertexId>() && h_labels[i] != -1)
+                {
+                    ++nodes_visited;
+                    edges_visited += graph->row_offsets[i+1]-graph->row_offsets[i];
+                }
+                if ( info["name"].get_str().compare("GPU BC") == 0 )
+                {
+                    //For betweenness should count the backward phase too.
+                    edges_visited *= 2;
+                }
+            }
+            if (total_queued > 0)
+            {
+                // measure duplicate edges put through queue
+                redundant_work = ((double)total_queued - edges_visited) / edges_visited;
+            }
+            redundant_work *= 100;
+
+            info["nodes_visited"] = nodes_visited;
+            info["edges_visited"] = edges_visited;
+            info["redundant_work"] = redundant_work;
+        }
+        
+    }
+
+template<
+    typename VertexId,
+    typename Value,
+    typename SizeT>
+    void computeTraversalStats(
+                    EnactorStats *enactor_stats,
+                    float elapsed,
+                    const VertexId *h_labels,
+                    const Csr<VertexId, Value, SizeT> *graph)
+    {
+        computeCommonStats(
+                    enactor_stats,
+                    elapsed,
+                    h_labels,
+                    graph,
+                    true);
+    }
+
+    void json()
+    {
+        json_spirit::write_stream(
+            json_spirit::mValue(info), std::cout,
+            json_spirit::pretty_print);
+    }
+
+    void jsonFile()
+    {
+        std::ofstream of(ofname.data());
+        json_spirit::write_stream(
+            json_spirit::mValue(info), of,
+            json_spirit::pretty_print);
+    }
+
+    void jsonDir()
+    {
+        std::string filename =
+            dir + "/" + info["name"].get_str() + "_" +
+            ((file_stem != "") ? (file_stem + "_") : "") +
+            info["time"].get_str() + ".json";
+        // now filter out bad chars (the list in badchars)
+        char badchars[] = ":\n";
+        for (unsigned int i = 0; i < strlen(badchars); ++i)
+        {
+            filename.erase(
+                std::remove(filename.begin(), filename.end(), badchars[i]),
+                filename.end());
+        }
+        std::ofstream of(filename.data());
+        json_spirit::write_stream(
+            json_spirit::mValue(info), of,
+            json_spirit::pretty_print);
+    }
+};
+
+/**
  * @brief Structure for auxiliary variables used in frontier operations.
  */
 template <typename SizeT>
