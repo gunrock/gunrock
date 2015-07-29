@@ -163,7 +163,7 @@ inline void VaryParams(
  * @param[in] seed
  */
 template <bool WITH_VALUES, typename VertexId, typename Value, typename SizeT>
-int BuildRmatGraph (
+int BuildRmatGraph(
     SizeT nodes, SizeT edges,
     Csr<VertexId, Value, SizeT> &graph,
     bool undirected,
@@ -191,7 +191,10 @@ int BuildRmatGraph (
         sizeof(EdgeTupleType) * directed_edges);
 
     if (seed == -1) seed = time(NULL);
-    printf("rmat_seed = %lld\n", (long long)seed);
+    if (!quiet)
+    {
+        printf("rmat_seed = %lld\n", (long long)seed);
+    }
 
     //omp_set_num_threads(2);
     #pragma omp parallel
@@ -257,7 +260,7 @@ int BuildRmatGraph (
     // convert COO to CSR
     char *out_file = NULL;  // TODO: currently does not support write CSR file
     graph.template FromCoo<WITH_VALUES, EdgeTupleType>(
-        out_file, coo, nodes, directed_edges, quiet);
+        out_file, coo, nodes, directed_edges, false, undirected, false, quiet);
 
     free(coo);
 
