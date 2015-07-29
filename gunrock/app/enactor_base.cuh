@@ -714,7 +714,7 @@ public:
                     edges_visited *= 2;
                 }
             }
-            if (total_queued > 0)
+            if (total_queued > edges_visited)
             {
                 // measure duplicate edges put through queue
                 redundant_work =

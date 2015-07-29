@@ -24,19 +24,19 @@ files=(./bin/*)
 #split file names into arr
 arr=$(echo $files | tr " " "\n")
 max_ver_num="$"
-exe_file=${arr[0]}
+EXECUTION=${arr[0]}
 #iterate over all file names to get the largest version number
 for x in $arr
 do
     output=$(grep -o "[0-9]\.[0-9]" <<<"$x")
     if [ "$output" \> "$max_ver_num" ]; then
-        exe_file=$x
+        EXECUTION=$x
     fi
 done
 
 #put OS and Device type here
 SUFFIX="ubuntu12.04.k40cx4_brp0.5_dsize3"
-EXCUTION="./bin/test_bfs_6.5_x86_64"
+#EXCUTION="./bin/test_bfs_6.5_x86_64"
 DATADIR="/data/gunrock_dataset/large"
 
 mkdir -p eval/$SUFFIX
@@ -96,11 +96,11 @@ do
     for j in 4 6 #0 1 2 3 4 6
     do
         if [ "$j" -eq "0" ] || [ "$j" -eq "1" ] || [ "$j" -eq "4" ] || [ "$j" -eq "5" ]; then
-            echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_DIR[$i]} --in-sizing=${I_SIZE_DIR[$i]} "> eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt"
-            $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_DIR[$i]} --in-sizing=${I_SIZE_DIR[$i]} > eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt
+            echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_DIR[$i]} --in-sizing=${I_SIZE_DIR[$i]} "> eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt"
+            $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_DIR[$i]} --in-sizing=${I_SIZE_DIR[$i]} > eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt
         else
-            echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_UDIR[$i]} --in-sizing=${I_SIZE_UDIR[$i]} "> eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt"
-            $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_UDIR[$i]} --in-sizing=${I_SIZE_UDIR[$i]} > eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt
+            echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_UDIR[$i]} --in-sizing=${I_SIZE_UDIR[$i]} "> eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt"
+            $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_UDIR[$i]} --in-sizing=${I_SIZE_UDIR[$i]} > eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt
         fi
         sleep 1
     done
