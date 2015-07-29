@@ -201,7 +201,7 @@ public:
         graph = &csr;          // set graph pointer
 
         info["idempotent"] =  args.CheckCmdLineFlag("idempotence");     // BFS
-        info["mark_predessors"] =  args.CheckCmdLineFlag("mark-pred");  // BFS
+        info["mark_predecessors"] =  args.CheckCmdLineFlag("mark-pred");  // BFS
 
         info["json"]     = args.CheckCmdLineFlag("json");
         info["jsonfile"] = args.CheckCmdLineFlag("jsonfile");
@@ -212,19 +212,19 @@ public:
         {
             std::string source_type;
             args.GetCmdLineArgument("src", source_type);
-            info["source_type"] = source_type;
             if (source_type.empty())
             {
                 source = 0;
+                info["source_type"] = "default";
             }
             else if (source_type.compare("randomize") == 0)
             {
-                printf("csr node: %d\n", csr.nodes);
                 source = graphio::RandomNode(csr.nodes);
                 if (!args.CheckCmdLineFlag("quiet"))
                 {
                     printf("Using random source vertex: %d\n", source);
                 }
+                info["source_type"] = "random";
             }
             else if (source_type.compare("largestdegree") == 0)
             {
@@ -235,6 +235,7 @@ public:
                     printf("Using highest degree (%d), vertex: %d\n",
                            maximum_degree, source);
                 }
+                info["source_type"] = "largest-degree";
             }
             else
             {
@@ -245,8 +246,8 @@ public:
             {
                 printf("Source vertex: %d\n", (int64_t)source);
             }
-        }    
-        if (args.CheckCmdLineFlag("grid_size"))
+        }
+        if (args.CheckCmdLineFlag("grid-size"))
         {
             args.GetCmdLineArgument("grid-size", grid_size);
             info["max_grid_size"] = grid_size;
@@ -259,7 +260,7 @@ public:
         if (args.CheckCmdLineFlag("max_iter"))
         {
             args.GetCmdLineArgument("max_iter", max_iters);
-            info["max_iteration"] = max_iters; 
+            info["max_iteration"] = max_iters;
         }
         if (args.CheckCmdLineFlag("queue-sizing"))
         {
@@ -1465,7 +1466,7 @@ void ShowDebugInfo(
     //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
     //    util::cpu_mt::PrintGPUArray<SizeT, Value   >("valu1", graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE), _queue_length, thread_num, enactor_stats->iteration);
     //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("degrees", data_slice->degrees.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
-    //if (BFSProblem::MARK_PREDECESSORS)
+    //if (BFSProblem::MARK_PREDECESSOR)
     //    util::cpu_mt::PrintGPUArray<SizeT, VertexId>("pred1", data_slice[0]->preds.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration);
     //if (BFSProblem::ENABLE_IDEMPOTENCE)
     //    util::cpu_mt::PrintGPUArray<SizeT, unsigned char>("mask1", data_slice[0]->visited_mask.GetPointer(util::DEVICE), (graph_slice->nodes+7)/8, thread_num, enactor_stats->iteration);
