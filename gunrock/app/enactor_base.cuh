@@ -661,9 +661,12 @@ struct Info
             }
             redundant_work *= 100;
 
+            m_teps = (double)edges_visited / elapsed * 1000.0;
+
             info["nodes_visited"] = nodes_visited;
             info["edges_visited"] = edges_visited;
             info["redundant_work"] = redundant_work;
+            info["m_teps"] = m_teps;
         }
         
     }
