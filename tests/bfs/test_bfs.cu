@@ -628,6 +628,8 @@ void RunTests(app::Info<VertexId, Value, SizeT> *info)
         (h_labels, h_preds, graph->nodes, quiet_mode);
     }
 
+//    info->computeTraversalStats(stats, elapsed, h_labels, graph);
+
     DisplayStats<MARK_PREDECESSORS, VertexId, Value, SizeT>(
         *stats,
         info->info,
@@ -880,24 +882,24 @@ void RunTests_instrumented(app::Info<VertexId, Value, SizeT> *info)
 
 int main(int argc, char** argv)
 {
+    // command line check
     CommandLineArgs args(argc, argv);
     int graph_args = argc - args.ParsedArgc() - 1;
-
     if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
     {
         Usage();
         return 1;
     }
 
+    // define data types
     typedef int VertexId;  // Use int as the vertex identifier
     typedef int Value;     // Use int as the value type
     typedef int SizeT;     // Use int as the graph size type
 
-    Csr<VertexId, Value, SizeT> graph(false);  // default false stream_from_host
+    Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
     app::Info<VertexId, Value, SizeT> *info = new app::Info<VertexId, Value, SizeT>;
 
-    info->Init(args, graph);  // initialize Info structure
-    info->graph = &graph;     // set graph pointer
+    info->Init(args, csr);  // initialize Info structure
 
     RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test
 
