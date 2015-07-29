@@ -131,6 +131,15 @@ public:
         return commandLineStr;
     }
 
+    template <typename T>
+    void ParseArgument(const char *name, T &val)
+    {
+        if (CheckCmdLineFlag(name))
+        {
+            GetCmdLineArgument(name, val);
+        }
+    }
+
     char * GetCmdLineArgvGraphType()
     {
         char * graph_type = argv[1];

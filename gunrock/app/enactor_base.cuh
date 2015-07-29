@@ -109,8 +109,8 @@ template<typename VertexId, typename Value, typename SizeT>
 struct Info
 {
 private:
-    int         num_invoke; // Number of times invoke primitive test
-    int         iterations; // Maximum number of super-steps allowed
+    int          num_iters; // Number of times invoke primitive test
+    int          max_iters; // Maximum number of super-steps allowed
     int*        device_idx; // Array of GPU indices
     int          grid_size; // Maximum grid size (0 leave it up to the enactor)
     int          traversal; // Load-balanced or Dynamic cooperative
@@ -138,31 +138,49 @@ public:
     Info()
     {
         // Assign default values
-        info["name"]               = "";
-        info["quiet_mode"]         = false;
-        info["quick_mode"]         = false;
-        info["stream_from_host"]   = false;
-        info["undirected"]         = false;
-        info["instrument"]         = false;
-        info["debug_mode"]         = false;
-        info["size_check"]         = true;
-        info["vertex_id"]          = -1;
-        info["max_grid_size"]      = 0;
-        info["num_gpus"]           = 1;
-        info["max_in_sizing"]      = 1.0f;
-        info["queue_sizing"]       = 1.0f;
-        info["partition_method"]   = "random";
-        info["partition_factor"]   = -1;
-        info["partition_seed"]     = -1;
-        info["iterations"]         = 1;
-        info["traversal_mode"]     = -1;
-        info["idempotent"] = false;  // BFS
-        info["mark_preds"] = false;  // BFS
-        info["queue_sizing1"] = 1.0f;  // BFS
-        info["json"] = false;
-        info["jsonfile"] = false;
-        info["jsondir"] = false;
-        info["graph_type"] = "";
+        info["algorithm"]          = "";     // algorithm/primitive name
+        info["average_duty"]       = 0.0f;   // average runtime duty
+        info["command_line"]       = "";     // entire command line
+        info["debug_mode"]         = false;  // verbose flag print debug info
+        info["edges_visited"]      = 0;      // number of edges touched
+        info["elapsed"]            = 0.0f;   // elapsed device running time
+        info["engine"]             = "";     // engine name - Gunrock
+        info["git_commit_sha1"]    = "";     // git commit sha1
+        info["graph_type"]         = "";     // input graph type
+        info["gunrock_version"]    = "";     // gunrock version number
+        info["idempotent"]         = false;  // enable idempotent (BFS)
+        info["instrument"]         = false;  // enable instrumentation
+        info["num_iteration"]     = 1;       // number of runs
+        info["json"]               = false;  // --json flag
+        info["jsonfile"]           = false;  // --jsonfile flag
+        info["jsondir"]            = false;  // --jsondir flag
+        info["mark_predecessors"]  = false;  // mark predecessors (BFS, SSSP)
+        info["max_grid_size"]      = 0;      // maximum grid size
+        info["max_iteration"]      = 50;     // default maximum iteration
+        info["max_in_sizing"]      = 1.0f;   // maximum in queue sizing factor
+        info["max_queue_sizing"]   = 1.0f;   // maximum queue sizing factor
+        info["max_queue_sizing1"]  = 1.0f;   // maximum queue sizing factor
+        info["m_teps"]             = 0.0f;   // traversed edges per second
+        info["num_gpus"]           = 1;      // number of GPU(s) used
+        info["nodes_visited"]      = 0;      // number of nodes visited
+        info["partition_method"]   = "random";  // default partition method
+        info["partition_factor"]   = -1;     // partition factor
+        info["partition_seed"]     = -1;     // partition seed
+        info["quiet_mode"]         = false;  // don't print anything
+        info["quick_mode"]         = false;  // skip CPU validation
+        info["redundant_work"]     = 0.0f;   // redundant work (BFS)
+        info["search_depth"]       = 0;      // search depth (iterations)
+        info["size_check"]         = true;   // enable or disable size check
+        info["source_type"]        = "";     // source type
+        info["source_vertex"]      = 0;      // source (BFS, SSSP)
+        info["stream_from_host"]   = false;  // stream from host to device
+        info["traversal_mode"]     = -1;     // advance mode
+        info["undirected"]         = false;  // undirected graph input
+        // info["gpuinfo"]
+        // info["device_list"]
+        // info["sysinfo"]
+        // info["time"]
+        // info["userinfo"]
     }  // end Info()
 
     /**
@@ -182,8 +200,8 @@ public:
         LoadGraph(args, csr);  // load or generate graph
         graph = &csr;          // set graph pointer
 
-        info["idempotent"] =  args.CheckCmdLineFlag("idempotence");  // BFS
-        info["mark_preds"] =  args.CheckCmdLineFlag("mark-pred");    // BFS
+        info["idempotent"] =  args.CheckCmdLineFlag("idempotence");     // BFS
+        info["mark_predessors"] =  args.CheckCmdLineFlag("mark-pred");  // BFS
 
         info["json"]     = args.CheckCmdLineFlag("json");
         info["jsonfile"] = args.CheckCmdLineFlag("jsonfile");
@@ -194,6 +212,7 @@ public:
         {
             std::string source_type;
             args.GetCmdLineArgument("src", source_type);
+            info["source_type"] = source_type;
             if (source_type.empty())
             {
                 source = 0;
@@ -221,25 +240,56 @@ public:
             {
                 args.GetCmdLineArgument("src", source);
             }
+            info["source_vertex"] = (int64_t)source;
             if (!args.CheckCmdLineFlag("quiet"))
             {
                 printf("Source vertex: %d\n", (int64_t)source);
             }
+        }    
+        if (args.CheckCmdLineFlag("grid_size"))
+        {
+            args.GetCmdLineArgument("grid-size", grid_size);
+            info["max_grid_size"] = grid_size;
         }
-
-        args.GetCmdLineArgument("queue-sizing", q_sizing);
-        args.GetCmdLineArgument("in-sizing", i_sizing);
-        args.GetCmdLineArgument("grid-size", grid_size);
-        args.GetCmdLineArgument("partition-factor", par_factor);
-        args.GetCmdLineArgument("partition-seed", par_seed);
-        args.GetCmdLineArgument("iteration-num", num_invoke);
-        args.GetCmdLineArgument("max_iter", iterations);
-        args.GetCmdLineArgument("queue-sizing1", q_sizing1);  // BFS
-
+        if (args.CheckCmdLineFlag("iteration-num"))
+        {
+            args.GetCmdLineArgument("iteration-num", num_iters);
+            info["num_iteration"] = num_iters;
+        }
+        if (args.CheckCmdLineFlag("max_iter"))
+        {
+            args.GetCmdLineArgument("max_iter", max_iters);
+            info["max_iteration"] = max_iters; 
+        }
+        if (args.CheckCmdLineFlag("queue-sizing"))
+        {
+            args.GetCmdLineArgument("queue-sizing", q_sizing);
+            info["max_queue_sizing"] = q_sizing;
+        }
+        if (args.CheckCmdLineFlag("queue-sizing1"))
+        {
+            args.GetCmdLineArgument("queue-sizing1", q_sizing1);  // BFS
+            info["max_queue_sizing1"] = q_sizing1;
+        }
         if (args.CheckCmdLineFlag("partition_method"))
         {
             args.GetCmdLineArgument("partition_method", par_method);
             info["partition_method"] = par_method;
+        }
+        if (args.CheckCmdLineFlag("partition-factor"))
+        {
+            args.GetCmdLineArgument("partition-factor", par_factor);
+            info["partition_factor"] = par_factor;
+        }
+        if (args.CheckCmdLineFlag("partition-seed"))
+        {
+            args.GetCmdLineArgument("partition-seed", par_seed);
+            info["partition_seed"] = par_seed;
+        }
+        if (args.CheckCmdLineFlag("traversal-mode"))
+        {
+            args.GetCmdLineArgument("traversal-mode", traversal);
+            info["traversal_mode"] = traversal;
         }
 
         // parse device count and device list
@@ -306,29 +356,25 @@ public:
         info["git_commit_sha1"] = g_GIT_SHA1;
 
         // parsed testing parameters
-        info["max_grid_size"] = grid_size;
-        info["traversal_mode"] = traversal;
-        info["vertex_id"] = (int64_t)source;
-        info["partition_factor"] = par_factor;
-        info["partition_seed"] = par_seed;
+
         info["graph_type"] = args.GetCmdLineArgvGraphType();
-        info["queue_sizing"] = q_sizing;
-        info["queue_sizing1"] = q_sizing1;
-        info["iteration_num"] = num_invoke;
-        info["max_iteration"] = iterations;
+    }
 
-        // running statistics
-
+    /**
+     * @brief Display JSON mObject info. Should be called after Compute Stats.
+     */
+    void CollectInfo()
+    {
         // output JSON if user specified
-        if (args.CheckCmdLineFlag("json"))
+        if (info["json"].get_bool())
         {
             PrintJson();
         }
-        if (args.CheckCmdLineFlag("jsonfile"))
+        if (info["jsonfile"].get_bool())
         {
             JsonFile();
         }
-        if (args.CheckCmdLineFlag("jsondir"))
+        if (info["jsondir"].get_bool())
         {
             JsonDir();
         }
@@ -405,7 +451,7 @@ public:
     void JsonDir()
     {
         std::string filename =
-            dir + "/" + info["name"].get_str() + "_" +
+            dir + "/" + info["algorithm"].get_str() + "_" +
             ((file_stem != "") ? (file_stem + "_") : "") +
             info["time"].get_str() + ".json";
         // now filter out bad chars (the list in bad_chars)
@@ -642,7 +688,7 @@ public:
             double(total_runtimes) / total_lifetimes * 100.0 : 0.0;
 
         info["elapsed"] = elapsed;
-        info["avg_duty"] = avg_duty;
+        info["average_duty"]= avg_duty;
 
         if (get_traversal_stats)
         {
@@ -661,7 +707,7 @@ public:
                     edges_visited +=
                         graph->row_offsets[i + 1] - graph->row_offsets[i];
                 }
-                if (info["name"].get_str().compare("GPU BC") == 0)
+                if (info["algorithm"].get_str().compare("GPU BC") == 0)
                 {
                     // For betweenness should count the backward phase too.
                     edges_visited *= 2;
@@ -675,7 +721,7 @@ public:
             }
             redundant_work *= 100;
 
-            m_teps = (double)edges_visited / elapsed * 1000.0;
+            m_teps = (double)edges_visited / (elapsed * 1000.0);
 
             info["nodes_visited"] = nodes_visited;
             info["edges_visited"] = edges_visited;
@@ -704,11 +750,11 @@ public:
         double m_teps = info["m_teps"].get_real();
         float elapsed = info["elapsed"].get_real();
         int64_t search_depth = info["search_depth"].get_int();
-        double avg_duty = info["avg_duty"].get_real();
+        double avg_duty = info["average_duty"].get_real();
         int64_t total_queued = info["total_queued"].get_int();
         double redundant_work = info["redundant_work"].get_real();
-        
-        printf("\n[%s] finished. ", info["name"].get_str().c_str());
+
+        printf("\n[%s] finished. ", info["algorithm"].get_str().c_str());
 
         if (verbose)
         {
@@ -744,7 +790,6 @@ public:
             }
             printf("\n");
         }
-
     }
 };
 

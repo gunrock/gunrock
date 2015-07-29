@@ -290,11 +290,11 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     // parse configurations from mObject info
     Csr<VertexId, Value, SizeT> *graph = (Csr<VertexId, Value, SizeT>*)info->graph;
-    VertexId src                 = info->info["vertex_id"].get_int64();
+    VertexId src                 = info->info["source_vertex"].get_int64();
     int max_grid_size            = info->info["max_grid_size"].get_int();
     int num_gpus                 = info->info["num_gpus"].get_int();
-    double max_queue_sizing      = info->info["queue_sizing"].get_real();
-    double max_queue_sizing1     = info->info["queue_sizing1"].get_real();
+    double max_queue_sizing      = info->info["max_queue_sizing"].get_real();
+    double max_queue_sizing1     = info->info["max_queue_sizing1"].get_real();
     double max_in_sizing         = info->info["max_in_sizing"].get_real();
     std::string partition_method = info->info["partition_method"].get_str();
     float partition_factor       = info->info["partition_factor"].get_real();
@@ -303,7 +303,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     bool g_quick                 = info->info["quick_mode"].get_bool();
     bool g_stream_from_host      = info->info["stream_from_host"].get_bool();
     int traversal_mode           = info->info["traversal_mode"].get_int();
-    int iterations               = info->info["iterations"].get_int();
+    int iterations               = info->info["num_iteration"].get_int();
 
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
@@ -382,7 +382,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         }
     }
 
-    info->info["name"] = "GPU BFS";
+    info->info["algorithm"] = "GPU BFS";
 
     //
     // Perform BFS
@@ -475,10 +475,12 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     info->ComputeTraversalStats(
         enactor->enactor_stats.GetPointer(), elapsed, h_labels);
-    if (!quiet_mode) 
-    { 
-        info->DisplayStats(); 
+    if (!quiet_mode)
+    {
+        info->DisplayStats();
     }
+
+    info->CollectInfo();
 
     if (!quiet_mode)
     {
@@ -618,7 +620,7 @@ template <
     bool        SIZE_CHECK >
 void RunTests_mark_predecessors(Info<VertexId, Value, SizeT> *info)
 {
-    if (info->info["mark_preds"].get_bool())
+    if (info->info["mark_predecessors"].get_bool())
     {
         RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
                                     DEBUG, SIZE_CHECK,  true> (info);
