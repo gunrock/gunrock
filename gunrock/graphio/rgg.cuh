@@ -42,7 +42,12 @@ public:
     long long node;
 
     RggPoint() {}
-    RggPoint(double x, double y, long long node) {this->x = x; this->y = y; this->node = node;}
+    RggPoint(double x, double y, long long node)
+    {
+        this->x = x;
+        this->y = y;
+        this->node = node;
+    }
 };
 
 //inline bool operator< (const RggPoint& lhs, const RggPoint& rhs)
@@ -93,7 +98,8 @@ int BuildRggGraph(
     bool   undirected = true,
     double value_multipiler = 1,
     double value_min        = 1,
-    int    seed             = -1)
+    int    seed             = -1,
+    bool   quiet = false)
 {
     typedef Coo<VertexId, Value> EdgeTupleType;
 
@@ -125,7 +131,7 @@ int BuildRggGraph(
     long long initial_length   = reserved_factor2 * nodes / row_length / row_length;
 
     if (seed == -1) seed = time(NULL);
-    printf("rgg seed = %lld\n", (long long)seed);
+    if (!quiet) { printf("rgg seed = %lld\n", (long long)seed); }
     if (initial_length <4) initial_length = 4;
     for (SizeT i=0; i< row_length * row_length +1; i++)
     {
@@ -317,7 +323,7 @@ int BuildRggGraph(
 
     char *out_file = NULL;
     graph.template FromCoo<WITH_VALUES, EdgeTupleType>(
-        out_file, coo, nodes, edges);
+        out_file, coo, nodes, edges, false, undirected, false, quiet);
 
     //delete[] co_x       ; co_x        = NULL;
     //delete[] co_y       ; co_y        = NULL;
@@ -328,7 +334,7 @@ int BuildRggGraph(
     delete[] block_size ; block_size  = NULL;
     delete[] block_length; block_length = NULL;
     delete[] col_index_ ; col_index_  = NULL;
-    if (WITH_VALUES) {delete[] values_; values_ = NULL;}
+    if (WITH_VALUES) { delete[] values_; values_ = NULL; }
     free(coo); coo=NULL;
 
     return 0;

@@ -176,7 +176,8 @@ struct Info
         info["quick_mode"] =  args.CheckCmdLineFlag("quick");
         info["undirected"] =  args.CheckCmdLineFlag("undirected");
 
-        LoadGraph(args, csr);
+        LoadGraph(args, csr);  // load or generate graph
+        graph = &csr;          // set graph pointer
 
         info["idempotent"] =  args.CheckCmdLineFlag("idempotence");  // BFS
         info["mark_preds"] =  args.CheckCmdLineFlag("mark-pred");    // BFS
@@ -265,9 +266,8 @@ struct Info
             for (int i = 0; i < num_gpus * 2; i++)
             {
                 int _i = gpu * num_gpus * 2 + i;
-                util::GRError(
-                    cudaStreamCreate(&streams_[_i]),
-                    "cudaStreamCreate failed.", __FILE__, __LINE__);
+                util::GRError(cudaStreamCreate(&streams_[_i]),
+                              "cudaStreamCreate failed.", __FILE__, __LINE__);
                 if (i < num_gpus)
                 {
                     context_[gpu * num_gpus + i] =
@@ -503,7 +503,8 @@ struct Info
                         rmat_d,
                         1,
                         1,
-                        rmat_seed) != 0)
+                        rmat_seed,
+                        args.CheckCmdLineFlag("quiet")) != 0)
             {
                 return 1;
             }
@@ -556,7 +557,8 @@ struct Info
                         args.CheckCmdLineFlag("undirected"),
                         rgg_vmultipiler,
                         1,
-                        rgg_seed) != 0)
+                        rgg_seed,
+                        args.CheckCmdLineFlag("quiet")) != 0)
             {
                 return 1;
             }
