@@ -17,11 +17,18 @@
 #include <vector>
 #include <string>
 
+// Graph construction utilities
+#include <gunrock/graphio/market.cuh>
+#include <gunrock/graphio/rmat.cuh>
+#include <gunrock/graphio/rgg.cuh>
+
+// Information stats utilities
 #include <boost/filesystem.hpp>
 #include <gunrock/util/sysinfo.h>
 #include <gunrock/util/gitsha1.h>
 #include <gunrock/util/json_spirit_writer_template.h>
 
+// Gunrock test error utilities
 #include <gunrock/util/basic_utils.h>
 #include <gunrock/util/cuda_properties.cuh>
 #include <gunrock/util/memset_kernel.cuh>
@@ -32,7 +39,9 @@
 #include <gunrock/util/io/modified_store.cuh>
 #include <gunrock/util/array_utils.cuh>
 #include <gunrock/util/test_utils.cuh>
+#include <gunrock/util/test_utils.h>
 
+// Graph partitioner utilities
 #include <gunrock/app/rp/rp_partitioner.cuh>
 #include <gunrock/app/cp/cp_partitioner.cuh>
 #include <gunrock/app/brp/brp_partitioner.cuh>
@@ -61,9 +70,9 @@ enum FrontierType
 /**
  * @brief Graph slice structure which contains common graph structural data.
  *
- * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam Value               Type to use as vertex / edge associated values
+ * @tparam SizeT    Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam VertexId Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam Value    Type to use as vertex / edge associated values
  */
 template <
     typename SizeT,
@@ -1072,11 +1081,11 @@ public:
  * @brief Info data structure contains test parameter and running statistics.
  * All test parameters and running statistics stored in json_spirit::mObject.
  */
+template<typename VertexId, typename Value, typename SizeT>
 struct Info
 {
  private:
     int         num_invoke; // Number of times invoke primitive test
-    int         num_device; // Number of GPUs for multi-GPU enactor to use
     int         iterations; // Maximum number of super-steps allowed
     int*        device_idx; // Array of GPU indices
     int          grid_size; // Maximum grid size (0 leave it up to the enactor)
@@ -1084,19 +1093,21 @@ struct Info
     double        q_sizing; // Maximum size scaling factor for work queues
     double       q_sizing1; // Value of max_queue_sizing1
     double        i_sizing; // Maximum size scaling factor for communication
-    int64_t      srcvertex; // Source vertex ID
+    long long       source; // Source vertex ID
     std::string  file_stem; // Market filename path stem
     std::string     ofname; // Used for jsonfile command
     std::string        dir; // Used for jsondir command
     std::string par_method; // Partition method
     float       par_factor; // Partition factor
     int           par_seed; // Partition seed
+    int           num_gpus; // Number of GPUs used
 
  public:
-    // Storing test parameters and running stats
-    json_spirit::mObject info;
-
-
+    json_spirit::mObject info;  // test parameters and running statistics
+    Csr<VertexId, Value, SizeT> *graph;  // pointer to CSR input graph
+    void         *context;  // pointer to context array used by MordernGPU
+    cudaStream_t *streams;  // pointer to array of GPU streams
+    
     /**
      * @brief Info default constructor
      */
@@ -1113,7 +1124,6 @@ struct Info
         info["vertex_id"]          = -1;
         info["max_grid_size"]      = 0;
         info["num_gpus"]           = 1;
-//        info["gpu_idx"]            = vector(0);
         info["max_in_sizing"]      = 1.0f;
         info["queue_sizing"]       = 1.0f;
         info["partition_method"]   = "random";
@@ -1127,13 +1137,14 @@ struct Info
         info["json"] = false;
         info["jsonfile"] = false;
         info["jsondir"] = false;
+        info["graph_type"] = "";
     }  // end Info()
 
     /**
      * @brief Initialization process for Info
      * @param[in] args Command line arguments
      */
-    void Init(util::CommandLineArgs &args)
+    void Init(util::CommandLineArgs &args, Csr<VertexId, Value, SizeT> &csr)
     {
         // Get configuration parameters from command line arguments
         info["instrument"] =  args.CheckCmdLineFlag("instrumented");
@@ -1143,6 +1154,8 @@ struct Info
         info["quick_mode"] =  args.CheckCmdLineFlag("quick");
         info["undirected"] =  args.CheckCmdLineFlag("undirected");
 
+        LoadGraph(args, csr);
+
         info["idempotent"] =  args.CheckCmdLineFlag("idempotence");  // BFS
         info["mark_preds"] =  args.CheckCmdLineFlag("mark-pred");    // BFS
 
@@ -1150,7 +1163,44 @@ struct Info
         info["jsonfile"] = args.CheckCmdLineFlag("jsonfile");
         info["jsondir"]  = args.CheckCmdLineFlag("jsondir");
 
-        args.GetCmdLineArgument("src", srcvertex);
+        // determine which source to start search
+        if (args.CheckCmdLineFlag("src"))
+        { 
+            std::string source_type;
+            args.GetCmdLineArgument("src", source_type);
+            if (source_type.empty())
+            {
+                source = 0;
+            }
+            else if (source_type.compare("randomize") == 0)
+            {
+                printf("csr node: %d\n", csr.nodes);
+                source = graphio::RandomNode(csr.nodes);
+                if (!args.CheckCmdLineFlag("quiet"))
+                {
+                    printf("Using random source vertex: %d\n", source);
+                }
+            }
+            else if (source_type.compare("largestdegree") == 0)
+            {
+                int maximum_degree;
+                source = csr.GetNodeWithHighestDegree(maximum_degree);
+                if (!args.CheckCmdLineFlag("quiet"))
+                {
+                    printf("Using highest degree (%d), vertex: %d\n",
+                           maximum_degree, source);
+                }
+            }
+            else
+            {
+                args.GetCmdLineArgument("src", source);
+            }
+            if (!args.CheckCmdLineFlag("quiet"))
+            {
+                printf("Source vertex: %d\n", (int64_t)source);
+            }
+        }
+
         args.GetCmdLineArgument("queue-sizing", q_sizing);
         args.GetCmdLineArgument("in-sizing", i_sizing);
         args.GetCmdLineArgument("grid-size", grid_size);
@@ -1166,7 +1216,48 @@ struct Info
         }
 
         // parse device count and device list
-        info["device_list"] = getDeviceList(args);
+        info["device_list"] = GetDeviceList(args);
+
+        ///////////////////////////////////////////////////////////////////////
+        // initialize CUDA streams and context for MordernGPU API.
+        // TODO: streams and context initialize can be removed after merge
+        // with `mgpu-cq` branch. YC already moved them into Enactor code.
+        std::vector<int> temp_devices;
+        if (args.CheckCmdLineFlag("device"))  // parse device list
+        {
+            args.GetCmdLineArguments<int>("device", temp_devices);
+            num_gpus = temp_devices.size();
+        }
+        else  // use single device with index 0
+        {
+            num_gpus = 1;
+            temp_devices.push_back(0);
+        }
+        
+        cudaStream_t*     streams_ = new cudaStream_t[num_gpus * num_gpus * 2];
+        mgpu::ContextPtr* context_ = new mgpu::ContextPtr[num_gpus * num_gpus];
+
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            util::SetDevice(temp_devices[gpu]);
+            for (int i = 0; i < num_gpus * 2; i++)
+            {
+                int _i = gpu * num_gpus * 2 + i;
+                util::GRError(
+                    cudaStreamCreate(&streams_[_i]),
+                    "cudaStreamCreate failed.", __FILE__, __LINE__);
+                if (i < num_gpus)
+                {
+                    context_[gpu * num_gpus + i] =
+                        mgpu::CreateCudaDeviceAttachStream(
+                            temp_devices[gpu], streams_[_i]);
+                }
+            }
+        }
+        ///////////////////////////////////////////////////////////////////////
+
+        context = (mgpu::ContextPtr*)context_;
+        streams = (cudaStream_t*)streams_;
 
         args.GetCmdLineArgument("jsonfile", ofname);
         args.GetCmdLineArgument("jsondir", dir);
@@ -1178,10 +1269,6 @@ struct Info
         // system information
         info["engine"] = "Gunrock";
         info["command_line"] = json_spirit::mValue(args.GetEntireCommandLine());
-        char *market_filename = args.GetCmdLineArgvDataset();
-        boost::filesystem::path market_filename_path(market_filename);
-        file_stem = market_filename_path.stem().string();
-        info["dataset"] = file_stem;
         gunrock::util::Sysinfo sysinfo;  // get machine / OS / user / time info
         info["sysinfo"] = sysinfo.getSysinfo();
         gunrock::util::Gpuinfo gpuinfo;
@@ -1195,58 +1282,84 @@ struct Info
         // parsed testing parameters
         info["max_grid_size"] = grid_size;
         info["traversal_mode"] = traversal;
-        info["num_gpus"] = num_device;
-        info["vertex_id"] = srcvertex;
+        info["vertex_id"] = (int64_t)source;
         info["partition_factor"] = par_factor;
         info["partition_seed"] = par_seed;
+        info["graph_type"] = args.GetCmdLineArgvGraphType();
 
         // running statistics
-
 
         // output JSON if user specified
         if (args.CheckCmdLineFlag("json"))
         {
-            json();
+            PrintJson();
         }
         if (args.CheckCmdLineFlag("jsonfile"))
         {
-            jsonFile();   
+            JsonFile();   
         }
         if (args.CheckCmdLineFlag("jsondir"))
         {
-            jsonDir();
+            JsonDir();
         }
     }
     
-    json_spirit::mArray getDeviceList(util::CommandLineArgs &args)
+    /**
+     * @brief Utility function to parse device list.
+     *
+     * @param[in] args Command line arguments.
+     *
+     * \return json_spirit::mArray object contain devices used.
+     */
+    json_spirit::mArray GetDeviceList(util::CommandLineArgs &args)
     {
-        json_spirit::mArray devices;
-        if (args.CheckCmdLineFlag("device"))
+        std::vector<int> devices;
+        json_spirit::mArray device_list;
+        if (args.CheckCmdLineFlag("device"))  // parse device list
         {
-            std::vector<int> gpus;
-            args.GetCmdLineArguments<int>("device", gpus);
-            num_device = gpus.size();
-            for (int i = 0; i < num_device; i++)
+            args.GetCmdLineArguments<int>("device", devices);
+            num_gpus = devices.size();
+            if (!args.CheckCmdLineFlag("quiet"))
             {
-                devices.push_back(gpus[i]);
+                printf("Using %d GPU(s): [", num_gpus);
+                for (int i = 0; i < num_gpus; ++i) 
+                { 
+                    printf(" %d", devices[i]); 
+                }
+                printf(" ].\n");
+            }
+            info["num_gpus"] = num_gpus;  // update number of devices
+            for (int i = 0; i < num_gpus; i++)
+            {
+                device_list.push_back(devices[i]);
             }
         }
-        else
+        else  // use single device with index 0
         {
-            num_device = 1;
-            devices.push_back(0);
+            num_gpus = 1;
+            device_list.push_back(0);
+            if (!args.CheckCmdLineFlag("quiet"))
+            {
+                printf("Using 1 GPU: [ 0 ].\n");
+            }
         }
-        return devices;
+        return device_list;
     }
 
-    void json()
+    /**
+     * @brief Writes the JSON structure to STDOUT (command line --json).
+     */
+    void PrintJson()
     {
         json_spirit::write_stream(
             json_spirit::mValue(info), std::cout,
             json_spirit::pretty_print);
     }
 
-    void jsonFile()
+    /*
+     * @brief Writes the JSON structure to filename (command line --jsonfile).
+     */
+    void JsonFile()
     {
         std::ofstream of(ofname.data());
         json_spirit::write_stream(
@@ -1254,24 +1367,197 @@ struct Info
             json_spirit::pretty_print);
     }
 
-    void jsonDir()
+    /**
+     * @brief Writes the JSON structure to an automatically-uniquely-named
+     * file in the dir directory (command line --jsondir).
+     */
+    void JsonDir()
     {
         std::string filename =
             dir + "/" + info["name"].get_str() + "_" +
             ((file_stem != "") ? (file_stem + "_") : "") +
             info["time"].get_str() + ".json";
-        // now filter out bad chars (the list in badchars)
-        char badchars[] = ":\n";
-        for (unsigned int i = 0; i < strlen(badchars); ++i)
+        // now filter out bad chars (the list in bad_chars)
+        char bad_chars[] = ":\n";
+        for (unsigned int i = 0; i < strlen(bad_chars); ++i)
         {
             filename.erase(
-                std::remove(filename.begin(), filename.end(), badchars[i]),
+                std::remove(filename.begin(), filename.end(), bad_chars[i]),
                 filename.end());
         }
         std::ofstream of(filename.data());
         json_spirit::write_stream(
             json_spirit::mValue(info), of,
             json_spirit::pretty_print);
+    }
+
+    /**
+     * @brief Utility function to load input graph.
+     *
+     * @param[in] args Command line arguments.
+     * @param[in] csr Reference to the CSR graph.
+     */
+    int LoadGraph(
+        util::CommandLineArgs &args, Csr<VertexId, Value, SizeT> &csr)
+    {
+        std::string graph_type = args.GetCmdLineArgvGraphType();
+        if (graph_type == "market") 
+        {
+            if (!args.CheckCmdLineFlag("quiet")) 
+            {
+                printf("Loading Market-Matrix graph ...\n"); 
+            }
+            // Matrix-market coordinate-formatted graph file
+            char *market_filename = args.GetCmdLineArgvDataset();
+            if (market_filename == NULL && !args.CheckCmdLineFlag("quiet"))
+            {
+                fprintf(stderr, "Input graph does not exist.\n");
+                return 1;
+            }
+            boost::filesystem::path market_filename_path(market_filename);
+            file_stem = market_filename_path.stem().string();
+            info["dataset"] = file_stem;
+            if (graphio::BuildMarketGraph<false>(
+                        market_filename,
+                        csr,
+                        args.CheckCmdLineFlag("undirected"),
+                        false,  // no inverse graph
+                        args.CheckCmdLineFlag("quiet")) != 0)   
+            {
+                return 1;
+            }
+        }
+        else if (graph_type == "rmat")
+        {
+            if (!args.CheckCmdLineFlag("quiet")) 
+            {
+                printf("Generating R-MAT graph ...\n");
+            }
+            // parse R-MAT parameters
+            SizeT rmat_nodes = 1 << 10;
+            SizeT rmat_edges = 1 << 10;
+            SizeT rmat_scale = 10;
+            SizeT rmat_edgefactor = 48;
+            double rmat_a = 0.57;
+            double rmat_b = 0.19;
+            double rmat_c = 0.19;
+            double rmat_d = 1 - (rmat_a + rmat_b + rmat_c);
+            int    rmat_seed = -1;
+
+            args.GetCmdLineArgument("rmat_scale", rmat_scale);
+            rmat_nodes = 1 << rmat_scale;
+            args.GetCmdLineArgument("rmat_nodes", rmat_nodes);
+            args.GetCmdLineArgument("rmat_edgefactor", rmat_edgefactor);
+            rmat_edges = rmat_nodes * rmat_edgefactor;
+            args.GetCmdLineArgument("rmat_edges", rmat_edges);
+            args.GetCmdLineArgument("rmat_a", rmat_a);
+            args.GetCmdLineArgument("rmat_b", rmat_b);
+            args.GetCmdLineArgument("rmat_c", rmat_c);
+            rmat_d = 1 - (rmat_a + rmat_b + rmat_c);
+            args.GetCmdLineArgument("rmat_d", rmat_d);
+            args.GetCmdLineArgument("rmat_seed", rmat_seed);
+
+            // put everything into mObject info
+            info["rmat_a"] = rmat_a;
+            info["rmat_b"] = rmat_b;
+            info["rmat_c"] = rmat_c;
+            info["rmat_d"] = rmat_d;
+            info["rmat_seed"] = rmat_seed;
+            info["rmat_scale"] = rmat_scale;
+            info["rmat_nodes"] = rmat_nodes;
+            info["rmat_edges"] = rmat_edges;
+            info["rmat_edgefactor"] = rmat_edgefactor;
+
+            // CpuTimer cpu_timer;
+            // cpu_timer.Start();
+            if (graphio::BuildRmatGraph<false>(
+                        rmat_nodes,
+                        rmat_edges,
+                        csr,
+                        args.CheckCmdLineFlag("undirected"),
+                        rmat_a,
+                        rmat_b,
+                        rmat_c,
+                        rmat_d,
+                        1,
+                        1,
+                        rmat_seed) != 0)
+            {
+                return 1;
+            }
+            // cpu_timer.Stop();
+            float elapsed = 0.0f; // cpu_timer.ElapsedMillis();
+            if (!args.CheckCmdLineFlag("quiet"))
+            {
+                printf("R-MAT graph generated in %.3f ms, "
+                       "a = %.3f, b = %.3f, c = %.3f, d = %.3f\n",
+                       elapsed, rmat_a, rmat_b, rmat_c, rmat_d);
+            }
+        }
+        else if (graph_type == "rgg")
+        {
+            if (!args.CheckCmdLineFlag("quiet")) 
+            {
+                printf("Generating RGG (Random Geometry Graph) ...\n");
+            }
+
+            SizeT rgg_nodes = 1 << 10;
+            SizeT rgg_scale = 10;
+            double rgg_thfactor  = 0.55;
+            double rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
+            double rgg_vmultipiler = 1;
+            int    rgg_seed        = -1;
+
+            args.GetCmdLineArgument("rgg_scale", rgg_scale);
+            rgg_nodes = 1 << rgg_scale;
+            args.GetCmdLineArgument("rgg_nodes", rgg_nodes);
+            args.GetCmdLineArgument("rgg_thfactor", rgg_thfactor);
+            rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
+            args.GetCmdLineArgument("rgg_threshold", rgg_threshold);
+            args.GetCmdLineArgument("rgg_vmultipiler", rgg_vmultipiler);
+            args.GetCmdLineArgument("rgg_seed", rgg_seed);
+
+            // put everything into mObject info
+            info["rgg_seed"]        = rgg_seed;
+            info["rgg_scale"]       = rgg_scale;
+            info["rgg_nodes"]       = rgg_nodes;
+            info["rgg_thfactor"]    = rgg_thfactor;
+            info["rgg_threshold"]   = rgg_threshold;
+            info["rgg_vmultipiler"] = rgg_vmultipiler;
+
+            // CpuTimer cpu_timer;
+            // cpu_timer.Start();
+            if (graphio::BuildRggGraph<false>(
+                        rgg_nodes,
+                        csr,
+                        rgg_threshold,
+                        args.CheckCmdLineFlag("undirected"),
+                        rgg_vmultipiler,
+                        1,
+                        rgg_seed) != 0)
+            {
+                return 1;
+            }
+            // cpu_timer.Stop();
+            float elapsed = 0.0f; // cpu_timer.ElapsedMillis();
+            if (!args.CheckCmdLineFlag("quiet"))
+            {
+                printf("RGG generated in %.3f ms, "
+                       "threshold = %.3lf, vmultipiler = %.3lf\n",
+                       elapsed, rgg_threshold, rgg_vmultipiler);
+            }
+        }
+        else
+        {
+            fprintf(stderr, "Unspecified graph type.\n");
+            return 1;
+        }
+
+        if (!args.CheckCmdLineFlag("quiet"))
+        {
+            csr.PrintHistogram();
+        }
+        return 0;
     }
 };
 
@@ -1373,11 +1659,11 @@ struct ProblemBase
         // Cleanup graph slices on the heap
         for (int i = 0; i < num_gpus; ++i)
         {
-            delete   graph_slices     [i  ]; graph_slices     [i  ] = NULL;
+            delete graph_slices[i]; graph_slices[i] = NULL;
         }
         if (num_gpus > 1)
         {
-            delete   partitioner;           partitioner          = NULL;
+            delete partitioner; partitioner = NULL;
         }
         delete[] graph_slices; graph_slices = NULL;
         delete[] gpu_idx;      gpu_idx      = NULL;

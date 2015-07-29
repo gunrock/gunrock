@@ -26,11 +26,6 @@
 #include <gunrock/util/gitsha1.h>
 #include <boost/filesystem.hpp>
 
-// Graph construction utils
-#include <gunrock/graphio/market.cuh>
-#include <gunrock/graphio/rmat.cuh>
-#include <gunrock/graphio/rgg.cuh>
-
 // BFS includes
 #include <gunrock/app/bfs/bfs_enactor.cuh>
 #include <gunrock/app/bfs/bfs_problem.cuh>
@@ -161,37 +156,6 @@ struct Stats
     Stats() : name(NULL), rate(), search_depth(), redundant_work(), duty() {}
     Stats(const char *name) :
         name(name), rate(), search_depth(), redundant_work(), duty() {}
-};
-
-/**
- * @brief Test_Parameter structure
- */
-struct Test_Parameter : gunrock::app::TestParameter_Base
-{
-public:
-    bool   mark_predecessors ;  // Mark src-distance vs. parent vertices
-    bool   enable_idempotence;  // Enable idempotence operation
-    double max_queue_sizing1 ;
-
-    Test_Parameter()
-    {
-        mark_predecessors  = false;
-        enable_idempotence = false;
-        max_queue_sizing1  = -1.0;
-    }
-
-    ~Test_Parameter()
-    {
-
-    }
-
-    void Init(CommandLineArgs &args)
-    {
-        TestParameter_Base::Init(args);
-        mark_predecessors  = args.CheckCmdLineFlag("mark-pred");
-        enable_idempotence = args.CheckCmdLineFlag("idempotence");
-        args.GetCmdLineArgument("queue-sizing1", max_queue_sizing1);
-    }
 };
 
 /**
@@ -445,7 +409,7 @@ void SimpleReferenceBfs(
  * @param[in] max_queue_sizing Scaling factor used in edge mapping
  * @param[in] iterations Number of iterations for running the test
  * @param[in] traversal_mode Advance mode: Load-balanced or Dynamic cooperative
- * @param[in] context CudaContext pointer for moderngpu APIs
+ * @param[in] context CudaContext pointer for ModernGPU APIs
  *
  */
 template <
@@ -457,7 +421,7 @@ template <
     bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS,
     bool        ENABLE_IDEMPOTENCE >
-void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
+void RunTests(app::Info<VertexId, Value, SizeT> *info)
 {
     // info->json();
     typedef BFSProblem < VertexId,
@@ -474,8 +438,8 @@ void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
             SIZE_CHECK >
             BfsEnactor;
 
-    Csr<VertexId, Value, SizeT>
-    *graph = (Csr<VertexId, Value, SizeT>*)parameter->graph;  // TODO: replace with standalone pointer to CSR after merge mgpu-cq
+    // parse configurations from mObject info
+    Csr<VertexId, Value, SizeT> *graph = (Csr<VertexId, Value, SizeT>*)info->graph;
     VertexId src                 = info->info["vertex_id"].get_int64();
     int max_grid_size            = info->info["max_grid_size"].get_int();
     int num_gpus                 = info->info["num_gpus"].get_int();
@@ -485,6 +449,7 @@ void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
     std::string partition_method = info->info["partition_method"].get_str();
     float partition_factor       = info->info["partition_factor"].get_real();
     int partition_seed           = info->info["partition_seed"].get_int();
+    bool quiet_mode              = info->info["quiet_mode"].get_bool();
     bool g_quick                 = info->info["quick_mode"].get_bool();
     bool g_stream_from_host      = info->info["stream_from_host"].get_bool();
     int traversal_mode           = info->info["traversal_mode"].get_int();
@@ -492,18 +457,10 @@ void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
 
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
-    for (int i = 0; i < num_gpus; i++)
-    {
-        gpu_idx[i] = device_list[i].get_int();
-    }
+    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
 
-    for (int i = 0; i < num_gpus; ++i)
-    {
-        std::cout << std::endl << gpu_idx[i] << std::endl;
-    }
-
-    ContextPtr   *context               = (ContextPtr*)parameter -> context;  // TODO: remove after merge mgpu-cq
-    cudaStream_t *streams               = parameter -> streams;  // TODO: remove after merge mgpu-cq
+    ContextPtr   *context = (ContextPtr*)info -> context;  // TODO: remove after merge mgpu-cq
+    cudaStream_t *streams = info -> streams;  // TODO: remove after merge mgpu-cq
 
     size_t       *org_size              = new size_t  [num_gpus];
 
@@ -550,7 +507,7 @@ void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
                   "Problem BFS Initialization Failed", __FILE__, __LINE__);
 
     util::GRError(enactor->Init(context, problem, max_grid_size, traversal_mode),
-                  "BFS Enactor init failed", __FILE__, __LINE__);
+                  "BFS Enactor Init failed", __FILE__, __LINE__);
 
     //
     // Compute reference CPU BFS solution for source-distance
@@ -558,7 +515,7 @@ void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
 
     if (reference_check_label != NULL)
     {
-        if (!parameter->g_quiet)
+        if (!quiet_mode)
         {
             printf("Computing reference value ...\n");
         }
@@ -568,8 +525,8 @@ void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
                                reference_check_label,
                                reference_check_preds,
                                src,
-                               parameter->g_quiet);
-        if (!parameter->g_quiet)
+                               quiet_mode);
+        if (!quiet_mode)
         {
             printf("\n");
         }
@@ -599,7 +556,7 @@ void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
 
         util::GRError("Error before Enact", __FILE__, __LINE__);
 
-        if (!parameter->g_quiet)
+        if (!quiet_mode)
         {   printf("__________________________\n"); fflush(stdout); }
 
         cpu_timer.Start();
@@ -607,7 +564,7 @@ void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
                       "BFS Problem Enact Failed", __FILE__, __LINE__);
         cpu_timer.Stop();
 
-        if (!parameter->g_quiet)
+        if (!quiet_mode)
         {   printf("--------------------------\n"); fflush(stdout); }
 
         elapsed += cpu_timer.ElapsedMillis();
@@ -626,16 +583,16 @@ void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
     {
         if (!ENABLE_IDEMPOTENCE)
         {
-            if (!parameter->g_quiet)
+            if (!quiet_mode)
             {
                 printf("Label Validity: ");
             }
             int error_num = CompareResults(
                                 h_labels, reference_check_label,
-                                graph->nodes, true, parameter->g_quiet);
+                                graph->nodes, true, quiet_mode);
             if (error_num > 0)
             {
-                if (!parameter->g_quiet)
+                if (!quiet_mode)
                 {
                     printf("%d errors occurred.\n", error_num);
                 }
@@ -645,16 +602,16 @@ void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
         {
             if (!MARK_PREDECESSORS)
             {
-                if (!parameter->g_quiet)
+                if (!quiet_mode)
                 {
                     printf("Label Validity: ");
                 }
                 int error_num = CompareResults(
                                     h_labels, reference_check_label,
-                                    graph->nodes, true, parameter->g_quiet);
+                                    graph->nodes, true, quiet_mode);
                 if (error_num > 0)
                 {
-                    if (!parameter->g_quiet)
+                    if (!quiet_mode)
                     {
                         printf("%d errors occurred.\n", error_num);
                     }
@@ -664,16 +621,16 @@ void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
     }
 
     // Display Solution
-    if (!parameter->g_quiet)
+    if (!quiet_mode)
     {
         DisplaySolution <
         VertexId, SizeT, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE >
-        (h_labels, h_preds, graph->nodes, parameter->g_quiet);
+        (h_labels, h_preds, graph->nodes, quiet_mode);
     }
 
     DisplayStats<MARK_PREDECESSORS, VertexId, Value, SizeT>(
         *stats,
-        parameter->info,
+        info->info,
         src,
         h_labels,
         graph,
@@ -681,9 +638,9 @@ void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
         search_depth,
         total_queued,
         avg_duty,
-        parameter->g_quiet);
+        quiet_mode);
 
-    if (!parameter->g_quiet)
+    if (!quiet_mode)
     {
         printf("\n\tMemory Usage(B)\t");
         for (int gpu = 0; gpu < num_gpus; gpu++)
@@ -777,7 +734,7 @@ void RunTests(gunrock::app::Info *info, Test_Parameter *parameter)
  * @tparam SIZE_CHECK
  * @tparam MARK_PREDECESSORS
  *
- * @param[in] parameter Pointer to test parameter settings
+ * @param[in] info Pointer to mObject info.
  */
 template <
     typename    VertexId,
@@ -787,14 +744,18 @@ template <
     bool        DEBUG,
     bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS >
-void RunTests_enable_idempotence(gunrock::app::Info *info, Test_Parameter *parameter)
+void RunTests_enable_idempotence(app::Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->enable_idempotence) RunTests
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
-        MARK_PREDECESSORS, true > (info, parameter);
-    else RunTests
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
-        MARK_PREDECESSORS, false> (info, parameter);
+    if (info->info["idempotent"].get_bool())
+    {
+        RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
+                 MARK_PREDECESSORS, true > (info);
+    }
+    else
+    {
+        RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
+                 MARK_PREDECESSORS, false> (info);
+    }
 }
 
 /**
@@ -807,7 +768,7 @@ void RunTests_enable_idempotence(gunrock::app::Info *info, Test_Parameter *param
  * @tparam DEBUG
  * @tparam SIZE_CHECK
  *
- * @param[in] parameter Pointer to test parameter settings
+ * @param[in] info Pointer to mObject info.
  */
 template <
     typename    VertexId,
@@ -816,14 +777,18 @@ template <
     bool        INSTRUMENT,
     bool        DEBUG,
     bool        SIZE_CHECK >
-void RunTests_mark_predecessors(gunrock::app::Info *info, Test_Parameter *parameter)
+void RunTests_mark_predecessors(app::Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->mark_predecessors) RunTests_enable_idempotence
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
-        true > (info, parameter);
-    else RunTests_enable_idempotence
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
-        false> (info, parameter);
+    if (info->info["mark_preds"].get_bool())
+    {
+        RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
+                                    DEBUG, SIZE_CHECK,  true> (info);
+    }
+    else
+    {
+        RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
+                                    DEBUG, SIZE_CHECK, false> (info);
+    }
 }
 
 /**
@@ -835,7 +800,7 @@ void RunTests_mark_predecessors(gunrock::app::Info *info, Test_Parameter *parame
  * @tparam INSTRUMENT
  * @tparam DEBUG
  *
- * @param[in] parameter Pointer to test parameter settings
+ * @param[in] info Pointer to mObject info.
  */
 template <
     typename      VertexId,
@@ -843,14 +808,18 @@ template <
     typename      SizeT,
     bool          INSTRUMENT,
     bool          DEBUG >
-void RunTests_size_check(gunrock::app::Info *info, Test_Parameter *parameter)
+void RunTests_size_check(app::Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->size_check) RunTests_mark_predecessors
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-        true > (info, parameter);
-    else RunTests_mark_predecessors
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-        false> (info, parameter);
+    if (info->info["size_check"].get_bool())
+    {
+        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
+                                   DEBUG,  true> (info);
+    }
+    else
+    {
+        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
+                                   DEBUG, false> (info);
+    }
 }
 
 /**
@@ -861,21 +830,23 @@ void RunTests_size_check(gunrock::app::Info *info, Test_Parameter *parameter)
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] parameter Pointer to test parameter settings
+ * @param[in] info Pointer to mObject info.
  */
 template <
     typename    VertexId,
     typename    Value,
     typename    SizeT,
     bool        INSTRUMENT >
-void RunTests_debug(gunrock::app::Info *info, Test_Parameter *parameter)
+void RunTests_debug(app::Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->debug) RunTests_size_check
-        <VertexId, Value, SizeT, INSTRUMENT,
-        true > (info, parameter);
-    else RunTests_size_check
-        <VertexId, Value, SizeT, INSTRUMENT,
-        false> (info, parameter);
+    if (info->info["debug_mode"].get_bool())
+    {
+        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,  true> (info);
+    }
+    else
+    {
+        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT, false> (info);
+    }
 }
 
 /**
@@ -885,328 +856,50 @@ void RunTests_debug(gunrock::app::Info *info, Test_Parameter *parameter)
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] parameter Pointer to test parameter settings
+ * @param[in] info Pointer to mObject info.
  */
 template <
     typename      VertexId,
     typename      Value,
     typename      SizeT >
-void RunTests_instrumented(gunrock::app::Info *info, Test_Parameter *parameter)
+void RunTests_instrumented(app::Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->instrumented) RunTests_debug
-        <VertexId, Value, SizeT,
-        true > (info, parameter);
-    else RunTests_debug
-        <VertexId, Value, SizeT,
-        false> (info, parameter);
+    if (info->info["instrument"].get_bool())
+    {
+        RunTests_debug < VertexId, Value, SizeT, true> (info);
+    }
+    else
+    {
+        RunTests_debug<VertexId, Value, SizeT,  false> (info);
+    }
 }
 
 /******************************************************************************
 * Main
 ******************************************************************************/
 
-int main( int argc, char** argv)
+int main(int argc, char** argv)
 {
-    CommandLineArgs  args(argc, argv);
-    int              num_gpus     = 0;
-    int             *gpu_idx      = NULL;
-    ContextPtr      *context      = NULL;
-    cudaStream_t    *streams      = NULL;
-    bool             g_undirected = false;
+    CommandLineArgs args(argc, argv);
+    int graph_args = argc - args.ParsedArgc() - 1;
 
-    if ((argc < 2) || (args.CheckCmdLineFlag("help")))
+    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
     {
         Usage();
         return 1;
     }
 
-    Test_Parameter *parameter = new Test_Parameter;
-    gunrock::app::Info *info = new gunrock::app::Info;
+    typedef int VertexId;  // Use int as the vertex identifier
+    typedef int Value;     // Use int as the value type
+    typedef int SizeT;     // Use int as the graph size type
 
-    info->Init(args);
+    Csr<VertexId, Value, SizeT> graph(false);  // default false stream_from_host
+    app::Info<VertexId, Value, SizeT> *info = new app::Info<VertexId, Value, SizeT>;
 
-    parameter->Init(args);  // TODO: remove this after finish Info class.
+    info->Init(args, graph);  // initialize Info structure
+    info->graph = &graph;     // set graph pointer
 
-    // don't print anything unless specifically directed
-    parameter->g_quiet = args.CheckCmdLineFlag("quiet");  // TODO: remove this after finish Info class.
-
-    if (args.CheckCmdLineFlag  ("device"))
-    {
-        std::vector<int> gpus;
-        args.GetCmdLineArguments<int>("device", gpus);
-        num_gpus   = gpus.size();
-        gpu_idx    = new int[num_gpus];
-        for (int i = 0; i < num_gpus; i++)
-        {
-            gpu_idx[i] = gpus[i];
-        }
-    }
-    else
-    {
-        num_gpus   = 1;
-        gpu_idx    = new int[num_gpus];
-        gpu_idx[0] = 0;
-    }
-    streams  = new cudaStream_t[num_gpus * num_gpus * 2];
-    context  = new ContextPtr  [num_gpus * num_gpus];
-
-    if (!parameter->g_quiet)
-    {
-        printf("Using %d gpus: ", num_gpus);
-    }
-
-    for (int gpu = 0; gpu < num_gpus; gpu++)
-    {
-        if (!parameter->g_quiet)
-        {
-            printf(" %d ", gpu_idx[gpu]);
-        }
-        util::SetDevice(gpu_idx[gpu]);
-        for (int i = 0; i < num_gpus * 2; i++)
-        {
-            int _i = gpu * num_gpus * 2 + i;
-            util::GRError(
-                cudaStreamCreate(&streams[_i]),
-                "cudaStreamCreate fialed.", __FILE__, __LINE__);
-            if (i < num_gpus)
-            {
-                context[gpu * num_gpus + i] =
-                    mgpu::CreateCudaDeviceAttachStream(
-                        gpu_idx[gpu], streams[_i]);
-            }
-        }
-    }
-    if (!parameter->g_quiet)
-    {
-        printf("\n"); fflush(stdout);
-    }
-
-    std::string graph_type = argv[1];
-    int flags = args.ParsedArgc();
-    int graph_args = argc - flags - 1;
-
-    if (graph_args < 1)
-    {
-        Usage();
-        return 1;
-    }
-
-     // TODO: remove this after finish Info class.
-    parameter->info["engine"] = "Gunrock";
-    parameter->info["command_line"] = json_spirit::mValue(args.GetEntireCommandLine());
-
-    // get machine/OS/user/time info
-    Sysinfo sysinfo;
-    parameter->info["sysinfo"] = sysinfo.getSysinfo();
-    Gpuinfo gpuinfo;
-    parameter->info["gpuinfo"] = gpuinfo.getGpuinfo();
-    Userinfo userinfo;
-    parameter->info["userinfo"] = userinfo.getUserinfo();
-    time_t now = time(NULL);
-    parameter->info["time"] = ctime(&now);
-
-    /* Gunrock and git commit */
-    parameter->info["gunrock_version"] = XSTR(GUNROCKVERSION);
-    // parameter->info["git_commit_sha1"] = XSTR(GIT_SHA1);
-    parameter->info["git_commit_sha1"] = g_GIT_SHA1;
-
-    // Parse graph-contruction params
-    g_undirected = args.CheckCmdLineFlag("undirected");
-    parameter->info["undirected"] = g_undirected;
-
-    //
-    // Construct graph and perform search(es)
-    //
-
-    typedef int VertexId;                    // Use as the node identifier
-    typedef int Value;                       // Use as the value type
-    typedef int SizeT;                       // Use as the graph size type
-    Csr<VertexId, Value, SizeT> csr(false);  // default for stream_from_host
-    if (graph_args < 1) { Usage(); return 1; }
-
-    std::string file_stem;
-    if (graph_type == "market")
-    {
-        // Matrix-market coordinate-formatted graph file
-        if (graph_args < 1) { Usage(); return 1; }
-
-        char *market_filename = args.GetCmdLineArgvDataset();
-        boost::filesystem::path market_filename_path(market_filename);
-        file_stem = market_filename_path.stem().string();
-        parameter->info["dataset"] = file_stem;
-        if (graphio::BuildMarketGraph<false>(
-                    market_filename,
-                    csr,
-                    g_undirected,
-                    false,
-                    parameter->g_quiet) != 0)   // no inverse graph
-        {
-            return 1;
-        }
-
-        if (!parameter->g_quiet)
-        {
-            csr.PrintHistogram();
-        }
-    }
-    else if (graph_type == "rmat")
-    {
-        // parse rmat parameters
-        SizeT rmat_nodes = 1 << 10;
-        SizeT rmat_edges = 1 << 10;
-        SizeT rmat_scale = 10;
-        SizeT rmat_edgefactor = 48;
-        double rmat_a = 0.57;
-        double rmat_b = 0.19;
-        double rmat_c = 0.19;
-        double rmat_d = 1 - (rmat_a + rmat_b + rmat_c);
-        int    rmat_seed = -1;
-
-        args.GetCmdLineArgument("rmat_scale", rmat_scale);
-        rmat_nodes = 1 << rmat_scale;
-        args.GetCmdLineArgument("rmat_nodes", rmat_nodes);
-        args.GetCmdLineArgument("rmat_edgefactor", rmat_edgefactor);
-        rmat_edges = rmat_nodes * rmat_edgefactor;
-        args.GetCmdLineArgument("rmat_edges", rmat_edges);
-        args.GetCmdLineArgument("rmat_a", rmat_a);
-        args.GetCmdLineArgument("rmat_b", rmat_b);
-        args.GetCmdLineArgument("rmat_c", rmat_c);
-        rmat_d = 1 - (rmat_a + rmat_b + rmat_c);
-        args.GetCmdLineArgument("rmat_d", rmat_d);
-        args.GetCmdLineArgument("rmat_seed", rmat_seed);
-
-        CpuTimer cpu_timer;
-        cpu_timer.Start();
-        if (graphio::BuildRmatGraph<false>(
-                    rmat_nodes,
-                    rmat_edges,
-                    csr,
-                    g_undirected,
-                    rmat_a,
-                    rmat_b,
-                    rmat_c,
-                    rmat_d,
-                    1,
-                    1,
-                    rmat_seed) != 0)
-        {
-            return 1;
-        }
-        cpu_timer.Stop();
-        float elapsed = cpu_timer.ElapsedMillis();
-        if (!parameter->g_quiet)
-        {
-            printf("graph generated in %.3f ms, "
-                   "a = %.3f, b = %.3f, c = %.3f, d = %.3f\n",
-                   elapsed, rmat_a, rmat_b, rmat_c, rmat_d);
-        }
-    }
-    else if (graph_type == "rgg")
-    {
-        SizeT rgg_nodes = 1 << 10;
-        SizeT rgg_scale = 10;
-        double rgg_thfactor  = 0.55;
-        double rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
-        double rgg_vmultipiler = 1;
-        int    rgg_seed        = -1;
-
-        args.GetCmdLineArgument("rgg_scale", rgg_scale);
-        rgg_nodes = 1 << rgg_scale;
-        args.GetCmdLineArgument("rgg_nodes", rgg_nodes);
-        args.GetCmdLineArgument("rgg_thfactor", rgg_thfactor);
-        rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
-        args.GetCmdLineArgument("rgg_threshold", rgg_threshold);
-        args.GetCmdLineArgument("rgg_vmultipiler", rgg_vmultipiler);
-        args.GetCmdLineArgument("rgg_seed", rgg_seed);
-
-        CpuTimer cpu_timer;
-        cpu_timer.Start();
-        if (graphio::BuildRggGraph<false>(
-                    rgg_nodes,
-                    csr,
-                    rgg_threshold,
-                    g_undirected,
-                    rgg_vmultipiler,
-                    1,
-                    rgg_seed) != 0)
-        {
-            return 1;
-        }
-        cpu_timer.Stop();
-        float elapsed = cpu_timer.ElapsedMillis();
-        printf("graph generated in %.3f ms, "
-               "threshold = %.3lf, vmultipiler = %.3lf\n",
-               elapsed, rgg_threshold, rgg_vmultipiler);
-
-        if (!parameter->g_quiet)
-        {
-            csr.PrintHistogram();
-        }
-    }
-    else
-    {
-        fprintf(stderr, "Unspecified graph type\n");
-        return 1;
-    }
-
-     // TODO: remove this after finish Info class.
-    std::string src_str = "";
-    parameter->graph    = &csr;
-    parameter->num_gpus = num_gpus;
-    parameter->context  = context;
-    parameter->gpu_idx  = gpu_idx;
-    parameter->streams  = streams;
-
-    args.GetCmdLineArgument("src", src_str);
-
-    if (src_str.empty())
-    {
-        parameter->src = 0;
-    }
-    else if (src_str.compare("randomize") == 0)
-    {
-        parameter->src = graphio::RandomNode(csr.nodes);
-    }
-    else if (src_str.compare("largestdegree") == 0)
-    {
-        int maximum_degree;
-        parameter->src = csr.GetNodeWithHighestDegree(maximum_degree);
-        if (!parameter->g_quiet)
-        {
-            printf("Using highest degree (%d) vertex: %d\n",
-                   maximum_degree, parameter->src);
-        }
-    }
-    else
-    {
-        args.GetCmdLineArgument("src", parameter->src);
-    }
-    if (!parameter->g_quiet)
-    {
-        printf("src = %lld\n", (long long) parameter->src);
-    }
-
-    // traversal mode
-    args.GetCmdLineArgument("traversal-mode", parameter->traversal_mode);
-    if (parameter->traversal_mode == -1)
-    {
-        parameter->traversal_mode = csr.GetAverageDegree() > 8 ? 0 : 1;
-    }
-
-    // printf("Display neighbor list of src:\n");
-    // graph.DisplayNeighborList(src);
-
-     // TODO: remove this after finish Info class.
-    parameter->info["mark_predecessors"] = parameter -> mark_predecessors;
-    parameter->info["verbose"] = parameter -> debug;
-    parameter->info["instrumented"] = parameter -> instrumented;
-    parameter->info["quick"] = parameter -> g_quick;
-    parameter->info["iterations"] = parameter -> iterations;
-    parameter->info["max_grid_size"] = parameter -> max_grid_size;
-    parameter->info["idempotence"] = parameter -> enable_idempotence;
-    parameter->info["max_queue_sizing"] = parameter -> max_queue_sizing;
-
-    RunTests_instrumented<VertexId, Value, SizeT>(info, parameter);
+    RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test
 
     return 0;
 }

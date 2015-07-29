@@ -743,22 +743,38 @@ public:
         int traversal_mode = 0)
     {
         int min_sm_version = -1;
-        for (int i=0;i<this->num_gpus;i++)
-            if (min_sm_version == -1 || this->cuda_props[i].device_sm_version < min_sm_version)
+        for (int i = 0; i < this->num_gpus; i++) 
+        {
+            if (min_sm_version == -1 ||
+                this->cuda_props[i].device_sm_version < min_sm_version)
+            {
                 min_sm_version = this->cuda_props[i].device_sm_version;
+            }
+        }
 
         if (min_sm_version >= 300)
         {
-            if (Problem::ENABLE_IDEMPOTENCE) {
-                if (traversal_mode == 0)
+            if (Problem::ENABLE_IDEMPOTENCE) 
+            {
+                if (traversal_mode == 0) 
+                {
                     return EnactBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
-                else
+                }
+                else 
+                {
                     return EnactBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
-            } else {
-                if (traversal_mode == 0)
+                }
+            } 
+            else 
+            {
+                if (traversal_mode == 0) 
+                {
                     return EnactBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(src);
-                else
+                }
+                else 
+                {
                     return EnactBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(src);
+                }
             }
         }
 
@@ -797,24 +813,38 @@ public:
         {
             if (min_sm_version == -1 ||
                 this->cuda_props[i].device_sm_version < min_sm_version)
+            {
                 min_sm_version = this->cuda_props[i].device_sm_version;
+            }
         }
 
-        if (min_sm_version >= 300) {
-            if (Problem::ENABLE_IDEMPOTENCE) {
-                if (traversal_mode == 0)
+        if (min_sm_version >= 300) 
+        {
+            if (Problem::ENABLE_IDEMPOTENCE) 
+            {
+                if (traversal_mode == 0) 
+                {
                     return InitBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
                             context, problem, max_grid_size, size_check);
-                else
+                }
+                else 
+                {
                     return InitBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
                             context, problem, max_grid_size, size_check);
-            } else {
-                if (traversal_mode == 0)
+                }
+            } 
+            else 
+            {
+                if (traversal_mode == 0) 
+                {
                     return InitBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(
                             context, problem, max_grid_size, size_check);
-                else
+                }
+                else 
+                {
                     return InitBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(
                             context, problem, max_grid_size, size_check);
+                }
             }
         }
 
@@ -828,9 +858,9 @@ public:
     /** @} */
 };
 
-} // namespace bfs
-} // namespace app
-} // namespace gunrock
+}  // namespace bfs
+}  // namespace app
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

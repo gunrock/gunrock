@@ -58,7 +58,7 @@ inline bool Flip (struct drand48_data *rand_data)
  * @param[in] rand_data
  */
 template <typename VertexId>
-void ChoosePartition (
+inline void ChoosePartition (
     VertexId *u, VertexId *v, VertexId step,
     double a, double b, double c, double d, struct drand48_data *rand_data)
 {
@@ -93,7 +93,7 @@ void ChoosePartition (
  * @param[in] d
  * @param[in] rand_data
  */
-void VaryParams(
+inline void VaryParams(
     double *a, double *b, double *c, double *d, drand48_data *rand_data)
 {
     double v, S;

@@ -131,6 +131,12 @@ public:
         return commandLineStr;
     }
 
+    char * GetCmdLineArgvGraphType()
+    {
+        char * graph_type = argv[1];
+        return graph_type;
+    }
+
     char * GetCmdLineArgvDataset()
     {
         char * market_filename;
