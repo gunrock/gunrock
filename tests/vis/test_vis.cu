@@ -195,7 +195,7 @@
          problem->Init(g_stream_from_host, *graph, num_gpus),
          "Problem Initialization Failed", __FILE__, __LINE__);
 
-     Stats *stats = new Stats("GPU Primitive");
+     Stats *stats = new Stats("GPU Induced-Vertex-Subgraph");
 
      //
      // perform calculation

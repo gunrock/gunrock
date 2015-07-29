@@ -99,6 +99,110 @@ struct EnactorStats
     }
 };
 
+/*
+template<
+    typename VertexId,
+    typename Value,
+    typename SizeT>
+    void computeCommonStats(
+                EnactorStats *enactor_stats,
+                float elapsed,
+                const VertexId *h_labels,
+                const Csr<VertexId, Value, SizeT> *graph,
+                bool get_traversal_stats = false)
+    {
+        int64_t total_lifetimes = 0;
+        int64_t total_runtimes = 0;
+
+        //traversal stats
+        int64_t total_queued = 0;
+        int64_t search_depth = 0;
+        int64_t nodes_visited = 0;
+        int64_t edges_visited = 0;
+        float m_teps = 0.0f;
+        double redundant_work = 0.0f;
+
+        json_spirit::mArray device_list = info["device_list"].get_array();
+        for (int gpu = 0; gpu < num_device; ++gpu)
+        {
+            int my_gpu_idx = device_list[gpu].get_int();
+            if (num_device != 1)
+                if (util::SetDevice(my_gpu_idx)) return;
+            cudaThreadSynchronize();
+
+            for (int peer = 0; peer < num_device; ++peer)
+            {
+                EnactorStats *enactor_stats = enactor_stats + gpu*num_device + peer;
+                if (get_traversal_stats)
+                {
+                    enactor_stats->total_queued.Move(util::DEVICE, util::HOST);
+                    total_queued += enactor_stats->total_queued[0];
+                    if (enactor_stats->iteration > search_depth)
+                        search_depth = enactor_stats->iteration;
+                }
+                total_lifetimes += enactor_stats->total_lifetimes;
+                total_runtimes += enactor_stats->total_runtimes;
+            }
+        }
+        double avg_duty = (total_lifetimes > 0)? double(total_runtimes)/total_lifetimes : 0.0;
+        info["elapsed"] = elapsed;
+        info["avg_duty"] = avg_duty;
+
+        if (get_traversal_stats)
+        {
+            info["total_queued"] = total_queued;
+            info["search_depth"] = search_depth;
+        }
+
+        //TODO: compute traversal stats.
+        if (get_traversal_stats)
+        {
+            for (VertexId i = 0; i < graph->nodes; ++i)
+            {
+                if (h_labels[i] < util::MaxValue<VertexId>() && h_labels[i] != -1)
+                {
+                    ++nodes_visited;
+                    edges_visited += graph->row_offsets[i+1]-graph->row_offsets[i];
+                }
+                if ( info["name"].get_str().compare("GPU BC") == 0 )
+                {
+                    //For betweenness should count the backward phase too.
+                    edges_visited *= 2;
+                }
+            }
+            if (total_queued > 0)
+            {
+                // measure duplicate edges put through queue
+                redundant_work = ((double)total_queued - edges_visited) / edges_visited;
+            }
+            redundant_work *= 100;
+
+            info["nodes_visited"] = nodes_visited;
+            info["edges_visited"] = edges_visited;
+            info["redundant_work"] = redundant_work;
+        }
+        
+    }
+
+template<
+    typename VertexId,
+    typename Value,
+    typename SizeT>
+    void computeTraversalStats(
+                    EnactorStats *enactor_stats,
+                    float elapsed,
+                    const VertexId *h_labels,
+                    const Csr<VertexId, Value, SizeT> *graph)
+    {
+        computeCommonStats(
+                    enactor_stats,
+                    elapsed,
+                    h_labels,
+                    graph,
+                    true);
+    }
+*/
+
 /**
  * @brief Structure for auxiliary variables used in frontier operations.
  */
