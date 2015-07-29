@@ -103,6 +103,8 @@ struct EnactorStats
  * @brief Info data structure contains test parameter and running statistics.
  * All test parameters and running statistics stored in json_spirit::mObject.
  */
+//TODO: more robust empty info["value"] check.
+//
 template<typename VertexId, typename Value, typename SizeT>
 struct Info
 {
@@ -589,8 +591,8 @@ struct Info
                 const Csr<VertexId, Value, SizeT> *graph,
                 bool get_traversal_stats = false)
     {
-        int64_t total_lifetimes = 0;
-        int64_t total_runtimes = 0;
+        double total_lifetimes = 0;
+        double total_runtimes = 0;
 
         // traversal stats
         int64_t total_queued = 0;
@@ -627,7 +629,7 @@ struct Info
             }
         }
         double avg_duty = (total_lifetimes > 0) ? 
-            double(total_runtimes) / total_lifetimes : 0.0;
+            double(total_runtimes) / total_lifetimes * 100.0 : 0.0;
 
         info["elapsed"] = elapsed;
         info["avg_duty"] = avg_duty;
@@ -667,8 +669,8 @@ struct Info
             info["edges_visited"] = edges_visited;
             info["redundant_work"] = redundant_work;
             info["m_teps"] = m_teps;
+            info["search_depth"] = search_depth;
         }
-        
     }
 
     void computeTraversalStats(
@@ -683,6 +685,55 @@ struct Info
                     h_labels,
                     graph,
                     true);
+    }
+
+    void displayStats( bool quiet = false)
+    {
+        int64_t nodes_visited = info["nodes_visited"].get_int();
+        int64_t edges_visited = info["edges_visited"].get_int();
+        double m_teps = info["m_teps"].get_real();
+        float elapsed = info["elapsed"].get_real();
+        int64_t search_depth = info["search_depth"].get_int();
+        double avg_duty = info["avg_duty"].get_real();
+        int64_t total_queued = info["total_queued"].get_int();
+        double redundant_work = info["redundant_work"].get_real();
+        if (!quiet)
+        {
+            printf("[%s] finished. ", info["name"].get_str().c_str());
+
+            if (nodes_visited < 5)
+            {
+                printf("Fewer than 5 vertices visited.\n");
+            }
+            else
+            {
+                printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed,
+                                   m_teps);
+                if (search_depth != 0)
+                {
+                    printf(", search_depth: %lld", search_depth);      
+                }
+                if (avg_duty > 0.01)
+                {
+                    printf("\n avg CTA duty: %.2f%%", avg_duty);
+                }
+
+                printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
+                        source, nodes_visited, edges_visited);
+
+                if (total_queued > 0)
+                {
+                    printf(", total queued: %lld", total_queued);
+                }
+
+                if (redundant_work > 0.01)
+                {
+                    printf(", redundant work. %.2f%%", redundant_work);
+                }
+            }
+            printf("\n");
+        } 
+
     }
 };
 
