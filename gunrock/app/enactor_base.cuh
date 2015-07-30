@@ -31,6 +31,10 @@
 
 using namespace mgpu;
 
+/* this is the "stringize macro macro" hack */
+#define STR(x) #x
+#define XSTR(x) STR(x)
+
 namespace gunrock {
 namespace app {
 
@@ -102,33 +106,40 @@ struct EnactorStats
 /**
  * @brief Info data structure contains test parameter and running statistics.
  * All test parameters and running statistics stored in json_spirit::mObject.
+ * 
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
  */
-//TODO: more robust empty info["value"] check.
-//
+// TODO: more robust empty info["value"] check.
 template<typename VertexId, typename Value, typename SizeT>
 struct Info
 {
 private:
-    int          num_iters; // Number of times invoke primitive test
-    int          max_iters; // Maximum number of super-steps allowed
-    int*        device_idx; // Array of GPU indices
-    int          grid_size; // Maximum grid size (0 leave it up to the enactor)
-    int          traversal; // Load-balanced or Dynamic cooperative
-    double        q_sizing; // Maximum size scaling factor for work queues
-    double       q_sizing1; // Value of max_queue_sizing1
-    double        i_sizing; // Maximum size scaling factor for communication
-    long long       source; // Source vertex ID
-    std::string  file_stem; // Market filename path stem
-    std::string     ofname; // Used for jsonfile command
-    std::string        dir; // Used for jsondir command
-    std::string par_method; // Partition method
-    float       par_factor; // Partition factor
-    int           par_seed; // Partition seed
-    int           num_gpus; // Number of GPUs used
+    int            num_iters;  // Number of times invoke primitive test
+    int            max_iters;  // Maximum number of super-steps allowed
+    int            grid_size;  // Maximum grid size (0: up to the enactor)
+    int            traversal;  // Load-balanced or Dynamic cooperative
+    int             num_gpus;  // Number of GPUs used
+    double          q_sizing;  // Maximum size scaling factor for work queues
+    double         q_sizing1;  // Value of max_queue_sizing1
+    double          i_sizing;  // Maximum size scaling factor for communication
+    long long         source;  // Source vertex ID to start
+    std::string ref_filename;  // CPU reference input file name
+    std::string    file_stem;  // Market filename path stem
+    std::string       ofname;  // Used for jsonfile command
+    std::string          dir;  // Used for jsondir command
+    std::string   par_method;  // Partition method
+    double        par_factor;  // Partition factor
+    int             par_seed;  // Partition seed
+    int         delta_factor;  // Used in delta-stepping SSSP
+    double             delta;  // Used in PageRank
+    double             error;  // Used in PageRank
 
 public:
     json_spirit::mObject info;  // test parameters and running statistics
     Csr<VertexId, Value, SizeT> *graph;  // pointer to CSR input graph
+    // TODO: following two already moved into Enactor in branch mgpu-cq
     void         *context;  // pointer to context array used by MordernGPU
     cudaStream_t *streams;  // pointer to array of GPU streams
 
@@ -137,23 +148,25 @@ public:
      */
     Info()
     {
-        // Assign default values
+        // assign default values
         info["algorithm"]          = "";     // algorithm/primitive name
         info["average_duty"]       = 0.0f;   // average runtime duty
         info["command_line"]       = "";     // entire command line
         info["debug_mode"]         = false;  // verbose flag print debug info
+        info["dataset"]            = "";     // dataset name used in test
         info["edges_visited"]      = 0;      // number of edges touched
         info["elapsed"]            = 0.0f;   // elapsed device running time
         info["engine"]             = "";     // engine name - Gunrock
+        info["edge_value"]         = false;  // default don't load weights
         info["git_commit_sha1"]    = "";     // git commit sha1
         info["graph_type"]         = "";     // input graph type
         info["gunrock_version"]    = "";     // gunrock version number
         info["idempotent"]         = false;  // enable idempotent (BFS)
         info["instrument"]         = false;  // enable instrumentation
-        info["num_iteration"]     = 1;       // number of runs
+        info["num_iteration"]      = 1;      // number of runs
         info["json"]               = false;  // --json flag
-        info["jsonfile"]           = false;  // --jsonfile flag
-        info["jsondir"]            = false;  // --jsondir flag
+        info["jsonfile"]           = "";     // --jsonfile
+        info["jsondir"]            = "";     // --jsondir
         info["mark_predecessors"]  = false;  // mark predecessors (BFS, SSSP)
         info["max_grid_size"]      = 0;      // maximum grid size
         info["max_iteration"]      = 50;     // default maximum iteration
@@ -169,13 +182,18 @@ public:
         info["quiet_mode"]         = false;  // don't print anything
         info["quick_mode"]         = false;  // skip CPU validation
         info["redundant_work"]     = 0.0f;   // redundant work (BFS)
+        info["ref_filename"]       = "";     // reference file input
         info["search_depth"]       = 0;      // search depth (iterations)
         info["size_check"]         = true;   // enable or disable size check
         info["source_type"]        = "";     // source type
         info["source_vertex"]      = 0;      // source (BFS, SSSP)
         info["stream_from_host"]   = false;  // stream from host to device
         info["traversal_mode"]     = -1;     // advance mode
-        info["undirected"]         = false;  // undirected graph input
+        info["total_queued"]       = 0;      // number of element in queue
+        info["undirected"]         = true;   // default use undirected input
+        info["delta_factor"]       = 16;     // default delta-factor for SSSP
+        info["delta"]              = 0.85f;  // default delta for PageRank
+        info["error"]              = 0.01f;  // default error for PageRank
         // info["gpuinfo"]
         // info["device_list"]
         // info["sysinfo"]
@@ -187,25 +205,57 @@ public:
      * @brief Initialization process for Info
      * @param[in] args Command line arguments
      */
-    void Init(util::CommandLineArgs &args, Csr<VertexId, Value, SizeT> &csr)
+    void Init(
+        std::string algorithm_name,
+        util::CommandLineArgs &args, 
+        Csr<VertexId, Value, SizeT> &csr)
     {
-        // Get configuration parameters from command line arguments
+        // put basic information into info
+        info["engine"] = "Gunrock";
+        info["command_line"] = json_spirit::mValue(args.GetEntireCommandLine());
+        util::Sysinfo sysinfo;  // get machine / OS / user / time info
+        info["sysinfo"] = sysinfo.getSysinfo();
+        util::Gpuinfo gpuinfo;
+        info["gpuinfo"] = gpuinfo.getGpuinfo();
+        util::Userinfo userinfo;
+        info["userinfo"] = userinfo.getUserinfo();
+        time_t now = time(NULL); info["time"] = ctime(&now);
+        info["gunrock_version"] = XSTR(GUNROCKVERSION);
+        info["git_commit_sha1"] = g_GIT_SHA1;
+        info["graph_type"] = args.GetCmdLineArgvGraphType();
+
+        // get configuration parameters from command line arguments
+        info["algorithm"]  = algorithm_name;  // set algorithm name
         info["instrument"] =  args.CheckCmdLineFlag("instrumented");
         info["size_check"] = !args.CheckCmdLineFlag("disable-size-check");
         info["debug_mode"] =  args.CheckCmdLineFlag("v");
         info["quiet_mode"] =  args.CheckCmdLineFlag("quiet");
         info["quick_mode"] =  args.CheckCmdLineFlag("quick");
-        info["undirected"] =  args.CheckCmdLineFlag("undirected");
 
-        LoadGraph(args, csr);  // load or generate graph
-        graph = &csr;          // set graph pointer
+        if (info["edge_value"].get_bool())
+        {
+            LoadGraph<true>(args, csr);  // load graph with weighs
+        }
+        else
+        {
+            LoadGraph<false>(args, csr);  // load graph without weights
+        }
+        graph = &csr;  // set graph pointer
 
-        info["idempotent"] =  args.CheckCmdLineFlag("idempotence");     // BFS
+        info["idempotent"] = args.CheckCmdLineFlag("idempotence");        // BFS
         info["mark_predecessors"] =  args.CheckCmdLineFlag("mark-pred");  // BFS
 
-        info["json"]     = args.CheckCmdLineFlag("json");
-        info["jsonfile"] = args.CheckCmdLineFlag("jsonfile");
-        info["jsondir"]  = args.CheckCmdLineFlag("jsondir");
+        info["json"] = args.CheckCmdLineFlag("json");
+        if (args.CheckCmdLineFlag("jsonfile"))
+        {
+            args.GetCmdLineArgument("jsonfile", ofname);
+            info["jsonfile"] = ofname;
+        }
+        if (args.CheckCmdLineFlag("jsondir"))
+        {
+            args.GetCmdLineArgument("jsondir", dir);
+            info["jsondir"] = dir;
+        }
 
         // determine which source to start search
         if (args.CheckCmdLineFlag("src"))
@@ -240,11 +290,12 @@ public:
             else
             {
                 args.GetCmdLineArgument("src", source);
+                info["source_type"] = "user-defined";
             }
             info["source_vertex"] = (int64_t)source;
             if (!args.CheckCmdLineFlag("quiet"))
             {
-                printf("Source vertex: %d\n", (int64_t)source);
+                printf("Source vertex: %lld\n", source);
             }
         }
         if (args.CheckCmdLineFlag("grid-size"))
@@ -269,7 +320,7 @@ public:
         }
         if (args.CheckCmdLineFlag("queue-sizing1"))
         {
-            args.GetCmdLineArgument("queue-sizing1", q_sizing1);  // BFS
+            args.GetCmdLineArgument("queue-sizing1", q_sizing1);
             info["max_queue_sizing1"] = q_sizing1;
         }
         if (args.CheckCmdLineFlag("partition_method"))
@@ -292,13 +343,38 @@ public:
             args.GetCmdLineArgument("traversal-mode", traversal);
             info["traversal_mode"] = traversal;
         }
+        if (traversal == -1)
+        {
+            traversal = graph->GetAverageDegree() > 5 ? 0 : 1;
+            info["traversal_mode"] = traversal;
+        }
+        if (args.CheckCmdLineFlag("ref_filename"))
+        {
+            args.GetCmdLineArgument("ref_filename", ref_filename);
+            info["ref_filename"] = ref_filename;
+        }
+        if (args.CheckCmdLineFlag("delta-factor"))  // SSSP
+        {
+            args.GetCmdLineArgument("delta_factor", delta_factor);
+            info["delta_factor"] = delta_factor;
+        }
+        if (args.CheckCmdLineFlag("delta"))
+        {
+            args.GetCmdLineArgument("delta", delta);
+            info["delta"] = delta;
+        }
+        if (args.CheckCmdLineFlag("error"))
+        {
+            args.GetCmdLineArgument("error", error);       
+            info["error"] = error;
+        }
 
         // parse device count and device list
         info["device_list"] = GetDeviceList(args);
 
         ///////////////////////////////////////////////////////////////////////
         // initialize CUDA streams and context for MordernGPU API.
-        // TODO: streams and context initialize can be removed after merge
+        // TODO: streams and context initialization can be removed after merge
         // with `mgpu-cq` branch. YC already moved them into Enactor code.
         std::vector<int> temp_devices;
         if (args.CheckCmdLineFlag("device"))  // parse device list
@@ -331,38 +407,14 @@ public:
                 }
             }
         }
-        ///////////////////////////////////////////////////////////////////////
 
         context = (mgpu::ContextPtr*)context_;
         streams = (cudaStream_t*)streams_;
-
-        args.GetCmdLineArgument("jsonfile", ofname);
-        args.GetCmdLineArgument("jsondir", dir);
-
-        //
-        // Put everything into the json_spirit::mObject info
-        //
-
-        // system information
-        info["engine"] = "Gunrock";
-        info["command_line"] = json_spirit::mValue(args.GetEntireCommandLine());
-        gunrock::util::Sysinfo sysinfo;  // get machine / OS / user / time info
-        info["sysinfo"] = sysinfo.getSysinfo();
-        gunrock::util::Gpuinfo gpuinfo;
-        info["gpuinfo"] = gpuinfo.getGpuinfo();
-        gunrock::util::Userinfo userinfo;
-        info["userinfo"] = userinfo.getUserinfo();
-        time_t now = time(NULL); info["time"] = ctime(&now);
-        info["gunrock_version"] = XSTR(GUNROCKVERSION);
-        info["git_commit_sha1"] = g_GIT_SHA1;
-
-        // parsed testing parameters
-
-        info["graph_type"] = args.GetCmdLineArgvGraphType();
+        ///////////////////////////////////////////////////////////////////////
     }
 
     /**
-     * @brief Display JSON mObject info. Should be called after Compute Stats.
+     * @brief Display JSON mObject info. Should be called after ComputeStats.
      */
     void CollectInfo()
     {
@@ -371,11 +423,11 @@ public:
         {
             PrintJson();
         }
-        if (info["jsonfile"].get_bool())
+        if (ofname != "")
         {
             JsonFile();
         }
-        if (info["jsondir"].get_bool())
+        if (dir != "")
         {
             JsonDir();
         }
@@ -390,9 +442,9 @@ public:
      */
     json_spirit::mArray GetDeviceList(util::CommandLineArgs &args)
     {
-        std::vector<int> devices;
-        json_spirit::mArray device_list;
-        if (args.CheckCmdLineFlag("device"))  // parse device list
+        json_spirit::mArray device_list;      // return mArray
+        std::vector<int> devices;             // temp storage
+        if (args.CheckCmdLineFlag("device"))  // parse command
         {
             args.GetCmdLineArguments<int>("device", devices);
             num_gpus = devices.size();
@@ -475,19 +527,19 @@ public:
      * @param[in] args Command line arguments.
      * @param[in] csr Reference to the CSR graph.
      */
+    template<bool EDGE_VALUE>
     int LoadGraph(
         util::CommandLineArgs &args, Csr<VertexId, Value, SizeT> &csr)
     {
         std::string graph_type = args.GetCmdLineArgvGraphType();
-        if (graph_type == "market")
+        if (graph_type == "market")  // Matrix-market graph
         {
             if (!args.CheckCmdLineFlag("quiet"))
             {
-                printf("Loading Market-Matrix graph ...\n");
+                printf("Loading Matrix-market coordinate-formatted graph...\n");
             }
-            // Matrix-market coordinate-formatted graph file
             char *market_filename = args.GetCmdLineArgvDataset();
-            if (market_filename == NULL && !args.CheckCmdLineFlag("quiet"))
+            if (market_filename == NULL)
             {
                 fprintf(stderr, "Input graph does not exist.\n");
                 return 1;
@@ -495,7 +547,7 @@ public:
             boost::filesystem::path market_filename_path(market_filename);
             file_stem = market_filename_path.stem().string();
             info["dataset"] = file_stem;
-            if (graphio::BuildMarketGraph<false>(
+            if (graphio::BuildMarketGraph<EDGE_VALUE>(
                         market_filename,
                         csr,
                         args.CheckCmdLineFlag("undirected"),
@@ -505,7 +557,7 @@ public:
                 return 1;
             }
         }
-        else if (graph_type == "rmat")
+        else if (graph_type == "rmat")  // R-MAT graph
         {
             if (!args.CheckCmdLineFlag("quiet"))
             {
@@ -520,7 +572,7 @@ public:
             double rmat_b = 0.19;
             double rmat_c = 0.19;
             double rmat_d = 1 - (rmat_a + rmat_b + rmat_c);
-            int    rmat_seed = -1;
+            int rmat_seed = -1;
 
             args.GetCmdLineArgument("rmat_scale", rmat_scale);
             rmat_nodes = 1 << rmat_scale;
@@ -546,9 +598,11 @@ public:
             info["rmat_edges"] = rmat_edges;
             info["rmat_edgefactor"] = rmat_edgefactor;
 
-            // CpuTimer cpu_timer;
-            // cpu_timer.Start();
-            if (graphio::BuildRmatGraph<false>(
+            util::CpuTimer cpu_timer;
+            cpu_timer.Start();
+
+            // generate R-MAT graph
+            if (graphio::BuildRmatGraph<EDGE_VALUE>(
                         rmat_nodes,
                         rmat_edges,
                         csr,
@@ -564,8 +618,10 @@ public:
             {
                 return 1;
             }
-            // cpu_timer.Stop();
-            float elapsed = 0.0f; // cpu_timer.ElapsedMillis();
+
+            cpu_timer.Stop();
+            float elapsed = cpu_timer.ElapsedMillis();
+
             if (!args.CheckCmdLineFlag("quiet"))
             {
                 printf("R-MAT graph generated in %.3f ms, "
@@ -583,9 +639,10 @@ public:
             SizeT rgg_nodes = 1 << 10;
             SizeT rgg_scale = 10;
             double rgg_thfactor  = 0.55;
-            double rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
+            double rgg_threshold =
+                rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
             double rgg_vmultipiler = 1;
-            int    rgg_seed        = -1;
+            int rgg_seed = -1;
 
             args.GetCmdLineArgument("rgg_scale", rgg_scale);
             rgg_nodes = 1 << rgg_scale;
@@ -604,9 +661,11 @@ public:
             info["rgg_threshold"]   = rgg_threshold;
             info["rgg_vmultipiler"] = rgg_vmultipiler;
 
-            // CpuTimer cpu_timer;
-            // cpu_timer.Start();
-            if (graphio::BuildRggGraph<false>(
+            util::CpuTimer cpu_timer;
+            cpu_timer.Start();
+
+            // generate random geometry graph
+            if (graphio::BuildRggGraph<EDGE_VALUE>(
                         rgg_nodes,
                         csr,
                         rgg_threshold,
@@ -618,8 +677,9 @@ public:
             {
                 return 1;
             }
-            // cpu_timer.Stop();
-            float elapsed = 0.0f; // cpu_timer.ElapsedMillis();
+
+            cpu_timer.Stop();
+            float elapsed = cpu_timer.ElapsedMillis();
             if (!args.CheckCmdLineFlag("quiet"))
             {
                 printf("RGG generated in %.3f ms, "
@@ -635,15 +695,31 @@ public:
 
         if (!args.CheckCmdLineFlag("quiet"))
         {
+            csr.GetAverageDegree();
             csr.PrintHistogram();
+            if (info["algorithm"].get_str().compare("SSSP") == 0)
+            {
+                csr.GetAverageEdgeValue();
+                int max_degree;
+                csr.GetNodeWithHighestDegree(max_degree);
+                printf("Maximum degree: %d\n", max_degree);
+            }
         }
         return 0;
     }
 
+    /**
+     * @brief Compute statistics common to all primitives.
+     *
+     * @param[in] enactor_stats
+     * @param[in] elapsed
+     * @param[in] labels
+     * @param[in] get_traversal_stats
+     */
     void ComputeCommonStats(
         EnactorStats *enactor_stats,
         float elapsed,
-        const VertexId *h_labels,
+        const VertexId *labels = NULL,
         bool get_traversal_stats = false)
     {
         double total_lifetimes = 0;
@@ -675,7 +751,7 @@ public:
                 {
                     estats->total_queued.Move(util::DEVICE, util::HOST);
                     total_queued += estats->total_queued[0];
-                    if (estats->iteration > search_depth)
+                    // if (estats->iteration > search_depth)
                     {
                         search_depth = estats->iteration;
                     }
@@ -686,32 +762,32 @@ public:
         }
 
         double avg_duty = (total_lifetimes > 0) ?
-            double(total_runtimes) / total_lifetimes * 100.0 : 0.0;
+            double(total_runtimes) / total_lifetimes * 100.0 : 0.0f;
 
         info["elapsed"] = elapsed;
-        info["average_duty"]= avg_duty;
+        info["average_duty"] = avg_duty;
+        info["search_depth"] = search_depth;
 
         if (get_traversal_stats)
         {
             info["total_queued"] = total_queued;
-            info["search_depth"] = search_depth;
         }
 
-        // TODO: compute traversal stats.
+        // TODO: compute traversal stats
         if (get_traversal_stats)
         {
             for (VertexId i = 0; i < graph->nodes; ++i)
             {
-                if (h_labels[i] < util::MaxValue<VertexId>() && h_labels[i] != -1)
+                if (labels[i] < util::MaxValue<VertexId>() && labels[i] != -1)
                 {
                     ++nodes_visited;
                     edges_visited +=
                         graph->row_offsets[i + 1] - graph->row_offsets[i];
                 }
-                if (info["algorithm"].get_str().compare("GPU BC") == 0)
+                if (info["algorithm"].get_str().compare("BC") == 0)
                 {
-                    // For betweenness should count the backward phase too.
-                    edges_visited *= 2;
+                    // for betweenness should count the backward phase too.
+                    edges_visited = 2 * total_queued;
                 }
             }
             if (total_queued > edges_visited)
@@ -728,65 +804,76 @@ public:
             info["edges_visited"] = edges_visited;
             info["redundant_work"] = redundant_work;
             info["m_teps"] = m_teps;
-            info["search_depth"] = search_depth;
         }
     }
 
+    /**
+     * @brief Compute statistics common to all traversal primitives.
+     *
+     * @param[in] enactor_stats
+     * @param[in] elapsed
+     * @param[in] labels
+     */
     void ComputeTraversalStats(
         EnactorStats *enactor_stats,
         float elapsed,
-        const VertexId *h_labels)
+        const VertexId *labels = NULL)
     {
         ComputeCommonStats(
             enactor_stats,
             elapsed,
-            h_labels,
+            labels,
             true);
     }
 
+    /**
+     * @brief Display running statistics.
+     *
+     * @param[in] verbose Whether or not to print extra information.
+     */
     void DisplayStats(bool verbose = true)
     {
+        double elapsed = info["elapsed"].get_real();
+
         int64_t nodes_visited = info["nodes_visited"].get_int();
         int64_t edges_visited = info["edges_visited"].get_int();
-        double m_teps = info["m_teps"].get_real();
-        float elapsed = info["elapsed"].get_real();
-        int64_t search_depth = info["search_depth"].get_int();
-        double avg_duty = info["average_duty"].get_real();
-        int64_t total_queued = info["total_queued"].get_int();
+        double m_teps         = info["m_teps"].get_real();
+        int64_t search_depth  = info["search_depth"].get_int();
+        double avg_duty       = info["average_duty"].get_real();
+        int64_t total_queued  = info["total_queued"].get_int();
         double redundant_work = info["redundant_work"].get_real();
 
         printf("\n[%s] finished. ", info["algorithm"].get_str().c_str());
+        printf("\n elapsed: %.4f ms, iterations: %d", elapsed, search_depth);
 
         if (verbose)
         {
-            if (nodes_visited < 5)
+            if (nodes_visited != 0 && nodes_visited < 5)
             {
                 printf("Fewer than 5 vertices visited.\n");
             }
             else
             {
-                printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s",
-                       elapsed, m_teps);
-                if (search_depth != 0)
+                if (m_teps > 0.01)
                 {
-                    printf(", search_depth: %lld", search_depth);
+                    printf(", rate: %.4f MiEdges/s\n", m_teps);
                 }
                 if (avg_duty > 0.01)
                 {
-                    printf("\n avg CTA duty: %.2f%%", avg_duty);
+                    printf("\n average CTA duty: %.2f%%", avg_duty);
                 }
-
-                printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
-                       source, nodes_visited, edges_visited);
-
+                if (nodes_visited != 0 && edges_visited != 0)
+                {
+                    printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
+                        source, nodes_visited, edges_visited);
+                }
                 if (total_queued > 0)
                 {
                     printf(", total queued: %lld", total_queued);
                 }
-
                 if (redundant_work > 0.01)
                 {
-                    printf(", redundant work. %.2f%%", redundant_work);
+                    printf(", redundant work: %.2f%%", redundant_work);
                 }
             }
             printf("\n");

@@ -26,8 +26,10 @@
 #include <gunrock/coo.cuh>
 #include <gunrock/csr.cuh>
 
-namespace gunrock {
-namespace graphio {
+namespace gunrock
+{
+namespace graphio
+{
 
 /**
  * @brief Generates a random node-ID in the range of [0, num_nodes)
@@ -47,7 +49,7 @@ SizeT RandomNode (SizeT num_nodes)
 
 template <typename VertexId, typename Value, typename SizeT>
 void RemoveStandaloneNodes(
-    Csr<VertexId, Value, SizeT>* graph)
+    Csr<VertexId, Value, SizeT>* graph, bool quiet = false)
 {
     SizeT nodes = graph->nodes;
     SizeT edges = graph->edges;
@@ -56,7 +58,7 @@ void RemoveStandaloneNodes(
     VertexId *column_indices = graph->column_indices;
     SizeT    *row_offsets    = graph->row_offsets;
     SizeT    *displacements  = new SizeT   [graph->nodes];
-    SizeT    *new_offsets    = new SizeT   [graph->nodes+1];
+    SizeT    *new_offsets    = new SizeT   [graph->nodes + 1];
     SizeT    *block_offsets  = NULL;
     VertexId *new_nodes      = new VertexId[graph->nodes];
     Value    *new_values     = new Value   [graph->nodes];
@@ -65,34 +67,34 @@ void RemoveStandaloneNodes(
 
     #pragma omp parallel
     {
-            num_threads  = omp_get_num_threads();
+        num_threads  = omp_get_num_threads();
         int thread_num   = omp_get_thread_num ();
         SizeT edge_start = (long long)(edges) * thread_num / num_threads;
-        SizeT edge_end   = (long long)(edges) * (thread_num+1) / num_threads;
+        SizeT edge_end   = (long long)(edges) * (thread_num + 1) / num_threads;
         SizeT node_start = (long long)(nodes) * thread_num / num_threads;
-        SizeT node_end   = (long long)(nodes) * (thread_num+1) / num_threads;
+        SizeT node_end   = (long long)(nodes) * (thread_num + 1) / num_threads;
 
         for (SizeT    edge = edge_start; edge < edge_end; edge++)
             marker[column_indices[edge]] = 1;
         for (VertexId node = node_start; node < node_end; node++)
-            if (row_offsets[node] != row_offsets[node+1])
-            marker[node] = 1;
-        if (thread_num == 0) block_offsets = new SizeT[num_threads+1];
+            if (row_offsets[node] != row_offsets[node + 1])
+                marker[node] = 1;
+        if (thread_num == 0) block_offsets = new SizeT[num_threads + 1];
         #pragma omp barrier
 
         displacements[node_start] = 0;
-        for (VertexId node = node_start; node < node_end-1; node++)
-            displacements[node+1] = displacements[node] + 1 - marker[node];
+        for (VertexId node = node_start; node < node_end - 1; node++)
+            displacements[node + 1] = displacements[node] + 1 - marker[node];
         if (node_end != 0)
-            block_offsets[thread_num + 1] = displacements[node_end -1] + 1 - marker[node_end-1];
+            block_offsets[thread_num + 1] = displacements[node_end - 1] + 1 - marker[node_end - 1];
         else block_offsets[thread_num + 1] = 1 - marker[0];
 
         #pragma omp barrier
         #pragma omp single
         {
             block_offsets[0] = 0;
-            for (int i=0; i<num_threads; i++)
-                block_offsets[i+1] += block_offsets[i];
+            for (int i = 0; i < num_threads; i++)
+                block_offsets[i + 1] += block_offsets[i];
         }
 
         for (VertexId node = node_start; node < node_end; node++)
@@ -112,8 +114,12 @@ void RemoveStandaloneNodes(
 
     nodes = nodes - block_offsets[num_threads];
     memcpy(row_offsets, new_offsets, sizeof(SizeT) * (nodes + 1));
-    if (values!=NULL) memcpy(values, new_values, sizeof(Value) * nodes);
-    printf("graph #nodes : %lld -> %lld \n", (long long)graph->nodes, (long long)nodes);
+    if (values != NULL) memcpy(values, new_values, sizeof(Value) * nodes);
+    if (!quiet)
+    {
+        printf("graph #nodes : %lld -> %lld \n", 
+            (long long)graph->nodes, (long long)nodes);
+    }
     graph->nodes = nodes;
     row_offsets[nodes] = graph->edges;
 

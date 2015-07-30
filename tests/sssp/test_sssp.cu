@@ -21,11 +21,6 @@
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
 
-// Graph construction utils
-#include <gunrock/graphio/market.cuh>
-#include <gunrock/graphio/rmat.cuh>
-#include <gunrock/graphio/rgg.cuh>
-
 // SSSP includes
 #include <gunrock/app/sssp/sssp_enactor.cuh>
 #include <gunrock/app/sssp/sssp_problem.cuh>
@@ -46,6 +41,7 @@
 #include <boost/property_map/property_map.hpp>
 
 using namespace gunrock;
+using namespace gunrock::app;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::sssp;
@@ -110,136 +106,6 @@ void DisplaySolution (VertexId *source_path, SizeT num_nodes)
         printf(" ");
     }
     printf("]\n");
-}
-
-/**
- * Performance/Evaluation statistics
- */
-struct Stats
-{
-    const char *name;
-    Statistic rate;
-    Statistic search_depth;
-    Statistic redundant_work;
-    Statistic duty;
-
-    Stats() : name(NULL), rate(), search_depth(), redundant_work(), duty() {}
-    Stats(const char *name) :
-        name(name), rate(), search_depth(), redundant_work(), duty() {}
-};
-
-/**
- * @brief Test_Parameter structure
- */
-struct Test_Parameter : gunrock::app::TestParameter_Base
-{
-public:
-    //bool mark_predecessors ;// Mark src-distance vs. parent vertices
-    int delta_factor;
-    double max_queue_sizing1;
-
-    Test_Parameter()
-    {
-        delta_factor = 16;
-        mark_predecessors = false;
-        max_queue_sizing1 = -1.0;
-    }
-
-    ~Test_Parameter()
-    {
-    }
-
-    void Init(CommandLineArgs &args)
-    {
-        TestParameter_Base::Init(args);
-        mark_predecessors = args.CheckCmdLineFlag("mark-pred");
-        args.GetCmdLineArgument("delta-factor"    , delta_factor    );
-        args.GetCmdLineArgument("queue-sizing1", max_queue_sizing1);
-    }
-};
-
-/**
- * @brief Displays timing and correctness statistics
- *
- * @tparam MARK_PREDECESSORS
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] stats Reference to the Stats object defined in RunTests
- * @param[in] src Source node where SSSP starts
- * @param[in] h_labels Host-side vector stores computed labels for validation
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] elapsed Total elapsed kernel running time
- * @param[in] search_depth Maximum search depth of the SSSP algorithm
- * @param[in] total_queued Total element queued in SSSP kernel running process
- * @param[in] avg_duty Average duty of the SSSP kernels
- */
-template <
-    typename VertexId,
-    typename Value,
-    typename SizeT >
-void DisplayStats(
-    Stats               &stats,
-    VertexId            src,
-    Value               *h_labels,
-    const Csr<VertexId, Value, SizeT> &graph,
-    double              elapsed,
-    VertexId            search_depth,
-    long long           total_queued,
-    double              avg_duty)
-{
-    // Compute nodes and edges visited
-    SizeT edges_visited = 0;
-    SizeT nodes_visited = 0;
-    for (VertexId i = 0; i < graph.nodes; ++i)
-    {
-        if (h_labels[i] < util::MaxValue<VertexId>())
-        {
-            ++nodes_visited;
-            edges_visited += graph.row_offsets[i + 1] - graph.row_offsets[i];
-        }
-    }
-
-    double redundant_work = 0.0;
-    if (total_queued > 0)
-    {
-        redundant_work =
-            ((double) total_queued - edges_visited) / edges_visited;
-    }
-    redundant_work *= 100;
-
-    // Display test name
-    printf("[%s] finished.", stats.name);
-
-    // Display statistics
-    if (nodes_visited < 5)
-    {
-        printf("Fewer than 5 vertices visited.\n");
-    }
-    else
-    {
-        // Display the specific sample statistics
-        double m_teps = (double) edges_visited / (elapsed * 1000.0);
-        printf("\n elapsed: %.4f ms, rate: %.4f MiEdges/s", elapsed, m_teps);
-        if (search_depth != 0)
-            printf(", search_depth: %lld", (long long) search_depth);
-        printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
-               (long long) src, (long long) nodes_visited, (long long) edges_visited);
-        if (avg_duty != 0)
-        {
-            printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
-        }
-        if (total_queued > 0)
-        {
-            printf(", total queued: %lld", total_queued);
-        }
-        if (redundant_work > 0)
-        {
-            printf(", redundant work: %.2f%%", redundant_work);
-        }
-        printf("\n");
-    }
 }
 
 /******************************************************************************
@@ -394,48 +260,53 @@ template <
     bool DEBUG,
     bool SIZE_CHECK,
     bool MARK_PREDECESSORS >
-void RunTests(Test_Parameter *parameter)
+void RunTests(Info<VertexId, Value, SizeT> *info)
 {
-    typedef SSSPProblem <
-    VertexId,
-    SizeT,
-    Value,
-    MARK_PREDECESSORS > Problem;
+    typedef SSSPProblem < VertexId,
+            SizeT,
+            Value,
+            MARK_PREDECESSORS > Problem;
 
-    typedef SSSPEnactor <
-    Problem,
-    INSTRUMENT,
-    DEBUG,
-    SIZE_CHECK > Enactor;
+    typedef SSSPEnactor < Problem,
+            INSTRUMENT,
+            DEBUG,
+            SIZE_CHECK > Enactor;
 
-    Csr<VertexId, Value, SizeT>
-    *graph                 = (Csr<VertexId, Value, SizeT>*)parameter->graph;
-    bool          quiet                 = parameter -> g_quiet;
-    VertexId      src                   = (VertexId)parameter -> src;
-    int           max_grid_size         = parameter -> max_grid_size;
-    int           num_gpus              = parameter -> num_gpus;
-    double        max_queue_sizing      = parameter -> max_queue_sizing;
-    double        max_in_sizing         = parameter -> max_in_sizing;
-    ContextPtr   *context               = (ContextPtr*)parameter -> context;
-    std::string   partition_method      = parameter -> partition_method;
-    int          *gpu_idx               = parameter -> gpu_idx;
-    cudaStream_t *streams               = parameter -> streams;
-    float         partition_factor      = parameter -> partition_factor;
-    int           partition_seed        = parameter -> partition_seed;
-    bool          g_quick               = parameter -> g_quick;
-    bool          g_stream_from_host    = parameter -> g_stream_from_host;
-    int           delta_factor          = parameter -> delta_factor;
-    int           iterations            = parameter -> iterations;
-    int           traversal_mode        = parameter -> traversal_mode;
-    size_t       *org_size              = new size_t[num_gpus];
-    // Allocate host-side label array (for both reference and gpu-computed results)
-    Value        *reference_labels      = new Value[graph->nodes];
-    Value        *h_labels              = new Value[graph->nodes];
-    Value        *reference_check_label = (g_quick) ? NULL : reference_labels;
-    VertexId     *reference_preds       = MARK_PREDECESSORS ? new VertexId[graph->nodes] : NULL;
-    VertexId     *h_preds               = MARK_PREDECESSORS ? new VertexId[graph->nodes] : NULL;
-    VertexId     *reference_check_pred  = (g_quick || !MARK_PREDECESSORS) ? NULL : reference_preds;
+    // parse configurations from mObject info
+    Csr<VertexId, Value, SizeT> *graph = info->graph;
+    VertexId src                 = info->info["source_vertex"].get_int64();
+    int max_grid_size            = info->info["max_grid_size"].get_int();
+    int num_gpus                 = info->info["num_gpus"].get_int();
+    double max_queue_sizing      = info->info["max_queue_sizing"].get_real();
+    double max_queue_sizing1     = info->info["max_queue_sizing1"].get_real();
+    double max_in_sizing         = info->info["max_in_sizing"].get_real();
+    std::string partition_method = info->info["partition_method"].get_str();
+    double partition_factor      = info->info["partition_factor"].get_real();
+    int partition_seed           = info->info["partition_seed"].get_int();
+    bool quiet_mode              = info->info["quiet_mode"].get_bool();
+    bool quick_mode              = info->info["quick_mode"].get_bool();
+    bool stream_from_host        = info->info["stream_from_host"].get_bool();
+    int traversal_mode           = info->info["traversal_mode"].get_int();
+    int iterations               = info->info["num_iteration"].get_int();
+    int delta_factor             = info->info["delta_factor"].get_int();
 
+    json_spirit::mArray device_list = info->info["device_list"].get_array();
+    int* gpu_idx = new int[num_gpus];
+    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
+
+    // TODO: remove after merge mgpu-cq
+    ContextPtr   *context = (ContextPtr*)  info->context;
+    cudaStream_t *streams = (cudaStream_t*)info->streams;
+
+    // Allocate host-side array (for both reference and GPU-computed results)
+    Value    *reference_labels      = new Value[graph->nodes];
+    Value    *h_labels              = new Value[graph->nodes];
+    Value    *reference_check_label = (quick_mode) ? NULL : reference_labels;
+    VertexId *reference_preds       = MARK_PREDECESSORS ? new VertexId[graph->nodes] : NULL;
+    VertexId *h_preds               = MARK_PREDECESSORS ? new VertexId[graph->nodes] : NULL;
+    VertexId *reference_check_pred  = (quick_mode || !MARK_PREDECESSORS) ? NULL : reference_preds;
+
+    size_t *org_size = new size_t[num_gpus];
     for (int gpu = 0; gpu < num_gpus; gpu++)
     {
         size_t dummy;
@@ -449,7 +320,7 @@ void RunTests(Test_Parameter *parameter)
     // Allocate problem on GPU
     Problem *problem = new Problem;
     util::GRError(problem->Init(
-                      g_stream_from_host,
+                      stream_from_host,
                       graph,
                       NULL,
                       num_gpus,
@@ -461,48 +332,52 @@ void RunTests(Test_Parameter *parameter)
                       max_in_sizing,
                       partition_factor,
                       partition_seed),
-                  "Problem SSSP Initialization Failed", __FILE__, __LINE__);
-    util::GRError(enactor->Init(context, problem, max_grid_size, traversal_mode),
-                  "SSSP Enactor init failed", __FILE__, __LINE__);
-    //
-    // Compute reference CPU SSSP solution for source-distance
-    //
+                  "SSSP Problem Init failed", __FILE__, __LINE__);
+    util::GRError(enactor->Init(
+        context, problem, max_grid_size, traversal_mode),
+                  "SSSP Enactor Init failed", __FILE__, __LINE__);
+
+    // compute reference CPU SSSP solution for source-distance
     if (reference_check_label != NULL)
     {
-        if (!quiet) { printf("Computing reference value ...\n"); }
+        if (!quiet_mode) { printf("Computing reference value ...\n"); }
         SimpleReferenceSssp<VertexId, Value, SizeT, MARK_PREDECESSORS>(
             *graph,
             reference_check_label,
             reference_check_pred,
             src,
-            quiet);
-        if (!quiet) { printf("\n"); }
+            quiet_mode);
+        if (!quiet_mode) { printf("\n"); }
     }
 
-    Stats      *stats       = new Stats("GPU SSSP");
-    long long  total_queued = 0;
-    VertexId   search_depth = 0;
-    double     avg_duty     = 0.0;
-    float      elapsed      = 0.0f;
+    double elapsed = 0.0f;
 
-    // Perform SSSP
+    // perform SSSP
     CpuTimer cpu_timer;
 
     for (int iter = 0; iter < iterations; ++iter)
     {
-        util::GRError(problem->Reset(src, enactor->GetFrontierType(), max_queue_sizing), "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(enactor->Reset(), "SSSP Enactor Reset failed", __FILE__, __LINE__);
+        util::GRError(problem->Reset(
+                          src, enactor->GetFrontierType(), max_queue_sizing),
+                      "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(enactor->Reset(),
+                      "SSSP Enactor Reset failed", __FILE__, __LINE__);
 
-        if (!quiet) { printf("__________________________\n"); fflush(stdout); }
+        if (!quiet_mode)
+        {
+            printf("__________________________\n"); fflush(stdout);
+        }
         cpu_timer.Start();
-        util::GRError(enactor->Enact(src, traversal_mode), "SSSP Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(enactor->Enact(src, traversal_mode),
+                      "SSSP Problem Enact Failed", __FILE__, __LINE__);
         cpu_timer.Stop();
-        if (!quiet) { printf("--------------------------\n"); fflush(stdout); }
+        if (!quiet_mode)
+        {
+            printf("--------------------------\n"); fflush(stdout);
+        }
         elapsed += cpu_timer.ElapsedMillis();
     }
     elapsed /= iterations;
-
-    enactor->GetStatistics(total_queued, search_depth, avg_duty);
 
     // Copy out results
     util::GRError(problem->Extract(h_labels, h_preds),
@@ -516,7 +391,7 @@ void RunTests(Test_Parameter *parameter)
         }
     }
 
-    if (!quiet)
+    if (!quiet_mode)
     {
         // Display Solution
         printf("\nFirst 40 labels of the GPU result.\n");
@@ -525,20 +400,32 @@ void RunTests(Test_Parameter *parameter)
     // Verify the result
     if (reference_check_label != NULL)
     {
-        if (!quiet) { printf("Label Validity: "); }
-        int error_num = CompareResults(h_labels, reference_check_label, graph->nodes, true, quiet);
+        if (!quiet_mode) { printf("Label Validity: "); }
+        int error_num = CompareResults(
+                            h_labels, reference_check_label,
+                            graph->nodes, true, quiet_mode);
         if (error_num > 0)
         {
-            if (!quiet) { printf("%d errors occurred.\n", error_num); }
+            if (!quiet_mode) { printf("%d errors occurred.\n", error_num); }
         }
-        if (!quiet)
+        if (!quiet_mode)
         {
             printf("\nFirst 40 labels of the reference CPU result.\n");
             DisplaySolution(reference_check_label, graph->nodes);
         }
     }
 
-    if (!quiet)
+    info->ComputeTraversalStats(  // compute running statistics
+        enactor->enactor_stats.GetPointer(), elapsed, h_labels);
+
+    if (!quiet_mode)
+    {
+        info->DisplayStats();  // display collected statistics
+    }
+
+    info->CollectInfo();  // collected all the info and put into JSON mObject
+
+    if (!quiet_mode)
     {
         if (MARK_PREDECESSORS)
         {
@@ -550,16 +437,6 @@ void RunTests(Test_Parameter *parameter)
                 DisplaySolution(reference_check_pred, graph->nodes);
             }
         }
-
-        DisplayStats(
-            *stats,
-            src,
-            h_labels,
-            *graph,
-            elapsed,
-            search_depth,
-            total_queued,
-            avg_duty);
 
         printf("\n\tMemory Usage(B)\t");
         for (int gpu = 0; gpu < num_gpus; gpu++)
@@ -599,9 +476,9 @@ void RunTests(Test_Parameter *parameter)
         if (num_gpus > 1) printf("\t in_sizing =\t %lf", max_in_sizing_);
         printf("\n");
     }
+
     // Clean up
     if (org_size        ) {delete[] org_size        ; org_size         = NULL;}
-    if (stats           ) {delete   stats           ; stats            = NULL;}
     if (enactor         ) {delete   enactor         ; enactor          = NULL;}
     if (problem         ) {delete   problem         ; problem          = NULL;}
     if (reference_labels) {delete[] reference_labels; reference_labels = NULL;}
@@ -620,7 +497,7 @@ void RunTests(Test_Parameter *parameter)
  * @tparam DEBUG
  * @tparam SIZE_CHECK
  *
- * @param[in] parameter Pointer to test parameter settings
+ * @param[in] info Pointer to mObject info.
  */
 template <
     typename    VertexId,
@@ -629,14 +506,18 @@ template <
     bool        INSTRUMENT,
     bool        DEBUG,
     bool        SIZE_CHECK >
-void RunTests_mark_predecessors(Test_Parameter *parameter)
+void RunTests_mark_predecessors(Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->mark_predecessors) RunTests
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
-        true > (parameter);
-    else RunTests
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
-        false> (parameter);
+    if (info->info["mark_predecessors"].get_bool())
+    {
+        RunTests<VertexId, Value, SizeT, INSTRUMENT,
+                 DEBUG, SIZE_CHECK, true>(info);
+    }
+    else
+    {
+        RunTests<VertexId, Value, SizeT, INSTRUMENT,
+                 DEBUG, SIZE_CHECK, false>(info);
+    }
 }
 
 /**
@@ -648,7 +529,7 @@ void RunTests_mark_predecessors(Test_Parameter *parameter)
  * @tparam INSTRUMENT
  * @tparam DEBUG
  *
- * @param[in] parameter Pointer to test parameter settings
+ * @param[in] info Pointer to mObject info.
  */
 template <
     typename      VertexId,
@@ -656,14 +537,18 @@ template <
     typename      SizeT,
     bool          INSTRUMENT,
     bool          DEBUG >
-void RunTests_size_check(Test_Parameter *parameter)
+void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->size_check) RunTests_mark_predecessors
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-        true > (parameter);
-    else RunTests_mark_predecessors
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-        false> (parameter);
+    if (info->info["size_check"].get_bool())
+    {
+        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
+                                   DEBUG,  true>(info);
+    }
+    else
+    {
+        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
+                                   DEBUG, false>(info);
+    }
 }
 
 /**
@@ -674,21 +559,23 @@ void RunTests_size_check(Test_Parameter *parameter)
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] parameter Pointer to test parameter settings
+ * @param[in] info Pointer to mObject info.
  */
 template <
     typename    VertexId,
     typename    Value,
     typename    SizeT,
     bool        INSTRUMENT >
-void RunTests_debug(Test_Parameter *parameter)
+void RunTests_debug(Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->debug) RunTests_size_check
-        <VertexId, Value, SizeT, INSTRUMENT,
-        true > (parameter);
-    else RunTests_size_check
-        <VertexId, Value, SizeT, INSTRUMENT,
-        false> (parameter);
+    if (info->info["debug_mode"].get_bool())
+    {
+        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,  true>(info);
+    }
+    else
+    {
+        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT, false>(info);
+    }
 }
 
 /**
@@ -698,268 +585,51 @@ void RunTests_debug(Test_Parameter *parameter)
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] parameter Pointer to test parameter settings
+ * @param[in] info Pointer to mObject info.
  */
 template <
     typename      VertexId,
     typename      Value,
     typename      SizeT >
-void RunTests_instrumented(Test_Parameter *parameter)
+void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->instrumented) RunTests_debug
-        <VertexId, Value, SizeT,
-        true > (parameter);
-    else RunTests_debug
-        <VertexId, Value, SizeT,
-        false> (parameter);
+    if (info->info["instrument"].get_bool())
+    {
+        RunTests_debug<VertexId, Value, SizeT, true>(info);
+    }
+    else
+    {
+        RunTests_debug<VertexId, Value, SizeT, false>(info);
+    }
 }
 
 /******************************************************************************
 * Main
 ******************************************************************************/
 
-int main( int argc, char** argv)
+int main(int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
-    int          num_gpus = 0;
-    int          *gpu_idx = NULL;
-    ContextPtr   *context = NULL;
-    cudaStream_t *streams = NULL;
-    bool          g_undirected = false;
-
-    if ((argc < 2) || (args.CheckCmdLineFlag("help")))
+    int graph_args = argc - args.ParsedArgc() - 1;
+    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
     {
         Usage();
         return 1;
     }
 
-    Test_Parameter *parameter = new Test_Parameter;
-    parameter -> Init(args);
-    parameter -> g_undirected = args.CheckCmdLineFlag("undirected");
-    // don't print anything unless specifically directed
-    parameter->g_quiet = args.CheckCmdLineFlag("quiet");
+    typedef int VertexId;  // Use int as the vertex identifier
+    typedef int Value;     // Use int as the value type
+    typedef int SizeT;     // Use int as the graph size type
 
-    if (args.CheckCmdLineFlag("device"))
-    {
-        std::vector<int> gpus;
-        args.GetCmdLineArguments<int>("device", gpus);
-        num_gpus   = gpus.size();
-        gpu_idx    = new int[num_gpus];
-        for (int i = 0; i < num_gpus; i++)
-            gpu_idx[i] = gpus[i];
-    }
-    else
-    {
-        num_gpus   = 1;
-        gpu_idx    = new int[num_gpus];
-        gpu_idx[0] = 0;
-    }
-    streams  = new cudaStream_t[num_gpus * num_gpus * 2];
-    context  = new ContextPtr  [num_gpus * num_gpus];
-    if (!parameter->g_quiet) { printf("Using %d gpus: ", num_gpus); }
-    for (int gpu = 0; gpu < num_gpus; gpu++)
-    {
-        if (!parameter->g_quiet) { printf(" %d ", gpu_idx[gpu]); }
-        util::SetDevice(gpu_idx[gpu]);
-        for (int i = 0; i < num_gpus * 2; i++)
-        {
-            int _i = gpu * num_gpus * 2 + i;
-            util::GRError(cudaStreamCreate(&streams[_i]), "cudaStreamCreate fialed.", __FILE__, __LINE__);
-            if (i < num_gpus) context[gpu * num_gpus + i] = mgpu::CreateCudaDeviceAttachStream(gpu_idx[gpu], streams[_i]);
-        }
-    }
-    if (!parameter->g_quiet) { printf("\n"); fflush(stdout); }
+    Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
+    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
+    
+    // graph construction or generation related parameters
+    info->info["undirected"] = args.CheckCmdLineFlag("undirected");
+    info->info["edge_value"] = true;  // require per edge weight values
 
-    // Parse graph-contruction params
-    std::string graph_type = argv[1];
-    int flags = args.ParsedArgc();
-    int graph_args = argc - flags - 1;
-
-    if (graph_args < 1)
-    {
-        Usage();
-        return 1;
-    }
-
-    //
-    // Construct graph and perform search(es)
-    //
-    typedef int VertexId;                   // Use as the node identifier type
-    typedef int Value;                      // Use as the value type
-    typedef int SizeT;                      // Use as the graph size type
-    Csr<VertexId, Value, SizeT> csr(false); // default value for stream_from_host is false
-    if (graph_args < 1) { Usage(); return 1; }
-
-    if (graph_type == "market")
-    {
-        // Matrix-market coordinate-formatted graph file
-        char *market_filename = (graph_args == 2) ? argv[2] : NULL;
-        if (graphio::BuildMarketGraph<true>(
-                    market_filename,
-                    csr,
-                    g_undirected,
-                    false,
-                    parameter->g_quiet) != 0) // no inverse graph
-        {
-            return 1;
-        }
-
-    }
-    else if (graph_type == "rmat")
-    {
-        // parse rmat parameters
-        SizeT rmat_nodes = 1 << 10;
-        SizeT rmat_edges = 1 << 10;
-        SizeT rmat_scale = 10;
-        SizeT rmat_edgefactor = 48;
-        double rmat_a = 0.57;
-        double rmat_b = 0.19;
-        double rmat_c = 0.19;
-        double rmat_d = 1 - (rmat_a + rmat_b + rmat_c);
-        double rmat_vmultipiler = 20;
-        double rmat_vmin        = 1;
-        int    rmat_seed        = -1;
-
-        args.GetCmdLineArgument("rmat_scale", rmat_scale);
-        rmat_nodes = 1 << rmat_scale;
-        args.GetCmdLineArgument("rmat_nodes", rmat_nodes);
-        args.GetCmdLineArgument("rmat_edgefactor", rmat_edgefactor);
-        rmat_edges = rmat_nodes * rmat_edgefactor;
-        rmat_vmultipiler = rmat_edgefactor * 2;
-        args.GetCmdLineArgument("rmat_edges", rmat_edges);
-        args.GetCmdLineArgument("rmat_a", rmat_a);
-        args.GetCmdLineArgument("rmat_b", rmat_b);
-        args.GetCmdLineArgument("rmat_c", rmat_c);
-        rmat_d = 1 - (rmat_a + rmat_b + rmat_c);
-        args.GetCmdLineArgument("rmat_d", rmat_d);
-        args.GetCmdLineArgument("rmat_vmultipiler", rmat_vmultipiler);
-        args.GetCmdLineArgument("rmat_vmin", rmat_vmin);
-        args.GetCmdLineArgument("rmat_seed", rmat_seed);
-
-        CpuTimer cpu_timer;
-        cpu_timer.Start();
-        if (graphio::BuildRmatGraph<true>(
-                    rmat_nodes,
-                    rmat_edges,
-                    csr,
-                    g_undirected,
-                    rmat_a,
-                    rmat_b,
-                    rmat_c,
-                    rmat_d,
-                    rmat_vmultipiler,
-                    rmat_vmin,
-                    rmat_seed) != 0)
-        {
-            return 1;
-        }
-        cpu_timer.Stop();
-        float elapsed = cpu_timer.ElapsedMillis();
-        printf("graph generated: %.3f ms, a = %.3f, b = %.3f, c = %.3f, d = %.3f\n", elapsed, rmat_a, rmat_b, rmat_c, rmat_d);
-    }
-    else if (graph_type == "rgg")
-    {
-
-        SizeT rgg_nodes = 1 << 10;
-        SizeT rgg_scale = 10;
-        double rgg_thfactor  = 0.55;
-        double rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
-        double rgg_vmultipiler = 20;
-        double rgg_vmin = 1;
-        int    rgg_seed = -1;
-
-        args.GetCmdLineArgument("rgg_scale", rgg_scale);
-        rgg_nodes = 1 << rgg_scale;
-        args.GetCmdLineArgument("rgg_nodes", rgg_nodes);
-        args.GetCmdLineArgument("rgg_thfactor", rgg_thfactor);
-        rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
-        args.GetCmdLineArgument("rgg_threshold", rgg_threshold);
-        args.GetCmdLineArgument("rgg_vmultipiler", rgg_vmultipiler);
-        args.GetCmdLineArgument("rgg_vmin", rgg_vmin);
-        args.GetCmdLineArgument("rgg_seed", rgg_seed);
-
-        CpuTimer cpu_timer;
-        cpu_timer.Start();
-        if (graphio::BuildRggGraph<true>(
-                    rgg_nodes,
-                    csr,
-                    rgg_threshold,
-                    g_undirected,
-                    rgg_vmultipiler,
-                    rgg_vmin,
-                    rgg_seed) != 0)
-        {
-            return 1;
-        }
-        cpu_timer.Stop();
-        float elapsed = cpu_timer.ElapsedMillis();
-        printf("graph generated: %.3f ms, threshold = %.3lf, vmultipiler = %.3lf\n", elapsed, rgg_threshold, rgg_vmultipiler);
-    }
-    else
-    {
-        // Unknown graph type
-        fprintf(stderr, "Unspecified graph type\n");
-        return 1;
-    }
-
-    if (!parameter->g_quiet)
-    {
-        csr.PrintHistogram();
-        csr.DisplayGraph(true); //print graph with edge_value
-        //util::cpu_mt::PrintCPUArray("row_offsets", csr.row_offsets,csr.nodes+1);
-        //util::cpu_mt::PrintCPUArray("colum_indiece", csr.column_indices, csr.edges);
-
-        csr.GetAverageEdgeValue();
-        csr.GetAverageDegree();
-        int max_degree;
-        csr.GetNodeWithHighestDegree(max_degree);
-        printf("max degree:%d\n", max_degree);
-    }
-
-    //
-    // Run test
-    //
-
-    parameter -> graph    = &csr;
-    parameter -> num_gpus = num_gpus;
-    parameter -> context  = context;
-    parameter -> gpu_idx  = gpu_idx;
-    parameter -> streams  = streams;
-
-    // source vertex to start
-    std::string src_str = "";
-    args.GetCmdLineArgument("src", src_str);
-    if (src_str.empty())
-    {
-        parameter->src = 0;
-    }
-    else if (src_str.compare("randomize") == 0)
-    {
-        parameter->src = graphio::RandomNode(csr.nodes);
-    }
-    else if (src_str.compare("largestdegree") == 0)
-    {
-        int max_degree;
-        parameter->src = csr.GetNodeWithHighestDegree(max_degree);
-    }
-    else
-    {
-        args.GetCmdLineArgument("src", parameter->src);
-    }
-
-    // traversal mode
-    args.GetCmdLineArgument("traversal-mode", parameter->traversal_mode);
-    if (parameter->traversal_mode == -1)
-    {
-        parameter->traversal_mode = 0;
-    }
-
-    if (!parameter->g_quiet)
-    {
-        printf("src = %lld\n", parameter->src);
-    }
-
-    RunTests_instrumented<VertexId, Value, SizeT>(parameter);
+    info->Init("SSSP", args, csr);  // initialize Info structure
+    RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test
 
     return 0;
 }

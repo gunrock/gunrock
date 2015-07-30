@@ -1283,7 +1283,7 @@ struct ProblemBase
 
                 // printf("partition_method = %s\n", partition_method.c_str());
 
-                if (partition_method == "random") 
+                if (partition_method == "random")
                 {
                     partitioner = new rp::RandomPartitioner<VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                     (*graph, num_gpus);
@@ -1308,7 +1308,7 @@ struct ProblemBase
                     partitioner = new brp::BiasRandomPartitioner<VertexId, SizeT, Value, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
                     (*graph, num_gpus);
                 }
-                else 
+                else
                 {
                     util::GRError("partition_method invalid", __FILE__, __LINE__);
                 }
@@ -1371,7 +1371,7 @@ struct ProblemBase
                 graph_slices[gpu] = new GraphSlice<SizeT, VertexId, Value>(this->gpu_idx[gpu]);
                 if (num_gpus > 1)
                 {
-                    if (_ENABLE_BACKWARD) 
+                    if (_ENABLE_BACKWARD)
                     {
                         retval = graph_slices[gpu]->Init(
                                      stream_from_host,
@@ -1406,7 +1406,7 @@ struct ProblemBase
                                      NULL);
                     }
                 }
-                else 
+                else
                 {
                     retval = graph_slices[gpu]->Init(
                                       stream_from_host,
