@@ -15,6 +15,7 @@ CUDA_ADD_EXECUTABLE(SALSA
   test_salsa.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/test_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
+  ${CMAKE_SOURCE_DIR}/gunrock/util/gitsha1.c
   ${mgpu_SOURCE_FILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
 

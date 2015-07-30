@@ -22,6 +22,7 @@ CUDA_ADD_EXECUTABLE(minimum_spanning_tree
   test_mst.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/test_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
+  ${CMAKE_SOURCE_DIR}/gunrock/util/gitsha1.c
   ${mgpu_SOURCE_FILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
 
