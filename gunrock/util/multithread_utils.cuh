@@ -23,6 +23,7 @@
 #endif
 #include <gunrock/util/multithreading.cuh>
 #include <gunrock/util/array_utils.cuh>
+#include <gunrock/util/misc_utils.cuh>
 
 namespace gunrock {
 namespace util {
