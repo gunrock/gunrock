@@ -22,9 +22,18 @@ CUDA_ADD_EXECUTABLE(degree_centrality
   test_topk.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/test_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
+  ${CMAKE_SOURCE_DIR}/gunrock/util/misc_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/gitsha1.c
   ${mgpu_SOURCE_FILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
 
 target_link_libraries(degree_centrality ${Boost_LIBRARIES})
 target_link_libraries(degree_centrality ${METIS_LIBRARY})
+
+# OpenMP on OS X/clang
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    link_directories("/opt/local/lib")
+    target_link_libraries(degree_centrality "omp")
+  endif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
