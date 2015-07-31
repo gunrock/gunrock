@@ -108,6 +108,10 @@ struct GRSetup
  * @brief Initialization function for GRSetup.
  * \return Initialized configurations object.
  */
+#ifdef __clang__
+// http://clang.llvm.org/compatibility.html#inline
+static
+#endif
 inline struct GRSetup InitSetup()
 {
     struct GRSetup configurations;
