@@ -14,6 +14,24 @@
 
 #pragma once
 
+// #define USE_STD_RANDOM          // undefine to use {s,d}rand48_r
+#ifdef __APPLE__
+#ifdef __clang__
+#define USE_STD_RANDOM          // OS X/clang has no {s,d}rand48_r
+#endif
+#endif
+#ifdef USE_STD_RANDOM
+#include <random>
+// this struct is a bit of a hack, but allows us to change as little
+// code as possible in keeping {s,d}rand48_r capability as well as to
+// use <random>
+struct drand48_data
+{
+    std::mt19937_64 engine;
+    std::uniform_real_distribution<double> dist;
+};
+#endif
+
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -117,7 +135,7 @@ void RemoveStandaloneNodes(
     if (values != NULL) memcpy(values, new_values, sizeof(Value) * nodes);
     if (!quiet)
     {
-        printf("graph #nodes : %lld -> %lld \n", 
+        printf("graph #nodes : %lld -> %lld \n",
             (long long)graph->nodes, (long long)nodes);
     }
     graph->nodes = nodes;

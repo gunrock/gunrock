@@ -31,7 +31,11 @@ namespace graphio {
 inline double Sprng (struct drand48_data *rand_data)
 {
     double result;
+#ifdef USE_STD_RANDOM
+    result = rand_data->dist(rand_data->engine);
+#else
     drand48_r(rand_data, &result);
+#endif
     return result;
 }
 
@@ -205,7 +209,12 @@ int BuildRmatGraph(
         SizeT i_start   = (long long )(edges) * thread_num / num_threads;
         SizeT i_end     = (long long )(edges) * (thread_num + 1) / num_threads;
         unsigned int seed_ = seed + 616 * thread_num;
+#ifdef USE_STD_RANDOM
+        rand_data.engine = std::mt19937_64(seed_);
+        rand_data.dist = std::uniform_real_distribution<double>(0.0, 1.0);
+#else
         srand48_r(seed_, &rand_data);
+#endif
 
         for (SizeT i = i_start; i < i_end; i++)
         {
@@ -237,7 +246,11 @@ int BuildRmatGraph(
             if (WITH_VALUES)
             {
                 double t_value;
+#ifdef USE_STD_RANDOM
+                t_value = rand_data.dist(rand_data.engine);
+#else
                 drand48_r(&rand_data, &t_value);
+#endif
                 coo_p->val = t_value * vmultipiler + vmin;
             } else coo_p->val = 1;
 
@@ -250,7 +263,11 @@ int BuildRmatGraph(
                 if (WITH_VALUES)
                 {
                     double t_value;
+#ifdef USE_STD_RANDOM
+                    t_value = rand_data.dist(rand_data.engine);
+#else
                     drand48_r(&rand_data, &t_value);
+#endif
                     cooi_p->val = t_value * vmultipiler + vmin;
                 } else coo_p->val = 1;
             }

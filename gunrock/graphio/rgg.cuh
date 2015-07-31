@@ -155,16 +155,29 @@ int BuildRggGraph(
         VertexId *col_index   = col_index_ + reserved_size * node_start;
         Value    *values      = WITH_VALUES ? values_ + reserved_size * node_start : NULL;
         unsigned int seed_    = seed + 805 * thread_num;
+#ifdef USE_STD_RANDOM
+        rand_data.engine = std::mt19937_64(seed_);
+        rand_data.dist = std::uniform_real_distribution<double>(0.0, 1.0);
+#else
         srand48_r(seed_, &rand_data);
+#endif
         #pragma omp single
             offsets           = new SizeT[num_threads+1];
 
         for (VertexId node = node_start; node < node_end; node++)
         {
             double t_value;
+#ifdef USE_STD_RANDOM
+            t_value = rand_data.dist(rand_data.engine);
+#else
             drand48_r(&rand_data, &t_value);
+#endif
             points[node].x = t_value;
+#ifdef USE_STD_RANDOM
+            t_value = rand_data.dist(rand_data.engine);
+#else
             drand48_r(&rand_data, &t_value);
+#endif
             points[node].y = t_value;
             points[node].node = node;
         }
@@ -248,7 +261,11 @@ int BuildRggGraph(
                     if (WITH_VALUES)
                     {
                         double t_value;
+#ifdef USE_STD_RANDOM
+                        t_value = rand_data.dist(rand_data.engine);
+#else
                         drand48_r(&rand_data, &t_value);
+#endif
                         values[counter] = t_value * value_multipiler + value_min;
                     }
                     counter++;
