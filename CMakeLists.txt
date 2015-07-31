@@ -180,6 +180,11 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(CUDA_PROPAGATE_HOST_FLAGS OFF)
   set(CMAKE_CXX_FLAGS -std=c++11)
   set(CUDA_NVCC_FLAGS -std=c++11)
+
+  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    link_directories("/opt/local/lib")
+  endif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+
 endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 if(GUNROCK_BUILD_LIB)
