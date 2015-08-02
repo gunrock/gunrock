@@ -316,7 +316,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             SIZE_CHECK > PrEnactor;
 
     // parse configurations from mObject info
-    Csr<VertexId, Value, SizeT> *graph = info->graph;
+    Csr<VertexId, Value, SizeT> *graph = info->csr_ptr;
     VertexId src                 = info->info["source_vertex"].get_int64();
     bool undirected              = info->info["undirected"].get_bool();
     bool quiet_mode              = info->info["quiet_mode"].get_bool();
@@ -445,7 +445,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     {
         if (!quiet_mode) { printf("Validity Rank: "); }
         int errors_count = CompareResults_(
-                               h_rank, ref_check, 
+                               h_rank, ref_check,
                                graph->nodes, true, quiet_mode);
         if (errors_count > 0)
         {
@@ -465,7 +465,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     info->ComputeCommonStats(  // compute running statistics
         enactor->enactor_stats.GetPointer(), elapsed);
-    
+
     if (!quiet_mode)
     {
         info->DisplayStats();  // display collected statistics
@@ -625,7 +625,7 @@ int main(int argc, char** argv)
 
     Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
-    
+
     // graph construction or generation related parameters
     info->info["undirected"] = true;   // require undirected input graph
     info->info["edge_value"] = false;  // don't need per edge weight values

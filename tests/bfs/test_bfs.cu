@@ -268,7 +268,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             BfsEnactor;
 
     // parse configurations from mObject info
-    Csr<VertexId, Value, SizeT> *graph = info->graph;
+    Csr<VertexId, Value, SizeT> *graph = info->csr_ptr;
     VertexId src                 = info->info["source_vertex"].get_int64();
     int max_grid_size            = info->info["max_grid_size"].get_int();
     int num_gpus                 = info->info["num_gpus"].get_int();

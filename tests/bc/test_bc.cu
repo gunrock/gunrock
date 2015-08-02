@@ -322,7 +322,7 @@ void ReferenceBC(
             }
         }
 
-        for (int i = 0; i < graph.nodes; ++i) 
+        for (int i = 0; i < graph.nodes; ++i)
         {
             bc_values[i] *= 0.5f;
         }
@@ -375,7 +375,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             BcEnactor;
 
     // parse configurations from mObject info
-    Csr<VertexId, Value, SizeT> *graph = info->graph;
+    Csr<VertexId, Value, SizeT> *graph = info->csr_ptr;
     VertexId src                 = info->info["source_vertex"].get_int64();
     bool quiet_mode              = info->info["quiet_mode"].get_bool();
     int max_grid_size            = info->info["max_grid_size"].get_int();
@@ -631,9 +631,9 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                             graph->nodes, true, quiet_mode);
         if (num_error > 0)
         {
-            if (!quiet_mode) 
-            { 
-                printf("Number of errors occurred: %d\n", num_error); 
+            if (!quiet_mode)
+            {
+                printf("Number of errors occurred: %d\n", num_error);
             }
         }
         if (!quiet_mode) { printf("\n"); }
@@ -646,9 +646,9 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                             graph->nodes, true, quiet_mode);
         if (num_error > 0)
         {
-            if (!quiet_mode) 
-            { 
-                printf("Number of errors occurred: %d\n", num_error); 
+            if (!quiet_mode)
+            {
+                printf("Number of errors occurred: %d\n", num_error);
             }
         }
         if (!quiet_mode) { printf("\n"); }
@@ -662,7 +662,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     info->ComputeTraversalStats(  // compute running statistics
         enactor->enactor_stats.GetPointer(), elapsed, h_labels);
-    
+
     if (!quiet_mode)
     {
         info->DisplayStats();  // display collected statistics
@@ -826,7 +826,7 @@ int main(int argc, char** argv)
 
     Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
-    
+
     // graph construction or generation related parameters
     info->info["undirected"] = true;   // require undirected input graph
     info->info["edge_value"] = false;  // don't need per edge weight values

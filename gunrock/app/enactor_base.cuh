@@ -138,7 +138,9 @@ private:
 
 public:
     json_spirit::mObject info;  // test parameters and running statistics
-    Csr<VertexId, Value, SizeT> *graph;  // pointer to CSR input graph
+    Csr<VertexId, Value, SizeT> *csr_ptr;  // pointer to CSR input graph
+    Csr<VertexId, Value, SizeT> *csc_ptr;  // pointer to CSC input graph
+
     // TODO: following two already moved into Enactor in branch mgpu-cq
     void         *context;  // pointer to context array used by MordernGPU
     cudaStream_t *streams;  // pointer to array of GPU streams
@@ -208,7 +210,7 @@ public:
     void Init(
         std::string algorithm_name,
         util::CommandLineArgs &args, 
-        Csr<VertexId, Value, SizeT> &csr)
+        Csr<VertexId, Value, SizeT> &csr_ref)
     {
         // put basic information into info
         info["engine"] = "Gunrock";
@@ -225,7 +227,7 @@ public:
         info["graph_type"] = args.GetCmdLineArgvGraphType();
 
         // get configuration parameters from command line arguments
-        info["algorithm"]  = algorithm_name;  // set algorithm name
+        info["algorithm"]  =  algorithm_name;  // set algorithm name
         info["instrument"] =  args.CheckCmdLineFlag("instrumented");
         info["size_check"] = !args.CheckCmdLineFlag("disable-size-check");
         info["debug_mode"] =  args.CheckCmdLineFlag("v");
@@ -234,13 +236,13 @@ public:
 
         if (info["edge_value"].get_bool())
         {
-            LoadGraph<true>(args, csr);  // load graph with weighs
+            LoadGraph<true>(args, csr_ref);  // load graph with weighs
         }
         else
         {
-            LoadGraph<false>(args, csr);  // load graph without weights
+            LoadGraph<false>(args, csr_ref);  // load graph without weights
         }
-        graph = &csr;  // set graph pointer
+        csr_ptr = &csr_ref;  // set graph pointer
 
         info["idempotent"] = args.CheckCmdLineFlag("idempotence");        // BFS
         info["mark_predecessors"] =  args.CheckCmdLineFlag("mark-pred");  // BFS
@@ -269,7 +271,7 @@ public:
             }
             else if (source_type.compare("randomize") == 0)
             {
-                source = graphio::RandomNode(csr.nodes);
+                source = graphio::RandomNode(csr_ref.nodes);
                 if (!args.CheckCmdLineFlag("quiet"))
                 {
                     printf("Using random source vertex: %d\n", source);
@@ -279,7 +281,7 @@ public:
             else if (source_type.compare("largestdegree") == 0)
             {
                 int maximum_degree;
-                source = csr.GetNodeWithHighestDegree(maximum_degree);
+                source = csr_ref.GetNodeWithHighestDegree(maximum_degree);
                 if (!args.CheckCmdLineFlag("quiet"))
                 {
                     printf("Using highest degree (%d), vertex: %d\n",
@@ -345,7 +347,7 @@ public:
         }
         if (traversal == -1)
         {
-            traversal = graph->GetAverageDegree() > 5 ? 0 : 1;
+            traversal = csr_ptr->GetAverageDegree() > 5 ? 0 : 1;
             info["traversal_mode"] = traversal;
         }
         if (args.CheckCmdLineFlag("ref_filename"))
@@ -529,7 +531,8 @@ public:
      */
     template<bool EDGE_VALUE>
     int LoadGraph(
-        util::CommandLineArgs &args, Csr<VertexId, Value, SizeT> &csr)
+        util::CommandLineArgs &args, 
+        Csr<VertexId, Value, SizeT> &csr_ref)
     {
         std::string graph_type = args.GetCmdLineArgvGraphType();
         if (graph_type == "market")  // Matrix-market graph
@@ -549,7 +552,7 @@ public:
             info["dataset"] = file_stem;
             if (graphio::BuildMarketGraph<EDGE_VALUE>(
                         market_filename,
-                        csr,
+                        csr_ref,
                         args.CheckCmdLineFlag("undirected"),
                         false,  // no inverse graph
                         args.CheckCmdLineFlag("quiet")) != 0)
@@ -605,7 +608,7 @@ public:
             if (graphio::BuildRmatGraph<EDGE_VALUE>(
                         rmat_nodes,
                         rmat_edges,
-                        csr,
+                        csr_ref,
                         args.CheckCmdLineFlag("undirected"),
                         rmat_a,
                         rmat_b,
@@ -667,7 +670,7 @@ public:
             // generate random geometry graph
             if (graphio::BuildRggGraph<EDGE_VALUE>(
                         rgg_nodes,
-                        csr,
+                        csr_ref,
                         rgg_threshold,
                         args.CheckCmdLineFlag("undirected"),
                         rgg_vmultipiler,
@@ -695,13 +698,13 @@ public:
 
         if (!args.CheckCmdLineFlag("quiet"))
         {
-            csr.GetAverageDegree();
-            csr.PrintHistogram();
+            csr_ref.GetAverageDegree();
+            csr_ref.PrintHistogram();
             if (info["algorithm"].get_str().compare("SSSP") == 0)
             {
-                csr.GetAverageEdgeValue();
+                csr_ref.GetAverageEdgeValue();
                 int max_degree;
-                csr.GetNodeWithHighestDegree(max_degree);
+                csr_ref.GetNodeWithHighestDegree(max_degree);
                 printf("Maximum degree: %d\n", max_degree);
             }
         }
@@ -776,13 +779,13 @@ public:
         // TODO: compute traversal stats
         if (get_traversal_stats)
         {
-            for (VertexId i = 0; i < graph->nodes; ++i)
+            for (VertexId i = 0; i < csr_ptr->nodes; ++i)
             {
                 if (labels[i] < util::MaxValue<VertexId>() && labels[i] != -1)
                 {
                     ++nodes_visited;
                     edges_visited +=
-                        graph->row_offsets[i + 1] - graph->row_offsets[i];
+                        csr_ptr->row_offsets[i + 1] - csr_ptr->row_offsets[i];
                 }
                 if (info["algorithm"].get_str().compare("BC") == 0)
                 {

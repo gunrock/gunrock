@@ -273,7 +273,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             SIZE_CHECK > Enactor;
 
     // parse configurations from mObject info
-    Csr<VertexId, Value, SizeT> *graph = info->graph;
+    Csr<VertexId, Value, SizeT> *graph = info->csr_ptr;
     VertexId src                 = info->info["source_vertex"].get_int64();
     int max_grid_size            = info->info["max_grid_size"].get_int();
     int num_gpus                 = info->info["num_gpus"].get_int();
@@ -623,7 +623,7 @@ int main(int argc, char** argv)
 
     Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
-    
+
     // graph construction or generation related parameters
     info->info["undirected"] = args.CheckCmdLineFlag("undirected");
     info->info["edge_value"] = true;  // require per edge weight values

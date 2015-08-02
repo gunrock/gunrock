@@ -257,7 +257,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             SIZE_CHECK > CcEnactor;
 
     // parse configurations from mObject info
-    Csr<VertexId, Value, SizeT> *graph = info->graph;
+    Csr<VertexId, Value, SizeT> *graph = info->csr_ptr;
     int max_grid_size            = info->info["max_grid_size"].get_int();
     int num_gpus                 = info->info["num_gpus"].get_int();
     double max_queue_sizing      = info->info["max_queue_sizing"].get_real();
@@ -433,7 +433,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     info->ComputeCommonStats(  // compute running statistics
         enactor->enactor_stats.GetPointer(), elapsed, h_component_ids);
-    
+
     if (!quiet_mode)
     {
         info->DisplayStats();  // display collected statistics
