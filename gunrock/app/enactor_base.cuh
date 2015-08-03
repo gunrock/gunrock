@@ -135,6 +135,8 @@ private:
     int         delta_factor;  // Used in delta-stepping SSSP
     double             delta;  // Used in PageRank
     double             error;  // Used in PageRank
+    double             alpha;  // Used in direction optimal BFS
+    double              beta;  // Used in direction optimal BFS
 
 public:
     json_spirit::mObject info;  // test parameters and running statistics
@@ -196,6 +198,8 @@ public:
         info["delta_factor"]       = 16;     // default delta-factor for SSSP
         info["delta"]              = 0.85f;  // default delta for PageRank
         info["error"]              = 0.01f;  // default error for PageRank
+        info["alpha"]              = 6.0f;   // default alpha for DOBFS
+        info["beta"]               = 6.0f;   // default beta for DOBFS
         // info["gpuinfo"]
         // info["device_list"]
         // info["sysinfo"]
@@ -204,13 +208,12 @@ public:
     }  // end Info()
 
     /**
-     * @brief Initialization process for Info
-     * @param[in] args Command line arguments
+     * @brief Initialization process for Info.
+     *
+     * @param[in] algorithm_name Algorithm name.
+     * @param[in] args Command line arguments.
      */
-    void Init(
-        std::string algorithm_name,
-        util::CommandLineArgs &args, 
-        Csr<VertexId, Value, SizeT> &csr_ref)
+    void InitBase(std::string algorithm_name, util::CommandLineArgs &args) 
     {
         // put basic information into info
         info["engine"] = "Gunrock";
@@ -233,16 +236,6 @@ public:
         info["debug_mode"] =  args.CheckCmdLineFlag("v");
         info["quiet_mode"] =  args.CheckCmdLineFlag("quiet");
         info["quick_mode"] =  args.CheckCmdLineFlag("quick");
-
-        if (info["edge_value"].get_bool())
-        {
-            LoadGraph<true>(args, csr_ref);  // load graph with weighs
-        }
-        else
-        {
-            LoadGraph<false>(args, csr_ref);  // load graph without weights
-        }
-        csr_ptr = &csr_ref;  // set graph pointer
 
         info["idempotent"] = args.CheckCmdLineFlag("idempotence");        // BFS
         info["mark_predecessors"] =  args.CheckCmdLineFlag("mark-pred");  // BFS
@@ -271,7 +264,7 @@ public:
             }
             else if (source_type.compare("randomize") == 0)
             {
-                source = graphio::RandomNode(csr_ref.nodes);
+                source = graphio::RandomNode(csr_ptr->nodes);
                 if (!args.CheckCmdLineFlag("quiet"))
                 {
                     printf("Using random source vertex: %d\n", source);
@@ -281,7 +274,7 @@ public:
             else if (source_type.compare("largestdegree") == 0)
             {
                 int maximum_degree;
-                source = csr_ref.GetNodeWithHighestDegree(maximum_degree);
+                source = csr_ptr->GetNodeWithHighestDegree(maximum_degree);
                 if (!args.CheckCmdLineFlag("quiet"))
                 {
                     printf("Using highest degree (%d), vertex: %d\n",
@@ -370,6 +363,14 @@ public:
             args.GetCmdLineArgument("error", error);       
             info["error"] = error;
         }
+        if (args.CheckCmdLineFlag("alpha"))
+        {
+            args.GetCmdLineArgument("alpha", alpha);
+        }
+        if (args.CheckCmdLineFlag("beta"))
+        {
+            args.GetCmdLineArgument("beta", beta);
+        }
 
         // parse device count and device list
         info["device_list"] = GetDeviceList(args);
@@ -413,6 +414,77 @@ public:
         context = (mgpu::ContextPtr*)context_;
         streams = (cudaStream_t*)streams_;
         ///////////////////////////////////////////////////////////////////////
+    }
+
+    /**
+     * @brief Initialization process for Info.
+     *
+     * @param[in] algorithm_name Algorithm name.
+     * @param[in] args Command line arguments.
+     * @param[in] csr_ref Reference to the CSR structure.
+     */
+    void Init(
+        std::string algorithm_name,
+        util::CommandLineArgs &args,
+        Csr<VertexId, Value, SizeT> &csr_ref)
+    {
+        // load or generate input graph
+        if (info["edge_value"].get_bool())
+        {
+            LoadGraph<true, false>(args, csr_ref);  // load graph with weighs
+        }
+        else
+        {
+            LoadGraph<false, false>(args, csr_ref);  // load without weights
+        }
+        csr_ptr = &csr_ref;  // set graph pointer
+        InitBase(algorithm_name, args);
+    }
+
+    /**
+     * @brief Initialization process for Info.
+     *
+     * @param[in] algorithm_name Algorithm name.
+     * @param[in] args Command line arguments.
+     * @param[in] csr_ref Reference to the CSR structure.
+     * @param[in] csc_ref Reference to the CSC structure.
+     */
+    void Init(
+        std::string algorithm_name,
+        util::CommandLineArgs &args,
+        Csr<VertexId, Value, SizeT> &csr_ref,
+        Csr<VertexId, Value, SizeT> &csc_ref)
+    {
+         // load or generate input graph TODO
+        if (info["edge_value"].get_bool())
+        {
+            if (info["undirected"].get_bool())
+            {
+                LoadGraph<true, false>(args, csr_ref);  // with weigh values
+                LoadGraph<true, false>(args, csc_ref);  // same as CSR
+            }
+            else
+            {
+                LoadGraph<true, false>(args, csr_ref);  // load CSR input
+                LoadGraph<true,  true>(args, csc_ref);  // load CSC input
+            }
+        }
+        else  // does not need weight values
+        {
+            if (info["undirected"].get_bool())
+            {
+                LoadGraph<false, false>(args, csr_ref);  // without weights
+                LoadGraph<false, false>(args, csc_ref);  // without weights
+            }
+            else
+            {
+                LoadGraph<false, false>(args, csr_ref);  // without weights
+                LoadGraph<false,  true>(args, csc_ref);  // without weights
+            }
+        }
+        csr_ptr = &csr_ref;  // set CSR pointer
+        csc_ptr = &csc_ref;  // set CSC pointer
+        InitBase(algorithm_name, args);
     }
 
     /**
@@ -529,9 +601,9 @@ public:
      * @param[in] args Command line arguments.
      * @param[in] csr Reference to the CSR graph.
      */
-    template<bool EDGE_VALUE>
+    template<bool EDGE_VALUE, bool INVERSE_GRAPH>
     int LoadGraph(
-        util::CommandLineArgs &args, 
+        util::CommandLineArgs &args,
         Csr<VertexId, Value, SizeT> &csr_ref)
     {
         std::string graph_type = args.GetCmdLineArgvGraphType();
@@ -554,7 +626,7 @@ public:
                         market_filename,
                         csr_ref,
                         args.CheckCmdLineFlag("undirected"),
-                        false,  // no inverse graph
+                        INVERSE_GRAPH,
                         args.CheckCmdLineFlag("quiet")) != 0)
             {
                 return 1;
@@ -846,8 +918,8 @@ public:
         int64_t total_queued  = info["total_queued"].get_int();
         double redundant_work = info["redundant_work"].get_real();
 
-        printf("\n[%s] finished. ", info["algorithm"].get_str().c_str());
-        printf("\n elapsed: %.4f ms, iterations: %d", elapsed, search_depth);
+        printf("\n [%s] finished.", info["algorithm"].get_str().c_str());
+        printf("\n elapsed: %.4f ms\n iterations: %d", elapsed, search_depth);
 
         if (verbose)
         {
@@ -859,7 +931,7 @@ public:
             {
                 if (m_teps > 0.01)
                 {
-                    printf(", rate: %.4f MiEdges/s\n", m_teps);
+                    printf("\n rate: %.4f MiEdges/s", m_teps);
                 }
                 if (avg_duty > 0.01)
                 {
@@ -867,16 +939,16 @@ public:
                 }
                 if (nodes_visited != 0 && edges_visited != 0)
                 {
-                    printf("\n src: %lld, nodes_visited: %lld, edges_visited: %lld",
+                    printf("\n src: %lld\n nodes_visited: %lld\n edges_visited: %lld",
                         source, nodes_visited, edges_visited);
                 }
                 if (total_queued > 0)
                 {
-                    printf(", total queued: %lld", total_queued);
+                    printf("\n total queued: %lld", total_queued);
                 }
                 if (redundant_work > 0.01)
                 {
-                    printf(", redundant work: %.2f%%", redundant_work);
+                    printf("\n redundant work: %.2f%%", redundant_work);
                 }
             }
             printf("\n");
