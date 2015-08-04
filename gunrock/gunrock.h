@@ -128,6 +128,8 @@ inline struct GRSetup InitSetup()
     configurations.max_queue_sizing = 1.0;
     configurations.traversal_mode = 0;
     configurations.source_mode = manually;
+    int* gpu_idx = (int*)malloc(sizeof(int)); gpu_idx[0] = 0;
+    configurations.device_list = gpu_idx;
     return configurations;
 }
 
