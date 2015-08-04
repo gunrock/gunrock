@@ -266,7 +266,7 @@ public:
                 source = graphio::RandomNode(csr_ptr->nodes);
                 if (!args.CheckCmdLineFlag("quiet"))
                 {
-                    printf("Using random source vertex: %d\n", source);
+                    printf("Using random source vertex: %lld\n", source);
                 }
                 info["source_type"] = "random";
             }
@@ -276,7 +276,7 @@ public:
                 source = csr_ptr->GetNodeWithHighestDegree(maximum_degree);
                 if (!args.CheckCmdLineFlag("quiet"))
                 {
-                    printf("Using highest degree (%d), vertex: %d\n",
+                    printf("Using highest degree (%d), vertex: %lld\n",
                            maximum_degree, source);
                 }
                 info["source_type"] = "largest-degree";
@@ -918,7 +918,7 @@ public:
         double redundant_work = info["redundant_work"].get_real();
 
         printf("\n [%s] finished.", info["algorithm"].get_str().c_str());
-        printf("\n elapsed: %.4f ms\n iterations: %d", elapsed, search_depth);
+        printf("\n elapsed: %.4f ms\n iterations: %lld", elapsed, search_depth);
 
         if (verbose)
         {
@@ -2040,7 +2040,8 @@ void Iteration_Loop(
                     mssg[6]=char(pre_stage+'0');
                     mssg[14]=char(thread_num+'0');
                     mssg[23]=char(peer__+'0');
-                    if (enactor_stats_->retval = util::GRError(mssg, __FILE__, __LINE__)) break;
+                    enactor_stats_->retval = util::GRError(mssg, __FILE__, __LINE__);
+                    if (enactor_stats_ -> retval) break;
                 }
                 stages[peer__]++;
                 if (enactor_stats_->retval) break;
