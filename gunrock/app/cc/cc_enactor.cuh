@@ -1056,7 +1056,7 @@ public:
                 if (this->enactor_stats[gpu].retval!=cudaSuccess)
                 {retval=this->enactor_stats[gpu].retval;break;}
         } while (0);
-        if (this->DEBUG) printf("\nGPU CC Done.\n");
+        if (DEBUG) printf("\nGPU CC Done.\n");
         return retval;
     }
 

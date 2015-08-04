@@ -747,7 +747,7 @@ public:
             }
         } while(0);
 
-        if (this->DEBUG) printf("\nGPU SSSP Done.\n");
+        if (DEBUG) printf("\nGPU SSSP Done.\n");
         return retval;
     }
 
