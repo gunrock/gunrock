@@ -438,6 +438,8 @@ public:
         long long cot_size                       = (1000 > graph_slice->nodes) ? graph_slice->nodes : 1000; 
         frontier_attribute->queue_length         = cot_size;
 
+        util::DisplayDeviceResults(data_slice->node_ids.GetPointer(util::DEVICE), cot_size);
+
         //if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, cot_size)) break;
 
         // Edge Map

@@ -494,6 +494,8 @@ int main( int argc, char** argv)
     Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
+    info->info["undirected"] = args.CheckCmdLineFlag("undirected");
+
     info->Init("WTF", args, csr);
     RunTests_instrumented<VertexId, Value, SizeT>(info);
     
