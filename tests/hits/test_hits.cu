@@ -37,6 +37,7 @@
 #include <moderngpu.cuh>
 
 using namespace gunrock;
+using namespace gunrock::app;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::hits;
@@ -128,79 +129,6 @@ void DisplaySolution(Value *hrank, Value *arank, SizeT nodes)
     free(ar_list);
 }
 
-/**
- * Performance/Evaluation statistics
- */
-
-struct Stats {
-    const char *name;
-    Statistic rate;
-    Statistic search_depth;
-    Statistic redundant_work;
-    Statistic duty;
-
-    Stats() : name(NULL), rate(), search_depth(), redundant_work(), duty() {}
-    Stats(const char *name) :
-        name(name), rate(), search_depth(), redundant_work(), duty() {}
-};
-
-/**
- * @brief Displays timing and correctness statistics
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] stats Reference to the Stats object defined in RunTests
- * @param[in] elapsed Total elapsed kernel running time
- * @param[in] avg_duty Average duty of the BFS kernels
- */
-
-void DisplayStats(
-    Stats               &stats,
-    double              elapsed,
-    double              avg_duty)
-{
-
-    // Display test name
-    printf("[%s] finished. ", stats.name);
-
-    // Display the specific sample statistics
-    printf(" elapsed: %.3f ms", elapsed);
-    if (avg_duty != 0) {
-        printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
-    }
-    printf("\n");
-}
-
-struct Test_Parameter : gunrock::app::TestParameter_Base {
-public:
-    double    delta        ;// = 0.2;
-    long long src          ;// = 0;
-    long long max_iter     ;// = 1;
-    void*     inv_graph    ;
-
-    Test_Parameter()
-    {
-        delta = 0.2;
-        src   = 0;
-        max_iter = 1;
-        inv_graph = NULL;
-    }
-
-    ~Test_Parameter()
-    {
-    }
-
-    void Init(CommandLineArgs &args)
-    {
-        TestParameter_Base::Init(args);
-        args.GetCmdLineArgument("delta", delta);
-        args.GetCmdLineArgument("max-iter", max_iter);
-    }
-};
-
-
 /******************************************************************************
  * BFS Testing Routines
  *****************************************************************************/
@@ -271,15 +199,7 @@ template <
     bool INSTRUMENT,
     bool DEBUG,
     bool SIZE_CHECK>
-void RunTests(Test_Parameter *parameter)
-    /*const Csr<VertexId, Value, SizeT> &graph,
-    const Csr<VertexId, Value, SizeT> &inv_graph,
-    VertexId src,
-    Value delta,
-    SizeT max_iter,
-    int max_grid_size,
-    int num_gpus,
-    CudaContext& context)*/
+void RunTests(Info<VertexId, Value, SizeT> *info)
 {
 
     typedef HITSProblem<
@@ -288,35 +208,41 @@ void RunTests(Test_Parameter *parameter)
         Value> Problem;
 
     Csr<VertexId, Value, SizeT>
-                 *graph                 = (Csr<VertexId, Value, SizeT>*)parameter->graph;
+                 *csr                   = info->csr_ptr;
     Csr<VertexId, Value, SizeT>
-                 *inv_graph             = (Csr<VertexId, Value, SizeT>*)parameter->inv_graph;
-    VertexId      src                   = (VertexId)parameter -> src;
-    int           max_grid_size         = parameter -> max_grid_size;
-    SizeT         max_iter              = parameter -> max_iter;
-    Value         delta                 = parameter -> delta;
-    int           num_gpus              = parameter -> num_gpus;
-    ContextPtr   *context               = (ContextPtr*)parameter -> context;
-    int          *gpu_idx               = parameter -> gpu_idx;
-    bool          g_quick               = parameter -> g_quick;
-    bool          g_stream_from_host    = parameter -> g_stream_from_host;
+                 *csc                   = info->csc_ptr;
+    VertexId      src                   = info->info["source_vertex"].get_int64();
+    int           max_grid_size         = info->info["max_grid_size"].get_int();
+    SizeT         max_iter              = info->info["max_iteration"].get_int();
+    Value         delta                 = info->info["delta"].get_real();
+    int           num_gpus              = info->info["num_gpus"].get_int();
+    ContextPtr   *context               = (ContextPtr*)info->context;
+    bool          quick_mode            = info->info["quick_mode"].get_bool();
+    bool          quiet_mode            = info->info["quiet_mode"].get_bool();
+    bool          stream_from_host      = info->info["stream_from_host"].get_bool();
+
+
+    json_spirit::mArray device_list = info->info["device_list"].get_array();
+    int* gpu_idx = new int[num_gpus];
+    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
+
     // Allocate host-side label array (for both reference and gpu-computed results)
-    Value    *reference_hrank       = (Value*)malloc(sizeof(Value) * graph->nodes);
-    Value    *reference_arank       = (Value*)malloc(sizeof(Value) * graph->nodes);
-    Value    *h_hrank               = (Value*)malloc(sizeof(Value) * graph->nodes);
-    Value    *h_arank               = (Value*)malloc(sizeof(Value) * graph->nodes);
-    Value    *reference_check_h     = (g_quick) ? NULL : reference_hrank;
-    Value    *reference_check_a     = (g_quick) ? NULL : reference_arank;
+    Value    *reference_hrank       = (Value*)malloc(sizeof(Value) * csr->nodes);
+    Value    *reference_arank       = (Value*)malloc(sizeof(Value) * csr->nodes);
+    Value    *h_hrank               = (Value*)malloc(sizeof(Value) * csr->nodes);
+    Value    *h_arank               = (Value*)malloc(sizeof(Value) * csr->nodes);
+    Value    *reference_check_h     = (quick_mode) ? NULL : reference_hrank;
+    Value    *reference_check_a     = (quick_mode) ? NULL : reference_arank;
 
     // Allocate BFS enactor map
     HITSEnactor<Problem, INSTRUMENT, DEBUG, SIZE_CHECK> hits_enactor(gpu_idx);
 
     // Allocate problem on GPU
-    Problem *csr_problem = new Problem;
-    util::GRError(csr_problem->Init(
-                      g_stream_from_host,
-                      *graph,
-                      *inv_graph,
+    Problem *problem = new Problem;
+    util::GRError(problem->Init(
+                      stream_from_host,
+                      *csr,
+                      *csc,
                       num_gpus), "Problem HITS Initialization Failed", __FILE__, __LINE__);
 
     //
@@ -324,64 +250,49 @@ void RunTests(Test_Parameter *parameter)
     //
     if (reference_check_h != NULL)
     {
-        printf("compute ref value\n");
+        if (!quiet_mode) printf("compute ref value\n");
         SimpleReferenceHITS(
-            *graph,
-            *inv_graph,
+            *csr,
+            *csc,
             reference_check_h,
             reference_check_a,
             max_iter);
-        printf("\n");
+        if (!quiet_mode) printf("\n");
     }
-
-    Stats *stats = new Stats("GPU HITS");
-
-    long long           total_queued = 0;
-    double              avg_duty = 0.0;
 
     // Perform HITS
     GpuTimer gpu_timer;
 
     util::GRError(
-        csr_problem->Reset(src, delta, hits_enactor.GetFrontierType()),
+        problem->Reset(src, delta, hits_enactor.GetFrontierType()),
         "HITS Problem Data Reset Failed", __FILE__, __LINE__);
     gpu_timer.Start();
     util::GRError(
         hits_enactor.template Enact<Problem>(
-            *context, csr_problem, max_iter, max_grid_size),
+            *context, problem, max_iter, max_grid_size),
         "HITS Problem Enact Failed", __FILE__, __LINE__);
     gpu_timer.Stop();
-
-    hits_enactor.GetStatistics(total_queued, avg_duty);
 
     double elapsed = gpu_timer.ElapsedMillis();
 
     // Copy out results
     util::GRError(
-        csr_problem->Extract(h_hrank, h_arank),
+        problem->Extract(h_hrank, h_arank),
         "HITS Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    /*
-    // Verify the result
-    if (reference_check_a != NULL)
-    {
-        printf("Validity: ");
-        CompareResults(h_hrank, reference_check_h, graph->nodes, true);
-        CompareResults(h_arank, reference_check_a, graph->nodes, true);
-    }
-    */
 
     // Display Solution
-    DisplaySolution(h_hrank, h_arank, graph->nodes);
+    if (!quiet_mode) DisplaySolution(h_hrank, h_arank, csr->nodes);
 
-    DisplayStats(
-        *stats,
-        elapsed,
-        avg_duty);
+    info->ComputeCommonStats(hits_enactor.enactor_stats.GetPointer(), elapsed);
+
+    if (!quiet_mode)
+        info->DisplayStats();   // display collected statistics.
+
+    info->CollectInfo();
 
     // Cleanup
-    delete stats;
-    if (csr_problem) delete csr_problem;
+    if (problem) delete problem;
     if (reference_check_h) free(reference_check_h);
     if (reference_check_a) free(reference_check_a);
 
@@ -397,14 +308,12 @@ template <
     typename      SizeT,
     bool          INSTRUMENT,
     bool          DEBUG>
-void RunTests_size_check(Test_Parameter *parameter)
+void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->size_check) RunTests
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-        true > (parameter);
-   else RunTests
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-        false> (parameter);
+    if (info->info["size_check"].get_bool())
+        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, true > (info);
+    else 
+        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, false> (info);
 }
 
 template <
@@ -412,79 +321,28 @@ template <
     typename    Value,
     typename    SizeT,
     bool        INSTRUMENT>
-void RunTests_debug(Test_Parameter *parameter)
+void RunTests_debug(Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->debug) RunTests_size_check
+    if (info->info["debug_mode"].get_bool()) RunTests_size_check
         <VertexId, Value, SizeT, INSTRUMENT,
-        true > (parameter);
+            true > (info);
     else RunTests_size_check
         <VertexId, Value, SizeT, INSTRUMENT,
-        false> (parameter);
+            false> (info);
 }
 
 template <
     typename      VertexId,
     typename      Value,
     typename      SizeT>
-void RunTests_instrumented(Test_Parameter *parameter)
+void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->instrumented) RunTests_debug
+    if (info->info["instrument"].get_bool()) RunTests_debug
         <VertexId, Value, SizeT,
-        true > (parameter);
+        true > (info);
     else RunTests_debug
         <VertexId, Value, SizeT,
-        false> (parameter);
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] inv_graph Reference to the inversed CSR graph we process on
- * @param[in] args Reference to the command line arguments
- * @param[in] context CudaContext for moderngpu to use
- */
-template <
-    typename VertexId,
-    typename Value,
-    typename SizeT>
-void RunTests(
-    Csr<VertexId, Value, SizeT> *graph,
-    Csr<VertexId, Value, SizeT> *inv_graph,
-    CommandLineArgs             &args,
-    int                          num_gpus,
-    ContextPtr                  *context,
-    int                         *gpu_idx,
-    cudaStream_t                *streams = NULL)
-{
-    std::string src_str="";
-    Test_Parameter *parameter = new Test_Parameter;
-
-    parameter -> Init(args);
-    parameter -> graph              = graph;
-    parameter -> inv_graph          = inv_graph;
-    parameter -> num_gpus           = num_gpus;
-    parameter -> context            = context;
-    parameter -> gpu_idx            = gpu_idx;
-    parameter -> streams            = streams;
-
-    args.GetCmdLineArgument("src", src_str);
-    if (src_str.empty()) {
-        parameter->src = 0;
-    } else if (src_str.compare("randomize") == 0) {
-        parameter->src = graphio::RandomNode(graph->nodes);
-    } else if (src_str.compare("largestdegree") == 0) {
-        int temp;
-        parameter->src = graph->GetNodeWithHighestDegree(temp);
-    } else {
-        args.GetCmdLineArgument("src", parameter->src);
-    }
-
-    RunTests_instrumented<VertexId, Value, SizeT>(parameter);
+        false> (info);
 }
 
 /******************************************************************************
@@ -494,83 +352,28 @@ int main( int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
 
-    if ((argc < 2) || (args.CheckCmdLineFlag("help")))
+    int graph_args = argc - args.ParsedArgc() - 1;
+    if ((argc < 2) || (graph_args < 1) || (args.CheckCmdLineFlag("help")))
     {
         Usage();
         return 1;
     }
 
-    //DeviceInit(args);
-    //cudaSetDeviceFlags(cudaDeviceMapHost);
-    int dev = 0;
-    args.GetCmdLineArgument("device", dev);
-    ContextPtr context = mgpu::CreateCudaDevice(dev);
+    typedef int VertexId;                   // Use as the node identifier
+    typedef float Value;                    // Use as the value type
+    typedef int SizeT;                      // Use as the graph size type
 
-    //srand(0); // Presently deterministic
-    //srand(time(NULL));
+    Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
+    Csr<VertexId, Value, SizeT> csc(false);
+    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
-    // Parse graph-contruction params
-    bool g_undirected = false;
+    info->info["undirected"] = false;
+    info->info["edge_value"] = false;
 
-    std::string graph_type = argv[1];
-    int flags = args.ParsedArgc();
-    int graph_args = argc - flags - 1;
+    info->Init("HITS", args, csr, csc);
 
-    if (graph_args < 1)
-    {
-        Usage();
-        return 1;
-    }
+    info->info["quick_mode"] = true;
+    RunTests_instrumented<VertexId, Value, SizeT>(info);
 
-    //
-    // Construct graph and perform search(es)
-    //
-
-    if (graph_type == "market")
-    {
-
-        // Matrix-market coordinate-formatted graph file
-
-        typedef int VertexId;                   // Use as the node identifier
-        typedef float Value;                    // Use as the value type
-        typedef int SizeT;                      // Use as the graph size type
-        Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
-
-        Csr<VertexId, Value, SizeT> inv_csr(false);
-
-        if (graph_args < 1) { Usage(); return 1; }
-
-        char *market_filename = (graph_args == 2) ? argv[2] : NULL;
-        if (graphio::BuildMarketGraph<false>(
-                market_filename,
-                csr,
-                g_undirected,
-                false) != 0)
-        {
-            return 1;
-        }
-
-        if (graphio::BuildMarketGraph<false>(
-                market_filename,
-                inv_csr,
-                g_undirected,
-                true) != 0)
-        {
-            return 1;
-        }
-
-        csr.PrintHistogram();
-        //csr.DisplayGraph();
-        //inv_csr.DisplayGraph();
-
-        // Run tests
-        RunTests(&csr, &inv_csr, args, 1, &context, &dev);
-
-    }
-    else
-    {
-        fprintf(stderr, "Unspecified graph type\n");
-        return 1;
-    }
     return 0;
 }
