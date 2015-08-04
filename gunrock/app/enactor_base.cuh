@@ -106,7 +106,7 @@ struct EnactorStats
 /**
  * @brief Info data structure contains test parameter and running statistics.
  * All test parameters and running statistics stored in json_spirit::mObject.
- * 
+ *
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
@@ -213,7 +213,7 @@ public:
      * @param[in] algorithm_name Algorithm name.
      * @param[in] args Command line arguments.
      */
-    void InitBase(std::string algorithm_name, util::CommandLineArgs &args) 
+    void InitBase(std::string algorithm_name, util::CommandLineArgs &args)
     {
         // put basic information into info
         info["engine"] = "Gunrock";
@@ -234,10 +234,9 @@ public:
         info["instrument"] =  args.CheckCmdLineFlag("instrumented");
         info["size_check"] = !args.CheckCmdLineFlag("disable-size-check");
         info["debug_mode"] =  args.CheckCmdLineFlag("v");
-        info["quiet_mode"] =  args.CheckCmdLineFlag("quiet");
         info["quick_mode"] =  args.CheckCmdLineFlag("quick");
-
-        info["idempotent"] = args.CheckCmdLineFlag("idempotence");        // BFS
+        info["quiet_mode"] =  args.CheckCmdLineFlag("quiet");
+        info["idempotent"] =  args.CheckCmdLineFlag("idempotence");       // BFS
         info["mark_predecessors"] =  args.CheckCmdLineFlag("mark-pred");  // BFS
 
         info["json"] = args.CheckCmdLineFlag("json");
@@ -360,7 +359,7 @@ public:
         }
         if (args.CheckCmdLineFlag("error"))
         {
-            args.GetCmdLineArgument("error", error);       
+            args.GetCmdLineArgument("error", error);
             info["error"] = error;
         }
         if (args.CheckCmdLineFlag("alpha"))
@@ -455,7 +454,7 @@ public:
         Csr<VertexId, Value, SizeT> &csr_ref,
         Csr<VertexId, Value, SizeT> &csc_ref)
     {
-         // load or generate input graph TODO
+         // load or generate input graph
         if (info["edge_value"].get_bool())
         {
             if (info["undirected"].get_bool())
@@ -625,7 +624,7 @@ public:
             if (graphio::BuildMarketGraph<EDGE_VALUE>(
                         market_filename,
                         csr_ref,
-                        args.CheckCmdLineFlag("undirected"),
+                        info["undirected"].get_bool(),
                         INVERSE_GRAPH,
                         args.CheckCmdLineFlag("quiet")) != 0)
             {
@@ -681,7 +680,7 @@ public:
                         rmat_nodes,
                         rmat_edges,
                         csr_ref,
-                        args.CheckCmdLineFlag("undirected"),
+                        info["undirected"].get_bool(),
                         rmat_a,
                         rmat_b,
                         rmat_c,
@@ -744,7 +743,7 @@ public:
                         rgg_nodes,
                         csr_ref,
                         rgg_threshold,
-                        args.CheckCmdLineFlag("undirected"),
+                        info["undirected"].get_bool(),
                         rgg_vmultipiler,
                         1,
                         rgg_seed,

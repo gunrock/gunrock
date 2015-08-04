@@ -222,7 +222,7 @@ class MSTEnactor :
 
       // debug configurations
       //SizeT num_edges_origin = graph_slice->edges;
-      bool debug_info = 0; // used for debug purpose
+      bool debug_info = 0;   // used for debug purpose
       //int tmp_select  = 0; // used for debug purpose
       //int tmp_length  = 0; // used for debug purpose
       unsigned int *num_selected = new unsigned int; // used in cub select
