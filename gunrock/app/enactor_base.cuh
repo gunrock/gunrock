@@ -950,8 +950,8 @@ public:
                     printf("\n redundant work: %.2f%%", redundant_work);
                 }
             }
-            printf("\n");
         }
+        printf("\n");
     }
 };
 
