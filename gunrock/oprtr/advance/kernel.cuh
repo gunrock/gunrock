@@ -81,7 +81,7 @@ cudaError_t ComputeOutputLength(
     // load edge-expand-partitioned kernel
     //util::DisplayDeviceResults(d_in_key_queue, frontier_attribute.queue_length);
     typedef typename Problem::SizeT         SizeT;
-    if (frontier_attribute->queue_length ==0)
+    if (frontier_attribute->queue_length == 0)
     {
         printf("setting output_length to 0");
         util::MemsetKernel<SizeT><<<1,1,0,stream>>>(frontier_attribute->output_length.GetPointer(util::DEVICE),0,1);
@@ -103,7 +103,9 @@ cudaError_t ComputeOutputLength(
                 max_out,
                 ADVANCE_TYPE);
         //util::DisplayDeviceResults(partitioned_scanned_edges, frontier_attribute->queue_length);
-    } else if (KernelPolicy::ADVANCE_MODE == LB)
+    }
+    else if (KernelPolicy::ADVANCE_MODE == LB ||
+             KernelPolicy::ADVANCE_MODE == LB_LIGHT)
     {
         gunrock::oprtr::edge_map_partitioned::GetEdgeCounts
             <typename KernelPolicy::LOAD_BALANCED, Problem, Functor>
@@ -136,7 +138,8 @@ cudaError_t ComputeOutputLength(
     return util::GRError(cudaMemcpyAsync(
          frontier_attribute->output_length.GetPointer(util::DEVICE),
          partitioned_scanned_edges + frontier_attribute->queue_length - 1, // TODO: +1?
-         sizeof(SizeT), cudaMemcpyDeviceToDevice, stream), "cudaMemcpyAsync failed", __FILE__, __LINE__);
+         sizeof(SizeT), cudaMemcpyDeviceToDevice, stream),
+         "cudaMemcpyAsync failed", __FILE__, __LINE__);
 }
 
 /**
@@ -202,7 +205,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         CudaContext                             &context,
         cudaStream_t                             stream,
         TYPE                                     ADVANCE_TYPE,
-        bool                                     input_inverse_graph     = false,
+        bool                                     input_inverse_graph  = false,
         bool                                     output_inverse_graph = false,
         bool                                     get_output_length = true,
         REDUCE_OP                                R_OP              = gunrock::oprtr::advance::NONE,
@@ -488,13 +491,17 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         }
         case LB_LIGHT:
         {
-            typedef typename ProblemData::SizeT         SizeT;
-            typedef typename ProblemData::VertexId      VertexId;
-            typedef typename ProblemData::Value         Value;
+            typedef typename ProblemData::SizeT          SizeT;
+            typedef typename ProblemData::VertexId       VertexId;
+            typedef typename ProblemData::Value          Value;
             typedef typename KernelPolicy::LOAD_BALANCED LBPOLICY;
             // load edge-expand-partitioned kernel
-            SizeT num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
-             if (get_output_length)
+            SizeT num_block = (frontier_attribute.queue_length +
+                               KernelPolicy::LOAD_BALANCED::THREADS - 1) /
+                               KernelPolicy::LOAD_BALANCED::THREADS;
+
+            if (get_output_length)
+            {
                 ComputeOutputLength<KernelPolicy, ProblemData, Functor>(
                     &frontier_attribute,
                     d_row_offsets,
@@ -510,7 +517,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     ADVANCE_TYPE,
                     false,
                     input_inverse_graph,
-                    output_inverse_graph);   
+                    output_inverse_graph);
+            }
 
             gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(

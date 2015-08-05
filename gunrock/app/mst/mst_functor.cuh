@@ -309,7 +309,7 @@ struct PJmpFunctor
     if (parent != grand_parent)
     {
       util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        0, problem->d_vertex_flag);
+        0, problem->d_vertex_flag + 0);
       util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
         grand_parent, problem->d_successors + node);
     }
