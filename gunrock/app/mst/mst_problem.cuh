@@ -67,76 +67,26 @@ struct MSTProblem : ProblemBase <
    */
   struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
   {
-    //
-    // data slice device-side arrays
-    //
+    util::Array1D<SizeT, VertexId> labels;
 
-    util::Array1D<SizeT, VertexId> labels; // does not used in MST
-    util::Array1D<SizeT, int> done_flags;  // complete flag for jumping kernels
-    util::Array1D<SizeT, int> mst_output;  // mask indicates selected MST edges
-    util::Array1D<SizeT, unsigned int> flag_array;  // one for start of segment
-    util::Array1D<SizeT, unsigned int> edge_flags;  // output of segmented sort
-    util::Array1D<SizeT, VertexId> keys_array;  // prefix sum of the flag array
-    util::Array1D<SizeT, VertexId> reduce_key;  // segmented reduced keys array
-    util::Array1D<SizeT, VertexId> successors;  // destinations have min weight
-    util::Array1D<SizeT, VertexId> original_n;  // tracking original vertex IDs
-    util::Array1D<SizeT, VertexId> original_e;  // tracking original edge IDs
-    util::Array1D<SizeT, VertexId> super_edge;  // super edges next iteration
-    util::Array1D<SizeT, VertexId> colindices;  // column indices of CSR graph
-    util::Array1D<SizeT, VertexId> temp_index;  // used for storing temp index
-    util::Array1D<SizeT, Value>    temp_value;  // used for storing temp value
-    util::Array1D<SizeT, Value>    reduce_val;  // store reduced minimum weight
-    util::Array1D<SizeT, Value>    edge_value;  // store weight values per edge
-    util::Array1D<SizeT, SizeT>    row_offset;  // row offsets arr of CSR graph
-    util::Array1D<SizeT, SizeT>    super_idxs;  // vertex ids scanned from flag
-
-    /*
-     * @brief Default constructor
-     */
-    DataSlice()
-    {
-      done_flags.SetName("done_flags");
-      mst_output.SetName("mst_output");
-      flag_array.SetName("flag_array");
-      edge_flags.SetName("edge_flags");
-      keys_array.SetName("keys_array");
-      reduce_key.SetName("reduce_key");
-      successors.SetName("successors");
-      original_n.SetName("original_n");
-      original_e.SetName("original_e");
-      super_edge.SetName("super_edge");
-      colindices.SetName("colindices");
-      temp_index.SetName("temp_index");
-      temp_value.SetName("temp_value");
-      reduce_val.SetName("reduce_val");
-      edge_value.SetName("edge_value");
-      row_offset.SetName("row_offset");
-      super_idxs.SetName("super_idxs");
-    }
-
-    /*
-     * @brief Default destructor
-     */
-    ~DataSlice()
-    {
-      mst_output.Release();
-      done_flags.Release();
-      flag_array.Release();
-      edge_flags.Release();
-      keys_array.Release();
-      reduce_key.Release();
-      successors.Release();
-      original_n.Release();
-      original_e.Release();
-      super_edge.Release();
-      colindices.Release();
-      temp_index.Release();
-      temp_value.Release();
-      reduce_val.Release();
-      edge_value.Release();
-      row_offset.Release();
-      super_idxs.Release();
-    }
+    // device storage arrays
+    int          *d_vertex_flag;   // finish flag for per-vertex kernels
+    int          *d_mst_output;    // mark selected edges with 1
+    unsigned int *d_flags_array;   // flags 1 start of segment, 0 otherwise
+    unsigned int *d_edge_flags;    // flags from the output of segment sort
+    VertexId     *d_keys_array;    // keys array - scan of the flags array
+    VertexId     *d_reduced_keys;  // reduced keys array
+    VertexId     *d_successors;    // destination vertices that have min weight
+    VertexId     *d_origin_nodes;  // used to track origin vertex ids
+    VertexId     *d_origin_edges;  // origin edge list keep track of e_ids
+    VertexId     *d_super_edges;   // super edge list for next iteration
+    VertexId     *d_col_indices;   // column indices of CSR graph (edges)
+    VertexId     *d_temp_index;    // used for storing temp index
+    Value        *d_temp_value;    // used for storing temp value
+    Value        *d_reduced_vals;  // store reduced minimum weights
+    Value        *d_edge_weights;  // store weights per edge
+    SizeT        *d_supervtx_ids;  // super vertex ids scanned from flags
+    SizeT        *d_row_offsets;   // row offsets of CSR graph
   };
 
   // Members
@@ -192,6 +142,60 @@ struct MSTProblem : ProblemBase <
         cudaSetDevice(gpu_idx[i]),
         "~MSTProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
 
+      data_slices[i]->labels.Release();
+
+      if (data_slices[i]->d_col_indices)
+        util::GRError(cudaFree(data_slices[i]->d_col_indices),
+          "GpuSlice cudaFree d_col_indices  failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_edge_weights)
+        util::GRError(cudaFree(data_slices[i]->d_edge_weights),
+          "GpuSlice cudaFree d_edge_weights failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_reduced_vals)
+        util::GRError(cudaFree(data_slices[i]->d_reduced_vals),
+          "GpuSlice cudaFree d_reduced_vals failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_flags_array)
+        util::GRError(cudaFree(data_slices[i]->d_flags_array),
+          "GpuSlice cudaFree  d_flags_array failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_keys_array)
+        util::GRError(cudaFree(data_slices[i]->d_keys_array),
+          "GpuSlice cudaFree  d_keys_array  failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_temp_index)
+        util::GRError(cudaFree(data_slices[i]->d_temp_index),
+          "GpuSlice cudaFree  d_temp_index  failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_reduced_keys)
+        util::GRError(cudaFree(data_slices[i]->d_reduced_keys),
+          "GpuSlice cudaFree d_reduced_keys failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_successors)
+        util::GRError(cudaFree(data_slices[i]->d_successors),
+          "GpuSlice cudaFree  d_successors  failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_row_offsets)
+        util::GRError(cudaFree(data_slices[i]->d_row_offsets),
+          "GpuSlice cudaFree d_row_offsets  failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_vertex_flag)
+        util::GRError(cudaFree(data_slices[i]->d_vertex_flag),
+          "GpuSlice cudaFree d_vertex_flag  failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_origin_nodes)
+        util::GRError(cudaFree(data_slices[i]->d_origin_nodes),
+          "GpuSlice cudaFree d_origin_nodes failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_supervtx_ids)
+        util::GRError(cudaFree(data_slices[i]->d_supervtx_ids),
+          "GpuSlice cudaFree d_supervtx_ids failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_origin_edges)
+        util::GRError(cudaFree(data_slices[i]->d_origin_edges),
+          "GpuSlice cudaFree d_origin_edges failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_mst_output)
+        util::GRError(cudaFree(data_slices[i]->d_mst_output),
+          "GpuSlice cudaFree  d_mst_output  failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_edge_flags)
+        util::GRError(cudaFree(data_slices[i]->d_edge_flags),
+          "GpuSlice cudaFree  d_edge_flags  failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_temp_value)
+        util::GRError(cudaFree(data_slices[i]->d_temp_value),
+          "GpuSlice cudaFree  d_temp_value  failed", __FILE__, __LINE__);
+      if (data_slices[i]->d_super_edges)
+        util::GRError(cudaFree(data_slices[i]->d_super_edges),
+          "GpuSlice cudaFree d_super_edges  failed", __FILE__, __LINE__);
+
       if (d_data_slices[i])
         util::GRError(cudaFree(d_data_slices[i]),
           "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
@@ -203,7 +207,7 @@ struct MSTProblem : ProblemBase <
   }
 
   /**
-   * \addtogroup Public Interface
+   * \addtogroup PublicInterface
    * @{
    */
 
@@ -218,7 +222,7 @@ struct MSTProblem : ProblemBase <
    */
   cudaError_t Extract(SizeT *h_mst_output)
   {
-    cudaError_t ret = cudaSuccess;
+    cudaError_t retval = cudaSuccess;
     do
     {
       if (num_gpus == 1)
@@ -227,16 +231,17 @@ struct MSTProblem : ProblemBase <
         if (util::GRError(cudaSetDevice(gpu_idx[0]),
           "MSTProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
 
-        data_slices[0]->mst_output.SetPointer(h_mst_output);
-        if (ret = data_slices[0]->mst_output.Move(
-          util::DEVICE, util::HOST)) return ret;
+        if (retval = util::GRError(cudaMemcpy(
+          h_mst_output, data_slices[0]->d_mst_output,
+          sizeof(SizeT) * edges, cudaMemcpyDeviceToHost),
+          "MSTProblem cudaMemcpy selector failed", __FILE__, __LINE__)) break;
       }
       else
       {
         // TODO: multi-GPU extract result
       }
     } while(0);
-    return ret;
+    return retval;
   }
 
   /**
@@ -274,7 +279,7 @@ struct MSTProblem : ProblemBase <
     // Allocate output labels.
     //
 
-    cudaError_t ret = cudaSuccess;
+    cudaError_t retval = cudaSuccess;
     data_slices   = new DataSlice * [num_gpus];
     d_data_slices = new DataSlice * [num_gpus];
 
@@ -292,17 +297,17 @@ struct MSTProblem : ProblemBase <
 
         // create a single data slice for the currently-set GPU
         int gpu;
-        if (ret = util::GRError(cudaGetDevice(&gpu),
+        if (retval = util::GRError(cudaGetDevice(&gpu),
           "MSTProblem cudaGetDevice failed",
           __FILE__, __LINE__)) break;
         gpu_idx[0] = gpu;
 
         data_slices[0] = new DataSlice;
-        if (ret = util::GRError(cudaMalloc(
+        if (retval = util::GRError(cudaMalloc(
           (void**)&d_data_slices[0],
           sizeof(DataSlice)),
           "MSTProblem cudaMalloc d_data_slices failed",
-          __FILE__, __LINE__)) return ret;
+          __FILE__, __LINE__)) return retval;
 
         data_slices[0][0].streams.SetPointer(streams, 1);
         data_slices[0]->Init(
@@ -314,143 +319,203 @@ struct MSTProblem : ProblemBase <
           NULL,        // Number of in vertices
           NULL);       // Number of out vertices
 
-        //
-        // allocate SoA on device
-        //
+        // create SoA on device
+        VertexId *d_col_indices;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_col_indices,
+          edges * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_col_indices failed",
+          __FILE__, __LINE__)) return retval;
+        if (retval = util::GRError(cudaMemcpy(
+          d_col_indices,
+          graph.column_indices,
+          edges * sizeof(VertexId),
+          cudaMemcpyHostToDevice),
+          "ProblemBase cudaMemcpy d_col_indices failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[0]->d_col_indices = d_col_indices;
 
-        if (ret = data_slices[gpu]->done_flags.Allocate(    1, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->mst_output.Allocate(edges, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->flag_array.Allocate(edges, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->edge_flags.Allocate(edges, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->keys_array.Allocate(edges, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->reduce_key.Allocate(nodes, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->successors.Allocate(nodes, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->original_n.Allocate(nodes, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->original_e.Allocate(edges, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->super_edge.Allocate(edges, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->colindices.Allocate(edges, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->temp_index.Allocate(edges, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->temp_value.Allocate(edges, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->reduce_val.Allocate(edges, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->edge_value.Allocate(edges, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->row_offset.Allocate(edges, util::DEVICE))
-          return ret;
-        if (ret = data_slices[gpu]->super_idxs.Allocate(edges, util::DEVICE))
-          return ret;
+        VertexId *d_super_edges;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_super_edges,
+          edges * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_super_edges failed",
+          __FILE__, __LINE__)) return retval;
+        if (retval = util::GRError(cudaMemcpy(
+          d_super_edges,
+          graph.column_indices,
+          edges * sizeof(VertexId),
+          cudaMemcpyHostToDevice),
+          "ProblemBase cudaMemcpy d_super_edges failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[0]->d_super_edges = d_super_edges;
 
-        //
-        // initialize if necessary
-        //
+        Value *d_edge_weights;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_edge_weights,
+          edges * sizeof(Value)),
+          "MSTProblem cudaMalloc d_edge_weights failed",
+          __FILE__, __LINE__)) return retval;
+        if (retval = util::GRError(cudaMemcpy(
+          d_edge_weights,
+          graph.edge_values,
+          edges * sizeof(Value),
+          cudaMemcpyHostToDevice),
+          "ProblemBase cudaMemcpy d_edge_weights failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[0]->d_edge_weights = d_edge_weights;
 
-        // initialize done flag for kernel calls
-        int *vertex_flag = new int; vertex_flag[0] = 1;
-        data_slices[gpu]->done_flags.SetPointer(vertex_flag);
-        if (ret = data_slices[gpu]->done_flags.Move(util::HOST, util::DEVICE))
-          return ret;
-
-        // initialize mst_output to a vector of zeros
+        Value *d_reduced_vals;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_reduced_vals,
+          nodes * sizeof(Value)),
+          "MSTProblem cudaMalloc d_reduced_vals failed",
+          __FILE__, __LINE__)) return retval;
+          data_slices[0]->d_reduced_vals = d_reduced_vals;
         util::MemsetKernel<<<128, 128>>>(
-          data_slices[gpu]->mst_output.GetPointer(util::DEVICE),
-          (int)0, edges);
+          data_slices[0]->d_reduced_vals, (Value)0, nodes);
 
-        // initialize flag_array to a vector of zeros
+        unsigned int *d_flags_array;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_flags_array,
+          edges * sizeof(unsigned int)),
+          "MSTProblem cudaMalloc d_flags_array Failed",
+          __FILE__, __LINE__)) return retval;
+          data_slices[0]->d_flags_array = d_flags_array;
         util::MemsetKernel<unsigned int><<<128, 128>>>(
-          data_slices[gpu]->flag_array.GetPointer(util::DEVICE),
-          (unsigned int)0, edges);
+          data_slices[0]->d_flags_array, 0, edges);
 
-        // initialize edge_flags to a vector of zeros
+        VertexId *d_keys_array;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_keys_array,
+          edges * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_keys_array Failed",
+          __FILE__, __LINE__)) return retval;
+          data_slices[0]->d_keys_array = d_keys_array;
+        util::MemsetKernel<<<128, 128>>>(
+          data_slices[0]->d_keys_array, 0, edges);
+
+        VertexId *d_temp_index;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_temp_index,
+          edges * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_temp_index Failed",
+          __FILE__, __LINE__)) return retval;
+          data_slices[0]->d_temp_index = d_temp_index;
+        util::MemsetKernel<<<128, 128>>>(
+          data_slices[0]->d_temp_index, (VertexId)0, edges);
+
+        VertexId *d_reduced_keys;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_reduced_keys,
+          nodes * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_reduced_keys Failed",
+          __FILE__, __LINE__)) return retval;
+          data_slices[0]->d_reduced_keys = d_reduced_keys;
+        util::MemsetKernel<<<128, 128>>>(
+          data_slices[0]->d_reduced_keys, 0, nodes);
+
+        VertexId *d_successors;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_successors,
+          nodes * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_successors Failed",
+          __FILE__, __LINE__)) return retval;
+          data_slices[0]->d_successors = d_successors;
+        util::MemsetKernel<<<128, 128>>>(
+          data_slices[0]->d_successors, 0, nodes);
+
+        SizeT *d_row_offsets;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_row_offsets,
+          (nodes + 1) * sizeof(SizeT)),
+          "MSTProblem cudaMalloc d_row_offsets Failed",
+          __FILE__, __LINE__)) return retval;
+        if (retval = util::GRError(cudaMemcpy(
+          d_row_offsets,
+          graph.row_offsets,
+          (nodes + 1) * sizeof(SizeT),
+          cudaMemcpyHostToDevice),
+          "ProblemBase cudaMemcpy d_row_offsets failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[0]->d_row_offsets = d_row_offsets;
+
+        int *d_vertex_flag;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_vertex_flag,
+          sizeof(int)),
+          "MSTProblem cudaMalloc d_vertex_flag failed",
+          __FILE__, __LINE__)) return retval;
+          data_slices[0]->d_vertex_flag = d_vertex_flag;
+
+        VertexId *d_origin_nodes;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_origin_nodes,
+          nodes * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_origin_nodes failed",
+          __FILE__, __LINE__)) return retval;
+          data_slices[0]->d_origin_nodes = d_origin_nodes;
+        util::MemsetIdxKernel<<<128, 128>>>(
+          data_slices[0]->d_origin_nodes, nodes);
+
+        VertexId *d_supervtx_ids;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_supervtx_ids,
+          nodes * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_supervtx_ids Failed",
+          __FILE__, __LINE__)) return retval;
+          data_slices[0]->d_supervtx_ids = d_supervtx_ids;
+        util::MemsetKernel<<<128, 128>>>(
+          data_slices[0]->d_supervtx_ids, 0, nodes);
+
+        VertexId *d_origin_edges;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_origin_edges,
+          edges * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_origin_edges Failed",
+          __FILE__, __LINE__)) return retval;
+          data_slices[0]->d_origin_edges = d_origin_edges;
+        util::MemsetIdxKernel<<<128, 128>>>(
+          data_slices[0]->d_origin_edges, edges);
+
+        int *d_mst_output;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_mst_output,
+          edges * sizeof(SizeT)),
+          "MSTProblem cudaMalloc d_mst_output Failed",
+          __FILE__, __LINE__)) return retval;
+          data_slices[0]->d_mst_output = d_mst_output;
+        util::MemsetKernel<<<128, 128>>>(
+          data_slices[0]->d_mst_output, 0, edges);
+
+        unsigned int *d_edge_flags;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_edge_flags,
+          edges * sizeof(unsigned int)),
+          "MSTProblem cudaMalloc d_edge_flags Failed",
+          __FILE__, __LINE__)) return retval;
+          data_slices[0]->d_edge_flags = d_edge_flags;
         util::MemsetKernel<unsigned int><<<128, 128>>>(
-          data_slices[gpu]->edge_flags.GetPointer(util::DEVICE),
-          (unsigned int)0, edges);
+          data_slices[0]->d_edge_flags, 0, edges);
 
-        // initialize keys_array to a vector of zeros
+        Value *d_temp_value;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_temp_value,
+          edges * sizeof(Value)),
+          "MSTProblem cudaMalloc d_temp_value Failed",
+          __FILE__, __LINE__)) return retval;
+          data_slices[0]->d_temp_value = d_temp_value;
         util::MemsetKernel<<<128, 128>>>(
-          data_slices[gpu]->keys_array.GetPointer(util::DEVICE),
-          (VertexId)0, edges);
-
-        // initialize reduce_key to a vector of zeros
-        util::MemsetKernel<<<128, 128>>>(
-          data_slices[gpu]->reduce_key.GetPointer(util::DEVICE),
-          (VertexId)0, edges);
-
-        // initialize successors to a vector of zeros
-        util::MemsetKernel<<<128, 128>>>(
-          data_slices[gpu]->successors.GetPointer(util::DEVICE),
-          (VertexId)0, edges);
-
-        // initialize original node IDs from 0 to nodes
-        util::MemsetIdxKernel<<<128, 128>>>(
-          data_slices[gpu]->original_n.GetPointer(util::DEVICE), nodes);
-
-        // initialize original edge IDs from 0 to edges
-        util::MemsetIdxKernel<<<128, 128>>>(
-          data_slices[gpu]->original_e.GetPointer(util::DEVICE), edges);
-
-        // initialize super edges with graph.column_indices
-        data_slices[gpu]->super_edge.SetPointer(graph.column_indices);
-        if (ret = data_slices[gpu]->super_edge.Move(util::HOST, util::DEVICE))
-          return ret;
-
-        // initialize col_indices with graph.column_indices
-        data_slices[gpu]->colindices.SetPointer(graph.column_indices);
-        if (ret = data_slices[gpu]->colindices.Move(util::HOST, util::DEVICE))
-          return ret;
-
-        // initialize temp_index to a vector of zeros
-        util::MemsetKernel<<<128, 128>>>(
-          data_slices[gpu]->temp_index.GetPointer(util::DEVICE),
-          (VertexId)0, edges);
-
-        // initialize temp_value to a vector of zeros
-        util::MemsetKernel<<<128, 128>>>(
-          data_slices[gpu]->temp_value.GetPointer(util::DEVICE),
-          (Value)0, edges);
-
-        // initialize reduce_val to a vector of zeros
-        util::MemsetKernel<<<128, 128>>>(
-          data_slices[gpu]->reduce_val.GetPointer(util::DEVICE),
-          (Value)0, edges);
-
-        // initialize edge_value with graph.column_indices
-        data_slices[gpu]->edge_value.SetPointer(graph.edge_values);
-        if (ret = data_slices[gpu]->edge_value.Move(util::HOST, util::DEVICE))
-          return ret;
-
-        // initialize row_offset with graph.column_indices
-        data_slices[gpu]->row_offset.SetPointer(graph.row_offsets);
-        if (ret = data_slices[gpu]->row_offset.Move(util::HOST, util::DEVICE))
-          return ret;
-
-        // initialize super_idxs to a vector of zeros
-        util::MemsetKernel<<<128, 128>>>(
-          data_slices[gpu]->super_idxs.GetPointer(util::DEVICE),
-          (SizeT)0, nodes);
+          data_slices[0]->d_temp_value, (Value)0, edges);
 
         data_slices[0]->labels.SetName("labels");
-        if (ret = data_slices[0]->labels.Allocate(nodes, util::DEVICE))
+        if (retval = data_slices[0]->labels.Allocate(nodes, util::DEVICE))
         {
-          return ret;
+          return retval;
         }
-
-        delete vertex_flag;
       }
     } while (0);
-    return ret;
+    return retval;
   }
 
   /**
@@ -464,15 +529,15 @@ struct MSTProblem : ProblemBase <
    */
   cudaError_t Reset(FrontierType frontier_type, double queue_sizing)
   {
-    cudaError_t ret = cudaSuccess;
+    cudaError_t retval = cudaSuccess;
 
     for (int gpu = 0; gpu < num_gpus; ++gpu)
     {
       // Set device
-      if (ret = util::GRError(
+      if (retval = util::GRError(
         cudaSetDevice(gpu_idx[gpu]),
         "MSTProblem cudaSetDevice failed",
-        __FILE__, __LINE__)) return ret;
+        __FILE__, __LINE__)) return retval;
 
       data_slices[gpu]->Reset(
         frontier_type,
@@ -480,85 +545,191 @@ struct MSTProblem : ProblemBase <
         queue_sizing,
         queue_sizing);
 
-      //
-      // Allocate outputs if necessary
-      //
+      // Allocate output if necessary
+      if (!data_slices[gpu]->d_col_indices)
+      {
+        VertexId *d_col_indices;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_col_indices, edges * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_col_indices failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_col_indices = d_col_indices;
+      }
 
-      if (data_slices[gpu]->done_flags.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->done_flags.Allocate(    1, util::DEVICE))
-          return ret;
+      if (!data_slices[gpu]->d_super_edges)
+      {
+        VertexId *d_super_edges;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_super_edges, edges * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_super_edges failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_super_edges = d_super_edges;
+      }
 
-      if (data_slices[gpu]->mst_output.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->mst_output.Allocate(edges, util::DEVICE))
-          return ret;
+      if (!data_slices[gpu]->d_edge_weights)
+      {
+        Value *d_edge_weights;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_edge_weights, edges * sizeof(Value)),
+          "MSTProblem cudaMalloc d_edge_weights failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_edge_weights = d_edge_weights;
+      }
 
-      if (data_slices[gpu]->flag_array.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->flag_array.Allocate(edges, util::DEVICE))
-          return ret;
+      if(!data_slices[gpu]->d_reduced_vals)
+      {
+        Value *d_reduced_vals;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_reduced_vals, nodes * sizeof(Value)),
+          "MSTProblem cudaMalloc d_reduced_vals failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_reduced_vals = d_reduced_vals;
+      }
 
-      if (data_slices[gpu]->edge_flags.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->edge_flags.Allocate(edges, util::DEVICE))
-          return ret;
+      if (!data_slices[gpu]->d_flags_array)
+      {
+        unsigned int *d_flags_array;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_flags_array, edges * sizeof(unsigned int)),
+          "MSTProblem cudaMalloc d_flags_array Failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_flags_array = d_flags_array;
+      }
 
-      if (data_slices[gpu]->keys_array.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->keys_array.Allocate(edges, util::DEVICE))
-          return ret;
+      if (!data_slices[gpu]->d_keys_array)
+      {
+        VertexId *d_keys_array;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_keys_array, edges * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_keys_array Failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_keys_array = d_keys_array;
+      }
 
-      if (data_slices[gpu]->reduce_key.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->reduce_key.Allocate(nodes, util::DEVICE))
-          return ret;
+      if (!data_slices[gpu]->d_temp_index)
+      {
+        VertexId *d_temp_index;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_temp_index, edges * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_temp_index Failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_temp_index = d_temp_index;
+      }
 
-      if (data_slices[gpu]->successors.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->successors.Allocate(nodes, util::DEVICE))
-          return ret;
+      if (!data_slices[gpu]->d_successors)
+      {
+        VertexId *d_successors;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_successors, nodes * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_successors Failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_successors = d_successors;
+      }
 
-      if (data_slices[gpu]->original_n.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->original_n.Allocate(nodes, util::DEVICE))
-          return ret;
+      if (!data_slices[gpu]->d_reduced_keys)
+      {
+        VertexId *d_reduced_keys;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_reduced_keys, nodes * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_reduced_keys Failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_reduced_keys = d_reduced_keys;
+      }
 
-      if (data_slices[gpu]->original_e.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->original_e.Allocate(edges, util::DEVICE))
-          return ret;
+      if (!data_slices[gpu]->d_row_offsets)
+      {
+        SizeT *d_row_offsets;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_row_offsets, (nodes+1) * sizeof(SizeT)),
+          "MSTProblem cudaMalloc d_row_offsets Failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_row_offsets = d_row_offsets;
+      }
 
-      if (data_slices[gpu]->super_edge.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->super_edge.Allocate(edges, util::DEVICE))
-          return ret;
+      int *vertex_flag = new int;
+      // allocate vertex_flag if necessary
+      if (!data_slices[gpu]->d_vertex_flag)
+      {
+        int *d_vertex_flag;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_vertex_flag, sizeof(int)),
+          "MSTProblem cudaMalloc d_vertex_flag failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_vertex_flag = d_vertex_flag;
+      }
+      vertex_flag[0] = 1;
+      if (retval = util::GRError(cudaMemcpy(
+        data_slices[gpu]->d_vertex_flag,
+        vertex_flag, sizeof(int), cudaMemcpyHostToDevice),
+        "MSTProblem cudaMemcpy vertex_flag to d_vertex_flag failed",
+        __FILE__, __LINE__)) return retval;
+      delete vertex_flag;
 
-      if (data_slices[gpu]->colindices.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->colindices.Allocate(edges, util::DEVICE))
-          return ret;
+      if (!data_slices[gpu]->d_origin_nodes)
+      {
+        VertexId *d_origin_nodes;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_origin_nodes, nodes * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_origin_nodes Failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_origin_nodes = d_origin_nodes;
+      }
 
-      if (data_slices[gpu]->temp_index.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->temp_index.Allocate(edges, util::DEVICE))
-          return ret;
+      if (!data_slices[gpu]->d_supervtx_ids)
+      {
+        VertexId *d_supervtx_ids;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_supervtx_ids, nodes * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_supervtx_ids Failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_supervtx_ids = d_supervtx_ids;
+      }
 
-      if (data_slices[gpu]->temp_value.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->temp_value.Allocate(edges, util::DEVICE))
-          return ret;
+      if (!data_slices[gpu]->d_origin_edges)
+      {
+        VertexId *d_origin_edges;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_origin_edges, edges * sizeof(VertexId)),
+          "MSTProblem cudaMalloc d_origin_edges Failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_origin_edges = d_origin_edges;
+      }
 
-      if (data_slices[gpu]->reduce_val.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->reduce_val.Allocate(edges, util::DEVICE))
-          return ret;
+      if (!data_slices[gpu]->d_mst_output)
+      {
+        int *d_mst_output;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_mst_output, edges * sizeof(int)),
+          "MSTProblem cudaMalloc d_mst_output Failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_mst_output = d_mst_output;
+      }
 
-      if (data_slices[gpu]->edge_value.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->edge_value.Allocate(edges, util::DEVICE))
+      if (!data_slices[gpu]->d_edge_flags)
+      {
+        unsigned int *d_edge_flags;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_edge_flags, edges * sizeof(unsigned int)),
+          "MSTProblem cudaMalloc d_edge_flags Failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_edge_flags = d_edge_flags;
+      }
 
-          return ret;
-
-      if (data_slices[gpu]->row_offset.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->row_offset.Allocate(edges, util::DEVICE))
-          return ret;
-
-      if (data_slices[gpu]->super_idxs.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->super_idxs.Allocate(edges, util::DEVICE))
-          return ret;
-
+      if (!data_slices[gpu]->d_temp_value)
+      {
+        Value *d_temp_value;
+        if (retval = util::GRError(cudaMalloc(
+          (void**)&d_temp_value, edges * sizeof(Value)),
+          "MSTProblem cudaMalloc d_temp_value Failed",
+          __FILE__, __LINE__)) return retval;
+        data_slices[gpu]->d_temp_value = d_temp_value;
+      }
 
       if (data_slices[gpu]->labels.GetPointer(util::DEVICE) == NULL)
       {
-        if (ret = data_slices[gpu]->labels.Allocate(nodes, util::DEVICE))
+        if (retval = data_slices[gpu]->labels.Allocate(nodes, util::DEVICE))
         {
-          return ret;
+          return retval;
         }
       }
 
@@ -572,13 +743,13 @@ struct MSTProblem : ProblemBase <
         data_slices[gpu]->frontier_queues[0].values[0].GetPointer(util::DEVICE),
         edges);
 
-      if (ret = util::GRError(cudaMemcpy(d_data_slices[gpu],
+      if (retval = util::GRError(cudaMemcpy(d_data_slices[gpu],
           data_slices[gpu], sizeof(DataSlice), cudaMemcpyHostToDevice),
           "MSTProblem cudaMemcpy data_slices to d_data_slices failed",
-          __FILE__, __LINE__)) return ret;
+          __FILE__, __LINE__)) return retval;
 
     }
-    return ret;
+    return retval;
   }
 
   /** @} */
