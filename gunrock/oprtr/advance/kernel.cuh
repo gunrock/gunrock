@@ -81,7 +81,7 @@ cudaError_t ComputeOutputLength(
     // load edge-expand-partitioned kernel
     //util::DisplayDeviceResults(d_in_key_queue, frontier_attribute.queue_length);
     typedef typename Problem::SizeT         SizeT;
-    if (frontier_attribute->queue_length ==0)
+    if (frontier_attribute->queue_length == 0)
     {
         printf("setting output_length to 0");
         util::MemsetKernel<SizeT><<<1,1,0,stream>>>(frontier_attribute->output_length.GetPointer(util::DEVICE),0,1);
@@ -103,7 +103,9 @@ cudaError_t ComputeOutputLength(
                 max_out,
                 ADVANCE_TYPE);
         //util::DisplayDeviceResults(partitioned_scanned_edges, frontier_attribute->queue_length);
-    } else if (KernelPolicy::ADVANCE_MODE == LB)
+    }
+    else if (KernelPolicy::ADVANCE_MODE == LB ||
+             KernelPolicy::ADVANCE_MODE == LB_LIGHT)
     {
         gunrock::oprtr::edge_map_partitioned::GetEdgeCounts
             <typename KernelPolicy::LOAD_BALANCED, Problem, Functor>
@@ -136,7 +138,8 @@ cudaError_t ComputeOutputLength(
     return util::GRError(cudaMemcpyAsync(
          frontier_attribute->output_length.GetPointer(util::DEVICE),
          partitioned_scanned_edges + frontier_attribute->queue_length - 1, // TODO: +1?
-         sizeof(SizeT), cudaMemcpyDeviceToDevice, stream), "cudaMemcpyAsync failed", __FILE__, __LINE__);
+         sizeof(SizeT), cudaMemcpyDeviceToDevice, stream),
+         "cudaMemcpyAsync failed", __FILE__, __LINE__);
 }
 
 /**
@@ -202,7 +205,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         CudaContext                             &context,
         cudaStream_t                             stream,
         TYPE                                     ADVANCE_TYPE,
-        bool                                     input_inverse_graph     = false,
+        bool                                     input_inverse_graph  = false,
         bool                                     output_inverse_graph = false,
         bool                                     get_output_length = true,
         REDUCE_OP                                R_OP              = gunrock::oprtr::advance::NONE,
@@ -378,15 +381,6 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     false,
                     input_inverse_graph,
                     output_inverse_graph);
-
-            //if (frontier_attribute.output_length < LBPOLICY::LIGHT_EDGE_THRESHOLD)
-            //if (frontier_attribute.output_length !=0) {
-//=======
-//
-//            SizeT *temp = new SizeT[1];
-//            cudaMemcpy(temp,partitioned_scanned_edges+frontier_attribute.queue_length, sizeof(SizeT), cudaMemcpyDeviceToHost);
-//            SizeT output_queue_len = temp[0];
-//
             if (!get_output_length || (get_output_length && frontier_attribute.output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD))
             {
                 gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
@@ -492,6 +486,65 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                       break;
               }
             }*/
+            break;
+        }
+        case LB_LIGHT:
+        {
+            typedef typename ProblemData::SizeT          SizeT;
+            typedef typename ProblemData::VertexId       VertexId;
+            typedef typename ProblemData::Value          Value;
+            typedef typename KernelPolicy::LOAD_BALANCED LBPOLICY;
+            // load edge-expand-partitioned kernel
+            SizeT num_block = (frontier_attribute.queue_length +
+                               KernelPolicy::LOAD_BALANCED::THREADS - 1) /
+                               KernelPolicy::LOAD_BALANCED::THREADS;
+
+            if (get_output_length)
+            {
+                ComputeOutputLength<KernelPolicy, ProblemData, Functor>(
+                    &frontier_attribute,
+                    d_row_offsets,
+                    d_column_indices,
+                    d_column_offsets,
+                    d_row_indices,
+                    d_in_key_queue,
+                    partitioned_scanned_edges,
+                    max_in,
+                    max_out,
+                    context,
+                    stream,
+                    ADVANCE_TYPE,
+                    false,
+                    input_inverse_graph,
+                    output_inverse_graph);
+            }
+
+            gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
+                <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(
+                        frontier_attribute.queue_reset,
+                        frontier_attribute.queue_index,
+                        enactor_stats.iteration,
+                        d_row_offsets,
+                        d_column_offsets,
+                        d_column_indices,
+                        d_row_indices,
+                        partitioned_scanned_edges, // TODO: +1?
+                        d_in_key_queue,
+                        d_out_key_queue,
+                        data_slice,
+                        frontier_attribute.queue_length,
+                        frontier_attribute.output_length.GetPointer(util::DEVICE),
+                        max_in,
+                        max_out,
+                        work_progress,
+                        enactor_stats.advance_kernel_stats,
+                        ADVANCE_TYPE,
+                        input_inverse_graph,
+                        output_inverse_graph,
+                        R_TYPE,
+                        R_OP,
+                        d_value_to_reduce,
+                        d_reduce_frontier);
             break;
         }
     }

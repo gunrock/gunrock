@@ -6,7 +6,8 @@
 #include <stdio.h>
 #include <gunrock/gunrock.h>
 
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[])
+{
     ////////////////////////////////////////////////////////////////////////////
     struct GRTypes data_t;                 // data type structure
     data_t.VTXID_TYPE = VTXID_INT;         // vertex identifier
@@ -18,7 +19,7 @@ int main(int argc, char* argv[]) {
     int num_nodes = 7, num_edges = 26;
     int row_offsets[8]  = {0, 3, 6, 11, 15, 19, 23, 26};
     int col_indices[26] = {1, 2, 3, 0, 2, 4, 0, 1, 3, 4, 5, 0, 2,
-                         5, 6, 1, 2, 5, 6, 2, 3, 4, 6, 3, 4, 5};
+                           5, 6, 1, 2, 5, 6, 2, 3, 4, 6, 3, 4, 5};
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));
@@ -35,7 +36,7 @@ int main(int argc, char* argv[]) {
     top_nodes = (  int*)grapho->node_value2;
     top_ranks = (float*)grapho->node_value1;
     int node; for (node = 0; node < config.top_nodes; ++node)
-        printf("Node_ID [%d] : Score: [%f]\n", top_nodes[node],top_ranks[node]);
+        printf("Node_ID [%d] : Score: [%f]\n", top_nodes[node], top_ranks[node]);
 
     if (graphi) free(graphi);
     if (grapho) free(grapho);

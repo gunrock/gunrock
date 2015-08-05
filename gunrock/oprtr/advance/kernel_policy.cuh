@@ -45,7 +45,7 @@ enum MODE {
     TWC_BACKWARD,
     LB_BACKWARD,
     LB,
-    LB2
+    LB_LIGHT,
 };
 
 /**

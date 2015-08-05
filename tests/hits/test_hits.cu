@@ -150,24 +150,22 @@ void DisplaySolution(Value *hrank, Value *arank, SizeT nodes)
  * @param[in] hrank Host-side vector to store CPU computed hub rank scores for each node
  * @param[in] arank Host-side vector to store CPU computed authority rank scores for each node
  * @param[in] max_iter max iteration to go
+ * @param[in] quiet Don't print out anything to stdout
  */
-template<
+template <
     typename VertexId,
     typename Value,
-    typename SizeT>
+    typename SizeT >
 void SimpleReferenceHITS(
     const Csr<VertexId, Value, SizeT>       &graph,
     const Csr<VertexId, Value, SizeT>       &inv_graph,
     Value                                   *hrank,
     Value                                   *arank,
-    SizeT                                   max_iter)
+    SizeT                                   max_iter,
+    bool                                    quiet = false)
 {
-    //using namespace boost;
-
-    //Preparation
-
     //
-    //compute HITS rank
+    // compute HITS rank
     //
 
     CpuTimer cpu_timer;
@@ -176,26 +174,20 @@ void SimpleReferenceHITS(
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
 
-    printf("CPU BFS finished in %lf msec.\n", elapsed);
+    if (!quiet) { printf("CPU BFS finished in %lf msec.\n", elapsed); }
 }
 
 /**
- * @brief Run HITS tests
+ * @brief RunTests
  *
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
  * @tparam INSTRUMENT
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] inv_graph Reference to the inversed CSR graph we process on
- * @param[in] src Source node ID for HITS algorithm
- * @param[in] delta Delta value for computing HITS, usually set to .85
- * @param[in] max_iter Max iteration for HITS computing
- * @param[in] max_grid_size Maximum CTA occupancy
- * @param[in] num_gpus Number of GPUs
- * @param[in] context CudaContext for moderngpu to use
- *
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename VertexId,
@@ -203,43 +195,38 @@ template <
     typename SizeT,
     bool INSTRUMENT,
     bool DEBUG,
-    bool SIZE_CHECK>
+    bool SIZE_CHECK >
 void RunTests(Info<VertexId, Value, SizeT> *info)
 {
+    typedef HITSProblem < VertexId,
+            SizeT,
+            Value > Problem;
 
-    typedef HITSProblem<
-        VertexId,
-        SizeT,
-        Value> Problem;
-
-    Csr<VertexId, Value, SizeT>
-                 *csr                   = info->csr_ptr;
-    Csr<VertexId, Value, SizeT>
-                 *csc                   = info->csc_ptr;
-    VertexId      src                   = info->info["source_vertex"].get_int64();
-    int           max_grid_size         = info->info["max_grid_size"].get_int();
-    SizeT         max_iter              = info->info["max_iteration"].get_int();
-    Value         delta                 = info->info["delta"].get_real();
-    int           num_gpus              = info->info["num_gpus"].get_int();
-    ContextPtr   *context               = (ContextPtr*)info->context;
-    bool          quick_mode            = info->info["quick_mode"].get_bool();
-    bool          quiet_mode            = info->info["quiet_mode"].get_bool();
-    bool          stream_from_host      = info->info["stream_from_host"].get_bool();
-
+    Csr<VertexId, Value, SizeT> *csr = info->csr_ptr;
+    Csr<VertexId, Value, SizeT> *csc = info->csc_ptr;
+    VertexId      src                = info->info["source_vertex"].get_int64();
+    int           max_grid_size      = info->info["max_grid_size"].get_int();
+    SizeT         max_iter           = info->info["max_iteration"].get_int();
+    Value         delta              = info->info["delta"].get_real();
+    int           num_gpus           = info->info["num_gpus"].get_int();
+    ContextPtr   *context            = (ContextPtr*)info->context;
+    bool          quick_mode         = info->info["quick_mode"].get_bool();
+    bool          quiet_mode         = info->info["quiet_mode"].get_bool();
+    bool          stream_from_host   = info->info["stream_from_host"].get_bool();
 
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
 
-    // Allocate host-side label array (for both reference and gpu-computed results)
-    Value    *reference_hrank       = (Value*)malloc(sizeof(Value) * csr->nodes);
-    Value    *reference_arank       = (Value*)malloc(sizeof(Value) * csr->nodes);
-    Value    *h_hrank               = (Value*)malloc(sizeof(Value) * csr->nodes);
-    Value    *h_arank               = (Value*)malloc(sizeof(Value) * csr->nodes);
-    Value    *reference_check_h     = (quick_mode) ? NULL : reference_hrank;
-    Value    *reference_check_a     = (quick_mode) ? NULL : reference_arank;
+    // Allocate host-side array (for both reference and GPU-computed results)
+    Value *reference_hrank   = (Value*)malloc(sizeof(Value) * csr->nodes);
+    Value *reference_arank   = (Value*)malloc(sizeof(Value) * csr->nodes);
+    Value *h_hrank           = (Value*)malloc(sizeof(Value) * csr->nodes);
+    Value *h_arank           = (Value*)malloc(sizeof(Value) * csr->nodes);
+    Value *reference_check_h = (quick_mode) ? NULL : reference_hrank;
+    Value *reference_check_a = (quick_mode) ? NULL : reference_arank;
 
-    // Allocate BFS enactor map
+    // Allocate HITS enactor map
     HITSEnactor<Problem, INSTRUMENT, DEBUG, SIZE_CHECK> hits_enactor(gpu_idx);
 
     // Allocate problem on GPU
@@ -248,14 +235,15 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                       stream_from_host,
                       *csr,
                       *csc,
-                      num_gpus), "Problem HITS Initialization Failed", __FILE__, __LINE__);
+                      num_gpus),
+                  "Problem HITS Initialization Failed", __FILE__, __LINE__);
 
     //
     // Compute reference CPU HITS solution for source-distance
     //
     if (reference_check_h != NULL)
     {
-        if (!quiet_mode) printf("compute ref value\n");
+        if (!quiet_mode) printf("compute reference value...\n");
         SimpleReferenceHITS(
             *csr,
             *csc,
@@ -307,39 +295,69 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     cudaDeviceSynchronize();
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
 template <
     typename      VertexId,
     typename      Value,
     typename      SizeT,
     bool          INSTRUMENT,
-    bool          DEBUG>
+    bool          DEBUG >
 void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["size_check"].get_bool())
         RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, true > (info);
-    else 
+    else
         RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, false> (info);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
 template <
     typename    VertexId,
     typename    Value,
     typename    SizeT,
-    bool        INSTRUMENT>
+    bool        INSTRUMENT >
 void RunTests_debug(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["debug_mode"].get_bool()) RunTests_size_check
         <VertexId, Value, SizeT, INSTRUMENT,
-            true > (info);
+        true > (info);
     else RunTests_size_check
         <VertexId, Value, SizeT, INSTRUMENT,
-            false> (info);
+        false> (info);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
 template <
     typename      VertexId,
     typename      Value,
-    typename      SizeT>
+    typename      SizeT >
 void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["instrument"].get_bool()) RunTests_debug
@@ -356,7 +374,6 @@ void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 int main( int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
-
     int graph_args = argc - args.ParsedArgc() - 1;
     if ((argc < 2) || (graph_args < 1) || (args.CheckCmdLineFlag("help")))
     {
@@ -364,19 +381,19 @@ int main( int argc, char** argv)
         return 1;
     }
 
-    typedef int VertexId;                   // Use as the node identifier
-    typedef float Value;                    // Use as the value type
-    typedef int SizeT;                      // Use as the graph size type
+    typedef int   VertexId;  // use as the node identifier
+    typedef float Value;     // use as the value type
+    typedef int   SizeT;     // use as the graph size type
 
     Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
     Csr<VertexId, Value, SizeT> csc(false);
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
     info->info["undirected"] = false;
-    info->info["edge_value"] = false;
-
     info->Init("HITS", args, csr, csc);
 
+    // TODO: add a CPU Reference algorithm,
+    // before that, quick_mode always on.
     info->info["quick_mode"] = true;
     RunTests_instrumented<VertexId, Value, SizeT>(info);
 
