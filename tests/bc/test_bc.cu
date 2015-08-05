@@ -131,6 +131,7 @@ struct EdgeProperties
  * @param[in] ebc_values Pointer to edge bc value
  * @param[in] sigmas Pointer to node sigma value
  * @param[in] src VertexId of source node if there is any
+ * @param[in] quiet Don't print out anything to stdout
  */
 template <
     typename VertexId,
@@ -351,7 +352,7 @@ void ReferenceBC(
  * @tparam DEBUG
  * @tparam SIZE_CHECK
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename VertexId,
@@ -536,65 +537,6 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     util::GRError(problem->Extract(
                       h_sigmas, h_bc_values, h_ebc_values, h_labels),
                   "BC Problem Data Extraction Failed", __FILE__, __LINE__);
-    /*
-    printf("edge bc values: %d\n", graph.edges);
-    for (int i = 0; i < graph.edges; ++i) {
-        printf("%5f, %5f\n", h_ebc_values[i], reference_check_ebc_values[i]);
-    }
-    printf("edge bc values end\n");*/
-
-    /*std::queue<VertexId> temp_queue;
-    int *temp_marker=new int[graph->nodes];
-    memset(temp_marker, 0, sizeof(int)*graph->nodes);
-    temp_queue.push(41107);
-    temp_queue.push(41109);
-    cout<<"parent\tchild\tlabel\tsigma\tbc_value\t\tlabel\tsigma\tbc_value"<<endl;
-    while (!temp_queue.empty())
-    {
-        VertexId parent = temp_queue.front();
-        temp_queue.pop();
-        temp_marker[parent]=1;
-        int      gpu     = problem->partition_tables[0][parent];
-        VertexId parent_ = problem->convertion_tables[0][parent];
-        util::SetDevice(gpu_idx[gpu]);
-        for (int i=graph->row_offsets[parent];i<graph->row_offsets[parent+1];i++)
-        {
-            VertexId child = graph->column_indices[i];
-            VertexId child_ = 0;
-
-            for (int j=problem->graph_slices[gpu]->row_offsets[parent_];
-                     j<problem->graph_slices[gpu]->row_offsets[parent_+1];j++)
-            {
-                VertexId c=problem->graph_slices[gpu]->column_indices[j];
-                if (problem->graph_slices[gpu]->original_vertex[c] == child)
-                {
-                    child_=c;break;
-                }
-            }
-            //if (h_labels[child] != h_labels[parent]+1) continue;
-            cout<<parent<<"\t "<<child<<"\t "<<h_labels[child]<<"\t "<<h_sigmas[child]<<"\t "<<h_bc_values[child]<<"\t";
-            if (reference_check_labels[child] != h_labels[child] ||
-                reference_check_sigmas[child] != h_sigmas[child] ||
-                reference_check_bc_values[child] != h_bc_values[child])
-            {
-                cout<<"*";
-                if (h_labels[child]==h_labels[parent]+1 && temp_marker[child]!=1) temp_queue.push(child);
-            }
-            cout<<"\t "<<reference_check_labels[child]<<"\t "<<reference_check_sigmas[child]<<"\t "<<reference_check_bc_values[child];
-            cout<<"\t "<<gpu<<"\t "<<parent_<<"\t "<<child_;
-            VertexId temp_label;
-            Value    temp_sigma, temp_bc;
-            cudaMemcpy((void*)&temp_label, problem->data_slices[gpu]->labels.GetPointer(util::DEVICE)+child_, sizeof(VertexId), cudaMemcpyDeviceToHost);
-            cudaMemcpy((void*)&temp_sigma, problem->data_slices[gpu]->sigmas.GetPointer(util::DEVICE)+child_, sizeof(Value   ), cudaMemcpyDeviceToHost);
-            cudaMemcpy((void*)&temp_bc, problem->data_slices[gpu]->bc_values.GetPointer(util::DEVICE)+child_, sizeof(Value), cudaMemcpyDeviceToHost);
-            cout<<"\t "<<temp_label<<"\t "<<temp_sigma<<"\t "<<temp_bc;
-
-            cudaMemcpy((void*)&temp_label, problem->data_slices[gpu]->labels.GetPointer(util::DEVICE)+parent_, sizeof(VertexId), cudaMemcpyDeviceToHost);
-            cudaMemcpy((void*)&temp_sigma, problem->data_slices[gpu]->sigmas.GetPointer(util::DEVICE)+parent_, sizeof(Value   ), cudaMemcpyDeviceToHost);
-            cudaMemcpy((void*)&temp_bc, problem->data_slices[gpu]->bc_values.GetPointer(util::DEVICE)+parent_, sizeof(Value), cudaMemcpyDeviceToHost);
-            cout<<"\t "<<temp_label<<"\t "<<temp_sigma<<"\t "<<temp_bc<<endl;
-        }
-    }*/
 
     // Verify the result
     if (reference_check_bc_values != NULL)
@@ -734,7 +676,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
  * @tparam INSTRUMENT
  * @tparam DEBUG
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename      VertexId,
@@ -762,7 +704,7 @@ void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename    VertexId,
@@ -782,13 +724,13 @@ void RunTests_debug(Info<VertexId, Value, SizeT> *info)
 }
 
 /**
- * @brief RunTests entry
+ * @brief Test entry
  *
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename      VertexId,
@@ -828,8 +770,7 @@ int main(int argc, char** argv)
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
     // graph construction or generation related parameters
-    info->info["undirected"] = true;   // require undirected input graph
-    info->info["edge_value"] = false;  // don't need per edge weight values
+    info->info["undirected"] = true;  // require undirected input graph
 
     info->Init("BC", args, csr);  // initialize Info structure
     RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test

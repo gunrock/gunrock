@@ -9,7 +9,7 @@
  * @file
  * test_sssp.cu
  *
- * @brief Simple test driver program for single source shorest path.
+ * @brief Simple test driver program for single source shortest path.
  */
 
 #include <stdio.h>
@@ -33,7 +33,7 @@
 
 #include <moderngpu.cuh>
 
-// Boost includes for CPU dijkstra SSSP reference algorithms
+// Boost includes for CPU Dijkstra SSSP reference algorithms
 #include <boost/config.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
@@ -124,6 +124,7 @@ void DisplaySolution (VertexId *source_path, SizeT num_nodes)
  * @param[in] node_values Host-side vector to store CPU computed labels for each node
  * @param[in] node_preds Host-side vector to store CPU computed predecessors for each node
  * @param[in] src Source node where SSSP starts
+ * @param[in] quiet Don't print out anything to stdout
  */
 template <
     typename VertexId,
@@ -250,7 +251,7 @@ void SimpleReferenceSssp(
  * @tparam INSTRUMENT
  * @tparam MARK_PREDECESSORS
  *
- * @param[in] parameter Pointer to test parameter settings
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename VertexId,
@@ -334,7 +335,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                       partition_seed),
                   "SSSP Problem Init failed", __FILE__, __LINE__);
     util::GRError(enactor->Init(
-        context, problem, max_grid_size, traversal_mode),
+                      context, problem, max_grid_size, traversal_mode),
                   "SSSP Enactor Init failed", __FILE__, __LINE__);
 
     // compute reference CPU SSSP solution for source-distance
@@ -497,7 +498,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
  * @tparam DEBUG
  * @tparam SIZE_CHECK
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename    VertexId,
@@ -559,7 +560,7 @@ void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename    VertexId,
@@ -585,7 +586,7 @@ void RunTests_debug(Info<VertexId, Value, SizeT> *info)
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename      VertexId,

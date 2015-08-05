@@ -160,6 +160,7 @@ void DisplaySolution(
  *
  * @param[in]  graph  Reference to the CSR graph we process on
  * @param[out] labels Host-side vector to store the component id for each node in the graph
+ * @param[in] quiet Don't print out anything to stdout
  *
  * \return Number of connected components in the graph
  */
@@ -235,7 +236,7 @@ void ConvertIDs(
  * @tparam DEBUG
  * @tparam SIZE_CHECK
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename VertexId,
@@ -501,7 +502,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
  * @tparam INSTRUMENT
  * @tparam DEBUG
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename      VertexId,
@@ -530,7 +531,7 @@ void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename    VertexId,
@@ -556,7 +557,7 @@ void RunTests_debug(Info<VertexId, Value, SizeT> *info)
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename      VertexId,
@@ -597,7 +598,6 @@ int main(int argc, char** argv)
 
     // graph construction or generation related parameters
     info->info["undirected"] = true;   // require undirected input graph
-    info->info["edge_value"] = false;  // don't need per edge weight values
 
     info->Init("CC", args, csr);  // initialize Info structure
     graphio::RemoveStandaloneNodes<VertexId, Value, SizeT>(

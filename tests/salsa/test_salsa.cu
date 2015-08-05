@@ -50,13 +50,14 @@ using namespace gunrock::app::salsa;
  ******************************************************************************/
 
 template <typename VertexId, typename Value>
-struct RankPair {
+struct RankPair
+{
     VertexId        vertex_id;
     Value           page_rank;
 
     RankPair(VertexId vertex_id, Value page_rank) :
-                vertex_id(vertex_id),
-                page_rank(page_rank) {}
+        vertex_id(vertex_id),
+        page_rank(page_rank) {}
 };
 
 template<typename RankPair>
@@ -84,7 +85,7 @@ void Usage()
            "  --instrumented If set then kernels keep track of queue-search_depth\n"
            "  and barrier duty (a relative indicator of load imbalance.)\n"
            "  --quick If set will skip the CPU validation code.\n"
-        );
+          );
 }
 
 /**
@@ -144,20 +145,20 @@ void DisplaySolution(Value *hrank, Value *arank, SizeT nodes)
  * @param[in] hrank Host-side vector to store CPU computed hub ranks for each node
  * @param[in] arank Host-side vector to store CPU computed authority ranks for each node
  * @param[in] max_iter max iteration to go
+ * @param[in] quiet Don't print out anything to stdout
  */
-template<
+template <
     typename VertexId,
     typename Value,
-    typename SizeT>
+    typename SizeT >
 void SimpleReferenceSALSA(
     const Csr<VertexId, Value, SizeT>       &graph,
     const Csr<VertexId, Value, SizeT>       &inv_graph,
     Value                                   *hrank,
     Value                                   *arank,
-    SizeT                                   max_iter)
+    SizeT                                   max_iter,
+    bool                                    quiet = false)
 {
-    //Preparation
-
     //
     //compute SALSA rank
     //
@@ -168,19 +169,21 @@ void SimpleReferenceSALSA(
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
 
-    printf("CPU BFS finished in %lf msec.\n", elapsed);
+    if (!quiet) { printf("CPU BFS finished in %lf msec.\n", elapsed); }
 }
 
+
 /**
- * @brief Run SALSA tests
+ * @brief RunTests entry
  *
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
  * @tparam INSTRUMENT
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
  *
- * @param[in] info Stats and parameter data structure
- *
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename VertexId,
@@ -188,42 +191,42 @@ template <
     typename SizeT,
     bool INSTRUMENT,
     bool DEBUG,
-    bool SIZE_CHECK>
+    bool SIZE_CHECK >
 void RunTests(Info<VertexId, Value, SizeT> *info)
 {
 
-    typedef SALSAProblem<
-        VertexId,
-        SizeT,
-        Value> Problem;
+    typedef SALSAProblem <
+    VertexId,
+    SizeT,
+    Value > Problem;
 
     Csr<VertexId, Value, SizeT>
-                *csr                    = (Csr<VertexId, Value, SizeT>*)info->csr_ptr;
+    *csr                    = (Csr<VertexId, Value, SizeT>*)info->csr_ptr;
     Csr<VertexId, Value, SizeT>
-                *csc                    = (Csr<VertexId, Value, SizeT>*)info->csc_ptr;
-    int         max_grid_size           = info->info["max_grid_size"].get_int64();
-    int         num_gpus                = info->info["num_gpus"].get_int();
-    bool        quiet_mode              = info->info["quiet_mode"].get_bool();
-    bool        quick_mode              = info->info["quick_mode"].get_bool();
-    SizeT       max_iter                = info->info["max_iteration"].get_int();
-    bool        undirected              = info->info["undirected"].get_bool(); 
-    bool        stream_from_host        = info->info["stream_from_host"].get_bool();
+    *csc                    = (Csr<VertexId, Value, SizeT>*)info->csc_ptr;
+    int         max_grid_size    = info->info["max_grid_size"].get_int64();
+    int         num_gpus         = info->info["num_gpus"].get_int();
+    int         max_iter         = info->info["max_iteration"].get_int();
+    bool        quiet_mode       = info->info["quiet_mode"].get_bool();
+    bool        quick_mode       = info->info["quick_mode"].get_bool();
+    bool        undirected       = info->info["undirected"].get_bool();
+    bool        stream_from_host = info->info["stream_from_host"].get_bool();
 
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
 
-    ContextPtr   *context               = (ContextPtr*)info -> context;
+    ContextPtr   *context           = (ContextPtr*)info -> context;
 
-    // Allocate host-side label array (for both reference and gpu-computed results)
-    Value    *reference_hrank       = (Value*)malloc(sizeof(Value) * csr->nodes);
-    Value    *reference_arank       = (Value*)malloc(sizeof(Value) * csr->nodes);
-    Value    *h_hrank               = (Value*)malloc(sizeof(Value) * csr->nodes);
-    Value    *h_arank               = (Value*)malloc(sizeof(Value) * csr->nodes);
-    Value    *reference_check_h     = (quick_mode) ? NULL : reference_hrank;
-    Value    *reference_check_a     = (quick_mode) ? NULL : reference_arank;
+    // Allocate host-side array (for both reference and GPU-computed results)
+    Value *reference_hrank   = (Value*)malloc(sizeof(Value) * csr->nodes);
+    Value *reference_arank   = (Value*)malloc(sizeof(Value) * csr->nodes);
+    Value *h_hrank           = (Value*)malloc(sizeof(Value) * csr->nodes);
+    Value *h_arank           = (Value*)malloc(sizeof(Value) * csr->nodes);
+    Value *reference_check_h = (quick_mode) ? NULL : reference_hrank;
+    Value *reference_check_a = (quick_mode) ? NULL : reference_arank;
 
-    // Allocate BFS enactor map
+    // Allocate enactor map
     SALSAEnactor<Problem, INSTRUMENT, DEBUG, SIZE_CHECK> salsa_enactor(gpu_idx);
 
     // Allocate problem on GPU
@@ -250,7 +253,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         if (!quiet_mode) printf("\n");
     }
 
-    // Perform BFS
+    // Perform SALSA
     GpuTimer gpu_timer;
 
     util::GRError(
@@ -277,8 +280,8 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         CompareResults(h_hrank, reference_check_h, csr->nodes, true);
         CompareResults(h_arank, reference_check_a, csr->nodes, true);
     }
-    if (!quiet_mode) 
-    DisplaySolution(h_hrank, h_arank, csr->nodes);
+    if (!quiet_mode)
+        DisplaySolution(h_hrank, h_arank, csr->nodes);
 
     info->ComputeCommonStats(salsa_enactor.enactor_stats.GetPointer(), elapsed);
 
@@ -298,46 +301,76 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     cudaDeviceSynchronize();
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
 template <
     typename      VertexId,
     typename      Value,
     typename      SizeT,
     bool          INSTRUMENT,
-    bool          DEBUG>
+    bool          DEBUG >
 void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
 {
 
     if (info->info["size_check"].get_bool())
         RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-        true > (info);
-   else RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-        false> (info);
+                 true > (info);
+    else RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
+             false> (info);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
 template <
     typename    VertexId,
     typename    Value,
     typename    SizeT,
-    bool        INSTRUMENT>
+    bool        INSTRUMENT >
 void RunTests_debug(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["debug_mode"].get_bool())
         RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,
-        true > (info);
+                            true > (info);
     else RunTests_size_check
         <VertexId, Value, SizeT, INSTRUMENT,
         false> (info);
 }
 
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
 template <
     typename      VertexId,
     typename      Value,
-    typename      SizeT>
+    typename      SizeT >
 void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["instrument"].get_bool())
         RunTests_debug<VertexId, Value, SizeT,
-        true > (info);
+                       true > (info);
     else RunTests_debug
         <VertexId, Value, SizeT,
         false> (info);
@@ -350,7 +383,6 @@ void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 int main( int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
-
     int graph_args = argc - args.ParsedArgc() - 1;
     if ((argc < 2) || (graph_args < 1) || (args.CheckCmdLineFlag("help")))
     {
@@ -358,24 +390,23 @@ int main( int argc, char** argv)
         return 1;
     }
 
-        typedef int VertexId;                   // Use as the node identifier
-        typedef float Value;                    // Use as the value type
-        typedef int SizeT;                      // Use as the graph size type
+    typedef int   VertexId;  // use as the node identifier
+    typedef float Value;     // use as the value type
+    typedef int   SizeT;     // use as the graph size type
 
-        Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
-        Csr<VertexId, Value, SizeT> csc(false);
-        Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
+    Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
+    Csr<VertexId, Value, SizeT> csc(false);
+    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
-        info->info["undirected"] = false;
-        info->info["edge_value"] = false;
- 
-        info->Init("SALSA", args, csr, csc);
+    info->info["undirected"] = false;
+    info->info["edge_value"] = false;
 
-        // TODO: add a CPU Reference SALSA algorithm.
-        // before that, quick_mode always on.
-        info->info["quick_mode"] = true;
-        RunTests_instrumented<VertexId, Value, SizeT>(info);
+    info->Init("SALSA", args, csr, csc);
 
-    
+    // TODO: add a CPU Reference SALSA algorithm.
+    // before that, quick_mode always on.
+    info->info["quick_mode"] = true;
+    RunTests_instrumented<VertexId, Value, SizeT>(info);
+
     return 0;
 }

@@ -128,6 +128,7 @@ void DisplaySolution(
  *
  * @param[in] edge_values Weight value associated with each edge.
  * @param[in] graph Reference to the CSR graph we process on.
+ * @param[in] quiet Don't print out anything to stdout.
  *
  *  \return long long int which indicates the total weight of the graph.
  */
@@ -215,6 +216,8 @@ Value SimpleReferenceMST(
  * @tparam Value
  * @tparam DEBUG
  * @tparam SIZE_CHECK
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename VertexId,
@@ -360,6 +363,7 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
  * @tparam SizeT
  * @tparam DEBUG
  *
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename VertexId,
@@ -385,6 +389,7 @@ void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
  * @tparam Value
  * @tparam SizeT
  *
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename VertexId,
@@ -409,6 +414,7 @@ void RunTests_debug(Info<VertexId, Value, SizeT> *info)
  * @tparam Value
  * @tparam SizeT
  *
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <typename VertexId, typename Value, typename SizeT>
 void RunTest_connectivity_check(Info<VertexId, Value, SizeT> *info)

@@ -94,6 +94,7 @@ void Usage()
  * @param[in] labels    Search depth from the source for each node.
  * @param[in] preds     Predecessor node id for each node.
  * @param[in] num_nodes Number of nodes in the graph.
+ * @param[in] quiet     Don't print out anything to stdout
  */
 template <
     typename VertexId,
@@ -141,13 +142,14 @@ void DisplaySolution(
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
  * @tparam MARK_PREDECESSORS
+ * @tpatam ENABLE_IDEMPOTENCE
  *
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] source_path Host-side vector to store CPU computed labels for each node
  * @param[in] predecessor Host-side vector to store CPU computed predecessor for each node
  * @param[in] src Source node where BFS starts
+ * @param[in] quiet Don't print out anything to stdout
  */
 template <
     typename VertexId,
@@ -240,7 +242,7 @@ void ReferenceBFS(
  * @tparam MARK_PREDECESSORS
  * @tparam ENABLE_IDEMPOTENCE
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename    VertexId,
@@ -547,7 +549,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
  * @tparam SIZE_CHECK
  * @tparam MARK_PREDECESSORS
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename    VertexId,
@@ -581,7 +583,7 @@ void RunTests_enable_idempotence(Info<VertexId, Value, SizeT> *info)
  * @tparam DEBUG
  * @tparam SIZE_CHECK
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename    VertexId,
@@ -613,7 +615,7 @@ void RunTests_mark_predecessors(Info<VertexId, Value, SizeT> *info)
  * @tparam INSTRUMENT
  * @tparam DEBUG
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename      VertexId,
@@ -643,7 +645,7 @@ void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename    VertexId,
@@ -669,7 +671,7 @@ void RunTests_debug(Info<VertexId, Value, SizeT> *info)
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename      VertexId,
@@ -710,7 +712,6 @@ int main(int argc, char** argv)
 
     // graph construction or generation related parameters
     info->info["undirected"] = args.CheckCmdLineFlag("undirected");
-    info->info["edge_value"] = false;  // don't need per edge weight values
 
     info->Init("BFS", args, csr);  // initialize Info structure
     RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test

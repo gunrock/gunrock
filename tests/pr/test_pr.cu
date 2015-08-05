@@ -209,9 +209,10 @@ int CompareResults_(
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] node_id Source node for personalized PageRank (if any)
  * @param[in] rank Host-side vector to store CPU computed labels for each node
- * @param[in] delta delta for computing PR
- * @param[in] error error threshold
- * @param[in] max_iteration max iteration to go
+ * @param[in] delta Delta for computing PR
+ * @param[in] error Error threshold
+ * @param[in] max_iteration Maximum iteration to go
+ * @param[in] quiet Don't print out anything to stdout
  */
 template <
     typename VertexId,
@@ -295,7 +296,7 @@ void SimpleReferencePageRank(
  * @tparam DEBUG
  * @tparam SIZE_CHECK
  *
- * @param[in] parameter Pointer to test parameter settings
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename VertexId,
@@ -533,7 +534,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
  * @tparam INSTRUMENT
  * @tparam DEBUG
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename      VertexId,
@@ -561,7 +562,7 @@ void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename    VertexId,
@@ -587,7 +588,7 @@ void RunTests_debug(Info<VertexId, Value, SizeT> *info)
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] info Pointer to mObject info.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename      VertexId,
@@ -619,16 +620,15 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    typedef int VertexId;  // Use int as the vertex identifier
-    typedef float Value;   // Use float as the value type
-    typedef int SizeT;     // Use int as the graph size type
+    typedef int VertexId;  // use int as the vertex identifier
+    typedef float Value;   // use float as the value type
+    typedef int SizeT;     // use int as the graph size type
 
     Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
     // graph construction or generation related parameters
     info->info["undirected"] = true;   // require undirected input graph
-    info->info["edge_value"] = false;  // don't need per edge weight values
 
     info->Init("PageRank", args, csr);  // initialize Info structure
     RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test
