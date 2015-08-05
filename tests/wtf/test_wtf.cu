@@ -418,6 +418,13 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         DisplaySolution(h_node_id, h_rank, csr->nodes);
     }
 
+    info->ComputeCommonStats(wtf_enactor.enactor_stats.GetPointer(), elapsed);
+
+    if (!quiet_mode)
+        info->DisplayStats();
+
+    info->CollectInfo();
+
     // Cleanup
     if (problem) delete problem;
     if (reference_check) free(reference_check);

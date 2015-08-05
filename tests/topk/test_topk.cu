@@ -280,6 +280,11 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     h_degrees_o,
     top_nodes);
 
+  info->ComputeCommonStats(topk_enactor.enactor_stats.GetPointer(), elapsed_gpu);
+
+  if (!quiet_mode)
+    info->DisplayStats();
+
   // validation
   SimpleReferenceTopK(
     *csr,
@@ -294,6 +299,8 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     if (!quiet_mode) printf("INCOREECT! %d error(s) occured. \n", error_num);
   }
   if (!quiet_mode) printf("\n");
+
+  info->CollectInfo();
 
   // cleanup if neccessary
   if (topk_problem) { delete topk_problem; }

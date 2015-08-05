@@ -220,7 +220,7 @@ class VISEnactor :
                 frontier_attribute->queue_index,
                 frontier_attribute->queue_length)) break;
 
-            if (true) {
+            /*if (true) {
                 printf("filter queue length: %lld",
                        (long long) frontier_attribute->queue_length);
                 util::DisplayDeviceResults(
@@ -230,7 +230,7 @@ class VISEnactor :
                 util::DisplayDeviceResults(
                     frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE),
                     frontier_attribute->queue_length);
-            }
+            }*/
 
             oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, Functor>(
                 enactor_stats[0],
