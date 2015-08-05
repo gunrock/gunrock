@@ -402,7 +402,7 @@ void dispatch_bfs(
                 {
                     printf(" source: %lld\n", (long long) parameter->src);
                 }
-                
+
                 RunTests_instrumented<int, int, int>(grapho, parameter);
 
                 // reset for free memory
@@ -507,15 +507,10 @@ void bfs(
     data_t.SIZET_TYPE = SIZET_INT;  // integer graph size type
     data_t.VALUE_TYPE = VALUE_INT;  // integer attributes type
 
-    struct GRSetup config;          // primitive-specific configures
-    int list[] = {0, 1, 2, 3};      // default device to run algorithm
-    config.device_list = list;      // default device to run algorithm
-    config.num_devices = sizeof(list) / sizeof(list[0]);
-    config.source_mode = manually;      // manually setting source
-    config.source_vertex = source;      // source vertex to start
-    config.mark_predecessors  = false;  // do not mark predecessors
-    config.enable_idempotence = false;  // wether enable idempotence
-    config.max_queue_sizing  = 1.0f;    // maximum queue size factor
+    struct GRSetup config = InitSetup();  // primitive-specific configures
+    config.source_vertex = source;        // source vertex to start
+    config.mark_predecessors  = false;    // do not mark predecessors
+    config.enable_idempotence = false;    // wether enable idempotence
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));

@@ -418,14 +418,8 @@ void pagerank(
     data_t.SIZET_TYPE = SIZET_INT;    // integer graph size type
     data_t.VALUE_TYPE = VALUE_FLOAT;  // float attributes type
 
-    struct GRSetup config;            // primitive-specific configures
-    int list[] = {0, 1, 2, 3};        // device to run algorithm
-    config.num_devices = sizeof(list) / sizeof(list[0]);  // number of devices
-    config.device_list    =  list;    // device list to run algorithm
-    config.pagerank_delta = 0.85f;    // default delta value
-    config.pagerank_error = 0.01f;    // default error threshold
-    config.max_iters      =    50;    // maximum number of iterations
-    config.top_nodes      =    10;    // number of top nodes
+    struct GRSetup config = InitSetup();  // primitive-specific configures
+    config.top_nodes      = 10;           // number of top nodes
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));

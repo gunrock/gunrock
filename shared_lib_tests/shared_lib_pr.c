@@ -14,13 +14,6 @@ int main(int argc, char* argv[]) {
     data_t.VALUE_TYPE = VALUE_FLOAT;       // attributes type
 
     struct GRSetup config = InitSetup();   // gunrock configurations
-    int list[] = {0};                      // device to run algorithm
-    config.num_devices = sizeof(list) / sizeof(list[0]);  // number of devices
-    config.device_list    =  list;         // device list to run algorithm
-    config.pagerank_delta = 0.85f;         // default delta value
-    config.pagerank_error = 0.01f;         // default error threshold
-    config.max_iters      =    50;         // maximum number of iterations
-    config.top_nodes      =     7;         // number of top nodes
 
     int num_nodes = 7, num_edges = 26;
     int row_offsets[8]  = {0, 3, 6, 11, 15, 19, 23, 26};

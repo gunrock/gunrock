@@ -476,13 +476,8 @@ void bc(
     data_t.SIZET_TYPE = SIZET_INT;    // integer graph size type
     data_t.VALUE_TYPE = VALUE_FLOAT;  // float attributes type
 
-    struct GRSetup config;            // primitive-specific configures
-    int list[] = {0, 1, 2, 3};        // device to run algorithm
-    config.num_devices = sizeof(list) / sizeof(list[0]);  // number of devices
-    config.device_list = list;        // device list to run algorithm
-    config.source_mode = manually;    // manually setting source vertex
-    config.source_vertex = source;    // source vertex to start
-    config.max_queue_sizing = 1.0f;   // maximum queue sizing factor
+    struct GRSetup config = InitSetup();  // primitive-specific configures
+    config.source_vertex = source;        // source vertex to start
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));

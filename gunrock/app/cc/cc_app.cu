@@ -209,12 +209,11 @@ void runCC(GRGraph* output, Test_Parameter *parameter)
     util::GRError(
         enactor->Reset(), "CC Enactor Reset failed", __FILE__, __LINE__);
 
-    if (!quiet) { printf("_________________________\n"); fflush(stdout); }
     cpu_timer.Start();
     util::GRError(
         enactor->Enact(), "CC Problem Enact Failed", __FILE__, __LINE__);
     cpu_timer.Stop();
-    if (!quiet) { printf("-------------------------\n"); fflush(stdout); }
+
     float elapsed = cpu_timer.ElapsedMillis();
 
     // Copy out results
@@ -383,10 +382,7 @@ int cc(
     data_t.SIZET_TYPE = SIZET_INT;  // integer graph size type
     data_t.VALUE_TYPE = VALUE_INT;  // integer attributes type
 
-    struct GRSetup config;          // primitive-specific configures
-    int list[] = {0, 1, 2, 3};      // device to run algorithm
-    config.num_devices = sizeof(list) / sizeof(list[0]);  // number of devices
-    config.device_list = list;      // device list to run algorithm
+    struct GRSetup config = InitSetup();  // primitive-specific configures
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));
