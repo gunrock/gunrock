@@ -137,6 +137,7 @@ private:
     double             error;  // Used in PageRank
     double             alpha;  // Used in direction optimal BFS
     double              beta;  // Used in direction optimal BFS
+    int            top_nodes;  // Used in Top-K
 
 public:
     json_spirit::mObject info;  // test parameters and running statistics
@@ -200,6 +201,7 @@ public:
         info["error"]              = 0.01f;  // default error for PageRank
         info["alpha"]              = 6.0f;   // default alpha for DOBFS
         info["beta"]               = 6.0f;   // default beta for DOBFS
+        info["top_nodes"]          = 0;     // default number of nodes for top-k primitive
         // info["gpuinfo"]
         // info["device_list"]
         // info["sysinfo"]
@@ -347,7 +349,7 @@ public:
             args.GetCmdLineArgument("ref_filename", ref_filename);
             info["ref_filename"] = ref_filename;
         }
-        if (args.CheckCmdLineFlag("delta-factor"))  // SSSP
+        if (args.CheckCmdLineFlag("delta_factor"))  // SSSP
         {
             args.GetCmdLineArgument("delta_factor", delta_factor);
             info["delta_factor"] = delta_factor;
@@ -369,6 +371,10 @@ public:
         if (args.CheckCmdLineFlag("beta"))
         {
             args.GetCmdLineArgument("beta", beta);
+        }
+        if (args.CheckCmdLineFlag("top_nodes"))
+        {
+            args.GetCmdLineArgument("top_nodes", top_nodes);
         }
 
         // parse device count and device list

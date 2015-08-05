@@ -38,17 +38,10 @@
 #include <gunrock/oprtr/filter/kernel.cuh>
 
 using namespace gunrock;
+using namespace gunrock::app;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::topk;
-
-/******************************************************************************
- * Defines, constants, globals
- ******************************************************************************/
-//bool g_verbose;
-//bool g_undirected;
-//bool g_quick;
-//bool g_stream_from_host;
 
 /******************************************************************************
  * Housekeeping Routines
@@ -93,27 +86,6 @@ void DisplaySolution(
     printf("%d %d %d\n", h_node_id[iter], h_degrees_i[iter], h_degrees_o[iter]);
 }
 
-struct Test_Parameter : gunrock::app::TestParameter_Base {
-public:
-    void         *inv_graph         ;
-    long long     top_nodes;
-
-    Test_Parameter()
-    {
-        inv_graph          = NULL ;
-        top_nodes          = 0;
-    }
-
-    ~Test_Parameter()
-    {
-    }
-
-    void Init(CommandLineArgs &args)
-    {
-        TestParameter_Base::Init(args);
-   }
-};
-
 /******************************************************************************
  * Degree Centrality Testing Routines
  *****************************************************************************/
@@ -140,8 +112,8 @@ template<
   typename Value,
   typename SizeT>
 void SimpleReferenceTopK(
-  Csr<VertexId, Value, SizeT> &graph_original,
-  Csr<VertexId, Value, SizeT> &graph_reversed,
+  Csr<VertexId, Value, SizeT> &csr,
+  Csr<VertexId, Value, SizeT> &csc,
   VertexId *ref_node_id,
   Value    *ref_degrees,
   SizeT    top_nodes)
@@ -151,26 +123,26 @@ void SimpleReferenceTopK(
 
   // malloc degree centrality spaces
   Value *ref_degrees_original =
-    (Value*)malloc(sizeof(Value) * graph_original.nodes);
+    (Value*)malloc(sizeof(Value) * csr.nodes);
   Value *ref_degrees_reversed =
-    (Value*)malloc(sizeof(Value) * graph_reversed.nodes);
+    (Value*)malloc(sizeof(Value) * csc.nodes);
 
   // store reference output results
   std::vector< std::pair<int, int> > results;
 
   // calculations
-  for (SizeT node = 0; node < graph_original.nodes; ++node)
+  for (SizeT node = 0; node < csr.nodes; ++node)
   {
     ref_degrees_original[node] =
-      graph_original.row_offsets[node+1] - graph_original.row_offsets[node];
+      csr.row_offsets[node+1] - csr.row_offsets[node];
     ref_degrees_reversed[node] =
-      graph_reversed.row_offsets[node+1] - graph_reversed.row_offsets[node];
+      csc.row_offsets[node+1] - csc.row_offsets[node];
   }
 
   cpu_timer.Start();
 
   // add ingoing degrees and outgoing degrees together
-  for (SizeT node = 0; node < graph_original.nodes; ++node)
+  for (SizeT node = 0; node < csr.nodes; ++node)
   {
     ref_degrees_original[node] =
       ref_degrees_original[node] + ref_degrees_reversed[node];
@@ -204,8 +176,8 @@ void SimpleReferenceTopK(
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] graph_original Reference to the CSR graph we process on
- * @param[in] graph_reversed Reference to the inversed CSR graph we process on
+ * @param[in] csr Reference to the CSR graph we process on
+ * @param[in] csc Reference to the inversed CSR graph we process on
  * @param[in] args Reference to the command line arguments
  * @param[in] max_grid_size Maximum CTA occupancy
  * @param[in] num_gpus Number of GPUs
@@ -220,14 +192,7 @@ template <
   bool INSTRUMENT,
   bool DEBUG,
   bool SIZE_CHECK>
-void RunTests(Test_Parameter *parameter)
-          /*const Csr<VertexId, Value, SizeT> &graph,
-              const Csr<VertexId, Value, SizeT> &graph_inv,
-              CommandLineArgs                   &args,
-              int                               max_grid_size,
-              int                               num_gpus,
-              int                               top_nodes,
-              CudaContext                       &context)*/
+void RunTests(Info<VertexId, Value, SizeT> *info)
 {
 
   // define the problem data structure for graph primitive
@@ -237,15 +202,20 @@ void RunTests(Test_Parameter *parameter)
     Value> Problem;
 
     Csr<VertexId, Value, SizeT>
-                 *graph_original        = (Csr<VertexId, Value, SizeT>*)parameter->graph;
+                 *csr        = info->csr_ptr;
     Csr<VertexId, Value, SizeT>
-                 *graph_reversed        = (Csr<VertexId, Value, SizeT>*)parameter->inv_graph;
-    int           max_grid_size         = parameter -> max_grid_size;
-    int           num_gpus              = parameter -> num_gpus;
-    ContextPtr   *context               = (ContextPtr*)parameter -> context;
-    int          *gpu_idx               = parameter -> gpu_idx;
-    bool          g_stream_from_host    = parameter -> g_stream_from_host;
-    SizeT         top_nodes             = parameter -> top_nodes;
+                 *csc        = info->csc_ptr;
+    int           max_grid_size         = info->info["max_grid_size"].get_int();
+    int           num_gpus              = info->info["num_gpus"].get_int();
+    bool          stream_from_host      = info->info["stream_from_host"].get_bool();
+    SizeT         top_nodes             = info->info["top_nodes"].get_int();
+    bool          quiet_mode            = info->info["quiet_mode"].get_bool();
+
+    ContextPtr    *context              = (ContextPtr*)info->context;
+
+    json_spirit::mArray device_list = info->info["device_list"].get_array();
+    int* gpu_idx = new int[num_gpus];
+    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
 
   // INSTRUMENT specifies whether we want to keep such statistical data
   // Allocate TOPK enactor map
@@ -256,7 +226,7 @@ void RunTests(Test_Parameter *parameter)
   Problem *topk_problem = new Problem;
 
   // reset top_nodes if input k > total number of nodes
-  if (top_nodes > graph_original->nodes) top_nodes = graph_original->nodes;
+  if (top_nodes > csr->nodes) top_nodes = csr->nodes;
 
   // malloc host memory
   VertexId *h_node_id   = (VertexId*)malloc(sizeof(VertexId) * top_nodes);
@@ -268,9 +238,9 @@ void RunTests(Test_Parameter *parameter)
   // copy data from CPU to GPU
   // initialize data members in DataSlice for graph
   util::GRError(topk_problem->Init(
-    g_stream_from_host,
-    *graph_original,
-    *graph_reversed,
+    stream_from_host,
+    *csr,
+    *csc,
     num_gpus),
     "Problem TOPK Initialization Failed", __FILE__, __LINE__);
 
@@ -303,6 +273,7 @@ void RunTests(Test_Parameter *parameter)
     __FILE__, __LINE__);
 
   // display solution
+  if (!quiet_mode)
   DisplaySolution(
     h_node_id,
     h_degrees_i,
@@ -311,8 +282,8 @@ void RunTests(Test_Parameter *parameter)
 
   // validation
   SimpleReferenceTopK(
-    *graph_original,
-    *graph_reversed,
+    *csr,
+    *csc,
     ref_node_id,
     ref_degrees,
     top_nodes);
@@ -320,9 +291,9 @@ void RunTests(Test_Parameter *parameter)
   int error_num = CompareResults(h_node_id, ref_node_id, top_nodes, true);
   if (error_num > 0)
   {
-    printf("INCOREECT! %d error(s) occured. \n", error_num);
+    if (!quiet_mode) printf("INCOREECT! %d error(s) occured. \n", error_num);
   }
-  printf("\n");
+  if (!quiet_mode) printf("\n");
 
   // cleanup if neccessary
   if (topk_problem) { delete topk_problem; }
@@ -339,14 +310,14 @@ template <
     typename      SizeT,
     bool          INSTRUMENT,
     bool          DEBUG>
-void RunTests_size_check(Test_Parameter *parameter)
+void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->size_check) RunTests
+    if (info->info["size_check"].get_bool()) RunTests
         <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-        true > (parameter);
+        true > (info);
    else RunTests
         <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-        false> (parameter);
+        false> (info);
 }
 
 template <
@@ -354,70 +325,28 @@ template <
     typename    Value,
     typename    SizeT,
     bool        INSTRUMENT>
-void RunTests_debug(Test_Parameter *parameter)
+void RunTests_debug(Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->debug) RunTests_size_check
+    if (info->info["debug_mode"].get_bool()) RunTests_size_check
         <VertexId, Value, SizeT, INSTRUMENT,
-        true > (parameter);
+        true > (info);
     else RunTests_size_check
         <VertexId, Value, SizeT, INSTRUMENT,
-        false> (parameter);
+        false> (info);
 }
 
 template <
     typename      VertexId,
     typename      Value,
     typename      SizeT>
-void RunTests_instrumented(Test_Parameter *parameter)
+void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 {
-    if (parameter->instrumented) RunTests_debug
+    if (info->info["instrument"].get_bool()) RunTests_debug
         <VertexId, Value, SizeT,
-        true > (parameter);
+        true > (info);
     else RunTests_debug
         <VertexId, Value, SizeT,
-        false> (parameter);
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] graph_original Reference to the CSR graph we process on
- * @param[in] graph_reversed Reference to the inversed CSR graph we process on
- * @param[in] args Reference to the command line arguments
- * @param[in] top_nodes Number of nodes to process for Top-K algorithm
- * @param[in] context CudaContext for moderngpu library
- */
-template <
-    typename VertexId,
-    typename Value,
-    typename SizeT>
-void RunTests(
-    Csr<VertexId, Value, SizeT> *graph,
-    Csr<VertexId, Value, SizeT> *inv_graph,
-    CommandLineArgs             &args,
-    SizeT                        top_nodes,
-    int                          num_gpus,
-    ContextPtr                  *context,
-    int                         *gpu_idx,
-    cudaStream_t                *streams = NULL)
-{
-    std::string src_str="";
-    Test_Parameter *parameter = new Test_Parameter;
-
-    parameter -> Init(args);
-    parameter -> graph              = graph;
-    parameter -> inv_graph          = inv_graph;
-    parameter -> num_gpus           = num_gpus;
-    parameter -> context            = context;
-    parameter -> gpu_idx            = gpu_idx;
-    parameter -> streams            = streams;
-    parameter -> top_nodes          = top_nodes;
-
-    RunTests_instrumented<VertexId, Value, SizeT>(parameter);
+        false> (info);
 }
 
 /******************************************************************************
@@ -427,91 +356,24 @@ int main(int argc, char** argv)
 {
   CommandLineArgs args(argc, argv);
 
+  int graph_args = argc - args.ParsedArgc() - 1;
   if ((argc < 2) || (args.CheckCmdLineFlag("help")))
   {
     Usage();
     return 1;
   }
 
-  int dev = 0;
-  int top_nodes;
+  typedef int VertexId;
+  typedef int Value;
+  typedef int SizeT;
+  Csr<VertexId, Value, SizeT> csr(false);
+  Csr<VertexId, Value, SizeT> csc(false);
+  Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
-  args.GetCmdLineArgument("device", dev);
-  args.GetCmdLineArgument("top", top_nodes);
+  info->info["undirected"] = args.CheckCmdLineFlag("undirected");
+  info->Init("TOPK", args, csr, csc);
 
-  mgpu::ContextPtr context = mgpu::CreateCudaDevice(dev);
-
-  // Parse graph-contruction params
-  bool g_undirected = false;
-
-  std::string graph_type = argv[1];
-  int flags = args.ParsedArgc();
-  int graph_args = argc - flags - 1;
-
-  if (graph_args < 1)
-  {
-    Usage();
-    return 1;
-  }
-
-  //
-  // Construct graph and perform
-  //
-  if (graph_type == "market")
-  {
-    // Matrix-market coordinate-formatted graph file
-
-    typedef int VertexId; //!< Use as the node identifier type
-    typedef int Value;    //!< Use as the value type
-    typedef int SizeT;    //!< Use as the graph size type
-
-    Csr<VertexId, Value, SizeT> csr_original(false);
-    Csr<VertexId, Value, SizeT> csr_reversed(false);
-
-    // Default value for stream_from_host is false
-    if (graph_args < 1)
-    {
-      Usage();
-      return 1;
-    }
-
-    char *market_filename = (graph_args == 2) ? argv[2] : NULL;
-
-    // BuildMarketGraph() reads a mtx file into CSR data structure
-    // Template argumet = true because the graph has edge weights
-    // read in non-inversed graph
-    if (graphio::BuildMarketGraph<true>(
-      market_filename,
-      csr_original,
-      g_undirected,
-      false) != 0) // original graph
-    {
-      return 1;
-    }
-
-    // read in inversed graph
-    if (graphio::BuildMarketGraph<true>(
-      market_filename,
-      csr_reversed,
-      g_undirected,
-      true) != 0) // reversed graph
-    {
-      return 1;
-    }
-
-    //csr_original.DisplayGraph();
-    //csr_reversed.DisplayGraph();
-
-    // run gpu tests
-    RunTests(&csr_original, &csr_reversed, args, top_nodes, 1, &context, &dev);
-
-  }
-  else
-  {
-    // unknown graph type
-    fprintf(stderr, "Unspecified graph type\n");
-    return 1;
-  }
+  RunTests_instrumented<VertexId, Value, SizeT>(info);
 
   return 0;
 }
