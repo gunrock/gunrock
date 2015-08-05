@@ -57,6 +57,7 @@ void Usage()
         " ------------------------------------------------------------------\n"
         " test_mst <graph type> <graph type args> [--device=<device_index>]\n"
         " [--quick] [--quiet] [--v]\n\n"
+        " [--quiet] [--json] [--jsonfile=<name>] [--jsondir=<dir>]"
         "Graph types and args:\n"
         "  market [<file>]\n"
         "    Reads a Matrix-Market coordinate-format graph of directed/undirected\n"
@@ -65,7 +66,11 @@ void Usage()
         "  --quick If set will skip the CPU validation code\n"
         "  --quiet If set don't print anything\n"
         "  --v If set will enable debug mode\n\n"
-        " ------------------------------------------------------------------\n");
+        " --quiet                  No output (unless --json is specified).\n"
+        " --json                   Output JSON-format statistics to stdout.\n"
+        " --jsonfile=<name>        Output JSON-format statistics to file <name>\n"
+        " --jsondir=<dir>          Output JSON-format statistics to <dir>/name,\n"
+        " ------------------------------------------------------------------\n"); 
 }
 
 /**
@@ -237,7 +242,7 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
         (Csr<VertexId, Value, SizeT>*)info->csr_ptr;
     int num_gpus            = info->info["num_gpus"].get_int();
     int max_grid_size       = info->info["max_grid_size"].get_int();
-    int iterations          = info->info["num_iteration"].get_int();
+    int iterations          = 1; //force to 1 info->info["num_iteration"].get_int();
     bool quiet_mode         = info->info["quiet_mode"].get_bool();
     bool quick_mode         = info->info["quick_mode"].get_bool();
     bool stream_from_host   = info->info["stream_from_host"].get_bool();

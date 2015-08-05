@@ -82,6 +82,7 @@ void Usage()
     printf(
         "\ntest_pr <graph type> <graph type args> [--device=<device_index>] "
         "[--undirected] [--instrumented] [--quick=<0|1>] [--v]\n"
+        " [--quiet] [--json] [--jsonfile=<name>] [--jsondir=<dir>]"
         "\n"
         "Graph types and args:\n"
         "  market [<file>]\n"
@@ -92,6 +93,10 @@ void Usage()
         "  --instrumented If set then kernels keep track of queue-search_depth\n"
         "  and barrier duty (a relative indicator of load imbalance.)\n"
         "  --quick If set will skip the CPU validation code. Default: 0\n"
+        " --quiet                  No output (unless --json is specified).\n"
+        " --json                   Output JSON-format statistics to stdout.\n"
+        " --jsonfile=<name>        Output JSON-format statistics to file <name>\n"
+        " --jsondir=<dir>          Output JSON-format statistics to <dir>/name,\n" 
     );
 }
 
@@ -331,7 +336,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     std::string partition_method = info->info["partition_method"].get_str();
     double partition_factor      = info->info["partition_factor"].get_real();
     int partition_seed           = info->info["partition_seed"].get_int();
-    int iterations               = info->info["num_iteration"].get_int();
+    int iterations               = 1; //force to 1 info->info["num_iteration"].get_int();
     int traversal_mode           = info->info["traversal_mode"].get_int();
     std::string ref_filename     = info->info["ref_filename"].get_str();
     Value delta                  = info->info["delta"].get_real();

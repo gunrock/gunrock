@@ -81,19 +81,24 @@ bool PRCompare(
 void Usage()
 {
     printf("\ntest_wtf <graph type> <graph type args> [--device=<device_index>] "
-           "[--undirected] [--instrumented] [--quick] "
-           "[--v]\n"
-           "\n"
-           "Graph types and args:\n"
-           "  market [<file>]\n"
-           "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
-           "    edges from stdin (or from the optionally-specified file).\n"
-           "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
-           "  --undirected If set then treat the graph as undirected.\n"
-           "  --instrumented If set then kernels keep track of queue-search_depth\n"
-           "  and barrier duty (a relative indicator of load imbalance.)\n"
-           "  --quick If set will skip the CPU validation code.\n"
-        );
+            "[--undirected] [--instrumented] [--quick] "
+            "[--v]\n"
+            " [--quiet] [--json] [--jsonfile=<name>] [--jsondir=<dir>]"
+            "\n"
+            "Graph types and args:\n"
+            "  market [<file>]\n"
+            "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
+            "    edges from stdin (or from the optionally-specified file).\n"
+            "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
+            "  --undirected If set then treat the graph as undirected.\n"
+            "  --instrumented If set then kernels keep track of queue-search_depth\n"
+            "  and barrier duty (a relative indicator of load imbalance.)\n"
+            "  --quick If set will skip the CPU validation code.\n"
+            " --quiet                  No output (unless --json is specified).\n"
+            " --json                   Output JSON-format statistics to stdout.\n"
+            " --jsonfile=<name>        Output JSON-format statistics to file <name>\n"
+            " --jsondir=<dir>          Output JSON-format statistics to <dir>/name,\n" 
+          );
 }
 
 /**

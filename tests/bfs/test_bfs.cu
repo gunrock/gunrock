@@ -71,7 +71,7 @@ void Usage()
         "  --queue-sizing=<factor> Allocates a frontier queue sized at: \n"
         "                          (graph-edges * <factor>). [Default: 1.0]\n"
         "  --v                     Print verbose per iteration debug info.\n"
-        "  --iteration-num=<num>   Number of runs to perform the test [Default: 1].\n"
+        "  --iteration-num=<num>   Number of runs to perform the test [Now force to be 1].\n"
         "  --traversal-mode=<0|1>  Set traversal strategy, 0 for Load-Balanced, \n"
         "                          1 for Dynamic-Cooperative [Default: dynamic\n"
         "                          determine based on average degree].\n"
@@ -282,7 +282,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     bool quick_mode              = info->info["quick_mode"].get_bool();
     bool stream_from_host        = info->info["stream_from_host"].get_bool();
     int traversal_mode           = info->info["traversal_mode"].get_int();
-    int iterations               = info->info["num_iteration"].get_int();
+    int iterations               = 1; //disable since doesn't support mgpu stop condition. info->info["num_iteration"].get_int();
 
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];

@@ -74,6 +74,7 @@ void Usage()
         " [--in-sizing=<in/out queue scale factor>] [--disable-size-check]\n"
         " [--partition_method=<random|biasrandom|clustered|metis]\n"
         " [--grid-sizing=<grid size>] [--partition_seed=<seed>]\n"
+        " [--quiet] [--json] [--jsonfile=<name>] [--jsondir=<dir>]"
         "\n"
         "Graph types and args:\n"
         "  market [<file>]\n"
@@ -83,6 +84,11 @@ void Usage()
         "  --instrumented If set then kernels keep track of queue-search_depth\n"
         "  and barrier duty (a relative indicator of load imbalance.)\n"
         "  --quick If set will skip the CPU validation code. Default: 0.\n"
+        " --quiet                  No output (unless --json is specified).\n"
+        " --json                   Output JSON-format statistics to stdout.\n"
+        " --jsonfile=<name>        Output JSON-format statistics to file <name>\n"
+        " --jsondir=<dir>          Output JSON-format statistics to <dir>/name,\n"
+        
     );
 }
 
@@ -270,7 +276,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     bool quick_mode              = info->info["quick_mode"].get_bool();
     bool stream_from_host        = info->info["stream_from_host"].get_bool();
     int traversal_mode           = info->info["traversal_mode"].get_int();
-    int iterations               = info->info["num_iteration"].get_int();
+    int iterations               = 1; //set to 1 for now. info->info["num_iteration"].get_int();
 
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];

@@ -57,6 +57,7 @@ void Usage()
         " test_dobfs <graph type> <graph type args> [--device=<device_index>]\n"
         " [--src=<source_index>] [--instrumented] [--idempotence=<0|1>] [--v]\n"
         " [--undirected] [--iteration-num=<num>] [--quick=<0|1>] [--mark-pred]\n"
+        " [--quiet] [--json] [--jsonfile=<name>] [--jsondir=<dir>]"
         " [--queue-sizing=<scale factor>]\n"
         "\n"
         "Graph types and args:\n"
@@ -77,7 +78,11 @@ void Usage()
         "  --queue-sizing=<factor>   Allocates a frontier queue sized at: \n"
         "                            (graph-edges * <scale factor>). [Default: 1.0]\n"
         "  --v                       Print verbose per iteration debug info.\n"
-        "  --iteration-num=<number>  Number of runs to perform the test [Default: 1].\n"
+        "  --iteration-num=<number>  Number of runs to perform the test [Force to 1].\n"
+        " --quiet                  No output (unless --json is specified).\n"
+        " --json                   Output JSON-format statistics to stdout.\n"
+        " --jsonfile=<name>        Output JSON-format statistics to file <name>\n"
+        " --jsondir=<dir>          Output JSON-format statistics to <dir>/name,\n" 
     );
 }
 
@@ -251,7 +256,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     bool quick_mode         = info->info["quick_mode"].get_bool();
     bool undirected         = info->info["undirected"].get_bool();
     bool stream_from_host   = info->info["stream_from_host"].get_bool();
-    int iterations          = info->info["num_iteration"].get_int();
+    int iterations          = 1; // force to 1 info->info["num_iteration"].get_int();
     double alpha            = info->info["alpha"].get_real();
     double beta             = info->info["beta"].get_real();
 

@@ -55,10 +55,11 @@ void Usage()
 {
     printf(
         "\ntest_bc <graph type> <graph type args> [--device=<device_index>] "
-        "[--instrumented] [--src=<source index>] [--quick] [--v]"
+        "[--instrumented] [--src=<source index>] [--quick] [--iteration-num=<num>][--v]"
         "[--queue-sizing=<scale factor>] [--ref-file=<reference filename>]\n"
         "[--in-sizing=<in/out queue scale factor>] [--disable-size-check] "
         "[--grid-size=<grid size>] [partition_method=random / biasrandom / clustered / metis]\n"
+        " [--quiet] [--json] [--jsonfile=<name>] [--jsondir=<dir>]"
         "\n"
         "Graph types and args:\n"
         "  market [<file>]\n"
@@ -67,6 +68,7 @@ void Usage()
         "--device=<device_index>: Set GPU device for running the graph primitive.\n"
         "--undirected: If set then treat the graph as undirected graph.\n"
         "--instrumented: If set then kernels keep track of queue-search_depth\n"
+        "  --iteration-num=<num>   Number of runs to perform the test [Now force to be 1].\n"
         "and barrier duty (a relative indicator of load imbalance.)\n"
         "--src=<source index>: When source index is -1, compute BC value for each\n"
         "node. Otherwise, debug the delta value for one node\n"
@@ -75,6 +77,11 @@ void Usage()
         "Default is 1.0.\n"
         "--v: If set, enable verbose output, keep track of the kernel running.\n"
         "--ref-file: If set, use pre-computed result stored in ref-file to verify.\n"
+        " --quiet                  No output (unless --json is specified).\n"
+        " --json                   Output JSON-format statistics to stdout.\n"
+        " --jsonfile=<name>        Output JSON-format statistics to file <name>\n"
+        " --jsondir=<dir>          Output JSON-format statistics to <dir>/name,\n"
+        "                          where name is auto-generated.\n"
     );
 }
 
@@ -388,7 +395,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     int partition_seed           = info->info["partition_seed"].get_int();
     bool quick_mode              = info->info["quick_mode"].get_bool();
     bool stream_from_host        = info->info["stream_from_host"].get_bool();
-    int iterations               = info->info["num_iteration"].get_int();
+    int iterations               = 1; // force to 1 info->info["num_iteration"].get_int();
     std::string ref_filename     = info->info["ref_filename"].get_str();
 
     json_spirit::mArray device_list = info->info["device_list"].get_array();
@@ -487,6 +494,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     for (int iter = 0; iter < iterations; ++iter)
     {
+        printf("iteration:%d\n", iter);
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
             util::SetDevice(gpu_idx[gpu]);
