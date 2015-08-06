@@ -11,11 +11,11 @@ Boost Dependency           {#build_boost}
 =================
 
 Gunrock uses the
-[Boost Graph Library (BGL)](http://www.boost.org/doc/libs/1_55_0/libs/graph/doc/index.html)
+[Boost Graph Library (BGL)](http://www.boost.org/doc/libs/1_58_0/libs/graph/doc/index.html)
 for the CPU reference implementations of Connected Component, Betweenness
 Centrality, PageRank, Single-Source Shortest Path, and Minimum Spanning Tree.
 You will need to
-[install Boost](http://www.boost.org/doc/libs/1_55_0/doc/html/bbv2/installation.html)
+[install Boost](http://www.boost.org/doc/libs/1_58_0/doc/html/bbv2/installation.html)
 to build test applications.
 
 METIS Dependency {#build_metis}
@@ -71,5 +71,5 @@ test files of calling Gunrock APIs are located at `gunrock/shared_lib_tests`.
 
 Alternatively, you can build gunrock using individual `Makefiles` under
 `gunrock/test/primitive_name` and simply type `make`.
-To run the tests for each graph primitive, go into `tests/primitive_name` and
-simply type `sh run.sh`.
+You can either run the test for all primitives by typing `make test` in the
+build directory, or do your own testings manually.
