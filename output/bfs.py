@@ -7,7 +7,12 @@ for mark_pred in ["", "--mark-pred"]:
         for dataset in ['soc-LiveJournal1',
                         'kron_g500-logn21',
                         'delaunay_n21',
+                        'delaunay_n24',
                         'belgium_osm',
+                        'europe_osm',
+                        'road_usa',
+                        'webbase-1M',
+                        'cit-Patents',
                         'ak2010',
                         'delaunay_n13',
                         'coAuthorsDBLP']:
