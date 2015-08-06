@@ -245,19 +245,20 @@ class MSTEnactor :
            graph_slice->nodes + 1);
         }
 
-        // generate d_flags_array from d_row_offsets using MarkSegment kernel
+        // generate flag_array from d_row_offsets using MarkSegment kernel
         util::MarkSegmentFromIndices<<<128, 128>>>(
-          problem->data_slices[0]->d_flags_array,
+          problem->data_slices[0]->flag_array.GetPointer(util::DEVICE),
           graph_slice->row_offsets.GetPointer(util::DEVICE),
           graph_slice->nodes);
 
-        if (DEBUG) printf("* finished mark segmentation >> d_flags_array.\n");
+        if (DEBUG) printf("* finished mark segmentation >> flag_array.\n");
 
-        // generate d_keys_array from d_flags_array using sum inclusive scan
+        // generate d_keys_array from flag_array using sum inclusive scan
         Scan<MgpuScanTypeInc>(
-          (int*)problem->data_slices[0]->d_flags_array, graph_slice->edges,
-          (int)0, mgpu::plus<int>(), (int*)0, (int*)0,
-          (int*)problem->data_slices[0]->d_keys_array, context[0]);
+          (int*)problem->data_slices[0]->flag_array.GetPointer(util::DEVICE),
+          graph_slice->edges, (int)0, mgpu::plus<int>(), (int*)0, (int*)0,
+          (int*)problem->data_slices[0]->keys_array.GetPointer(util::DEVICE),
+          context[0]);
 
         if (DEBUG) printf("* finished segmented sum scan >> d_keys_array.\n");
         if (DEBUG) printf("A. MARKING THE MST EDGES ...\n");
@@ -268,39 +269,44 @@ class MSTEnactor :
         // select minimum edge_weights and keys using mgpu::ReduceByKey
         int num_segments;
         ReduceByKey(
-          problem->data_slices[0]->d_keys_array,
-          problem->data_slices[0]->d_edge_weights,
+          problem->data_slices[0]->keys_array.GetPointer(util::DEVICE),
+          problem->data_slices[0]->edge_value.GetPointer(util::DEVICE),
           graph_slice->edges,
           std::numeric_limits<Value>::max(),
           mgpu::minimum<Value>(),
           mgpu::equal_to<Value>(),
-          problem->data_slices[0]->d_reduced_keys,
-          problem->data_slices[0]->d_reduced_vals,
+          problem->data_slices[0]->reduce_key.GetPointer(util::DEVICE),
+          problem->data_slices[0]->reduce_val.GetPointer(util::DEVICE),
           &num_segments, (int*)0, context[0]);
 
         if (DEBUG) printf("  * finished segmented reduction: keys & weight.\n");
 
         if (debug_info)
         {
-          printf(":: origin d_flags_array ::");
+          printf(":: origin flag_array ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_flags_array, graph_slice->edges);
+            problem->data_slices[0]->flag_array.GetPointer(util::DEVICE),
+            graph_slice->edges);
           printf(":: origin d_keys_array ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_keys_array, graph_slice->edges);
+            problem->data_slices[0]->keys_array.GetPointer(util::DEVICE),
+            graph_slice->edges);
           printf(":: origin d_col_indices ::");
           util::DisplayDeviceResults(
             graph_slice->column_indices.GetPointer(util::DEVICE),
             graph_slice->edges);
           printf(":: origin d_edge_weights ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_edge_weights, graph_slice->edges);
+            problem->data_slices[0]->edge_value.GetPointer(util::DEVICE),
+            graph_slice->edges);
           printf(":: reduced keys array - d_reduced_keys ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_reduced_keys, num_segments);
+            problem->data_slices[0]->reduce_key.GetPointer(util::DEVICE),
+            num_segments);
           printf(":: reduced edge weights - d_reduced_vals ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_reduced_vals, num_segments);
+            problem->data_slices[0]->reduce_val.GetPointer(util::DEVICE),
+            num_segments);
         }
 
         if (DEBUG) printf(" (b). Finding and Removing Cycles.\n");
@@ -314,11 +320,11 @@ class MSTEnactor :
         attributes->queue_reset  = true;
 
         util::MemsetKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_successors,
+          problem->data_slices[0]->successors.GetPointer(util::DEVICE),
           std::numeric_limits<int>::max(),
           graph_slice->nodes);
         util::MemsetKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_temp_index,
+          problem->data_slices[0]->temp_index.GetPointer(util::DEVICE),
           std::numeric_limits<VertexId>::max(),
           graph_slice->nodes);
         util::MemsetIdxKernel<<<128, 128>>>(
@@ -462,7 +468,8 @@ class MSTEnactor :
         {
           printf(":: remove cycles from successors ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_successors, graph_slice->nodes);
+            problem->data_slices[0]->successors.GetPointer(util::DEVICE),
+            graph_slice->nodes);
         }
 
         if (DEBUG) printf("B. GRAPH CONSTRUCTION ...\n");
@@ -482,11 +489,9 @@ class MSTEnactor :
         while (!vertex_flag[0])
         {
           vertex_flag[0] = 1;
-          if (retval = util::GRError(cudaMemcpy(
-            problem->data_slices[0]->d_vertex_flag, vertex_flag,
-            sizeof(int), cudaMemcpyHostToDevice),
-            "MSTProblem cudaMemcpy vertex_flag to d_vertex_flag failed",
-            __FILE__, __LINE__)) return retval;
+          problem->data_slices[0]->done_flags.SetPointer(vertex_flag);
+          if (retval = problem->data_slices[0]->done_flags.Move(
+            util::HOST, util::DEVICE)) return retval;
 
           gunrock::oprtr::filter::Kernel
             <FilterKernelPolicy, MSTProblem, PJmpFunctor>
@@ -517,11 +522,9 @@ class MSTEnactor :
           attributes->queue_index++;
           attributes->selector ^= 1;
 
-          if (retval = util::GRError(cudaMemcpy(
-            vertex_flag, problem->data_slices[0]->d_vertex_flag,
-            sizeof(int), cudaMemcpyDeviceToHost),
-            "MSTProblem cudaMemcpy d_vertex_flag to vertex_flag failed",
-            __FILE__, __LINE__)) return retval;
+          problem->data_slices[0]->done_flags.SetPointer(vertex_flag);
+          if (retval = problem->data_slices[0]->done_flags.Move(
+            util::DEVICE, util::HOST)) return retval;
 
           // check if finished pointer jumping
           if (vertex_flag[0]) break;
@@ -537,33 +540,36 @@ class MSTEnactor :
 
         // bring all vertices of a super-vertex together by sorting
         util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_supervtx_ids,
-          problem->data_slices[0]->d_successors,
+          problem->data_slices[0]->super_idxs.GetPointer(util::DEVICE),
+          problem->data_slices[0]->successors.GetPointer(util::DEVICE),
           graph_slice->nodes);
 
         util::MemsetIdxKernel<<<128, 128>>>(
-        problem->data_slices[0]->d_origin_nodes, graph_slice->nodes);
+        problem->data_slices[0]->original_n.GetPointer(util::DEVICE),
+        graph_slice->nodes);
 
         util::CUBRadixSort<VertexId, VertexId>(
           true, graph_slice->nodes,
-          problem->data_slices[0]->d_supervtx_ids,
-          problem->data_slices[0]->d_origin_nodes);
+          problem->data_slices[0]->super_idxs.GetPointer(util::DEVICE),
+          problem->data_slices[0]->original_n.GetPointer(util::DEVICE));
 
         if (debug_info)
         {
           printf(":: pointer jumping: representatives ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_successors, graph_slice->nodes);
+            problem->data_slices[0]->successors.GetPointer(util::DEVICE),
+            graph_slice->nodes);
           printf(":: bring all vertices of a super-vertex together ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_supervtx_ids, graph_slice->nodes);
+            problem->data_slices[0]->super_idxs.GetPointer(util::DEVICE),
+            graph_slice->nodes);
         }
 
         ////////////////////////////////////////////////////////////////////////
         // create a flag to mark the boundaries of representative vertices
         util::MarkSegmentFromKeys<<<128, 128>>>(
-          problem->data_slices[0]->d_flags_array,
-          problem->data_slices[0]->d_supervtx_ids,
+          problem->data_slices[0]->flag_array.GetPointer(util::DEVICE),
+          problem->data_slices[0]->super_idxs.GetPointer(util::DEVICE),
           graph_slice->nodes);
 
         if (DEBUG) printf("  * finished mark super-vertices: super flags.\n");
@@ -571,37 +577,40 @@ class MSTEnactor :
         ////////////////////////////////////////////////////////////////////////
         // sum scan of the super flags to assign new super-vertex ids
         Scan<MgpuScanTypeInc>(
-          (int*)problem->data_slices[0]->d_flags_array, graph_slice->nodes,
-          (int)0, mgpu::plus<int>(), (int*)0, (int*)0,
-          (int*)problem->data_slices[0]->d_supervtx_ids, context[0]);
+          (int*)problem->data_slices[0]->flag_array.GetPointer(util::DEVICE),
+          graph_slice->nodes, (int)0, mgpu::plus<int>(), (int*)0, (int*)0,
+          (int*)problem->data_slices[0]->super_idxs.GetPointer(util::DEVICE),
+          context[0]);
 
-        if (DEBUG) printf("  * finished assign super ids: d_supervtx_ids.\n");
+        if (DEBUG) printf("  * finished assign super ids:   .\n");
 
         if (debug_info)
         {
           printf(":: super flags (a.k.a. c flag) ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_flags_array, graph_slice->nodes);
+            problem->data_slices[0]->flag_array.GetPointer(util::DEVICE),
+            graph_slice->nodes);
           printf(":: new assigned super-vertex ids ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_supervtx_ids, graph_slice->nodes);
+            problem->data_slices[0]->super_idxs.GetPointer(util::DEVICE),
+            graph_slice->nodes);
         }
 
         ////////////////////////////////////////////////////////////////////////
         // used for finding super-vertex ids for next iteration
         util::CUBRadixSort<VertexId, VertexId>(
           true, graph_slice->nodes,
-          problem->data_slices[0]->d_origin_nodes,
-          problem->data_slices[0]->d_supervtx_ids);
+          problem->data_slices[0]->original_n.GetPointer(util::DEVICE),
+          problem->data_slices[0]->super_idxs.GetPointer(util::DEVICE));
 
         ////////////////////////////////////////////////////////////////////////
         // update graph_slice->nodes with number of super-vertices
         SizeT current_nodes = graph_slice->nodes;
         // the first segment in flag was set to 0 instead of 1
         util::MemsetKernel<unsigned int><<<1, 1>>>(
-          problem->data_slices[0]->d_flags_array, 1, 1);
+          problem->data_slices[0]->flag_array.GetPointer(util::DEVICE), 1, 1);
         graph_slice->nodes = Reduce(
-          problem->data_slices[0]->d_flags_array,
+          problem->data_slices[0]->flag_array.GetPointer(util::DEVICE),
           graph_slice->nodes, context[0]);
 
         if (DEBUG)
@@ -658,42 +667,50 @@ class MSTEnactor :
         ////////////////////////////////////////////////////////////////////////
         // filter to remove all -1 in d_col_indices
         util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_temp_index,
-          problem->data_slices[0]->d_col_indices,
+          problem->data_slices[0]->temp_index.GetPointer(util::DEVICE),
+          problem->data_slices[0]->colindices.GetPointer(util::DEVICE),
           graph_slice->edges);
         util::CUBSelect<VertexId, SizeT>(
-          problem->data_slices[0]->d_temp_index, graph_slice->edges,
-          problem->data_slices[0]->d_col_indices, num_selected);
+          problem->data_slices[0]->temp_index.GetPointer(util::DEVICE),
+          graph_slice->edges,
+          problem->data_slices[0]->colindices.GetPointer(util::DEVICE),
+          num_selected);
 
         ////////////////////////////////////////////////////////////////////////
         // filter to remove all -1 in d_edge_weights
         util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_temp_value,
-          problem->data_slices[0]->d_edge_weights,
+          problem->data_slices[0]->temp_value.GetPointer(util::DEVICE),
+          problem->data_slices[0]->edge_value.GetPointer(util::DEVICE),
           graph_slice->edges);
         util::CUBSelect<Value, SizeT>(
-          problem->data_slices[0]->d_temp_value, graph_slice->edges,
-          problem->data_slices[0]->d_edge_weights, num_selected);
+          problem->data_slices[0]->temp_value.GetPointer(util::DEVICE),
+          graph_slice->edges,
+          problem->data_slices[0]->edge_value.GetPointer(util::DEVICE),
+          num_selected);
 
         ////////////////////////////////////////////////////////////////////////
         // filter to remove all -1 in d_keys_array
         util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_temp_index,
-          problem->data_slices[0]->d_keys_array,
+          problem->data_slices[0]->temp_index.GetPointer(util::DEVICE),
+          problem->data_slices[0]->keys_array.GetPointer(util::DEVICE),
           graph_slice->edges);
         util::CUBSelect<VertexId, SizeT>(
-          problem->data_slices[0]->d_temp_index, graph_slice->edges,
-          problem->data_slices[0]->d_keys_array, num_selected);
+          problem->data_slices[0]->temp_index.GetPointer(util::DEVICE),
+          graph_slice->edges,
+          problem->data_slices[0]->keys_array.GetPointer(util::DEVICE),
+          num_selected);
 
         ////////////////////////////////////////////////////////////////////////
         // filter to remove all -1 in d_origin_edges
         util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_temp_index,
-          problem->data_slices[0]->d_origin_edges,
+          problem->data_slices[0]->temp_index.GetPointer(util::DEVICE),
+          problem->data_slices[0]->original_e.GetPointer(util::DEVICE),
           graph_slice->edges);
         util::CUBSelect<VertexId, SizeT>(
-          problem->data_slices[0]->d_temp_index, graph_slice->edges,
-          problem->data_slices[0]->d_origin_edges, num_selected);
+          problem->data_slices[0]->temp_index.GetPointer(util::DEVICE),
+          graph_slice->edges,
+          problem->data_slices[0]->original_e.GetPointer(util::DEVICE),
+          num_selected);
 
         if (DEBUG) printf("  * finished remove edges in one super-vertex.\n");
 
@@ -707,16 +724,20 @@ class MSTEnactor :
         {
           printf(":: edge removal in one super-vertex (d_keys_array) ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_keys_array, graph_slice->edges);
+            problem->data_slices[0]->keys_array.GetPointer(util::DEVICE),
+            graph_slice->edges);
           printf(":: edge removal in one super-vertex (d_col_indices) ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_col_indices, graph_slice->edges);
+            problem->data_slices[0]->colindices.GetPointer(util::DEVICE),
+            graph_slice->edges);
           printf(":: edge removal in one super-vertex (d_edge_weights) ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_edge_weights, graph_slice->edges);
+            problem->data_slices[0]->edge_value.GetPointer(util::DEVICE),
+            graph_slice->edges);
           printf(":: edge removal in one super-vertex (d_origin_edges) ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_origin_edges, graph_slice->edges);
+            problem->data_slices[0]->original_e.GetPointer(util::DEVICE),
+            graph_slice->edges);
         }
 
         ////////////////////////////////////////////////////////////////////////
@@ -753,38 +774,42 @@ class MSTEnactor :
         {
           printf(":: keys_array found super-vertex ids ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_keys_array, graph_slice->edges);
+            problem->data_slices[0]->keys_array.GetPointer(util::DEVICE),
+            graph_slice->edges);
           printf(":: edgeId_list found super-vertex ids ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_col_indices, graph_slice->edges);
+            problem->data_slices[0]->colindices.GetPointer(util::DEVICE),
+            graph_slice->edges);
         }
 
         ////////////////////////////////////////////////////////////////////////
         // bring edges, weights, origin_eids together according to keys
         util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_temp_index,
-          problem->data_slices[0]->d_keys_array,
+          problem->data_slices[0]->temp_index.GetPointer(util::DEVICE),
+          problem->data_slices[0]->keys_array.GetPointer(util::DEVICE),
           graph_slice->edges);
 
+        // used super_edge as temp_index here
         util::MemsetCopyVectorKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_super_edges,  // used as temp_index
-          problem->data_slices[0]->d_keys_array,
+          problem->data_slices[0]->super_edge.GetPointer(util::DEVICE),
+          problem->data_slices[0]->keys_array.GetPointer(util::DEVICE),
           graph_slice->edges);
 
         util::CUBRadixSort<VertexId, VertexId>(
           true, graph_slice->edges,
-          problem->data_slices[0]->d_keys_array,
-          problem->data_slices[0]->d_col_indices);
+          problem->data_slices[0]->keys_array.GetPointer(util::DEVICE),
+          problem->data_slices[0]->colindices.GetPointer(util::DEVICE));
 
         util::CUBRadixSort<VertexId, Value>(
           true, graph_slice->edges,
-          problem->data_slices[0]->d_temp_index,
-          problem->data_slices[0]->d_edge_weights);
+          problem->data_slices[0]->temp_index.GetPointer(util::DEVICE),
+          problem->data_slices[0]->edge_value.GetPointer(util::DEVICE));
 
+        // used super_edge as temp_index here
         util::CUBRadixSort<VertexId, VertexId>(
           true, graph_slice->edges,
-          problem->data_slices[0]->d_super_edges,  // used as temp_index
-          problem->data_slices[0]->d_origin_edges);
+          problem->data_slices[0]->super_edge.GetPointer(util::DEVICE),
+          problem->data_slices[0]->original_e.GetPointer(util::DEVICE));
 
         if (DEBUG) printf("  * finished sort according to new vertex ids.\n");
         if (DEBUG) printf(" (d). Constructing the Vertex List.\n");
@@ -792,12 +817,12 @@ class MSTEnactor :
         ////////////////////////////////////////////////////////////////////////
         // flag array used for getting row_offsets for next iteration
         util::MarkSegmentFromKeys<<<128, 128>>>(
-          problem->data_slices[0]->d_flags_array,
-          problem->data_slices[0]->d_keys_array,
+          problem->data_slices[0]->flag_array.GetPointer(util::DEVICE),
+          problem->data_slices[0]->keys_array.GetPointer(util::DEVICE),
           graph_slice->edges);
 
         util::MemsetKernel<unsigned int><<<1, 1>>>(
-          problem->data_slices[0]->d_flags_array, 0, 1);
+          problem->data_slices[0]->flag_array.GetPointer(util::DEVICE), 0, 1);
 
         if (DEBUG) printf("  * finished scan of keys: flags next iteration.\n");
 
@@ -833,17 +858,17 @@ class MSTEnactor :
         // copy back d_col_indices back to column indices in graph_slice
         util::MemsetCopyVectorKernel<<<128, 128>>>(
           graph_slice->column_indices.GetPointer(util::DEVICE),
-          problem->data_slices[0]->d_col_indices,
+          problem->data_slices[0]->colindices.GetPointer(util::DEVICE),
           graph_slice->edges);
 
         ////////////////////////////////////////////////////////////////////////
         // set last element of row_offsets manually and copy back to graph_slice
         util::MemsetKernel<<<128, 128>>>(
-          problem->data_slices[0]->d_row_offsets + graph_slice->nodes,
-          graph_slice->edges, 1);
+          problem->data_slices[0]->row_offset.GetPointer(util::DEVICE)
+          + graph_slice->nodes, graph_slice->edges, 1);
         util::MemsetCopyVectorKernel<<<128, 128>>>(
           graph_slice->row_offsets.GetPointer(util::DEVICE),
-          problem->data_slices[0]->d_row_offsets,
+          problem->data_slices[0]->row_offset.GetPointer(util::DEVICE),
           graph_slice->nodes + 1);
 
         if (DEBUG) printf("  * finished row_offset for next iteration.\n");
@@ -856,13 +881,16 @@ class MSTEnactor :
             graph_slice->edges);
           printf(":: final keys for current iteration ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_keys_array, graph_slice->edges);
+            problem->data_slices[0]->keys_array.GetPointer(util::DEVICE),
+            graph_slice->edges);
           printf(":: final edge_values for current iteration ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_edge_weights, graph_slice->edges);
+            problem->data_slices[0]->edge_value.GetPointer(util::DEVICE),
+            graph_slice->edges);
           printf(":: final d_origin_edges for current iteration ::");
           util::DisplayDeviceResults(
-            problem->data_slices[0]->d_origin_edges, graph_slice->edges);
+            problem->data_slices[0]->original_e.GetPointer(util::DEVICE),
+            graph_slice->edges);
         }
 
         if (DEBUG)

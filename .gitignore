@@ -37,3 +37,6 @@ tests/*/*.txt
 
 # Ignore vim temp files
 *.sw~
+
+# Ignore cmake configure_file() files
+gunrock/util/gitsha1.c
