@@ -389,11 +389,13 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     util::GRError(problem->Extract(h_labels, h_preds),
                   "SSSP Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    for (SizeT i = 0; i < graph->nodes; i++)
-    {
-        if (reference_check_label[i] == -1)
+    if (!quick_mode) {
+        for (SizeT i = 0; i < graph->nodes; i++)
         {
-            reference_check_label[i] = util::MaxValue<Value>();
+            if (reference_check_label[i] == -1)
+            {
+                reference_check_label[i] = util::MaxValue<Value>();
+            }
         }
     }
 

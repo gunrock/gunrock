@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OPTION[0]="--src=largestdegree --device=0,1,2,3 --partition_method=biasrandom --grid-size=768 --disable-size-check"
+OPTION[0]="--src=largestdegree --device=0,1,2,3 --partition_method=biasrandom --grid-size=768"
 #OPTION[0]="" #directed and do not mark-pred"
 OPTION[1]=${OPTION[0]}" --mark-pred" #directed and mark-pred"
 OPTION[2]=${OPTION[0]}" --undirected" #undirected and do not mark-pred"

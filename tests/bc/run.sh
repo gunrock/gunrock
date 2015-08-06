@@ -31,7 +31,7 @@ do
     for j in 0
     do
         echo $EXCUTION market $DATADIR/$i/$i.mtx ${OPTION[$j]} "> eval/$SUFFIX/$i.$SUFFIX${MARK[$j]}.txt"
-             #$EXCUTION market $DATADIR/$i/$i.mtx ${OPTION[$j]}  > eval/$SUFFIX/$i.$SUFFIX${MARK[$j]}.txt
+             $EXCUTION market $DATADIR/$i/$i.mtx ${OPTION[$j]}  > eval/$SUFFIX/$i.$SUFFIX${MARK[$j]}.txt
         sleep 1
     done
 done
@@ -44,7 +44,7 @@ do
     for j in 0
     do
         echo $EXCUTION market $DATADIR/../small/$i.mtx ${OPTION[$j]} "> eval/$SUFFIX/$i.$SUFFIX${MARK[$j]}.txt"
-             #$EXCUTION market $DATADIR/../small/$i.mtx ${OPTION[$j]}  > eval/$SUFFIX/$i.$SUFFIX${MARK[$j]}.txt
+             $EXCUTION market $DATADIR/../small/$i.mtx ${OPTION[$j]}  > eval/$SUFFIX/$i.$SUFFIX${MARK[$j]}.txt
         sleep 1
     done
 done
