@@ -53,11 +53,11 @@ void Usage() {
         "   --device=<device_index> Set GPU device to run. [Default: 0]\n"
         "   --undirected            Convert the graph to undirected\n"
         "   --quick                 Skip the CPU validation [Default: false]\n"
-        "   --v                     Print verbose per iteration debug info\n");
+        "   --v                     Print verbose per iteration debug info\n"
         " --quiet                  No output (unless --json is specified).\n"
         " --json                   Output JSON-format statistics to stdout.\n"
         " --jsonfile=<name>        Output JSON-format statistics to file <name>\n"
-        " --jsondir=<dir>          Output JSON-format statistics to <dir>/name,\n"
+        " --jsondir=<dir>          Output JSON-format statistics to <dir>/name,\n");
 }
 
 /**
@@ -128,7 +128,7 @@ void RunTest(Info<VertexId, Value, SizeT> *info) {
         false,  // ENABLE_IDEMPOTENCE
         false > Problem;
 
-    Csr<VertexId, Value, SizeT>* csr = Info->csr_ptr;
+    Csr<VertexId, Value, SizeT>* csr = info->csr_ptr;
 
     ContextPtr* context             = (ContextPtr*)info -> context;
     std::string partition_method    = info->info["partition_method"].get_str();
@@ -192,17 +192,19 @@ void RunTest(Info<VertexId, Value, SizeT> *info) {
     // compute reference CPU validation solution
     if (!quick_mode) {
         if (!quiet_mode) printf("==> computing reference value ... (currently missing)\n");
-        SimpleReference<VertexId, SizeT, Value>(graph);
+        SimpleReference<VertexId, SizeT, Value>(csr);
         if (!quiet_mode) printf("==> validation: (currently missing)\n");
     }
 
-    if (!quiet_mode) DisplaySolution<VertexId, SizeT, Value>(graph);  // display solution
+    if (!quiet_mode) DisplaySolution<VertexId, SizeT, Value>(csr);  // display solution
 
-    
+    info->ComputeCommonStats(enactor.enactor_stats.GetPointer(), elapsed);
 
+    if (!quiet_mode) info->DisplayStats();
+
+    info->CollectInfo();
 
     // clean up
-    if (stats)    { delete stats;   }
     if (problem)  { delete problem; }
     if (r_labels) { free(r_labels); }
     if (h_labels) { free(h_labels); }
@@ -223,11 +225,11 @@ template <
     typename      Value,
     typename      SizeT,
     bool          DEBUG >
-void RunTests_size_check(Test_Parameter *parameter) {
-    if (parameter->size_check)
-        RunTest <VertexId, Value, SizeT, DEBUG,  true>(parameter);
+void RunTests_size_check(Info<VertexId, Value, SizeT> *info) {
+    if (info->info["size_check"].get_bool())
+        RunTest <VertexId, Value, SizeT, DEBUG,  true>(info);
     else
-        RunTest <VertexId, Value, SizeT, DEBUG, false>(parameter);
+        RunTest <VertexId, Value, SizeT, DEBUG, false>(info);
 }
 
 /**
@@ -243,97 +245,37 @@ template <
     typename    VertexId,
     typename    Value,
     typename    SizeT >
-void RunTests_debug(Test_Parameter *parameter) {
-    if (parameter->debug)
-        RunTests_size_check <VertexId, Value, SizeT,  true>(parameter);
+void RunTests_debug(Info<VertexId, Value, SizeT> *info) {
+    if (info->info["debug_mode"].get_bool())
+        RunTests_size_check <VertexId, Value, SizeT,  true>(info);
     else
-        RunTests_size_check <VertexId, Value, SizeT, false>(parameter);
-}
-
-/**
- * @brief Sample test entry
- *
- * @tparam VertexId
- * @tparam SizeT
- * @tparam Value
- *
- * @param[in] graph    Pointer to the CSR graph we process on.
- * @param[in] args     Reference to the command line arguments.
- * @param[in] num_gpus Number of GPUs.
- * @param[in] context  CudaContext pointer for moderngpu APIs.
- * @param[in] gpu_idx  GPU inddex to run algorithm.
- * @param[in] streams  CUDA streams.
- */
-template <
-    typename VertexId,
-    typename Value,
-    typename SizeT >
-void RunTest(
-    Csr<VertexId, Value, SizeT>* graph,
-    CommandLineArgs&             args,
-    int                          num_gpus,
-    ContextPtr*                  context,
-    int*                         gpu_idx,
-    cudaStream_t*                streams = NULL) {
-    Test_Parameter *parameter = new Test_Parameter;
-
-    parameter -> Init(args);
-    parameter -> graph    = graph;
-    parameter -> num_gpus = num_gpus;
-    parameter -> context  = context;
-    parameter -> gpu_idx  = gpu_idx;
-    parameter -> streams  = streams;
-
-    RunTests_debug<VertexId, Value, SizeT>(parameter);
+        RunTests_size_check <VertexId, Value, SizeT, false>(info);
 }
 
 // ----------------------------------------------------------------------------
 // Main
 // ----------------------------------------------------------------------------
 int main(int argc, char** argv) {
+
     CommandLineArgs args(argc, argv);
-
-    if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
+    int graph_args = argc - args.ParsedArgc() - 1;
+    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
+    {
         Usage();
         return 1;
     }
 
-    int device = 0;
-    args.GetCmdLineArgument("device", device);
-    ContextPtr context = mgpu::CreateCudaDevice(device);
+    typedef int VertexId;  // use int as the vertex identifier
+    typedef int Value;   // use float as the value type
+    typedef int SizeT;     // use int as the graph size type
 
-    // parse graph-construction parameters
-    bool g_undirected = args.CheckCmdLineFlag("undirected");
+    Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
+    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
-    std::string graph_type = argv[1];
-    int flags = args.ParsedArgc();
-    int graph_args = argc - flags - 1;
-    if (graph_args < 1) {
-        Usage();
-        return 1;
-    }
-
-    typedef int VertexId;  // Use as the vertex identifier
-    typedef int SizeT;     // Use as the graph size type
-    typedef int Value;     // Use as the value type
-
-    if (graph_type == "market") {
-        // matrix-market coordinate-formatted graph
-        Csr<VertexId, Value, SizeT> csr(false);
-        char *name = (graph_args == 2) ? argv[2] : NULL;
-        if (graphio::BuildMarketGraph<false>(
-                    name, csr, g_undirected, false) != 0) {
-            return 1;
-        }
-
-        csr.DisplayGraph();    // display graph adjacent list
-        csr.PrintHistogram();  // display graph histogram
-        RunTest<VertexId, Value, SizeT>(&csr, args, 1, &context, &device);
-
-    } else {
-        fprintf(stderr, "Unspecified graph type\n");
-        return 1;
-    }
+    // graph construction or generation related parameters
+    info->info["undirected"] = args.CheckCmdLineFlag("undirected");
+    info->Init("Primitive_Name", args, csr);  // initialize Info structure
+    RunTests_debug<VertexId, Value, SizeT>(info);  // run test
     return 0;
 }
 
