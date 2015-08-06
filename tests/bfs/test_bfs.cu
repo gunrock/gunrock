@@ -81,6 +81,7 @@ void Usage()
         "[--quick]                 Skip the CPU reference validation process.\n"
         "[--mark-pred]             Keep both label info and predecessor info.\n"
         "[--disable-size-check]    Disable frontier queue size check.\n"
+        "[--grid-size=<grid size>] Maximum allowed grid size setting.\n"
         "[--queue-sizing=<factor>] Allocates a frontier queue sized at: \n"
         "                          (graph-edges * <factor>). (Default: 1.0)\n"
         "[--in-sizing=<in/out_queue_scale_factor>]\n"

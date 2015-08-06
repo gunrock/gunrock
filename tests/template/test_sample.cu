@@ -41,23 +41,57 @@ using namespace gunrock::app::sample;
 // ----------------------------------------------------------------------------
 // Housekeeping Routines
 // ----------------------------------------------------------------------------
-void Usage() {
+void Usage()
+{
     printf(
-        " sample_test <graph type> <file name> [--undirected] [--quick]\n"
-        "   [--device=<device_index>]\n"
-        " [--quiet] [--json] [--jsonfile=<name>] [--jsondir=<dir>]"
-        " Graph types and arguments:\n"
-        "   market <file>\n"
-        "     Reads a Matrix-Market coordinate-formatted graph,\n"
-        "     edges from STDIN (or from the optionally-specified file)\n"
-        "   --device=<device_index> Set GPU device to run. [Default: 0]\n"
-        "   --undirected            Convert the graph to undirected\n"
-        "   --quick                 Skip the CPU validation [Default: false]\n"
-        "   --v                     Print verbose per iteration debug info\n"
-        " --quiet                  No output (unless --json is specified).\n"
-        " --json                   Output JSON-format statistics to stdout.\n"
-        " --jsonfile=<name>        Output JSON-format statistics to file <name>\n"
-        " --jsondir=<dir>          Output JSON-format statistics to <dir>/name,\n");
+        "test <graph-type> [graph-type-arguments]\n"
+        "Graph type and graph type arguments:\n"
+        "    market <matrix-market-file-name>\n"
+        "        Reads a Matrix-Market coordinate-formatted graph of\n"
+        "        directed/undirected edges from STDIN (or from the\n"
+        "        optionally-specified file).\n"
+        "    rmat (default: rmat_scale = 10, a = 0.57, b = c = 0.19)\n"
+        "        Generate R-MAT graph as input\n"
+        "        --rmat_scale=<vertex-scale>\n"
+        "        --rmat_nodes=<number-nodes>\n"
+        "        --rmat_edgefactor=<edge-factor>\n"
+        "        --rmat_edges=<number-edges>\n"
+        "        --rmat_a=<factor> --rmat_b=<factor> --rmat_c=<factor>\n"
+        "        --rmat_seed=<seed>\n"
+        "    rgg (default: rgg_scale = 10, rgg_thfactor = 0.55)\n"
+        "        Generate Random Geometry Graph as input\n"
+        "        --rgg_scale=<vertex-scale>\n"
+        "        --rgg_nodes=<number-nodes>\n"
+        "        --rgg_thfactor=<threshold-factor>\n"
+        "        --rgg_threshold=<threshold>\n"
+        "        --rgg_vmultipiler=<vmultipiler>\n"
+        "        --rgg_seed=<seed>\n\n"
+        "Optional arguments:\n"
+        "[--device=<device_index>] Set GPU(s) for testing (Default: 0).\n"
+        "[--undirected]            Treat the graph as undirected (symmetric).\n"
+        "[--instrumented]          Keep kernels statics [Default: Disable].\n"
+        "                          total_queued, search_depth and barrier duty.\n"
+        "                          (a relative indicator of load imbalance.)\n"
+        "[--src=<Vertex-ID|randomize|largestdegree>]\n"
+        "                          Begins traversal from the source (Default: 0).\n"
+        "                          If randomize: from a random source vertex.\n"
+        "                          If largestdegree: from largest degree vertex.\n"
+        "[--quick]                 Skip the CPU reference validation process.\n"
+        "[--disable-size-check]    Disable frontier queue size check.\n"
+        "[--grid-size=<grid size>] Maximum allowed grid size setting.\n"
+        "[--queue-sizing=<factor>] Allocates a frontier queue sized at: \n"
+        "                          (graph-edges * <factor>). (Default: 1.0)\n"
+        "[--in-sizing=<in/out_queue_scale_factor>]\n"
+        "                          Allocates a frontier queue sized at: \n"
+        "                          (graph-edges * <factor>). (Default: 1.0)\n"
+        "[--v]                     Print verbose per iteration debug info.\n"
+        "[--iteration-num=<num>]   Number of runs to perform the test.\n"
+        "[--quiet]                 No output (unless --json is specified).\n"
+        "[--json]                  Output JSON-format statistics to STDOUT.\n"
+        "[--jsonfile=<name>]       Output JSON-format statistics to file <name>\n"
+        "[--jsondir=<dir>]         Output JSON-format statistics to <dir>/name,\n"
+        "                          where name is auto-generated.\n"
+    );
 }
 
 /**
@@ -70,7 +104,8 @@ void Usage() {
  * @param[in] graph Reference to the CSR graph.
  */
 template<typename VertexId, typename SizeT, typename Value>
-void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph) {
+void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph)
+{
     printf("==> display solution: (currently missing)\n");
     // TODO(developer): code to print out results
 }
@@ -89,7 +124,8 @@ void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph) {
  * @param[in] graph Reference to the CSR graph we process on.
  */
 template<typename VertexId, typename SizeT, typename Value>
-void SimpleReference(const Csr<VertexId, Value, SizeT> &graph) {
+void SimpleReference(const Csr<VertexId, Value, SizeT> &graph)
+{
     // initialization
 
     // perform calculation
@@ -122,11 +158,12 @@ template <
     typename Value,
     bool DEBUG,
     bool SIZE_CHECK >
-void RunTest(Info<VertexId, Value, SizeT> *info) {
+void RunTest(Info<VertexId, Value, SizeT> *info)
+{
     typedef SampleProblem < VertexId, SizeT, Value,
-        true,   // MARK_PREDECESSORS
-        false,  // ENABLE_IDEMPOTENCE
-        false > Problem;
+            true,   // MARK_PREDECESSORS
+            false,  // ENABLE_IDEMPOTENCE
+            false > Problem;
 
     Csr<VertexId, Value, SizeT>* csr = info->csr_ptr;
 
@@ -150,11 +187,11 @@ void RunTest(Info<VertexId, Value, SizeT> *info) {
     VertexId *h_labels = (VertexId*)malloc(sizeof(VertexId) * csr->nodes);
 
     SampleEnactor <
-        Problem,
-        false,  // INSTRUMENT
-        false,  // DEBUG
-        true >  // SIZE_CHECK
-        enactor(gpu_idx);  // allocate primitive enactor map
+    Problem,
+    false,  // INSTRUMENT
+    false,  // DEBUG
+    true >  // SIZE_CHECK
+    enactor(gpu_idx);  // allocate primitive enactor map
 
     Problem *problem = new Problem;  // allocate primitive problem on GPU
     util::GRError(
@@ -169,7 +206,8 @@ void RunTest(Info<VertexId, Value, SizeT> *info) {
 
     float elapsed = 0.0f;
 
-    for (int iter = 0; iter < iterations; ++iter) {
+    for (int iter = 0; iter < iterations; ++iter)
+    {
         util::GRError(
             problem->Reset(enactor.GetFrontierType(),
                            max_queue_sizing),
@@ -190,7 +228,8 @@ void RunTest(Info<VertexId, Value, SizeT> *info) {
         "Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // compute reference CPU validation solution
-    if (!quick_mode) {
+    if (!quick_mode)
+    {
         if (!quiet_mode) printf("==> computing reference value ... (currently missing)\n");
         SimpleReference<VertexId, SizeT, Value>(csr);
         if (!quiet_mode) printf("==> validation: (currently missing)\n");
@@ -225,7 +264,8 @@ template <
     typename      Value,
     typename      SizeT,
     bool          DEBUG >
-void RunTests_size_check(Info<VertexId, Value, SizeT> *info) {
+void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
+{
     if (info->info["size_check"].get_bool())
         RunTest <VertexId, Value, SizeT, DEBUG,  true>(info);
     else
@@ -245,7 +285,8 @@ template <
     typename    VertexId,
     typename    Value,
     typename    SizeT >
-void RunTests_debug(Info<VertexId, Value, SizeT> *info) {
+void RunTests_debug(Info<VertexId, Value, SizeT> *info)
+{
     if (info->info["debug_mode"].get_bool())
         RunTests_size_check <VertexId, Value, SizeT,  true>(info);
     else
@@ -255,7 +296,8 @@ void RunTests_debug(Info<VertexId, Value, SizeT> *info) {
 // ----------------------------------------------------------------------------
 // Main
 // ----------------------------------------------------------------------------
-int main(int argc, char** argv) {
+int main(int argc, char** argv)
+{
 
     CommandLineArgs args(argc, argv);
     int graph_args = argc - args.ParsedArgc() - 1;
