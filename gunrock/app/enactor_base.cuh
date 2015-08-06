@@ -616,7 +616,7 @@ public:
         {
             if (!args.CheckCmdLineFlag("quiet"))
             {
-                printf("Loading Matrix-market coordinate-formatted graph...\n");
+                printf("Loading Matrix-market coordinate-formatted graph ...\n");
             }
             char *market_filename = args.GetCmdLineArgvDataset();
             if (market_filename == NULL)
