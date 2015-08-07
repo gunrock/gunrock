@@ -60,7 +60,8 @@ using namespace gunrock::app::wtf;
 //bool g_stream_from_host;
 
 template <typename VertexId, typename Value>
-struct RankPair {
+struct RankPair
+{
     VertexId        vertex_id;
     Value           page_rank;
 
@@ -80,25 +81,52 @@ bool PRCompare(
  ******************************************************************************/
 void Usage()
 {
-    printf("\ntest_wtf <graph type> <graph type args> [--device=<device_index>] "
-            "[--undirected] [--instrumented] [--quick] "
-            "[--v]\n"
-            " [--quiet] [--json] [--jsonfile=<name>] [--jsondir=<dir>]"
-            "\n"
-            "Graph types and args:\n"
-            "  market [<file>]\n"
-            "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
-            "    edges from stdin (or from the optionally-specified file).\n"
-            "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
-            "  --undirected If set then treat the graph as undirected.\n"
-            "  --instrumented If set then kernels keep track of queue-search_depth\n"
-            "  and barrier duty (a relative indicator of load imbalance.)\n"
-            "  --quick If set will skip the CPU validation code.\n"
-            " --quiet                  No output (unless --json is specified).\n"
-            " --json                   Output JSON-format statistics to stdout.\n"
-            " --jsonfile=<name>        Output JSON-format statistics to file <name>\n"
-            " --jsondir=<dir>          Output JSON-format statistics to <dir>/name,\n" 
-          );
+    printf(
+        "test <graph-type> [graph-type-arguments]\n"
+        "Graph type and graph type arguments:\n"
+        "    market <matrix-market-file-name>\n"
+        "        Reads a Matrix-Market coordinate-formatted graph of\n"
+        "        directed/undirected edges from STDIN (or from the\n"
+        "        optionally-specified file).\n"
+        "    rmat (default: rmat_scale = 10, a = 0.57, b = c = 0.19)\n"
+        "        Generate R-MAT graph as input\n"
+        "        --rmat_scale=<vertex-scale>\n"
+        "        --rmat_nodes=<number-nodes>\n"
+        "        --rmat_edgefactor=<edge-factor>\n"
+        "        --rmat_edges=<number-edges>\n"
+        "        --rmat_a=<factor> --rmat_b=<factor> --rmat_c=<factor>\n"
+        "        --rmat_seed=<seed>\n"
+        "    rgg (default: rgg_scale = 10, rgg_thfactor = 0.55)\n"
+        "        Generate Random Geometry Graph as input\n"
+        "        --rgg_scale=<vertex-scale>\n"
+        "        --rgg_nodes=<number-nodes>\n"
+        "        --rgg_thfactor=<threshold-factor>\n"
+        "        --rgg_threshold=<threshold>\n"
+        "        --rgg_vmultipiler=<vmultipiler>\n"
+        "        --rgg_seed=<seed>\n\n"
+        "Optional arguments:\n"
+        "[--device=<device_index>] Set GPU(s) for testing (Default: 0).\n"
+        "[--undirected]            Treat the graph as undirected (symmetric).\n"
+        "[--instrumented]          Keep kernels statics [Default: Disable].\n"
+        "                          total_queued, search_depth and barrier duty.\n"
+        "                          (a relative indicator of load imbalance.)\n"
+        "[--quick]                 Skip the CPU reference validation process.\n"
+        "[--mark-pred]             Keep both label info and predecessor info.\n"
+        "[--disable-size-check]    Disable frontier queue size check.\n"
+        "[--grid-size=<grid size>] Maximum allowed grid size setting.\n"
+        "[--queue-sizing=<factor>] Allocates a frontier queue sized at: \n"
+        "                          (graph-edges * <factor>). (Default: 1.0)\n"
+        "[--in-sizing=<in/out_queue_scale_factor>]\n"
+        "                          Allocates a frontier queue sized at: \n"
+        "                          (graph-edges * <factor>). (Default: 1.0)\n"
+        "[--v]                     Print verbose per iteration debug info.\n"
+        "[--iteration-num=<num>]   Number of runs to perform the test.\n"
+        "[--quiet]                 No output (unless --json is specified).\n"
+        "[--json]                  Output JSON-format statistics to STDOUT.\n"
+        "[--jsonfile=<name>]       Output JSON-format statistics to file <name>\n"
+        "[--jsondir=<dir>]         Output JSON-format statistics to <dir>/name,\n"
+        "                          where name is auto-generated.\n"
+    );
 }
 
 /**
@@ -141,10 +169,10 @@ void DisplaySolution(VertexId *node_id, Value *rank, SizeT nodes)
  */
 // TODO: Boost PageRank cannot handle personalized pagerank, so currently the CPU
 // implementation gives incorrect answer. Need to find a CPU PPR implementation
-template<
+template <
     typename VertexId,
     typename Value,
-    typename SizeT>
+    typename SizeT >
 void SimpleReferenceWTF(
     const Csr<VertexId, Value, SizeT>       &graph,
     VertexId                                src,
@@ -158,13 +186,13 @@ void SimpleReferenceWTF(
 
     //Preparation
     typedef adjacency_list<vecS, vecS, bidirectionalS, no_property,
-                           property<edge_index_t, int> > Graph;
+            property<edge_index_t, int> > Graph;
 
     Graph g;
 
     for (int i = 0; i < graph.nodes; ++i)
     {
-        for (int j = graph.row_offsets[i]; j < graph.row_offsets[i+1]; ++j)
+        for (int j = graph.row_offsets[i]; j < graph.row_offsets[i + 1]; ++j)
         {
             Graph::edge_descriptor e =
                 add_edge(i, graph.column_indices[j], g).first;
@@ -226,25 +254,25 @@ void SimpleReferenceWTF(
     {
         int node = node_id[i];
         for (int j = graph.row_offsets[node];
-             j < graph.row_offsets[node+1]; ++j)
+                j < graph.row_offsets[node + 1]; ++j)
         {
             VertexId edge = graph.column_indices[j];
             ++in_degree[edge];
         }
     }
 
-    int salsa_iter = 1.0/alpha+1;
+    int salsa_iter = 1.0 / alpha + 1;
     for (int iter = 0; iter < salsa_iter; ++iter)
     {
         for (int i = 0; i < cot_size; ++i)
         {
             int node = node_id[i];
-            int out_degree = graph.row_offsets[node+1]-graph.row_offsets[node];
+            int out_degree = graph.row_offsets[node + 1] - graph.row_offsets[node];
             for (int j = graph.row_offsets[node];
-                 j < graph.row_offsets[node+1]; ++j)
+                    j < graph.row_offsets[node + 1]; ++j)
             {
                 VertexId edge = graph.column_indices[j];
-                Value val = rank[node]/ (out_degree > 0 ? out_degree : 1.0);
+                Value val = rank[node] / (out_degree > 0 ? out_degree : 1.0);
                 refscore[edge] += val;
             }
         }
@@ -258,17 +286,17 @@ void SimpleReferenceWTF(
             int node = node_id[i];
             rank[node] += (node == src) ? alpha : 0;
             for (int j = graph.row_offsets[node];
-                 j < graph.row_offsets[node+1]; ++j)
+                    j < graph.row_offsets[node + 1]; ++j)
             {
                 VertexId edge = graph.column_indices[j];
-                Value val = (1-alpha)*refscore[edge]/in_degree[edge];
+                Value val = (1 - alpha) * refscore[edge] / in_degree[edge];
                 rank[node] += val;
             }
         }
 
         for (int i = 0; i < cot_size; ++i)
         {
-            if (iter+1<salsa_iter) refscore[node_id[i]] = 0;
+            if (iter + 1 < salsa_iter) refscore[node_id[i]] = 0;
         }
     }
 
@@ -321,17 +349,17 @@ template <
     typename SizeT,
     bool INSTRUMENT,
     bool DEBUG,
-    bool SIZE_CHECK>
+    bool SIZE_CHECK >
 void RunTests(Info<VertexId, Value, SizeT> *info)
 {
 
-    typedef WTFProblem<
-        VertexId,
-        SizeT,
-        Value> Problem;
+    typedef WTFProblem <
+    VertexId,
+    SizeT,
+    Value > Problem;
 
     Csr<VertexId, Value, SizeT>
-                 *csr                 = info->csr_ptr;
+    *csr                 = info->csr_ptr;
     VertexId      src                   = info->info["source_vertex"].get_int64();
     int           max_grid_size         = info->info["max_grid_size"].get_int();
     int           num_gpus              = info->info["num_gpus"].get_int();
@@ -418,7 +446,8 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         CompareResults(h_rank, reference_check, csr->nodes, true);
     }
 
-    if (!quiet_mode) {
+    if (!quiet_mode)
+    {
         printf("\nGPU result.");
         DisplaySolution(h_node_id, h_rank, csr->nodes);
     }
@@ -443,13 +472,13 @@ template <
     typename      Value,
     typename      SizeT,
     bool          INSTRUMENT,
-    bool          DEBUG>
+    bool          DEBUG >
 void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["size_check"].get_bool()) RunTests
         <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
         true > (info);
-   else RunTests
+    else RunTests
         <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
         false> (info);
 }
@@ -458,7 +487,7 @@ template <
     typename    VertexId,
     typename    Value,
     typename    SizeT,
-    bool        INSTRUMENT>
+    bool        INSTRUMENT >
 void RunTests_debug(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["debug_mode"].get_bool()) RunTests_size_check
@@ -472,7 +501,7 @@ void RunTests_debug(Info<VertexId, Value, SizeT> *info)
 template <
     typename      VertexId,
     typename      Value,
-    typename      SizeT>
+    typename      SizeT >
 void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["instrument"].get_bool()) RunTests_debug
@@ -510,6 +539,12 @@ int main( int argc, char** argv)
 
     info->Init("WTF", args, csr);
     RunTests_instrumented<VertexId, Value, SizeT>(info);
-    
+
     return 0;
 }
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

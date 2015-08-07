@@ -48,25 +48,48 @@ using namespace gunrock::app::topk;
  ******************************************************************************/
 void Usage()
 {
-  printf(
-    "\ntest_topk <graph type> <graph type args> [--top=<K_value>] [--device=<device_index>] "
-    "[--instrumented] [--quick] "
-    "[--quiet --json --jsonfile=<name> --jsondir=<dir> "
-    "[--v]\n"
-    "\n"
-    "Graph types and args:\n"
-    "  market [<file>]\n"
-    "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
-    "    edges from stdin (or from the optionally-specified file).\n"
-    "    k value top K value.\n"
-    "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
-    "  --instrumented If set then kernels keep track of queue-search_depth\n"
-    "  and barrier duty (a relative indicator of load imbalance.)\n"
-    "  --quick If set will skip the CPU validation code.\n"
-    " --quiet                  No output (unless --json is specified).\n"
-    " --json                   Output JSON-format statistics to stdout.\n"
-    " --jsonfile=<name>        Output JSON-format statistics to file <name>\n"
-    " --jsondir=<dir>          Output JSON-format statistics to <dir>/name,\n");
+    printf(
+        "test <graph-type> [graph-type-arguments]\n"
+        "Graph type and graph type arguments:\n"
+        "    market <matrix-market-file-name>\n"
+        "        Reads a Matrix-Market coordinate-formatted graph of\n"
+        "        directed/undirected edges from STDIN (or from the\n"
+        "        optionally-specified file).\n"
+        "    rmat (default: rmat_scale = 10, a = 0.57, b = c = 0.19)\n"
+        "        Generate R-MAT graph as input\n"
+        "        --rmat_scale=<vertex-scale>\n"
+        "        --rmat_nodes=<number-nodes>\n"
+        "        --rmat_edgefactor=<edge-factor>\n"
+        "        --rmat_edges=<number-edges>\n"
+        "        --rmat_a=<factor> --rmat_b=<factor> --rmat_c=<factor>\n"
+        "        --rmat_seed=<seed>\n"
+        "    rgg (default: rgg_scale = 10, rgg_thfactor = 0.55)\n"
+        "        Generate Random Geometry Graph as input\n"
+        "        --rgg_scale=<vertex-scale>\n"
+        "        --rgg_nodes=<number-nodes>\n"
+        "        --rgg_thfactor=<threshold-factor>\n"
+        "        --rgg_threshold=<threshold>\n"
+        "        --rgg_vmultipiler=<vmultipiler>\n"
+        "        --rgg_seed=<seed>\n\n"
+        "Optional arguments:\n"
+        "[--device=<device_index>] Set GPU(s) for testing (Default: 0).\n"
+        "[--undirected]            Treat the graph as undirected (symmetric).\n"
+        "[--instrumented]          Keep kernels statics [Default: Disable].\n"
+        "                          total_queued, search_depth and barrier duty.\n"
+        "                          (a relative indicator of load imbalance.)\n"
+        "[--quick]                 Skip the CPU reference validation process.\n"
+        "[--disable-size-check]    Disable frontier queue size check.\n"
+        "[--grid-size=<grid size>] Maximum allowed grid size setting.\n"
+        "[--queue-sizing=<factor>] Allocates a frontier queue sized at: \n"
+        "                          (graph-edges * <factor>). (Default: 1.0)\n"
+        "[--v]                     Print verbose per iteration debug info.\n"
+        "[--iteration-num=<num>]   Number of runs to perform the test.\n"
+        "[--quiet]                 No output (unless --json is specified).\n"
+        "[--json]                  Output JSON-format statistics to STDOUT.\n"
+        "[--jsonfile=<name>]       Output JSON-format statistics to file <name>\n"
+        "[--jsondir=<dir>]         Output JSON-format statistics to <dir>/name,\n"
+        "                          where name is auto-generated.\n"
+    );
 }
 
 /**
@@ -404,6 +427,7 @@ int main(int argc, char** argv)
     typedef int VertexId;
     typedef int Value;
     typedef int SizeT;
+
     Csr<VertexId, Value, SizeT> csr(false);
     Csr<VertexId, Value, SizeT> csc(false);
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;

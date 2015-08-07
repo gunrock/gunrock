@@ -8,7 +8,7 @@ Gunrock is a fast-and-efficient graph processing library on the GPU which
 provides a set of graph algorithms used in big data analytics and visualization
 with high performance.  It also provides a set of operators which abstract the
 general operations in graph processing for other developers to build
-high-performance graph algorithm prototyes with minimum programming effort.
+high-performance graph algorithm prototypes with minimum programming effort.
 
 How does it do it?
 ------------------
@@ -28,7 +28,7 @@ use existing graph primitives provided by Gunrock.  The second kind of users
 are programmers who want to use Gunrock's high-level, programmable abstraction
 to express, develop, and refine their own (and often more complicated) graph
 primitives.
-    
+
 What is the skill set users need to use it?
 -------------------------------------------
 
@@ -53,7 +53,7 @@ Why would someone want this?
 The study of social networks, webgraphs, biological networks, and unstructured
 meshes in scientific simulation has raised a significant demand for efficient
 parallel frameworks for processing and analytics on large-scale graphs. Initial
-research efforts in using GPUs for graph processing and anlytics are promising.
+research efforts in using GPUs for graph processing and analytics are promising.
 
 How is it better than the current state of the art?
 ---------------------------------------------------
@@ -73,8 +73,8 @@ How would someone get it?
 -------------------------
 
 Gunrock is an open-sourced library. The code, documentation, and quick start
-guide are all on its [github page](gunrock.github.io).
-    
+guide are all on its [GitHub page](gunrock.github.io).
+
 Is a user account required?
 ---------------------------
 
@@ -85,7 +85,7 @@ Are all of its components/dependencies easy to find?
 ----------------------------------------------------
 
 Gunrock has three dependencies. Two of them are also GPU primitive library which
-also reside on github. The third one is Boost (Gunrock uses Boost Graph Library
+also reside on GitHub. The third one is Boost (Gunrock uses Boost Graph Library
 to implement CPU reference testing algorithms). All dependencies do not require
 installation. To use, one only needs to download or git clone them and put them
 in the according directories. More details in the installation section of this
@@ -114,19 +114,19 @@ Does this process actually work? All the time? On all systems specified?
 ------------------------------------------------------------------------
 Currently, Gunrock has been tested on two Linux distributions: Linux Mint and
 Ubuntu. But we expect it to run correctly on other Linux distributions too.
-We are currently building a Cmake solution to port Gunrock to Mac and Windows.
+We are currently building a CMake solution to port Gunrock to Mac and Windows.
 The feature will be included in the soon-to-arrive next release of Gunrock.
 
 How would someone test that it's working with provided sample data?
 -------------------------------------------------------------------
 
 Testrigs are provided as well as a small simple example for users to test the
-correctness and performance of every graph primitive. 
+correctness and performance of every graph primitive.
 
 Is the "using" of sample data clear?
 ------------------------------------
 
-On linux, one only needs to go to the dataset directory and run "make", the
+On Linux, one only needs to go to the dataset directory and run "make", the
 script will automatically download all the needed datasets. One can also choose
 to download a single dataset in its separated directory.
 

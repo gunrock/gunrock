@@ -54,33 +54,58 @@ using namespace gunrock::app::bc;
 void Usage()
 {
     printf(
-        "\ntest_bc <graph type> <graph type args> [--device=<device_index>] "
-        "[--instrumented] [--src=<source index>] [--quick] [--iteration-num=<num>][--v]"
-        "[--queue-sizing=<scale factor>] [--ref-file=<reference filename>]\n"
-        "[--in-sizing=<in/out queue scale factor>] [--disable-size-check] "
-        "[--grid-size=<grid size>] [partition_method=random / biasrandom / clustered / metis]\n"
-        " [--quiet] [--json] [--jsonfile=<name>] [--jsondir=<dir>]"
-        "\n"
-        "Graph types and args:\n"
-        "  market [<file>]\n"
-        "    Reads a Matrix-Market coordinate-formatted graph of undirected\n"
-        "    edges from stdin (or from the optionally-specified file).\n"
-        "--device=<device_index>: Set GPU device for running the graph primitive.\n"
-        "--undirected: If set then treat the graph as undirected graph.\n"
-        "--instrumented: If set then kernels keep track of queue-search_depth\n"
-        "  --iteration-num=<num>   Number of runs to perform the test [Now force to be 1].\n"
-        "and barrier duty (a relative indicator of load imbalance.)\n"
-        "--src=<source index>: When source index is -1, compute BC value for each\n"
-        "node. Otherwise, debug the delta value for one node\n"
-        "--quick: If set will skip the CPU validation code.\n"
-        "--queue-sizing Allocates a frontier queue sized at (graph-edges * <scale factor>).\n"
-        "Default is 1.0.\n"
-        "--v: If set, enable verbose output, keep track of the kernel running.\n"
-        "--ref-file: If set, use pre-computed result stored in ref-file to verify.\n"
-        " --quiet                  No output (unless --json is specified).\n"
-        " --json                   Output JSON-format statistics to stdout.\n"
-        " --jsonfile=<name>        Output JSON-format statistics to file <name>\n"
-        " --jsondir=<dir>          Output JSON-format statistics to <dir>/name,\n"
+        "test <graph-type> [graph-type-arguments]\n"
+        "Graph type and graph type arguments:\n"
+        "    market <matrix-market-file-name>\n"
+        "        Reads a Matrix-Market coordinate-formatted graph of\n"
+        "        directed/undirected edges from STDIN (or from the\n"
+        "        optionally-specified file).\n"
+        "    rmat (default: rmat_scale = 10, a = 0.57, b = c = 0.19)\n"
+        "        Generate R-MAT graph as input\n"
+        "        --rmat_scale=<vertex-scale>\n"
+        "        --rmat_nodes=<number-nodes>\n"
+        "        --rmat_edgefactor=<edge-factor>\n"
+        "        --rmat_edges=<number-edges>\n"
+        "        --rmat_a=<factor> --rmat_b=<factor> --rmat_c=<factor>\n"
+        "        --rmat_seed=<seed>\n"
+        "    rgg (default: rgg_scale = 10, rgg_thfactor = 0.55)\n"
+        "        Generate Random Geometry Graph as input\n"
+        "        --rgg_scale=<vertex-scale>\n"
+        "        --rgg_nodes=<number-nodes>\n"
+        "        --rgg_thfactor=<threshold-factor>\n"
+        "        --rgg_threshold=<threshold>\n"
+        "        --rgg_vmultipiler=<vmultipiler>\n"
+        "        --rgg_seed=<seed>\n\n"
+        "Optional arguments:\n"
+        "[--device=<device_index>] Set GPU(s) for testing (Default: 0).\n"
+        "[--instrumented]          Keep kernels statics [Default: Disable].\n"
+        "                          total_queued, search_depth and barrier duty.\n"
+        "                          (a relative indicator of load imbalance.)\n"
+        "[--src=<Vertex-ID|randomize|largestdegree>]\n"
+        "                          Begins traversal from the source (Default: 0).\n"
+        "                          If randomize: from a random source vertex.\n"
+        "                          If largestdegree: from largest degree vertex.\n"
+        "[--quick]                 Skip the CPU reference validation process.\n"
+        "[--mark-pred]             Keep both label info and predecessor info.\n"
+        "[--disable-size-check]    Disable frontier queue size check.\n"
+        "[--grid-size=<grid size>] Maximum allowed grid size setting.\n"
+        "[--queue-sizing=<factor>] Allocates a frontier queue sized at: \n"
+        "                          (graph-edges * <factor>). (Default: 1.0)\n"
+        "[--in-sizing=<in/out_queue_scale_factor>]\n"
+        "                          Allocates a frontier queue sized at: \n"
+        "                          (graph-edges * <factor>). (Default: 1.0)\n"
+        "[--v]                     Print verbose per iteration debug info.\n"
+        "[--iteration-num=<num>]   Number of runs to perform the test.\n"
+        "[--traversal-mode=<0|1>]  Set traversal strategy, 0 for Load-Balanced\n"
+        "                          1 for Dynamic-Cooperative (Default: dynamic\n"
+        "                          determine based on average degree).\n"
+        "[--partition_method=<random|biasrandom|clustered|metis>]\n"
+        "                          Choose partitioner (Default use random).\n"
+        "[--ref-file=<file_name>]  Use pre-computed result in file to verify.\n"
+        "[--quiet]                 No output (unless --json is specified).\n"
+        "[--json]                  Output JSON-format statistics to STDOUT.\n"
+        "[--jsonfile=<name>]       Output JSON-format statistics to file <name>\n"
+        "[--jsondir=<dir>]         Output JSON-format statistics to <dir>/name,\n"
         "                          where name is auto-generated.\n"
     );
 }
@@ -244,10 +269,10 @@ void ReferenceBC(
     }
     else
     {
-        //Simple BFS pass to get single pass BC
-        //VertexId *source_path = new VertexId[graph.nodes];
+        // Simple BFS pass to get single pass BC
+        // VertexId *source_path = new VertexId[graph.nodes];
 
-        //initialize distances
+        // Initialize distances
         for (VertexId i = 0; i < graph.nodes; ++i)
         {
             source_path[i] = -1;
@@ -263,14 +288,13 @@ void ReferenceBC(
         frontier.push_back(src);
 
         //
-        //Perform one pass of BFS for one source
+        // Perform one pass of BFS for one source
         //
 
         CpuTimer cpu_timer;
         cpu_timer.Start();
         while (!frontier.empty())
         {
-
             // Dequeue node from frontier
             VertexId dequeued_node = frontier.front();
             frontier.pop_front();

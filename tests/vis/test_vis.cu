@@ -11,217 +11,252 @@
  * @brief Simple test driver program for Vertex-Induced Subgraph
  */
 
- #include <stdio.h>
- #include <string>
- #include <iostream>
+#include <stdio.h>
+#include <string>
+#include <iostream>
 
- // utilities for correctness checking
- #include <gunrock/util/test_utils.cuh>
+// utilities for correctness checking
+#include <gunrock/util/test_utils.cuh>
 
- // graph construction utilities
- #include <gunrock/graphio/market.cuh>
+// graph construction utilities
+#include <gunrock/graphio/market.cuh>
 
- // primitive-specific headers include
- #include <gunrock/app/vis/vis_enactor.cuh>
- #include <gunrock/app/vis/vis_problem.cuh>
- #include <gunrock/app/vis/vis_functor.cuh>
+// primitive-specific headers include
+#include <gunrock/app/vis/vis_enactor.cuh>
+#include <gunrock/app/vis/vis_problem.cuh>
+#include <gunrock/app/vis/vis_functor.cuh>
 
- // gunrock abstraction graph operators
- #include <gunrock/oprtr/advance/kernel.cuh>
- #include <gunrock/oprtr/filter/kernel.cuh>
+// gunrock abstraction graph operators
+#include <gunrock/oprtr/advance/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
 
- #include <moderngpu.cuh>
+#include <moderngpu.cuh>
 
- using namespace gunrock;
- using namespace gunrock::app;
- using namespace gunrock::util;
- using namespace gunrock::oprtr;
- using namespace gunrock::app::vis;
+using namespace gunrock;
+using namespace gunrock::app;
+using namespace gunrock::util;
+using namespace gunrock::oprtr;
+using namespace gunrock::app::vis;
 
- // ----------------------------------------------------------------------------
- // Housekeeping Routines
- // ----------------------------------------------------------------------------
- void Usage() {
-     printf(
-         " test_vis <graph type> <graph type args> [--undirected] [--quick]\n"
-         " [--device=<device_index>] [--instrumented] [--v]\n"
-         "Graph types and arguments:\n"
-         "  market <file>\n"
-         "    Reads a Matrix-Market coordinate-formatted graph,\n"
-         "    edges from STDIN (or from the optionally-specified file)\n"
-         "  --device=<device_index> Set GPU device to run. [Default: 0]\n"
-         "  --undirected            Convert the graph to undirected\n"
-         "  --instrumented          Keep kernels statics [Default: Disable]\n"
-         "                          total_queued, search_depth and avg_duty\n"
-         "                          (a relative indicator of load imbalance)\n"
-         "  --quick                 Skip the CPU validation [Default: false]\n"
-         "  --queue-sizing=<factor> Allocates a frontier queue sized at: \n"
-         "                          (graph-edges * <factor>) [Default: 1.0]\n"
-         "  --v                     Print verbose per iteration debug info\n");
- }
+// ----------------------------------------------------------------------------
+// Housekeeping Routines
+// ----------------------------------------------------------------------------
+void Usage()
+{
+    printf(
+        "test <graph-type> [graph-type-arguments]\n"
+        "Graph type and graph type arguments:\n"
+        "    market <matrix-market-file-name>\n"
+        "        Reads a Matrix-Market coordinate-formatted graph of\n"
+        "        directed/undirected edges from STDIN (or from the\n"
+        "        optionally-specified file).\n"
+        "    rmat (default: rmat_scale = 10, a = 0.57, b = c = 0.19)\n"
+        "        Generate R-MAT graph as input\n"
+        "        --rmat_scale=<vertex-scale>\n"
+        "        --rmat_nodes=<number-nodes>\n"
+        "        --rmat_edgefactor=<edge-factor>\n"
+        "        --rmat_edges=<number-edges>\n"
+        "        --rmat_a=<factor> --rmat_b=<factor> --rmat_c=<factor>\n"
+        "        --rmat_seed=<seed>\n"
+        "    rgg (default: rgg_scale = 10, rgg_thfactor = 0.55)\n"
+        "        Generate Random Geometry Graph as input\n"
+        "        --rgg_scale=<vertex-scale>\n"
+        "        --rgg_nodes=<number-nodes>\n"
+        "        --rgg_thfactor=<threshold-factor>\n"
+        "        --rgg_threshold=<threshold>\n"
+        "        --rgg_vmultipiler=<vmultipiler>\n"
+        "        --rgg_seed=<seed>\n\n"
+        "Optional arguments:\n"
+        "[--device=<device_index>] Set GPU(s) for testing (Default: 0).\n"
+        "[--undirected]            Treat the graph as undirected (symmetric).\n"
+        "[--instrumented]          Keep kernels statics [Default: Disable].\n"
+        "                          total_queued, search_depth and barrier duty.\n"
+        "                          (a relative indicator of load imbalance.)\n"
+        "[--quick]                 Skip the CPU reference validation process.\n"
+        "[--mark-pred]             Keep both label info and predecessor info.\n"
+        "[--disable-size-check]    Disable frontier queue size check.\n"
+        "[--grid-size=<grid size>] Maximum allowed grid size setting.\n"
+        "[--queue-sizing=<factor>] Allocates a frontier queue sized at: \n"
+        "                          (graph-edges * <factor>). (Default: 1.0)\n"
+        "[--v]                     Print verbose per iteration debug info.\n"
+        "[--iteration-num=<num>]   Number of runs to perform the test.\n"
+        "[--quiet]                 No output (unless --json is specified).\n"
+        "[--json]                  Output JSON-format statistics to STDOUT.\n"
+        "[--jsonfile=<name>]       Output JSON-format statistics to file <name>\n"
+        "[--jsondir=<dir>]         Output JSON-format statistics to <dir>/name,\n"
+        "                          where name is auto-generated.\n"
+    );
+}
 
- /**
-  * @brief Displays primitive results.
-  *
-  * @tparam VertexId
-  * @tparam SizeT
-  * @tparam Value
-  *
-  * @param[in] graph Reference to the CSR graph.
-  */
- template<typename VertexId, typename SizeT, typename Value>
- void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph) {
-     printf("==> display solution: (currently missing)\n");
-     // TODO(developer): code to print out results
- }
+/**
+ * @brief Displays primitive results.
+ *
+ * @tparam VertexId
+ * @tparam SizeT
+ * @tparam Value
+ *
+ * @param[in] graph Reference to the CSR graph.
+ */
+template<typename VertexId, typename SizeT, typename Value>
+void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph)
+{
+    printf("==> display solution: (currently missing)\n");
+    // TODO(developer): code to print out results
+}
 
- // ----------------------------------------------------------------------------
- // Testing Routines
- // ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// Testing Routines
+// ----------------------------------------------------------------------------
 
- /**
-  * @brief A simple CPU-based reference implementation.
-  *
-  * @tparam VertexId
-  * @tparam SizeT
-  * @tparam Value
-  *
-  * @param[in] graph Reference to the CSR graph we process on.
-  */
- template<typename VertexId, typename SizeT, typename Value>
- void SimpleReference(const Csr<VertexId, Value, SizeT> &graph) {
-     // initialization
+/**
+ * @brief A simple CPU-based reference implementation.
+ *
+ * @tparam VertexId
+ * @tparam SizeT
+ * @tparam Value
+ *
+ * @param[in] graph Reference to the CSR graph we process on.
+ */
+template<typename VertexId, typename SizeT, typename Value>
+void SimpleReference(const Csr<VertexId, Value, SizeT> &graph)
+{
+    // initialization
 
-     // perform calculation
+    // perform calculation
 
-     CpuTimer cpu_timer;
-     cpu_timer.Start();
+    CpuTimer cpu_timer;
+    cpu_timer.Start();
 
-     // TODO(developer): CPU validation code here
+    // TODO(developer): CPU validation code here
 
-     cpu_timer.Stop();
+    cpu_timer.Stop();
 
-     float cpu_elapsed = cpu_timer.ElapsedMillis();
-     printf("CPU reference finished in %lf ms.\n\n", cpu_elapsed);
- }
+    float cpu_elapsed = cpu_timer.ElapsedMillis();
+    printf("CPU reference finished in %lf ms.\n\n", cpu_elapsed);
+}
 
- /**
-  * @brief Sample test entry
-  *
-  * @tparam VertexId
-  * @tparam SizeT
-  * @tparam Value
-  *
-  * @param[in] parameter Test parameter settings.
-  */
- template<typename VertexId, typename SizeT, typename Value>
- void RunTests(Info<VertexId, Value, SizeT> *info) {
-     typedef VISProblem < VertexId, SizeT, Value,
-         true,   // MARK_PREDECESSORS
-         false,  // ENABLE_IDEMPOTENCE
-         false > Problem;
+/**
+ * @brief Sample test entry
+ *
+ * @tparam VertexId
+ * @tparam SizeT
+ * @tparam Value
+ *
+ * @param[in] parameter Test parameter settings.
+ */
+template<typename VertexId, typename SizeT, typename Value>
+void RunTests(Info<VertexId, Value, SizeT> *info)
+{
+    typedef VISProblem < VertexId, SizeT, Value,
+            true,   // MARK_PREDECESSORS
+            false,  // ENABLE_IDEMPOTENCE
+            false > Problem;
 
-     Csr<VertexId, Value, SizeT>* csr = info->csr_ptr;
-     
-     std::string partition_method   = info->info["partition_method"].get_str();
-     int         max_grid_size      = info->info["max_grid_size"].get_int();
-     int         num_gpus           = info->info["num_gpus"].get_int();
+    Csr<VertexId, Value, SizeT>* csr = info->csr_ptr;
 
-     int iterations                 = info->info["num_iteration"].get_int();
-     bool        quick_mode         = info->info["quick_mode"].get_bool();
-     bool        quiet_mode         = info->info["quiet_mode"].get_bool();
-     bool        stream_from_host   = info->info["stream_from_host"].get_bool();
-     double      max_queue_sizing   = info->info["max_queue_sizing"].get_real();
+    std::string partition_method   = info->info["partition_method"].get_str();
+    int         max_grid_size      = info->info["max_grid_size"].get_int();
+    int         num_gpus           = info->info["num_gpus"].get_int();
 
-     json_spirit::mArray device_list = info->info["device_list"].get_array();
-     int* gpu_idx = new int[num_gpus];
-     for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
+    int iterations                 = info->info["num_iteration"].get_int();
+    bool        quick_mode         = info->info["quick_mode"].get_bool();
+    bool        quiet_mode         = info->info["quiet_mode"].get_bool();
+    bool        stream_from_host   = info->info["stream_from_host"].get_bool();
+    double      max_queue_sizing   = info->info["max_queue_sizing"].get_real();
 
-     ContextPtr *context = (ContextPtr*)info->context;
+    json_spirit::mArray device_list = info->info["device_list"].get_array();
+    int* gpu_idx = new int[num_gpus];
+    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
 
-     // allocate host-side array (for both reference and GPU-computed results)
-     VertexId *r_labels = (VertexId*)malloc(sizeof(VertexId) * csr->nodes);
-     VertexId *h_labels = (VertexId*)malloc(sizeof(VertexId) * csr->nodes);
+    ContextPtr *context = (ContextPtr*)info->context;
+
+    // allocate host-side array (for both reference and GPU-computed results)
+    VertexId *r_labels = (VertexId*)malloc(sizeof(VertexId) * csr->nodes);
+    VertexId *h_labels = (VertexId*)malloc(sizeof(VertexId) * csr->nodes);
 
     VISEnactor <
-         Problem,
-         false,  // INSTRUMENT
-         false,  // DEBUG
-         true >  // SIZE_CHECK
-         enactor(gpu_idx);  // allocate primitive enactor map
+    Problem,
+    false,  // INSTRUMENT
+    false,  // DEBUG
+    true >  // SIZE_CHECK
+    enactor(gpu_idx);  // allocate primitive enactor map
 
-     Problem *problem = new Problem;  // allocate primitive problem on GPU
-     util::GRError(
-         problem->Init(stream_from_host, *csr, num_gpus),
-         "Problem Initialization Failed", __FILE__, __LINE__);
+    Problem *problem = new Problem;  // allocate primitive problem on GPU
+    util::GRError(
+        problem->Init(stream_from_host, *csr, num_gpus),
+        "Problem Initialization Failed", __FILE__, __LINE__);
 
-     //
-     // perform calculation
-     //
+    //
+    // perform calculation
+    //
 
-     GpuTimer gpu_timer;
+    GpuTimer gpu_timer;
 
-     float elapsed = 0.0f;
+    float elapsed = 0.0f;
 
-     for (int iter = 0; iter < iterations; ++iter) {
-         util::GRError(
-             problem->Reset(enactor.GetFrontierType(),
-                            max_queue_sizing),
-             "Problem Data Reset Failed", __FILE__, __LINE__);
-         gpu_timer.Start();
-         util::GRError(
-             enactor.template Enact<Problem>(*context, problem, max_grid_size),
-             "Problem Enact Failed", __FILE__, __LINE__);
-         gpu_timer.Stop();
-         elapsed += gpu_timer.ElapsedMillis();
-     }
+    for (int iter = 0; iter < iterations; ++iter)
+    {
+        util::GRError(
+            problem->Reset(enactor.GetFrontierType(),
+                           max_queue_sizing),
+            "Problem Data Reset Failed", __FILE__, __LINE__);
+        gpu_timer.Start();
+        util::GRError(
+            enactor.template Enact<Problem>(*context, problem, max_grid_size),
+            "Problem Enact Failed", __FILE__, __LINE__);
+        gpu_timer.Stop();
+        elapsed += gpu_timer.ElapsedMillis();
+    }
 
-     elapsed /= iterations;
+    elapsed /= iterations;
 
-     // extract results
-     util::GRError(
-         problem->Extract(h_labels),
-         "Problem Data Extraction Failed", __FILE__, __LINE__);
+    // extract results
+    util::GRError(
+        problem->Extract(h_labels),
+        "Problem Data Extraction Failed", __FILE__, __LINE__);
 
-     // compute reference CPU validation solution
-     if (!quick_mode) {
-         if (!quiet_mode) printf("==> computing reference value ... (currently missing)\n");
-         SimpleReference<VertexId, SizeT, Value>(csr);
-         if (!quiet_mode) printf("==> validation: (currently missing)\n");
-     }
+    // compute reference CPU validation solution
+    if (!quick_mode)
+    {
+        if (!quiet_mode) printf("==> computing reference value ... (currently missing)\n");
+        SimpleReference<VertexId, SizeT, Value>(csr);
+        if (!quiet_mode) printf("==> validation: (currently missing)\n");
+    }
 
-     if (!quiet_mode) DisplaySolution<VertexId, SizeT, Value>(csr);  // display solution
+    if (!quiet_mode) DisplaySolution<VertexId, SizeT, Value>(csr);  // display solution
 
-     info->ComputeCommonStats(enactor.enactor_stats.GetPointer(), elapsed);
+    info->ComputeCommonStats(enactor.enactor_stats.GetPointer(), elapsed);
 
-     if (!quiet_mode)
+    if (!quiet_mode)
         info->DisplayStats();
 
     info->CollectInfo();
 
-     // clean up
-     if (problem)  { delete problem; }
-     if (r_labels) { free(r_labels); }
-     if (h_labels) { free(h_labels); }
- }
+    // clean up
+    if (problem)  { delete problem; }
+    if (r_labels) { free(r_labels); }
+    if (h_labels) { free(h_labels); }
+}
 
 
- // ----------------------------------------------------------------------------
- // Main
- // ----------------------------------------------------------------------------
- int main(int argc, char** argv) {
-     CommandLineArgs args(argc, argv);
+// ----------------------------------------------------------------------------
+// Main
+// ----------------------------------------------------------------------------
+int main(int argc, char** argv)
+{
+    CommandLineArgs args(argc, argv);
 
-     int graph_args = argc - args.ParsedArgc() - 1;
+    int graph_args = argc - args.ParsedArgc() - 1;
 
-     if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
-         Usage();
-         return 1;
-     }
+    if ((argc < 2) || (args.CheckCmdLineFlag("help")))
+    {
+        Usage();
+        return 1;
+    }
 
-     typedef int VertexId;  // Use as the vertex identifier
-     typedef int SizeT;     // Use as the graph size type
-     typedef int Value;     // Use as the value type
+    typedef int VertexId;  // Use as the vertex identifier
+    typedef int SizeT;     // Use as the graph size type
+    typedef int Value;     // Use as the value type
 
     Csr<VertexId, Value, SizeT>csr(false);
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
@@ -231,11 +266,11 @@
 
     RunTests<VertexId, Value, SizeT>(info);
 
-     return 0;
- }
+    return 0;
+}
 
- // Leave this at the end of the file
- // Local Variables:
- // mode:c++
- // c-file-style: "NVIDIA"
- // End:
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:
