@@ -35,7 +35,7 @@ PROJECT_NAME           = gunrock
 # This could be handy for archiving the generated documentation or
 # if some version control system is used.
 
-PROJECT_NUMBER         = 0.2
+PROJECT_NUMBER         = 0.3
 
 # Using the PROJECT_BRIEF tag one can provide an optional one line description
 # for a project that appears at the top of each page and should give viewer
@@ -155,7 +155,6 @@ STRIP_FROM_PATH        = ./ \
                          ./app/dobfs \
                          ./app/pr \
                          ./app/sssp \
-                         ./simple_example
 
 # The STRIP_FROM_INC_PATH tag can be used to strip a user-defined part of
 # the path mentioned in the documentation of a class, which tells
@@ -680,8 +679,6 @@ WARN_LOGFILE           = warn.log
 INPUT                  = ../README.md \
                          ../gunrock \
                          ../tests \
-                         ../simple_example \
-                         ./simple_example.dox \
                          ./building_gunrock.md \
                          ./programming_model.md \
                          ../FAQ.md

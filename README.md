@@ -25,7 +25,7 @@ application for all the functionality of Gunrock.
 
 For the programming model we use in Gunrock, see [Programming Model](http://gunrock.github.io/gunrock/doc/0.2/programming_model.html).
 
-We have also provided a code walkthrough of a [simple example](http://gunrock.github.io/gunrock/doc/0.2/simple_example.html) and [annotated code](http://gunrock.github.io/gunrock/doc/annotated_primitives/annotated_primitives.html) for two typical graph primitives.
+We have also provided [code samples](https://github.com/gunrock/gunrock/tree/master/python) for how to use Gunrock's C interface in Python, and [annotated code](http://gunrock.github.io/gunrock/doc/annotated_primitives/annotated_primitives.html) for two typical graph primitives.
 
 Reporting Problems
 ==================
@@ -38,7 +38,7 @@ directly using [Github](https://github.com/gunrock/gunrock/issues).
 Operating System Support and Requirements
 =========================================
 
-This release (0.2) has only been tested on Linux Mint 15 (64-bit) with
+This release (0.3) has only been tested on Linux Mint 15 (64-bit) with
 CUDA 5.5, 6.0, and 6.5 installed. We expect Gunrock to build and run correctly on
 other 64-bit and 32-bit Linux distributions, Mac OS, and Windows.
 
@@ -128,6 +128,6 @@ Gunrock Copyright and Software License
 ======================================
 
 Gunrock is copyright The Regents of the University of
-California, 2013. The library, examples, and all source code are
+California, 2015. The library, examples, and all source code are
 released under
 [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0).
