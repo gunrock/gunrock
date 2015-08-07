@@ -29,21 +29,21 @@ using namespace gunrock::oprtr;
 using namespace gunrock::app::bc;
 
 /**
- * @brief Test_Parameter structure
+ * @brief BC_Parameter structure
  */
-struct Test_Parameter : gunrock::app::TestParameter_Base
+struct BC_Parameter : gunrock::app::TestParameter_Base
 {
 public:
     std::string ref_filename;
     double max_queue_sizing1;
 
-    Test_Parameter()
+    BC_Parameter()
     {
         ref_filename = "";
         max_queue_sizing1 = -1.0;
     }
 
-    ~Test_Parameter()
+    ~BC_Parameter()
     {
     }
 };
@@ -63,7 +63,7 @@ template <
     bool INSTRUMENT,
     bool DEBUG,
     bool SIZE_CHECK >
-void runBC(GRGraph* output, Test_Parameter *parameter);
+void runBC(GRGraph* output, BC_Parameter *parameter);
 
 /**
  * @brief Run test
@@ -83,7 +83,7 @@ template <
     typename      SizeT,
     bool          INSTRUMENT,
     bool          DEBUG >
-void RunTests_size_check(GRGraph* output, Test_Parameter *parameter)
+void RunTests_size_check(GRGraph* output, BC_Parameter *parameter)
 {
     if (parameter->size_check)
         runBC<VertexId, Value, SizeT, INSTRUMENT,
@@ -109,7 +109,7 @@ template <
     typename    Value,
     typename    SizeT,
     bool        INSTRUMENT >
-void RunTests_debug(GRGraph* output, Test_Parameter *parameter)
+void RunTests_debug(GRGraph* output, BC_Parameter *parameter)
 {
     if (parameter->debug)
         RunTests_size_check<VertexId, Value, SizeT,
@@ -133,7 +133,7 @@ template <
     typename      VertexId,
     typename      Value,
     typename      SizeT >
-void RunTests_instrumented(GRGraph* output, Test_Parameter *parameter)
+void RunTests_instrumented(GRGraph* output, BC_Parameter *parameter)
 {
     if (parameter->instrumented)
         RunTests_debug<VertexId, Value, SizeT,  true>(output, parameter);
@@ -161,7 +161,7 @@ template <
     bool INSTRUMENT,
     bool DEBUG,
     bool SIZE_CHECK >
-void runBC(GRGraph* output, Test_Parameter *parameter)
+void runBC(GRGraph* output, BC_Parameter *parameter)
 {
     typedef BCProblem <VertexId,
             SizeT,
@@ -253,7 +253,6 @@ void runBC(GRGraph* output, Test_Parameter *parameter)
                        max_queue_sizing, max_queue_sizing1),
         "BC Problem Data Reset Failed", __FILE__, __LINE__);
 
-    if (!quiet) { printf("__________________________\n"); fflush(stdout); }
     cpu_timer.Start();
     for (VertexId i = start_src; i < end_src; ++i)
     {
@@ -275,7 +274,7 @@ void runBC(GRGraph* output, Test_Parameter *parameter)
             (Value)0.5f, (int)(problem->sub_graphs[gpu].nodes));
     }
     cpu_timer.Stop();
-    if (!quiet) { printf("--------------------------\n"); fflush(stdout); }
+
     float elapsed = cpu_timer.ElapsedMillis();
 
     // Copy out results
@@ -317,7 +316,7 @@ void dispatchBC(
     ContextPtr*     context,
     cudaStream_t*   streams)
 {
-    Test_Parameter* parameter = new Test_Parameter;
+    BC_Parameter* parameter = new BC_Parameter;
     parameter->g_quiet  = config.quiet;
     parameter->context  = context;
     parameter->streams  = streams;
@@ -486,7 +485,6 @@ void bc(
     graphi->num_edges   = num_edges;  // setting graph edges
     graphi->row_offsets = (void*)&row_offsets[0];  // setting row_offsets
     graphi->col_indices = (void*)&col_indices[0];  // setting col_indices
-    printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
 
     gunrock_bc(grapho, graphi, config, data_t);
     memcpy(bc_scores, (float*)grapho->node_value1, num_nodes * sizeof(float));

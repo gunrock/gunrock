@@ -29,23 +29,23 @@ using namespace gunrock::oprtr;
 using namespace gunrock::app::sssp;
 
 /**
- * @brief Test_Parameter structure
+ * @brief SSSP_Parameter structure
  */
-struct Test_Parameter : gunrock::app::TestParameter_Base
+struct SSSP_Parameter : gunrock::app::TestParameter_Base
 {
 public:
     bool   mark_predecessors;
     int    delta_factor;
     double max_queue_sizing1;
 
-    Test_Parameter()
+    SSSP_Parameter()
     {
         delta_factor      =    32;
         mark_predecessors = false;
         max_queue_sizing1 =  -1.0;
     }
 
-    ~Test_Parameter()
+    ~SSSP_Parameter()
     {
     }
 };
@@ -58,7 +58,7 @@ template <
     bool DEBUG,
     bool SIZE_CHECK,
     bool MARK_PREDECESSORS >
-void runSSSP(GRGraph* output, Test_Parameter *parameter);
+void runSSSP(GRGraph* output, SSSP_Parameter *parameter);
 
 /**
  * @brief Run test
@@ -80,7 +80,7 @@ template <
     bool        INSTRUMENT,
     bool        DEBUG,
     bool        SIZE_CHECK >
-void markPredecessorsSSSP(GRGraph* output, Test_Parameter *parameter)
+void markPredecessorsSSSP(GRGraph* output, SSSP_Parameter *parameter)
 {
     if (parameter->mark_predecessors)
         runSSSP<VertexId, Value, SizeT, INSTRUMENT,
@@ -108,7 +108,7 @@ template <
     typename      SizeT,
     bool          INSTRUMENT,
     bool          DEBUG >
-void sizeCheckSSSP(GRGraph* output, Test_Parameter *parameter)
+void sizeCheckSSSP(GRGraph* output, SSSP_Parameter *parameter)
 {
     if (parameter->size_check)
         markPredecessorsSSSP<VertexId, Value, SizeT, INSTRUMENT,
@@ -134,7 +134,7 @@ template <
     typename    Value,
     typename    SizeT,
     bool        INSTRUMENT >
-void debugSSSP(GRGraph* output, Test_Parameter *parameter)
+void debugSSSP(GRGraph* output, SSSP_Parameter *parameter)
 {
     if (parameter->debug)
         sizeCheckSSSP<VertexId, Value, SizeT, INSTRUMENT,
@@ -158,7 +158,7 @@ template <
     typename      VertexId,
     typename      Value,
     typename      SizeT >
-void instrumentedSSSP(GRGraph* output, Test_Parameter *parameter)
+void instrumentedSSSP(GRGraph* output, SSSP_Parameter *parameter)
 {
     if (parameter->instrumented)
         debugSSSP<VertexId, Value, SizeT,  true>(output, parameter);
@@ -188,7 +188,7 @@ template <
     bool DEBUG,
     bool SIZE_CHECK,
     bool MARK_PREDECESSORS >
-void runSSSP(GRGraph* output, Test_Parameter *parameter)
+void runSSSP(GRGraph* output, SSSP_Parameter *parameter)
 {
     typedef SSSPProblem < VertexId,
             SizeT,
@@ -261,13 +261,12 @@ void runSSSP(GRGraph* output, Test_Parameter *parameter)
     util::GRError(
         enactor->Reset(), "SSSP Enactor Reset failed", __FILE__, __LINE__);
 
-    if (!quiet) { printf("__________________________\n"); fflush(stdout); }
     cpu_timer.Start();
     util::GRError(
         enactor->Enact(src, traversal_mode),
         "SSSP Problem Enact Failed", __FILE__, __LINE__);
     cpu_timer.Stop();
-    if (!quiet) { printf("--------------------------\n"); fflush(stdout); }
+
     float elapsed = cpu_timer.ElapsedMillis();
 
     // Copy out results
@@ -307,7 +306,7 @@ void dispatchSSSP(
     ContextPtr*    context,
     cudaStream_t*  streams)
 {
-    Test_Parameter *parameter = new Test_Parameter;
+    SSSP_Parameter *parameter = new SSSP_Parameter;
     parameter->context  = context;
     parameter->streams  = streams;
     parameter->g_quiet  = config.quiet;
@@ -486,7 +485,6 @@ void sssp(
     graphi->row_offsets = (void*)&row_offsets[0];  // setting row_offsets
     graphi->col_indices = (void*)&col_indices[0];  // setting col_indices
     graphi->edge_values = (void*)&edge_values[0];  // setting edge_values
-    printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
 
     gunrock_sssp(grapho, graphi, config, data_t);
     memcpy(distances, (int*)grapho->node_value1, num_nodes * sizeof(int));

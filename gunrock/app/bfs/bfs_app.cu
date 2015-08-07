@@ -29,23 +29,23 @@ using namespace gunrock::oprtr;
 using namespace gunrock::app::bfs;
 
 /**
- * @brief Test_Parameter structure
+ * @brief BFS_Parameter structure
  */
-struct Test_Parameter : gunrock::app::TestParameter_Base
+struct BFS_Parameter : gunrock::app::TestParameter_Base
 {
 public:
     bool   mark_predecessors ;  // mark src-distance vs. parent vertices
     bool   enable_idempotence;  // enable idempotence operation
     double max_queue_sizing1 ;  // maximum queue sizing factor
 
-    Test_Parameter()
+    BFS_Parameter()
     {
         mark_predecessors  = false;
         enable_idempotence = false;
         max_queue_sizing1  = -1.0f;
     }
 
-    ~Test_Parameter()
+    ~BFS_Parameter()
     {
     }
 };
@@ -53,7 +53,7 @@ public:
 template<typename VertexId, typename Value, typename SizeT,
          bool INSTRUMENT, bool DEBUG, bool SIZE_CHECK,
          bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE>
-void runBFS(GRGraph* output, Test_Parameter *parameter);
+void runBFS(GRGraph* output, BFS_Parameter *parameter);
 
 /**
  * @brief Run test
@@ -77,7 +77,7 @@ template <
     bool        DEBUG,
     bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS >
-void RunTests_enable_idempotence(GRGraph* output, Test_Parameter *parameter)
+void RunTests_enable_idempotence(GRGraph* output, BFS_Parameter *parameter)
 {
     if (parameter->enable_idempotence)
         runBFS<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
@@ -107,7 +107,7 @@ template <
     bool        INSTRUMENT,
     bool        DEBUG,
     bool        SIZE_CHECK >
-void RunTests_mark_predecessors(GRGraph* output, Test_Parameter *parameter)
+void RunTests_mark_predecessors(GRGraph* output, BFS_Parameter *parameter)
 {
     if (parameter->mark_predecessors)
         RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
@@ -135,7 +135,7 @@ template <
     typename      SizeT,
     bool          INSTRUMENT,
     bool          DEBUG >
-void RunTests_size_check(GRGraph* output, Test_Parameter *parameter)
+void RunTests_size_check(GRGraph* output, BFS_Parameter *parameter)
 {
     if (parameter->size_check)
         RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
@@ -161,7 +161,7 @@ template <
     typename    Value,
     typename    SizeT,
     bool        INSTRUMENT >
-void RunTests_debug(GRGraph* output, Test_Parameter *parameter)
+void RunTests_debug(GRGraph* output, BFS_Parameter *parameter)
 {
     if (parameter->debug)
         RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,
@@ -185,7 +185,7 @@ template <
     typename      VertexId,
     typename      Value,
     typename      SizeT >
-void RunTests_instrumented(GRGraph* output, Test_Parameter *parameter)
+void RunTests_instrumented(GRGraph* output, BFS_Parameter *parameter)
 {
     if (parameter->instrumented)
         RunTests_debug<VertexId, Value, SizeT,  true>(output, parameter);
@@ -217,7 +217,7 @@ template <
     bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS,
     bool        ENABLE_IDEMPOTENCE >
-void runBFS(GRGraph* output, Test_Parameter *parameter)
+void runBFS(GRGraph* output, BFS_Parameter *parameter)
 {
     typedef BFSProblem < VertexId,
             SizeT,
@@ -296,7 +296,6 @@ void runBFS(GRGraph* output, Test_Parameter *parameter)
     util::GRError(
         enactor->Reset(), "BFS Enactor Reset failed", __FILE__, __LINE__);
 
-    if (!quiet) { printf("__________________________\n"); fflush(stdout); }
     cpu_timer.Start();
 
     util::GRError(
@@ -304,7 +303,7 @@ void runBFS(GRGraph* output, Test_Parameter *parameter)
         "BFS Problem Enact Failed", __FILE__, __LINE__);
 
     cpu_timer.Stop();
-    if (!quiet) { printf("--------------------------\n"); fflush(stdout); }
+
     float elapsed = cpu_timer.ElapsedMillis();
 
     // Copy out results
@@ -344,7 +343,7 @@ void dispatch_bfs(
     ContextPtr*    context,
     cudaStream_t*  streams)
 {
-    Test_Parameter *parameter = new Test_Parameter;
+    BFS_Parameter *parameter = new BFS_Parameter;
     parameter->context  = context;
     parameter->streams  = streams;
     parameter->g_quiet  = config.quiet;
@@ -519,7 +518,6 @@ void bfs(
     graphi->num_edges   = num_edges;  // setting graph edges
     graphi->row_offsets = (void*)&row_offsets[0];  // setting row_offsets
     graphi->col_indices = (void*)&col_indices[0];  // setting col_indices
-    printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
 
     gunrock_bfs(grapho, graphi, config, data_t);
     memcpy(bfs_label, (int*)grapho->node_value1, num_nodes * sizeof(int));

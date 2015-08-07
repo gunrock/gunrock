@@ -27,13 +27,13 @@ using namespace gunrock::oprtr;
 using namespace gunrock::app::cc;
 
 /**
- * @brief Test_Parameter structure
+ * @brief CC_Parameter structure
  */
-struct Test_Parameter : gunrock::app::TestParameter_Base
+struct CC_Parameter : gunrock::app::TestParameter_Base
 {
 public:
-    Test_Parameter()  { }
-    ~Test_Parameter() { }
+    CC_Parameter()  { }
+    ~CC_Parameter() { }
 };
 
 template <
@@ -43,7 +43,7 @@ template <
     bool INSTRUMENT,
     bool DEBUG,
     bool SIZE_CHECK >
-void runCC(GRGraph* output, Test_Parameter *parameter);
+void runCC(GRGraph* output, CC_Parameter *parameter);
 
 /**
  * @brief Run test
@@ -63,7 +63,7 @@ template <
     typename      SizeT,
     bool          INSTRUMENT,
     bool          DEBUG >
-void sizeCheckCC(GRGraph* output, Test_Parameter *parameter)
+void sizeCheckCC(GRGraph* output, CC_Parameter *parameter)
 {
     if (parameter->size_check)
         runCC<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
@@ -90,7 +90,7 @@ template <
     typename    Value,
     typename    SizeT,
     bool        INSTRUMENT >
-void debugCC(GRGraph* output, Test_Parameter *parameter)
+void debugCC(GRGraph* output, CC_Parameter *parameter)
 {
     if (parameter->debug)
         sizeCheckCC<VertexId, Value, SizeT, INSTRUMENT,
@@ -114,7 +114,7 @@ template <
     typename      VertexId,
     typename      Value,
     typename      SizeT >
-void instrumentedCC(GRGraph* output, Test_Parameter *parameter)
+void instrumentedCC(GRGraph* output, CC_Parameter *parameter)
 {
     if (parameter->instrumented)
         debugCC<VertexId, Value, SizeT,  true>(output, parameter);
@@ -142,7 +142,7 @@ template <
     bool INSTRUMENT,
     bool DEBUG,
     bool SIZE_CHECK >
-void runCC(GRGraph* output, Test_Parameter *parameter)
+void runCC(GRGraph* output, CC_Parameter *parameter)
 {
     typedef CCProblem < VertexId,
             SizeT,
@@ -254,7 +254,7 @@ void dispatch_cc(
     ContextPtr*    context,
     cudaStream_t*  streams)
 {
-    Test_Parameter *parameter = new Test_Parameter;
+    CC_Parameter *parameter = new CC_Parameter;
     parameter->context  = context;
     parameter->streams  = streams;
     parameter->g_quiet  = config.quiet;
@@ -391,7 +391,6 @@ int cc(
     graphi->num_edges   = num_edges;  // setting graph edges
     graphi->row_offsets = (void*)&row_offsets[0];  // setting row_offsets
     graphi->col_indices = (void*)&col_indices[0];  // setting col_indices
-    printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
 
     gunrock_cc(grapho, graphi, config, data_t);
     int* num_components = (int*)grapho->aggregation;

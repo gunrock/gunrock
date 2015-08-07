@@ -29,23 +29,23 @@ using namespace gunrock::oprtr;
 using namespace gunrock::app::pr;
 
 /**
- * @brief Test_Parameter structure
+ * @brief PR_Parameter structure
  */
-struct Test_Parameter : gunrock::app::TestParameter_Base
+struct PR_Parameter : gunrock::app::TestParameter_Base
 {
 public:
     float    delta          ;  // Delta value for PageRank
     float    error          ;  // Error threshold PageRank
     int      max_iter       ;  // Maximum number of iteration
 
-    Test_Parameter()
+    PR_Parameter()
     {
         delta    = 0.85f;
         error    = 0.01f;
         max_iter =    50;
         src      =    -1;
     }
-    ~Test_Parameter()
+    ~PR_Parameter()
     {
     }
 };
@@ -57,7 +57,7 @@ template <
     bool INSTRUMENT,
     bool DEBUG,
     bool SIZE_CHECK >
-void runPageRank(GRGraph *output, Test_Parameter *parameter);
+void runPageRank(GRGraph *output, PR_Parameter *parameter);
 
 /**
  * @brief Run test
@@ -77,7 +77,7 @@ template <
     typename      SizeT,
     bool          INSTRUMENT,
     bool          DEBUG >
-void sizeCheckPageRank(GRGraph *output, Test_Parameter *parameter)
+void sizeCheckPageRank(GRGraph *output, PR_Parameter *parameter)
 {
     if (parameter->size_check)
         runPageRank<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
@@ -103,7 +103,7 @@ template <
     typename    Value,
     typename    SizeT,
     bool        INSTRUMENT >
-void debugPageRank(GRGraph *output, Test_Parameter *parameter)
+void debugPageRank(GRGraph *output, PR_Parameter *parameter)
 {
     if (parameter->debug)
         sizeCheckPageRank<VertexId, Value, SizeT, INSTRUMENT,
@@ -127,7 +127,7 @@ template <
     typename VertexId,
     typename Value,
     typename SizeT >
-void runPageRank(GRGraph *output, Test_Parameter* parameter)
+void runPageRank(GRGraph *output, PR_Parameter* parameter)
 {
     if (parameter->instrumented)
         debugPageRank<VertexId, Value, SizeT,  true>(output, parameter);
@@ -155,7 +155,7 @@ template <
     bool INSTRUMENT,
     bool DEBUG,
     bool SIZE_CHECK >
-void runPageRank(GRGraph *output, Test_Parameter *parameter)
+void runPageRank(GRGraph *output, PR_Parameter *parameter)
 {
     typedef PRProblem < VertexId,
             SizeT,
@@ -228,19 +228,12 @@ void runPageRank(GRGraph *output, Test_Parameter *parameter)
     util::GRError(
         enactor->Reset(), "PR Enactor Reset Reset failed", __FILE__, __LINE__);
 
-    if (!quiet)
-    {
-        printf("_________________________________________\n"); fflush(stdout);
-    }
     cpu_timer.Start();
     util::GRError(
         enactor->Enact(traversal_mode),
         "PR Problem Enact Failed", __FILE__, __LINE__);
     cpu_timer.Stop();
-    if (!quiet)
-    {
-        printf("-----------------------------------------\n"); fflush(stdout);
-    }
+
     float elapsed = cpu_timer.ElapsedMillis();
 
     // Copy out results
@@ -284,7 +277,7 @@ void dispatchPageRank(
     ContextPtr*    context,
     cudaStream_t*  streams)
 {
-    Test_Parameter *parameter = new Test_Parameter;
+    PR_Parameter *parameter = new PR_Parameter;
     parameter->context      =  context;
     parameter->streams      =  streams;
     parameter->g_quiet      = config.quiet;
@@ -428,7 +421,6 @@ void pagerank(
     graphi->num_edges   = num_edges;  // setting graph edges
     graphi->row_offsets = (void*)&row_offsets[0];  // setting row_offsets
     graphi->col_indices = (void*)&col_indices[0];  // setting col_indices
-    printf(" loaded %d nodes and %d edges\n", num_nodes, num_edges);
 
     gunrock_pagerank(grapho, graphi, config, data_t);
     memcpy(pagerank, (float*)grapho->node_value1, num_nodes * sizeof(float));
