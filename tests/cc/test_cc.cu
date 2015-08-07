@@ -327,7 +327,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                       partition_seed),
                   "CC Problem Initialization Failed", __FILE__, __LINE__);
     util::GRError(enactor->Init(context, problem, max_grid_size),
-                  "BC Enactor Init failed", __FILE__, __LINE__);
+                  "CC Enactor Init failed", __FILE__, __LINE__);
 
     // compute reference CPU CC
     if (reference_check != NULL)

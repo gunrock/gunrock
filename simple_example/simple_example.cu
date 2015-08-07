@@ -9,20 +9,20 @@
  * @file
  * simple_example.cu
  *
- * @brief Simple example driver for all three primitives
+ * @brief Simple test driver program for connected component.
  */
 
 #include <stdio.h>
 #include <string>
 #include <deque>
 #include <vector>
+#include <queue>
 #include <iostream>
+#include <fstream>
+#include <algorithm>
 
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
-
-// Graph construction utils
-#include <gunrock/graphio/market.cuh>
 
 // CC includes
 #include <gunrock/app/cc/cc_enactor.cuh>
@@ -40,31 +40,31 @@
 #include <gunrock/app/bc/bc_functor.cuh>
 
 // Operator includes
-#include <gunrock/oprtr/filter/kernel.cuh>
 #include <gunrock/oprtr/advance/kernel.cuh>
+#include <gunrock/oprtr/filter/kernel.cuh>
 
-#include "cpu_graph_lib.hpp"
-
+// Boost includes for CPU reference algorithms
+#include <boost/config.hpp>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/connected_components.hpp>
+#include <boost/graph/bc_clustering.hpp>
+#include <boost/graph/iteration_macros.hpp>
 
 using namespace gunrock;
+using namespace gunrock::app;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::cc;
 using namespace gunrock::app::bfs;
 using namespace gunrock::app::bc;
 
-
 /******************************************************************************
  * Defines, constants, globals
  ******************************************************************************/
 
-bool g_verbose;
-bool g_undirected;
-bool g_quick;
-bool g_stream_from_host;
-
 template <typename VertexId>
-struct CcList {
+struct CcList
+{
     VertexId        root;
     unsigned int    histogram;
 
@@ -80,23 +80,33 @@ bool CCCompare(
     return elem1.histogram > elem2.histogram;
 }
 
-
 /******************************************************************************
  * Housekeeping Routines
  ******************************************************************************/
 void Usage()
 {
     printf(
-        "\nsimple_example <graph type> <graph type args> [--device=<device_index>] "
-        "[--instrumented] [--quick]\n"
+        "\n test_cc <graph type> <graph type args> [--device=<device_index>]\n"
+        " [--instrumented] [--quick] [--v] [--queue-sizing=<scale factor>]\n"
+        " [--in-sizing=<in/out queue scale factor>] [--disable-size-check]\n"
+        " [--partition_method=<random|biasrandom|clustered|metis]\n"
+        " [--grid-sizing=<grid size>] [--partition_seed=<seed>]\n"
+        " [--quiet] [--json] [--jsonfile=<name>] [--jsondir=<dir>]"
         "\n"
         "Graph types and args:\n"
         "  market [<file>]\n"
         "    Reads a Matrix-Market coordinate-formatted graph of directed/undirected\n"
         "    edges from stdin (or from the optionally-specified file).\n"
-        "--instrumentd: If include then show detailed kernel running stats.\n"
-        "--quick: If include then do not perform CPU validity code.\n"
-        );
+        "  --device=<device_index>  Set GPU device for running the graph primitive.\n"
+        "  --instrumented If set then kernels keep track of queue-search_depth\n"
+        "  and barrier duty (a relative indicator of load imbalance.)\n"
+        "  --quick If set will skip the CPU validation code. Default: 0.\n"
+        " --quiet                  No output (unless --json is specified).\n"
+        " --json                   Output JSON-format statistics to stdout.\n"
+        " --jsonfile=<name>        Output JSON-format statistics to file <name>\n"
+        " --jsondir=<dir>          Output JSON-format statistics to <dir>/name,\n"
+        
+    );
 }
 
 /**
@@ -105,27 +115,47 @@ void Usage()
  * @tparam VertexId
  * @tparam SizeT
  *
- * @param[in] comp_ids
- * @param[in] nodes
- * @param[in] num_components
+ * @param[in] comp_ids Host-side vector to store computed component id for each node
+ * @param[in] nodes Number of nodes in the graph
+ * @param[in] num_components Number of connected components in the graph
+ * @param[in] roots Host-side vector stores the root for each node in the graph
+ * @param[in] histogram Histogram of connected component ids
  */
 template<typename VertexId, typename SizeT>
-void DisplayCCSolution(VertexId *comp_ids, SizeT nodes,
-                       unsigned int num_components)
+VertexId DisplayCCSolution(
+    VertexId     *comp_ids,
+    SizeT        nodes,
+    unsigned int num_components,
+    VertexId     *roots,
+    unsigned int *histogram)
 {
-    printf("Number of components: %d\n", num_components);
+    typedef CcList<VertexId> CcListType;
+    //printf("Number of components: %d\n", num_components);
+    VertexId largest_cc_id;
 
-    if (nodes <= 40) {
-        printf("[");
-        for (VertexId i = 0; i < nodes; ++i) {
-            PrintValue(i);
-            printf(":");
-            PrintValue(comp_ids[i]);
-            printf(",");
-            printf(" ");
-        }
-        printf("]\n");
+    //sort the components by size
+    CcListType *cclist =
+        (CcListType*)malloc(sizeof(CcListType) * num_components);
+    for (int i = 0; i < num_components; ++i)
+    {
+        cclist[i].root = roots[i];
+        cclist[i].histogram = histogram[i];
     }
+    std::stable_sort(
+            cclist, cclist + num_components, CCCompare<CcListType>);
+
+    // Print out at most top 10 largest components
+    int top = (num_components < 10) ? num_components : 10;
+    printf("Top %d largest components:\n", top);
+    for (int i = 0; i < top; ++i)
+    {
+        printf("CC ID: %d, CC Root: %d, CC Size: %d\n",
+                i, cclist[i].root, cclist[i].histogram);
+    }
+    largest_cc_id = cclist[0].root;
+
+    free(cclist);
+    return largest_cc_id;
 }
 
 /**
@@ -133,149 +163,131 @@ void DisplayCCSolution(VertexId *comp_ids, SizeT nodes,
  *
  * @tparam VertexId
  * @tparam SizeT
+ * @tparam MARK_PREDECESSORS
+ * @tparam ENABLE_IDEMPOTENCE
  *
- * @param[in] source_path
- * @param[in] preds
- * @param[in] nodes
- * @param[in] MARK_PREDECESSORS
+ * @param[in] labels    Search depth from the source for each node.
+ * @param[in] preds     Predecessor node id for each node.
+ * @param[in] num_nodes Number of nodes in the graph.
+ * @param[in] quiet     Don't print out anything to stdout
  */
-template<typename VertexId, typename SizeT>
-void DisplayBFSSolution(VertexId *source_path, VertexId *preds, SizeT nodes,
-                        bool MARK_PREDECESSORS)
+template <
+    typename VertexId,
+    typename SizeT,
+    bool MARK_PREDECESSORS,
+    bool ENABLE_IDEMPOTENCE >
+void DisplayBFSSolution(
+    VertexId *labels,
+    VertexId *preds,
+    SizeT     num_nodes,
+    bool quiet = false)
 {
-    if (nodes > 40)
-        nodes = 40;
+    if (quiet) { return; }
+    // careful: if later code in this
+    // function changes something, this
+    // return is the wrong thing to do
+
+    if (num_nodes > 40) { num_nodes = 40; }
+
+    printf("\nFirst %d labels of the GPU result:\n", num_nodes);
+
     printf("[");
-    for (VertexId i = 0; i < nodes; ++i) {
+    for (VertexId i = 0; i < num_nodes; ++i)
+    {
         PrintValue(i);
         printf(":");
-        PrintValue(source_path[i]);
-        printf(",");
-        if (MARK_PREDECESSORS)
+        PrintValue(labels[i]);
+        if (MARK_PREDECESSORS && !ENABLE_IDEMPOTENCE)
+        {
+            printf(",");
             PrintValue(preds[i]);
+        }
         printf(" ");
     }
     printf("]\n");
 }
 
 /**
- * Displays the BC result (sigma value and BC value)
+ * @brief Displays the BC result (sigma value and BC value)
  *
  * @tparam Value
  * @tparam SizeT
  *
+ * @param[in] sigmas
  * @param[in] bc_values
  * @param[in] nodes
  */
 template<typename Value, typename SizeT>
-void DisplayBCSolution(Value *bc_values, SizeT nodes)
+void DisplayBCSolution(Value *sigmas, Value *bc_values, SizeT nodes)
 {
-    if (nodes > 40)
-        nodes = 40;
-    printf("[");
-    for (SizeT i = 0; i < nodes; ++i) {
-        PrintValue(i);
-        printf(":");
-        PrintValue(bc_values[i]);
-        printf(" ");
+    if (nodes < 40)
+    {
+        printf("[");
+        for (SizeT i = 0; i < nodes; ++i)
+        {
+            PrintValue(i);
+            printf(":");
+            PrintValue(sigmas[i]);
+            printf(",");
+            PrintValue(bc_values[i]);
+            printf(" ");
+        }
+        printf("]\n");
     }
-    printf("]\n");
 }
 
-/**
- * Performance/Evaluation statistics
- */
-
-struct Stats {
-    const char *name;
-    Statistic rate;
-    Statistic search_depth;
-    Statistic redundant_work;
-    Statistic duty;
-
-    Stats() : name(NULL), rate(), search_depth(), redundant_work(), duty() {}
-    Stats(const char *name) :
-        name(name), rate(), search_depth(), redundant_work(), duty() {}
-};
+/******************************************************************************
+ * CC Testing Routines
+ *****************************************************************************/
 
 /**
- * @brief Displays timing and correctness statistics for BFS
+ * @brief CPU-based reference CC algorithm using Boost Graph Library
  *
- * @tparam MARK_PREDECESSORS
  * @tparam VertexId
- * @tparam Value
  * @tparam SizeT
  *
- * @param[in] stats Reference to ...
- * @param[in] src
- * @param[in] h_labels
- * @param[in] graph Reference to ...
- * @param[in] elapsed
- * @param[in] search_depth
- * @param[in] total_queued
- * @param[in] avg_duty
+ * @param[in]  graph  Reference to the CSR graph we process on
+ * @param[out] labels Host-side vector to store the component id for each node in the graph
+ * @param[in] quiet Don't print out anything to stdout
+ *
+ * \return Number of connected components in the graph
  */
-template<
+template <
     typename VertexId,
     typename Value,
-    typename SizeT>
-void DisplayBFSStats(
-    Stats               &stats,
-    VertexId            src,
-    VertexId            *h_labels,
+    typename SizeT >
+unsigned int ReferenceCC(
     const Csr<VertexId, Value, SizeT> &graph,
-    double              elapsed,
-    VertexId            search_depth,
-    long long           total_queued,
-    double              avg_duty)
+    int *labels,
+    bool quiet = false)
 {
-    // Compute nodes and edges visited
-    SizeT edges_visited = 0;
-    SizeT nodes_visited = 0;
-    for (VertexId i = 0; i < graph.nodes; ++i) {
-        if (h_labels[i] > -1) {
-            ++nodes_visited;
-            edges_visited += graph.row_offsets[i+1] - graph.row_offsets[i];
+    using namespace boost;
+    SizeT    *row_offsets    = graph.row_offsets;
+    VertexId *column_indices = graph.column_indices;
+    SizeT     num_nodes      = graph.nodes;
+
+    typedef adjacency_list <vecS, vecS, undirectedS> Graph;
+    Graph G;
+    for (int i = 0; i < num_nodes; ++i)
+    {
+        for (int j = row_offsets[i]; j < row_offsets[i + 1]; ++j)
+        {
+            add_edge(i, column_indices[j], G);
         }
     }
+    CpuTimer cpu_timer;
+    cpu_timer.Start();
+    int num_components = connected_components(G, &labels[0]);
+    cpu_timer.Stop();
+    float elapsed = cpu_timer.ElapsedMillis();
 
-    double redundant_work = 0.0;
-    if (total_queued > 0) {
-        // measure duplicate edges put through queue
-        redundant_work =
-            ((double) total_queued - edges_visited) / edges_visited;
-    }
-    redundant_work *= 100;
-
-    // Display test name
-    printf("[%s] finished. ", stats.name);
-
-    // Display statistics
-    if (nodes_visited < 5) {
-        printf("Fewer than 5 vertices visited.\n");
-    } else {
-        // Display the specific sample statistics
-        double m_teps = (double) edges_visited / (elapsed * 1000.0);
-        printf(" elapsed: %.3f ms, rate: %.3f MiEdges/s", elapsed, m_teps);
-        if (search_depth != 0) {
-            printf(", search_depth: %lld", (long long) search_depth);
-        }
-        if (avg_duty != 0) {
-            printf("\n avg CTA duty: %.2f%%", avg_duty * 100);
-        }
-        printf("\n src: %lld, nodes_visited: %lld, edges visited: %lld",
-               (long long) src, (long long) nodes_visited,
-               (long long) edges_visited);
-        if (total_queued > 0) {
-            printf(", total queued: %lld", total_queued);
-        }
-        if (redundant_work > 0) {
-            printf(", redundant work: %.2f%%", redundant_work);
-        }
-        printf("\n");
-    }
-
+    if (!quiet) { printf("CPU CC finished in %lf msec.\n", elapsed); }
+    return num_components;
 }
+
+/******************************************************************************
+ * BFS Testing Routines
+ *****************************************************************************/
 
 /**
  * @brief A simple CPU-based reference BFS ranking implementation.
@@ -283,23 +295,36 @@ void DisplayBFSStats(
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
+ * @tparam MARK_PREDECESSORS
+ * @tpatam ENABLE_IDEMPOTENCE
  *
- * @param[in] graph Reference to ...
- * @param[in] source_path
- * @param[in] src
+ * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] source_path Host-side vector to store CPU computed labels for each node
+ * @param[in] predecessor Host-side vector to store CPU computed predecessor for each node
+ * @param[in] src Source node where BFS starts
+ * @param[in] quiet Don't print out anything to stdout
  */
-template<
+template <
     typename VertexId,
     typename Value,
-    typename SizeT>
-void SimpleReferenceBfs(
-    const Csr<VertexId, Value, SizeT>       &graph,
-    VertexId                                *source_path,
-    VertexId                                src)
+    typename SizeT,
+    bool MARK_PREDECESSORS,
+    bool ENABLE_IDEMPOTENCE >
+void ReferenceBFS(
+    const Csr<VertexId, Value, SizeT> *graph,
+    VertexId                          *source_path,
+    VertexId                          *predecessor,
+    VertexId                          src,
+    bool                              quiet = false)
 {
-    //initialize distances
-    for (VertexId i = 0; i < graph.nodes; ++i) {
-        source_path[i] = -1;
+    // Initialize labels
+    for (VertexId i = 0; i < graph->nodes; ++i)
+    {
+        source_path[i] = ENABLE_IDEMPOTENCE ? -1 : util::MaxValue<VertexId>() - 1;
+        if (MARK_PREDECESSORS)
+        {
+            predecessor[i] = -1;
+        }
     }
     source_path[src] = 0;
     VertexId search_depth = 0;
@@ -308,29 +333,33 @@ void SimpleReferenceBfs(
     std::deque<VertexId> frontier;
     frontier.push_back(src);
 
-    //
-    //Perform BFS
-    //
-
+    // Perform BFS
     CpuTimer cpu_timer;
     cpu_timer.Start();
-    while (!frontier.empty()) {
-
+    while (!frontier.empty())
+    {
         // Dequeue node from frontier
         VertexId dequeued_node = frontier.front();
         frontier.pop_front();
         VertexId neighbor_dist = source_path[dequeued_node] + 1;
 
         // Locate adjacency list
-        int edges_begin = graph.row_offsets[dequeued_node];
-        int edges_end = graph.row_offsets[dequeued_node + 1];
+        SizeT edges_begin = graph->row_offsets[dequeued_node];
+        SizeT edges_end = graph->row_offsets[dequeued_node + 1];
 
-        for (int edge = edges_begin; edge < edges_end; ++edge) {
+        for (SizeT edge = edges_begin; edge < edges_end; ++edge)
+        {
             //Lookup neighbor and enqueue if undiscovered
-            VertexId neighbor = graph.column_indices[edge];
-            if (source_path[neighbor] == -1) {
+            VertexId neighbor = graph->column_indices[edge];
+            if (source_path[neighbor] > neighbor_dist || source_path[neighbor] == -1)
+            {
                 source_path[neighbor] = neighbor_dist;
-                if (search_depth < neighbor_dist) {
+                if (MARK_PREDECESSORS)
+                {
+                    predecessor[neighbor] = dequeued_node;
+                }
+                if (search_depth < neighbor_dist)
+                {
                     search_depth = neighbor_dist;
                 }
                 frontier.push_back(neighbor);
@@ -338,404 +367,1495 @@ void SimpleReferenceBfs(
         }
     }
 
+    if (MARK_PREDECESSORS)
+    {
+        predecessor[src] = -1;
+    }
+
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
     search_depth++;
 
-    printf("CPU BFS finished in %lf msec. Search depth is:%d\n",
-           elapsed, search_depth);
+    if (!quiet)
+    {
+        printf("CPU BFS finished in %lf msec. cpu_search_depth: %d\n",
+               elapsed, search_depth);
+    }
+}
+
+/******************************************************************************
+* BC Testing Routines
+*****************************************************************************/
+
+/**
+ * @brief Graph edge properties (bundled properties)
+ */
+struct EdgeProperties
+{
+    int weight;
+};
+
+/**
+ * @brief A simple CPU-based reference BC ranking implementation.
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] graph Reference to graph we process on
+ * @param[in] bc_values Pointer to node bc value
+ * @param[in] ebc_values Pointer to edge bc value
+ * @param[in] sigmas Pointer to node sigma value
+ * @param[in] src VertexId of source node if there is any
+ * @param[in] quiet Don't print out anything to stdout
+ */
+template <
+    typename VertexId,
+    typename Value,
+    typename SizeT >
+void ReferenceBC(
+    const Csr<VertexId, Value, SizeT> &graph,
+    Value                             *bc_values,
+    Value                             *ebc_values,
+    Value                             *sigmas,
+    VertexId                          *source_path,
+    VertexId                           src,
+    bool                               quiet = false)
+{
+    typedef Coo<VertexId, Value> EdgeTupleType;
+    EdgeTupleType *coo = (EdgeTupleType*) malloc(sizeof(EdgeTupleType) * graph.edges);
+    if (src == -1)
+    {
+        // Perform full exact BC using BGL
+
+        using namespace boost;
+        typedef adjacency_list <setS, vecS, undirectedS, no_property,
+                EdgeProperties> Graph;
+        typedef Graph::vertex_descriptor Vertex;
+        typedef Graph::edge_descriptor Edge;
+
+        Graph G;
+        for (int i = 0; i < graph.nodes; ++i)
+        {
+            for (int j = graph.row_offsets[i]; j < graph.row_offsets[i + 1]; ++j)
+            {
+                add_edge(vertex(i, G), vertex(graph.column_indices[j], G), G);
+            }
+        }
+
+        typedef std::map<Edge, int> StdEdgeIndexMap;
+        StdEdgeIndexMap my_e_index;
+        typedef boost::associative_property_map< StdEdgeIndexMap > EdgeIndexMap;
+        EdgeIndexMap e_index(my_e_index);
+
+        int i = 0;
+        BGL_FORALL_EDGES(edge, G, Graph)
+        {
+            my_e_index.insert(std::pair<Edge, int>(edge, i));
+            ++i;
+        }
+
+        // Define EdgeCentralityMap
+        std::vector< double > e_centrality_vec(boost::num_edges(G), 0.0);
+        // Create the external property map
+        boost::iterator_property_map< std::vector< double >::iterator,
+              EdgeIndexMap >
+              e_centrality_map(e_centrality_vec.begin(), e_index);
+
+        // Define VertexCentralityMap
+        typedef boost::property_map< Graph, boost::vertex_index_t>::type
+        VertexIndexMap;
+        VertexIndexMap v_index = get(boost::vertex_index, G);
+        std::vector< double > v_centrality_vec(boost::num_vertices(G), 0.0);
+
+        // Create the external property map
+        boost::iterator_property_map< std::vector< double >::iterator,
+              VertexIndexMap>
+              v_centrality_map(v_centrality_vec.begin(), v_index);
+
+        // Perform BC
+        CpuTimer cpu_timer;
+        cpu_timer.Start();
+        brandes_betweenness_centrality(G, v_centrality_map, e_centrality_map);
+        cpu_timer.Stop();
+        float elapsed = cpu_timer.ElapsedMillis();
+
+        BGL_FORALL_VERTICES(vertex, G, Graph)
+        {
+            bc_values[vertex] = (Value)v_centrality_map[vertex];
+        }
+
+        int idx = 0;
+        BGL_FORALL_EDGES(edge, G, Graph)
+        {
+            coo[idx].row = source(edge, G);
+            coo[idx].col = target(edge, G);
+            coo[idx++].val = (Value)e_centrality_map[edge];
+            coo[idx].col = source(edge, G);
+            coo[idx].row = target(edge, G);
+            coo[idx++].val = (Value)e_centrality_map[edge];
+        }
+
+        std::stable_sort(coo, coo + graph.edges,
+                         RowFirstTupleCompare<EdgeTupleType>);
+
+        for (idx = 0; idx < graph.edges; ++idx)
+        {
+            //std::cout << coo[idx].row << "," << coo[idx].col
+            //          << ":" << coo[idx].val << std::endl;
+            //ebc_values[idx] = coo[idx].val;
+        }
+
+        if (!quiet)
+        {
+            printf("CPU BC finished in %lf msec.", elapsed);
+        }
+    }
+    else
+    {
+        //Simple BFS pass to get single pass BC
+        //VertexId *source_path = new VertexId[graph.nodes];
+
+        //initialize distances
+        for (VertexId i = 0; i < graph.nodes; ++i)
+        {
+            source_path[i] = -1;
+            bc_values[i] = 0;
+            sigmas[i] = 0;
+        }
+        source_path[src] = 0;
+        VertexId search_depth = 0;
+        sigmas[src] = 1;
+
+        // Initialize queue for managing previously-discovered nodes
+        std::deque<VertexId> frontier;
+        frontier.push_back(src);
+
+        //
+        //Perform one pass of BFS for one source
+        //
+
+        CpuTimer cpu_timer;
+        cpu_timer.Start();
+        while (!frontier.empty())
+        {
+
+            // Dequeue node from frontier
+            VertexId dequeued_node = frontier.front();
+            frontier.pop_front();
+            VertexId neighbor_dist = source_path[dequeued_node] + 1;
+
+            // Locate adjacency list
+            int edges_begin = graph.row_offsets[dequeued_node];
+            int edges_end = graph.row_offsets[dequeued_node + 1];
+
+            for (int edge = edges_begin; edge < edges_end; ++edge)
+            {
+                // Lookup neighbor and enqueue if undiscovered
+                VertexId neighbor = graph.column_indices[edge];
+                if (source_path[neighbor] == -1)
+                {
+                    source_path[neighbor] = neighbor_dist;
+                    sigmas[neighbor] += sigmas[dequeued_node];
+                    if (search_depth < neighbor_dist)
+                    {
+                        search_depth = neighbor_dist;
+                    }
+
+                    frontier.push_back(neighbor);
+                }
+                else
+                {
+                    if (source_path[neighbor] == source_path[dequeued_node] + 1)
+                        sigmas[neighbor] += sigmas[dequeued_node];
+                }
+            }
+        }
+        search_depth++;
+
+        for (int iter = search_depth - 2; iter > 0; --iter)
+        {
+
+            int cur_level = 0;
+            for (int node = 0; node < graph.nodes; ++node)
+            {
+                if (source_path[node] == iter)
+                {
+                    ++cur_level;
+                    int edges_begin = graph.row_offsets[node];
+                    int edges_end = graph.row_offsets[node + 1];
+
+                    for (int edge = edges_begin; edge < edges_end; ++edge)
+                    {
+                        VertexId neighbor = graph.column_indices[edge];
+                        if (source_path[neighbor] == iter + 1)
+                        {
+                            bc_values[node] +=
+                                1.0f * sigmas[node] / sigmas[neighbor] *
+                                (1.0f + bc_values[neighbor]);
+                        }
+                    }
+                }
+            }
+        }
+
+        for (int i = 0; i < graph.nodes; ++i)
+        {
+            bc_values[i] *= 0.5f;
+        }
+
+        cpu_timer.Stop();
+        float elapsed = cpu_timer.ElapsedMillis();
+
+        if (!quiet)
+        {
+            printf("CPU BC finished in %lf msec. Search depth: %d\n",
+                   elapsed, search_depth);
+        }
+
+        //delete[] source_path;
+    }
+    free(coo);
 }
 
 /**
- * @brief Run tests
+ * @brief Convert component IDs.
+ *
+ * @tparam VertexId
+ * @tparam SizeT
+ *
+ * @param[in] labels
+ * @param[in] num_nodes
+ * @param[in] num_components
+ */
+template <
+    typename VertexId,
+    typename SizeT >
+void ConvertIDs(
+    VertexId *labels,
+    SizeT    num_nodes,
+    SizeT    num_components)
+{
+    VertexId *min_nodes = new VertexId[num_nodes];
+
+    for (int cc = 0; cc < num_nodes; cc++)
+        min_nodes[cc] = num_nodes;
+    for (int node = 0; node < num_nodes; node++)
+        if (min_nodes[labels[node]] > node) min_nodes[labels[node]] = node;
+    for (int node = 0; node < num_nodes; node++)
+        labels[node] = min_nodes[labels[node]];
+    delete[] min_nodes; min_nodes = NULL;
+}
+
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
+template <
+    typename VertexId,
+    typename Value,
+    typename SizeT,
+    bool INSTRUMENT,
+    bool DEBUG,
+    bool SIZE_CHECK >
+VertexId RunCC(Info<VertexId, Value, SizeT> *info)
+{
+    typedef CCProblem < VertexId,
+            SizeT,
+            Value,
+            false > CcProblem;  // use double buffer for advance and filter
+
+    typedef CCEnactor < CcProblem,
+            INSTRUMENT,
+            DEBUG,
+            SIZE_CHECK > CcEnactor;
+
+    // parse configurations from mObject info
+    Csr<VertexId, Value, SizeT> *graph = info->csr_ptr;
+    int max_grid_size            = info->info["max_grid_size"].get_int();
+    int num_gpus                 = info->info["num_gpus"].get_int();
+    double max_queue_sizing      = info->info["max_queue_sizing"].get_real();
+    double max_queue_sizing1     = info->info["max_queue_sizing1"].get_real();
+    double max_in_sizing         = info->info["max_in_sizing"].get_real();
+    std::string partition_method = info->info["partition_method"].get_str();
+    double partition_factor      = info->info["partition_factor"].get_real();
+    int partition_seed           = info->info["partition_seed"].get_int();
+    bool quiet_mode              = info->info["quiet_mode"].get_bool();
+    bool quick_mode              = info->info["quick_mode"].get_bool();
+    bool stream_from_host        = info->info["stream_from_host"].get_bool();
+    int traversal_mode           = info->info["traversal_mode"].get_int();
+    int iterations               = 1; //set to 1 for now. info->info["num_iteration"].get_int();
+
+    json_spirit::mArray device_list = info->info["device_list"].get_array();
+    int* gpu_idx = new int[num_gpus];
+    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
+
+    // TODO: remove after merge mgpu-cq
+    ContextPtr   *context = (ContextPtr*)  info->context;
+    cudaStream_t *streams = (cudaStream_t*)info->streams;
+
+    // Allocate host-side array (for both reference and GPU-computed results)
+    VertexId    *reference_component_ids = new VertexId[graph->nodes];
+    VertexId    *h_component_ids        = new VertexId[graph->nodes];
+    VertexId    *reference_check        = (quick_mode) ? NULL : reference_component_ids;
+    unsigned int ref_num_components     = 0;
+
+    //printf("0: node %d: %d -> %d, node %d: %d -> %d\n", 131070, graph->row_offsets[131070], graph->row_offsets[131071], 131071, graph->row_offsets[131071], graph->row_offsets[131072]);
+    //for (int edge = 0; edge < graph->edges; edge ++)
+    //{
+    //    if (graph->column_indices[edge] == 131070 || graph->column_indices[edge] == 131071)
+    //    printf("edge %d: -> %d\n", edge, graph->column_indices[edge]);
+    //}
+
+    //util::cpu_mt::PrintCPUArray("row_offsets", graph->row_offsets, graph->nodes+1);
+    //util::cpu_mt::PrintCPUArray("colunm_indices", graph->column_indices, graph->edges);
+    size_t *org_size = new size_t[num_gpus];
+    for (int gpu = 0; gpu < num_gpus; gpu++)
+    {
+        size_t dummy;
+        cudaSetDevice(gpu_idx[gpu]);
+        cudaMemGetInfo(&(org_size[gpu]), &dummy);
+    }
+
+    CcEnactor* enactor = new CcEnactor(num_gpus, gpu_idx);  // enactor map
+    CcProblem* problem = new CcProblem;  // allocate problem on GPU
+
+    util::GRError(problem->Init(
+                      stream_from_host,
+                      graph,
+                      NULL,
+                      num_gpus,
+                      gpu_idx,
+                      partition_method,
+                      streams,
+                      max_queue_sizing,
+                      max_in_sizing,
+                      partition_factor,
+                      partition_seed),
+                  "CC Problem Initialization Failed", __FILE__, __LINE__);
+    util::GRError(enactor->Init(context, problem, max_grid_size),
+                  "CC Enactor Init failed", __FILE__, __LINE__);
+
+    // compute reference CPU CC
+    if (reference_check != NULL)
+    {
+        if (!quiet_mode) { printf("Computing reference value ...\n"); }
+        ref_num_components = ReferenceCC(*graph, reference_check, quiet_mode);
+        if (!quiet_mode) { printf("\n"); }
+    }
+
+    // perform CC
+    CpuTimer cpu_timer;
+    float elapsed = 0.0f;
+
+    for (SizeT iter = 0; iter < iterations; ++iter)
+    {
+        util::GRError(problem->Reset(
+                          enactor->GetFrontierType(), max_queue_sizing),
+                      "CC Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(enactor->Reset(),
+                      "CC Enactor Reset failed", __FILE__, __LINE__);
+
+        if (!quiet_mode)
+        {
+            printf("_________________________\n"); fflush(stdout);
+        }
+        cpu_timer.Start();
+        util::GRError(enactor->Enact(),
+                      "CC Problem Enact Failed", __FILE__, __LINE__);
+        cpu_timer.Stop();
+        if (!quiet_mode)
+        {
+            printf("-------------------------\n"); fflush(stdout);
+        }
+        elapsed += cpu_timer.ElapsedMillis();
+    }
+    elapsed /= iterations;
+
+    // copy out results
+    util::GRError(problem->Extract(h_component_ids),
+                  "CC Problem Data Extraction Failed", __FILE__, __LINE__);
+
+    // validity
+    if (reference_check != NULL)
+    {
+        if (ref_num_components == problem->num_components)
+        {
+            if (!quiet_mode)
+            {
+                printf("CORRECT. Component Count: %d\n", ref_num_components);
+            }
+        }
+        else
+        {
+            if (!quiet_mode)
+            {
+                printf(
+                    "INCORRECT. Ref Component Count: %d, "
+                    "GPU Computed Component Count: %d\n",
+                    ref_num_components, problem->num_components);
+            }
+        }
+    }
+    else
+    {
+        if (!quiet_mode)
+        {
+            printf("Component Count: %lld\n", (long long) problem->num_components);
+        }
+    }
+    if (reference_check != NULL)
+    {
+        ConvertIDs<VertexId, SizeT>(reference_check, graph->nodes, ref_num_components);
+        ConvertIDs<VertexId, SizeT>(h_component_ids, graph->nodes, problem->num_components);
+        if (!quiet_mode)
+        {
+            printf("Label Validity: ");
+        }
+        int error_num = CompareResults(
+                            h_component_ids, reference_check, graph->nodes, true, quiet_mode);
+        if (error_num > 0)
+        {
+            if (!quiet_mode) { printf("%d errors occurred.\n", error_num); }
+        }
+        else
+        {
+            if (!quiet_mode) { printf("\n"); }
+        }
+    }
+
+        // Compute size and root of each component
+        VertexId     *h_roots      = new VertexId    [problem->num_components];
+        unsigned int *h_histograms = new unsigned int[problem->num_components];
+
+        //printf("num_components = %d\n", problem->num_components);
+        problem->ComputeCCHistogram(h_component_ids, h_roots, h_histograms);
+        //printf("num_components = %d\n", problem->num_components);
+
+            // Display Solution
+        VertexId largest_cc_id = DisplayCCSolution(h_component_ids, graph->nodes,
+                            problem->num_components, h_roots, h_histograms);
+
+        if (h_roots     ) {delete[] h_roots     ; h_roots      = NULL;}
+        if (h_histograms) {delete[] h_histograms; h_histograms = NULL;}
+
+    info->ComputeCommonStats(  // compute running statistics
+        enactor->enactor_stats.GetPointer(), elapsed, h_component_ids);
+
+    if (!quiet_mode)
+    {
+        info->DisplayStats();  // display collected statistics
+    }
+
+    info->CollectInfo();  // collected all the info and put into JSON mObject
+
+    if (!quiet_mode)
+    {
+        printf("\n\tMemory Usage(B)\t");
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+            if (num_gpus > 1)
+            {
+                if (gpu != 0) printf(" #keys%d\t #ins%d,0\t #ins%d,1", gpu, gpu, gpu);
+                else printf(" $keys%d", gpu);
+            }
+            else printf(" #keys%d", gpu);
+        if (num_gpus > 1) printf(" #keys%d", num_gpus);
+        printf("\n");
+
+        double max_key_sizing = 0, max_in_sizing_ = 0;
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            size_t gpu_free, dummy;
+            cudaSetDevice(gpu_idx[gpu]);
+            cudaMemGetInfo(&gpu_free, &dummy);
+            printf("GPU_%d\t %ld", gpu_idx[gpu], org_size[gpu] - gpu_free);
+            for (int i = 0; i < num_gpus; i++)
+            {
+                SizeT x = problem->data_slices[gpu]->frontier_queues[i].keys[0].GetSize();
+                printf("\t %d", x);
+                double factor = 1.0 * x / (num_gpus > 1 ? problem->graph_slices[gpu]->in_counter[i] : problem->graph_slices[gpu]->nodes);
+                if (factor > max_key_sizing) max_key_sizing = factor;
+                if (num_gpus > 1 && i != 0 )
+                    for (int t = 0; t < 2; t++)
+                    {
+                        x = problem->data_slices[gpu][0].keys_in[t][i].GetSize();
+                        printf("\t %d", x);
+                        factor = 1.0 * x / problem->graph_slices[gpu]->in_counter[i];
+                        if (factor > max_in_sizing_) max_in_sizing_ = factor;
+                    }
+            }
+            if (num_gpus > 1) printf("\t %d", problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
+            printf("\n");
+        }
+        printf("\t key_sizing =\t %lf", max_key_sizing);
+        if (num_gpus > 1) printf("\t in_sizing =\t %lf", max_in_sizing_);
+        printf("\n");
+    }
+
+    // Cleanup
+    if (org_size               ) {delete[] org_size               ; org_size                = NULL;}
+    if (problem                ) {delete   problem                ; problem                 = NULL;}
+    if (enactor                ) {delete   enactor                ; enactor                 = NULL;}
+    if (reference_component_ids) {delete[] reference_component_ids; reference_component_ids = NULL;}
+    if (h_component_ids        ) {delete[] h_component_ids        ; h_component_ids         = NULL;}
+
+    return largest_cc_id;
+}
+
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
+template <
+    typename      VertexId,
+    typename      Value,
+    typename      SizeT,
+    bool          INSTRUMENT,
+    bool          DEBUG >
+VertexId RunCC_size_check(Info<VertexId, Value, SizeT> *info)
+{
+    if (info->info["size_check"].get_bool())
+    {
+        return RunCC<VertexId, Value, SizeT, INSTRUMENT, DEBUG,  true>(info);
+    }
+    else
+    {
+        return RunCC<VertexId, Value, SizeT, INSTRUMENT, DEBUG, false>(info);
+    }
+}
+
+
+/**
+ * @brief RunTests entry
  *
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
  * @tparam INSTRUMENT
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] max_grid_size
- * @param[in] num_gpus
- * @param[in] max_queue_sizing
- * @param[in] context CudaContext pointer for moderngpu APIs
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
+template <
+    typename    VertexId,
+    typename    Value,
+    typename    SizeT,
+    bool        INSTRUMENT >
+VertexId RunCC_debug(Info<VertexId, Value, SizeT> *info)
+{
+    if (info->info["debug_mode"].get_bool())
+    {
+        return RunCC_size_check<VertexId, Value, SizeT, INSTRUMENT,  true>(info);
+    }
+    else
+    {
+        return RunCC_size_check<VertexId, Value, SizeT, INSTRUMENT, false>(info);
+    }
+}
+
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
+template <
+    typename      VertexId,
+    typename      Value,
+    typename      SizeT >
+VertexId RunCC_instrumented(Info<VertexId, Value, SizeT> *info)
+{
+    if (info->info["instrument"].get_bool())
+    {
+        return RunCC_debug<VertexId, Value, SizeT, true>(info);
+    }
+    else
+    {
+        return RunCC_debug<VertexId, Value, SizeT, false>(info);
+    }
+}
+
+/**
+ * @brief Run BFS tests
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
+ * @tparam MARK_PREDECESSORS
+ * @tparam ENABLE_IDEMPOTENCE
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
+template <
+    typename    VertexId,
+    typename    Value,
+    typename    SizeT,
+    bool        INSTRUMENT,
+    bool        DEBUG,
+    bool        SIZE_CHECK,
+    bool        MARK_PREDECESSORS,
+    bool        ENABLE_IDEMPOTENCE >
+void RunBFS(Info<VertexId, Value, SizeT> *info, VertexId src_input)
+{
+    typedef BFSProblem < VertexId,
+            SizeT,
+            Value,
+            MARK_PREDECESSORS,
+            ENABLE_IDEMPOTENCE,
+            (MARK_PREDECESSORS && ENABLE_IDEMPOTENCE) >
+            BfsProblem;  // does not use double buffer
+
+    typedef BFSEnactor < BfsProblem,
+            INSTRUMENT,
+            DEBUG,
+            SIZE_CHECK >
+            BfsEnactor;
+
+    // parse configurations from mObject info
+    Csr<VertexId, Value, SizeT> *graph = info->csr_ptr;
+    VertexId src                 = src_input;
+    info->info["source_vertex"] = src;
+    int max_grid_size            = info->info["max_grid_size"].get_int();
+    int num_gpus                 = info->info["num_gpus"].get_int();
+    double max_queue_sizing      = info->info["max_queue_sizing"].get_real();
+    double max_queue_sizing1     = info->info["max_queue_sizing1"].get_real();
+    double max_in_sizing         = info->info["max_in_sizing"].get_real();
+    std::string partition_method = info->info["partition_method"].get_str();
+    double partition_factor      = info->info["partition_factor"].get_real();
+    int partition_seed           = info->info["partition_seed"].get_int();
+    bool quiet_mode              = info->info["quiet_mode"].get_bool();
+    bool quick_mode              = info->info["quick_mode"].get_bool();
+    bool stream_from_host        = info->info["stream_from_host"].get_bool();
+    int traversal_mode           = info->info["traversal_mode"].get_int();
+    int iterations               = 1; //disable since doesn't support mgpu stop condition. info->info["num_iteration"].get_int();
+
+    json_spirit::mArray device_list = info->info["device_list"].get_array();
+    int* gpu_idx = new int[num_gpus];
+    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
+
+    // TODO: remove after merge mgpu-cq
+    ContextPtr   *context = (ContextPtr*)  info->context;
+    cudaStream_t *streams = (cudaStream_t*)info->streams;
+
+    // allocate host-side label array (for both reference and GPU results)
+    VertexId *reference_labels      = new VertexId[graph->nodes];
+    VertexId *reference_preds       = new VertexId[graph->nodes];
+    VertexId *h_labels              = new VertexId[graph->nodes];
+    VertexId *reference_check_label = (quick_mode) ? NULL : reference_labels;
+    VertexId *reference_check_preds = NULL;
+    VertexId *h_preds               = NULL;
+
+    if (MARK_PREDECESSORS)
+    {
+        h_preds = new VertexId[graph->nodes];
+        if (!quick_mode)
+        {
+            reference_check_preds = reference_preds;
+        }
+    }
+
+    size_t *org_size = new size_t[num_gpus];
+    for (int gpu = 0; gpu < num_gpus; gpu++)
+    {
+        size_t dummy;
+        cudaSetDevice(gpu_idx[gpu]);
+        cudaMemGetInfo(&(org_size[gpu]), &dummy);
+    }
+
+    BfsEnactor* enactor = new BfsEnactor(num_gpus, gpu_idx);  // enactor map
+    BfsProblem* problem = new BfsProblem;  // allocate problem on GPU
+
+    util::GRError(problem->Init(
+                      stream_from_host,
+                      graph,
+                      NULL,
+                      num_gpus,
+                      gpu_idx,
+                      partition_method,
+                      streams,
+                      max_queue_sizing,
+                      max_in_sizing,
+                      partition_factor,
+                      partition_seed),
+                  "BFS Problem Init failed", __FILE__, __LINE__);
+
+    util::GRError(enactor->Init(
+                      context, problem, max_grid_size, traversal_mode),
+                  "BFS Enactor Init failed", __FILE__, __LINE__);
+
+    // compute reference CPU BFS solution for source-distance
+    if (reference_check_label != NULL)
+    {
+        if (!quiet_mode)
+        {
+            printf("Computing reference value ...\n");
+        }
+        ReferenceBFS<VertexId, Value, SizeT,
+                     MARK_PREDECESSORS, ENABLE_IDEMPOTENCE>(
+                         graph, reference_check_label,
+                         reference_check_preds, src, quiet_mode);
+        if (!quiet_mode)
+        {
+            printf("\n");
+        }
+    }
+
+    // perform BFS
+    double elapsed = 0.0f;
+    CpuTimer cpu_timer;
+
+    for (int iter = 0; iter < iterations; ++iter)
+    {
+        util::GRError(problem->Reset(
+                          src, enactor->GetFrontierType(),
+                          max_queue_sizing, max_queue_sizing1),
+                      "BFS Problem Data Reset Failed", __FILE__, __LINE__);
+
+        util::GRError(enactor->Reset(),
+                      "BFS Enactor Reset failed", __FILE__, __LINE__);
+
+        util::GRError("Error before Enact", __FILE__, __LINE__);
+
+        if (!quiet_mode)
+        {
+            printf("__________________________\n"); fflush(stdout);
+        }
+
+        cpu_timer.Start();
+        util::GRError(enactor->Enact(src, traversal_mode),
+                      "BFS Problem Enact Failed", __FILE__, __LINE__);
+        cpu_timer.Stop();
+
+        if (!quiet_mode)
+        {
+            printf("--------------------------\n"); fflush(stdout);
+        }
+
+        elapsed += cpu_timer.ElapsedMillis();
+    }
+
+    elapsed /= iterations;
+
+    // copy out results
+    util::GRError(problem->Extract(h_labels, h_preds),
+                  "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
+
+    // verify the result
+    if (reference_check_label != NULL)
+    {
+        if (!ENABLE_IDEMPOTENCE)
+        {
+            if (!quiet_mode)
+            {
+                printf("Label Validity: ");
+            }
+            int error_num = CompareResults(
+                                h_labels, reference_check_label,
+                                graph->nodes, true, quiet_mode);
+            if (error_num > 0)
+            {
+                if (!quiet_mode)
+                {
+                    printf("%d errors occurred.\n", error_num);
+                }
+            }
+        }
+        else
+        {
+            if (!MARK_PREDECESSORS)
+            {
+                if (!quiet_mode)
+                {
+                    printf("Label Validity: ");
+                }
+                int error_num = CompareResults(
+                                    h_labels, reference_check_label,
+                                    graph->nodes, true, quiet_mode);
+                if (error_num > 0)
+                {
+                    if (!quiet_mode)
+                    {
+                        printf("%d errors occurred.\n", error_num);
+                    }
+                }
+            }
+        }
+    }
+
+    // display Solution
+    if (!quiet_mode)
+    {
+        DisplayBFSSolution<VertexId, SizeT, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE>
+        (h_labels, h_preds, graph->nodes, quiet_mode);
+    }
+
+    info->ComputeTraversalStats(  // compute running statistics
+        enactor->enactor_stats.GetPointer(), elapsed, h_labels);
+
+    if (!quiet_mode)
+    {
+        info->DisplayStats();  // display collected statistics
+    }
+
+    info->CollectInfo();  // collected all the info and put into JSON mObject
+
+    if (!quiet_mode)
+    {
+        printf("\n\tMemory Usage(B)\t");
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+            if (num_gpus > 1)
+            {
+                if (gpu != 0)
+                {
+                    printf(" #keys%d,0\t #keys%d,1\t #ins%d,0\t #ins%d,1",
+                           gpu, gpu, gpu, gpu);
+                }
+                else
+                {
+                    printf(" #keys%d,0\t #keys%d,1", gpu, gpu);
+                }
+            }
+            else
+            {
+                printf(" #keys%d,0\t #keys%d,1", gpu, gpu);
+            }
+        if (num_gpus > 1)
+        {
+            printf(" #keys%d", num_gpus);
+        }
+        printf("\n");
+        double max_queue_sizing_[2] = {0, 0 }, max_in_sizing_ = 0;
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            size_t gpu_free, dummy;
+            cudaSetDevice(gpu_idx[gpu]);
+            cudaMemGetInfo(&gpu_free, &dummy);
+            printf("GPU_%d\t %ld", gpu_idx[gpu], org_size[gpu] - gpu_free);
+            for (int i = 0; i < num_gpus; i++)
+            {
+                for (int j = 0; j < 2; j++)
+                {
+                    SizeT x = problem->data_slices[gpu]->frontier_queues[i].keys[j].GetSize();
+                    printf("\t %lld", (long long) x);
+                    double factor = 1.0 * x / (num_gpus > 1 ? problem->graph_slices[gpu]->in_counter[i] : problem->graph_slices[gpu]->nodes);
+                    if (factor > max_queue_sizing_[j])
+                    {
+                        max_queue_sizing_[j] = factor;
+                    }
+                }
+                if (num_gpus > 1 && i != 0 )
+                {
+                    for (int t = 0; t < 2; t++)
+                    {
+                        SizeT x = problem->data_slices[gpu][0].keys_in[t][i].GetSize();
+                        printf("\t %lld", (long long) x);
+                        double factor = 1.0 * x / problem->graph_slices[gpu]->in_counter[i];
+                        if (factor > max_in_sizing_)
+                        {
+                            max_in_sizing_ = factor;
+                        }
+                    }
+                }
+            }
+            if (num_gpus > 1)
+            {
+                printf("\t %lld", (long long)(problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize()));
+            }
+            printf("\n");
+        }
+        printf("\t queue_sizing =\t %lf \t %lf", max_queue_sizing_[0], max_queue_sizing_[1]);
+        if (num_gpus > 1)
+        {
+            printf("\t in_sizing =\t %lf", max_in_sizing_);
+        }
+        printf("\n");
+    }
+
+    // Clean up
+    if (org_size        ) {delete[] org_size        ; org_size         = NULL;}
+    if (enactor         ) {delete   enactor         ; enactor          = NULL;}
+    if (problem         ) {delete   problem         ; problem          = NULL;}
+    if (reference_labels) {delete[] reference_labels; reference_labels = NULL;}
+    if (reference_preds ) {delete[] reference_preds ; reference_preds  = NULL;}
+    if (h_labels        ) {delete[] h_labels        ; h_labels         = NULL;}
+    if (h_preds         ) {delete[] h_preds         ; h_preds          = NULL;}
+}
+
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
+ * @tparam MARK_PREDECESSORS
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
+template <
+    typename    VertexId,
+    typename    Value,
+    typename    SizeT,
+    bool        INSTRUMENT,
+    bool        DEBUG,
+    bool        SIZE_CHECK,
+    bool        MARK_PREDECESSORS >
+void RunBFS_enable_idempotence(Info<VertexId, Value, SizeT> *info, VertexId src)
+{
+    if (info->info["idempotent"].get_bool())
+    {
+        RunBFS <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
+                 MARK_PREDECESSORS, true > (info, src);
+    }
+    else
+    {
+        RunBFS <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
+                 MARK_PREDECESSORS, false> (info, src);
+    }
+}
+
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
+template <
+    typename    VertexId,
+    typename    Value,
+    typename    SizeT,
+    bool        INSTRUMENT,
+    bool        DEBUG,
+    bool        SIZE_CHECK >
+void RunBFS_mark_predecessors(Info<VertexId, Value, SizeT> *info, VertexId src)
+{
+    if (info->info["mark_predecessors"].get_bool())
+    {
+        RunBFS_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
+                                    DEBUG, SIZE_CHECK,  true> (info, src);
+    }
+    else
+    {
+        RunBFS_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
+                                    DEBUG, SIZE_CHECK, false> (info, src);
+    }
+}
+
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
+template <
+    typename      VertexId,
+    typename      Value,
+    typename      SizeT,
+    bool          INSTRUMENT,
+    bool          DEBUG >
+void RunBFS_size_check(Info<VertexId, Value, SizeT> *info, VertexId src)
+{
+    if (info->info["size_check"].get_bool())
+    {
+        RunBFS_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
+                                   DEBUG,  true>(info, src);
+    }
+    else
+    {
+        RunBFS_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
+                                   DEBUG, false>(info, src);
+    }
+}
+
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
+template <
+    typename    VertexId,
+    typename    Value,
+    typename    SizeT,
+    bool        INSTRUMENT >
+void RunBFS_debug(Info<VertexId, Value, SizeT> *info, VertexId src)
+{
+    if (info->info["debug_mode"].get_bool())
+    {
+        RunBFS_size_check<VertexId, Value, SizeT, INSTRUMENT,  true>(info, src);
+    }
+    else
+    {
+        RunBFS_size_check<VertexId, Value, SizeT, INSTRUMENT, false>(info, src);
+    }
+}
+
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
+template <
+    typename      VertexId,
+    typename      Value,
+    typename      SizeT >
+void RunBFS_instrumented(Info<VertexId, Value, SizeT> *info, VertexId src)
+{
+    if (info->info["instrument"].get_bool())
+    {
+        RunBFS_debug<VertexId, Value, SizeT, true>(info, src);
+    }
+    else
+    {
+        RunBFS_debug<VertexId, Value, SizeT, false>(info, src);
+    }
+}
+
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename VertexId,
     typename Value,
     typename SizeT,
-    bool INSTRUMENT>
-void RunTests(
-    const Csr<VertexId, Value, SizeT> &graph,
-    int max_grid_size,
-    int num_gpus,
-    double max_queue_sizing,
-    CudaContext& context)
+    bool INSTRUMENT,
+    bool DEBUG,
+    bool SIZE_CHECK >
+void RunBC(Info<VertexId, Value, SizeT> *info)
 {
-    typedef CCProblem<
-        VertexId,
-        SizeT,
-        Value,
-        true> CCProblem_T; //use double buffer for edgemap and vertexmap.
+    typedef BCProblem < VertexId,
+            SizeT,
+            Value,
+            true,   // MARK_PREDECESSORS
+            false > BcProblem;  //does not use double buffer
 
-    // Allocate host-side label array (for both reference and
-    // gpu-computed results)
-    VertexId    *reference_component_ids        =
-        (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-    VertexId    *h_component_ids                =
-        (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-    VertexId    *reference_check                =
-        (g_quick) ? NULL : reference_component_ids;
-    unsigned int ref_num_components             = 0;
+    typedef BCEnactor < BcProblem,
+            INSTRUMENT,
+            DEBUG,
+            SIZE_CHECK >
+            BcEnactor;
 
-    // Allocate CC enactor
-    CCEnactor<INSTRUMENT> cc_enactor(g_verbose);
+    // parse configurations from mObject info
+    Csr<VertexId, Value, SizeT> *graph = info->csr_ptr;
+    VertexId src                 = info->info["source_vertex"].get_int64();
+    bool quiet_mode              = info->info["quiet_mode"].get_bool();
+    int max_grid_size            = info->info["max_grid_size"].get_int();
+    int num_gpus                 = info->info["num_gpus"].get_int();
+    double max_queue_sizing      = info->info["max_queue_sizing"].get_real();
+    double max_queue_sizing1     = info->info["max_queue_sizing1"].get_real();
+    double max_in_sizing         = info->info["max_in_sizing"].get_real();
+    std::string partition_method = info->info["partition_method"].get_str();
+    double partition_factor      = info->info["partition_factor"].get_real();
+    int partition_seed           = info->info["partition_seed"].get_int();
+    bool quick_mode              = info->info["quick_mode"].get_bool();
+    bool stream_from_host        = info->info["stream_from_host"].get_bool();
+    int iterations               = 1; // force to 1 info->info["num_iteration"].get_int();
+    std::string ref_filename     = info->info["ref_filename"].get_str();
 
-    // Allocate problem on GPU
-    CCProblem_T *cc_problem = new CCProblem_T;
-    util::GRError(cc_problem->Init(
-                      g_stream_from_host,
-                      graph,
-                      num_gpus),
-                  "CC Problem Initialization Failed", __FILE__, __LINE__);
+    json_spirit::mArray device_list = info->info["device_list"].get_array();
+    int* gpu_idx = new int[num_gpus];
+    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
 
-    //
-    // Compute reference CPU CC solution for source-distance
-    //
-    if (reference_check != NULL)
-        {
-            printf("compute ref value\n");
-            ref_num_components = RefCPUCC(
-                graph.row_offsets,
-                graph.column_indices,
-                graph.nodes,
-                reference_check);
-            printf("\n");
-        }
+    // TODO: remove after merge mgpu-cq
+    ContextPtr   *context = (ContextPtr*)  info->context;
+    cudaStream_t *streams = (cudaStream_t*)info->streams;
 
-    // Perform CC
-    GpuTimer gpu_timer;
+    // Allocate host-side array (for both reference and GPU-computed results)
+    Value        *reference_bc_values        = new Value   [graph->nodes];
+    Value        *reference_ebc_values       = new Value   [graph->edges];
+    Value        *reference_sigmas           = new Value   [graph->nodes];
+    VertexId     *reference_labels           = new VertexId[graph->nodes];
+    Value        *h_sigmas                   = new Value   [graph->nodes];
+    Value        *h_bc_values                = new Value   [graph->nodes];
+    Value        *h_ebc_values               = new Value   [graph->edges];
+    VertexId     *h_labels                   = new VertexId[graph->nodes];
+    Value        *reference_check_bc_values  = (quick_mode)                ? NULL : reference_bc_values;
+    Value        *reference_check_ebc_values = (quick_mode || (src != -1)) ? NULL : reference_ebc_values;
+    Value        *reference_check_sigmas     = (quick_mode || (src == -1)) ? NULL : reference_sigmas;
+    VertexId     *reference_check_labels     = (quick_mode || (src == -1)) ? NULL : reference_labels;
 
-    util::GRError(
-        cc_problem->Reset(cc_enactor.GetFrontierType()),
-        "CC Problem Data Reset Failed", __FILE__, __LINE__);
-    gpu_timer.Start();
-    util::GRError(
-        cc_enactor.Enact(cc_problem, max_grid_size),
-        "CC Problem Enact Failed", __FILE__, __LINE__);
-    gpu_timer.Stop();
-
-    float elapsed = gpu_timer.ElapsedMillis();
-
-    // Copy out results
-    util::GRError(
-        cc_problem->Extract(h_component_ids),
-        "CC Problem Data Extraction Failed", __FILE__, __LINE__);
-
-    int num_errors = 0;
-    // Validity
-    if (ref_num_components == cc_problem->num_components)
-        printf("CORRECT.\n");
-    else {
-        printf("INCORRECT. Ref Component Count: %d, "
-               "GPU Computed Component Count: %d\n",
-               ref_num_components, cc_problem->num_components);
-        printf("TEST FAILED\n");
-        return;
+    size_t *org_size = new size_t[num_gpus];
+    for (int gpu = 0; gpu < num_gpus; gpu++)
+    {
+        size_t dummy;
+        cudaSetDevice(gpu_idx[gpu]);
+        cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
 
-    // Compute size and root of each component
-    VertexId        *h_roots            =
-        new VertexId[cc_problem->num_components];
-    unsigned int    *h_histograms       =
-        new unsigned int[cc_problem->num_components];
+    BcEnactor* enactor = new BcEnactor(num_gpus, gpu_idx);  // enactor map
+    BcProblem* problem = new BcProblem;  // allocate problem on GPU
 
-    cc_problem->ComputeCCHistogram(h_component_ids, h_roots, h_histograms);
-
-    // Display Solution
-    DisplayCCSolution(h_component_ids, graph.nodes, ref_num_components);
-
-    typedef CcList<VertexId> CcListType;
-    //sort the components by size
-    CcListType *cclist =
-        (CcListType*)malloc(sizeof(CcListType) * ref_num_components);
-    for (int i = 0; i < ref_num_components; ++i) {
-        cclist[i].root = h_roots[i];
-        cclist[i].histogram = h_histograms[i];
-    }
-    std::stable_sort(
-        cclist, cclist + ref_num_components, CCCompare<CcListType>);
-
-    // Print out at most top 10 largest components
-    int top = (ref_num_components < 10) ? ref_num_components : 10;
-    printf("Top %d largest components:\n", top);
-    for (int i = 0; i < top; ++i)
-        {
-            printf("CC ID: %d, CC Root: %d, CC Size: %d\n",
-                   i, cclist[i].root, cclist[i].histogram);
-        }
-
-    printf("GPU Connected Component finished in %lf msec.\n", elapsed);
-
-    VertexId src = cclist[0].root;      // Set the root of the largest
-                                        // components as BFS source
-
-    // Cleanup
-    delete cc_problem;
-    delete[] h_roots;
-    delete[] h_histograms;
-    free(cclist);
-    free(reference_component_ids);
-    free(h_component_ids);
-
-    cudaDeviceSynchronize();
-
-    typedef BFSProblem<
-        VertexId,
-        SizeT,
-        Value,
-        false,               // Set MARK_PREDECESSORS flag true
-        true,                // Set to enable idempotent operation
-        false> BFSProblem_T; // does not use double buffer
-
-    // Allocate host-side label array (for both reference and
-    // gpu-computed results)
-    VertexId *reference_labels =
-        (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-    VertexId *h_labels         =
-        (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-    reference_check            =
-        (g_quick) ? NULL : reference_labels;
-    VertexId *h_preds          =
-        (VertexId*)malloc(sizeof(VertexId) * graph.nodes);
-
-
-    // Allocate BFS enactor
-    BFSEnactor<INSTRUMENT> bfs_enactor(g_verbose);
-
-    // Allocate problem on GPU
-    BFSProblem_T *bfs_problem = new BFSProblem_T;
-    util::GRError(bfs_problem->Init(
-                      g_stream_from_host,
+    util::GRError(problem->Init(
+                      stream_from_host,
                       graph,
-                      num_gpus),
-                  "BFS Problem Initialization Failed", __FILE__, __LINE__);
-
-    //
-    // Compute reference CPU BFS solution for source-distance
-    //
-    if (reference_check != NULL)
-        {
-            printf("compute ref value\n");
-            SimpleReferenceBfs(
-                graph,
-                reference_check,
-                src);
-            printf("\n");
-        }
-
-    Stats *stats = new Stats("GPU BFS");
-
-    long long           total_queued = 0;
-    VertexId            search_depth = 0;
-    double              avg_duty = 0.0;
-
-    // Perform BFS
-
-    util::GRError(
-        bfs_problem->Reset(src,bfs_enactor.GetFrontierType(), max_queue_sizing),
-        "BFS Problem Data Reset Failed", __FILE__, __LINE__);
-    gpu_timer.Start();
-    util::GRError(
-        bfs_enactor.Enact(context, bfs_problem, src, max_grid_size),
-        "BFS Problem Enact Failed", __FILE__, __LINE__);
-    gpu_timer.Stop();
-
-    bfs_enactor.GetStatistics(total_queued, search_depth, avg_duty);
-
-    elapsed = gpu_timer.ElapsedMillis();
-
-    // Copy out results
-    util::GRError(
-        bfs_problem->Extract(h_labels, h_preds),
-        "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
-
-    // Verify the result
-    if (reference_check != NULL) {
-        printf("Validity: ");
-        num_errors += CompareResults(h_labels, reference_check, graph.nodes);
-    }
-    printf("\nFirst 40 labels of the GPU result.");
-    // Display Solution
-    DisplayBFSSolution(h_labels, h_preds, graph.nodes, true);
-
-    DisplayBFSStats(
-        *stats,
-        src,
-        h_labels,
-        graph,
-        elapsed,
-        search_depth,
-        total_queued,
-        avg_duty);
-
-
-    // Cleanup
-    delete stats;
-    delete bfs_problem;
-    free(reference_labels);
-    free(h_labels);
-    free(h_preds);
-
-    cudaDeviceSynchronize();
-
-    // Perform BC
-    src = -1;
-    typedef BCProblem<
-        VertexId,
-        SizeT,
-        Value,
-        true,               // MARK_PREDECESSOR
-        false> BCProblem_T; //does not use double buffer
-
-    // Allocate host-side array (for both reference and gpu-computed results)
-    Value *reference_bc_values       =
-        (Value*)malloc(sizeof(Value) * graph.nodes);
-    Value *h_bc_values               =
-        (Value*)malloc(sizeof(Value) * graph.nodes);
-    Value *reference_check_bc_values = (g_quick) ? NULL : reference_bc_values;
-
-    // Allocate BC enactor
-    BCEnactor<INSTRUMENT> bc_enactor(g_verbose);
-
-    // Allocate problem on GPU
-    BCProblem_T *bc_problem = new BCProblem_T;
-    util::GRError(bc_problem->Init(
-                      g_stream_from_host,
-                      graph,
-                      num_gpus),
+                      NULL,
+                      num_gpus,
+                      gpu_idx,
+                      partition_method,
+                      streams,
+                      max_queue_sizing,
+                      max_in_sizing,
+                      partition_factor,
+                      partition_seed),
                   "BC Problem Initialization Failed", __FILE__, __LINE__);
 
-    //
-    // Compute reference CPU BC solution for source-distance
-    //
+    util::GRError(enactor->Init(context, problem, max_grid_size),
+                  "BC Enactor init failed", __FILE__, __LINE__);
+
+    // compute reference CPU BC solution for source-distance
     if (reference_check_bc_values != NULL)
+    {
+        if (ref_filename.empty())
         {
-            printf("compute ref value\n");
-            RefCPUBC(
-                graph.row_offsets,
-                graph.column_indices,
+            if (!quiet_mode) { printf("Computing reference value ...\n"); }
+            ReferenceBC(
+                *graph,
                 reference_check_bc_values,
-                graph.nodes,
-                src);
-            printf("\n");
+                reference_check_ebc_values,
+                reference_check_sigmas,
+                reference_check_labels,
+                src,
+                quiet_mode);
+            if (!quiet_mode) { printf("\n"); }
         }
-
-    avg_duty = 0.0;
-
-    // Perform BC
-    VertexId start_src = 0;
-    VertexId end_src = graph.nodes;
-
-    gpu_timer.Start();
-    for (VertexId i = start_src; i < end_src; ++i)
+        else
         {
-            util::GRError(
-                bc_problem->Reset(i, bc_enactor.GetFrontierType(), max_queue_sizing),
-                "BC Problem Data Reset Failed", __FILE__, __LINE__);
-            util::GRError(
-                bc_enactor.Enact(context, bc_problem, i, max_grid_size),
-                "BC Problem Enact Failed", __FILE__, __LINE__);
+            std::ifstream fin;
+            fin.open(ref_filename.c_str(), std::ios::binary);
+            for (int i = 0; i < graph->nodes; ++i)
+            {
+                fin.read(reinterpret_cast<char*>(&reference_check_bc_values[i]), sizeof(Value));
+            }
+            fin.close();
         }
+    }
 
-    // Normalize BC value
-    util::MemsetScaleKernel<<<128, 128>>>
-        (bc_problem->data_slices[0]->d_bc_values, 0.5f, graph.nodes);
+    // perform BC
+    double elapsed  = 0.0f;
+    CpuTimer cpu_timer;
 
-    gpu_timer.Stop();
+    VertexId start_src, end_src;
+    if (src == -1)
+    {
+        start_src = 0;
+        end_src = graph->nodes;
+    }
+    else
+    {
+        start_src = src;
+        end_src = src + 1;
+    }
 
-    elapsed = gpu_timer.ElapsedMillis();
+    for (int iter = 0; iter < iterations; ++iter)
+    {
+        printf("iteration:%d\n", iter);
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            util::SetDevice(gpu_idx[gpu]);
+            util::MemsetKernel <<< 128, 128>>>(
+                problem->data_slices[gpu]->bc_values.GetPointer(util::DEVICE),
+                (Value)0.0f, (int)(problem->sub_graphs[gpu].nodes));
+        }
+        util::GRError(problem->Reset(
+                          0, enactor->GetFrontierType(),
+                          max_queue_sizing, max_queue_sizing1),
+                      "BC Problem Data Reset Failed", __FILE__, __LINE__);
 
-    bc_enactor.GetStatistics(avg_duty);
+        if (!quiet_mode)
+        {
+            printf("__________________________\n"); fflush(stdout);
+        }
+        cpu_timer.Start();
+        for (VertexId i = start_src; i < end_src; ++i)
+        {
+            util::GRError(problem->Reset(
+                              i, enactor->GetFrontierType(),
+                              max_queue_sizing, max_queue_sizing1),
+                          "BC Problem Data Reset Failed", __FILE__, __LINE__);
+            util::GRError(enactor ->Reset(),
+                          "BC Enactor Reset failed", __FILE__, __LINE__);
+            util::GRError(enactor ->Enact(i),
+                          "BC Problem Enact Failed", __FILE__, __LINE__);
+        }
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            util::SetDevice(gpu_idx[gpu]);
+            util::MemsetScaleKernel <<< 128, 128>>>(
+                problem->data_slices[gpu]->bc_values.GetPointer(util::DEVICE),
+                (Value)0.5f, (int)(problem->sub_graphs[gpu].nodes));
+        }
+        cpu_timer.Stop();
+        if (!quiet_mode)
+        {
+            printf("--------------------------\n"); fflush(stdout);
+        }
+        elapsed += cpu_timer.ElapsedMillis();
+    }
+
+    elapsed /= iterations;
 
     // Copy out results
-    util::GRError(
-        bc_problem->Extract(NULL, h_bc_values, NULL),
-        "BC Problem Data Extraction Failed", __FILE__, __LINE__);
+    util::GRError(problem->Extract(
+                      h_sigmas, h_bc_values, h_ebc_values, h_labels),
+                  "BC Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // Verify the result
-    if (reference_check_bc_values != NULL) {
-        printf("Validity BC Value: ");
-        num_errors += CompareResults(
-            h_bc_values, reference_check_bc_values, graph.nodes, true);
+    if (reference_check_bc_values != NULL)
+    {
+        //util::cpu_mt::PrintCPUArray<SizeT, Value>("reference_check_bc_values", reference_check_bc_values, graph->nodes);
+        //util::cpu_mt::PrintCPUArray<SizeT, Value>("bc_values", h_bc_values, graph->nodes);
+        if (!quiet_mode) { printf("Validity BC Value: "); }
+        int num_error = CompareResults(
+                            h_bc_values, reference_check_bc_values,
+                            graph->nodes, true, quiet_mode);
+        if (num_error > 0)
+        {
+            if (!quiet_mode) { printf("Number of errors occurred: %d\n", num_error); }
+        }
+        if (!quiet_mode) { printf("\n"); }
+    }
+    if (reference_check_ebc_values != NULL)
+    {
+        if (!quiet_mode) { printf("Validity Edge BC Value: "); }
+        int num_error = CompareResults(
+                            h_ebc_values, reference_check_ebc_values,
+                            graph->edges, true, quiet_mode);
+        if (num_error > 0)
+        {
+            if (!quiet_mode) { printf("Number of errors occurred: %d\n", num_error); }
+        }
+        if (!quiet_mode) { printf("\n"); }
+    }
+    if (reference_check_sigmas != NULL)
+    {
+        if (!quiet_mode) { printf("Validity Sigma: "); }
+        int num_error = CompareResults(
+                            h_sigmas, reference_check_sigmas,
+                            graph->nodes, true, quiet_mode);
+        if (num_error > 0)
+        {
+            if (!quiet_mode)
+            {
+                printf("Number of errors occurred: %d\n", num_error);
+            }
+        }
+        if (!quiet_mode) { printf("\n"); }
+    }
+    if (reference_check_labels != NULL)
+    {
+        if (!quiet_mode) { printf("Validity labels: "); }
+        int num_error = CompareResults(
+                            h_labels, reference_check_labels,
+                            graph->nodes, true, quiet_mode);
+        if (num_error > 0)
+        {
+            if (!quiet_mode)
+            {
+                printf("Number of errors occurred: %d\n", num_error);
+            }
+        }
+        if (!quiet_mode) { printf("\n"); }
+    }
+
+    if (!quiet_mode)
+    {
+        // Display Solution
+        DisplayBCSolution(h_sigmas, h_bc_values, graph->nodes);
+    }
+
+    info->ComputeTraversalStats(  // compute running statistics
+        enactor->enactor_stats.GetPointer(), elapsed, h_labels);
+
+    if (!quiet_mode)
+    {
+        info->DisplayStats();  // display collected statistics
+    }
+
+    info->CollectInfo();  // collected all the info and put into JSON mObject
+
+    if (!quiet_mode)
+    {
+        printf("\n\tMemory Usage(B)\t");
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+            if (num_gpus > 1) {if (gpu != 0) printf(" #keys%d,0\t #keys%d,1\t #ins%d,0\t #ins%d,1", gpu, gpu, gpu, gpu); else printf(" #keys%d,0\t #keys%d,1", gpu, gpu);}
+            else printf(" #keys%d,0\t #keys%d,1", gpu, gpu);
+        if (num_gpus > 1) printf(" #keys%d", num_gpus);
+        printf("\n");
+        double max_queue_sizing_[2] = {0, 0}, max_in_sizing_ = 0;
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            size_t gpu_free, dummy;
+            cudaSetDevice(gpu_idx[gpu]);
+            cudaMemGetInfo(&gpu_free, &dummy);
+            printf("GPU_%d\t %ld", gpu_idx[gpu], org_size[gpu] - gpu_free);
+            for (int i = 0; i < num_gpus; i++)
+            {
+                for (int j = 0; j < 2; j++)
+                {
+                    SizeT x = problem->data_slices[gpu]->frontier_queues[i].keys[j].GetSize();
+                    printf("\t %lld", (long long) x);
+                    double factor = 1.0 * x / (num_gpus > 1 ? problem->graph_slices[gpu]->in_counter[i] : problem->graph_slices[gpu]->nodes);
+                    if (factor > max_queue_sizing_[j]) max_queue_sizing_[j] = factor;
+                }
+                if (num_gpus > 1 && i != 0 )
+                    for (int t = 0; t < 2; t++)
+                    {
+                        SizeT x = problem->data_slices[gpu][0].keys_in[t][i].GetSize();
+                        printf("\t %lld", (long long) x);
+                        double factor = 1.0 * x / problem->graph_slices[gpu]->in_counter[i];
+                        if (factor > max_in_sizing_) max_in_sizing_ = factor;
+                    }
+            }
+            if (num_gpus > 1) printf("\t %lld", (long long)(problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize()));
+            printf("\n");
+        }
+        printf("\t queue_sizing =\t %lf \t %lf", max_queue_sizing_[0], max_queue_sizing_[1]);
+        if (num_gpus > 1) printf("\t in_sizing =\t %lf", max_in_sizing_);
         printf("\n");
     }
 
-    printf("\nFirst 40 bc_values of the GPU result.");
-    // Display Solution
-    DisplayBCSolution(h_bc_values, graph.nodes);
-
-    printf("GPU BC finished in %lf msec.\n", elapsed);
-    if (INSTRUMENT &&  avg_duty != 0)
-        printf("\n avg CTA duty: %.2f%%\n", avg_duty * 100);
-
-    if( 0 == num_errors ) {
-        printf("\nTEST PASSED\n");
-    }
-    else {
-        printf("\nTEST FAILED\n");
-    }
-
     // Cleanup
-    delete bc_problem;
-    free(reference_bc_values);
-    free(h_bc_values);
-
-    cudaDeviceSynchronize();
+    if (org_size            ) {delete[] org_size            ; org_size             = NULL;}
+    if (problem             ) {delete   problem             ; problem              = NULL;}
+    if (enactor             ) {delete   enactor             ; enactor              = NULL;}
+    if (reference_sigmas    ) {delete[] reference_sigmas    ; reference_sigmas     = NULL;}
+    if (reference_bc_values ) {delete[] reference_bc_values ; reference_bc_values  = NULL;}
+    if (reference_ebc_values) {delete[] reference_ebc_values; reference_ebc_values = NULL;}
+    if (reference_labels    ) {delete[] reference_labels    ; reference_labels     = NULL;}
+    if (h_sigmas            ) {delete[] h_sigmas            ; h_sigmas             = NULL;}
+    if (h_bc_values         ) {delete[] h_bc_values         ; h_bc_values          = NULL;}
+    if (h_ebc_values        ) {delete[] h_ebc_values        ; h_ebc_values         = NULL;}
+    if (h_labels            ) {delete[] h_labels            ; h_labels             = NULL;}
 }
 
-
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ * @tparam DEBUG
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
 template <
-    typename VertexId,
-    typename Value,
-    typename SizeT>
-void RunTests(
-    Csr<VertexId, Value, SizeT> &graph,
-    CommandLineArgs &args,
-    CudaContext& context)
+    typename      VertexId,
+    typename      Value,
+    typename      SizeT,
+    bool          INSTRUMENT,
+    bool          DEBUG >
+void RunBC_size_check(Info<VertexId, Value, SizeT> *info)
 {
-    bool   instrumented     = false; // Whether or not to collect
-                                     // instrumentation from kernels
-    int    max_grid_size    = 0;     // maximum grid size (0: leave it
-                                     // up to the enactor)
-    int    num_gpus         = 1;     // Number of GPUs for multi-gpu
-                                     // enactor to use
-    double max_queue_sizing = 1.3;   // Maximum size scaling factor
-                                     // for work queues. (e.g., 1.3
-                                     // creates [1.3n] and
-                                     // [1.3m]-element vertex and edge
-                                     // frontiers.
+    if (info->info["size_check"].get_bool())
+    {
+        RunBC<VertexId, Value, SizeT, INSTRUMENT, DEBUG,  true>(info);
+    }
+    else
+    {
+        RunBC<VertexId, Value, SizeT, INSTRUMENT, DEBUG, false>(info);
+    }
+}
 
-    instrumented = args.CheckCmdLineFlag("instrumented");
+/**
+ * @brief RunTests entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam INSTRUMENT
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
+template <
+    typename    VertexId,
+    typename    Value,
+    typename    SizeT,
+    bool        INSTRUMENT >
+void RunBC_debug(Info<VertexId, Value, SizeT> *info)
+{
+    if (info->info["debug_mode"].get_bool())
+    {
+        RunBC_size_check<VertexId, Value, SizeT, INSTRUMENT,  true>(info);
+    }
+    else
+    {
+        RunBC_size_check<VertexId, Value, SizeT, INSTRUMENT, false>(info);
+    }
+}
 
-    g_quick = args.CheckCmdLineFlag("quick");
-    args.GetCmdLineArgument("num-gpus", num_gpus);
-    g_verbose = args.CheckCmdLineFlag("v");
-
-    if (instrumented) {
-        RunTests<VertexId, Value, SizeT, true>(
-            graph,
-            max_grid_size,
-            num_gpus,
-            max_queue_sizing,
-            context);
-    } else {
-        RunTests<VertexId, Value, SizeT, false>(
-            graph,
-            max_grid_size,
-            num_gpus,
-            max_queue_sizing,
-            context);
+/**
+ * @brief Test entry
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ */
+template <
+    typename      VertexId,
+    typename      Value,
+    typename      SizeT >
+void RunBC_instrumented(Info<VertexId, Value, SizeT> *info)
+{
+    if (info->info["instrument"].get_bool())
+    {
+        RunBC_debug<VertexId, Value, SizeT,  true>(info);
+    }
+    else
+    {
+        RunBC_debug<VertexId, Value, SizeT, false>(info);
     }
 }
 
@@ -743,71 +1863,49 @@ void RunTests(
  * Main
  ******************************************************************************/
 
-int main( int argc, char** argv)
+int main(int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
-
-    if ((argc < 2) || (args.CheckCmdLineFlag("help"))) {
+    int graph_args = argc - args.ParsedArgc() - 1;
+    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
+    {
         Usage();
         return 1;
     }
 
-    int dev = 0;
-    args.GetCmdLineArgument("device", dev);
-    ContextPtr context = mgpu::CreateCudaDevice(dev);
+    typedef int VertexId;  // Use int as the vertex identifier
+    typedef int Value;     // Use int as the value type
+    typedef int SizeT;     // Use int as the graph size type
 
-    // Parse graph-contruction params
-    g_undirected = true;
+    Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
+    Info<VertexId, Value, SizeT> *info_cc = new Info<VertexId, Value, SizeT>;
 
-    std::string graph_type = argv[1];
-    int flags = args.ParsedArgc();
-    int graph_args = argc - flags - 1;
+    // graph construction or generation related parameters
+    info_cc->info["undirected"] = true;   // require undirected input graph
 
-    if (graph_args < 1) {
-        Usage();
-        return 1;
-    }
+    info_cc->Init("CC", args, csr);  // initialize Info structure
+    graphio::RemoveStandaloneNodes<VertexId, Value, SizeT>(
+        &csr, args.CheckCmdLineFlag("quiet"));
+    VertexId src = RunCC_instrumented<VertexId, Value, SizeT>(info_cc);  // run test
 
-    //
-    // Construct graph and perform search(es)
-    //
+    Info<VertexId, Value, SizeT> *info_bfs = new Info<VertexId, Value, SizeT>;
 
-    if (graph_type == "market") {
+    // graph construction or generation related parameters
+    info_bfs->info["undirected"] = args.CheckCmdLineFlag("undirected");
 
-        // Matrix-market coordinate-formatted graph file
+    info_bfs->Init("BFS", args, csr);  // initialize Info structure
+    RunBFS_instrumented<VertexId, Value, SizeT>(info_bfs, src);  // run test
 
-        typedef int VertexId;   // Use as the node identifier type
-        typedef float Value;    // Use as the value type
-        typedef int SizeT;      // Use as the graph size type
-        Csr<VertexId, Value, SizeT> csr(false); // default value for
-                                                // stream_from_host is
-                                                // false
+    typedef float FloatValue;   // Use float as the value type
 
-        if (graph_args < 1) { Usage(); return 1; }
-        char *market_filename = (graph_args == 2) ? argv[2] : NULL;
-        if (graphio::BuildMarketGraph<false>(
-                market_filename,
-                csr,
-                g_undirected,
-                false) != 0) // no inverse graph
-        {
-            return 1;
-        }
+    Csr<VertexId, FloatValue, SizeT> csr_bc(false);  // graph we process on
+    Info<VertexId, FloatValue, SizeT> *info_bc = new Info<VertexId, FloatValue, SizeT>;
 
-        // csr.DisplayGraph();
-        fflush(stdout);
+    // graph construction or generation related parameters
+    info_bc->info["undirected"] = true;  // require undirected input graph
 
-        // Run tests
-        RunTests(csr, args, *context);
-
-
-    } else {
-
-        // Unknown graph type
-        fprintf(stderr, "Unspecified graph type\n");
-        return 1;
-
-    }
+    info_bc->Init("BC", args, csr_bc);  // initialize Info structure
+    RunBC_instrumented<VertexId, FloatValue, SizeT>(info_bc);  // run test
 
     return 0;
 }
@@ -817,3 +1915,7 @@ int main( int argc, char** argv)
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
+
+
+
+
