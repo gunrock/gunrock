@@ -15,6 +15,7 @@ import os      # built-in
 json_files = [f for f in os.listdir('.')
               if (os.path.isfile(f) and
                   f.endswith(".json") and
+                  (f.startswith("BFS") or f.startswith("DOBFS")) and
                   not f.startswith("_"))]
 data_unfiltered = [json.load(open(jf)) for jf in json_files]
 df = pandas.DataFrame(data_unfiltered)
@@ -22,16 +23,20 @@ df = pandas.DataFrame(data_unfiltered)
 
 ## Let's add a new column (attribute), conditional on existing columns.
 ## We'll need this to pivot later.
-df.loc[df['mark_predecessors'] & df['undirected'], 'parameters'] = "undirected, mark predecessors"
-df.loc[-df['mark_predecessors'] & df['undirected'], 'parameters'] = "undirected, no mark predecessors"
-df.loc[df['mark_predecessors'] & -df['undirected'], 'parameters'] = "directed, mark predecessors"
-df.loc[-df['mark_predecessors'] & -df['undirected'], 'parameters'] = "directed, no mark predecessors"
+def setParameters(row):
+    return (row['algorithm'] + ', ' +
+            ('un' if row['undirected'] else '') + 'directed, ' +
+            ('' if row['mark_predecessors'] else 'no ') + 'mark predecessors')
+df['parameters'] = df.apply(setParameters, axis=1)
+
+# df.loc[df['mark_predecessors'] & df['undirected'], 'parameters'] = "BFS, undirected, mark predecessors"
+
 
 ## Bar graph, restricted to mark-pred+undirected
 ## x axis: dataset, y axis: MTEPS
 ## The following two subsetting operations are equivalent.
-df_mteps = df[df['mark_predecessors'] & df['undirected']]
-df_mteps = df[df['parameters'] == "undirected, mark predecessors"]
+df_mteps = df[df['mark_predecessors'] & df['undirected']] # except for BFS
+df_mteps = df[df['parameters'] == "BFS, undirected, mark predecessors"]
 
 ## draw bar graph
 # these next three appear to be equivalent
@@ -69,6 +74,7 @@ g_grouped = vincent.GroupedBar(df.pivot(index='dataset',
 g_grouped.axis_titles(x='Dataset', y='MTEPS')
 g_grouped.legend(title='Parameters')
 g_grouped.colors(brew='Spectral')
+# g_grouped.scales['y'].type = 'log'
 g_grouped.to_json('_g_grouped.json',
                 html_out=True,
                 html_path='g_grouped.html')
