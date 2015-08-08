@@ -373,7 +373,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
      *
      * @param[in] stream_from_host Whether to stream data from host.
      * @param[in] graph Pointer to the CSR graph object we process on. @see Csr
-     * @param[in] graph Pointer to the inversed CSR graph object we process on.
+     * @param[in] inversegraph Pointer to the inversed CSR graph object we process on.
      * @param[in] num_gpus Number of the GPUs used.
      * @param[in] gpu_idx GPU index used for testing.
      * @param[in] partition_method Partition method to partition input graph.
@@ -390,7 +390,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
         Csr<VertexId, Value, SizeT>
                      *graph,
         Csr<VertexId, Value, SizeT>
-                     *inversgraph      = NULL,
+                     *inversegraph      = NULL,
         int           num_gpus         = 1,
         int          *gpu_idx          = NULL,
         std::string   partition_method = "random",
@@ -403,7 +403,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
         ProblemBase<VertexId, SizeT, Value, _MARK_PREDECESSORS, false, _USE_DOUBLE_BUFFER, true, false, false>::Init(
             stream_from_host,
             graph,
-            inversgraph,
+            inversegraph,
             num_gpus,
             gpu_idx,
             partition_method,

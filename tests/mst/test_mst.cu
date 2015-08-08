@@ -150,7 +150,7 @@ void DisplaySolution(
  *
  * @param[in] edge_values Weight value associated with each edge.
  * @param[in] graph Reference to the CSR graph we process on.
- * @param[in] quiet Don't print out anything to stdout.
+ * @param[in] quiet_mode Don't print out anything to stdout.
  *
  *  \return long long int which indicates the total weight of the graph.
  */

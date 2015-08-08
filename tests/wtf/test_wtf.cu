@@ -331,16 +331,10 @@ void SimpleReferenceWTF(
  * @tparam Value
  * @tparam SizeT
  * @tparam INSTRUMENT
+ * @tparam DEBUG
+ * @tparam SIZE_CHECK
  *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] src Source node ID for WTF algorithm
- * @param[in] delta Delta value for computing WTF, usually set to .85
- * @param[in] alpha Parameter to adjust iteration number
- * @param[in] error Error threshold value
- * @param[in] max_iter Max iteration for WTF computing
- * @param[in] max_grid_size Maximum CTA occupancy
- * @param[in] num_gpus Number of GPUs
- * @param[in] context CudaContext for moderngpu to use
+ * @param[in] info Pointer to info contains parameters and statistics.
  *
  */
 template <

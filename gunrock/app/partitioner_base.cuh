@@ -241,6 +241,8 @@ public:
      * @brief MakeSubGraph_Thread function.
      *
      * @param[in] thread_data_
+     *
+     * \return CUT_THREADPROC 
      */
     static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
     {

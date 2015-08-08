@@ -220,7 +220,6 @@ struct BackwardFunctor {
      * @param[in] node Vertex identifier.
      * @param[in] problem Data slice object.
      * @param[in] v auxiliary value.
-     * @param[in] nid Vertex index.
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -235,7 +234,6 @@ struct BackwardFunctor {
      * @param[in] node Vertex identifier.
      * @param[in] problem Data slice object.
      * @param[in] v auxiliary value.
-     * @param[in] nid Vertex index.
      *
      */
     static __device__ __forceinline__ void ApplyFilter(

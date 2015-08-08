@@ -1,4 +1,5 @@
-# Why Gunrock?
+Why Gunrock? {#why-gunrock}
+============
 
 Gunrock is a stable, powerful, and forward-looking substrate for GPU-based graph-centric research and development. Like many graph frameworks, it leverages a bulk-synchronous programming model and targets iterative convergent graph computations. We believe that today Gunrock offers both the best performance on GPU graph analytics as well as the widest range of primitives.
 

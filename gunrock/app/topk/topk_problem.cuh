@@ -218,6 +218,7 @@ struct TOPKProblem : ProblemBase<_VertexId, _SizeT, _Value,
    * @param[in] graph_original Reference to the CSR graph object we process on. @see Csr
    * @param[in] graph_reversed Reference to the inversed CSR graph object we process on. @see Csr
    * @param[in] _num_gpus Number of the GPUs used.
+   * @param[in] streams pointer to CUDA Streams.
    *
    * \return cudaError_t object which indicates the success of all CUDA function calls.
    */
@@ -343,7 +344,6 @@ struct TOPKProblem : ProblemBase<_VertexId, _SizeT, _Value,
    *  @brief Performs any initialization work needed for TOPK problem type. 
    *	Must be called prior to each TOPK iteration.
    *
-   *  @param[in] src Source node for one TOPK computing pass.
    *  @param[in] frontier_type The f rontier type (i.e., edge/vertex/mixed)
    * 
    *  \return cudaError_t object which indicates the success of all CUDA function calls.

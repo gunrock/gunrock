@@ -109,6 +109,7 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, _Value,
      *
      * @param[in] stream_from_host Whether to stream data from host.
      * @param[in] graph Reference to the CSR graph object we process on.
+     * @param[in] inv_graph Reference to the CSC graph object we process on.
      * @param[in] num_gpus Number of the GPUs used.
      */
     SALSAProblem(bool        stream_from_host,       // Only meaningful for single-GPU
@@ -205,6 +206,7 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, _Value,
      * @param[in] hub_graph Reference to the CSR graph object we process on. @see Csr
      * @param[in] auth_graph Reference to the CSC graph object we process on.
      * @param[in] _num_gpus Number of the GPUs used.
+     * @param[in] streams CUDA Streams
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -351,8 +353,8 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, _Value,
     /**
      *  @brief Performs any initialization work needed for PR problem type. Must be called prior to each PR iteration.
      *
-     *  @param[in] src Source node for one PR computing pass.
      *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
+     *  @param[in] queue_sizing Queue sizing of the frontier
      * 
      *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -372,98 +374,29 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, _Value,
                         "SALSAProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
             data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, queue_sizing);
 
-            // Allocate output page ranks if necessary
-            /*if (!data_slices[gpu]->d_hrank_curr) {
-                Value    *d_hrank1;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_hrank1,
-                                nodes * sizeof(Value)),
-                            "SALSAProblem cudaMalloc d_hrank1 failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_hrank_curr = d_hrank1;
-            }*/
             if (data_slices[gpu]->hrank_curr.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->hrank_curr.Allocate(nodes, util::DEVICE)) return retval;
 
-            /*if (!data_slices[gpu]->d_arank_curr) {
-                Value    *d_arank1;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_arank1,
-                                nodes * sizeof(Value)),
-                            "SALSAProblem cudaMalloc d_hrank1 failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_arank_curr = d_arank1;
-            }*/
             if (data_slices[gpu]->arank_curr.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->arank_curr.Allocate(nodes, util::DEVICE)) return retval;
 
-            /*if (!data_slices[gpu]->d_hrank_next) {
-                Value    *d_hrank2;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_hrank2,
-                                nodes * sizeof(Value)),
-                            "SALSAProblem cudaMalloc d_hrank2 failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_hrank_next = d_hrank2;
-            }*/
             if (data_slices[gpu]->hrank_next.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->hrank_next.Allocate(nodes, util::DEVICE)) return retval;
 
-            /*if (!data_slices[gpu]->d_arank_next) {
-                Value    *d_arank2;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_arank2,
-                                nodes * sizeof(Value)),
-                            "SALSAProblem cudaMalloc d_arank2 failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_arank_next = d_arank2;
-            }*/
             if (data_slices[gpu]->arank_next.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->arank_next.Allocate(nodes, util::DEVICE)) return retval;
 
-            // Allocate d_degrees if necessary
-            /*if (!data_slices[gpu]->d_in_degrees) {
-                VertexId    *d_in_degrees;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_in_degrees,
-                                nodes * sizeof(VertexId)),
-                            "PRProblem cudaMalloc d_in_degrees failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_in_degrees = d_in_degrees;
-            }*/
             if (data_slices[gpu]->in_degrees.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->in_degrees.Allocate(nodes, util::DEVICE)) return retval;
 
-            /*if (!data_slices[gpu]->d_hub_predecessors) {
-                VertexId   *d_hub_predecessors;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_hub_predecessors,
-                                edges * sizeof(VertexId)),
-                            "PRProblem cudaMalloc d_hub_predecessors failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_hub_predecessors = d_hub_predecessors;
-            }*/
             if (data_slices[gpu]->hub_predecessors.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->hub_predecessors.Allocate(edges, util::DEVICE)) return retval;
 
-            /*if (!data_slices[gpu]->d_auth_predecessors) {
-                VertexId   *d_auth_predecessors;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_auth_predecessors,
-                                edges * sizeof(VertexId)),
-                            "PRProblem cudaMalloc d_auth_predecessors failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_auth_predecessors = d_auth_predecessors;
-            }*/
             if (data_slices[gpu]->auth_predecessors.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->auth_predecessors.Allocate(edges, util::DEVICE)) return retval;
 
-            // Allocate d_degrees if necessary
-            /*if (!data_slices[gpu]->d_out_degrees) {
-                VertexId    *d_out_degrees;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_out_degrees,
-                                nodes * sizeof(VertexId)),
-                            "PRProblem cudaMalloc d_out_degrees failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_out_degrees = d_out_degrees;
-            }*/
             if (data_slices[gpu]->out_degrees.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->out_degrees.Allocate(nodes, util::DEVICE)) return retval;
-
-            //data_slices[gpu]->d_labels = NULL;
 
             // Initial rank_curr = 0 
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->hrank_curr.GetPointer(util::DEVICE), (Value)1.0/out_nodes, nodes);

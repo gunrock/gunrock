@@ -245,6 +245,7 @@ struct MSTProblem : ProblemBase <
    * @param[in] stream_from_host Whether to stream data from host.
    * @param[in] graph Reference to the CSR graph object we process on.
    * @param[in] _num_gpus Number of the GPUs used.
+   * @param[in] streams pointer to CUDA Streams used (NULL by default)
    *
    * \return cudaError_t object which indicates the success of
    * all CUDA function calls.
@@ -458,6 +459,7 @@ struct MSTProblem : ProblemBase <
    * Must be called prior to each MST iteration.
    *
    * @param[in] frontier_type The frontier type (i.e., edge / vertex / mixed)
+   * @param[in] queue_sizing Queue sizing factor
    *
    *  \return cudaError_t object which indicates the success of
    * all CUDA function calls.

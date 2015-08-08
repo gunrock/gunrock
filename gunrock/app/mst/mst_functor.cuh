@@ -279,6 +279,7 @@ struct PJmpFunctor
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v Vertex value
+   * @param[in] nid Node ID
    *
    * \return Whether to load the apply function for the node and include
    * it in the outgoing vertex frontier.
@@ -296,6 +297,7 @@ struct PJmpFunctor
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v Vertex value
+   * @param[in] nid Node ID
    */
   static __device__ __forceinline__ void ApplyFilter(
     VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
@@ -386,6 +388,7 @@ struct EgRmFunctor
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v Vertex value
+   * @param[in] nid Node ID
    *
    * \return Whether to load the apply function for the node and include
    * it in the outgoing vertex frontier.
@@ -403,6 +406,7 @@ struct EgRmFunctor
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v Vertex value
+   * @param[in] nid Node ID
    */
   static __device__ __forceinline__ void ApplyFilter(
   VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
@@ -443,6 +447,7 @@ struct RIdxFunctor
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v Vertex value
+   * @param[in] nid Node ID
    *
    * \return Whether to load the apply function for the node and include
    * it in the outgoing vertex frontier.
@@ -459,6 +464,7 @@ struct RIdxFunctor
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v Vertex value
+   * @param[in] nid Node ID
    *
    */
   static __device__ __forceinline__ void ApplyFilter(
@@ -494,6 +500,7 @@ struct EIdxFunctor
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v node value (if any)
+   * @param[in] nid Node ID
    *
    * \return Whether to load the apply function for the node and include
    * it in the outgoing vertex frontier.
@@ -510,6 +517,7 @@ struct EIdxFunctor
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v node value (if any)
+   * @param[in] nid Node ID
    */
   static __device__ __forceinline__ void ApplyFilter(
     VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
@@ -545,6 +553,7 @@ struct SuRmFunctor
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v node value (if any)
+   * @param[in] nid Node ID
    *
    * \return Whether to load the apply function for the node and include
    * it in the outgoing vertex frontier.
@@ -561,6 +570,7 @@ struct SuRmFunctor
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v node value (if any)
+   * @param[in] nid Node ID
    */
   static __device__ __forceinline__ void ApplyFilter(
     VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)

@@ -52,6 +52,8 @@ struct PRMarkerFunctor {
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id Output edge index
+     * @param[in] e_id_in Input edge index
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
@@ -69,6 +71,8 @@ struct PRMarkerFunctor {
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id Output edge index
+     * @param[in] e_id_in Input edge index
      *
      */
     static __device__ __forceinline__ void ApplyEdge(
@@ -197,6 +201,8 @@ struct RemoveZeroDegreeNodeFunctor {
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id Output edge index
+     * @param[in] e_id_in Input edge index
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
@@ -214,6 +220,8 @@ struct RemoveZeroDegreeNodeFunctor {
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id Output edge index
+     * @param[in] e_id_in Input edge index
      *
      */
     static __device__ __forceinline__ void ApplyEdge(
@@ -228,7 +236,6 @@ struct RemoveZeroDegreeNodeFunctor {
      * @param[in] node Vertex identifier.
      * @param[in] problem Data slice object.
      * @param[in] v auxiliary value.
-     * @param[in] nid Vertex index.
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */

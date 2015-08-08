@@ -1,6 +1,8 @@
-# From Gunrock to JSON
+From Gunrock to JSON {#gunrock_to_json}
+====================
 
-## How do we export information from Gunrock?
+How do we export information from Gunrock?
+------------------------------------------
 
 Typical programs use "printf" to emit a bunch of unstructured information. As the program gets more sophisticated, "printf" is augmented with command-line switches, perhaps a configuration file, but it's hard to easily parse random printf output.
 
@@ -25,7 +27,8 @@ The current JSON structure (`info`) is passed by reference between various routi
 
 We don't have a fixed schema (yet), so what's below reflects what we put into the test_bfs code. Some of these are likely not useful for any analysis, but it's preferable to include too much info in the JSON output rather than not enough.
 
-## Fields that should be in any Gunrock run
+Fields that should be in any Gunrock run
+----------------------------------------
 
 - *avg_duty*. Average kernel running duty, calculated by kernel run time / kernel lifetime.
 - *command_line*. Reflects how the program was run. Use `args.GetEntireCommandLine()`.
@@ -41,7 +44,7 @@ We don't have a fixed schema (yet), so what's below reflects what we put into th
         #include <gunrock/util/sysinfo.h>
         Gpuinfo gpuinfo;
         info["gpuinfo"] = gpuinfo.getGpuinfo();
-- *gunrock_version*. Reflects what's set in the top-level CMakeFiles; set as a constant `#define` using a compiler flag `-D` during compilation. (Since *gunrock_version* should not change often, this `#define` is acceptable; we only need rebuild when we update the version.) Example: `0.1.0`.
+- *gunrock_version*. Reflects what's set in the top-level CMakeFiles; set as a constant "#define" using a compiler flag `-D` during compilation. (Since *gunrock_version* should not change often, this "#define" is acceptable; we only need rebuild when we update the version.) Example: `0.1.0`.
 
         #define STR(x) #x
         #define XSTR(x) STR(x)
@@ -71,7 +74,8 @@ We don't have a fixed schema (yet), so what's below reflects what we put into th
         info["userinfo"] = userinfo.getUserinfo();
 - *verbose*: Set by command-line flag; true or false. Presumably relates to logging output.
 
-## Fields for any traversal-based primitive
+Fields for any traversal-based primitive
+----------------------------------------
 
 - *edges_visited*. Self-explanatory.
 - *m_temps*. Millions of edge-traversals per second, e.g., `0.40378222181564849`.
@@ -84,28 +88,31 @@ We don't have a fixed schema (yet), so what's below reflects what we put into th
 
 - *total_queued*. Total elements put into the frontier.
 
-## BFS-specific fields
+BFS-specific fields
+-------------------
 
 - *impotence*: Set by command-line flag; true or false.
 - *instrumented*: Set by command-line flag; true or false.
 - *iterations*. Not entirely sure what this indicates. Example: `10`.
 - *max_grid_size*. Number of grids for GPU kernels, but sometimes the enactor itself will calculate a optimal number and ignore this setting.
-- *max_queue_sizing*. Used to calculate the initial size of frontiers (#vertices * queue-sizing, or #edges * queue-sizing). --*in-sizing* is for similar purpose, but for those buffers used by GPU-GPU communication.
+- *max_queue_sizing*. Used to calculate the initial size of frontiers (\#vertices * queue-sizing, or \#edges * queue-sizing). --*in-sizing* is for similar purpose, but for those buffers used by GPU-GPU communication.
 - *search_depth*. Presumably maximum distance from the source found in the graph. Integer.
 - *traversal_mode*. Switch for *advance* kernels. 0: load-balanced partitioning (Davidson); 1: Merrill's load-balance strategy. Default is currently dynamically choosing between the two.
 - *undirected*. Is the graph is undirected (true) or directed (false)? Command-line option.
 - *vertex_id*. Starting vertex ID. Integer.
 
-# Thread safety: "Using JSON Spirit with Multiple Threads"
+Thread safety: "Using JSON Spirit with Multiple Threads"
+========================================================
 
  "If you intend to use JSON Spirit in more than one thread, you will need to uncomment the following line near the top of json_spirit_reader.cpp.
 
-`//#define BOOST_SPIRIT_THREADSAFE`
+"//#define BOOST_SPIRIT_THREADSAFE"
 
 "In this case, Boost Spirit will require you to link against Boost Threads."
 
 [link](http://www.codeproject.com/KB/recipes/JSON_Spirit.aspx#threads)
 
-# If compilation is too slow
+If compilation is too slow
+==========================
 
 Currently we're using the header-only version of JSON Spirit, which is easier to integrate but requires more compilation. The (docs)[http://www.codeproject.com/KB/recipes/JSON_Spirit.aspx#reduc] have ways to increase compilation speed.

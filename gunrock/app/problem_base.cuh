@@ -301,8 +301,9 @@ struct GraphSlice
     /**
      * @brief overloaded = operator
      *
-     * @param[in] GraphSlice to copy from
-     * \return a copy of local GraphSlice
+     * @param[in] other GraphSlice to copy from
+     *
+     * \return GraphSlice& a copy of local GraphSlice
      */
     GraphSlice& operator=(GraphSlice other)
     {

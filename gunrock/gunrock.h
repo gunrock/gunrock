@@ -154,12 +154,12 @@ void gunrock_bfs(
 /**
  * @brief Breath-first search simple public interface.
  *
- * @param[out] Return bfs labels (depth).
- * @param[in] Input graph number of nodes.
- * @param[in] Input graph number of edges.
- * @param[in] Input graph row_offsets.
- * @param[in] Input graph col_indices.
- * @param[in] Source node to start.
+ * @param[out] bfs_label Return bfs labels (depth).
+ * @param[in] num_nodes Input graph number of nodes.
+ * @param[in] num_edges Input graph number of edges.
+ * @param[in] row_offsets Input graph row_offsets.
+ * @param[in] col_indices Input graph col_indices.
+ * @param[in] source Source node to start.
  */
 void bfs(
     int*       bfs_label,    // Return label (depth) per node
@@ -186,12 +186,12 @@ void gunrock_bc(
 /**
  * @brief Betweenness centrality simple public interface.
  *
- * @param[out] Return betweenness centralities.
- * @param[in] Input graph number of nodes.
- * @param[in] Input graph number of edges.
- * @param[in] Input graph row_offsets.
- * @param[in] Input graph col_indices.
- * @param[in] Source node to start.
+ * @param[out] bc_scores Return betweenness centralities.
+ * @param[in] num_nodes Input graph number of nodes.
+ * @param[in] num_edges Input graph number of edges.
+ * @param[in] row_offsets Input graph row_offsets.
+ * @param[in] col_indices Input graph col_indices.
+ * @param[in] source Source node to start.
  */
 void bc(
     float*     bc_scores,    // Return centrality score per node
@@ -218,11 +218,13 @@ void gunrock_cc(
 /**
  * @brief Connected component simple public interface.
  *
- * @param[out] Return per-node component IDs.
- * @param[in] Input graph number of nodes.
- * @param[in] Input graph number of edges.
- * @param[in] Input graph row_offsets.
- * @param[in] Input graph col_indices.
+ * @param[out] component Return per-node component IDs.
+ * @param[in] num_nodes Input graph number of nodes.
+ * @param[in] num_edges Input graph number of edges.
+ * @param[in] row_offsets Input graph row_offsets.
+ * @param[in] col_indices Input graph col_indices.
+
+ *\return int number of connected components in the graph.
  */
 int cc(
     int*       component,     // Return component IDs per node
@@ -248,13 +250,13 @@ void gunrock_sssp(
 /**
  * @brief Single-source shortest path simple public interface.
  *
- * @param[out] Return shortest distances.
- * @param[in] Input graph number of nodes.
- * @param[in] Input graph number of edges.
- * @param[in] Input graph row_offsets.
- * @param[in] Input graph col_indices.
- * @param[in] Input graph edge weight.
- * @param[in] Source node to start.
+ * @param[out] distances Return shortest distances.
+ * @param[in] num_nodes Input graph number of nodes.
+ * @param[in] num_edges Input graph number of edges.
+ * @param[in] row_offsets Input graph row_offsets.
+ * @param[in] col_indices Input graph col_indices.
+ * @param[in] edge_values Input graph edge weight.
+ * @param[in] source Source node to start.
  */
 void sssp(
     unsigned int*       distances,    // Return shortest distances
@@ -282,12 +284,12 @@ void gunrock_pagerank(
 /**
  * @brief PageRank simple public interface.
  *
- * @param[out] Return top-ranked vertex IDs.
- * @param[out] Return top-ranked PageRank scores.
- * @param[in] Input graph number of nodes.
- * @param[in] Input graph number of edges.
- * @param[in] Input graph row_offsets.
- * @param[in] Input graph col_indices.
+ * @param[out] node_ids Return top-ranked vertex IDs.
+ * @param[out] pagerank Return top-ranked PageRank scores.
+ * @param[in] num_nodes Input graph number of nodes.
+ * @param[in] num_edges Input graph number of edges.
+ * @param[in] row_offsets Input graph row_offsets.
+ * @param[in] col_indices Input graph col_indices.
  */
 void pagerank(
     int*       node_ids,      // Return top-ranked vertex IDs

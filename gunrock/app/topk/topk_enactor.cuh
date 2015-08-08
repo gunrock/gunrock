@@ -83,8 +83,6 @@ protected:
    * @brief Prepare the enactor for TOPK kernel call. Must be called prior to each TOPK iteration.
    *
    * @param[in] problem TOPK Problem object which holds the graph data and TOPK problem data to compute.
-   * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-   * @param[in] filter_grid_size CTA occupancy for filter kernel call.
    *
    * \return cudaError_t object which indicates the success of all CUDA function calls.
    */
@@ -205,7 +203,9 @@ void GetStatistics(long long   &total_queued,
    * @tparam FilterKernelPolicy Kernel policy for filtering.
    * @tparam TOPKProblem TOPK Problem type.
    *
+   * @param[in] context CUDA context pointer.
    * @param[in] problem TOPKProblem object.
+   * @param[in] top_nodes Number of top nodes to process.
    * @param[in] max_grid_size Max grid size for TOPK kernel calls.
    *
    * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -214,11 +214,11 @@ void GetStatistics(long long   &total_queued,
     typename AdvanceKernelPolicy,
     typename FilterKernelPolicy,
     typename TOPKProblem>
-  cudaError_t EnactTOPK(
-    ContextPtr context,
-		      TOPKProblem   *problem,
-		      int         top_nodes,
-		      float         max_grid_size = 0)
+        cudaError_t EnactTOPK(
+                ContextPtr context,
+                TOPKProblem   *problem,
+                int         top_nodes,
+                float         max_grid_size = 0)
   {
     typedef typename TOPKProblem::SizeT      SizeT;
     typedef typename TOPKProblem::Value      Value;
@@ -303,8 +303,9 @@ do
    *
    * @tparam TOPKProblem TOPK Problem type. @see TOPKProblem
    *
+   * @param[in] context CUDA context pointer.
    * @param[in] problem Pointer to TOPKProblem object.
-   * @param[in] src Source node for TOPK.
+   * @param[in] top_nodes Top nodes to process.
    * @param[in] max_grid_size Max grid size for TOPK kernel calls.
    *
    * \return cudaError_t object which indicates the success of all CUDA function calls.

@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file sample_test.cu
+ * @file test_sample.cu
  *
  * @brief Simple test driver program
  */
@@ -150,7 +150,7 @@ void SimpleReference(const Csr<VertexId, Value, SizeT> &graph)
  * @tparam DEBUG
  * @tparam SIZE_CHECK
  *
- * @param[in] parameter Test parameter settings.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename VertexId,
@@ -257,7 +257,7 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
  * @tparam SizeT
  * @tparam DEBUG
  *
- * @param[in] parameter Pointer to test parameter settings
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename      VertexId,
@@ -279,7 +279,7 @@ void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
  * @tparam Value
  * @tparam SizeT
  *
- * @param[in] parameter Pointer to test parameter settings
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template <
     typename    VertexId,

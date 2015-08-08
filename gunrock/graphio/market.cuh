@@ -348,10 +348,18 @@ int BuildMarketGraph(
 /**
  * @brief read in graph function read in graph according to its type.
  *
+ * @tparam LOAD_VALUES
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
  * @param[in] file_in    Input MARKET graph file.
  * @param[in] graph      CSR graph object to store the graph data.
  * @param[in] undirected Is the graph undirected or not?
  * @param[in] reversed   Whether or not the graph is inversed.
+ * @param[in] quiet     Don't print out anything to stdout
+ *
+ * \return int Whether error occurs (0 correct, 1 error)
  */
 template <bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
 int BuildMarketGraph(

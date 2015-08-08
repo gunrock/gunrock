@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file test_vis.cuh
+ * @file test_vis.cu
  *
  * @brief Simple test driver program for Vertex-Induced Subgraph
  */
@@ -142,7 +142,7 @@ void SimpleReference(const Csr<VertexId, Value, SizeT> &graph)
  * @tparam SizeT
  * @tparam Value
  *
- * @param[in] parameter Test parameter settings.
+ * @param[in] info Pointer to info contains parameters and statistics.
  */
 template<typename VertexId, typename SizeT, typename Value>
 void RunTests(Info<VertexId, Value, SizeT> *info)

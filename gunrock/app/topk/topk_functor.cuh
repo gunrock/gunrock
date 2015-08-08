@@ -74,6 +74,7 @@ struct TOPKFunctor
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v Vertex value
+   * @param[in] nid Node ID
    *
    * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
    */
@@ -88,6 +89,7 @@ struct TOPKFunctor
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v Vertex value
+   * @param[in] nid Node ID
    *
    */
   static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)

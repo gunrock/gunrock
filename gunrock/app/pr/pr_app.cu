@@ -68,7 +68,7 @@ void runPageRank(GRGraph *output, PR_Parameter *parameter);
  * @tparam INSTRUMENT Keep kernels statics
  * @tparam DEBUG      Keep debug statics
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <
@@ -95,7 +95,7 @@ void sizeCheckPageRank(GRGraph *output, PR_Parameter *parameter)
  * @tparam SizeT      Graph size type
  * @tparam INSTRUMENT Keep kernels statics
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <
@@ -120,7 +120,7 @@ void debugPageRank(GRGraph *output, PR_Parameter *parameter)
  * @tparam Value    Attribute type
  * @tparam SizeT    Graph size type
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <
@@ -145,7 +145,7 @@ void runPageRank(GRGraph *output, PR_Parameter* parameter)
  * @tparam DEBUG      Keep debug statics
  * @tparam SIZE_CHECK Enable size check
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <

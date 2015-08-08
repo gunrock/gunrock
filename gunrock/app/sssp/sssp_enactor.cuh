@@ -622,6 +622,8 @@ public:
             double(total_runtimes) / total_lifetimes : 0.0;
     }
 
+    /** @} */
+
     /**
      * @brief Initialize the problem.
      *
@@ -749,12 +751,7 @@ public:
 
         if (DEBUG) printf("\nGPU SSSP Done.\n");
         return retval;
-    }
-
-    /**
-     * \addtogroup PublicInterface
-     * @{
-     */
+    } 
 
     typedef gunrock::oprtr::filter::KernelPolicy<
         Problem,                            // Problem data type
@@ -806,6 +803,11 @@ public:
     LBAdvanceKernelPolicy;
 
     /**
+     * \addtogroup PublicInterface
+     * @{
+     */
+
+    /**
      * @brief SSSP Enact kernel entry.
      *
      * @param[in] src Source node to start primitive.
@@ -839,11 +841,6 @@ public:
         printf("Not yet tuned for this architecture\n");
         return cudaErrorInvalidDeviceFunction;
     }
-
-    /**
-     * \addtogroup PublicInterface
-     * @{
-     */
 
     /**
      * @brief SSSP Enact kernel entry.

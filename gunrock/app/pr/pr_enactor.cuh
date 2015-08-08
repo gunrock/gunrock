@@ -1474,12 +1474,7 @@ public:
             delete[] cpu_barrier;cpu_barrier=NULL;
         }
     }
-
-    /**
-     * \addtogroup PublicInterface
-     * @{
-     */
-
+    
     /**
      * @brief Obtain statistics about the last primitive enacted.
      *
@@ -1621,6 +1616,8 @@ public:
         if (DEBUG) printf("\nGPU PR Done.\n");
         return retval;
     }
+
+    /** @} */
 
     typedef gunrock::oprtr::filter::KernelPolicy<
         Problem,                            // Problem data type

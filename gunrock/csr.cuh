@@ -152,8 +152,8 @@ struct Csr
      * @param[in] file_name Original graph file path and name.
      * @param[in] v Number of vertices in input graph.
      * @param[in] e Number of edges in input graph.
-     * @param[in] row_offsets Row-offsets array store row pointers.
-     * @param[in] col_indices Column-indices array store destinations.
+     * @param[in] row Row-offsets array store row pointers.
+     * @param[in] col Column-indices array store destinations.
      * @param[in] edge_values Per edge weight values associated.
      *
      */
@@ -283,6 +283,7 @@ struct Csr
      *
      * @tparam LOAD_EDGE_VALUES Whether or not to load edge values.
      *
+     * @param[in] f_in Input file name.
      * @param[in] quiet Don't print out anything.
      */
     template <bool LOAD_EDGE_VALUES>
@@ -552,7 +553,7 @@ struct Csr
     /**
      * @brief Display CSR graph to console
      *
-     * with_edge_value Whether or not print edge values.
+     * @param[in] with_edge_value Whether display graph with edge values.
      */
     void DisplayGraph(bool with_edge_value = false)
     {
@@ -648,8 +649,9 @@ struct Csr
 
     /**
      * @brief Find node with largest neighbor list
-     *
      * @param[in] max_degree Maximum degree in the graph.
+     *
+     * \return int the source node with highest degree
      */
     int GetNodeWithHighestDegree(int& max_degree)
     {

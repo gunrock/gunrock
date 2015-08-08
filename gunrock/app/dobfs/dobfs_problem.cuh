@@ -222,6 +222,7 @@ struct DOBFSProblem : ProblemBase<_VertexId, _SizeT, _Value,
      * @param[in] _num_gpus Number of the GPUs used.
      * @param[in] _alpha Tuning parameter for switching to backward BFS
      * @param[in] _beta Tuning parameter for switching back to normal BFS
+     * @param[in] streams CUDA stream.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */

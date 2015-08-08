@@ -66,7 +66,7 @@ void runBFS(GRGraph* output, BFS_Parameter *parameter);
  * @tparam SIZE_CHECK        Enable size check
  * @tparam MARK_PREDECESSORS Enable mark predecessors
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <
@@ -97,7 +97,7 @@ void RunTests_enable_idempotence(GRGraph* output, BFS_Parameter *parameter)
  * @tparam DEBUG      Keep debug statics
  * @tparam SIZE_CHECK Enable size check
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <
@@ -126,7 +126,7 @@ void RunTests_mark_predecessors(GRGraph* output, BFS_Parameter *parameter)
  * @tparam INSTRUMENT Keep kernels statics
  * @tparam DEBUG      Keep debug statics
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <
@@ -153,7 +153,7 @@ void RunTests_size_check(GRGraph* output, BFS_Parameter *parameter)
  * @tparam SizeT      Graph size type
  * @tparam INSTRUMENT Keep kernels statics
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <
@@ -178,7 +178,7 @@ void RunTests_debug(GRGraph* output, BFS_Parameter *parameter)
  * @tparam Value    Attribute type
  * @tparam SizeT    Graph size type
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <
@@ -205,7 +205,7 @@ void RunTests_instrumented(GRGraph* output, BFS_Parameter *parameter)
  * @tparam MARK_PREDECESSORS  Enable mark predecessors
  * @tparam ENABLE_IDEMPOTENCE Enable idempotent operation
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <

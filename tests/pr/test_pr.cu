@@ -130,7 +130,7 @@ void Usage()
 /**
  * @brief Displays the PageRank result
  *
- * @param[in] node_id Node vertex Id
+ * @param[in] node Node vertex Id
  * @param[in] rank Rank value for the node
  * @param[in] nodes Number of nodes in the graph.
  */
@@ -157,6 +157,7 @@ void DisplaySolution(VertexId *node, Value *rank, SizeT nodes)
  * @param[in] reference Vector of reference values
  * @param[in] len Vector length
  * @param[in] verbose Whether to print values around the incorrect one.
+ * @param[in] quiet     Don't print out anything to stdout
  *
  * \return Zero if two vectors are exactly the same, non-zero if there is any difference.
  */
@@ -244,6 +245,7 @@ int CompareResults_(
  * @param[in] delta Delta for computing PR
  * @param[in] error Error threshold
  * @param[in] max_iteration Maximum iteration to go
+ * @param[in] directed Whether the graph is directed
  * @param[in] quiet Don't print out anything to stdout
  */
 template <

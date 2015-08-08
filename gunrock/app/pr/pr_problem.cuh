@@ -257,7 +257,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
      *
      * @param[in] stream_from_host Whether to stream data from host.
      * @param[in] graph Pointer to the CSR graph object we process on. @see Csr
-     * @param[in] graph Pointer to the inversed CSR graph object we process on.
+     * @param[in] inversegraph Pointer to the inversed CSR graph object we process on.
      * @param[in] num_gpus Number of the GPUs used.
      * @param[in] gpu_idx GPU index used for testing.
      * @param[in] partition_method Partition method to partition input graph.
@@ -274,7 +274,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             Csr<VertexId, Value, SizeT>
                          *graph,
             Csr<VertexId, Value, SizeT>
-                         *inversgraph      = NULL,
+                         *inversegraph      = NULL,
             int           num_gpus         = 1,
             int          *gpu_idx          = NULL,
             std::string   partition_method = "random",
@@ -287,7 +287,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
         ProblemBase<VertexId, SizeT, Value, true, false, false, false, false, true> :: Init(
             stream_from_host,
             graph,
-            inversgraph,
+            inversegraph,
             num_gpus,
             gpu_idx,
             partition_method,
@@ -355,6 +355,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
      * @param[in] delta PageRank delta factor
      * @param[in] threshold Threshold for remove node from PR computation process.
+     * @param[in] max_iter Maximum number of iterations.
      * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
      * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
      *

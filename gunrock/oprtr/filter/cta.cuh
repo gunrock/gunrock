@@ -210,6 +210,8 @@ struct Cta
 
             /**
              * @brief Set vertex id to -1 if we want to cull this vertex from the outgoing frontier.
+             * @param[in] cta
+             * @param[in] tile
              *
              */
             static __device__ __forceinline__ void VertexCull(

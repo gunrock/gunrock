@@ -162,6 +162,7 @@ struct EdgeProperties
  * @param[in] bc_values Pointer to node bc value
  * @param[in] ebc_values Pointer to edge bc value
  * @param[in] sigmas Pointer to node sigma value
+ * @param[in] source_path Pointer to a vector to store CPU computed labels for each node
  * @param[in] src VertexId of source node if there is any
  * @param[in] quiet Don't print out anything to stdout
  */

@@ -52,6 +52,7 @@ struct PrepareInputFrontierMapFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      * @param[in] v auxiliary value
+     * @param[in] nid node id
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -89,6 +90,7 @@ struct PrepareUnvisitedQueueFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      * @param[in] v auxiliary value
+     * @param[in] nid node id
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -180,6 +182,7 @@ struct ReverseBFSFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      * @param[in] v auxiliary value
+     * @param[in] nid node id
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -220,6 +223,7 @@ struct SwitchToNormalFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      * @param[in] v auxiliary value
+     * @param[in] nid node id
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */

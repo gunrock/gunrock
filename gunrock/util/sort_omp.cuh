@@ -9,7 +9,7 @@
  * @file
  * sort_omp.cuh
  *
- * @brie Fast sorting using OpenMP
+ * @brief Fast sorting using OpenMP
  */
 
 #pragma once

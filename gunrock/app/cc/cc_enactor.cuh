@@ -1030,8 +1030,6 @@ public:
      * @tparam AdvanceKernelPolicy Kernel policy for advance operator.
      * @tparam FilterKernelPolicy Kernel policy for filter operator.
      *
-     * @param[in] src Source node to start primitive.
-     *
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
     template<

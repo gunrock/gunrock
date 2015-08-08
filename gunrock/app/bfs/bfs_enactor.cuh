@@ -516,6 +516,8 @@ public:
             double(total_runtimes) / total_lifetimes : 0.0;
     }
 
+    /** @} */
+
     /**
      * @brief Initialize the problem.
      *
@@ -784,11 +786,6 @@ public:
         return cudaErrorInvalidDeviceFunction;
 
     }
-
-    /**
-     * \addtogroup PublicInterface
-     * @{
-     */
 
     /**
      * @brief BFS Enact kernel entry.

@@ -70,7 +70,7 @@ void runSSSP(GRGraph* output, SSSP_Parameter *parameter);
  * @tparam DEBUG      Keep debug statics
  * @tparam SIZE_CHECK Enable size check
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <
@@ -99,7 +99,7 @@ void markPredecessorsSSSP(GRGraph* output, SSSP_Parameter *parameter)
  * @tparam INSTRUMENT Keep kernels statics
  * @tparam DEBUG      Keep debug statics
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <
@@ -126,7 +126,7 @@ void sizeCheckSSSP(GRGraph* output, SSSP_Parameter *parameter)
  * @tparam SizeT      Graph size type
  * @tparam INSTRUMENT Keep kernels statics
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <
@@ -151,7 +151,7 @@ void debugSSSP(GRGraph* output, SSSP_Parameter *parameter)
  * @tparam Value    Attribute type
  * @tparam SizeT    Graph size type
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <
@@ -177,7 +177,7 @@ void instrumentedSSSP(GRGraph* output, SSSP_Parameter *parameter)
  * @tparam SIZE_CHECK        Enable size check
  * @tparam MARK_PREDECESSORS Enable mark predecessors
  *
- * @praam[out] output    Pointer to output graph structure of the problem
+ * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
  */
 template <

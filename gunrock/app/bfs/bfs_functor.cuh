@@ -98,6 +98,7 @@ struct BFSFunctor {
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      * @param[in] v auxiliary value
+     * @param[in] nid Node ID
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */

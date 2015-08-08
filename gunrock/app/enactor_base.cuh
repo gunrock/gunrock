@@ -603,8 +603,13 @@ public:
     /**
      * @brief Utility function to load input graph.
      *
+     * @tparam EDGE_VALUE
+     * @tparam INVERSE_GRAPH
+     *
      * @param[in] args Command line arguments.
-     * @param[in] csr Reference to the CSR graph.
+     * @param[in] csr_ref Reference to the CSR graph.
+     *
+     * \return int whether successfully loaded the graph (0 success, 1 error).
      */
     template<bool EDGE_VALUE, bool INVERSE_GRAPH>
     int LoadGraph(

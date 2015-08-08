@@ -162,7 +162,7 @@ void DisplaySolution(
  * @tparam Value
  * @tparam SizeT
  * @tparam MARK_PREDECESSORS
- * @tpatam ENABLE_IDEMPOTENCE
+ * @tparam ENABLE_IDEMPOTENCE
  *
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] source_path Host-side vector to store CPU computed labels for each node

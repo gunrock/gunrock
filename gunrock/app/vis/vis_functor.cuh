@@ -73,6 +73,7 @@ struct VISFunctor {
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      * @param[in] v Auxiliary value
+     * @param[in] nid Node ID
      *
      * \return Whether to load the apply function for the node and
      *         include it in the outgoing vertex frontier.
@@ -88,6 +89,7 @@ struct VISFunctor {
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      * @param[in] v Auxiliary value
+     * @param[in] nid Node ID
      *
      */
     static __device__ __forceinline__ void

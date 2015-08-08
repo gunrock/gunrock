@@ -158,6 +158,7 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, _Value,
      * @brief Copy result labels and/or predecessors computed on the GPU back to host-side vectors.
      *
      * @param[out] h_rank host-side vector to store page rank values.
+     * @param[out] h_node_id host-side vector to store node IDs.
      *
      *\return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -204,6 +205,7 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, _Value,
      * @param[in] stream_from_host Whether to stream data from host.
      * @param[in] graph Reference to the CSR graph object we process on. @see Csr
      * @param[in] _num_gpus Number of the GPUs used.
+     * @param[in] streams pointer to CUDA streams.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -374,7 +376,11 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, _Value,
      *  @brief Performs any initialization work needed for WTF problem type. Must be called prior to each WTF iteration.
      *
      *  @param[in] src Source node for one WTF computing pass.
+     *  @param[in] delta Delta in SALSA equation.
+     *  @param[in] alpha Alpha in SALSA equation.
+     *  @param[in] threshold Threshold for convergence.
      *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
+     *  @param[in] queue_sizing Queue sizing of the frontier.
      * 
      *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
