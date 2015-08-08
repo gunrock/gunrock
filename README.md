@@ -1,12 +1,17 @@
 Gunrock documentation
 =====================
 
+News!
+=====
+
+Gunrock v0.3 released! Check out the [Release-Note](http://gunrock.github.io/gunrock/doc/0.3/release_notes.html)!
+
 Introduction
 ============
 
 Gunrock is a CUDA library for graph-processing designed specifically for the GPU. It uses a high-level, bulk-synchronous, data-centric abstraction focused on operations on a vertex or edge frontier. Gunrock achieves a balance between performance and expressiveness by coupling high performance GPU computing primitives and optimization strategies with a high-level programming model that allows programmers to quickly develop new graph primitives with small code size and minimal GPU programming knowledge. For more
-details, please read our paper on arxiv:
-[Gunrock: A High-Performance Graph Processing Library on the GPU](http://arxiv.org/abs/1501.05387) and check out the [Publications](https://github.com/gunrock/gunrock#publications) section.
+details, please read [Why-Gunrock](http://gunrock.github.io/gunrock/doc/0.3/why-gunrock.html), our paper on arxiv:
+[Gunrock: A High-Performance Graph Processing Library on the GPU](http://arxiv.org/abs/1501.05387), and check out the [Publications](https://github.com/gunrock/gunrock#publications) section.
 
 Home Page
 ---------
@@ -15,15 +20,17 @@ Homepage for Gunrock: <http://gunrock.github.io/>
 
 Getting Started with Gunrock
 ----------------------------
-For Frequently Asked Questions, see [FAQ](http://gunrock.github.io/gunrock/doc/0.2/faq.html).
+For Frequently Asked Questions, see [FAQ](http://gunrock.github.io/gunrock/doc/0.3/faq.html).
 
-For information on building Gunrock, see [Building Gunrock](http://gunrock.github.io/gunrock/doc/0.2/building_gunrock.html)
+For information on building Gunrock, see [Building Gunrock](http://gunrock.github.io/gunrock/doc/0.3/building_gunrock.html)
 and refer to [Operating System Support and Requirements](https://github.com/gunrock/gunrock#operating-system-support-and-requirements).
 
 The "tests" subdirectory included with Gunrock has a comprehensive test
 application for all the functionality of Gunrock.
 
-For the programming model we use in Gunrock, see [Programming Model](http://gunrock.github.io/gunrock/doc/0.2/programming_model.html).
+For the programming model we use in Gunrock, see [Programming Model](http://gunrock.github.io/gunrock/doc/0.3/programming_model.html).
+
+To use our stats logging and performance chart generation pipeline. Please check out [Gunrock-to-JSON](http://gunrock.github.io/gunrock/doc/0.3/gunrock_to_json.html).
 
 We have also provided [code samples](https://github.com/gunrock/gunrock/tree/master/python) for how to use Gunrock's C interface in Python, and [annotated code](http://gunrock.github.io/gunrock/doc/annotated_primitives/annotated_primitives.html) for two typical graph primitives.
 
