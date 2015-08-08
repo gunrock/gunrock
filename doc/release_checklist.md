@@ -1,3 +1,5 @@
+This instruction is after the coding phase. First make sure that the code for the new release pass every test and is frozen.
+
 - update release notes (and related docs if necessary).
 - update version info in CMakeLists.txt:
 
