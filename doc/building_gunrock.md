@@ -70,6 +70,6 @@ It will also build a shared library with a C-friendly interface; the example
 test files of calling Gunrock APIs are located at `gunrock/shared_lib_tests`.
 
 Alternatively, you can build gunrock using individual `Makefiles` under
-`gunrock/test/primitive_name` and simply type `make`.
-You can either run the test for all primitives by typing `make test` in the
-build directory, or do your own testings manually.
+`gunrock/test/primitive_name` and simply type `make`.  You can either run the
+test for all primitives by typing `make test` or `ctest` in the build
+directory, or do your own testings manually.
