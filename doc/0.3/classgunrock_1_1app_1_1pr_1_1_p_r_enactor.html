@@ -28,7 +28,7 @@
   
   <td style="padding-left: 0.5em;">
    <div id="projectname">gunrock
-   &#160;<span id="projectnumber">0.3</span>
+   &#160;<span id="projectnumber">0.2</span>
    </div>
    <div id="projectbrief">Gunrock: High-Performance Graph Primitives for the GPU</div>
   </td>
@@ -47,6 +47,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li><a href="modules.html"><span>Modules</span></a></li>
       <li><a href="namespaces.html"><span>Namespaces</span></a></li>
       <li class="current"><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
@@ -127,10 +128,10 @@ virtual&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="g
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Initialize the problem.  <a href="group___public_interface.html#gadfa2f25949ac7343f3a6a2e38d805f01"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gad776d3c2ae0a6c347351a901b8f6470a">Reset</a> ()</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset enactor.  <a href="group___public_interface.html#gad776d3c2ae0a6c347351a901b8f6470a"></a><br/></td></tr>
-<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classgunrock_1_1app_1_1pr_1_1_p_r_enactor.html#adbfe24c24cdcab2a4633ba85aeb7b8ff">Enact</a> (int traversal_mode)</td></tr>
-<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">PageRank Enact kernel entry.  <a href="#adbfe24c24cdcab2a4633ba85aeb7b8ff"></a><br/></td></tr>
-<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classgunrock_1_1app_1_1pr_1_1_p_r_enactor.html#a6c7d061abfe1bb0c823b41793d400972">Init</a> (ContextPtr *context, Problem *problem, int traversal_mode, int max_grid_size=512)</td></tr>
-<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">PageRank Enact kernel entry.  <a href="#a6c7d061abfe1bb0c823b41793d400972"></a><br/></td></tr>
+<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gadbfe24c24cdcab2a4633ba85aeb7b8ff">Enact</a> (int traversal_mode)</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">PageRank Enact kernel entry.  <a href="group___public_interface.html#gadbfe24c24cdcab2a4633ba85aeb7b8ff"></a><br/></td></tr>
+<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga6c7d061abfe1bb0c823b41793d400972">Init</a> (ContextPtr *context, Problem *problem, int traversal_mode, int max_grid_size=512)</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">PageRank Enact kernel entry.  <a href="group___public_interface.html#ga6c7d061abfe1bb0c823b41793d400972"></a><br/></td></tr>
 </table>
 <hr/><a name="details" id="details"></a><h2>Detailed Description</h2>
 <div class="textblock"><h3>template&lt;typename _Problem, bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&gt;<br/>
@@ -146,90 +147,8 @@ class gunrock::app::pr::PREnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK
   </table>
   </dd>
 </dl>
-</div><hr/><h2>Member Function Documentation</h2>
-<a class="anchor" id="adbfe24c24cdcab2a4633ba85aeb7b8ff"></a><!-- doxytag: member="gunrock::app::pr::PREnactor::Enact" ref="adbfe24c24cdcab2a4633ba85aeb7b8ff" args="(int traversal_mode)" -->
-<div class="memitem">
-<div class="memproto">
-<div class="memtemplate">
-template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&gt; </div>
-      <table class="memname">
-        <tr>
-          <td class="memname">cudaError_t <a class="el" href="classgunrock_1_1app_1_1pr_1_1_p_r_enactor.html">gunrock::app::pr::PREnactor</a>&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::<a class="el" href="classgunrock_1_1app_1_1pr_1_1_p_r_enactor.html#adbfe24c24cdcab2a4633ba85aeb7b8ff">Enact</a> </td>
-          <td>(</td>
-          <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>traversal_mode</em></td><td>)</td>
-          <td><code> [inline]</code></td>
-        </tr>
-      </table>
-</div>
-<div class="memdoc">
-
-<p>PageRank Enact kernel entry. </p>
-<dl class="params"><dt><b>Parameters:</b></dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">traversal_mode</td><td>Load-balanced or Dynamic cooperative.</td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="return"><dt><b>Returns:</b></dt><dd>cudaError_t object Indicates the success of all CUDA calls. </dd></dl>
-
-</div>
-</div>
-<a class="anchor" id="a6c7d061abfe1bb0c823b41793d400972"></a><!-- doxytag: member="gunrock::app::pr::PREnactor::Init" ref="a6c7d061abfe1bb0c823b41793d400972" args="(ContextPtr *context, Problem *problem, int traversal_mode, int max_grid_size=512)" -->
-<div class="memitem">
-<div class="memproto">
-<div class="memtemplate">
-template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&gt; </div>
-      <table class="memname">
-        <tr>
-          <td class="memname">cudaError_t <a class="el" href="classgunrock_1_1app_1_1pr_1_1_p_r_enactor.html">gunrock::app::pr::PREnactor</a>&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::<a class="el" href="classgunrock_1_1app_1_1pr_1_1_p_r_enactor.html#a6c7d061abfe1bb0c823b41793d400972">Init</a> </td>
-          <td>(</td>
-          <td class="paramtype">ContextPtr *&#160;</td>
-          <td class="paramname"><em>context</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Problem *&#160;</td>
-          <td class="paramname"><em>problem</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>traversal_mode</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>max_grid_size</em> = <code>512</code>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td><code> [inline]</code></td>
-        </tr>
-      </table>
-</div>
-<div class="memdoc">
-
-<p>PageRank Enact kernel entry. </p>
-<dl class="params"><dt><b>Parameters:</b></dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">context</td><td>CudaContext pointer for ModernGPU API. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">problem</td><td>Pointer to Problem object. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">max_grid_size</td><td>Maximum grid size for kernel calls. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">traversal_mode</td><td>Load-balanced or Dynamic cooperative.</td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="return"><dt><b>Returns:</b></dt><dd>cudaError_t object Indicates the success of all CUDA calls. </dd></dl>
-
-</div>
-</div>
-<hr/>The documentation for this class was generated from the following file:<ul>
-<li>/home/yzh/Projects/gunrock/gunrock/app/pr/<a class="el" href="pr__enactor_8cuh.html">pr_enactor.cuh</a></li>
+</div><hr/>The documentation for this class was generated from the following file:<ul>
+<li>/home/yuduo/mgpu-merge/gunrock/gunrock/app/pr/<a class="el" href="pr__enactor_8cuh.html">pr_enactor.cuh</a></li>
 </ul>
 </div><!-- contents -->
 <!-- window showing the filter options -->
@@ -249,7 +168,7 @@ template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&
 
 
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Aug 7 2015 19:10:40 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Fri Aug 7 2015 13:23:36 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.7.6.1
 </small></address>

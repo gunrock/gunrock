@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
-<title>gunrock: /home/yzh/Projects/gunrock/tests/wtf/test_wtf.cu File Reference</title>
+<title>gunrock: /home/yuduo/mgpu-merge/gunrock/tests/wtf/test_wtf.cu File Reference</title>
 
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
@@ -28,7 +28,7 @@
   
   <td style="padding-left: 0.5em;">
    <div id="projectname">gunrock
-   &#160;<span id="projectnumber">0.3</span>
+   &#160;<span id="projectnumber">0.2</span>
    </div>
    <div id="projectbrief">Gunrock: High-Performance Graph Primitives for the GPU</div>
   </td>
@@ -47,6 +47,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li><a href="modules.html"><span>Modules</span></a></li>
       <li><a href="namespaces.html"><span>Namespaces</span></a></li>
       <li><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
@@ -80,7 +81,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div class="summary">
 <a href="#func-members">Functions</a>  </div>
   <div class="headertitle">
-<div class="title">/home/yzh/Projects/gunrock/tests/wtf/test_wtf.cu File Reference</div>  </div>
+<div class="title">/home/yuduo/mgpu-merge/gunrock/tests/wtf/test_wtf.cu File Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
 
@@ -271,14 +272,20 @@ template&lt;typename VertexId , typename Value , typename SizeT , bool INSTRUMEN
     <tr><td class="paramname">Value</td><td></td></tr>
     <tr><td class="paramname">SizeT</td><td></td></tr>
     <tr><td class="paramname">INSTRUMENT</td><td></td></tr>
-    <tr><td class="paramname">DEBUG</td><td></td></tr>
-    <tr><td class="paramname">SIZE_CHECK</td><td></td></tr>
   </table>
   </dd>
 </dl>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">info</td><td>Pointer to info contains parameters and statistics. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">graph</td><td>Reference to the CSR graph we process on </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">src</td><td>Source node ID for WTF algorithm </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">delta</td><td>Delta value for computing WTF, usually set to .85 </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">alpha</td><td>Parameter to adjust iteration number </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">error</td><td>Error threshold value </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">max_iter</td><td>Max iteration for WTF computing </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">max_grid_size</td><td>Maximum CTA occupancy </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">num_gpus</td><td>Number of GPUs </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">context</td><td>CudaContext for moderngpu to use </td></tr>
   </table>
   </dd>
 </dl>
@@ -303,7 +310,7 @@ template&lt;typename VertexId , typename Value , typename SizeT , bool INSTRUMEN
 
 
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Aug 7 2015 19:10:39 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Fri Aug 7 2015 13:23:36 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.7.6.1
 </small></address>
