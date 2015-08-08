@@ -86,8 +86,8 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 Operators                       </h1>
 <p>Gunrock supports two operators that form the basis of graph computation:</p>
 <ul>
-<li>Advance: This operator represents the most common operation in graph: advancing from one frontier to another through edges. It takes either a vertex frontier or an edge frontier as the input, visits the edges connect to the elements in the frontier, and returns a new frontier which contains either the edges or the vertices it reaches.</li>
-<li>Filter: This operator inputs a queue of elements, culls some elements by testing whether it meets the criteria defined by users, and outputs the rest into a new queue. It can also do computations while visiting the elements in the queue and doing the validation test.</li>
+<li>Advance: This operator represents the most common operation in graphs: advancing from one frontier to another through edges. It takes either a vertex frontier or an edge frontier as the input, visits the edges connected to the elements in the frontier, and returns a new frontier that contains either the edges or the vertices it reaches.</li>
+<li>Filter: This operator inputs a frontier of elements, culls some elements by testing whether it meets the criteria defined by users, and outputs the rest into a new frontier. It can also do computations while visiting the elements in the queue and doing the validation test.</li>
 </ul>
 <h1><a class="anchor" id="functors"></a>
 Functors                        </h1>
@@ -102,7 +102,7 @@ Create New Graph Primitive         </h1>
 </div></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat Aug 8 2015 10:10:54 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Sat Aug 8 2015 15:56:01 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.9.1
 </small></address>

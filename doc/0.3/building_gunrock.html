@@ -90,12 +90,12 @@ METIS Dependency </h1>
 <p>Gunrock uses the <a href="http://glaros.dtc.umn.edu/gkhome/metis/metis/overview">METIS</a> as one possible partitioner. You will need to <a href="http://glaros.dtc.umn.edu/gkhome/metis/metis/download">install METIS</a> to build test applications.</p>
 <h1><a class="anchor" id="build_mgpu"></a>
 ModernGPU &amp; CUB Dependency           </h1>
-<p>Gunrock uses APIs from <a href="https://github.com/NVlabs/moderngpu">Modern GPU</a> and <a href="http://nvlabs.github.io/cub/">CUB</a>. You will need to download or clone them and place them to <code>gunrock/externals</code>. Alternatively, you can clone gunrock recursively by git command: </p><pre class="fragment">git clone --recursive https://github.com/gunrock/gunrock
+<p>Gunrock uses APIs from <a href="https://github.com/NVlabs/moderngpu">Modern GPU</a> and <a href="http://nvlabs.github.io/cub/">CUB</a>. You will need to download or clone them and place them to <code>gunrock/externals</code>. Alternatively, you can clone gunrock recursively with the git command: </p><pre class="fragment">git clone --recursive https://github.com/gunrock/gunrock
 </pre><p>or if you already cloned gunrock, under <code>gunrock/</code>: </p><pre class="fragment">git submodule init
 git submodule update
 </pre><h1><a class="anchor" id="generating_datasets"></a>
 Generating Datasets           </h1>
-<p>All dataset-related code is under the <code>gunrock/dataset/</code> subdirectory. The current version of Gunrock only supports <a href="http://math.nist.gov/MatrixMarket/formats.html">Matrix-market coordinate-formatted graph</a> file. The datasets are divided into two categories according to their scale. Under the <code>dataset/small/</code> subdirectory, there are trivial graph datasets for testing the correctness of the graph primitives. All of them are ready to use. Under the <code>dataset/large/</code> subdirectory, there are large graph datasets for doing performance regression tests. To download them to your local machine, just type <code>make</code> in the <code>dataset/large/</code> subdirectory. You can also choose to only download one specific dataset to your local machine by stepping into the subdirectory of that dataset and typing <code>make</code> inside that subdirectory.</p>
+<p>All dataset-related code is under the <code>gunrock/dataset/</code> subdirectory. The current version of Gunrock only supports <a href="http://math.nist.gov/MatrixMarket/formats.html">Matrix-market coordinate-formatted graph</a> format. The datasets are divided into two categories according to their scale. Under the <code>dataset/small/</code> subdirectory, there are trivial graph datasets for testing the correctness of the graph primitives. All of them are ready to use. Under the <code>dataset/large/</code> subdirectory, there are large graph datasets for doing performance regression tests. To download them to your local machine, just type <code>make</code> in the <code>dataset/large/</code> subdirectory. You can also choose to only download one specific dataset to your local machine by stepping into the subdirectory of that dataset and typing <code>make</code> inside that subdirectory.</p>
 <h1><a class="anchor" id="running_tests"></a>
 Running the Tests           </h1>
 <p>Before running the tests, make sure you have installed boost and have successfully generated the datasets.</p>
@@ -104,12 +104,12 @@ Running the Tests           </h1>
 <li>Create and enter build directory: <code>mkdir build &amp;&amp; cd build</code></li>
 <li>Make: <code>cmake [gunrock directory]</code>, Then type: <code>make</code> Binary test files are in directory: <code>build/bin</code></li>
 </ul>
-<p>It will also build a shared library with a C-friendly interface, the examples test files of calling Gunrock APIs are located at <code>gunrock/shared_lib_tests</code>.</p>
-<p>Alternatively, you can build gunrock using individual <code>Makefiles</code> under <code>gunrock/test/primitive_name</code> and simply type <code>make</code>. You can either run the test for all primitives by typing <code>make test</code> in the build directory, or do your own testings manually. </p>
+<p>It will also build a shared library with a C-friendly interface; the example test files of calling Gunrock APIs are located at <code>gunrock/shared_lib_tests</code>.</p>
+<p>Alternatively, you can build gunrock using individual <code>Makefiles</code> under <code>gunrock/test/primitive_name</code> and simply type <code>make</code>. You can either run the test for all primitives by typing <code>make test</code> or <code>ctest</code> in the build directory, or do your own testings manually. </p>
 </div></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat Aug 8 2015 10:10:54 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Sat Aug 8 2015 15:56:01 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.9.1
 </small></address>
