@@ -38,16 +38,15 @@ directly using [Github](https://github.com/gunrock/gunrock/issues).
 Operating System Support and Requirements
 =========================================
 
-This release (0.3) has only been tested on Linux Mint 15 (64-bit) with
-CUDA 5.5, 6.0, and 6.5 installed. We expect Gunrock to build and run correctly on
-other 64-bit and 32-bit Linux distributions, Mac OS, and Windows.
+This release (0.3) has only been tested on Linux Mint 15 (64-bit) and Ubuntu
+12.04 with CUDA 5.5, 6.0, 6.5, and 7.0 installed. We expect Gunrock to build and run correctly on other 64-bit and 32-bit Linux distributions, Mac OS, and Windows.
 
 Requirements
 ------------
 
 Gunrock has not been tested with any CUDA version < 5.5.
 
-Several graph primitives' CPU validation code uses Boost Graph Library v1.53.0.
+Several graph primitives' CPU validation code uses Boost Graph Library (> v1.53.0).
 
 CUDA
 ====
@@ -62,6 +61,15 @@ detailed information.
 
 Publications
 ============
+Yuduo Wu, Yangzihao Wang, Yuechao Pan, Carl Yang, and John D. Owens.
+**Performance Characterization for High-Level Programming Models for GPU Graph
+Analytics.** In IEEE International Symposium on Workload Characterization,
+IISWC2015, October 2015
+
+Yuechao Pan, Yangzihao Wang, Yuduo Wu, Carl Yang, and John D. Owens. **Multi-GPU
+Graph Analytics.** CoRR, abs/1504.04804(1504.04804v1), April 2015.
+[arXiv](http://arxiv.org/abs/1504.04804)
+
 Yangzihao Wang, Andrew Davidson, Yuechao Pan, Yuduo Wu, Andy Riffel, and John D. Owens. **Gunrock: A High-Performance Graph Processing Library on the GPU.** CoRR, abs/1501.05387v2), March 2015. [arXiv](http://arxiv.org/abs/1501.05387v2)
 
 Carl Yang, Yangzihao Wang, and John D. Owens. **Fast Sparse Matrix and Sparse Vector Multiplication Algorithm on the GPU.** In Graph Algorithms Building Blocks, GABB 2015, May 2015. [http](http://www.escholarship.org/uc/item/1rq9t3j3)
@@ -71,12 +79,17 @@ Afton Geil, Yangzihao Wang, and John D. Owens. **WTF, GPU! Computing Twitter's W
 Road Map
 ========
 
- - Framework: The structure of the operator code in Gunrock may change
-   significantly during near-term future development. Generally we
-   want to find the right set of operators that can abstract most
-   graph primitives while delivering high performance.
+ - Framework: In v0.3 we have integrated single-GPU and multi-GPU frameworks
+   into a unified framework. We are exploring more operators such as
+   Gather-Reduce and matrix opeartors. Generally we want to find the right set
+   of operators that can abstract most graph primitives while delivering high
+   performance.
 
- - Primitives: Our near-term goal is to implement maximal independent set algorithm and graph matching algorithm, build better support for bipartite graph algorithms, and explore community detection algorithms. The long term goal includes algorithms on dynamic graphs, priority queue support, graph partitioning and multi-GPU algorithms.
+ - Primitives: Our near-term goal is to implement maximal independent set
+   algorithm and graph matching algorithm, build better support for bipartite
+   graph algorithms, and explore community detection algorithms. The long term
+   goal includes algorithms on dynamic graphs, priority queue support, graph
+   partitioning and multi-GPU algorithms.
 
 Credits
 =======
@@ -121,8 +134,8 @@ This work was funded by the DARPA XDATA program under AFRL Contract
 FA8750-13-C-0002 and by NSF awards CCF-1017399 and OCI-1032859. Our
 XDATA principal investigator is Eric Whyne of
 [Data Tactics Corporation](http://www.data-tactics.com/) and our DARPA
-program manager is
-[Dr. Christopher White](http://www.darpa.mil/Our_Work/I2O/Personnel/Dr_Christopher_White.aspx).
+program manager was Dr. Christopher White (2012-2014) and [Mr. Wade
+Shen](http://www.darpa.mil/staff/mr-wade-shen) (2015-now).
 
 Gunrock Copyright and Software License
 ======================================

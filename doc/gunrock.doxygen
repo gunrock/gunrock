@@ -683,6 +683,7 @@ INPUT                  = ../README.md \
                          ./programming_model.md \
                          ./gunrock_to_json.md \
                          ./why-gunrock.md \
+                         ./release_notes.md \
                          ../FAQ.md
 
 # This tag can be used to specify the character encoding of the source files
