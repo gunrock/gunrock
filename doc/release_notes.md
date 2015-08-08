@@ -25,4 +25,4 @@ v0.3 ChangeLog
 
 v0.3 Known Issues
 =================
- - Direction-Optimizing BFS does not work with multi-GPU.
+ - Direction-Optimizing BFS, HITS, SALSA, WTF, and MST do not support multi-GPU yet.
