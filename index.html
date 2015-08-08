@@ -29,14 +29,17 @@
       </header>
       <section>
         <h1>
-<a id="gunrock-documentation" class="anchor" href="#gunrock-documentation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Gunrock documentation</h1>
+            <a id="gunrock-documentation" class="anchor" href="#gunrock-documentation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Gunrock documentation</h1>
+
+        <h1><a id="news" class="anchor" href="#news" aria-hidden="true"><span class="octicon octicon-link"></span></a>News!</h1>
+        <p>Gunrock v0.3 released! Check out the <a href="http://gunrock.github.io/gunrock/doc/0.3/release_notes.html">Release-Note</a>!</p>
 
 <h1>
 <a id="introduction" class="anchor" href="#introduction" aria-hidden="true"><span class="octicon octicon-link"></span></a>Introduction</h1>
 
 <p>Gunrock is a CUDA library for graph-processing designed specifically for the GPU. It uses a high-level, bulk-synchronous, data-centric abstraction focused on operations on a vertex or edge frontier. Gunrock achieves a balance between performance and expressiveness by coupling high performance GPU computing primitives and optimization strategies with a high-level programming model that allows programmers to quickly develop new graph primitives with small code size and minimal GPU programming knowledge. For more
-details, please read our paper on arXiv:
-<a href="http://arxiv.org/abs/1501.05387">Gunrock: A High-Performance Graph Processing Library on the GPU</a> and check out the <a href="#publications">Publications</a> section.</p>
+details, please read <a href="http://gunrock.github.io/gunrock/doc/0.3/why-gunrock.html">Why-Gunrock</a>, our paper on arXiv:
+<a href="http://arxiv.org/abs/1501.05387">Gunrock: A High-Performance Graph Processing Library on the GPU</a>, and check out the <a href="#publications">Publications</a> section.</p>
 
 <h2>
 <a id="home-page" class="anchor" href="#home-page" aria-hidden="true"><span class="octicon octicon-link"></span></a>Home Page</h2>
@@ -46,17 +49,19 @@ details, please read our paper on arXiv:
 <h2>
 <a id="getting-started-with-gunrock" class="anchor" href="#getting-started-with-gunrock" aria-hidden="true"><span class="octicon octicon-link"></span></a>Getting Started with Gunrock</h2>
 
-<p>For Frequently Asked Questions, see <a href="http://gunrock.github.io/gunrock/doc/0.2/faq.html">FAQ</a>.</p>
+<p>For Frequently Asked Questions, see <a href="http://gunrock.github.io/gunrock/doc/0.3/faq.html">FAQ</a>.</p>
 
-<p>For information on building Gunrock, see <a href="http://gunrock.github.io/gunrock/doc/0.2/building_gunrock.html">Building Gunrock</a>
+<p>For information on building Gunrock, see <a href="http://gunrock.github.io/gunrock/doc/0.3/building_gunrock.html">Building Gunrock</a>
 and refer to <a href="#operating-system-support-and-requirements">Operating System Support and Requirements</a>.</p>
 
 <p>The "tests" subdirectory included with Gunrock has a comprehensive test
 application for all the functionality of Gunrock.</p>
 
-<p>For the programming model we use in Gunrock, see <a href="http://gunrock.github.io/gunrock/doc/0.2/programming_model.html">Programming Model</a>.</p>
+<p>For the programming model we use in Gunrock, see <a href="http://gunrock.github.io/gunrock/doc/0.3/programming_model.html">Programming Model</a>.</p>
 
-<p>We have also provided a code walk-through of a <a href="http://gunrock.github.io/gunrock/doc/0.2/simple_example.html">simple example</a> and <a href="http://gunrock.github.io/gunrock/doc/annotated_primitives/annotated_primitives.html">annotated code</a> for two typical graph primitives.</p>
+<p>To use our stats logging and performance chart generation pipeline. Please check out <a href="http://gunrock.github.io/gunrock/doc/0.3/gunrock_to_json.html">Gunrock-to-JSON</a>.
+
+<p>We have also provided  <a href="https://github.com/gunrock/gunrock/tree/master/python">code samples</a> for how to use Gunrock's C interface in Python, and <a href="http://gunrock.github.io/gunrock/doc/annotated_primitives/annotated_primitives.html">annotated code</a> for two typical graph primitives.</p>
 
 <h1>
 <a id="reporting-problems" class="anchor" href="#reporting-problems" aria-hidden="true"><span class="octicon octicon-link"></span></a>Reporting Problems</h1>
@@ -69,16 +74,14 @@ directly using <a href="https://github.com/gunrock/gunrock/issues">Github</a>.</
 <h1>
 <a id="operating-system-support-and-requirements" class="anchor" href="#operating-system-support-and-requirements" aria-hidden="true"><span class="octicon octicon-link"></span></a>Operating System Support and Requirements</h1>
 
-<p>This release (0.2) has only been tested on Linux Mint 15 (64-bit), Ubuntu 12.04 (64-bit), and CentOS 6.4  with
-CUDA 5.5, 6.0, and 6.5 installed. We expect Gunrock to build and run correctly on
-other 64-bit and 32-bit Linux distributions, Mac OS, and Windows.</p>
+<p>This release (0.3) has only been tested on Linux Mint 15 (64-bit) and Ubuntu 12.04 (64-bit)  with CUDA 5.5, 6.0, 6.5, and 7.0 installed. We expect Gunrock to build and run correctly on other 64-bit and 32-bit Linux distributions, Mac OS, and Windows.</p>
 
 <h2>
 <a id="requirements" class="anchor" href="#requirements" aria-hidden="true"><span class="octicon octicon-link"></span></a>Requirements</h2>
 
 <p>Gunrock has not been tested with any CUDA version &lt; 5.5.</p>
 
-<p>Several graph primitives' CPU validation code uses Boost Graph Library v1.53.0.</p>
+<p>Several graph primitives' CPU validation code uses Boost Graph Library ( &gt; v1.53.0).</p>
 
 <h1>
 <a id="cuda" class="anchor" href="#cuda" aria-hidden="true"><span class="octicon octicon-link"></span></a>CUDA</h1>
@@ -92,7 +95,9 @@ Linux</a> for
 detailed information.</p>
 
 <h1>
-<a id="publications" class="anchor" href="#publications" aria-hidden="true"><span class="octicon octicon-link"></span></a>Publications</h1>
+    <a id="publications" class="anchor" href="#publications" aria-hidden="true"><span class="octicon octicon-link"></span></a>Publications</h1>
+
+<p>Yuduo Wu, Yangzihao Wang, Yuechao Pan, Carl Yang, and John D. Owens. <strong>Performance Characterization for High-Level Programming Models for GPU Graph Analytics.</strong> In IEEE International Symposium on Workload Characterization, IISWC2015, October 2015</p>
 
 <p>Yuechao Pan, Yangzihao Wang, Yuduo Wu, Carl Yang, and John D. Owens. <strong>Multi-GPU Graph Analytics.</strong> CoRR, abs/1504.04804, Apr. 2015. <a href="http://arxiv.org/abs/1504.04804">arXiv</a></p>
 
@@ -106,10 +111,7 @@ detailed information.</p>
 <a id="road-map" class="anchor" href="#road-map" aria-hidden="true"><span class="octicon octicon-link"></span></a>Road Map</h1>
 
 <ul>
-<li><p>Framework: The structure of the operator code in Gunrock may change
-significantly during near-term future development. Generally we
-want to find the right set of operators that can abstract most
-graph primitives while delivering high performance.</p></li>
+<li><p>Framework: In v0.3 we have integrated single-GPU and multi-GPU frameworks into a unified framework. We are exploring more operators such as Gather-Reduce and matrix opeartors. Generally we want to find the right set of operators that can abstract most graph primitives while delivering high performance. </p></li>
 <li><p>Primitives: Our near-term goal is to implement maximal independent set algorithm and graph matching algorithm, build better support for bipartite graph algorithms, and explore community detection algorithms. The long term goal includes algorithms on dynamic graphs, priority queue support, graph partitioning and multi-GPU algorithms.</p></li>
 </ul>
 
@@ -151,14 +153,13 @@ library development and the dataset auto-generating code.</p>
 FA8750-13-C-0002 and by NSF awards CCF-1017399 and OCI-1032859. Our
 XDATA principal investigator is Eric Whyne of
 <a href="http://www.data-tactics.com/">Data Tactics Corporation</a> and our DARPA
-program manager is
-<a href="http://www.darpa.mil/Our_Work/I2O/Personnel/Dr_Christopher_White.aspx">Dr. Christopher White</a>.</p>
+program manager is Dr. Christopher White (2012-2014) and <a href="http://www.darpa.mil/staff/mr-wade-shen">Mr. Wade Shen</a>.</p>
 
 <h1>
 <a id="gunrock-copyright-and-software-license" class="anchor" href="#gunrock-copyright-and-software-license" aria-hidden="true"><span class="octicon octicon-link"></span></a>Gunrock Copyright and Software License</h1>
 
 <p>Gunrock is copyright The Regents of the University of
-California, 2013. The library, examples, and all source code are
+California, 2015. The library, examples, and all source code are
 released under
 <a href="http://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a>.</p>
       </section>
