@@ -9,16 +9,16 @@ Operators                       {#operators}
 Gunrock supports two operators that form the basis of graph computation:
 
 + Advance:
-This operator represents the most common operation in graph: advancing from one
+This operator represents the most common operation in graphs: advancing from one
 frontier to another through edges. It takes either a vertex frontier or an edge
-frontier as the input, visits the edges connect to the elements in the
-frontier, and returns a new frontier which contains either the edges or the
+frontier as the input, visits the edges connected to the elements in the
+frontier, and returns a new frontier that contains either the edges or the
 vertices it reaches.
 
 + Filter:
-This operator inputs a queue of elements, culls some elements by testing
+This operator inputs a frontier of elements, culls some elements by testing
 whether it meets the criteria defined by users, and outputs the rest into a new
-queue. It can also do computations while visiting the elements in the queue and
+frontier. It can also do computations while visiting the elements in the queue and
 doing the validation test.
 
 

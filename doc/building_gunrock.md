@@ -32,7 +32,7 @@ ModernGPU & CUB Dependency           {#build_mgpu}
 Gunrock uses APIs from [Modern GPU](https://github.com/NVlabs/moderngpu)
 and [CUB](http://nvlabs.github.io/cub/). You
 will need to download or clone them and place them to `gunrock/externals`.
-Alternatively, you can clone gunrock recursively by git command:
+Alternatively, you can clone gunrock recursively with the git command:
 
     git clone --recursive https://github.com/gunrock/gunrock
 
@@ -47,7 +47,7 @@ Generating Datasets           {#generating_datasets}
 All dataset-related code is under the `gunrock/dataset/` subdirectory. The
 current version of Gunrock only supports
 [Matrix-market coordinate-formatted graph](http://math.nist.gov/MatrixMarket/formats.html)
-file. The datasets are divided into two categories according to their scale.
+format. The datasets are divided into two categories according to their scale.
 Under the `dataset/small/` subdirectory, there are trivial graph datasets for
 testing the correctness of the graph primitives. All of them are ready to use.
 Under the `dataset/large/` subdirectory, there are large graph datasets for
@@ -66,7 +66,7 @@ successfully generated the datasets.
 - Make: `cmake [gunrock directory]`, Then type: `make`
 Binary test files are in directory: `build/bin`
 
-It will also build a shared library with a C-friendly interface, the examples
+It will also build a shared library with a C-friendly interface; the example
 test files of calling Gunrock APIs are located at `gunrock/shared_lib_tests`.
 
 Alternatively, you can build gunrock using individual `Makefiles` under
