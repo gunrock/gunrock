@@ -28,7 +28,7 @@
   
   <td style="padding-left: 0.5em;">
    <div id="projectname">gunrock
-   &#160;<span id="projectnumber">0.3</span>
+   &#160;<span id="projectnumber">0.2</span>
    </div>
    <div id="projectbrief">Gunrock: High-Performance Graph Primitives for the GPU</div>
   </td>
@@ -47,6 +47,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li><a href="modules.html"><span>Modules</span></a></li>
       <li><a href="namespaces.html"><span>Namespaces</span></a></li>
       <li class="current"><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
@@ -127,8 +128,8 @@ Public Member Functions</h2></td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="structgunrock_1_1app_1_1sssp_1_1_s_s_s_p_problem.html" title="Single-Source Shortest Path Problem structure stores device-side vectors for doing SSSP computing on ...">SSSPProblem</a> default destructor. <br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gac83d739b0bfadf0584639103dc92792a">Extract</a> (Value *h_labels, VertexId *h_preds)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Copy result labels computed on the GPU back to host-side vectors.  <a href="group___public_interface.html#gac83d739b0bfadf0584639103dc92792a"></a><br/></td></tr>
-<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gabe8171724788c125f9c5f427c283cc02">Init</a> (bool stream_from_host, <a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; *graph, <a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; *inversegraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, int delta_factor=16, float queue_sizing=2.0, float in_sizing=1.0, float partition_factor=-1.0, int partition_seed=-1)</td></tr>
-<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">initialization function.  <a href="group___public_interface.html#gabe8171724788c125f9c5f427c283cc02"></a><br/></td></tr>
+<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga94ce3b591593f0c379bcf847411425fe">Init</a> (bool stream_from_host, <a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; *graph, <a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; *inversgraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, int delta_factor=16, float queue_sizing=2.0, float in_sizing=1.0, float partition_factor=-1.0, int partition_seed=-1)</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">initialization function.  <a href="group___public_interface.html#ga94ce3b591593f0c379bcf847411425fe"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga078d2ae0ad785856d8357919af62d251">Reset</a> (VertexId src, FrontierType frontier_type, double queue_sizing)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset problem function. Must be called prior to each run.  <a href="group___public_interface.html#ga078d2ae0ad785856d8357919af62d251"></a><br/></td></tr>
 </table>
@@ -147,7 +148,7 @@ struct gunrock::app::sssp::SSSPProblem&lt; VertexId, SizeT, Value, _MARK_PATHS &
   </dd>
 </dl>
 </div><hr/>The documentation for this struct was generated from the following file:<ul>
-<li>/home/yzh/Projects/gunrock/gunrock/app/sssp/<a class="el" href="sssp__problem_8cuh.html">sssp_problem.cuh</a></li>
+<li>/home/yuduo/mgpu-merge/gunrock/gunrock/app/sssp/<a class="el" href="sssp__problem_8cuh.html">sssp_problem.cuh</a></li>
 </ul>
 </div><!-- contents -->
 <!-- window showing the filter options -->
@@ -167,7 +168,7 @@ struct gunrock::app::sssp::SSSPProblem&lt; VertexId, SizeT, Value, _MARK_PATHS &
 
 
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Aug 7 2015 19:10:40 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Fri Aug 7 2015 13:23:37 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.7.6.1
 </small></address>

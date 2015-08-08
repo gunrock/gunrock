@@ -28,7 +28,7 @@
   
   <td style="padding-left: 0.5em;">
    <div id="projectname">gunrock
-   &#160;<span id="projectnumber">0.3</span>
+   &#160;<span id="projectnumber">0.2</span>
    </div>
    <div id="projectbrief">Gunrock: High-Performance Graph Primitives for the GPU</div>
   </td>
@@ -47,6 +47,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li><a href="modules.html"><span>Modules</span></a></li>
       <li><a href="namespaces.html"><span>Namespaces</span></a></li>
       <li class="current"><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
@@ -124,10 +125,10 @@ virtual&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="c
 <tr><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga74aca802a5bdaec1a65e7dc026f224d5">GetStatistics</a> (long long &amp;total_queued, VertexId &amp;search_depth, double &amp;avg_duty)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Obtain statistics about the last primitive enacted.  <a href="group___public_interface.html#ga74aca802a5bdaec1a65e7dc026f224d5"></a><br/></td></tr>
 <tr><td class="memTemplParams" colspan="2">template&lt;typename AdvanceKernelPolicy , typename FilterKernelPolicy &gt; </td></tr>
-<tr><td class="memTemplItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classgunrock_1_1app_1_1bfs_1_1_b_f_s_enactor.html#a29fb27e1fdce0f69ac02ca135ef83dc0">InitBFS</a> (ContextPtr *context, Problem *problem, int max_grid_size=0, bool size_check=true)</td></tr>
-<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Initialize the problem.  <a href="#a29fb27e1fdce0f69ac02ca135ef83dc0"></a><br/></td></tr>
-<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classgunrock_1_1app_1_1bfs_1_1_b_f_s_enactor.html#a19740668269aeb0258cc3f93e4088062">Reset</a> ()</td></tr>
-<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset enactor.  <a href="#a19740668269aeb0258cc3f93e4088062"></a><br/></td></tr>
+<tr><td class="memTemplItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga29fb27e1fdce0f69ac02ca135ef83dc0">InitBFS</a> (ContextPtr *context, Problem *problem, int max_grid_size=0, bool size_check=true)</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Initialize the problem.  <a href="group___public_interface.html#ga29fb27e1fdce0f69ac02ca135ef83dc0"></a><br/></td></tr>
+<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga19740668269aeb0258cc3f93e4088062">Reset</a> ()</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset enactor.  <a href="group___public_interface.html#ga19740668269aeb0258cc3f93e4088062"></a><br/></td></tr>
 <tr><td class="memTemplParams" colspan="2">template&lt;typename AdvanceKernelPolicy , typename FilterKernelPolicy &gt; </td></tr>
 <tr><td class="memTemplItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classgunrock_1_1app_1_1bfs_1_1_b_f_s_enactor.html#a562788fca6e6ffb56349e13034b09c0f">EnactBFS</a> (VertexId src)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Enacts a breadth-first search computing on the specified graph.  <a href="#a562788fca6e6ffb56349e13034b09c0f"></a><br/></td></tr>
@@ -151,91 +152,6 @@ class gunrock::app::bfs::BFSEnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHE
   </dd>
 </dl>
 </div><hr/><h2>Member Function Documentation</h2>
-<a class="anchor" id="a29fb27e1fdce0f69ac02ca135ef83dc0"></a><!-- doxytag: member="gunrock::app::bfs::BFSEnactor::InitBFS" ref="a29fb27e1fdce0f69ac02ca135ef83dc0" args="(ContextPtr *context, Problem *problem, int max_grid_size=0, bool size_check=true)" -->
-<div class="memitem">
-<div class="memproto">
-<div class="memtemplate">
-template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&gt; </div>
-<div class="memtemplate">
-template&lt;typename AdvanceKernelPolicy , typename FilterKernelPolicy &gt; </div>
-      <table class="memname">
-        <tr>
-          <td class="memname">cudaError_t <a class="el" href="classgunrock_1_1app_1_1bfs_1_1_b_f_s_enactor.html">gunrock::app::bfs::BFSEnactor</a>&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::<a class="el" href="classgunrock_1_1app_1_1bfs_1_1_b_f_s_enactor.html#a29fb27e1fdce0f69ac02ca135ef83dc0">InitBFS</a> </td>
-          <td>(</td>
-          <td class="paramtype">ContextPtr *&#160;</td>
-          <td class="paramname"><em>context</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Problem *&#160;</td>
-          <td class="paramname"><em>problem</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>max_grid_size</em> = <code>0</code>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">bool&#160;</td>
-          <td class="paramname"><em>size_check</em> = <code>true</code>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td><code> [inline]</code></td>
-        </tr>
-      </table>
-</div>
-<div class="memdoc">
-
-<p>Initialize the problem. </p>
-<dl class=""><dt><b>Template Parameters:</b></dt><dd>
-  <table class="">
-    <tr><td class="paramname">AdvanceKernelPolicy</td><td>Kernel policy for advance operator. </td></tr>
-    <tr><td class="paramname">FilterKernelPolicy</td><td>Kernel policy for filter operator.</td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="params"><dt><b>Parameters:</b></dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">context</td><td>CudaContext pointer for ModernGPU API. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">problem</td><td>Pointer to Problem object. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">max_grid_size</td><td>Maximum grid size for kernel calls. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">size_check</td><td>Whether or not to enable size check.</td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="return"><dt><b>Returns:</b></dt><dd>cudaError_t object Indicates the success of all CUDA calls. </dd></dl>
-
-</div>
-</div>
-<a class="anchor" id="a19740668269aeb0258cc3f93e4088062"></a><!-- doxytag: member="gunrock::app::bfs::BFSEnactor::Reset" ref="a19740668269aeb0258cc3f93e4088062" args="()" -->
-<div class="memitem">
-<div class="memproto">
-<div class="memtemplate">
-template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&gt; </div>
-      <table class="memname">
-        <tr>
-          <td class="memname">cudaError_t <a class="el" href="classgunrock_1_1app_1_1bfs_1_1_b_f_s_enactor.html">gunrock::app::bfs::BFSEnactor</a>&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::<a class="el" href="classgunrock_1_1app_1_1bfs_1_1_b_f_s_enactor.html#a19740668269aeb0258cc3f93e4088062">Reset</a> </td>
-          <td>(</td>
-          <td class="paramname"></td><td>)</td>
-          <td><code> [inline]</code></td>
-        </tr>
-      </table>
-</div>
-<div class="memdoc">
-
-<p>Reset enactor. </p>
-<dl class="return"><dt><b>Returns:</b></dt><dd>cudaError_t object Indicates the success of all CUDA calls. </dd></dl>
-
-<p>Reimplemented from <a class="el" href="classgunrock_1_1app_1_1_enactor_base.html">gunrock::app::EnactorBase&lt; _Problem::SizeT, _DEBUG, _SIZE_CHECK &gt;</a>.</p>
-
-</div>
-</div>
 <a class="anchor" id="a562788fca6e6ffb56349e13034b09c0f"></a><!-- doxytag: member="gunrock::app::bfs::BFSEnactor::EnactBFS" ref="a562788fca6e6ffb56349e13034b09c0f" args="(VertexId src)" -->
 <div class="memitem">
 <div class="memproto">
@@ -274,7 +190,7 @@ template&lt;typename AdvanceKernelPolicy , typename FilterKernelPolicy &gt; </di
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following file:<ul>
-<li>/home/yzh/Projects/gunrock/gunrock/app/bfs/<a class="el" href="bfs__enactor_8cuh.html">bfs_enactor.cuh</a></li>
+<li>/home/yuduo/mgpu-merge/gunrock/gunrock/app/bfs/<a class="el" href="bfs__enactor_8cuh.html">bfs_enactor.cuh</a></li>
 </ul>
 </div><!-- contents -->
 <!-- window showing the filter options -->
@@ -294,7 +210,7 @@ template&lt;typename AdvanceKernelPolicy , typename FilterKernelPolicy &gt; </di
 
 
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Aug 7 2015 19:10:39 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Fri Aug 7 2015 13:23:36 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.7.6.1
 </small></address>

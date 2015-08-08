@@ -28,7 +28,7 @@
   
   <td style="padding-left: 0.5em;">
    <div id="projectname">gunrock
-   &#160;<span id="projectnumber">0.3</span>
+   &#160;<span id="projectnumber">0.2</span>
    </div>
    <div id="projectbrief">Gunrock: High-Performance Graph Primitives for the GPU</div>
   </td>
@@ -47,6 +47,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li><a href="modules.html"><span>Modules</span></a></li>
       <li><a href="namespaces.html"><span>Namespaces</span></a></li>
       <li><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
@@ -99,21 +100,26 @@ virtual&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="g
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">BC Enact kernel entry.  <a href="#gaac3aa9edef3dac4759bd50562701c3dc"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gad245a9e8dbe2d108b5448c25eb9a1456">gunrock::app::bc::BCProblem&lt; VertexId, SizeT, Value, _MARK_PREDECESSORS, _USE_DOUBLE_BUFFER &gt;::Extract</a> (Value *h_sigmas, Value *h_bc_values, Value *h_ebc_values, VertexId *h_labels)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Copy result per-node BC values and/or sigma values computed on the GPU back to host-side vectors.  <a href="#gad245a9e8dbe2d108b5448c25eb9a1456"></a><br/></td></tr>
-<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gacce34652c93cbbc70801c09f563c1653">gunrock::app::bc::BCProblem&lt; VertexId, SizeT, Value, _MARK_PREDECESSORS, _USE_DOUBLE_BUFFER &gt;::Init</a> (bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversegraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=-1.0f, int partition_seed=-1)</td></tr>
-<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">initialization function.  <a href="#gacce34652c93cbbc70801c09f563c1653"></a><br/></td></tr>
+<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga1948a3139ef04ae97d88d13b86026eea">gunrock::app::bc::BCProblem&lt; VertexId, SizeT, Value, _MARK_PREDECESSORS, _USE_DOUBLE_BUFFER &gt;::Init</a> (bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversgraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=-1.0f, int partition_seed=-1)</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">initialization function.  <a href="#ga1948a3139ef04ae97d88d13b86026eea"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga9a16a0851bd527f61bfca2d8e6ccc556">gunrock::app::bc::BCProblem&lt; VertexId, SizeT, Value, _MARK_PREDECESSORS, _USE_DOUBLE_BUFFER &gt;::Reset</a> (VertexId src, FrontierType frontier_type, double queue_sizing, double queue_sizing1=-1.0)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset problem function. Must be called prior to each run.  <a href="#ga9a16a0851bd527f61bfca2d8e6ccc556"></a><br/></td></tr>
 <tr><td class="memTemplParams" colspan="2">template&lt;typename VertexId &gt; </td></tr>
 <tr><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga74aca802a5bdaec1a65e7dc026f224d5">gunrock::app::bfs::BFSEnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::GetStatistics</a> (long long &amp;total_queued, VertexId &amp;search_depth, double &amp;avg_duty)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Obtain statistics about the last primitive enacted.  <a href="#ga74aca802a5bdaec1a65e7dc026f224d5"></a><br/></td></tr>
+<tr><td class="memTemplParams" colspan="2">template&lt;typename AdvanceKernelPolicy , typename FilterKernelPolicy &gt; </td></tr>
+<tr><td class="memTemplItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga29fb27e1fdce0f69ac02ca135ef83dc0">gunrock::app::bfs::BFSEnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::InitBFS</a> (ContextPtr *context, Problem *problem, int max_grid_size=0, bool size_check=true)</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Initialize the problem.  <a href="#ga29fb27e1fdce0f69ac02ca135ef83dc0"></a><br/></td></tr>
+<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga19740668269aeb0258cc3f93e4088062">gunrock::app::bfs::BFSEnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::Reset</a> ()</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset enactor.  <a href="#ga19740668269aeb0258cc3f93e4088062"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga05975e02c6e1305eae101a4220fa9689">gunrock::app::bfs::BFSEnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::Enact</a> (VertexId src, int traversal_mode=0)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">SSSP Enact kernel entry.  <a href="#ga05975e02c6e1305eae101a4220fa9689"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gac1da5d1b85417aa8b82032bdda17e097">gunrock::app::bfs::BFSEnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::Init</a> (ContextPtr *context, Problem *problem, int max_grid_size=0, bool size_check=true, int traversal_mode=0)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">BFS Enact kernel entry.  <a href="#gac1da5d1b85417aa8b82032bdda17e097"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga0639c660275f3084119c75ad4dbfa9b4">gunrock::app::bfs::BFSProblem&lt; VertexId, SizeT, Value, _MARK_PREDECESSORS, _ENABLE_IDEMPOTENCE, _USE_DOUBLE_BUFFER &gt;::Extract</a> (VertexId *h_labels, VertexId *h_preds)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Copy result labels and/or predecessors computed on the GPU back to host-side vectors.  <a href="#ga0639c660275f3084119c75ad4dbfa9b4"></a><br/></td></tr>
-<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga00bd50abf664a8c23b961901a1a944b2">gunrock::app::bfs::BFSProblem&lt; VertexId, SizeT, Value, _MARK_PREDECESSORS, _ENABLE_IDEMPOTENCE, _USE_DOUBLE_BUFFER &gt;::Init</a> (bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversegraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=-1.0f, int partition_seed=-1)</td></tr>
-<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">initialization function.  <a href="#ga00bd50abf664a8c23b961901a1a944b2"></a><br/></td></tr>
+<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gaf325dc8b4f91a08996dbed461fb3fdc9">gunrock::app::bfs::BFSProblem&lt; VertexId, SizeT, Value, _MARK_PREDECESSORS, _ENABLE_IDEMPOTENCE, _USE_DOUBLE_BUFFER &gt;::Init</a> (bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversgraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=-1.0f, int partition_seed=-1)</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">initialization function.  <a href="#gaf325dc8b4f91a08996dbed461fb3fdc9"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gaebd365e0753dc16532472e461ff1b775">gunrock::app::bfs::BFSProblem&lt; VertexId, SizeT, Value, _MARK_PREDECESSORS, _ENABLE_IDEMPOTENCE, _USE_DOUBLE_BUFFER &gt;::Reset</a> (VertexId src, FrontierType frontier_type, double queue_sizing, double queue_sizing1=-1.0)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset problem function. Must be called prior to each run.  <a href="#gaebd365e0753dc16532472e461ff1b775"></a><br/></td></tr>
 <tr><td class="memTemplParams" colspan="2">template&lt;typename VertexId &gt; </td></tr>
@@ -127,8 +133,8 @@ virtual&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="g
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Copy result component ids computed on the GPU back to a host-side vector.  <a href="#ga34b7de12121b2ee21c85df7cdb05b677"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gadfff5070a7e802070a1cae1583cd7939">gunrock::app::cc::CCProblem&lt; VertexId, SizeT, Value, _USE_DOUBLE_BUFFER &gt;::ComputeCCHistogram</a> (VertexId *h_component_ids, VertexId *h_roots, unsigned int *h_histograms)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute histogram for component ids.  <a href="#gadfff5070a7e802070a1cae1583cd7939"></a><br/></td></tr>
-<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gac632fd3a95d0b4e2e844d6762a326a55">gunrock::app::cc::CCProblem&lt; VertexId, SizeT, Value, _USE_DOUBLE_BUFFER &gt;::Init</a> (bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversegraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=-1.0f, int partition_seed=-1)</td></tr>
-<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">initialization function.  <a href="#gac632fd3a95d0b4e2e844d6762a326a55"></a><br/></td></tr>
+<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga5a0e77eab324d6c54215bbb64ed4a4fc">gunrock::app::cc::CCProblem&lt; VertexId, SizeT, Value, _USE_DOUBLE_BUFFER &gt;::Init</a> (bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversgraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=-1.0f, int partition_seed=-1)</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">initialization function.  <a href="#ga5a0e77eab324d6c54215bbb64ed4a4fc"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gae1592f8c4b124ee7d649665b5b18d24f">gunrock::app::cc::CCProblem&lt; VertexId, SizeT, Value, _USE_DOUBLE_BUFFER &gt;::Reset</a> (FrontierType frontier_type, double queue_sizing)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset problem function. Must be called prior to each run.  <a href="#gae1592f8c4b124ee7d649665b5b18d24f"></a><br/></td></tr>
 <tr><td class="memTemplParams" colspan="2">template&lt;typename VertexId &gt; </td></tr>
@@ -170,10 +176,14 @@ virtual&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="g
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Initialize the problem.  <a href="#gadfa2f25949ac7343f3a6a2e38d805f01"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gad776d3c2ae0a6c347351a901b8f6470a">gunrock::app::pr::PREnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::Reset</a> ()</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset enactor.  <a href="#gad776d3c2ae0a6c347351a901b8f6470a"></a><br/></td></tr>
+<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gadbfe24c24cdcab2a4633ba85aeb7b8ff">gunrock::app::pr::PREnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::Enact</a> (int traversal_mode)</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">PageRank Enact kernel entry.  <a href="#gadbfe24c24cdcab2a4633ba85aeb7b8ff"></a><br/></td></tr>
+<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga6c7d061abfe1bb0c823b41793d400972">gunrock::app::pr::PREnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::Init</a> (ContextPtr *context, Problem *problem, int traversal_mode, int max_grid_size=512)</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">PageRank Enact kernel entry.  <a href="#ga6c7d061abfe1bb0c823b41793d400972"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga2b9819f79958abd754936a463f12b498">gunrock::app::pr::PRProblem&lt; VertexId, SizeT, Value &gt;::Extract</a> (Value *h_rank, VertexId *h_node_id)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Copy result labels and/or predecessors computed on the GPU back to host-side vectors.  <a href="#ga2b9819f79958abd754936a463f12b498"></a><br/></td></tr>
-<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga30eb2acb4799e465cf1419bc061c3731">gunrock::app::pr::PRProblem&lt; VertexId, SizeT, Value &gt;::Init</a> (bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversegraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=-1.0f, int partition_seed=-1)</td></tr>
-<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">initialization function.  <a href="#ga30eb2acb4799e465cf1419bc061c3731"></a><br/></td></tr>
+<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga53b9295419d8837ab03aec5b7f71e617">gunrock::app::pr::PRProblem&lt; VertexId, SizeT, Value &gt;::Init</a> (bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversgraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=-1.0f, int partition_seed=-1)</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">initialization function.  <a href="#ga53b9295419d8837ab03aec5b7f71e617"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga1bab90da58690497350c84b18fd8b340">gunrock::app::pr::PRProblem&lt; VertexId, SizeT, Value &gt;::Reset</a> (VertexId src, Value delta, Value threshold, SizeT max_iter, FrontierType frontier_type, double queue_sizing)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset problem function. Must be called prior to each run.  <a href="#ga1bab90da58690497350c84b18fd8b340"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gad1af9755bccf6f00a82c52a5fac27576">gunrock::app::salsa::SALSAEnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::GetStatistics</a> (long long &amp;total_queued, double &amp;avg_duty)</td></tr>
@@ -190,14 +200,19 @@ virtual&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="g
 <tr><td class="memTemplParams" colspan="2">template&lt;typename VertexId &gt; </td></tr>
 <tr><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gab55a5293d9df571bb88f6b7d4af0a6e2">gunrock::app::sssp::SSSPEnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::GetStatistics</a> (long long &amp;total_queued, VertexId &amp;search_depth, double &amp;avg_duty)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Obtain statistics about the last primitive enacted.  <a href="#gab55a5293d9df571bb88f6b7d4af0a6e2"></a><br/></td></tr>
+<tr><td class="memTemplParams" colspan="2">template&lt;typename AdvanceKernelPolicy , typename FilterKernelPolicy &gt; </td></tr>
+<tr><td class="memTemplItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga1fbdf66bfee92f2785deb4449c684989">gunrock::app::sssp::SSSPEnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::InitSSSP</a> (ContextPtr *context, Problem *problem, int max_grid_size=0, bool size_check=true)</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Initialize the problem.  <a href="#ga1fbdf66bfee92f2785deb4449c684989"></a><br/></td></tr>
+<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga568155f5dfdf4af6a345bc78c09a3c3e">gunrock::app::sssp::SSSPEnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::Reset</a> ()</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset enactor.  <a href="#ga568155f5dfdf4af6a345bc78c09a3c3e"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gacba3aa1eacd2b054a039a6955fee770f">gunrock::app::sssp::SSSPEnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::Enact</a> (VertexId src, int traversal_mode=0)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">SSSP Enact kernel entry.  <a href="#gacba3aa1eacd2b054a039a6955fee770f"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga931dd16e73662fc19fd755c700c661bb">gunrock::app::sssp::SSSPEnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::Init</a> (ContextPtr *context, Problem *problem, int max_grid_size=0, bool size_check=true, int traversal_mode=0)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">SSSP Enact kernel entry.  <a href="#ga931dd16e73662fc19fd755c700c661bb"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gac83d739b0bfadf0584639103dc92792a">gunrock::app::sssp::SSSPProblem&lt; VertexId, SizeT, Value, _MARK_PATHS &gt;::Extract</a> (Value *h_labels, VertexId *h_preds)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Copy result labels computed on the GPU back to host-side vectors.  <a href="#gac83d739b0bfadf0584639103dc92792a"></a><br/></td></tr>
-<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gabe8171724788c125f9c5f427c283cc02">gunrock::app::sssp::SSSPProblem&lt; VertexId, SizeT, Value, _MARK_PATHS &gt;::Init</a> (bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversegraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, int delta_factor=16, float queue_sizing=2.0, float in_sizing=1.0, float partition_factor=-1.0, int partition_seed=-1)</td></tr>
-<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">initialization function.  <a href="#gabe8171724788c125f9c5f427c283cc02"></a><br/></td></tr>
+<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga94ce3b591593f0c379bcf847411425fe">gunrock::app::sssp::SSSPProblem&lt; VertexId, SizeT, Value, _MARK_PATHS &gt;::Init</a> (bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversgraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, int delta_factor=16, float queue_sizing=2.0, float in_sizing=1.0, float partition_factor=-1.0, int partition_seed=-1)</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">initialization function.  <a href="#ga94ce3b591593f0c379bcf847411425fe"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga078d2ae0ad785856d8357919af62d251">gunrock::app::sssp::SSSPProblem&lt; VertexId, SizeT, Value, _MARK_PATHS &gt;::Reset</a> (VertexId src, FrontierType frontier_type, double queue_sizing)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset problem function. Must be called prior to each run.  <a href="#ga078d2ae0ad785856d8357919af62d251"></a><br/></td></tr>
 <tr><td class="memTemplParams" colspan="2">template&lt;typename VertexId &gt; </td></tr>
@@ -564,7 +579,7 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _MARK_PRE
 
 </div>
 </div>
-<a class="anchor" id="gacce34652c93cbbc70801c09f563c1653"></a><!-- doxytag: member="gunrock::app::bc::BCProblem::Init" ref="gacce34652c93cbbc70801c09f563c1653" args="(bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversegraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=&#45;1.0f, int partition_seed=&#45;1)" -->
+<a class="anchor" id="ga1948a3139ef04ae97d88d13b86026eea"></a><!-- doxytag: member="gunrock::app::bc::BCProblem::Init" ref="ga1948a3139ef04ae97d88d13b86026eea" args="(bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversgraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=&#45;1.0f, int partition_seed=&#45;1)" -->
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
@@ -586,7 +601,7 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _MARK_PRE
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype"><a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; *&#160;</td>
-          <td class="paramname"><em>inversegraph</em> = <code>NULL</code>, </td>
+          <td class="paramname"><em>inversgraph</em> = <code>NULL</code>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -656,7 +671,7 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _MARK_PRE
 <dl class="see"><dt><b>See also:</b></dt><dd><a class="el" href="structgunrock_1_1_csr.html" title="CSR data structure which uses Compressed Sparse Row format to store a graph. It is a compressed way t...">Csr</a> </dd></dl>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">inversegraph</td><td>Pointer to the inversed CSR graph object we process on. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">graph</td><td>Pointer to the inversed CSR graph object we process on. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">num_gpus</td><td>Number of the GPUs used. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">gpu_idx</td><td>GPU index used for testing. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">partition_method</td><td>Partition method to partition input graph. </td></tr>
@@ -775,6 +790,91 @@ template&lt;typename VertexId &gt; </div>
   </table>
   </dd>
 </dl>
+
+</div>
+</div>
+<a class="anchor" id="ga29fb27e1fdce0f69ac02ca135ef83dc0"></a><!-- doxytag: member="gunrock::app::bfs::BFSEnactor::InitBFS" ref="ga29fb27e1fdce0f69ac02ca135ef83dc0" args="(ContextPtr *context, Problem *problem, int max_grid_size=0, bool size_check=true)" -->
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&gt; </div>
+<div class="memtemplate">
+template&lt;typename AdvanceKernelPolicy , typename FilterKernelPolicy &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">cudaError_t <a class="el" href="classgunrock_1_1app_1_1bfs_1_1_b_f_s_enactor.html">gunrock::app::bfs::BFSEnactor</a>&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::InitBFS </td>
+          <td>(</td>
+          <td class="paramtype">ContextPtr *&#160;</td>
+          <td class="paramname"><em>context</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Problem *&#160;</td>
+          <td class="paramname"><em>problem</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>max_grid_size</em> = <code>0</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>size_check</em> = <code>true</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td><code> [inline]</code></td>
+        </tr>
+      </table>
+</div>
+<div class="memdoc">
+
+<p>Initialize the problem. </p>
+<dl class=""><dt><b>Template Parameters:</b></dt><dd>
+  <table class="">
+    <tr><td class="paramname">AdvanceKernelPolicy</td><td>Kernel policy for advance operator. </td></tr>
+    <tr><td class="paramname">FilterKernelPolicy</td><td>Kernel policy for filter operator.</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="params"><dt><b>Parameters:</b></dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">context</td><td>CudaContext pointer for ModernGPU API. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">problem</td><td>Pointer to Problem object. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">max_grid_size</td><td>Maximum grid size for kernel calls. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">size_check</td><td>Whether or not to enable size check.</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="return"><dt><b>Returns:</b></dt><dd>cudaError_t object Indicates the success of all CUDA calls. </dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="ga19740668269aeb0258cc3f93e4088062"></a><!-- doxytag: member="gunrock::app::bfs::BFSEnactor::Reset" ref="ga19740668269aeb0258cc3f93e4088062" args="()" -->
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">cudaError_t <a class="el" href="classgunrock_1_1app_1_1bfs_1_1_b_f_s_enactor.html">gunrock::app::bfs::BFSEnactor</a>&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::Reset </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td><code> [inline]</code></td>
+        </tr>
+      </table>
+</div>
+<div class="memdoc">
+
+<p>Reset enactor. </p>
+<dl class="return"><dt><b>Returns:</b></dt><dd>cudaError_t object Indicates the success of all CUDA calls. </dd></dl>
+
+<p>Reimplemented from <a class="el" href="classgunrock_1_1app_1_1_enactor_base.html">gunrock::app::EnactorBase&lt; _Problem::SizeT, _DEBUG, _SIZE_CHECK &gt;</a>.</p>
 
 </div>
 </div>
@@ -916,7 +1016,7 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _MARK_PRE
 
 </div>
 </div>
-<a class="anchor" id="ga00bd50abf664a8c23b961901a1a944b2"></a><!-- doxytag: member="gunrock::app::bfs::BFSProblem::Init" ref="ga00bd50abf664a8c23b961901a1a944b2" args="(bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversegraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=&#45;1.0f, int partition_seed=&#45;1)" -->
+<a class="anchor" id="gaf325dc8b4f91a08996dbed461fb3fdc9"></a><!-- doxytag: member="gunrock::app::bfs::BFSProblem::Init" ref="gaf325dc8b4f91a08996dbed461fb3fdc9" args="(bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversgraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=&#45;1.0f, int partition_seed=&#45;1)" -->
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
@@ -938,7 +1038,7 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _MARK_PRE
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype"><a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; *&#160;</td>
-          <td class="paramname"><em>inversegraph</em> = <code>NULL</code>, </td>
+          <td class="paramname"><em>inversgraph</em> = <code>NULL</code>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -1008,7 +1108,7 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _MARK_PRE
 <dl class="see"><dt><b>See also:</b></dt><dd><a class="el" href="structgunrock_1_1_csr.html" title="CSR data structure which uses Compressed Sparse Row format to store a graph. It is a compressed way t...">Csr</a> </dd></dl>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">inversegraph</td><td>Pointer to the inversed CSR graph object we process on. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">graph</td><td>Pointer to the inversed CSR graph object we process on. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">num_gpus</td><td>Number of the GPUs used. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">gpu_idx</td><td>GPU index used for testing. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">partition_method</td><td>Partition method to partition input graph. </td></tr>
@@ -1277,7 +1377,7 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _USE_DOUB
 
 </div>
 </div>
-<a class="anchor" id="gac632fd3a95d0b4e2e844d6762a326a55"></a><!-- doxytag: member="gunrock::app::cc::CCProblem::Init" ref="gac632fd3a95d0b4e2e844d6762a326a55" args="(bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversegraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=&#45;1.0f, int partition_seed=&#45;1)" -->
+<a class="anchor" id="ga5a0e77eab324d6c54215bbb64ed4a4fc"></a><!-- doxytag: member="gunrock::app::cc::CCProblem::Init" ref="ga5a0e77eab324d6c54215bbb64ed4a4fc" args="(bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversgraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=&#45;1.0f, int partition_seed=&#45;1)" -->
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
@@ -1299,7 +1399,7 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _USE_DOUB
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype"><a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; *&#160;</td>
-          <td class="paramname"><em>inversegraph</em> = <code>NULL</code>, </td>
+          <td class="paramname"><em>inversgraph</em> = <code>NULL</code>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -1369,7 +1469,7 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _USE_DOUB
 <dl class="see"><dt><b>See also:</b></dt><dd><a class="el" href="structgunrock_1_1_csr.html" title="CSR data structure which uses Compressed Sparse Row format to store a graph. It is a compressed way t...">Csr</a> </dd></dl>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">inversegraph</td><td>Pointer to the inversed CSR graph object we process on. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">graph</td><td>Pointer to the inversed CSR graph object we process on. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">num_gpus</td><td>Number of the GPUs used. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">gpu_idx</td><td>GPU index used for testing. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">partition_method</td><td>Partition method to partition input graph. </td></tr>
@@ -1651,8 +1751,7 @@ template&lt;typename _VertexId , typename _SizeT , typename _Value , bool _MARK_
     <tr><td class="paramdir">[in]</td><td class="paramname">inv_graph</td><td>Reference to the inverse (CSC) graph object we process on. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">_num_gpus</td><td>Number of the GPUs used. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">_alpha</td><td>Tuning parameter for switching to backward BFS </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">_beta</td><td>Tuning parameter for switching back to normal BFS </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">streams</td><td>CUDA stream.</td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">_beta</td><td>Tuning parameter for switching back to normal BFS</td></tr>
   </table>
   </dd>
 </dl>
@@ -1903,8 +2002,7 @@ template&lt;typename _VertexId , typename _SizeT , typename _Value &gt; </div>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
     <tr><td class="paramdir">[in]</td><td class="paramname">auth_graph</td><td>Reference to the CSC graph object we process on. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">_num_gpus</td><td>Number of the GPUs used. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">streams</td><td>CUDA Streams.</td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">_num_gpus</td><td>Number of the GPUs used.</td></tr>
   </table>
   </dd>
 </dl>
@@ -2136,6 +2234,87 @@ template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&
 
 </div>
 </div>
+<a class="anchor" id="gadbfe24c24cdcab2a4633ba85aeb7b8ff"></a><!-- doxytag: member="gunrock::app::pr::PREnactor::Enact" ref="gadbfe24c24cdcab2a4633ba85aeb7b8ff" args="(int traversal_mode)" -->
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">cudaError_t <a class="el" href="classgunrock_1_1app_1_1pr_1_1_p_r_enactor.html">gunrock::app::pr::PREnactor</a>&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::Enact </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>traversal_mode</em></td><td>)</td>
+          <td><code> [inline]</code></td>
+        </tr>
+      </table>
+</div>
+<div class="memdoc">
+
+<p>PageRank Enact kernel entry. </p>
+<dl class="params"><dt><b>Parameters:</b></dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">traversal_mode</td><td>Load-balanced or Dynamic cooperative.</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="return"><dt><b>Returns:</b></dt><dd>cudaError_t object Indicates the success of all CUDA calls. </dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="ga6c7d061abfe1bb0c823b41793d400972"></a><!-- doxytag: member="gunrock::app::pr::PREnactor::Init" ref="ga6c7d061abfe1bb0c823b41793d400972" args="(ContextPtr *context, Problem *problem, int traversal_mode, int max_grid_size=512)" -->
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">cudaError_t <a class="el" href="classgunrock_1_1app_1_1pr_1_1_p_r_enactor.html">gunrock::app::pr::PREnactor</a>&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::Init </td>
+          <td>(</td>
+          <td class="paramtype">ContextPtr *&#160;</td>
+          <td class="paramname"><em>context</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Problem *&#160;</td>
+          <td class="paramname"><em>problem</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>traversal_mode</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>max_grid_size</em> = <code>512</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td><code> [inline]</code></td>
+        </tr>
+      </table>
+</div>
+<div class="memdoc">
+
+<p>PageRank Enact kernel entry. </p>
+<dl class="params"><dt><b>Parameters:</b></dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">context</td><td>CudaContext pointer for ModernGPU API. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">problem</td><td>Pointer to Problem object. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">max_grid_size</td><td>Maximum grid size for kernel calls. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">traversal_mode</td><td>Load-balanced or Dynamic cooperative.</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="return"><dt><b>Returns:</b></dt><dd>cudaError_t object Indicates the success of all CUDA calls. </dd></dl>
+
+</div>
+</div>
 <a class="anchor" id="ga2b9819f79958abd754936a463f12b498"></a><!-- doxytag: member="gunrock::app::pr::PRProblem::Extract" ref="ga2b9819f79958abd754936a463f12b498" args="(Value *h_rank, VertexId *h_node_id)" -->
 <div class="memitem">
 <div class="memproto">
@@ -2175,7 +2354,7 @@ template&lt;typename VertexId , typename SizeT , typename Value &gt; </div>
 
 </div>
 </div>
-<a class="anchor" id="ga30eb2acb4799e465cf1419bc061c3731"></a><!-- doxytag: member="gunrock::app::pr::PRProblem::Init" ref="ga30eb2acb4799e465cf1419bc061c3731" args="(bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversegraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=&#45;1.0f, int partition_seed=&#45;1)" -->
+<a class="anchor" id="ga53b9295419d8837ab03aec5b7f71e617"></a><!-- doxytag: member="gunrock::app::pr::PRProblem::Init" ref="ga53b9295419d8837ab03aec5b7f71e617" args="(bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversgraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=&#45;1.0f, int partition_seed=&#45;1)" -->
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
@@ -2197,7 +2376,7 @@ template&lt;typename VertexId , typename SizeT , typename Value &gt; </div>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype"><a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; *&#160;</td>
-          <td class="paramname"><em>inversegraph</em> = <code>NULL</code>, </td>
+          <td class="paramname"><em>inversgraph</em> = <code>NULL</code>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -2267,7 +2446,7 @@ template&lt;typename VertexId , typename SizeT , typename Value &gt; </div>
 <dl class="see"><dt><b>See also:</b></dt><dd><a class="el" href="structgunrock_1_1_csr.html" title="CSR data structure which uses Compressed Sparse Row format to store a graph. It is a compressed way t...">Csr</a> </dd></dl>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">inversegraph</td><td>Pointer to the inversed CSR graph object we process on. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">graph</td><td>Pointer to the inversed CSR graph object we process on. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">num_gpus</td><td>Number of the GPUs used. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">gpu_idx</td><td>GPU index used for testing. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">partition_method</td><td>Partition method to partition input graph. </td></tr>
@@ -2342,7 +2521,6 @@ template&lt;typename VertexId , typename SizeT , typename Value &gt; </div>
     <tr><td class="paramdir">[in]</td><td class="paramname">frontier_type</td><td>The frontier type (i.e., edge/vertex/mixed). </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">delta</td><td>PageRank delta factor </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">threshold</td><td>Threshold for remove node from PR computation process. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">max_iter</td><td>Maximum number of iterations. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">frontier_type</td><td>The frontier type (i.e., edge/vertex/mixed). </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">queue_sizing</td><td>Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).</td></tr>
   </table>
@@ -2441,9 +2619,8 @@ template&lt;typename SALSAProblem &gt; </div>
 <dl class="see"><dt><b>See also:</b></dt><dd><a class="el" href="structgunrock_1_1app_1_1salsa_1_1_s_a_l_s_a_problem.html" title="SALSA Problem structure stores device-side vectors for doing SALSA Algorithm on the GPU...">SALSAProblem</a></dd></dl>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">context</td><td>CUDA Contet pointer. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">problem</td><td>Pointer to <a class="el" href="structgunrock_1_1app_1_1salsa_1_1_s_a_l_s_a_problem.html" title="SALSA Problem structure stores device-side vectors for doing SALSA Algorithm on the GPU...">SALSAProblem</a> object. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">max_iteration</td><td>Max number of iterations. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">src</td><td>Source node for SALSA. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">max_grid_size</td><td>Max grid size for SALSA kernel calls.</td></tr>
   </table>
   </dd>
@@ -2548,8 +2725,7 @@ template&lt;typename _VertexId , typename _SizeT , typename _Value &gt; </div>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
     <tr><td class="paramdir">[in]</td><td class="paramname">auth_graph</td><td>Reference to the CSC graph object we process on. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">_num_gpus</td><td>Number of the GPUs used. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">streams</td><td>CUDA Streams</td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">_num_gpus</td><td>Number of the GPUs used.</td></tr>
   </table>
   </dd>
 </dl>
@@ -2588,8 +2764,8 @@ template&lt;typename _VertexId , typename _SizeT , typename _Value &gt; </div>
 <p>Performs any initialization work needed for PR problem type. Must be called prior to each PR iteration. </p>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">frontier_type</td><td>The frontier type (i.e., edge/vertex/mixed) </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">queue_sizing</td><td>Queue sizing of the frontier</td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">src</td><td>Source node for one PR computing pass. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">frontier_type</td><td>The frontier type (i.e., edge/vertex/mixed)</td></tr>
   </table>
   </dd>
 </dl>
@@ -2647,6 +2823,91 @@ template&lt;typename VertexId &gt; </div>
   </table>
   </dd>
 </dl>
+
+</div>
+</div>
+<a class="anchor" id="ga1fbdf66bfee92f2785deb4449c684989"></a><!-- doxytag: member="gunrock::app::sssp::SSSPEnactor::InitSSSP" ref="ga1fbdf66bfee92f2785deb4449c684989" args="(ContextPtr *context, Problem *problem, int max_grid_size=0, bool size_check=true)" -->
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&gt; </div>
+<div class="memtemplate">
+template&lt;typename AdvanceKernelPolicy , typename FilterKernelPolicy &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">cudaError_t <a class="el" href="classgunrock_1_1app_1_1sssp_1_1_s_s_s_p_enactor.html">gunrock::app::sssp::SSSPEnactor</a>&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::InitSSSP </td>
+          <td>(</td>
+          <td class="paramtype">ContextPtr *&#160;</td>
+          <td class="paramname"><em>context</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Problem *&#160;</td>
+          <td class="paramname"><em>problem</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>max_grid_size</em> = <code>0</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>size_check</em> = <code>true</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td><code> [inline]</code></td>
+        </tr>
+      </table>
+</div>
+<div class="memdoc">
+
+<p>Initialize the problem. </p>
+<dl class=""><dt><b>Template Parameters:</b></dt><dd>
+  <table class="">
+    <tr><td class="paramname">AdvanceKernelPolicy</td><td>Kernel policy for advance operator. </td></tr>
+    <tr><td class="paramname">FilterKernelPolicy</td><td>Kernel policy for filter operator.</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="params"><dt><b>Parameters:</b></dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">context</td><td>CudaContext pointer for ModernGPU API. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">problem</td><td>Pointer to Problem object. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">max_grid_size</td><td>Maximum grid size for kernel calls. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">size_check</td><td>Whether or not to enable size check.</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="return"><dt><b>Returns:</b></dt><dd>cudaError_t object Indicates the success of all CUDA calls. </dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="ga568155f5dfdf4af6a345bc78c09a3c3e"></a><!-- doxytag: member="gunrock::app::sssp::SSSPEnactor::Reset" ref="ga568155f5dfdf4af6a345bc78c09a3c3e" args="()" -->
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">cudaError_t <a class="el" href="classgunrock_1_1app_1_1sssp_1_1_s_s_s_p_enactor.html">gunrock::app::sssp::SSSPEnactor</a>&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::Reset </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td><code> [inline]</code></td>
+        </tr>
+      </table>
+</div>
+<div class="memdoc">
+
+<p>Reset enactor. </p>
+<dl class="return"><dt><b>Returns:</b></dt><dd>cudaError_t object Indicates the success of all CUDA calls. </dd></dl>
+
+<p>Reimplemented from <a class="el" href="classgunrock_1_1app_1_1_enactor_base.html">gunrock::app::EnactorBase&lt; _Problem::SizeT, _DEBUG, _SIZE_CHECK &gt;</a>.</p>
 
 </div>
 </div>
@@ -2788,7 +3049,7 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _MARK_PAT
 
 </div>
 </div>
-<a class="anchor" id="gabe8171724788c125f9c5f427c283cc02"></a><!-- doxytag: member="gunrock::app::sssp::SSSPProblem::Init" ref="gabe8171724788c125f9c5f427c283cc02" args="(bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversegraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, int delta_factor=16, float queue_sizing=2.0, float in_sizing=1.0, float partition_factor=&#45;1.0, int partition_seed=&#45;1)" -->
+<a class="anchor" id="ga94ce3b591593f0c379bcf847411425fe"></a><!-- doxytag: member="gunrock::app::sssp::SSSPProblem::Init" ref="ga94ce3b591593f0c379bcf847411425fe" args="(bool stream_from_host, Csr&lt; VertexId, Value, SizeT &gt; *graph, Csr&lt; VertexId, Value, SizeT &gt; *inversgraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, int delta_factor=16, float queue_sizing=2.0, float in_sizing=1.0, float partition_factor=&#45;1.0, int partition_seed=&#45;1)" -->
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
@@ -2810,7 +3071,7 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _MARK_PAT
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype"><a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; *&#160;</td>
-          <td class="paramname"><em>inversegraph</em> = <code>NULL</code>, </td>
+          <td class="paramname"><em>inversgraph</em> = <code>NULL</code>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -2886,12 +3147,11 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _MARK_PAT
 <dl class="see"><dt><b>See also:</b></dt><dd><a class="el" href="structgunrock_1_1_csr.html" title="CSR data structure which uses Compressed Sparse Row format to store a graph. It is a compressed way t...">Csr</a> </dd></dl>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">inversegraph</td><td>Pointer to the inversed CSR graph object we process on. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">graph</td><td>Pointer to the inversed CSR graph object we process on. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">num_gpus</td><td>Number of the GPUs used. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">gpu_idx</td><td>GPU index used for testing. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">partition_method</td><td>Partition method to partition input graph. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">streams</td><td>CUDA stream. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">delta_factor</td><td>delta factor for delta-stepping. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">queue_sizing</td><td>Maximum queue sizing factor. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">in_sizing</td><td></td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">partition_factor</td><td>Partition factor for partitioner. </td></tr>
@@ -3257,9 +3517,8 @@ template&lt;typename TOPKProblem &gt; </div>
 <dl class="see"><dt><b>See also:</b></dt><dd><a class="el" href="structgunrock_1_1app_1_1topk_1_1_t_o_p_k_problem.html" title="TOPK Problem structure stores device-side vectors for doing TOPK on the GPU.">TOPKProblem</a></dd></dl>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">context</td><td>CUDA context pointer. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">problem</td><td>Pointer to <a class="el" href="structgunrock_1_1app_1_1topk_1_1_t_o_p_k_problem.html" title="TOPK Problem structure stores device-side vectors for doing TOPK on the GPU.">TOPKProblem</a> object. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">top_nodes</td><td>Top nodes to process. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">src</td><td>Source node for TOPK. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">max_grid_size</td><td>Max grid size for TOPK kernel calls.</td></tr>
   </table>
   </dd>
@@ -3384,8 +3643,7 @@ template&lt;typename _VertexId , typename _SizeT , typename _Value &gt; </div>
 <dl class="see"><dt><b>See also:</b></dt><dd><a class="el" href="structgunrock_1_1_csr.html" title="CSR data structure which uses Compressed Sparse Row format to store a graph. It is a compressed way t...">Csr</a> </dd></dl>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">_num_gpus</td><td>Number of the GPUs used. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">streams</td><td>pointer to CUDA Streams.</td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">_num_gpus</td><td>Number of the GPUs used.</td></tr>
   </table>
   </dd>
 </dl>
@@ -3414,6 +3672,7 @@ template&lt;typename _VertexId , typename _SizeT , typename _Value &gt; </div>
 <p>Performs any initialization work needed for TOPK problem type. Must be called prior to each TOPK iteration. </p>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">src</td><td>Source node for one TOPK computing pass. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">frontier_type</td><td>The f rontier type (i.e., edge/vertex/mixed)</td></tr>
   </table>
   </dd>
@@ -3776,8 +4035,7 @@ template&lt;typename _VertexId , typename _SizeT , typename _Value &gt; </div>
 <p>Copy result labels and/or predecessors computed on the GPU back to host-side vectors. </p>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[out]</td><td class="paramname">h_rank</td><td>host-side vector to store page rank values. </td></tr>
-    <tr><td class="paramdir">[out]</td><td class="paramname">h_node_id</td><td>host-side vector to store node IDs.</td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">h_rank</td><td>host-side vector to store page rank values.</td></tr>
   </table>
   </dd>
 </dl>
@@ -3835,8 +4093,7 @@ template&lt;typename _VertexId , typename _SizeT , typename _Value &gt; </div>
 <dl class="see"><dt><b>See also:</b></dt><dd><a class="el" href="structgunrock_1_1_csr.html" title="CSR data structure which uses Compressed Sparse Row format to store a graph. It is a compressed way t...">Csr</a> </dd></dl>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">_num_gpus</td><td>Number of the GPUs used. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">streams</td><td>pointer to CUDA streams.</td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">_num_gpus</td><td>Number of the GPUs used.</td></tr>
   </table>
   </dd>
 </dl>
@@ -3900,11 +4157,7 @@ template&lt;typename _VertexId , typename _SizeT , typename _Value &gt; </div>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
     <tr><td class="paramdir">[in]</td><td class="paramname">src</td><td>Source node for one WTF computing pass. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">delta</td><td>Delta in SALSA equation. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">alpha</td><td>Alpha in SALSA equation. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">threshold</td><td>Threshold for convergence. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">frontier_type</td><td>The frontier type (i.e., edge/vertex/mixed) </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">queue_sizing</td><td>Queue sizing of the frontier.</td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">frontier_type</td><td>The frontier type (i.e., edge/vertex/mixed)</td></tr>
   </table>
   </dd>
 </dl>
@@ -3930,12 +4183,7 @@ template&lt;typename VertexId , typename Value , typename SizeT &gt; </div>
 <div class="memdoc">
 
 <p>Display CSR graph to console. </p>
-<dl class="params"><dt><b>Parameters:</b></dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">with_edge_value</td><td>Whether display graph with edge values. </td></tr>
-  </table>
-  </dd>
-</dl>
+<p>with_edge_value Whether or not print edge values. </p>
 
 </div>
 </div>
@@ -3959,11 +4207,10 @@ template&lt;typename VertexId , typename Value , typename SizeT &gt; </div>
 <p>Find node with largest neighbor list. </p>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">max_degree</td><td>Maximum degree in the graph.</td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">max_degree</td><td>Maximum degree in the graph. </td></tr>
   </table>
   </dd>
 </dl>
-<dl class="return"><dt><b>Returns:</b></dt><dd>int the source node with highest degree </dd></dl>
 
 </div>
 </div>
@@ -4567,7 +4814,7 @@ template&lt;typename SizeT &gt; </div>
 
 
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Aug 7 2015 19:10:39 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Fri Aug 7 2015 13:23:36 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.7.6.1
 </small></address>

@@ -28,7 +28,7 @@
   
   <td style="padding-left: 0.5em;">
    <div id="projectname">gunrock
-   &#160;<span id="projectnumber">0.3</span>
+   &#160;<span id="projectnumber">0.2</span>
    </div>
    <div id="projectbrief">Gunrock: High-Performance Graph Primitives for the GPU</div>
   </td>
@@ -47,6 +47,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li><a href="modules.html"><span>Modules</span></a></li>
       <li><a href="namespaces.html"><span>Namespaces</span></a></li>
       <li><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
@@ -166,8 +167,7 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _MARK_PRE
   <table class="params">
     <tr><td class="paramdir">[in]</td><td class="paramname">stream_from_host</td><td>Whether to stream data from host. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">graph</td><td>Reference to the CSR graph object we process on. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">_num_gpus</td><td>Number of the GPUs used. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">streams</td><td>pointer to CUDA Streams used (NULL by default)</td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">_num_gpus</td><td>Number of the GPUs used.</td></tr>
   </table>
   </dd>
 </dl>
@@ -205,8 +205,7 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _MARK_PRE
 <p>Performs any initialization work needed for MST problem type. Must be called prior to each MST iteration. </p>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">frontier_type</td><td>The frontier type (i.e., edge / vertex / mixed) </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">queue_sizing</td><td>Queue sizing factor</td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">frontier_type</td><td>The frontier type (i.e., edge / vertex / mixed)</td></tr>
   </table>
   </dd>
 </dl>
@@ -333,26 +332,15 @@ template&lt;bool LOAD_VALUES, typename VertexId , typename Value , typename Size
 <div class="memdoc">
 
 <p>read in graph function read in graph according to its type. </p>
-<dl class=""><dt><b>Template Parameters:</b></dt><dd>
-  <table class="">
-    <tr><td class="paramname">LOAD_VALUES</td><td></td></tr>
-    <tr><td class="paramname">VertexId</td><td></td></tr>
-    <tr><td class="paramname">Value</td><td></td></tr>
-    <tr><td class="paramname">SizeT</td><td></td></tr>
-  </table>
-  </dd>
-</dl>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
     <tr><td class="paramdir">[in]</td><td class="paramname">file_in</td><td>Input MARKET graph file. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">graph</td><td>CSR graph object to store the graph data. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">undirected</td><td>Is the graph undirected or not? </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">reversed</td><td>Whether or not the graph is inversed. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">quiet</td><td>Don't print out anything to stdout</td></tr>
   </table>
   </dd>
 </dl>
-<dl class="return"><dt><b>Returns:</b></dt><dd>int Whether error occurs (0 correct, 1 error) </dd></dl>
 
 </div>
 </div>
@@ -374,7 +362,7 @@ template&lt;bool LOAD_VALUES, typename VertexId , typename Value , typename Size
 
 
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Aug 7 2015 19:10:39 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Fri Aug 7 2015 13:23:36 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.7.6.1
 </small></address>

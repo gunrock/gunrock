@@ -12,6 +12,7 @@ var searchData=
   ['serial_5fscan_2ecuh',['serial_scan.cuh',['../serial__scan_8cuh.html',1,'']]],
   ['serial_5fsoa_5freduce_2ecuh',['serial_soa_reduce.cuh',['../serial__soa__reduce_8cuh.html',1,'']]],
   ['serial_5fsoa_5fscan_2ecuh',['serial_soa_scan.cuh',['../serial__soa__scan_8cuh.html',1,'']]],
+  ['simple_5fexample_2ecu',['simple_example.cu',['../simple__example_8cu.html',1,'']]],
   ['soa_5ftuple_2ecuh',['soa_tuple.cuh',['../soa__tuple_8cuh.html',1,'']]],
   ['sort_5fomp_2ecuh',['sort_omp.cuh',['../sort__omp_8cuh.html',1,'']]],
   ['sort_5futils_2ecuh',['sort_utils.cuh',['../sort__utils_8cuh.html',1,'']]],

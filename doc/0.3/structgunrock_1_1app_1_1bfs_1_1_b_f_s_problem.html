@@ -28,7 +28,7 @@
   
   <td style="padding-left: 0.5em;">
    <div id="projectname">gunrock
-   &#160;<span id="projectnumber">0.3</span>
+   &#160;<span id="projectnumber">0.2</span>
    </div>
    <div id="projectbrief">Gunrock: High-Performance Graph Primitives for the GPU</div>
   </td>
@@ -47,6 +47,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li><a href="modules.html"><span>Modules</span></a></li>
       <li><a href="namespaces.html"><span>Namespaces</span></a></li>
       <li class="current"><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
@@ -127,8 +128,8 @@ Public Member Functions</h2></td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="structgunrock_1_1app_1_1bfs_1_1_b_f_s_problem.html" title="Breadth-First Search Problem structure stores device-side vectors for doing BFS computing on the GPU...">BFSProblem</a> default destructor. <br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga0639c660275f3084119c75ad4dbfa9b4">Extract</a> (VertexId *h_labels, VertexId *h_preds)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Copy result labels and/or predecessors computed on the GPU back to host-side vectors.  <a href="group___public_interface.html#ga0639c660275f3084119c75ad4dbfa9b4"></a><br/></td></tr>
-<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga00bd50abf664a8c23b961901a1a944b2">Init</a> (bool stream_from_host, <a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; *graph, <a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; *inversegraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=-1.0f, int partition_seed=-1)</td></tr>
-<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">initialization function.  <a href="group___public_interface.html#ga00bd50abf664a8c23b961901a1a944b2"></a><br/></td></tr>
+<tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gaf325dc8b4f91a08996dbed461fb3fdc9">Init</a> (bool stream_from_host, <a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; *graph, <a class="el" href="structgunrock_1_1_csr.html">Csr</a>&lt; VertexId, Value, SizeT &gt; *inversgraph=NULL, int num_gpus=1, int *gpu_idx=NULL, std::string partition_method=&quot;random&quot;, cudaStream_t *streams=NULL, float queue_sizing=2.0f, float in_sizing=1.0f, float partition_factor=-1.0f, int partition_seed=-1)</td></tr>
+<tr><td class="mdescLeft">&#160;</td><td class="mdescRight">initialization function.  <a href="group___public_interface.html#gaf325dc8b4f91a08996dbed461fb3fdc9"></a><br/></td></tr>
 <tr><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gaebd365e0753dc16532472e461ff1b775">Reset</a> (VertexId src, FrontierType frontier_type, double queue_sizing, double queue_sizing1=-1.0)</td></tr>
 <tr><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset problem function. Must be called prior to each run.  <a href="group___public_interface.html#gaebd365e0753dc16532472e461ff1b775"></a><br/></td></tr>
 </table>
@@ -149,7 +150,7 @@ struct gunrock::app::bfs::BFSProblem&lt; VertexId, SizeT, Value, _MARK_PREDECESS
   </dd>
 </dl>
 </div><hr/>The documentation for this struct was generated from the following file:<ul>
-<li>/home/yzh/Projects/gunrock/gunrock/app/bfs/<a class="el" href="bfs__problem_8cuh.html">bfs_problem.cuh</a></li>
+<li>/home/yuduo/mgpu-merge/gunrock/gunrock/app/bfs/<a class="el" href="bfs__problem_8cuh.html">bfs_problem.cuh</a></li>
 </ul>
 </div><!-- contents -->
 <!-- window showing the filter options -->
@@ -169,7 +170,7 @@ struct gunrock::app::bfs::BFSProblem&lt; VertexId, SizeT, Value, _MARK_PREDECESS
 
 
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Aug 7 2015 19:10:39 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Fri Aug 7 2015 13:23:36 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.7.6.1
 </small></address>

@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.9.1"/>
-<title>gunrock: Gunrock V0.3 Release Notes</title>
+<title>gunrock: Gunrock v0.3 Release Notes</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -78,19 +78,28 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div><!-- top -->
 <div class="header">
   <div class="headertitle">
-<div class="title">Gunrock V0.3 Release Notes </div>  </div>
+<div class="title">Gunrock v0.3 Release Notes </div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p>Release 0.3 ? Aug 2015</p>
-<p>Gunrock release 0.3 is a feature release that adds two new graph primitives: Stochastic Approach for Link-Structure Analysis (SALSA) and Minimal Spanning Tree (MST), and improves several existing primitives. The new release uses a unified framework for both single-GPU and single-node multi-GPUs. Five graph primitives (BFS, CC, PR, BC, and SSSP) can be launched on multi-GPUs now by adding "--device=gpu_idx_1, gpu_idx_2,...,gpu_idx_n". A stats logging and performance chart generating pipeline is developed and integrated in this new release.</p>
-<h1>v0.3 Changelog </h1>
-<p>-Uses a unified framework for both single-GPU and single-node multi-GPUs -Added a stats logging and performance chart generating pipeline -Fixed bugs in BC, SALSA, and MST -Fixed bugs in E2V Advance traversal mode -Added C interfaces and Python sample code for five graph primitives (BFS, CC, PR, BC, and SSSP) -Can use both CMake system and make under each primitive directory</p>
+<div class="textblock"><p>Release 0.3 8th August 2015</p>
+<p>Gunrock release 0.3 is a feature release that adds two new graph primitives: Stochastic Approach for Link-Structure Analysis (SALSA) and Minimal Spanning Tree (MST), and improves several existing primitives. The new release uses a unified framework for both single-GPU and single-node multi-GPUs. Five graph primitives (BFS, CC, PR, BC, and SSSP) can be launched on multi-GPUs now by adding <code>--device=GPU_index_1,GPU_index_2,...,GPU_index_n</code>. A simple pure C interface allow users to easily integrate Gunrock into their own work. A stats logging and performance chart generating pipeline is developed and integrated in this new release.</p>
+<h1>v0.3 ChangeLog </h1>
+<ul>
+<li>Uses a unified framework for both single-GPU and single-node multi-GPUs.</li>
+<li>Added a stats logging and performance chart generating pipeline.</li>
+<li>Fixed bugs in BC, SALSA, and MST.</li>
+<li>Fixed bugs in E2V Advance traversal mode.</li>
+<li>Added C interfaces and Python sample code for five graph primitives (BFS, CC, PR, BC, and SSSP).</li>
+<li>Can use both CMake system and make under each primitive directory.</li>
+</ul>
 <h1>v0.3 Known Issues </h1>
-<p>-DOBFS does not work with multi-GPU </p>
+<ul>
+<li>Direction-Optimizing BFS does not work with multi-GPU. </li>
+</ul>
 </div></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Aug 7 2015 22:43:17 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Sat Aug 8 2015 10:10:54 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.9.1
 </small></address>

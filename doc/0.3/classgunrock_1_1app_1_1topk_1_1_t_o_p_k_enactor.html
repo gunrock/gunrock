@@ -28,7 +28,7 @@
   
   <td style="padding-left: 0.5em;">
    <div id="projectname">gunrock
-   &#160;<span id="projectnumber">0.3</span>
+   &#160;<span id="projectnumber">0.2</span>
    </div>
    <div id="projectbrief">Gunrock: High-Performance Graph Primitives for the GPU</div>
   </td>
@@ -47,6 +47,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li><a href="modules.html"><span>Modules</span></a></li>
       <li><a href="namespaces.html"><span>Namespaces</span></a></li>
       <li class="current"><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
@@ -175,7 +176,9 @@ template&lt;typename ProblemData &gt; </div>
 <p>Prepare the enactor for TOPK kernel call. Must be called prior to each TOPK iteration. </p>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">problem</td><td>TOPK Problem object which holds the graph data and TOPK problem data to compute.</td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">problem</td><td>TOPK Problem object which holds the graph data and TOPK problem data to compute. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">edge_map_grid_size</td><td>CTA occupancy for edge mapping kernel call. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">filter_grid_size</td><td>CTA occupancy for filter kernel call.</td></tr>
   </table>
   </dd>
 </dl>
@@ -235,9 +238,7 @@ template&lt;typename AdvanceKernelPolicy , typename FilterKernelPolicy , typenam
 </dl>
 <dl class="params"><dt><b>Parameters:</b></dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">context</td><td>CUDA context pointer. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">problem</td><td><a class="el" href="structgunrock_1_1app_1_1topk_1_1_t_o_p_k_problem.html" title="TOPK Problem structure stores device-side vectors for doing TOPK on the GPU.">TOPKProblem</a> object. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">top_nodes</td><td>Number of top nodes to process. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">max_grid_size</td><td>Max grid size for TOPK kernel calls.</td></tr>
   </table>
   </dd>
@@ -280,7 +281,7 @@ template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following file:<ul>
-<li>/home/yzh/Projects/gunrock/gunrock/app/topk/<a class="el" href="topk__enactor_8cuh.html">topk_enactor.cuh</a></li>
+<li>/home/yuduo/mgpu-merge/gunrock/gunrock/app/topk/<a class="el" href="topk__enactor_8cuh.html">topk_enactor.cuh</a></li>
 </ul>
 </div><!-- contents -->
 <!-- window showing the filter options -->
@@ -300,7 +301,7 @@ template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&
 
 
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Aug 7 2015 19:10:40 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Fri Aug 7 2015 13:23:37 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.7.6.1
 </small></address>
