@@ -169,7 +169,7 @@ Traversal* ([DOI](http://dx.doi.org/10.1145/2370036.2145832)). Thanks
 to Erich Elsen and Vishal Vaidyanathan from
 [Royal Caliber](http://www.royal-caliber.com/) and the [Onu](http://www.onu.io/) Team for their discussion on
 library development and the dataset auto-generating code. Thanks to
-Adam Maclaughlin for his technical discussion. Thanks to Oded Green
+Adam McLaughlin for his technical discussion. Thanks to Oded Green
 on his technical discussion and an optimization in CC primitive.
 
 This work was funded by the DARPA XDATA program under AFRL Contract
