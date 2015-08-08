@@ -83,12 +83,12 @@ int main(int argc, char* argv[])
         printf(" i: [%d] | rank: [%.4f]\n", top_nodes[i], top_ranks[i]);
 
     // clean up
-    if (bfs_label) free(bfs_label);
-    if (bc_scores) free(bc_scores);
-    if (conn_comp) free(conn_comp);
-    if (sssp_dist) free(sssp_dist);
-    if (top_nodes) free(top_nodes);
-    if (top_ranks) free(top_ranks);
+    free(bfs_label);
+    free(bc_scores);
+    free(conn_comp);
+    free(sssp_dist);
+    free(top_nodes);
+    free(top_ranks);
 
     return 0;
 }
