@@ -9,30 +9,49 @@ Gunrock v0.3 released! Check out the [Release-Note](http://gunrock.github.io/gun
 Introduction
 ============
 
-Gunrock is a CUDA library for graph-processing designed specifically for the GPU. It uses a high-level, bulk-synchronous, data-centric abstraction focused on operations on a vertex or edge frontier. Gunrock achieves a balance between performance and expressiveness by coupling high performance GPU computing primitives and optimization strategies with a high-level programming model that allows programmers to quickly develop new graph primitives with small code size and minimal GPU programming knowledge. For more
-details, please read [Why-Gunrock](http://gunrock.github.io/gunrock/doc/0.3/why-gunrock.html), our paper on arxiv:
-[Gunrock: A High-Performance Graph Processing Library on the GPU](http://arxiv.org/abs/1501.05387), and check out the [Publications](https://github.com/gunrock/gunrock#publications) section.
+Gunrock is a CUDA library for graph-processing designed specifically for the 
+GPU. It uses a high-level, bulk-synchronous, data-centric abstraction focused
+on operations on a vertex or edge frontier. Gunrock achieves a balance between
+performance and expressiveness by coupling high performance GPU computing 
+primitives and optimization strategies with a high-level programming model 
+that allows programmers to quickly develop new graph primitives with small 
+code size and minimal GPU programming knowledge. For more details, please read
+[Why-Gunrock](http://gunrock.github.io/gunrock/doc/0.3/why-gunrock.html), 
+our paper on arXiv:
+[Gunrock: A High-Performance Graph Processing Library on the GPU](http://arxiv.org/abs/1501.05387), 
+and check out the 
+[Publications](https://github.com/gunrock/gunrock#publications) section.
 
-Home Page
+Homepage
 ---------
 
 Homepage for Gunrock: <http://gunrock.github.io/>
 
 Getting Started with Gunrock
 ----------------------------
-For Frequently Asked Questions, see [FAQ](http://gunrock.github.io/gunrock/doc/0.3/faq.html).
+- For Frequently Asked Questions, see
+[FAQ](http://gunrock.github.io/gunrock/doc/0.3/faq.html).
 
-For information on building Gunrock, see [Building Gunrock](http://gunrock.github.io/gunrock/doc/0.3/building_gunrock.html)
-and refer to [Operating System Support and Requirements](https://github.com/gunrock/gunrock#operating-system-support-and-requirements).
+- For information on building Gunrock, see 
+[Building Gunrock](http://gunrock.github.io/gunrock/doc/0.3/building_gunrock.html)
+and refer to 
+[Operating System Support and Requirements](https://github.com/gunrock/gunrock#operating-system-support-and-requirements).
 
-The "tests" subdirectory included with Gunrock has a comprehensive test
-application for all the functionality of Gunrock.
+- The "tests" subdirectory included with Gunrock has a comprehensive test
+application for most the functionality of Gunrock.
 
-For the programming model we use in Gunrock, see [Programming Model](http://gunrock.github.io/gunrock/doc/0.3/programming_model.html).
+- For the programming model we use in Gunrock, see 
+[Programming Model](http://gunrock.github.io/gunrock/doc/0.3/programming_model.html).
 
-To use our stats logging and performance chart generation pipeline. Please check out [Gunrock-to-JSON](http://gunrock.github.io/gunrock/doc/0.3/gunrock_to_json.html).
+- To use our stats logging and performance chart generation pipeline. Please check
+out [Gunrock-to-JSON](http://gunrock.github.io/gunrock/doc/0.3/gunrock_to_json.html).
 
-We have also provided [code samples](https://github.com/gunrock/gunrock/tree/master/python) for how to use Gunrock's C interface in Python, and [annotated code](http://gunrock.github.io/gunrock/doc/annotated_primitives/annotated_primitives.html) for two typical graph primitives.
+- We have also provided code samples for how to use 
+[Gunrock's C interface](https://github.com/gunrock/gunrock/tree/master/shared_lib_tests) 
+and how to 
+[call Gunrock primitives from Python](https://github.com/gunrock/gunrock/tree/master/python), 
+and [annotated code](http://gunrock.github.io/gunrock/doc/annotated_primitives/annotated_primitives.html) 
+for two typical graph primitives.
 
 Reporting Problems
 ==================
@@ -46,7 +65,9 @@ Operating System Support and Requirements
 =========================================
 
 This release (0.3) has only been tested on Linux Mint 15 (64-bit) and Ubuntu
-12.04 with CUDA 5.5, 6.0, 6.5, and 7.0 installed. We expect Gunrock to build and run correctly on other 64-bit and 32-bit Linux distributions, Mac OS, and Windows.
+12.04 with CUDA 5.5, 6.0, 6.5, and 7.0 installed. We expect Gunrock to build 
+and run correctly on other 64-bit and 32-bit Linux distributions, Mac OS, 
+and Windows.
 
 Requirements
 ------------
@@ -73,22 +94,31 @@ Yuduo Wu, Yangzihao Wang, Yuechao Pan, Carl Yang, and John D. Owens.
 Analytics.** In IEEE International Symposium on Workload Characterization,
 IISWC2015, October 2015
 
-Yuechao Pan, Yangzihao Wang, Yuduo Wu, Carl Yang, and John D. Owens. **Multi-GPU
-Graph Analytics.** CoRR, abs/1504.04804(1504.04804v1), April 2015.
-[arXiv](http://arxiv.org/abs/1504.04804)
+Yuechao Pan, Yangzihao Wang, Yuduo Wu, Carl Yang, and John D. Owens. 
+**Multi-GPU Graph Analytics.** CoRR, abs/1504.04804(1504.04804v1), April 2015.
+[[arXiv](http://arxiv.org/abs/1504.04804)]
 
-Yangzihao Wang, Andrew Davidson, Yuechao Pan, Yuduo Wu, Andy Riffel, and John D. Owens. **Gunrock: A High-Performance Graph Processing Library on the GPU.** CoRR, abs/1501.05387v2), March 2015. [arXiv](http://arxiv.org/abs/1501.05387v2)
+Yangzihao Wang, Andrew Davidson, Yuechao Pan, Yuduo Wu, Andy Riffel, and John D. Owens. 
+**Gunrock: A High-Performance Graph Processing Library on the GPU.** 
+CoRR, abs/1501.05387v2), March 2015. [[arXiv](http://arxiv.org/abs/1501.05387v2)]
 
-Carl Yang, Yangzihao Wang, and John D. Owens. **Fast Sparse Matrix and Sparse Vector Multiplication Algorithm on the GPU.** In Graph Algorithms Building Blocks, GABB 2015, May 2015. [http](http://www.escholarship.org/uc/item/1rq9t3j3)
+Carl Yang, Yangzihao Wang, and John D. Owens. 
+**Fast Sparse Matrix and Sparse Vector Multiplication Algorithm on the GPU.** 
+In Graph Algorithms Building Blocks, GABB 2015, May 2015. 
+[[http](http://www.escholarship.org/uc/item/1rq9t3j3)]
 
-Afton Geil, Yangzihao Wang, and John D. Owens. **WTF, GPU! Computing Twitter's Who-To-Follow on the GPU.** In Proceedings of the Second ACM Conference on Online Social Networks, COSN '14, pages 63–68, October 2014. [DOI](http://dx.doi.org/10.1145/2660460.2660481) | [http](http://escholarship.org/uc/item/5xq3q8k0)
+Afton Geil, Yangzihao Wang, and John D. Owens. 
+**WTF, GPU! Computing Twitter's Who-To-Follow on the GPU.** 
+In Proceedings of the Second ACM Conference on Online Social Networks, 
+COSN '14, pages 63–68, October 2014. 
+[[DOI](http://dx.doi.org/10.1145/2660460.2660481) | [http](http://escholarship.org/uc/item/5xq3q8k0)]
 
 Road Map
 ========
 
  - Framework: In v0.3 we have integrated single-GPU and multi-GPU frameworks
    into a unified framework. We are exploring more operators such as
-   Gather-Reduce and matrix opeartors. Generally we want to find the right set
+   Gather-Reduce and matrix operators. Generally we want to find the right set
    of operators that can abstract most graph primitives while delivering high
    performance.
 
@@ -104,20 +134,21 @@ Credits
 Gunrock Developers
 ------------------
 
-- [Yangzihao Wang](http://www.idav.ucdavis.edu/~yzhwang/), University of
-  California, Davis
+- [Yangzihao Wang](http://www.idav.ucdavis.edu/~yzhwang/), 
+  University of California, Davis
 
-- Yuechao Pan, University of
-  California, Davis
+- Yuechao Pan, University of California, Davis
 
-- [Yuduo Wu](http://www.ece.ucdavis.edu/~wyd855/), University of California, Davis
+- [Yuduo Wu](http://www.ece.ucdavis.edu/~wyd855/), 
+  University of California, Davis
 
-- [Carl Yang](http://web.ece.ucdavis.edu/~ctcyang/), University of California, Davis
+- [Carl Yang](http://web.ece.ucdavis.edu/~ctcyang/), 
+  University of California, Davis
 
 - Andy Riffel, University of California, Davis
 
-- [John Owens](http://www.ece.ucdavis.edu/~jowens/), University of California,
-  Davis
+- [John Owens](http://www.ece.ucdavis.edu/~jowens/), 
+  University of California, Davis
 
 Acknowledgements
 ----------------
