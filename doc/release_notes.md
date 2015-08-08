@@ -4,15 +4,14 @@ Gunrock v0.3 Release Notes {#release_notes}
 Release 0.3
 8th August 2015
 
-Gunrock release 0.3 is a feature release that adds two new graph primitives: 
-Stochastic Approach for Link-Structure Analysis (SALSA) and Minimal Spanning 
-Tree (MST), and improves several existing primitives. The new release uses a
+Gunrock release 0.3 is a feature release that adds two new graph primitives---Stochastic Approach for Link-Structure Analysis (SALSA) and Minimal Spanning
+Tree (MST)---and improves several existing primitives. The new release uses a
 unified framework for both single-GPU and single-node multi-GPUs. Five graph
 primitives (BFS, CC, PR, BC, and SSSP) can be launched on multi-GPUs now by
-adding `--device=GPU_index_1,GPU_index_2,...,GPU_index_n`. A simple pure C
-interface allow users to easily integrate Gunrock into their own work. A 
-stats logging and performance chart generating pipeline is developed and
-integrated in this new release.
+adding the command-line option`--device=GPU_index_1,GPU_index_2,...,GPU_index_n`.
+A simple pure C interface allow users to easily integrate Gunrock into their own
+work. A stats-logging and performance-chart-generating pipeline is prototyped
+in this new release.
 
 v0.3 ChangeLog
 ==============
@@ -26,3 +25,24 @@ v0.3 ChangeLog
 v0.3 Known Issues
 =================
  - Direction-Optimizing BFS does not work with multi-GPU.
+ - Minimum Spanning Tree fails to compile on OS X.
+ - OS X requires a change to moderngpu's src/mgpuutil.cpp; replace the ifdef
+   block at the top with:
+
+   ```
+#define MGPU_RAND_NS std::tr1
+
+#ifdef _MSC_VER
+#include <random>
+#else
+#ifdef __clang__
+#include <random>
+#undef MGPU_RAND_NS
+#define MGPU_RAND_NS std
+#define uniform_int uniform_int_distribution
+#define uniform_real uniform_real_distribution
+#else
+#include <tr1/random>
+#endif
+#endif
+```
