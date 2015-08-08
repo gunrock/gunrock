@@ -30,19 +30,19 @@ v0.3 Known Issues
    block at the top with:
 
 ```C
-#define MGPU_RAND_NS std::tr1
+\#define MGPU_RAND_NS std::tr1
 
-#ifdef _MSC_VER
-#include <random>
-#else
-#ifdef __clang__
-#include <random>
-#undef MGPU_RAND_NS
-#define MGPU_RAND_NS std
-#define uniform_int uniform_int_distribution
-#define uniform_real uniform_real_distribution
-#else
-#include <tr1/random>
-#endif
-#endif
+\#ifdef _MSC_VER
+\#include \<random\>
+\#else
+\#ifdef __clang__
+\#include \<random\>
+\#undef MGPU_RAND_NS
+\#define MGPU_RAND_NS std
+\#define uniform_int uniform_int_distribution
+\#define uniform_real uniform_real_distribution
+\#else
+\#include \<tr1/random\>
+\#endif
+\#endif
 ```
