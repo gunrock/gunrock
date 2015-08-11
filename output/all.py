@@ -18,9 +18,9 @@ options = {
     "direction_optimizing_bfs" : "--src=0 --idempotence",
     "breadth_first_search" : "--src=0 --idempotence",
     "betweenness_centrality": "--src=0",
-    "connected_component": ""
-    "pagerank": "--undirected"
-    "single_source_shortest_path": "--src=0 --undirected"
+    "connected_component": "",
+    "pagerank": "--undirected",
+    "single_source_shortest_path": "--src=0 --undirected",
 }
 
 
