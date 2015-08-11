@@ -26,8 +26,7 @@ v0.3 Known Issues
 =================
  - Direction-Optimizing BFS does not work with multi-GPU.
  - Minimum Spanning Tree fails to compile on OS X.
- - OS X requires a change to moderngpu's src/mgpuutil.cpp; replace the ifdef
-   block at the top with:
+ - *(note: this is fixed in upstream moderngpu; get the latest moderngpu and this patch is no longer required*) OS X requires a change to moderngpu's src/mgpuutil.cpp; replace the ifdef block at the top with:
 
    ```
 #define MGPU_RAND_NS std::tr1
