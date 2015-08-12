@@ -35,4 +35,4 @@ for binary in ["betweenness_centrality",
                "pagerank",
                "single_source_shortest_path"]:
     for dataset in datasets:
-        os.system("../../gunrock-build/bin/%s market ../dataset/large/%s/%s.mtx %s --iteration-num=10 --quiet --jsondir=." % (binary, dataset, dataset, options[dataset]))
+        os.system("../../gunrock-build/bin/%s market ../dataset/large/%s/%s.mtx %s --iteration-num=10 --quiet --jsondir=." % (binary, dataset, dataset, options[binary]))
