@@ -166,6 +166,7 @@ struct SSSPIteration : public IterationBase <
     {
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration);
         frontier_attribute->queue_reset = true;
+        enactor_stats     ->nodes_queued[0] += frontier_attribute -> queue_length;
 
         // Edge Map
         gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, SsspFunctor>(
@@ -197,7 +198,7 @@ struct SSSPIteration : public IterationBase <
         frontier_attribute->queue_reset = false;
         frontier_attribute->queue_index++;
         frontier_attribute->selector ^= 1;
-        enactor_stats     -> Accumulate(
+        enactor_stats     -> AccumulateEdges(
             work_progress -> GetQueueLengthPointer<unsigned int, SizeT>(frontier_attribute->queue_index), stream);
 
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration, peer_);
@@ -591,7 +592,7 @@ public:
      * @param[out] search_depth Search depth (number of super-steps).
      * @param[out] avg_duty Average kernel duty (kernel time/kernel lifetime).
      */
-    template <typename VertexId>
+    /*template <typename VertexId>
     void GetStatistics(
         long long &total_queued,
         VertexId  &search_depth,
@@ -620,7 +621,7 @@ public:
         }
         avg_duty = (total_lifetimes >0) ?
             double(total_runtimes) / total_lifetimes : 0.0;
-    }
+    }*/
 
     /** @} */
 

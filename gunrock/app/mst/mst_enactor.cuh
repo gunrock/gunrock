@@ -131,7 +131,7 @@ class MSTEnactor :
    * @param[out] avg_duty Average kernel running duty
    * (kernel run time / kernel lifetime).
    */
-  template <typename VertexId>
+  /*template <typename VertexId>
   void GetStatistics(
     long long &total_queued,
     VertexId  &search_depth,
@@ -145,7 +145,7 @@ class MSTEnactor :
     avg_duty = (this->enactor_stats->total_lifetimes >0) ?
       double(this->enactor_stats->total_runtimes) /
         this->enactor_stats->total_lifetimes : 0.0;
-  }
+  }*/
 
   /** @} */
 

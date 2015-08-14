@@ -499,7 +499,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     }
 
     info->ComputeCommonStats(  // compute running statistics
-        enactor->enactor_stats.GetPointer(), elapsed);
+        enactor->enactor_stats.GetPointer(), elapsed, NULL, true);
 
     if (!quiet_mode)
     {

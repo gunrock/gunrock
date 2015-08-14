@@ -273,6 +273,7 @@ public:
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration);
 
         frontier_attribute->queue_reset = true;
+        enactor_stats     -> nodes_queued[0] += frontier_attribute->queue_length;
         // Edge Map
         gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, ForwardFunctor>(
             enactor_stats[0],
@@ -303,7 +304,7 @@ public:
         frontier_attribute->queue_reset = false;
         frontier_attribute->queue_index++;
         frontier_attribute->selector ^= 1;
-        enactor_stats      -> Accumulate(
+        enactor_stats      -> AccumulateEdges(
             work_progress  -> GetQueueLengthPointer<unsigned int,SizeT>(frontier_attribute->queue_index), stream);
 
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration);
@@ -703,6 +704,7 @@ public:
                 false,
                 false);
         }
+        enactor_stats -> nodes_queued[0] += frontier_attribute -> queue_length;
 
     }
 
@@ -1077,7 +1079,7 @@ public:
      * @param[out] total_queued Total queued elements in kernel running.
      * @param[out] avg_duty Average kernel duty (kernel time/kernel lifetime).
      */
-    void GetStatistics(
+    /*void GetStatistics(
         long long &total_queued,
         double    &avg_duty)
     {
@@ -1096,15 +1098,15 @@ public:
                 EnactorStats *enactor_stats_ = this->enactor_stats + gpu * this->num_gpus + peer;
                 enactor_stats_ -> total_queued.Move(util::DEVICE, util::HOST);
                 total_queued += enactor_stats_ -> total_queued[0];
-                /*if (this->enactor_stats[gpu].iteration > search_depth)
-                    search_depth = this->enactor_stats[gpu].iteration;*/
+                //if (this->enactor_stats[gpu].iteration > search_depth)
+                //    search_depth = this->enactor_stats[gpu].iteration;
                 total_lifetimes += enactor_stats_ ->total_lifetimes;
                 total_runtimes  += enactor_stats_ ->total_runtimes;
             }
         }
         avg_duty = (total_lifetimes > 0) ?
             double(total_runtimes) / total_lifetimes : 0.0;
-    }
+    }*/
 
     /**
      * @brief Initialize the problem.

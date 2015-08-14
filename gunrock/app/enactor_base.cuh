@@ -63,7 +63,8 @@ struct EnactorStats
     long long                        iteration           ;
     unsigned long long               total_lifetimes     ;
     unsigned long long               total_runtimes      ;
-    util::Array1D<int, size_t>       total_queued        ;
+    util::Array1D<int, long long>    edges_queued        ;
+    util::Array1D<int, long long>    nodes_queued        ;
     unsigned int                     advance_grid_size   ;
     unsigned int                     filter_grid_size    ;
     util::KernelRuntimeStatsLifetime advance_kernel_stats;
@@ -84,11 +85,12 @@ struct EnactorStats
         retval          = cudaSuccess;
         node_locks    .SetName("node_locks"    );
         node_locks_out.SetName("node_locks_out");
-        total_queued  .SetName("total_queued");
+        edges_queued  .SetName("edges_queued");
+        nodes_queued  .SetName("nodes_queued");
     }
 
     /*
-     * @brief Accumulate number function.
+     * @brief Accumulate edge function.
      *
      * @tparam SizeT2
      *
@@ -96,11 +98,27 @@ struct EnactorStats
      * @param[in] stream CUDA stream
      */
     template <typename SizeT2>
-    void Accumulate(SizeT2 *d_queued, cudaStream_t stream)
+    void AccumulateEdges(SizeT2 *d_queued, cudaStream_t stream)
     {
         Accumulate_Num<<<1,1,0,stream>>> (
-            d_queued, total_queued.GetPointer(util::DEVICE));
+            d_queued, edges_queued.GetPointer(util::DEVICE));
     }
+
+    /*
+     * @brief Accumulate node function.
+     *
+     * @tparam SizeT2
+     *
+     * @param[in] d_queue Pointer to the queue
+     * @param[in] stream CUDA stream
+     */
+    template <typename SizeT2>
+    void AccumulateNodes(SizeT2 *d_queued, cudaStream_t stream)
+    {
+        Accumulate_Num<<<1,1,0,stream>>> (
+            d_queued, nodes_queued.GetPointer(util::DEVICE));
+    }
+
 };
 
 /**
@@ -186,7 +204,8 @@ public:
         info["partition_seed"]     = -1;     // partition seed
         info["quiet_mode"]         = false;  // don't print anything
         info["quick_mode"]         = false;  // skip CPU validation
-        info["redundant_work"]     = 0.0f;   // redundant work (BFS)
+        info["edges_redundance"]   = 0.0f;   // redundant edge work (BFS)
+        info["nodes_redundance"]   = 0.0f;   // redundant node work
         info["ref_filename"]       = "";     // reference file input
         info["search_depth"]       = 0;      // search depth (iterations)
         info["size_check"]         = true;   // enable or disable size check
@@ -194,14 +213,15 @@ public:
         info["source_vertex"]      = 0;      // source (BFS, SSSP)
         info["stream_from_host"]   = false;  // stream from host to device
         info["traversal_mode"]     = -1;     // advance mode
-        info["total_queued"]       = 0;      // number of element in queue
+        info["edges_queued"]       = 0;      // number of edges in queue
+        info["nodes_queued"]       = 0;      // number of nodes in queue
         info["undirected"]         = true;   // default use undirected input
         info["delta_factor"]       = 16;     // default delta-factor for SSSP
         info["delta"]              = 0.85f;  // default delta for PageRank
         info["error"]              = 0.01f;  // default error for PageRank
         info["alpha"]              = 6.0f;   // default alpha for DOBFS
         info["beta"]               = 6.0f;   // default beta for DOBFS
-        info["top_nodes"]          = 0;     // default number of nodes for top-k primitive
+        info["top_nodes"]          = 0;      // default number of nodes for top-k primitive
         // info["gpuinfo"]
         // info["device_list"]
         // info["sysinfo"]
@@ -811,12 +831,14 @@ public:
         double total_runtimes = 0;
 
         // traversal stats
-        int64_t total_queued = 0;
+        int64_t edges_queued = 0;
+        int64_t nodes_queued = 0;
         int64_t search_depth = 0;
         int64_t nodes_visited = 0;
         int64_t edges_visited = 0;
-        float m_teps = 0.0f;
-        double redundant_work = 0.0f;
+        float   m_teps = 0.0f;
+        double  edges_redundance = 0.0f;
+        double  nodes_redundance = 0.0f;
 
         json_spirit::mArray device_list = info["device_list"].get_array();
 
@@ -834,9 +856,15 @@ public:
                 EnactorStats *estats = enactor_stats + gpu * num_gpus + peer;
                 if (get_traversal_stats)
                 {
-                    estats->total_queued.Move(util::DEVICE, util::HOST);
-                    total_queued += estats->total_queued[0];
-                    // if (estats->iteration > search_depth)
+                    edges_queued += estats->edges_queued[0];
+                    estats->edges_queued.Move(util::DEVICE, util::HOST);
+                    edges_queued += estats->edges_queued[0];
+
+                    nodes_queued += estats->nodes_queued[0];
+                    estats->nodes_queued.Move(util::DEVICE, util::HOST);
+                    nodes_queued += estats->nodes_queued[0];
+
+                    if (estats->iteration > search_depth)
                     {
                         search_depth = estats->iteration;
                     }
@@ -855,12 +883,14 @@ public:
 
         if (get_traversal_stats)
         {
-            info["total_queued"] = total_queued;
+            info["edges_queued"] = edges_queued;
+            info["nodes_queued"] = nodes_queued;
         }
 
         // TODO: compute traversal stats
         if (get_traversal_stats)
         {
+            if (labels != NULL)
             for (VertexId i = 0; i < csr_ptr->nodes; ++i)
             {
                 if (labels[i] < util::MaxValue<VertexId>() && labels[i] != -1)
@@ -872,22 +902,30 @@ public:
                 if (info["algorithm"].get_str().compare("BC") == 0)
                 {
                     // for betweenness should count the backward phase too.
-                    edges_visited = 2 * total_queued;
+                    edges_visited = 2 * edges_queued;
                 }
             }
-            if (total_queued > edges_visited)
+            if (nodes_queued > nodes_visited)
+            {  // measure duplicate nodes put through queue
+                nodes_redundance =
+                    ((double)nodes_queued - nodes_visited) / nodes_visited;
+            }
+
+            if (edges_queued > edges_visited)
             {
                 // measure duplicate edges put through queue
-                redundant_work =
-                    ((double)total_queued - edges_visited) / edges_visited;
+                edges_redundance =
+                    ((double)edges_queued - edges_visited) / edges_visited;
             }
-            redundant_work *= 100;
+            nodes_redundance *= 100;
+            edges_redundance *= 100;
 
             m_teps = (double)edges_visited / (elapsed * 1000.0);
 
             info["nodes_visited"] = nodes_visited;
             info["edges_visited"] = edges_visited;
-            info["redundant_work"] = redundant_work;
+            info["nodes_redundance"] = nodes_redundance;
+            info["edges_redundance"] = edges_redundance;
             info["m_teps"] = m_teps;
         }
     }
@@ -918,18 +956,19 @@ public:
      */
     void DisplayStats(bool verbose = true)
     {
-        double elapsed = info["elapsed"].get_real();
-
+        double elapsed        = info["elapsed"      ].get_real();
         int64_t nodes_visited = info["nodes_visited"].get_int();
         int64_t edges_visited = info["edges_visited"].get_int();
-        double m_teps         = info["m_teps"].get_real();
-        int64_t search_depth  = info["search_depth"].get_int();
-        double avg_duty       = info["average_duty"].get_real();
-        int64_t total_queued  = info["total_queued"].get_int();
-        double redundant_work = info["redundant_work"].get_real();
+        double  m_teps        = info["m_teps"       ].get_real();
+        int64_t search_depth  = info["search_depth" ].get_int();
+        double  avg_duty      = info["average_duty" ].get_real();
+        int64_t edges_queued  = info["edges_queued" ].get_int();
+        int64_t nodes_queued  = info["nodes_queued" ].get_int();
+        double  nodes_redundance = info["nodes_redundance"].get_real();
+        double  edges_redundance = info["edges_redundance"].get_real();
 
         printf("\n [%s] finished.", info["algorithm"].get_str().c_str());
-        printf("\n elapsed: %.4f ms\n iterations: %lld", elapsed, search_depth);
+        printf("\n elapsed: %.4f ms\n iterations: %lld", elapsed, (long long)search_depth);
 
         if (verbose)
         {
@@ -950,17 +989,25 @@ public:
                 if (nodes_visited != 0 && edges_visited != 0)
                 {
                     printf("\n src: %lld\n nodes_visited: %lld\n edges_visited: %lld",
-                        source, nodes_visited, edges_visited);
+                        source, (long long)nodes_visited, (long long)edges_visited);
                 }
-                if (total_queued > 0)
+                if (nodes_queued > 0)
                 {
-                    printf("\n total queued: %lld", total_queued);
+                    printf("\n nodes queued: %lld", (long long)nodes_queued);
                 }
-                if (redundant_work > 0.01)
+                if (edges_queued > 0)
                 {
-                    printf("\n redundant work: %.2f%%", redundant_work);
+                    printf("\n edges queued: %lld", (long long)edges_queued);
                 }
-            }
+                if (nodes_redundance > 0.01)
+                {
+                    printf("\n nodes redundance: %.2f%%", nodes_redundance);
+                }
+                if (edges_redundance > 0.01)
+                {
+                    printf("\n edges redundance: %.2f%%", edges_redundance);
+                }
+           }
         }
         printf("\n");
     }
@@ -2351,7 +2398,8 @@ protected:
             {
                 enactor_stats     [gpu*num_gpus+peer].node_locks    .Release();
                 enactor_stats     [gpu*num_gpus+peer].node_locks_out.Release();
-                enactor_stats     [gpu*num_gpus+peer].total_queued  .Release();
+                enactor_stats     [gpu*num_gpus+peer].edges_queued  .Release();
+                enactor_stats     [gpu*num_gpus+peer].nodes_queued  .Release();
                 frontier_attribute[gpu*num_gpus+peer].output_length .Release();
                 if (work_progress [gpu*num_gpus+peer].HostReset()) return;
             }
@@ -2399,7 +2447,8 @@ protected:
                 if (retval = enactor_stats_ ->  filter_kernel_stats.Setup(enactor_stats_->filter_grid_size)) return retval;
                 if (retval = enactor_stats_ -> node_locks    .Allocate(node_lock_size, util::DEVICE)) return retval;
                 if (retval = enactor_stats_ -> node_locks_out.Allocate(node_lock_size, util::DEVICE)) return retval;
-                if (retval = enactor_stats_ -> total_queued  .Allocate(1, util::DEVICE | util::HOST)) return retval;
+                if (retval = enactor_stats_ -> nodes_queued  .Allocate(1, util::DEVICE | util::HOST)) return retval;
+                if (retval = enactor_stats_ -> edges_queued  .Allocate(1, util::DEVICE | util::HOST)) return retval;
             }
         }
         return retval;
@@ -2421,8 +2470,10 @@ protected:
                 enactor_stats_ -> iteration             = 0;
                 enactor_stats_ -> total_runtimes        = 0;
                 enactor_stats_ -> total_lifetimes       = 0;
-                enactor_stats_ -> total_queued[0]       = 0;
-                enactor_stats_ -> total_queued.Move(util::HOST, util::DEVICE);
+                enactor_stats_ -> nodes_queued[0]       = 0;
+                enactor_stats_ -> edges_queued[0]       = 0;
+                enactor_stats_ -> nodes_queued.Move(util::HOST, util::DEVICE);
+                enactor_stats_ -> edges_queued.Move(util::HOST, util::DEVICE);
             }
         }
         return retval;

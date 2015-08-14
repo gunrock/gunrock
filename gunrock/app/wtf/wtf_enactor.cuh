@@ -175,7 +175,7 @@ public:
      * @param[out] total_queued Total queued elements in WTF kernel running.
      * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
      */
-    void GetStatistics(
+    /*void GetStatistics(
         long long &total_queued,
         double &avg_duty)
     {
@@ -185,7 +185,7 @@ public:
         
         avg_duty = (this->enactor_stats->total_lifetimes >0) ?
             double(this->enactor_stats->total_runtimes) / this->enactor_stats->total_lifetimes : 0.0;
-    }
+    }*/
 
     /** @} */
 
@@ -402,7 +402,7 @@ public:
 
                 if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
-                    enactor_stats->total_queued[0] += frontier_attribute->queue_length;
+                    enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
                     if (DEBUG) printf(", %lld", (long long) frontier_attribute->queue_length);
                     if (INSTRUMENT) {
                         if (retval = enactor_stats->filter_kernel_stats.Accumulate(

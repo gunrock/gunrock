@@ -452,6 +452,7 @@ static void FullQueue_Core(
     //    "scanned_edges", frontier_attribute->queue_length, scanned_edges, over_sized, thread_num, enactor_stats->iteration, peer_)) return;
     //if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, stream)) return;
     frontier_attribute->queue_reset = true;
+    enactor_stats -> nodes_queued[0] += frontier_attribute -> queue_length;
     gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, RemoveZeroFunctor>(
         enactor_stats[0],
         frontier_attribute[0],
@@ -480,7 +481,7 @@ static void FullQueue_Core(
 
     //if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
     //      "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-    enactor_stats      -> Accumulate(
+    enactor_stats      -> AccumulateEdges(
         work_progress  -> GetQueueLengthPointer<unsigned int,SizeT>(frontier_attribute->queue_index+1), stream);
 
     gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, RemoveZeroFunctor>
@@ -865,7 +866,7 @@ static void FullQueue_Core(
     if (enactor_stats -> iteration != 0)
     {
         frontier_attribute->queue_length = data_slice -> edge_map_queue_len;
-        enactor_stats->total_queued[0] += frontier_attribute->queue_length;
+        enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
 
         //printf("Filter start.\n");fflush(stdout);
          // filter kernel
@@ -961,7 +962,7 @@ static void FullQueue_Core(
 
     if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index+1, frontier_attribute->queue_length, false, stream, true)) return;
     if (enactor_stats->retval = cudaStreamSynchronize(stream)) return;
-    enactor_stats->total_queued[0] += frontier_attribute->queue_length;
+    enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
     frontier_attribute->queue_length = data_slice->edge_map_queue_len;
     //printf("Advance end.\n");fflush(stdout);
 
@@ -1482,7 +1483,7 @@ public:
      * @param[out] avg_duty Average kernel duty (kernel time/kernel lifetime).
      * @param[out] num_iter Number of super-steps performed.
      */
-    void GetStatistics(
+    /*void GetStatistics(
         long long &total_queued,
         double    &avg_duty,
         long long &num_iter)
@@ -1512,7 +1513,7 @@ public:
         }
         avg_duty = (total_lifetimes >0) ?
             double(total_runtimes) / total_lifetimes : 0.0;
-    }
+    }*/
 
     /** @} */
 
