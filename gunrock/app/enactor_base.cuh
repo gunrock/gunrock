@@ -899,12 +899,16 @@ public:
                     edges_visited +=
                         csr_ptr->row_offsets[i + 1] - csr_ptr->row_offsets[i];
                 }
-                if (info["algorithm"].get_str().compare("BC") == 0)
-                {
-                    // for betweenness should count the backward phase too.
-                    edges_visited = 2 * edges_queued;
-                }
             }
+            if (info["algorithm"].get_str().compare("BC") == 0)
+            {
+                // for betweenness should count the backward phase too.
+                edges_visited = 2 * edges_queued;
+            } else if (info["algorithm"].get_str().compare("PageRank") == 0)
+            {
+                edges_visited = csr_ptr -> edges;
+            }
+            
             if (nodes_queued > nodes_visited)
             {  // measure duplicate nodes put through queue
                 nodes_redundance =
