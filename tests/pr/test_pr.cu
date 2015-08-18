@@ -119,6 +119,8 @@ void Usage()
         "[--iteration-num=<num>]   Number of runs to perform the test.\n"
         "[--partition_method=<random|biasrandom|clustered|metis>]\n"
         "                          Choose partitioner (Default use random).\n"
+        "[--delta=<delta>]         Delta for PageRank (Default 0.85f).\n"
+        "[--error=<error>]         Error threshold for PageRank (Default 0.01f).\n"
         "[--quiet]                 No output (unless --json is specified).\n"
         "[--json]                  Output JSON-format statistics to STDOUT.\n"
         "[--jsonfile=<name>]       Output JSON-format statistics to file <name>\n"

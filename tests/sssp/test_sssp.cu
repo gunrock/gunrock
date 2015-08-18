@@ -100,6 +100,7 @@ void Usage()
         "                          determine based on average degree).\n"
         "[--partition_method=<random|biasrandom|clustered|metis>]\n"
         "                          Choose partitioner (Default use random).\n"
+        "[--delta_factor=<factor>] Delta factor for delta-stepping SSSP.\n"
         "[--quiet]                 No output (unless --json is specified).\n"
         "[--json]                  Output JSON-format statistics to STDOUT.\n"
         "[--jsonfile=<name>]       Output JSON-format statistics to file <name>\n"
