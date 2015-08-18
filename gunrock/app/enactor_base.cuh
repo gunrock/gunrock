@@ -387,14 +387,17 @@ public:
         if (args.CheckCmdLineFlag("alpha"))
         {
             args.GetCmdLineArgument("alpha", alpha);
+            info["alpha"] = alpha;
         }
         if (args.CheckCmdLineFlag("beta"))
         {
             args.GetCmdLineArgument("beta", beta);
+            info["beta"] = beta;
         }
         if (args.CheckCmdLineFlag("top_nodes"))
         {
             args.GetCmdLineArgument("top_nodes", top_nodes);
+            info["top_nodes"] = top_nodes;
         }
 
         // parse device count and device list
@@ -908,7 +911,7 @@ public:
             {
                 edges_visited = csr_ptr -> edges;
             }
-            
+
             if (nodes_queued > nodes_visited)
             {  // measure duplicate nodes put through queue
                 nodes_redundance =
