@@ -463,7 +463,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     }
 
     info->ComputeCommonStats(  // compute running statistics
-        enactor->enactor_stats.GetPointer(), elapsed, h_component_ids);
+        enactor->enactor_stats.GetPointer(), elapsed, h_component_ids, true);
 
     if (!quiet_mode)
     {

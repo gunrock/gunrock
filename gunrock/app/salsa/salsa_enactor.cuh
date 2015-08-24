@@ -133,7 +133,7 @@ public:
      * @param[out] total_queued Total queued elements in SALSA kernel running.
      * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
      */
-    void GetStatistics(
+    /*void GetStatistics(
         long long &total_queued,
         double &avg_duty)
     {
@@ -143,7 +143,7 @@ public:
         
         avg_duty = (this->enactor_stats->total_lifetimes >0) ?
             double(this->enactor_stats->total_runtimes) / this->enactor_stats->total_lifetimes : 0.0;
-    }
+    }*/
 
     /** @} */
 

@@ -178,7 +178,7 @@ public:
      * @param[out] search_depth Search depth of BFS algorithm.
      * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
      */
-    template <typename VertexId>
+    /*template <typename VertexId>
     void GetStatistics(
         long long &total_queued,
         VertexId  &search_depth,
@@ -191,7 +191,7 @@ public:
 
         avg_duty = (this->enactor_stats->total_lifetimes >0) ?
             double(this->enactor_stats->total_runtimes) / this->enactor_stats->total_lifetimes : 0.0;
-    }
+    }*/
 
     /** @} */
 
@@ -312,6 +312,7 @@ public:
                 //while (done[0] < 0) {
                 while (frontier_attribute->queue_length > 0) {
 
+                    enactor_stats -> nodes_queued[0] += frontier_attribute -> queue_length;
                     // Edge Map
                     gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, DOBFSProblem, BfsFunctor>(
                         //d_done,
@@ -353,6 +354,7 @@ public:
                     frontier_attribute->selector ^= 1;
 
                     if (retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
+                    enactor_stats -> edges_queued[0] += frontier_attribute -> queue_length;
 
                     if (DEBUG) {
                         //if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
@@ -407,7 +409,7 @@ public:
                     if (retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
 
                     if (INSTRUMENT || DEBUG) {
-                        enactor_stats->total_queued[0] += frontier_attribute->queue_length;
+                        //enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
                         if (DEBUG) printf(", %lld", (long long) frontier_attribute->queue_length);
                         if (INSTRUMENT) {
                             if (retval = enactor_stats->filter_kernel_stats.Accumulate(
@@ -508,6 +510,7 @@ public:
                 }
                 last_queue_length = frontier_attribute->queue_length;
 
+                enactor_stats -> nodes_queued[0] += frontier_attribute -> queue_length;
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<BackwardAdvanceKernelPolicy, DOBFSProblem, RBFSFunctor>(
                     //d_done,
@@ -567,6 +570,7 @@ public:
                 //if (done[0] == 0) break;
                 if (frontier_attribute->queue_length == 0) break;
 
+                enactor_stats -> edges_queued[0] += frontier_attribute -> queue_length;
                 // Vertex Map
                 gunrock::oprtr::filter::Kernel<FilterKernelPolicy, DOBFSProblem, RBFSFunctor>
                 <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS>>>(
@@ -596,7 +600,7 @@ public:
                 if (retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
                 //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
                 if (INSTRUMENT || DEBUG) {
-                    enactor_stats->total_queued[0] += frontier_attribute->queue_length;
+                    //enactor_stats->total_queued[0] += frontier_attribute->queue_length;
                     if (DEBUG) printf(", %lld", (long long) frontier_attribute->queue_length);
                     if (INSTRUMENT) {
                         if (retval = enactor_stats->filter_kernel_stats.Accumulate(
@@ -670,6 +674,7 @@ public:
             //while (done[0] < 0) {
             while (frontier_attribute -> queue_length !=0) {
 
+                enactor_stats -> nodes_queued[0] += frontier_attribute -> queue_length;
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, DOBFSProblem, BfsFunctor>(
                     //d_done,
@@ -734,6 +739,7 @@ public:
                 // Check if done
                 //if (done[0] == 0) break;
                 if (frontier_attribute -> queue_length == 0) break;
+                enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
 
                 // Vertex Map
                 gunrock::oprtr::filter::Kernel<FilterKernelPolicy, DOBFSProblem, BfsFunctor>
@@ -764,7 +770,7 @@ public:
                 if (retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length)) break;
 
                 if (INSTRUMENT || DEBUG) {
-                    enactor_stats->total_queued[0] += frontier_attribute->queue_length;
+                    //enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
                     if (DEBUG) printf(", %lld", (long long) frontier_attribute->queue_length);
                     if (INSTRUMENT) {
                         if (retval = enactor_stats->filter_kernel_stats.Accumulate(

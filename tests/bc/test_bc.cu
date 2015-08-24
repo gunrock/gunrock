@@ -520,7 +520,10 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     for (int iter = 0; iter < iterations; ++iter)
     {
-        printf("iteration:%d\n", iter);
+        if (!quiet_mode)
+        {
+            printf("iteration:%d\n", iter);
+        }
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
             util::SetDevice(gpu_idx[gpu]);

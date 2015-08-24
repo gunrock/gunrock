@@ -254,7 +254,7 @@ public:
                 frontier_queue->keys[frontier_attribute->selector^1].GetSize(),         // max_out_queue
                 enactor_stats->filter_kernel_stats);
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Initial HookInit Operation failed", __FILE__, __LINE__))) return;
-            enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
+            enactor_stats -> edges_queued[0] += frontier_attribute->queue_length;
         }
 
         if (data_slice->num_gpus > 1)
@@ -368,7 +368,7 @@ public:
                 frontier_queue->values[frontier_attribute->selector^1].GetSize(),         // max_out_queue
                 enactor_stats->filter_kernel_stats);
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel First Pointer Jumping Round failed", __FILE__, __LINE__))) return;
-            enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
+            enactor_stats -> nodes_queued[0] += frontier_attribute->queue_length;
 
             frontier_attribute->queue_reset = false;
             frontier_attribute->queue_index++;
@@ -401,7 +401,7 @@ public:
             frontier_queue->values[frontier_attribute->selector^1].GetSize(),         // max_out_queue
             enactor_stats->filter_kernel_stats);
         if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Update Mask Operation failed", __FILE__, __LINE__))) return;
-        enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
+        enactor_stats -> nodes_queued[0] += frontier_attribute->queue_length;
 
         enactor_stats->iteration = 1;
         data_slice->edge_flag[0] = 0;
@@ -449,7 +449,7 @@ public:
                     enactor_stats->filter_kernel_stats);
             //}
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Hook Min/Max Operation failed", __FILE__, __LINE__))) return;
-            enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
+            enactor_stats -> edges_queued[0] += frontier_attribute->queue_length;
 
             frontier_attribute->queue_reset = false;
             frontier_attribute->queue_index++;
@@ -489,7 +489,7 @@ public:
                     frontier_queue->values[frontier_attribute->selector^1].GetSize(),         // max_out_queue
                     enactor_stats->filter_kernel_stats);
                 if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Pointer Jumping Mask failed", __FILE__, __LINE__))) return;
-                enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
+                enactor_stats -> nodes_queued[0] += frontier_attribute->queue_length;
 
                 frontier_attribute->queue_reset = false;
                 frontier_attribute->queue_index++;
@@ -521,7 +521,7 @@ public:
                 frontier_queue->values[frontier_attribute->selector^1].GetSize(),         // max_out_queue
                 enactor_stats->filter_kernel_stats);
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Pointer Jumping Unmask Operation failed", __FILE__, __LINE__))) return;
-            enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
+            enactor_stats -> nodes_queued[0] += frontier_attribute->queue_length;
 
             gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, UpdateMaskFunctor>
                 <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
@@ -539,7 +539,7 @@ public:
                 frontier_queue->values[frontier_attribute->selector^1].GetSize(),         // max_out_queue
                 enactor_stats->filter_kernel_stats);
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Update Mask Operation failed", __FILE__, __LINE__))) return;
-            enactor_stats -> total_queued[0] += frontier_attribute->queue_length;
+            enactor_stats -> nodes_queued[0] += frontier_attribute->queue_length;
 
             ///////////////////////////////////////////
         }
@@ -926,7 +926,7 @@ public:
      * @param[out] num_iter Number of super-steps performed.
      * @param[out] avg_duty Average kernel duty (kernel time/kernel lifetime).
      */
-    template <typename VertexId>
+    /*template <typename VertexId>
     void GetStatistics(
         long long &total_queued,
         VertexId  &num_iter,
@@ -953,7 +953,7 @@ public:
 
         avg_duty = (total_lifetimes > 0) ?
             double (total_runtimes) / total_lifetimes : 0.0;
-    }
+    }*/
 
     /** @} */
 

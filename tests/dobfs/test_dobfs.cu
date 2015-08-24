@@ -285,6 +285,11 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     double alpha            = info->info["alpha"].get_real();
     double beta             = info->info["beta"].get_real();
 
+    if (!quiet_mode)
+    {
+        printf(" alpha = %.4f, beta = %.4f\n", alpha, beta);
+    }
+
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
