@@ -195,7 +195,7 @@ public:
         info["max_iteration"]      = 50;     // default maximum iteration
         info["max_in_sizing"]      = 1.0f;   // maximum in queue sizing factor
         info["max_queue_sizing"]   = 1.0f;   // maximum queue sizing factor
-        info["max_queue_sizing1"]  = 1.0f;   // maximum queue sizing factor
+        info["max_queue_sizing1"]  = -1.0f;   // maximum queue sizing factor
         info["m_teps"]             = 0.0f;   // traversed edges per second
         info["num_gpus"]           = 1;      // number of GPU(s) used
         info["nodes_visited"]      = 0;      // number of nodes visited
@@ -339,9 +339,14 @@ public:
             args.GetCmdLineArgument("queue-sizing1", q_sizing1);
             info["max_queue_sizing1"] = q_sizing1;
         }
-        if (args.CheckCmdLineFlag("partition_method"))
+        if (args.CheckCmdLineFlag("in-sizing"))
         {
-            args.GetCmdLineArgument("partition_method", par_method);
+            args.GetCmdLineArgument("in-sizing", i_sizing);
+            info["max_in_sizing"] = i_sizing;
+        }
+        if (args.CheckCmdLineFlag("partition-method"))
+        {
+            args.GetCmdLineArgument("partition-method", par_method);
             info["partition_method"] = par_method;
         }
         if (args.CheckCmdLineFlag("partition-factor"))
@@ -1509,8 +1514,8 @@ cudaError_t Check_Size(
 
     if (target_length > array->GetSize())
     {
-        // printf("%d\t %d\t %d\t %s \t oversize :\t %d ->\t %d\n",
-        // thread_num, iteration, peer_, name, array->GetSize(), target_length);
+        printf("%d\t %d\t %d\t %s \t oversize :\t %d ->\t %d\n",
+        thread_num, iteration, peer_, name, array->GetSize(), target_length);
         oversized=true;
         if (SIZE_CHECK)
         {
@@ -2064,7 +2069,7 @@ void Iteration_Loop(
                         if (to_show[peer_] == false) break;
                     }
 
-                    if (!Enactor::SIZE_CHECK && Enactor::DEBUG)
+                    if (!Enactor::SIZE_CHECK /*&& Enactor::DEBUG*/)
                     {
                         if (Iteration::HAS_SUBQ)
                         {
@@ -3041,7 +3046,9 @@ public:
                     offset,
                     data_slice    -> make_out_array      .GetPointer(util::DEVICE));
             for (peer_ = 0; peer_<num_gpus; peer_++)
+            {
                 data_slice->out_length[peer_] += t_out_length[peer_];
+            }
         }
         if (enactor_stats->retval) return;
         if (enactor_stats->retval = cudaStreamSynchronize(stream)) return;

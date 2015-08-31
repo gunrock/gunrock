@@ -230,6 +230,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
     {
         case TWC_FORWARD:
         {
+            printf("TWC_FORWARD\n"); fflush(stdout);
             // Load Thread Warp CTA Forward Kernel
             gunrock::oprtr::edge_map_forward::Kernel
                 <typename KernelPolicy::THREAD_WARP_CTA_FORWARD, ProblemData, Functor>
@@ -295,13 +296,13 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         }
         case LB_BACKWARD:
         {
+            printf("LB_BACKWARD\n"); fflush(stdout);
             // Load Thread Warp CTA Backward Kernel
             typedef typename ProblemData::SizeT         SizeT;
             typedef typename ProblemData::VertexId      VertexId;
             typedef typename KernelPolicy::LOAD_BALANCED LBPOLICY;
             SizeT num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
             if (get_output_length)
-            {
                 ComputeOutputLength<KernelPolicy, ProblemData, Functor>(
                     &frontier_attribute,
                     d_row_offsets,
@@ -318,7 +319,6 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     false,
                     input_inverse_graph,
                     output_inverse_graph);
-            }
 
             // Edge Map
             gunrock::oprtr::edge_map_partitioned_backward::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
@@ -346,6 +346,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         }
         case TWC_BACKWARD:
         {
+            printf("TWC_BACKWARD\n"); fflush(stdout);
             // Load Thread Warp CTA Backward Kernel
             // Edge Map
             gunrock::oprtr::edge_map_backward::Kernel
@@ -370,14 +371,14 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         }
         case LB:
         {
+            printf("LB\n"); fflush(stdout);
             typedef typename ProblemData::SizeT         SizeT;
             typedef typename ProblemData::VertexId      VertexId;
             typedef typename ProblemData::Value         Value;
             typedef typename KernelPolicy::LOAD_BALANCED LBPOLICY;
             // load edge-expand-partitioned kernel
             SizeT num_block = (frontier_attribute.queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
-            if (get_output_length)
-            {
+             if (get_output_length)
                 ComputeOutputLength<KernelPolicy, ProblemData, Functor>(
                     &frontier_attribute,
                     d_row_offsets,
@@ -394,10 +395,10 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     false,
                     input_inverse_graph,
                     output_inverse_graph);
-            }
             if (!get_output_length || (get_output_length && 
                 frontier_attribute.output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD))
             {
+                printf("LB1\n"); fflush(stdout);
                 gunrock::oprtr::edge_map_partitioned::RelaxLightEdges
                 <LBPOLICY, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(
@@ -428,6 +429,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             }
             else if (/*get_output_length &&*/ frontier_attribute.output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
             {
+                printf("LB2\n"); fflush(stdout);
                 unsigned int split_val = (frontier_attribute.output_length[0] + 
                     KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
                 util::MemsetIdxKernel<<<128, 128, 0, stream>>>(
@@ -510,6 +512,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         }
         case LB_LIGHT:
         {
+            printf("LB_LIGHT\n"); fflush(stdout);
             typedef typename ProblemData::SizeT          SizeT;
             typedef typename ProblemData::VertexId       VertexId;
             typedef typename ProblemData::Value          Value;

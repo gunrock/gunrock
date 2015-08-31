@@ -230,7 +230,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 //if (peer == num_gpu) continue;
                 SizeT max_elements = new_frontier_elements[0];
                 if (new_frontier_elements[1] > max_elements) max_elements=new_frontier_elements[1];
-                if (max_elements > nodes) max_elements = nodes;
+                //if (max_elements > nodes) max_elements = nodes;
                 if (this->scanned_edges[peer].GetSize() < max_elements)
                 {
                     if (retval = this->scanned_edges[peer].Release()) return retval;

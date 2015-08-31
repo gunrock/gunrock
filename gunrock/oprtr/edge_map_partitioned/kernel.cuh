@@ -216,6 +216,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         SizeT ncount = (!out_inv) ? GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE): GetNeighborListLength(d_column_offsets, d_row_indices, v_id, max_vertex, max_edge, ADVANCE_TYPE);
         //printf("my_id:%d, out_inv:%d, vid:%d, ncount:%d\n", my_id, out_inv, v_id, ncount);
         SizeT num_edges = (my_id == num_elements) ? 0 : ncount;
+        //printf("%d, %d, %dG\t", my_id, v_id, num_edges);
         d_scanned_edges[my_id] = num_edges;
     }
 
@@ -612,6 +613,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         // Barrier to protect work decomposition
         __syncthreads();
+        //printf("%dA\t", threadIdx.x);
 
         unsigned int range = input_queue_len;
         int tid = threadIdx.x;
@@ -629,7 +631,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         end_id = end_id % KernelPolicy::THREADS;
         s_edges[tid] = (my_id < range ? d_scanned_edges[my_id] - offset : max_edges);
 
-        //printf(" blockId = %d, threadId = %d, range = %d, my_id = %d\n", blockIdx.x, threadIdx.x, range, my_id);
+        //printf("%d,%d,%d,%db\t", tid, my_id, range, d_scanned_edges[my_id] - offset);
         if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
             s_vertices[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
             s_edge_ids[tid] = 0;
@@ -643,6 +645,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         }
 
         __syncthreads();
+        //printf("%d,%d,%dB\t", threadIdx.x, end_id, max_edges);
         unsigned int size = s_edges[end_id];
 
         VertexId v, e, e_id;
@@ -651,6 +654,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         e_id = s_edge_ids[v_index];
         int end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
 
+        //printf("%d,%d,%d,%dC\t", threadIdx.x, tid, size, KernelPolicy::THREADS);
         for (int i = tid; i < size; i += KernelPolicy::THREADS)
         {
             if (i >= end_last)
@@ -662,6 +666,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             }
 
             //printf(" blockId = %d, threadId = %d, i = %d, v = %d\n", blockIdx.x, threadIdx.x, i, v);
+            //printf("%d,%dCa\t", threadIdx.x, i);
             int internal_offset = v_index > 0 ? s_edges[v_index-1] : 0;
             e = i - internal_offset;
 
@@ -676,9 +681,12 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 u = d_column_indices[lookup];
             }
 
+            //printf("%d,%dCb\t", threadIdx.x, i);
             if (!ProblemData::MARK_PREDECESSORS) {
                 if (Functor::CondEdge(label, u, problem, lookup, e_id)) {
+                    //printf("%d,%dCc\t", threadIdx.x, i);
                     Functor::ApplyEdge(label, u, problem, lookup, e_id);
+                    //printf("%d,%dCd\t", threadIdx.x, i);
                     if (d_out != NULL) {
                         if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -691,6 +699,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                     d_out + offset+i);
                         }
                     }
+                    //printf("%d,%dCe\t", threadIdx.x, i);
                     if (d_value_to_reduce != NULL) {
                         if (R_TYPE == gunrock::oprtr::advance::VERTEX) {
                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -704,13 +713,16 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                     } else if (R_TYPE != gunrock::oprtr::advance::EMPTY) {
                         // use user-specified function to generate value to reduce
                     }
+                    //printf("%d,%dCf\t", threadIdx.x, i);
                 }
                 else {
+                    //printf("%d,%dCg\t", threadIdx.x, i);
                     if (d_out != NULL) {
                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                 -1,
                                 d_out + offset+i);
                     }
+                    //printf("%d,%dCh\t", threadIdx.x, i);
                     if (d_value_to_reduce != NULL) {
                         switch (R_OP) {
                             case gunrock::oprtr::advance::PLUS :
@@ -755,8 +767,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 break;
                         }
                     }
+                    //printf("%d,%dCi\t", threadIdx.x, i);
                 }
             } else {
+                //printf("%d,%dCj\t", threadIdx.x, i);
                 //v:pre, u:neighbor, outoffset:offset+i
                 if (Functor::CondEdge(v, u, problem, lookup, v_index)) {
                     Functor::ApplyEdge(v, u, problem, lookup, v_index);
@@ -846,6 +860,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             kernel_stats.MarkStop();
             kernel_stats.Flush();
         }
+        
+        //printf("%dD\t", threadIdx.x);
     }
 
 };
