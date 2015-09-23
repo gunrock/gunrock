@@ -18,8 +18,8 @@ NAME[ 8]="europe_osm"
 
 for i in {0..8} 
 do
-    echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx --undirected --include-header --keep-num --output-filename=$OUTDIR/${NAME[$i]}_ud.mtx
-    $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx --undirected --include-header --keep-num --output-filename=$OUTDIR/${NAME[$i]}_ud.mtx
-    echo /data/Compare/Galois-2.2.1/release/tools/graph-convert/graph-convert -mtx2floatgr $OUTDIR/${NAME[$i]}_ud.mtx $OUTDIR/${NAME[$i]}_ud.gr
-    /data/Compare/Galois-2.2.1/release/tools/graph-convert/graph-convert -mtx2floatgr $OUTDIR/${NAME[$i]}_ud.mtx $OUTDIR/${NAME[$i]}_ud.gr
+    echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx --undirected --include-header --keep-num --edge_value --output-filename=$OUTDIR/${NAME[$i]}_ud_ev.mtx
+    $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx --undirected --include-header --keep-num --edge_value --output-filename=$OUTDIR/${NAME[$i]}_ud_ev.mtx
+    echo /data/Compare/Galois-2.2.1/release/tools/graph-convert/graph-convert -mtx2floatgr $OUTDIR/${NAME[$i]}_ud_ev.mtx $OUTDIR/${NAME[$i]}_ud_ev.gr
+    /data/Compare/Galois-2.2.1/release/tools/graph-convert/graph-convert -mtx2floatgr $OUTDIR/${NAME[$i]}_ud_ev.mtx $OUTDIR/${NAME[$i]}_ud_ev.gr
 done
