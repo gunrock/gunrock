@@ -52,11 +52,11 @@ bar = {
     }
 }
 
+# this deletes everything except dataset (index) and m_teps columns
 # DataFrame cast is only to allow to_dict to run on a df instead of a series
 df_mteps = pandas.DataFrame(df_mteps.set_index('dataset')['m_teps'])
-# df_mteps.index.name = 'dataset'
+# turn dataset back into a vanilla column instead of index
 df_mteps = df_mteps.reset_index()
-# df_mteps.rename(columns={'m_teps': 'y'}, inplace=True)
 
 # bar now has a full vega-lite description
 bar["data"] = {"values" : df_mteps.to_dict(orient='records')}
@@ -67,20 +67,3 @@ f_bar = open('_g_bar.json', 'w')
 p = Popen(["vl2vg"], stdout=f_bar, stdin=PIPE)
 bar_vg = p.communicate(input=json.dumps(bar))[0]
 f_bar.close()
-# g_bar_vg = json.loads(bar_vg.decode())
-
-# print("\n\n")
-# print(g_bar_vg)
-
-## Set plotting parameters for bar graph
-# g_bar_vg.scales['y'].type = 'log'
-# g_bar_vg.colors(brew='Set3')
-# g_bar_vg.to_json('_g_mteps.json',
-               # html_out=True,
-               # html_path='g_bar_vg.html')
-
-matplotlib.style.use('ggplot')
-fig = plt.figure()
-fid = df_mteps.plot(kind='bar') # not sure how this is embedded into plt.figure()
-# mpld3.show()
-# mpld3.save_html(fig, "mpld3_bar.html")
