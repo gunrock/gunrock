@@ -31,46 +31,36 @@ def setParameters(row):
             ('' if row['mark_predecessors'] else 'no ') + 'mark predecessors')
 df['parameters'] = df.apply(setParameters, axis=1)
 
-# df.loc[df['mark_predecessors'] & df['undirected'], 'parameters'] = "BFS, undirected, mark predecessors"
-
-
-## Bar graph, restricted to mark-pred+undirected
+## Bar graph, restricted to BFS+mark-pred+undirected
 ## x axis: dataset, y axis: MTEPS
-## The following two subsetting operations are equivalent.
-df_mteps = df[df['mark_predecessors'] & df['undirected']] # except for BFS
 df_mteps = df[df['parameters'] == "BFS, undirected, mark predecessors"]
 
 ## draw bar graph
 bar = {
     "marktype": "bar",
     "encoding": {
-        "y": {"type": "Q","name": "m_teps"},
-        "x": {"type": "O","name": "dataset"}
+        "y": {"scale": {"type": "log"},
+              "type": "Q",
+              "name": "m_teps",
+              "axis": {
+                  "title": "MTEPS"
+              }
+        },
+        "x": {"type": "O",
+              "name": "dataset"
+        }
     }
 }
 
 # DataFrame cast is only to allow to_dict to run on a df instead of a series
-df_mteps_final = pandas.DataFrame(df_mteps.set_index('dataset')['m_teps'])
-print df_mteps_final
-
-
-print df_mteps_final.to_json(orient='split')
-print df_mteps_final.to_json(orient='records')
-print df_mteps_final.to_json(orient='index')
-print df_mteps_final.to_json(orient='columns')
-print df_mteps_final.to_json(orient='values')
-print df_mteps_final.to_dict(orient='dict')
-df_mteps_final.index.name = 'dataset'
-df_mteps_final = df_mteps_final.reset_index()
-# df_mteps_final.rename(columns={'m_teps': 'y'}, inplace=True)
-print df_mteps_final.to_dict(orient='records')
-bar["data"] = {"values" : df_mteps_final.to_dict(orient='records')}
+df_mteps = pandas.DataFrame(df_mteps.set_index('dataset')['m_teps'])
+# df_mteps.index.name = 'dataset'
+df_mteps = df_mteps.reset_index()
+# df_mteps.rename(columns={'m_teps': 'y'}, inplace=True)
 
 # bar now has a full vega-lite description
-
-print("\n\n")
-print(bar)
-print(json.dumps(bar))
+bar["data"] = {"values" : df_mteps.to_dict(orient='records')}
+print(json.dumps(bar))          # uses double-quotes, not single
 
 # pipe it through vl2vg to turn it into vega
 f_bar = open('_g_bar.json', 'w')
@@ -91,6 +81,6 @@ f_bar.close()
 
 matplotlib.style.use('ggplot')
 fig = plt.figure()
-fid = df_mteps_final.plot(kind='bar') # not sure how this is embedded into plt.figure()
+fid = df_mteps.plot(kind='bar') # not sure how this is embedded into plt.figure()
 # mpld3.show()
 # mpld3.save_html(fig, "mpld3_bar.html")
