@@ -67,3 +67,40 @@ f_bar = open('_g_bar.json', 'w')
 p = Popen(["vl2vg"], stdout=f_bar, stdin=PIPE)
 bar_vg = p.communicate(input=json.dumps(bar))[0]
 f_bar.close()
+
+df_gbar = df[['dataset','parameters','m_teps']]
+
+gbar = {
+  "marktype": "bar",
+  "encoding": {
+    "y": {"scale": {"type": "log"},
+          "name": "m_teps",
+          "type": "Q",
+          "axis": {
+              "title": "MTEPS"
+          }
+    },
+    "x": {"name": "dataset",
+          "type": "N"
+    },
+    "row": {"name": "parameters",
+            "type": "O"
+    },
+  },
+}
+
+gbar["data"] = {"values" : df_gbar.to_dict(orient='records')}
+
+f_gbar = open('_g_gbar.json', 'w')
+p = Popen(["vl2vg"], stdout=f_gbar, stdin=PIPE)
+gbar_vg = p.communicate(input=json.dumps(gbar))[0]
+f_gbar.close()
+
+gbart = gbar
+# swap "x" and "row"
+gbart["encoding"]["x"], gbart["encoding"]["row"] = gbart["encoding"]["row"], gbart["encoding"]["x"]
+
+f_gbart = open('_g_gbart.json', 'w')
+p = Popen(["vl2vg"], stdout=f_gbart, stdin=PIPE)
+gbart_vg = p.communicate(input=json.dumps(gbart))[0]
+f_gbart.close()
