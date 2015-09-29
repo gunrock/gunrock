@@ -293,6 +293,68 @@ void RunTests_debug(Info<VertexId, Value, SizeT> *info)
         RunTests_size_check <VertexId, Value, SizeT, false>(info);
 }
 
+template <
+    typename    VertexId,
+    typename    Value,
+    typename    SizeT >
+void GenerateLigraGraph(std::string filename, Csr<VertexId, Value, SizeT>& csr)
+{
+    using namespace std;
+    ofstream file;
+    string filename1 = filename + ".adjlist";
+    file.open(filename1.c_str());
+    file << "AdjacencyGraph" << endl;
+    file << csr.nodes << endl;
+    file << csr.edges << endl;
+    for (int i = 0; i < csr.nodes; ++i) {
+        file << csr.row_offsets[i] << endl;
+    }
+    for (int i = 0; i < csr.edges; ++i) {
+        file << csr.column_indices[i] << endl;
+    }
+    file.close();
+
+    string filename2 = filename + "-weight.adjlist";
+    file.open(filename2.c_str());
+    file << "WeightedAdjacencyGraph" << endl;
+    file << csr.nodes << endl;
+    file << csr.edges << endl;
+    for (int i = 0; i < csr.nodes; ++i) {
+        file << csr.row_offsets[i] << endl;
+    }
+    for (int i = 0; i < csr.edges; ++i) {
+        file << csr.column_indices[i] << endl;
+    }
+    srand(time(NULL));
+    for (int i = 0; i < csr.edges; ++i) {
+        file << rand()%64+1 << endl;
+    }
+    file.close();
+}
+
+template <
+    typename    VertexId,
+    typename    Value,
+    typename    SizeT >
+void GenerateMapGraph(std::string filename, Csr<VertexId, Value, SizeT>& csr)
+{
+    using namespace std;
+    ofstream file;
+    string filename1 = filename + "-mapgraph.mtx";
+    file.open(filename1.c_str());
+    srand(time(NULL));
+    file << csr.nodes << " " << csr.nodes;
+    file << " " << csr.edges << endl;
+    for (int i = 0; i < csr.nodes; ++i) {
+        VertexId start = csr.row_offsets[i];
+        VertexId end = csr.row_offsets[i+1];
+        for (int j = start; j < end; ++j) {
+            file << csr.column_indices[j]+1 << " " << i+1 << " " << rand()%64+1 << endl;
+        }
+    } 
+    file.close();
+}
+
 // ----------------------------------------------------------------------------
 // Main
 // ----------------------------------------------------------------------------
@@ -315,9 +377,18 @@ int main(int argc, char** argv)
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
     // graph construction or generation related parameters
-    info->info["undirected"] = args.CheckCmdLineFlag("undirected");
+    info->info["undirected"] = true;
     info->Init("Primitive_Name", args, csr);  // initialize Info structure
     RunTests_debug<VertexId, Value, SizeT>(info);  // run test
+    std::string filename;
+    args.GetCmdLineArgument("ligrafile", filename);
+    if (filename != "")
+        GenerateLigraGraph(filename, csr);
+    /*args.GetCmdLineArgument("mapgraphfile", filename);
+    GenerateMapGraph(filename, csr);*/
+    /*int highest_degree;
+    csr.GetNodeWithHighestDegree(highest_degree);
+    printf("largest degree:%d\n", highest_degree);*/
     return 0;
 }
 
