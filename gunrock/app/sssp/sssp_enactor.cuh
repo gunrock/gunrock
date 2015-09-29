@@ -100,10 +100,10 @@ __global__ void Expand_Incoming_SSSP (
 
         keys_out[x]=key;
 
-        #pragma unrool
+        #pragma unroll
         for (SizeT i=1;i<NUM_VALUE__ASSOCIATES;i++)
             s_value__associate_org[i][key]=s_value__associate_in[i][x];
-        #pragma unrool
+        #pragma unroll
         for (SizeT i=0;i<NUM_VERTEX_ASSOCIATES;i++)
             s_vertex_associate_org[i][key]=s_vertex_associate_in[i][x];
         x+=STRIDE;
