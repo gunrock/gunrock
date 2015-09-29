@@ -72,7 +72,8 @@ and Windows.
 Requirements
 ------------
 
-Gunrock has not been tested with any CUDA version < 5.5.
+CUDA version 5.5 (or greater) and compute capability 3.0 (or greater) is
+required.
 
 Several graph primitives' CPU validation code uses Boost Graph Library.
 We are also using Boost Spirit, filesystem, and timer in our utility code.
