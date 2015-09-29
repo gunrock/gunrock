@@ -546,45 +546,6 @@ void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
     }
 }
 
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT >
-void GenerateLigraGraph(std::string filename, Csr<VertexId, Value, SizeT>& csr)
-{
-    using namespace std;
-    ofstream file;
-    string filename1 = filename + ".adjlist";
-    file.open(filename1.c_str());
-    file << "AdjacencyGraph" << endl;
-    file << csr.nodes << endl;
-    file << csr.edges << endl;
-    for (int i = 0; i < csr.nodes; ++i) {
-        file << csr.row_offsets[i] << endl;
-    }
-    for (int i = 0; i < csr.edges; ++i) {
-        file << csr.column_indices[i] << endl;
-    }
-    file.close();
-
-    string filename2 = filename + "-weight.adjlist";
-    file.open(filename2.c_str());
-    file << "WeightedAdjacencyGraph" << endl;
-    file << csr.nodes << endl;
-    file << csr.edges << endl;
-    for (int i = 0; i < csr.nodes; ++i) {
-        file << csr.row_offsets[i] << endl;
-    }
-    for (int i = 0; i < csr.edges; ++i) {
-        file << csr.column_indices[i] << endl;
-    }
-    srand(time(NULL));
-    for (int i = 0; i < csr.edges; ++i) {
-        file << rand()%64+1 << endl;
-    }
-    file.close();
-}
-
 /******************************************************************************
 * Main
 ******************************************************************************/
