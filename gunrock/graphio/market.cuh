@@ -171,7 +171,7 @@ int ReadMarketStream(
             }
             else
             {
-                if (sscanf(line, "%lld %lld", &ll_col, &ll_row) != 2)
+                if (sscanf(line, "%lld %lld", &ll_row, &ll_col) != 2)
                 {
                     fprintf(stderr,
                             "Error parsing MARKET graph: badly formed edge\n");
@@ -378,25 +378,25 @@ int BuildMarketGraph(
     if (undirected)
     {
         char ud[256];  // undirected graph
-        sprintf(ud, "%s/.%s.ud.bin", file_path, file_name);
+        sprintf(ud, "%s/.%s.ud.%d.bin", file_path, file_name, (LOAD_VALUES?1:0));
         if (BuildMarketGraph<LOAD_VALUES>(file_in, ud, graph,
-                                          true, false, quiet) != 0)
+                    true, false, quiet) != 0)
             return 1;
     }
     else if (!undirected && reversed)
     {
         char rv[256];  // reversed graph
-        sprintf(rv, "%s/.%s.rv.bin", file_path, file_name);
+        sprintf(rv, "%s/.%s.rv.%d.bin", file_path, file_name, (LOAD_VALUES?1:0));
         if (BuildMarketGraph<LOAD_VALUES>(file_in, rv, graph,
-                                          false, true, quiet) != 0)
+                    false, true, quiet) != 0)
             return 1;
     }
     else if (!undirected && !reversed)
     {
         char di[256];  // directed graph
-        sprintf(di, "%s/.%s.di.bin", file_path, file_name);
+        sprintf(di, "%s/.%s.di.%d.bin", file_path, file_name, (LOAD_VALUES?1:0));
         if (BuildMarketGraph<LOAD_VALUES>(file_in, di, graph,
-                                          false, false, quiet) != 0)
+                    false, false, quiet) != 0)
             return 1;
     }
     else
