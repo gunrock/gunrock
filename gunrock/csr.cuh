@@ -387,7 +387,7 @@ struct Csr
             {
                 VertexId col = coo[edge].col;
                 VertexId row = coo[edge].row;
-                if ((col != row) && (edge == 0 || col != coo[edge - 1].col || row != coo[edge - 1].row))
+                //if ((col != row) && (edge == 0 || col != coo[edge - 1].col || row != coo[edge - 1].row))
                 {
                     new_coo[new_edge].col = col;
                     new_coo[new_edge].row = row;
