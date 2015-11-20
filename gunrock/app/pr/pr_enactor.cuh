@@ -648,6 +648,15 @@ static bool Stop_Condition(
         return false;
     }*/
 
+    bool past_max_iter = true;
+    for (int gpu=0; gpu<num_gpus*num_gpus; gpu++)
+    if (enactor_stats[gpu].iteration < data_slice[0].max_iter)
+    {
+        past_max_iter = false;
+        break;
+    }
+    if (past_max_iter) return true;
+
     for (int gpu=0; gpu<num_gpus; gpu++)
         if (data_slice[gpu]->to_continue && frontier_attribute[gpu*num_gpus].queue_length !=0)
     {
