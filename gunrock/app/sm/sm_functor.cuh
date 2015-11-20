@@ -125,6 +125,8 @@ struct EdgeWeightFunctor
   }
 }; // EdgeWeightFunctor
 
+//TODO: sort the query nodes based on edge weight.
+
 /**
  * @brief Structure contains device functions in pruning query node candidates. 
  *
@@ -183,42 +185,44 @@ struct PruneFunctor
     int offset;
     int i,j;
     bool save=false;
+    int num_iterations=3;
+	
+    for(int it=0; it<num_iterations; it++){
+  	  for(i=0; i<problem->nodes_query; i++){
+		query_node = problem->d_temp_keys[i];
+		// check if there's a candidate for each neighbor of query node 
+      	 	// add the 1s together and compare with query node's #neigbors, if smaller prune out
+		neighbors = problem->d_query_row[query_node+1] - problem->d_query_row[query_node];
 
-    for(i=0; i<problem->nodes_query; i++){
-	query_node = problem->d_temp_keys[i];
-	// check if there's a candidate for each neighbor of query node 
-        // TODO: add the 1s together and compare with query node's #neigbors, if smaller prune out
-	neighbors = problem->d_row_offsets[query_node+1] - problem->d_row_offsets[query_node];
-
-	if(problem->d_c_set[query_node * problem->nodes_data+s_id]){
-	    for(j=0; j < neighbors; j++){
-		offset = problem->d_row_offsets[query_node]+j;
-		if(problem->d_c_set[d_id+problem->nodes_data * problem->d_column_indices[offset]])
-		{
-			save=true;
-		}
-		__syncthreads();
-		if(save) continue;
-		else break;
+		if(problem->d_c_set[query_node * problem->nodes_data+s_id]){
+	    	for(j=0; j < neighbors; j++){
+			offset = problem->d_query_row[query_node]+j;
+			if(problem->d_c_set[d_id+problem->nodes_data * problem->d_query_col[offset]])
+				save=true;
 		
-	    }
+			__syncthreads();
+			if(save) continue;
+			else break;
+		
+	    	}
 	
-	   if(i<neighbors) problem->d_c_set[s_id + query_node * problem->nodes_data]=0;
-	   __syncthreads();
-	}
+		       if(i<neighbors) problem->d_c_set[s_id + query_node * problem->nodes_data]=0;
+  			__syncthreads();
+		}
 
-	if(problem->d_c_set[query_node * problem->nodes_data+s_id]){
-	   for(j=0; j<problem->nodes_query; j++){
-		temp = problem->d_temp_keys[i];
-		if(problem->d_c_set[d_id+temp*problem->nodes_data]) atomicAdd(&ones,1);
-	   	__syncthreads();
+		if(problem->d_c_set[query_node * problem->nodes_data+s_id]){
+	   	for(j=0; j<problem->nodes_query; j++){
+			temp = problem->d_temp_keys[i];
+			if(problem->d_c_set[d_id+temp*problem->nodes_data]) atomicAdd(&ones,1);
+	   		__syncthreads();
 	
-	   }
-	   if(ones<neighbors) problem->d_c_set[s_id+query_node*problem->nodes_data]=0;
-	}
+		   }	
+		   if(ones<neighbors) problem->d_c_set[s_id+query_node*problem->nodes_data]=0;
+		}
 	
-    }
+	    }
   }
+}
 
 }; // PruneFunctor
 

@@ -20,39 +20,88 @@ namespace sm {
 
 /**
  * @brief Problem structure stores device-side vectors
- * @tparam _VertexId Type use as vertex id (e.g., uint32)
- * @tparam _SizeT    Type use for array indexing. (e.g., uint32)
- * @tparam _Value    Type use for computed value.
+ * @tparam VertexId Type of signed integer to use as vertex id (e.g., uint32)
+ * @tparam SizeT    Type of unsigned integer to use for array indexing. (e.g., uint32)
+ * @tparam Value    Type of float or double to use for computing value.
+ * @tparam _MARK_PREDECESSORS   Boolean type parameter which defines whether to mark predecessor value for each node.
+ * @tparam _ENABLE_IDEMPOTENCE  Boolean type parameter which defines whether to enable idempotence operation for graph traverse.
+ * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer.
  */
-template<typename _VertexId, typename _SizeT, typename _Value>
-struct SMProblem : ProblemBase<_VertexId, _SizeT, false> {
-    typedef _VertexId VertexId;
-    typedef _SizeT    SizeT;
-    typedef _Value    Value;
-
-    static const bool MARK_PREDECESSORS  = false;
-    static const bool ENABLE_IDEMPOTENCE = false;
+template<typename VertexId, 
+	 typename SizeT, 
+	 typename Value,
+	 bool _MARK_PREDECESSORS,
+	 bool _ENABLE_IDEMPOTENCE,
+	 bool _USE_DOUBLE_BUFFER>
+struct SMProblem : ProblemBase<VertexId, SizeT, Value,
+	_MARK_PREDECESSORS,
+	_ENABLE_IDEMPOTENCE,
+	_USE_DOUBLE_BUFFER,
+	false,	// _ENABLE_BACKWARD
+	false,	// _KEEP_ORDER
+	false>  // _KEEP_NODE_NUM
+{
 
     /**
      * @brief Data slice structure which contains problem specific data.
+     *
+     * @tparam VertexId Type of signed integer to use as vertex IDs.
+     * @tparam SizeT    Type of int / uint to use for array indexing.
+     * @tparam Value    Type of float or double to use for attributes.
      */
-    struct DataSlice {
+     
+    struct DataSlice : DataSliceBase<SizeT, VertexId, Value>{
         // device storage arrays
-        VertexId *d_query_labels;  /** < Used for input query graph labels */
-	VertexId *d_data_labels;   /** < Used for input data graph labels */
-	VertexId *d_labels;        /** < Used for input query node indices */    
-	VertexId *d_edge_labels;   /** < Used for input query edge indices */
-	VertexId *d_row_offsets;   /** < Used for query row offsets     */
-	VertexId *d_column_indices;/** < Used for query column indices  */ 
-	Value    *d_edge_weights;  /** < Used for storing edge weights    */
-	SizeT    *d_data_degrees;  /** < Used for input data graph degrees */
-	SizeT 	 *d_query_degrees; /** < Used for input query graph degrees */
-	SizeT 	 *d_temp_keys;     /** < Used for candidate matrix row keys */
+	util::Array1D<SizeT, VertexId> labels;  // Used for ...
+        util::Array1D<SizeT, VertexId> d_query_labels;  /** < Used for query graph labels */
+	util::Array1D<SizeT, VertexId> d_data_labels;   /** < Used for data graph labels */
+	util::Array1D<SizeT, SizeT> d_query_nodeIDs;        /** < Used for query node indices */    
+	util::Array1D<SizeT, SizeT> d_query_edgeIDs;   /** < Used for query edge indices */
+	util::Array1D<SizeT, SizeT> d_query_row;   /** < Used for query row offsets     */
+	util::Array1D<SizeT, SizeT> d_query_col;/** < Used for query column indices  */ 
+	util::Array1D<SizeT, Value> d_edge_weights;  /** < Used for storing query edge weights    */
+	util::Array1D<SizeT, SizeT> d_data_degrees;  /** < Used for input data graph degrees */
+	util::Array1D<SizeT, SizeT> d_query_degrees; /** < Used for input query graph degrees */
+	util::Array1D<SizeT, SizeT> d_temp_keys;     /** < Used for candidate matrix row keys */
+	util::Array1D<SizeT, bool> d_c_set;         /** < Used for candidate set boolean matrix */
 	SizeT    nodes_data;       /** < Used for number of data nodes  */
 	SizeT	 nodes_query;      /** < Used for number of query nodes */
-	bool     *d_c_set;         /** < Used for candidate set  */
+	SizeT 	 edges_data;	   /** < Used for number of data edges   */
+	SizeT 	 edges_query;      /** < Used for number of query edges  */
+
+
+	/*
+         * @brief Default constructor
+         */
+        DataSlice()
+        {
+	    labels		.SetName("labels");
+	    d_query_labels	.SetName("d_query_labels");
+	    d_data_labels	.SetName("d_data_labels");
+	    d_query_nodeIDs	.SetName("d_query_nodeIDs"); 
+	    d_query_edgeIDs	.SetName("d_query_edgeIDs");
+	    d_query_row		.SetName("d_query_row");
+	    d_query_col		.SetName("d_query_col");
+	    d_edge_weights	.SetName("d_edge_weights");
+	    d_data_degrees	.SetName("d_data_degrees");
+	    d_query_degrees	.SetName("d_query_degrees");
+	    d_temp_keys		.SetName("d_temp_keys");
+	    d_c_set		.SetName("d_c_set");
+	    nodes_data		= 0;
+	    nodes_query		= 0;	   
+	    edges_data 		= 0;
+	    edges_query 	= 0; 
+	}
+	 /*
+         * @brief Default destructor
+         */
+        ~DataSlice()
+        {
+            if (util::SetDevice(this->gpu_idx)) return;
+	    d_c_set.Release();
+	}
         
-    };
+    }; // DataSlice
 
     // Number of GPUs to be sliced over
     int       num_gpus;
@@ -64,12 +113,12 @@ struct SMProblem : ProblemBase<_VertexId, _SizeT, false> {
     // Size of the data graph
     SizeT     nodes_data;
     SizeT     edges_data;
+    // Numer of matched subgraphs in data graph
     unsigned int num_matches;
 
-    // Set of data  slices (one for each GPU)
+    // Set of data slices (one for each GPU)
     DataSlice **data_slices;
 
-    // putting structure on device while keeping the SoA structure
     DataSlice **d_data_slices;
 
     // device index for each data slice
@@ -83,20 +132,23 @@ struct SMProblem : ProblemBase<_VertexId, _SizeT, false> {
     /**
      * @brief Constructor
      * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on.
+     * @param[in] graph_query Reference to the query CSR graph object we process on.
+     * @param[in] graph_data  Reference to the data  CSR graph object we process on.
+     * @param[in] h_query_labels Reference to the labels of query graph.
+     * @param[in] h_data_labels  Reference to the labels of data graph.
+     * @param[in] h_index Reference to the query node indices.
+     * @param[in] h_edge_index Reference to the query edge indices.
      * @param[in] num_gpus Number of the GPUs used.
+     * @param[out] h_c_set Reference to the candidate set boolean matrix.
      */
     SMProblem(bool  stream_from_host,  // only meaningful for single-GPU
                   const Csr<VertexId, Value, SizeT> &graph_query,
                   const Csr<VertexId, Value, SizeT> &graph_data,
 		  VertexId *h_query_labels,
 	 	  VertexId *h_data_labels,
-		  VertexId *h_index,
-		  VertexId *h_edge_index,
-		  bool* h_c_set,
                   int   num_gpus) :
         num_gpus(num_gpus) {
-	Init(stream_from_host, graph_query, graph_data, h_query_labels, h_data_labels, h_index, h_edge_index, num_gpus);
+	Init(stream_from_host, graph_query, graph_data, h_query_labels, h_data_labels, num_gpus);
     }
 
     /**
@@ -108,67 +160,26 @@ struct SMProblem : ProblemBase<_VertexId, _SizeT, false> {
                     cudaSetDevice(gpu_idx[i]),
                     "~Problem cudaSetDevice failed",
                     __FILE__, __LINE__)) break;
-            if (data_slices[i]->d_query_labels) {
-                util::GRError(cudaFree(data_slices[i]->d_query_labels),
-                              "GpuSlice cudaFree d_query_labels failed",
-                              __FILE__, __LINE__);
-            }
-            if (data_slices[i]->d_data_labels) {
-                util::GRError(cudaFree(data_slices[i]->d_data_labels),
-                              "GpuSlice cudaFree d_data_labels failed",
-                              __FILE__, __LINE__);
-            }
-            if (data_slices[i]->d_labels) {
-                util::GRError(cudaFree(data_slices[i]->d_labels),
-                              "GpuSlice cudaFree d_labels failed",
-                              __FILE__, __LINE__);
-            }
-            if (data_slices[i]->d_edge_labels) {
-                util::GRError(cudaFree(data_slices[i]->d_edge_labels),
-                              "GpuSlice cudaFree d_edge_labels failed",
-                              __FILE__, __LINE__);
-            }
-            if (data_slices[i]->d_edge_weights) {
-                util::GRError(cudaFree(data_slices[i]->d_edge_weights),
-                              "GpuSlice cudaFree d_edge_weights failed",
-                              __FILE__, __LINE__);
-            }
-            if (data_slices[i]->d_row_offsets) {
-                util::GRError(cudaFree(data_slices[i]->d_row_offsets),
-                              "GpuSlice cudaFree d_row_offsets failed",
-                              __FILE__, __LINE__);
-            }
-            if (data_slices[i]->d_column_indices) {
-                util::GRError(cudaFree(data_slices[i]->d_column_indices),
-                              "GpuSlice cudaFree d_column_indices failed",
-                              __FILE__, __LINE__);
-            }
-	    if (data_slices[i]->d_c_set) {
-		util::GRError(cudaFree(data_slices[i]->d_c_set), 
-			      "GpuSlice cudaFree d_c_set fail",
-			      __FILE__, __LINE__);
-	    }
-	    if (data_slices[i]->d_query_degrees) {
-		util::GRError(cudaFree(data_slices[i]->d_query_degrees), 
-			      "GpuSlice cudaFree d_query_degrees fail",
-			      __FILE__, __LINE__);
-	    }
-	    if (data_slices[i]->d_data_degrees) {
-		util::GRError(cudaFree(data_slices[i]->d_data_degrees), 
-			      "GpuSlice cudaFree d_data_degrees fail",
-			      __FILE__, __LINE__);
-	    }
-	    if (data_slices[i]->d_temp_keys) {
-		util::GRError(cudaFree(data_slices[i]->d_temp_keys), 
-			      "GpuSlice cudaFree d_temp_keys fail",
-			      __FILE__, __LINE__);
-	    }
-            if (d_data_slices[i]) {
+		
+	    data_slices[i]->labels.Release();
+	    data_slices[i]->d_query_labels.Release();
+	    data_slices[i]->d_data_labels.Release();
+	    data_slices[i]->d_query_nodeIDs.Release();
+	    data_slices[i]->d_query_edgeIDs.Release();
+	    data_slices[i]->d_query_row.Release();
+	    data_slices[i]->d_query_col.Release();
+	    data_slices[i]->d_edge_weights.Release();
+	    data_slices[i]->d_data_degrees.Release();
+	    data_slices[i]->d_query_degrees.Release();
+	    data_slices[i]->d_temp_keys.Release();
+
+	    if (d_data_slices[i]) {
                 util::GRError(cudaFree(d_data_slices[i]),
                               "GpuSlice cudaFree data_slices failed",
                               __FILE__, __LINE__);
             }
-        }
+	}
+
         if (d_data_slices) delete[] d_data_slices;
         if (data_slices) delete[] data_slices;
     }
@@ -195,7 +206,7 @@ struct SMProblem : ProblemBase<_VertexId, _SizeT, false> {
 
                 if (retval = util::GRError(
                         cudaMemcpy(h_c_set,
-                                   data_slices[0]->d_c_set,
+                                   data_slices[0]->d_c_set.GetPointer(util::DEVICE),
                                    sizeof(bool) * nodes_query * nodes_data,
                                    cudaMemcpyDeviceToHost),
                         "Problem cudaMemcpy d_c_set failed",
@@ -221,38 +232,46 @@ struct SMProblem : ProblemBase<_VertexId, _SizeT, false> {
      * \return cudaError_t object indicates the success of all CUDA functions.
      */
     cudaError_t Init(
-        bool  stream_from_host,  // only meaningful for single-GPU
-        Csr<VertexId, Value, SizeT> &graph_query,
-        const Csr<VertexId, Value, SizeT> &graph_data,
-	VertexId *h_query_labels,
-	VertexId *h_data_labels,
- 	VertexId *h_index,
-	VertexId *h_edge_index,
-        int   _num_gpus) {
+        bool  			     stream_from_host,  // only meaningful for single-GPU
+        Csr<VertexId, Value, SizeT>& graph_query,
+        Csr<VertexId, Value, SizeT>& graph_data,
+	VertexId*		     h_query_labels,
+	VertexId*		     h_data_labels,
+        int   			     _num_gpus,
+	cudaStream_t* 		     streams = NULL) {
         num_gpus = _num_gpus;
         nodes_query = graph_query.nodes;
         edges_query = graph_query.edges;
         nodes_data  = graph_data.nodes;
         edges_data  = graph_data.edges;
-        VertexId *h_row_offsets = graph_data.row_offsets;
-        VertexId *h_column_indices = graph_data.column_indices;
-	VertexId *h_query_rowoffsets = graph_query.row_offsets;
-	VertexId *h_query_columnindices = graph_query.column_indices;
-	SizeT *h_query_degrees = (SizeT*) malloc(sizeof(SizeT) * graph_query.nodes);
- 	graph_query.GetNodeDegree(h_query_degrees);
-	SizeT *h_temp_keys = (SizeT*) malloc(sizeof(SizeT) * graph_query.nodes);
-	for(int i=0; i<graph_query.nodes; i++) h_temp_keys[i] = i*graph_data.nodes;
 
-        ProblemBase<_VertexId, _SizeT, false>::Init(
-            stream_from_host,
-            nodes_data,  
-            edges_data, 
-            h_row_offsets,
-            h_column_indices,
-            NULL,
-            NULL,
-            num_gpus);
+        ProblemBase<
+	VertexId, SizeT, Value,
+		_MARK_PREDECESSORS,
+		_ENABLE_IDEMPOTENCE,
+		_USE_DOUBLE_BUFFER,
+		false, // _ENABLE_BACKWARD
+		false, //_KEEP_ORDER
+		false >::Init(stream_from_host,
+		              &graph_query,  
+            		      NULL,
+            		      num_gpus,
+			      NULL,
+			      "random");
 
+        ProblemBase<
+	VertexId, SizeT, Value,
+		_MARK_PREDECESSORS,
+		_ENABLE_IDEMPOTENCE,
+		_USE_DOUBLE_BUFFER,
+		false, // _ENABLE_BACKWARD
+		false, //_KEEP_ORDER
+		false >::Init(stream_from_host,
+		              &graph_data,  
+            		      NULL,
+            		      num_gpus,
+			      NULL,
+			      "random");
 	
         /**
          * Allocate output labels
@@ -260,7 +279,11 @@ struct SMProblem : ProblemBase<_VertexId, _SizeT, false> {
         cudaError_t retval = cudaSuccess;
         data_slices   = new DataSlice * [num_gpus];
         d_data_slices = new DataSlice * [num_gpus];
-        
+        if (streams == NULL) {
+            streams = new cudaStream_t[num_gpus];
+            streams[0] = 0;
+        }
+
 	//copy query graph labels and data graph labels from input
 	
         do {
@@ -282,167 +305,126 @@ struct SMProblem : ProblemBase<_VertexId, _SizeT, false> {
                         "Problem cudaMalloc d_data_slices failed",
                         __FILE__, __LINE__)) return retval;
 
+		data_slices[0][0].streams.SetPointer(streams, 1);
+                data_slices[0]->Init(
+                    1,           // Number of GPUs
+                    gpu_idx[0],  // GPU indices
+                    0,           // Number of vertex associate
+                    0,           // Number of value associate
+                    &graph_query,// Pointer to CSR graph
+                    NULL,        // Number of in vertices
+                    NULL);       // Number of out vertices
+
+                data_slices[0]->Init(
+                    1,           // Number of GPUs
+                    gpu_idx[0],  // GPU indices
+                    0,           // Number of vertex associate
+                    0,           // Number of value associate
+                    &graph_data, // Pointer to CSR graph
+                    NULL,        // Number of in vertices
+                    NULL);       // Number of out vertices
+
+
                 // create SoA on device
-                VertexId *d_query_labels;
-                if (retval = util::GRError(
-                        cudaMalloc((void**)&d_query_labels,
-                                   nodes_query * sizeof(VertexId)),
-                        "Problem cudaMalloc d_query_labels failed",
-                        __FILE__, __LINE__)) return retval;
+		if(retval = data_slices[gpu]->labels.Allocate(nodes_query, util::DEVICE)) 
+			return retval;
+		if(retval = data_slices[gpu]->d_query_labels.Allocate(nodes_query, util::DEVICE)) 
+			return retval;
+		if(retval = data_slices[gpu]->d_data_labels.Allocate(nodes_data, util::DEVICE)) 
+			return retval;
+		if(retval = data_slices[gpu]->d_query_nodeIDs.Allocate(nodes_query, util::DEVICE)) 
+			return retval;
+		if(retval = data_slices[gpu]->d_query_edgeIDs.Allocate(edges_query, util::DEVICE)) 
+			return retval;
+		if(retval = data_slices[gpu]->d_query_row.Allocate(nodes_query+1, util::DEVICE)) 
+			return retval;
+		if(retval = data_slices[gpu]->d_query_col.Allocate(edges_query, util::DEVICE)) 
+			return retval;
+		if(retval = data_slices[gpu]->d_edge_weights.Allocate(edges_query, util::DEVICE)) 
+			return retval;
+		if(retval = data_slices[gpu]->d_c_set.Allocate(nodes_query*nodes_data, util::DEVICE))
+			return retval;
+		if(retval = data_slices[gpu]->d_query_degrees.Allocate(nodes_query, util::DEVICE)) 
+			return retval;
+		if(retval = data_slices[gpu]->d_data_degrees.Allocate(nodes_data, util::DEVICE)) 
+			return retval;
+		if(retval = data_slices[gpu]->d_temp_keys.Allocate(nodes_query, util::DEVICE)) 
+			return retval;
 
-		if (retval = util::GRError(
-			cudaMemcpy(d_query_labels, h_query_labels,
-				   nodes_query * sizeof(VertexId),
-				   cudaMemcpyHostToDevice),
-			"Problem cudaMemcpy d_query_labels failed",
-			__FILE__, __LINE__)) return retval;
+		// Initialize labels
+            	util::MemsetKernel<<<128, 128>>>(
+                	data_slices[gpu]->labels.GetPointer(util::DEVICE),
+                	_ENABLE_IDEMPOTENCE ? -1 : (util::MaxValue<Value>() - 1), nodes_query);
 
-                data_slices[0]->d_query_labels = d_query_labels;
+		// Initialize query graph labels by given query_labels
+		data_slices[gpu]->d_query_labels.SetPointer(h_query_labels);
+		if (retval = data_slices[gpu]->d_query_labels.Move(util::HOST, util::DEVICE))
+			return retval;
 
-                VertexId *d_data_labels;
-                if (retval = util::GRError(
-                        cudaMalloc((void**)&d_data_labels,
-                                   nodes_data * sizeof(VertexId)),
-                        "Problem cudaMalloc d_data_labels failed",
-                        __FILE__, __LINE__)) return retval;
+		// Initialize data graph labels by given data_labels
+		data_slices[gpu]->d_data_labels.SetPointer(h_data_labels);
+		if (retval = data_slices[gpu]->d_data_labels.Move(util::HOST, util::DEVICE))
+			return retval;
 
-		if (retval = util::GRError(
-			cudaMemcpy(d_data_labels, h_data_labels,
-				   nodes_data * sizeof(VertexId),
-				   cudaMemcpyHostToDevice),
-			"Problem cudaMemcpy d_data_labels failed",
-			__FILE__, __LINE__)) return retval;
+		// Initialize query node IDs from 0 to nodes_query
+		util::MemsetIdxKernel<<<128, 128>>>(
+		    data_slices[gpu]->d_query_nodeIDs.GetPointer(util::DEVICE), nodes_query);
 
-                data_slices[0]->d_data_labels = d_data_labels;
+		// Initialize query edge IDs from 0 to edges_query
+		util::MemsetIdxKernel<<<128, 128>>>(
+		    data_slices[gpu]->d_query_edgeIDs.GetPointer(util::DEVICE), edges_query);
 
-                VertexId *d_labels;
-                if (retval = util::GRError(
-                        cudaMalloc((void**)&d_labels,
-                                   nodes_query * sizeof(VertexId)),
-                        "Problem cudaMalloc d_labels failed",
-                        __FILE__, __LINE__)) return retval;
+		// Initialize query row offsets with graph_query.row_offsets
+	 	data_slices[gpu]->d_query_row.SetPointer(graph_query.row_offsets);
+		if (retval = data_slices[gpu]->d_query_row.Move(util::HOST, util::DEVICE))
+			return retval;
 
-		if (retval = util::GRError(
-			cudaMemcpy(d_labels, h_index,
-				   nodes_query * sizeof(VertexId),
-				   cudaMemcpyHostToDevice),
-			"Problem cudaMemcpy d_labels failed",
-			__FILE__, __LINE__)) return retval;
+		// Initialize query column indices with graph_query.column_indices
+	 	data_slices[gpu]->d_query_col.SetPointer(graph_query.column_indices);
+		if (retval = data_slices[gpu]->d_query_col.Move(util::HOST, util::DEVICE))
+			return retval;
 
-                data_slices[0]->d_labels = d_labels;
+		// Initialize query edge weights to a vector of zeros
+		util::MemsetKernel<<<128, 128>>>(
+		    data_slices[gpu]->d_edge_weights.GetPointer(util::DEVICE),
+		    0, edges_query);
 
-                VertexId *d_edge_labels;
-                if (retval = util::GRError(
-                        cudaMalloc((void**)&d_edge_labels,
-                                   edges_query * sizeof(VertexId)),
-                        "Problem cudaMalloc d_edge_labels failed",
-                        __FILE__, __LINE__)) return retval;
+		// Initialize candidate set boolean matrix to false
+		util::MemsetKernel<<<128, 128>>>(
+		    data_slices[gpu]->d_c_set.GetPointer(util::DEVICE),
+		    false, nodes_query*nodes_data);
 
-		if (retval = util::GRError(
-			cudaMemcpy(d_edge_labels, h_edge_index,
-				   edges_query * sizeof(VertexId),
-				   cudaMemcpyHostToDevice),
-			"Problem cudaMemcpy d_edge_labels failed",
-			__FILE__, __LINE__)) return retval;
+		// Initialize candidate set row keys
+		SizeT *h_temp_keys= new SizeT[nodes_query];
+		for(int i=0; i<nodes_query; i++) 
+			h_temp_keys[i]=i * nodes_data;
+		data_slices[gpu]->d_temp_keys.SetPointer(h_temp_keys);
+		if (retval = data_slices[gpu]->d_temp_keys.Move(util::HOST, util::DEVICE))
+			return retval;
 
-                data_slices[0]->d_edge_labels = d_edge_labels;
+		// Initialize query graph node degrees
+		SizeT *h_query_degrees = new SizeT[nodes_query];
+ 		graph_query.GetNodeDegree(h_query_degrees);
+		data_slices[gpu]->d_query_degrees.SetPointer(h_query_degrees);
+		if (retval = data_slices[gpu]->d_query_degrees.Move(util::HOST, util::DEVICE))
+			return retval;
 
-                VertexId *d_row_offsets;
-                if (retval = util::GRError(
-                        cudaMalloc((void**)&d_row_offsets,
-                                   (nodes_query+1) * sizeof(VertexId)),
-                        "Problem cudaMalloc d_row_offsets failed",
-                        __FILE__, __LINE__)) return retval;
-
-		if (retval = util::GRError(
-			cudaMemcpy(d_row_offsets, h_query_rowoffsets,
-				   (nodes_query+1) * sizeof(VertexId),
-				   cudaMemcpyHostToDevice),
-			"Problem cudaMemcpy d_row_offsets failed",
-			__FILE__, __LINE__)) return retval;
-
-                data_slices[0]->d_row_offsets = d_row_offsets;
-
-
-                VertexId *d_column_indices;
-                if (retval = util::GRError(
-                        cudaMalloc((void**)&d_column_indices,
-                                   edges_query * sizeof(VertexId)),
-                        "Problem cudaMalloc d_column_indices failed",
-                        __FILE__, __LINE__)) return retval;
-
-		if (retval = util::GRError(
-			cudaMemcpy(d_column_indices, h_query_columnindices,
-				   edges_query * sizeof(VertexId),
-				   cudaMemcpyHostToDevice),
-			"Problem cudaMemcpy d_column_indices failed",
-			__FILE__, __LINE__)) return retval;
-
-                data_slices[0]->d_column_indices = d_column_indices;
-
-                Value *d_edge_weights;
-                if (retval = util::GRError(
-                        cudaMalloc((void**)&d_edge_weights,
-                                   edges_data * sizeof(Value)),
-                        "Problem cudaMalloc d_edge_weights failed",
-                        __FILE__, __LINE__)) return retval;
-		data_slices[0]->d_edge_weights = d_edge_weights;
-
-                bool *d_c_set;
-                if (retval = util::GRError(
-                        cudaMalloc((void**)&d_c_set,
-                                   nodes_query * nodes_data * sizeof(bool)),
-                        "Problem cudaMalloc d_c_set failed",
-                        __FILE__, __LINE__)) return retval;
-
-	        util::MemsetKernel<<<128, 128>>>(d_c_set, (bool)0,
-					     nodes_query * nodes_data);
-                data_slices[0]->d_c_set = d_c_set;
-
-                SizeT *d_data_degrees;
-                if (retval = util::GRError(
-                        cudaMalloc((void**)&d_data_degrees,
-                                   nodes_data * sizeof(SizeT)),
-                        "Problem cudaMalloc d_data_degrees failed",
-                        __FILE__, __LINE__)) return retval;
-
-                data_slices[0]->d_data_degrees = d_data_degrees;
+		// Initialize data graph node degrees
+		SizeT *h_data_degrees = new SizeT[nodes_data];
+ 		graph_data.GetNodeDegree(h_data_degrees);
+		data_slices[gpu]->d_data_degrees.SetPointer(h_data_degrees);
+		if (retval = data_slices[gpu]->d_data_degrees.Move(util::HOST, util::DEVICE))
+			return retval;
 
 
-                SizeT *d_query_degrees;
-                if (retval = util::GRError(
-                        cudaMalloc((void**)&d_query_degrees,
-                                   nodes_query * sizeof(SizeT)),
-                        "Problem cudaMalloc d_query_degrees failed",
-                        __FILE__, __LINE__)) return retval;
+		data_slices[gpu]->nodes_data = nodes_data;
+		data_slices[gpu]->nodes_query = nodes_query;
+		data_slices[gpu]->edges_data = edges_data;
+		data_slices[gpu]->edges_query = edges_query;
 
-		if (retval = util::GRError(
-			cudaMemcpy(d_query_degrees, h_query_degrees,
-				   nodes_query * sizeof(SizeT),
-				   cudaMemcpyHostToDevice),
-			"Problem cudaMemcpy d_query_degrees failed",
-			__FILE__, __LINE__)) return retval;
-
-                data_slices[0]->d_query_degrees = d_query_degrees;
-                
-		SizeT *d_temp_keys;
-                if (retval = util::GRError(
-                        cudaMalloc((void**)&d_temp_keys,
-                                   nodes_query * sizeof(SizeT)),
-                        "Problem cudaMalloc d_temp_keys failed",
-                        __FILE__, __LINE__)) return retval;
-
-		if (retval = util::GRError(
-			cudaMemcpy(d_temp_keys, h_temp_keys,
-				   nodes_query * sizeof(SizeT),
-				   cudaMemcpyHostToDevice),
-			"Problem cudaMemcpy d_temp_keys failed",
-			__FILE__, __LINE__)) return retval;
-
-                data_slices[0]->d_temp_keys = d_temp_keys;
-
-		data_slices[0]->nodes_data = nodes_data;
-		data_slices[0]->nodes_query = nodes_query;
+        	if (h_temp_keys) delete[] h_temp_keys;
+		if (h_query_degrees) delete[] h_query_degrees;
+		if (h_data_degrees) delete[] h_data_degrees;
 
             }
             // add multi-GPU allocation code
@@ -464,10 +446,6 @@ struct SMProblem : ProblemBase<_VertexId, _SizeT, false> {
         // n-element and m-element vertex and edge frontiers, respectively).
         // 0.0 is unspecified.
 
-        typedef ProblemBase<_VertexId, _SizeT, false> BaseProblem;
-
-        // load ProblemBase Reset
-        BaseProblem::Reset(frontier_type, queue_sizing);
 
         cudaError_t retval = cudaSuccess;
 
@@ -475,12 +453,48 @@ struct SMProblem : ProblemBase<_VertexId, _SizeT, false> {
             // setting device
             if (retval = util::GRError(
                     cudaSetDevice(gpu_idx[gpu]),
-                    "Problem cudaSetDevice failed",
+                    "SMProblem cudaSetDevice failed",
                     __FILE__, __LINE__)) return retval;
 
+	    data_slices[gpu]->Reset(
+                frontier_type, this->graph_slices[gpu],
+                queue_sizing, queue_sizing);
+
             // allocate output labels if necessary
-	    util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_c_set, (bool)0,
-					     nodes_query * nodes_data);
+	    if (data_slices[gpu]->labels.GetPointer(util::DEVICE) == NULL) 
+                if (retval = data_slices[gpu]->labels.Allocate(nodes_query, util::DEVICE)) 
+                    return retval;
+	    if (data_slices[gpu]->d_c_set.GetPointer(util::DEVICE) == NULL) 
+                if (retval = data_slices[gpu]->d_c_set.Allocate(nodes_query*nodes_data,util::DEVICE)) 			return retval;
+            
+	    if (data_slices[gpu]->d_query_labels.GetPointer(util::DEVICE) == NULL) 
+                if (retval = data_slices[gpu]->d_query_labels.Allocate(nodes_query,util::DEVICE)) 			return retval;
+            
+	    if (data_slices[gpu]->d_data_labels.GetPointer(util::DEVICE) == NULL) 
+                if (retval = data_slices[gpu]->d_data_labels.Allocate(nodes_data,util::DEVICE)) 			return retval;
+            
+	    if (data_slices[gpu]->d_query_row.GetPointer(util::DEVICE) == NULL) 
+                if (retval = data_slices[gpu]->d_query_row.Allocate(nodes_query+1,util::DEVICE)) 			return retval;
+            
+	    if (data_slices[gpu]->d_query_col.GetPointer(util::DEVICE) == NULL) 
+                if (retval = data_slices[gpu]->d_query_col.Allocate(edges_query,util::DEVICE)) 				return retval;
+            
+	    if (data_slices[gpu]->d_query_degrees.GetPointer(util::DEVICE) == NULL) 
+                if (retval = data_slices[gpu]->d_query_degrees.Allocate(nodes_query,util::DEVICE)) 			return retval;
+            
+	    if (data_slices[gpu]->d_data_degrees.GetPointer(util::DEVICE) == NULL) 
+                if (retval = data_slices[gpu]->d_data_degrees.Allocate(nodes_data,util::DEVICE)) 			return retval;
+            
+	    if (data_slices[gpu]->d_temp_keys.GetPointer(util::DEVICE) == NULL) 
+                if (retval = data_slices[gpu]->d_temp_keys.Allocate(nodes_query,util::DEVICE)) 				return retval;
+            
+	    if (data_slices[gpu]->d_query_nodeIDs.GetPointer(util::DEVICE) == NULL) 
+                if (retval = data_slices[gpu]->d_query_nodeIDs.Allocate(nodes_query,util::DEVICE)) 				return retval;
+            
+	    if (data_slices[gpu]->d_query_edgeIDs.GetPointer(util::DEVICE) == NULL) 
+                if (retval = data_slices[gpu]->d_query_edgeIDs.Allocate(edges_query,util::DEVICE)) 				return retval;
+            
+	    
 
             // TODO: code to for other allocations here
 
@@ -491,17 +505,11 @@ struct SMProblem : ProblemBase<_VertexId, _SizeT, false> {
                                cudaMemcpyHostToDevice),
                     "Problem cudaMemcpy data_slices to d_data_slices failed",
                     __FILE__, __LINE__)) return retval;
-        }
+            }
 
-        // TODO: fill in the initial input_queue for problem
-        // e.g., put every vertex in frontier queue
-        util::MemsetIdxKernel<<<128, 128>>>(
-            BaseProblem::graph_slices[0]->frontier_queues.d_keys[0], nodes_data);
-
-	util::MemsetMadVectorKernel<<<128, 128>>>(
-	    data_slices[0]->d_data_degrees,
-	    BaseProblem::graph_slices[0]->d_row_offsets,
-	    &BaseProblem::graph_slices[0]->d_row_offsets[1], -1, nodes_data);
+           // TODO: fill in the initial input_queue for problem
+	   util::MemsetIdxKernel<<<128, 128>>>(
+            data_slices[0]->frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes_data);
 
         return retval;
     }

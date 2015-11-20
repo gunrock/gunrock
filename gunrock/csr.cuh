@@ -706,6 +706,19 @@ struct Csr
     }
 
     /**
+     * @brief Get the degrees of all the nodes in graph
+     * 
+     * @param[in] node_degrees node degrees to fill in
+     */
+    void GetNodeDegree(SizeT *node_degrees)
+    {
+	for(SizeT node=0; node < nodes; ++node)
+	{
+		node_degrees[node] = row_offsets[node+1]-row_offsets[node];
+	}
+    }
+
+    /**
      * @brief Get the average node value in graph
      */
     Value GetAverageNodeValue()
