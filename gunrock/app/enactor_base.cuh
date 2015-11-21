@@ -324,9 +324,9 @@ public:
             args.GetCmdLineArgument("iteration-num", num_iters);
             info["num_iteration"] = num_iters;
         }
-        if (args.CheckCmdLineFlag("max_iter"))
+        if (args.CheckCmdLineFlag("max-iter"))
         {
-            args.GetCmdLineArgument("max_iter", max_iters);
+            args.GetCmdLineArgument("max-iter", max_iters);
             info["max_iteration"] = max_iters;
         }
         if (args.CheckCmdLineFlag("queue-sizing"))

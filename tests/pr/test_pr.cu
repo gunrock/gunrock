@@ -117,6 +117,8 @@ void Usage()
         "                          (graph-edges * <factor>). (Default: 1.0)\n"
         "[--v]                     Print verbose per iteration debug info.\n"
         "[--iteration-num=<num>]   Number of runs to perform the test.\n"
+        "[--max-iter=<num>]        Max iteration for rank score distribution\n"
+        "                          before one round of PageRank run end.\n"
         "[--partition_method=<random|biasrandom|clustered|metis>]\n"
         "                          Choose partitioner (Default use random).\n"
         "[--delta=<delta>]         Delta for PageRank (Default 0.85f).\n"
