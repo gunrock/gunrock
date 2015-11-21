@@ -2002,7 +2002,17 @@ void Iteration_Loop(
                         streams          [peer_],
                         gunrock::oprtr::advance::V2V, true, false, false)) break;
 
-                    frontier_attribute_->output_length.Move(util::DEVICE, util::HOST,1,0,streams[peer_]);
+                    if (!Enactor::SIZE_CHECK && 
+                        (Iteration::AdvanceKernelPolicy::ADVANCE_MODE 
+                            == oprtr::advance::TWC_FORWARD ||
+                         Iteration::AdvanceKernelPolicy::ADVANCE_MODE 
+                            == oprtr::advance::TWC_BACKWARD))
+                    {}
+                    else {
+                        frontier_attribute_ -> output_length.Move(
+                            util::DEVICE, util::HOST,1,0,streams[peer_]);
+                    }
+
                     if (Enactor::SIZE_CHECK)
                     {
                         Set_Record(data_slice, iteration, peer_, stages[peer_], streams[peer_]);
@@ -2388,7 +2398,8 @@ protected:
             for (int peer=0;peer<num_gpus;peer++)
             {
                 work_progress     [gpu*num_gpus+peer].template Setup<SizeT>();
-                frontier_attribute[gpu*num_gpus+peer].output_length.Allocate(1, util::HOST | util::DEVICE);
+                //frontier_attribute[gpu*num_gpus+peer].output_length.Allocate(1, util::HOST | util::DEVICE);
+                frontier_attribute[gpu*num_gpus + peer].output_length.Init(1, util::HOST | util::DEVICE, true);
             }
         }
     }
@@ -2546,9 +2557,9 @@ protected:
  * @tparam _UPDATE_PREDECESSORS
  */
 template <
-    typename AdvanceKernelPolicy,
-    typename FilterKernelPolicy,
-    typename Enactor,
+    typename _AdvanceKernelPolicy,
+    typename _FilterKernelPolicy,
+    typename _Enactor,
     bool     _HAS_SUBQ,
     bool     _HAS_FULLQ,
     bool     _BACKWARD,
@@ -2557,6 +2568,9 @@ template <
 struct IterationBase
 {
 public:
+    typedef _Enactor            Enactor   ;
+    typedef _AdvanceKernelPolicy AdvanceKernelPolicy;
+    typedef _FilterKernelPolicy  FilterKernelPolicy;
     typedef typename Enactor::SizeT      SizeT     ;
     typedef typename Enactor::Value      Value     ;
     typedef typename Enactor::VertexId   VertexId  ;

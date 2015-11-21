@@ -297,26 +297,35 @@ struct BFSIteration : public IterationBase <
     {
         cudaError_t retval = cudaSuccess;
         bool over_sized = false;
-        if (retval = Check_Size<Enactor::SIZE_CHECK, SizeT, SizeT> (
-            "scanned_edges", frontier_attribute->queue_length, partitioned_scanned_edges, over_sized, -1, -1, -1, false)) return retval;
-        retval = gunrock::oprtr::advance::ComputeOutputLength
-            <AdvanceKernelPolicy, Problem, BfsFunctor>(
-            frontier_attribute,
-            d_offsets,
-            d_indices,
-            d_inv_offsets,
-            d_inv_indices,
-            d_in_key_queue,
-            partitioned_scanned_edges->GetPointer(util::DEVICE),
-            max_in,
-            max_out,
-            context,
-            stream,
-            ADVANCE_TYPE,
-            express,
-            in_inv,
-            out_inv);
-        return retval;
+        if (!Enactor::SIZE_CHECK && 
+            (AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_FORWARD ||
+             AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_BACKWARD))
+            return retval;
+
+        else {
+            if (retval = Check_Size<Enactor::SIZE_CHECK, SizeT, SizeT> (
+                "scanned_edges", frontier_attribute->queue_length, 
+                partitioned_scanned_edges, over_sized, -1, -1, -1, false)) 
+                return retval;
+            retval = gunrock::oprtr::advance::ComputeOutputLength
+                <AdvanceKernelPolicy, Problem, BfsFunctor>(
+                frontier_attribute,
+                d_offsets,
+                d_indices,
+                d_inv_offsets,
+                d_inv_indices,
+                d_in_key_queue,
+                partitioned_scanned_edges->GetPointer(util::DEVICE),
+                max_in,
+                max_out,
+                context,
+                stream,
+                ADVANCE_TYPE,
+                express,
+                in_inv,
+                out_inv);
+            return retval;
+        }
     }
 
     /*
