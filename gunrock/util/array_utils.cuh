@@ -515,9 +515,10 @@ public:
         else if (source == DEVICE && target == HOST  ) {
             if (use_cuda_alloc && stream != 0)
             {
+                //printf("%s MemcpyAsync\n");
                 retval = GRError(
                     cudaMemcpyAsync( h_pointer + offset, d_pointer + offset, 
-                    sizeof(Value) * size, cudaMemcpyDeviceToHost), 
+                    sizeof(Value) * size, cudaMemcpyDeviceToHost, stream), 
                     name+" cudaMemcpyAsync D2H failed", __FILE__, __LINE__);
                 if (retval) return retval;
             } else {
