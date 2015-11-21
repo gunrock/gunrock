@@ -1360,7 +1360,7 @@ static CUT_THREADPROC PRThread(
                 data_slice->keys_out[0].GetPointer(util::DEVICE),
                 data_slice->local_nodes);
             enactor_stats->iteration++;
-            PushNeibor <PrEnactor::SIZE_CHECK, SizeT, VertexId, Value, GraphSlice, DataSlice, 0, 1> (
+            PushNeighbor <PrEnactor::SIZE_CHECK, SizeT, VertexId, Value, GraphSlice, DataSlice, 0, 1> (
                 thread_num,
                 0,
                 data_slice->local_nodes,

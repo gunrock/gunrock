@@ -1559,7 +1559,7 @@ template <
     typename DataSlice,
     SizeT    num_vertex_associate,
     SizeT    num_value__associate>
-void PushNeibor(
+void PushNeighbor(
     int gpu,
     int peer,
     SizeT             queue_length,
@@ -1970,8 +1970,8 @@ void Iteration_Loop(
                             Set_Record(data_slice, iteration, peer_, 2, streams[peer__]);
                             stages[peer__]=2;
                         }
-                    } else { //Push Neibor
-                        PushNeibor <Enactor::SIZE_CHECK, SizeT, VertexId, Value, GraphSlice, DataSlice,
+                    } else { //Push Neighbor
+                        PushNeighbor <Enactor::SIZE_CHECK, SizeT, VertexId, Value, GraphSlice, DataSlice,
                                 NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES> (
                             thread_num,
                             peer,
