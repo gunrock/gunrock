@@ -296,13 +296,16 @@ struct BFSIteration : public IterationBase <
         bool                            out_inv = false)
     {
         cudaError_t retval = cudaSuccess;
+        //printf("SIZE_CHECK = %s\n", Enactor::SIZE_CHECK ? "true" : "false");
         bool over_sized = false;
         if (!Enactor::SIZE_CHECK && 
             (AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_FORWARD ||
              AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_BACKWARD))
+        {
             return retval;
 
-        else {
+        } else {
+            //printf("Size check runs\n");
             if (retval = Check_Size<Enactor::SIZE_CHECK, SizeT, SizeT> (
                 "scanned_edges", frontier_attribute->queue_length, 
                 partitioned_scanned_edges, over_sized, -1, -1, -1, false)) 

@@ -2009,6 +2009,7 @@ void Iteration_Loop(
                             == oprtr::advance::TWC_BACKWARD))
                     {}
                     else {
+                        //printf("moving output_length\n");
                         frontier_attribute_ -> output_length.Move(
                             util::DEVICE, util::HOST,1,0,streams[peer_]);
                     }
@@ -2026,6 +2027,15 @@ void Iteration_Loop(
                             data_slice, iteration, peer_,
                             stages[peer_]-1, stages[peer_], to_show[peer_])) break;
                         if (to_show[peer_]==false) break;
+                        if (Iteration::AdvanceKernelPolicy::ADVANCE_MODE 
+                            == oprtr::advance::TWC_FORWARD ||
+                            Iteration::AdvanceKernelPolicy::ADVANCE_MODE
+                            == oprtr::advance::TWC_BACKWARD)
+                        {
+                            frontier_attribute_->output_length[0] *= 1.1;
+                        }
+                        //printf("iteration = %lld, request_size = %d\n",
+                        //    enactor_stats_ -> iteration, frontier_attribute_->output_length[0]);
                         Iteration::Check_Queue_Size(
                             thread_num,
                             peer_,

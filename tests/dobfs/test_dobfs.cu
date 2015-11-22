@@ -292,7 +292,15 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
-    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
+    for (int i = 0; i < num_gpus; i++) 
+        gpu_idx[i] = device_list[i].get_int();
+    size_t *org_size = new size_t[num_gpus];
+    for (int gpu = 0; gpu < num_gpus; gpu++)
+    {   
+        size_t dummy;
+        cudaSetDevice(gpu_idx[gpu]);
+        cudaMemGetInfo(&(org_size[gpu]), &dummy);
+    }   
 
     // TODO: remove after merge mgpu-cq
     ContextPtr *context = (ContextPtr*)info->context;
@@ -385,6 +393,78 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     }
 
     info->CollectInfo();  // collected all the info and put into JSON mObject
+
+    if (!quiet_mode)
+    {
+        printf("\n\tMemory Usage(B)\t");
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+            if (num_gpus > 1)
+            {
+                if (gpu != 0)
+                {
+                    printf(" #keys%d,0\t #keys%d,1\t #ins%d,0\t #ins%d,1",
+                           gpu, gpu, gpu, gpu);
+                }
+                else
+                {
+                    printf(" #keys%d,0\t #keys%d,1", gpu, gpu);
+                }
+            }
+            else
+            {
+                printf(" #keys%d,0\t #keys%d,1", gpu, gpu);
+            }
+        if (num_gpus > 1)
+        {
+            printf(" #keys%d", num_gpus);
+        }
+        printf("\n");
+        double max_queue_sizing_[2] = {0, 0 }, max_in_sizing_ = 0;
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {   
+            size_t gpu_free, dummy;
+            cudaSetDevice(gpu_idx[gpu]);
+            cudaMemGetInfo(&gpu_free, &dummy);
+            printf("GPU_%d\t %ld", gpu_idx[gpu], org_size[gpu] - gpu_free);
+            for (int i = 0; i < num_gpus; i++)
+            {   
+                for (int j = 0; j < 2; j++)
+                {   
+                    SizeT x = problem->data_slices[gpu]->frontier_queues[i].keys[j].GetSize();
+                    printf("\t %lld", (long long) x); 
+                    double factor = 1.0 * x / (num_gpus > 1 ? problem->graph_slices[gpu]->in_counter[i] : problem->graph_slices[gpu]->nodes);
+                    if (factor > max_queue_sizing_[j])
+                    {   
+                        max_queue_sizing_[j] = factor;
+                    }   
+                }   
+                if (num_gpus > 1 && i != 0 ) 
+                {   
+                    for (int t = 0; t < 2; t++)
+                    {   
+                        SizeT x = problem->data_slices[gpu][0].keys_in[t][i].GetSize();
+                        printf("\t %lld", (long long) x); 
+                        double factor = 1.0 * x / problem->graph_slices[gpu]->in_counter[i];
+                        if (factor > max_in_sizing_)
+                        {
+                            max_in_sizing_ = factor;
+                        }
+                    }
+                }
+            }
+            if (num_gpus > 1)
+            {
+                printf("\t %lld", (long long)(problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize()));
+            }
+            printf("\n");
+        }
+        printf("\t queue_sizing =\t %lf \t %lf", max_queue_sizing_[0], max_queue_sizing_[1]);
+        if (num_gpus > 1)
+        {
+            printf("\t in_sizing =\t %lf", max_in_sizing_);
+        }
+        printf("\n");
+    }
 
     // Clean up
     if (problem) delete problem;
