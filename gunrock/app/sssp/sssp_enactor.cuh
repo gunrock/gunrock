@@ -225,7 +225,7 @@ struct SSSPIteration : public IterationBase <
 
         //TODO: split the output queue into near/far pile, put far pile in far queue, put near pile as the input queue
         //for next round.
-        if (num_gpus == 1)
+        if (data_slice->num_gpus == 1)
         { // when #gpus == 1, use priority queue
             frontier_attribute->queue_index ++;
             frontier_attribute->selector ^= 1;

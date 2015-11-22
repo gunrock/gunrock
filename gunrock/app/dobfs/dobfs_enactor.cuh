@@ -292,10 +292,13 @@ public:
             SizeT num_unvisited_nodes = graph_slice->nodes - 1;
             SizeT current_frontier_size = 1;
 
-            if (retval = util::GRError(cudaMalloc(
-                            (void**)&d_scanned_edges,
-                            graph_slice->edges * sizeof(SizeT)),
-                        "PBFSProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
+            //if (retval = util::GRError(cudaMalloc(
+            //                (void**)&d_scanned_edges,
+            //                graph_slice->edges * sizeof(SizeT)),
+            //            "PBFSProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
+            if (retval = data_slice -> scanned_edges[0].EnsureSize(graph_slice->edges))
+                return retval;
+            d_scanned_edges = data_slice -> scanned_edges[0].GetPointer(util::DEVICE);
 
             // Normal BFS
             {
@@ -791,7 +794,7 @@ public:
             }
 
         } while(0);
-        if (d_scanned_edges) cudaFree(d_scanned_edges);
+        //if (d_scanned_edges) cudaFree(d_scanned_edges);
 
         if (DEBUG) printf("\nGPU BFS Done.\n");
         return retval;

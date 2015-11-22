@@ -277,6 +277,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     int max_grid_size       = info->info["max_grid_size"].get_int();
     int num_gpus            = info->info["num_gpus"].get_int();
     double max_queue_sizing = info->info["max_queue_sizing"].get_real();
+    double max_queue_sizing1 = info->info["max_queue_sizing1"].get_real();
     bool quiet_mode         = info->info["quiet_mode"].get_bool();
     bool quick_mode         = info->info["quick_mode"].get_bool();
     bool undirected         = info->info["undirected"].get_bool();
@@ -352,7 +353,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     for (int iter = 0; iter < iterations; ++iter)
     {
         util::GRError(problem->Reset(
-                          src, enactor.GetFrontierType(), max_queue_sizing),
+                          src, enactor.GetFrontierType(), max_queue_sizing, max_queue_sizing1),
                       "DOBFS Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
         util::GRError(enactor.template Enact<Problem>(
@@ -472,7 +473,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     if (h_labels) free(h_labels);
     if (h_preds) free(h_preds);
 
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
 }
 
 /**
@@ -654,6 +655,7 @@ int main( int argc, char** argv)
     info->Init("DOBFS", args, csr, csc);  // initialize Info structure
     RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test
 
+    cudaDeviceReset();
     return 0;
 }
 
