@@ -633,6 +633,7 @@ void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 
 int main( int argc, char** argv)
 {
+    cudaDeviceReset();
     CommandLineArgs args(argc, argv);
     int graph_args = argc - args.ParsedArgc() - 1;
     if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
