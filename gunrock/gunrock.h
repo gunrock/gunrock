@@ -91,7 +91,7 @@ struct GRSetup
     bool               quiet;  // Whether to print out to STDOUT
     bool   mark_predecessors;  // Whether to mark predecessor or not
     bool  enable_idempotence;  // Whether or not to enable idempotent
-    int        source_vertex;  // Source node define where to start
+    int*       source_vertex;  // Source nodes define where to start
     int         delta_factor;  // SSSP delta-factor parameter
     int*         device_list;  // Setting which device(s) to use
     unsigned int num_devices;  // Number of devices for computation
@@ -112,13 +112,21 @@ struct GRSetup
 // http://clang.llvm.org/compatibility.html#inline
 static
 #endif
-inline struct GRSetup InitSetup()
+inline struct GRSetup InitSetup(int num_iters = 1, int* source = NULL)
 {
     struct GRSetup configurations;
     configurations.quiet = true;
     configurations.mark_predecessors = true;
     configurations.enable_idempotence = false;
-    configurations.source_vertex = 0;
+    int* sources = (int*)malloc(sizeof(int)*num_iters);
+    if (source == NULL)
+    {
+        for (int i = 0; i < num_iters; ++i) sources[i] = 0;
+    } else
+    {
+        for (int i = 0; i < num_iters; ++i) sources[i] = source[i];
+    }
+    configurations.source_vertex = sources;
     configurations.delta_factor = 32;
     configurations.num_devices = 1;
     configurations.max_iters = 50;

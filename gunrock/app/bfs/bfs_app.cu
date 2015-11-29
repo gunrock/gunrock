@@ -486,12 +486,15 @@ void gunrock_bfs(
 /*
  * @brief Simple interface take in CSR arrays as input
  *
- * @param[out] bfs_label   Return BFS label (depth) per nodes
- * @param[in]  num_nodes   Number of nodes of the input graph
- * @param[in]  num_edges   Number of edges of the input graph
- * @param[in]  row_offsets CSR-formatted graph input row offsets
- * @param[in]  col_indices CSR-formatted graph input column indices
- * @param[in]  source      Source to begin traverse
+ * @param[out] bfs_label            Return BFS label (depth) per nodes or the predecessor per nodes
+ * @param[in]  num_nodes            Number of nodes of the input graph
+ * @param[in]  num_edges            Number of edges of the input graph
+ * @param[in]  row_offsets          CSR-formatted graph input row offsets
+ * @param[in]  col_indices          CSR-formatted graph input column indices
+ * @param[in]  num_iters            Number of BFS runs. Note if num_iters > 1, the bfs_lbel will only store the results from the last run
+ * @param[in]  source               Sources to begin traverse
+ * @param[in]  mark_predecessors    If the flag is set, mark predecessors instead of bfs label
+ * @param[in]  enable_idempotence   If the flag is set, use optimizations that allow idempotence operation (will usually bring better performance)
  */
 void bfs(
     int*       bfs_label,
@@ -499,17 +502,19 @@ void bfs(
     const int  num_edges,
     const int* row_offsets,
     const int* col_indices,
-    const int  source)
+    const int  num_iters,
+    const int* source,
+    const bool mark_predecessors,
+    const bool enable_idempotence)
 {
     struct GRTypes data_t;          // primitive-specific data types
     data_t.VTXID_TYPE = VTXID_INT;  // integer vertex identifier
     data_t.SIZET_TYPE = SIZET_INT;  // integer graph size type
     data_t.VALUE_TYPE = VALUE_INT;  // integer attributes type
 
-    struct GRSetup config = InitSetup();  // primitive-specific configures
-    config.source_vertex = source;        // source vertex to start
-    config.mark_predecessors  = false;    // do not mark predecessors
-    config.enable_idempotence = false;    // wether enable idempotence
+    struct GRSetup config = InitSetup(num_iters, source);  // primitive-specific configures
+    config.mark_predecessors  = mark_predecessors;    // do not mark predecessors
+    config.enable_idempotence = enable_idempotence;    // wether enable idempotence
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));
