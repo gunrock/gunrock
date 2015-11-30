@@ -955,7 +955,7 @@ public:
     bool          mark_predecessors ; // Whether or not to mark src-distance vs. parent vertices
     bool          enable_idempotence; // Whether or not to enable idempotent operation
     void         *graph             ; // Pointer to the input CSR graph
-    long long     src               ; // Source vertex ID
+    long long    *src               ; // Source vertex IDs
     int           max_grid_size     ; // maximum grid size (0: leave it up to the enactor)
     int           num_gpus          ; // Number of GPUs for multi-GPU enactor to use
     double        max_queue_sizing  ; // Maximum size scaling factor for work queues (e.g., 1.0 creates n and m-element vertex and edge frontiers).
@@ -983,7 +983,7 @@ public:
         debug              = false;
         size_check         = true;
         graph              = NULL;
-        src                = -1;
+        src                = NULL;
         max_grid_size      = 0;
         num_gpus           = 1;
         max_queue_sizing   = 1.0;

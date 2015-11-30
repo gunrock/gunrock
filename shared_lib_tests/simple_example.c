@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
     ///////////////////////////////////////////////////////////////////////////
     // run different primitive tests
     // graph traversal from given source return integer labels
-    bfs(bfs_label, nodes, edges, rows, cols, /*source=*/ 0);
+    bfs(bfs_label, nodes, edges, rows, cols, 1,/*source=*/ 0, 0, false, false);
     // node betweenness centrality from given source
     // store computed results to bc_scores of floats
     bc(bc_scores, nodes, edges, rows, cols, /*source=*/ 0);

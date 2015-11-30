@@ -447,7 +447,7 @@ void RunTest_connectivity_check(Info<VertexId, Value, SizeT> *info)
     data_t.SIZET_TYPE = SIZET_INT;  // graph size type
     data_t.VALUE_TYPE = VALUE_INT;  // attributes type
 
-    struct GRSetup config = InitSetup();  // gunrock configurations
+    struct GRSetup config = InitSetup(1, NULL);  // gunrock configurations
 
     struct GRGraph *grapho = (GRGraph*)malloc(sizeof(GRGraph));
     struct GRGraph *graphi = (GRGraph*)malloc(sizeof(GRGraph));

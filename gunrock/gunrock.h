@@ -92,6 +92,7 @@ struct GRSetup
     bool   mark_predecessors;  // Whether to mark predecessor or not
     bool  enable_idempotence;  // Whether or not to enable idempotent
     int*       source_vertex;  // Source nodes define where to start
+    int            num_iters;  // Number of BFS runs (currently only support BFS)
     int         delta_factor;  // SSSP delta-factor parameter
     int*         device_list;  // Setting which device(s) to use
     unsigned int num_devices;  // Number of devices for computation
@@ -112,24 +113,26 @@ struct GRSetup
 // http://clang.llvm.org/compatibility.html#inline
 static
 #endif
-inline struct GRSetup InitSetup(int num_iters = 1, int* source = NULL)
+inline struct GRSetup InitSetup(int num_iters, int* source)
 {
     struct GRSetup configurations;
     configurations.quiet = true;
     configurations.mark_predecessors = true;
     configurations.enable_idempotence = false;
     int* sources = (int*)malloc(sizeof(int)*num_iters);
+    int i;
     if (source == NULL)
     {
-        for (int i = 0; i < num_iters; ++i) sources[i] = 0;
+        for (i = 0; i < num_iters; ++i) sources[i] = 0;
     } else
     {
-        for (int i = 0; i < num_iters; ++i) sources[i] = source[i];
+        for (i = 0; i < num_iters; ++i) sources[i] = source[i];
     }
     configurations.source_vertex = sources;
     configurations.delta_factor = 32;
     configurations.num_devices = 1;
     configurations.max_iters = 50;
+    configurations.num_iters = num_iters;
     configurations.top_nodes = 10;
     configurations.pagerank_delta = 0.85f;
     configurations.pagerank_error = 0.01f;
@@ -153,29 +156,37 @@ extern "C" {
  * @param[in]  config Primitive-specific configurations.
  * @param[in]  data_t Primitive-specific data type setting.
  */
-void gunrock_bfs(
+float gunrock_bfs(
     struct GRGraph*       grapho,   // Output graph / results
     const struct GRGraph* graphi,   // Input graph structure
     const struct GRSetup  config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
-/**
- * @brief Breath-first search simple public interface.
+/*
+ * @brief Simple interface take in CSR arrays as input
  *
- * @param[out] bfs_label Return bfs labels (depth).
- * @param[in] num_nodes Input graph number of nodes.
- * @param[in] num_edges Input graph number of edges.
- * @param[in] row_offsets Input graph row_offsets.
- * @param[in] col_indices Input graph col_indices.
- * @param[in] source Source node to start.
+ * @param[out] bfs_label            Return BFS label (depth) per nodes or the predecessor per nodes
+ * @param[in]  num_nodes            Number of nodes of the input graph
+ * @param[in]  num_edges            Number of edges of the input graph
+ * @param[in]  row_offsets          CSR-formatted graph input row offsets
+ * @param[in]  col_indices          CSR-formatted graph input column indices
+ * @param[in]  num_iters            Number of BFS runs. Note if num_iters > 1, the bfs_lbel will only store the results from the last run
+ * @param[in]  source               Sources to begin traverse
+ * @param[in]  source_mode          Enumerator of source mode: manually, randomize, largest_degree
+ * @param[in]  mark_predecessors    If the flag is set, mark predecessors instead of bfs label
+ * @param[in]  enable_idempotence   If the flag is set, use optimizations that allow idempotence operation (will usually bring better performance)
  */
-void bfs(
-    int*       bfs_label,    // Return label (depth) per node
-    const int  num_nodes,    // Input graph number of nodes
-    const int  num_edges,    // Input graph number of edges
-    const int* row_offsets,  // Input graph row_offsets
-    const int* col_indices,  // Input graph col_indices
-    const int  source);      // Source vertex to start
+float bfs(
+    int*       bfs_label,
+    const int  num_nodes,
+    const int  num_edges,
+    const int* row_offsets,
+    const int* col_indices,
+    const int  num_iters,
+    int* source,
+    enum SrcMode source_mode,
+    const bool mark_predecessors,
+    const bool enable_idempotence);
 
 /**
  * @brief Betweenness centrality public interface.
