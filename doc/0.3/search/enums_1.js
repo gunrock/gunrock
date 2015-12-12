@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['valuetype',['ValueType',['../gunrock_8h.html#ad9971b6ef33e02ba2c75d19c1d2518a1',1,'gunrock.h']]],
-  ['vtxidtype',['VtxIdType',['../gunrock_8h.html#ae30e61b7b609c68512beb2e99ee93bee',1,'gunrock.h']]]
+  ['mode',['MODE',['../oprtr_2advance_2kernel__policy_8cuh.html#a8cb2bf1bbef00c2209f3ec4908385d2b',1,'gunrock::oprtr::advance']]]
 ];

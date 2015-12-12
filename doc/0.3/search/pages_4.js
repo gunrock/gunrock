@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['why_20gunrock_3f',['Why Gunrock?',['../why-gunrock.html',1,'']]]
+  ['vega_20graph_20examples',['Vega Graph Examples',['../md_vegademo.html',1,'']]]
 ];

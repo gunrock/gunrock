@@ -1,4 +1,4 @@
-/* The standard CSS for doxygen 1.8.9.1 */
+/* The standard CSS for doxygen 1.8.11 */
 
 body, table, div, p, dl {
 	font: 400 14px/22px Roboto,sans-serif;
@@ -204,6 +204,11 @@ div.line {
 	-o-transition-duration: 0.5s;
 	transition-property: background-color, box-shadow;
 	transition-duration: 0.5s;
+}
+
+div.line:after {
+    content:"\000A";
+    white-space: pre;
 }
 
 div.line.glow {
@@ -832,6 +837,10 @@ address {
 	color: #2A3D61;
 }
 
+table.doxtable caption {
+	caption-side: top;
+}
+
 table.doxtable {
 	border-collapse:collapse;
         margin-top: 4px;
@@ -1108,6 +1117,11 @@ dl.section dd {
 	border: 0px none;
 }
  
+#projectalign
+{
+        vertical-align: middle;
+}
+
 #projectname
 {
 	font: 300% Tahoma, Arial,sans-serif;
@@ -1191,7 +1205,7 @@ div.toc {
         border-radius: 7px 7px 7px 7px;
         float: right;
         height: auto;
-        margin: 0 20px 10px 10px;
+        margin: 0 8px 10px 10px;
         width: 200px;
 }
 

@@ -1,39 +1,71 @@
+<!-- HTML header for doxygen 1.8.8-->
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-<meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
-<meta http-equiv="X-UA-Compatible" content="IE=9"/>
-<meta name="generator" content="Doxygen 1.8.9.1"/>
-<title>gunrock: /home/yuduo/mgpu-merge/gunrock/gunrock/util/random_bits.h File Reference</title>
-<link href="tabs.css" rel="stylesheet" type="text/css"/>
-<script type="text/javascript" src="jquery.js"></script>
-<script type="text/javascript" src="dynsections.js"></script>
-<link href="search/search.css" rel="stylesheet" type="text/css"/>
+    <head>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <!-- For Mobile Devices -->
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
+        <meta name="generator" content="Doxygen 1.8.11"/>
+        <!--[if lt IE 9]>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+        <![endif]-->
+        <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+        <title>Gunrock: /home/huan/projects/gunrock/maingrepo/gunrock/gunrock/util/random_bits.h File Reference</title>
+        <!--<link href="tabs.css" rel="stylesheet" type="text/css"/>-->
+        <script type="text/javascript" src="dynsections.js"></script>
+        <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
 <script type="text/javascript">
   $(document).ready(function() { init_search(); });
 </script>
-<link href="doxygen.css" rel="stylesheet" type="text/css" />
-</head>
-<body>
-<div id="top"><!-- do not remove this div, it is closed by doxygen! -->
-<div id="titlearea">
-<table cellspacing="0" cellpadding="0">
- <tbody>
- <tr style="height: 56px;">
-  <td style="padding-left: 0.5em;">
-   <div id="projectname">gunrock
-   &#160;<span id="projectnumber">0.3</span>
-   </div>
-   <div id="projectbrief">Gunrock: High-Performance Graph Primitives for the GPU</div>
-  </td>
- </tr>
- </tbody>
-</table>
-</div>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+        <link rel="stylesheet" href="bootstrap.min.css">
+        <script src="bootstrap.min.js"></script>
+        <link href="doxygen.css" rel="stylesheet" type="text/css" />
+        <link href="customdoxygen.css" rel="stylesheet" type="text/css"/>
+        <script type="text/javascript" src="doxy-boot.js"></script>
+        <script src="http://vega.github.io/vega-editor/vendor/d3.min.js"></script>
+        <script src="http://vega.github.io/vega-editor/vendor/d3.geo.projection.min.js"></script>
+        <script src="http://vega.github.io/vega-editor/vendor/topojson.js"></script>
+        <script src="http://vega.github.io/vega-editor/vendor/d3.layout.cloud.js"></script>
+        <script src="http://vega.github.io/vega/vega.min.js"></script>
+        <script type="text/javascript">
+            // parse a spec and create a visualization view
+            function plot(divid, spec) {
+                vg.parse.spec(spec, function(chart) { chart({el:"#" + divid}).update(); });
+            }
+            function plotjson(divid, jsonpath) {
+                $.getJSON(jsonpath, function(result) {
+                    plot(divid, result);
+                });
+            }
+        </script>
+    </head>
+    <body>
+        <nav class="navbar navbar-inverse" role="navigation">
+            <div class="container">
+                <div class="navbar-header">
+                    <a class="navbar-brand"><strong>Gunrock: High-Performance Graph Primitives for the GPU</strong></a>
+                </div>
+                <div class="collapse navbar-collapse" id="myNavbar">
+                    <ul class="nav navbar-nav navbar-right">
+                        <li><a href="https://github.com/gunrock/gunrock/zipball/master">Download <strong>ZIP File</strong></a></li>
+                        <li><a href="https://github.com/gunrock/gunrock/tarball/master">Download <strong>TAR Ball</strong></a></li>
+                        <li><a href="https://github.com/gunrock/gunrock">View On <strong>GitHub</strong></a></li>
+                   </ul>
+                </div>
+            </div>
+        </nav>
+        <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
+            <div class="content" id="content">
+                <div class="container">
+                    <div class="row">
+                        <div class="col-sm-12 panel panel-default" style="padding-bottom: 15px;">
+                            <div style="margin-bottom: 15px;">
 <!-- end header part -->
-<!-- Generated by Doxygen 1.8.9.1 -->
+<!-- Generated by Doxygen 1.8.11 -->
 <script type="text/javascript">
 var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </script>
@@ -41,6 +73,8 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
       <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
+      <li><a href="modules.html"><span>Modules</span></a></li>
+      <li><a href="namespaces.html"><span>Namespaces</span></a></li>
       <li><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
       <li class="current"><a href="files.html"><span>Files</span></a></li>
       <li>
@@ -101,18 +135,64 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a22090907ca339dd90c6bedd875318d1e"><td class="memTemplParams" colspan="2">template&lt;typename K &gt; </td></tr>
-<tr class="memitem:a22090907ca339dd90c6bedd875318d1e"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><b>gunrock::util::RandomBits</b> (K &amp;key, int entropy_reduction=0, int lower_key_bits=sizeof(K)*8)</td></tr>
+<tr class="memitem:a22090907ca339dd90c6bedd875318d1e"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="random__bits_8h.html#a22090907ca339dd90c6bedd875318d1e">gunrock::util::RandomBits</a> (K &amp;key, int entropy_reduction=0, int lower_key_bits=sizeof(K)*8)</td></tr>
 <tr class="separator:a22090907ca339dd90c6bedd875318d1e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>A random bits generator. </p>
 <p><a class="el" href="random__bits_8h.html" title="A random bits generator. ">random_bits.h</a> </p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Function Documentation</h2>
+<a class="anchor" id="file_a22090907ca339dd90c6bedd875318d1e"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">void gunrock::util::RandomBits </td>
+          <td>(</td>
+          <td class="paramtype">K &amp;&#160;</td>
+          <td class="paramname"><em>key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>entropy_reduction</em> = <code>0</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>lower_key_bits</em> = <code>sizeof(K)&#160;*&#160;8</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Generates random 32-bit keys.</p>
+<p>We always take the second-order byte from rand() because the higher-order bits returned by rand() are commonly considered more uniformly distributed than the lower-order bits.</p>
+<p>We can decrease the entropy level of keys by adopting the technique of Thearling and Smith in which keys are computed from the bitwise AND of multiple random samples:</p>
+<h2>entropy_reduction | Effectively-unique bits per key </h2>
+<p>-1 | 0 0 | 32 1 | 25.95 2 | 17.41 3 | 10.78 4 | 6.42 ... | ... </p>
+
+</div>
+</div>
+</div><!-- contents -->
+<!-- HTML footer for doxygen 1.8.8-->
 <!-- start footer part -->
+</div>
+</div>
+</div>
+</div>
+</div>
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat Aug 8 2015 10:10:54 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Sat Dec 12 2015 00:50:07 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
-</a> 1.8.9.1
+</a> 1.8.11
 </small></address>
 </body>
 </html>

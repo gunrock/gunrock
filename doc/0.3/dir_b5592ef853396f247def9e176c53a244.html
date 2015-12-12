@@ -1,39 +1,71 @@
+<!-- HTML header for doxygen 1.8.8-->
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-<meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
-<meta http-equiv="X-UA-Compatible" content="IE=9"/>
-<meta name="generator" content="Doxygen 1.8.9.1"/>
-<title>gunrock: /home/yuduo/mgpu-merge/gunrock/gunrock/oprtr/edge_map_partitioned_backward Directory Reference</title>
-<link href="tabs.css" rel="stylesheet" type="text/css"/>
-<script type="text/javascript" src="jquery.js"></script>
-<script type="text/javascript" src="dynsections.js"></script>
-<link href="search/search.css" rel="stylesheet" type="text/css"/>
+    <head>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <!-- For Mobile Devices -->
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
+        <meta name="generator" content="Doxygen 1.8.11"/>
+        <!--[if lt IE 9]>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+        <![endif]-->
+        <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+        <title>Gunrock: /home/huan/projects/gunrock/maingrepo/gunrock/gunrock/oprtr/edge_map_partitioned_backward Directory Reference</title>
+        <!--<link href="tabs.css" rel="stylesheet" type="text/css"/>-->
+        <script type="text/javascript" src="dynsections.js"></script>
+        <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
 <script type="text/javascript">
   $(document).ready(function() { init_search(); });
 </script>
-<link href="doxygen.css" rel="stylesheet" type="text/css" />
-</head>
-<body>
-<div id="top"><!-- do not remove this div, it is closed by doxygen! -->
-<div id="titlearea">
-<table cellspacing="0" cellpadding="0">
- <tbody>
- <tr style="height: 56px;">
-  <td style="padding-left: 0.5em;">
-   <div id="projectname">gunrock
-   &#160;<span id="projectnumber">0.3</span>
-   </div>
-   <div id="projectbrief">Gunrock: High-Performance Graph Primitives for the GPU</div>
-  </td>
- </tr>
- </tbody>
-</table>
-</div>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+        <link rel="stylesheet" href="bootstrap.min.css">
+        <script src="bootstrap.min.js"></script>
+        <link href="doxygen.css" rel="stylesheet" type="text/css" />
+        <link href="customdoxygen.css" rel="stylesheet" type="text/css"/>
+        <script type="text/javascript" src="doxy-boot.js"></script>
+        <script src="http://vega.github.io/vega-editor/vendor/d3.min.js"></script>
+        <script src="http://vega.github.io/vega-editor/vendor/d3.geo.projection.min.js"></script>
+        <script src="http://vega.github.io/vega-editor/vendor/topojson.js"></script>
+        <script src="http://vega.github.io/vega-editor/vendor/d3.layout.cloud.js"></script>
+        <script src="http://vega.github.io/vega/vega.min.js"></script>
+        <script type="text/javascript">
+            // parse a spec and create a visualization view
+            function plot(divid, spec) {
+                vg.parse.spec(spec, function(chart) { chart({el:"#" + divid}).update(); });
+            }
+            function plotjson(divid, jsonpath) {
+                $.getJSON(jsonpath, function(result) {
+                    plot(divid, result);
+                });
+            }
+        </script>
+    </head>
+    <body>
+        <nav class="navbar navbar-inverse" role="navigation">
+            <div class="container">
+                <div class="navbar-header">
+                    <a class="navbar-brand"><strong>Gunrock: High-Performance Graph Primitives for the GPU</strong></a>
+                </div>
+                <div class="collapse navbar-collapse" id="myNavbar">
+                    <ul class="nav navbar-nav navbar-right">
+                        <li><a href="https://github.com/gunrock/gunrock/zipball/master">Download <strong>ZIP File</strong></a></li>
+                        <li><a href="https://github.com/gunrock/gunrock/tarball/master">Download <strong>TAR Ball</strong></a></li>
+                        <li><a href="https://github.com/gunrock/gunrock">View On <strong>GitHub</strong></a></li>
+                   </ul>
+                </div>
+            </div>
+        </nav>
+        <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
+            <div class="content" id="content">
+                <div class="container">
+                    <div class="row">
+                        <div class="col-sm-12 panel panel-default" style="padding-bottom: 15px;">
+                            <div style="margin-bottom: 15px;">
 <!-- end header part -->
-<!-- Generated by Doxygen 1.8.9.1 -->
+<!-- Generated by Doxygen 1.8.11 -->
 <script type="text/javascript">
 var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </script>
@@ -41,8 +73,10 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
       <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
+      <li><a href="modules.html"><span>Modules</span></a></li>
+      <li><a href="namespaces.html"><span>Namespaces</span></a></li>
       <li><a href="annotated.html"><span>Data&#160;Structures</span></a></li>
-      <li><a href="files.html"><span>Files</span></a></li>
+      <li class="current"><a href="files.html"><span>Files</span></a></li>
       <li>
         <div id="MSearchBox" class="MSearchBoxInactive">
         <span class="left">
@@ -59,6 +93,12 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
           </span>
         </div>
       </li>
+    </ul>
+  </div>
+  <div id="navrow2" class="tabs2">
+    <ul class="tablist">
+      <li class="current"><a href="files.html"><span>File&#160;List</span></a></li>
+      <li><a href="globals.html"><span>Globals</span></a></li>
     </ul>
   </div>
 <!-- window showing the filter options -->
@@ -88,17 +128,25 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="files"></a>
 Files</h2></td></tr>
-<tr class="memitem:oprtr_2edge__map__partitioned__backward_2kernel_8cuh"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><b>kernel.cuh</b></td></tr>
+<tr class="memitem:oprtr_2edge__map__partitioned__backward_2kernel_8cuh"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="oprtr_2edge__map__partitioned__backward_2kernel_8cuh.html">kernel.cuh</a></td></tr>
+<tr class="memdesc:oprtr_2edge__map__partitioned__backward_2kernel_8cuh"><td class="mdescLeft">&#160;</td><td class="mdescRight">Load balanced Edge Map Kernel Entry point. <br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:oprtr_2edge__map__partitioned__backward_2kernel__policy_8cuh"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><b>kernel_policy.cuh</b></td></tr>
+<tr class="memitem:oprtr_2edge__map__partitioned__backward_2kernel__policy_8cuh"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="oprtr_2edge__map__partitioned__backward_2kernel__policy_8cuh.html">kernel_policy.cuh</a></td></tr>
+<tr class="memdesc:oprtr_2edge__map__partitioned__backward_2kernel__policy_8cuh"><td class="mdescLeft">&#160;</td><td class="mdescRight">Kernel configuration policy for Load balanced Edge Expansion Kernel. <br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 </div><!-- contents -->
+<!-- HTML footer for doxygen 1.8.8-->
 <!-- start footer part -->
+</div>
+</div>
+</div>
+</div>
+</div>
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat Aug 8 2015 10:10:54 for gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Sat Dec 12 2015 00:50:08 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
-</a> 1.8.9.1
+</a> 1.8.11
 </small></address>
 </body>
 </html>
