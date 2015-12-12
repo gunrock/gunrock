@@ -153,6 +153,10 @@ Gunrock Developers
 
 - Andy Riffel, University of California, Davis
 
+- [Huan Zhang](http://www.huan-zhang.com/),
+  University of California, Davis
+
+
 - [John Owens](http://www.ece.ucdavis.edu/~jowens/),
   University of California, Davis
 
