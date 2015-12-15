@@ -382,7 +382,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     false,
                     input_inverse_graph,
                     output_inverse_graph);
-            if (!get_output_length || (get_output_length && frontier_attribute.output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD))
+            //if (!get_output_length || (get_output_length && frontier_attribute.output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD))
             {
                 gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
                 <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(
@@ -411,8 +411,9 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                         d_value_to_reduce,
                         d_reduce_frontier);
            }
-            else if (/*get_output_length &&*/ frontier_attribute.output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
-            {
+            //disable lb_over_edges for now, need more detailed performance characterization.
+            //else if (/*get_output_length &&*/ frontier_attribute.output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
+            /*{
                 unsigned int split_val = (frontier_attribute.output_length[0] + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
                 util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.node_locks.GetPointer(util::DEVICE), KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
                 SortedSearch<MgpuBoundsLower>(
@@ -424,7 +425,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                 context);
 
                 gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges2<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
-                <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS >>>(
+                <<< KernelPolicy::LOAD_BALANCED::BLOCKS, KernelPolicy::LOAD_BALANCED::THREADS >>>(
                                         frontier_attribute.queue_reset,
                                         frontier_attribute.queue_index,
                                         enactor_stats.iteration,
@@ -455,7 +456,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                         d_reduce_frontier);
 
                 //util::DisplayDeviceResults(d_out_key_queue, output_queue_len);
-            }
+            }*/
             // TODO: switch REDUCE_OP for different reduce operators
             // Do segreduction using d_scanned_edges and d_reduce_frontier
             /*if (R_TYPE != gunrock::oprtr::advance::EMPTY && d_value_to_reduce && d_reduce_frontier) {
