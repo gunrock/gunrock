@@ -4,7 +4,7 @@ Gunrock documentation
 News!
 =====
 
-Gunrock v0.3 released! Check out the [release notes](http://gunrock.github.io/gunrock/doc/0.3/release_notes.html)!
+Gunrock v0.3 released! Check out the [release notes](http://gunrock.github.io/gunrock/doc/latest/release_notes.html)!
 
 Introduction
 ============
@@ -16,11 +16,11 @@ performance and expressiveness by coupling high performance GPU computing
 primitives and optimization strategies with a high-level programming model
 that allows programmers to quickly develop new graph primitives with small
 code size and minimal GPU programming knowledge. For more details, please read
-[Why Gunrock](http://gunrock.github.io/gunrock/doc/0.3/why-gunrock.html),
+[Why Gunrock](http://gunrock.github.io/gunrock/doc/latest/why-gunrock.html),
 our paper on arXiv:
 [Gunrock: A High-Performance Graph Processing Library on the GPU](http://arxiv.org/abs/1501.05387),
 and check out the
-[Publications](https://github.com/gunrock/gunrock#publications) section.
+[Publications](#Publications) section.
 
 Homepage
 ---------
@@ -30,21 +30,21 @@ Homepage for Gunrock: <http://gunrock.github.io/>
 Getting Started with Gunrock
 ----------------------------
 - For Frequently Asked Questions, see the
-[FAQ](http://gunrock.github.io/gunrock/doc/0.3/faq.html).
+[FAQ](http://gunrock.github.io/gunrock/doc/latest/faq.html).
 
 - For information on building Gunrock, see
-[Building Gunrock](http://gunrock.github.io/gunrock/doc/0.3/building_gunrock.html)
+[Building Gunrock](http://gunrock.github.io/gunrock/doc/latest/building_gunrock.html)
 and refer to
-[Operating System Support and Requirements](https://github.com/gunrock/gunrock#operating-system-support-and-requirements).
+[Operating System Support and Requirements](#OS_Support).
 
 - The "tests" subdirectory included with Gunrock has a comprehensive test
 application for most the functionality of Gunrock.
 
 - For the programming model we use in Gunrock, see
-[Programming Model](http://gunrock.github.io/gunrock/doc/0.3/programming_model.html).
+[Programming Model](http://gunrock.github.io/gunrock/doc/latest/programming_model.html).
 
 - To use our stats logging and performance chart generation pipeline, please check
-out [Gunrock-to-JSON](http://gunrock.github.io/gunrock/doc/0.3/gunrock_to_json.html).
+out [Gunrock-to-JSON](http://gunrock.github.io/gunrock/doc/latest/gunrock_to_json.html).
 
 - We have also provided code samples for how to use
 [Gunrock's C interface](https://github.com/gunrock/gunrock/tree/master/shared_lib_tests)
@@ -61,6 +61,7 @@ directly using [Github](https://github.com/gunrock/gunrock/issues).
 
 <!-- TODO: Algorithm Input Size Limitations -->
 
+<a name="OS_Support"></a>
 Operating System Support and Requirements
 =========================================
 
@@ -90,6 +91,8 @@ examples. Please refer to [NVIDIA CUDA Getting Started Guide for
 Linux](http://docs.nvidia.com/cuda/cuda-getting-started-guide-for-linux) for
 detailed information.
 
+
+<a name="Publications"></a>
 Publications
 ============
 Yuduo Wu, Yangzihao Wang, Yuechao Pan, Carl Yang, and John D. Owens.
@@ -149,6 +152,10 @@ Gunrock Developers
   University of California, Davis
 
 - Andy Riffel, University of California, Davis
+
+- [Huan Zhang](http://www.huan-zhang.com/),
+  University of California, Davis
+
 
 - [John Owens](http://www.ece.ucdavis.edu/~jowens/),
   University of California, Davis
