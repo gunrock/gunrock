@@ -157,7 +157,7 @@ int ReadMarketStream(
             {
                 if ((num_input = sscanf(
                                      line, "%lld %lld %lld",
-                                     &ll_col, &ll_row, &ll_value)) < 2)
+                                     &ll_row, &ll_col, &ll_value)) < 2)
                 {
                     fprintf(stderr,
                             "Error parsing MARKET graph: badly formed edge\n");
