@@ -355,6 +355,7 @@ struct DOBFSProblem : ProblemBase<_VertexId, _SizeT, _Value,
      *  @param[in] src Source node for one BFS computing pass.
      *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
      *  @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+     *  @param[in] queue_sizing1  Size scaling factor for work queue allocation
      *
      *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -376,7 +377,7 @@ struct DOBFSProblem : ProblemBase<_VertexId, _SizeT, _Value,
             if (retval = util::GRError(cudaSetDevice(gpu_idx[gpu]),
                         "BSFProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
 
-            data_slices[gpu]->Reset(frontier_type, 
+            data_slices[gpu]->Reset(frontier_type,
                 this->graph_slices[gpu], queue_sizing, false, queue_sizing1);
             // Allocate output labels if necessary
             /*if (!data_slices[gpu]->d_labels) {

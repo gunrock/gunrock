@@ -918,13 +918,14 @@ public:
      */
 
     /**
-     * @brief Obtain statistics about the last primitive enacted.
+     * @ brief Obtain statistics about the last primitive enacted.
      *
-     * @tparam VertexId Vertex identifier type.
+     * @ tparam VertexId Vertex identifier type.
      *
-     * @param[out] total_queued Total queued elements in kernel running.
-     * @param[out] num_iter Number of super-steps performed.
-     * @param[out] avg_duty Average kernel duty (kernel time/kernel lifetime).
+     * @ param[out] total_queued Total queued elements in kernel running.
+     * @ param[out] num_iter Number of super-steps performed.
+     * @ param[out] avg_duty Average kernel duty (kernel time/kernel lifetime).
+     * spaces between @ and name are to eliminate doxygen warnings
      */
     /*template <typename VertexId>
     void GetStatistics(

@@ -235,10 +235,10 @@ struct SSSPIteration : public IterationBase <
                 "work_progress -> GetQueueLength failed", __FILE__, __LINE__))
                 return;
             out_length = 0;
-            
+
             if (frontier_attribute->queue_length > 0) {
                 out_length = gunrock::priority_queue::Bisect
-                    <PriorityQueueKernelPolicy, SSSPProblem, 
+                    <PriorityQueueKernelPolicy, SSSPProblem,
                     NearFarPriorityQueue, PqFunctor>(
                     (int*)frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE),
                     pq,
@@ -278,7 +278,7 @@ struct SSSPIteration : public IterationBase <
                 }
             }*/
             util::MemsetKernel<<<128, 128, 0, stream>>> (
-                data_slice -> sssp_marker.GetPointer(util::DEVICE), 
+                data_slice -> sssp_marker.GetPointer(util::DEVICE),
                 (int)0, graph_slice->nodes);
         } else { // #gpus != 1
             frontier_attribute->queue_index++;
@@ -593,13 +593,14 @@ public:
      */
 
     /**
-     * @brief Obtain statistics about the last primitive enacted.
+     * @ brief Obtain statistics about the last primitive enacted.
      *
-     * @tparam VertexId Vertex identifiler type.
+     * @ tparam VertexId Vertex identifiler type.
      *
-     * @param[out] total_queued Total queued elements in kernel running.
-     * @param[out] search_depth Search depth (number of super-steps).
-     * @param[out] avg_duty Average kernel duty (kernel time/kernel lifetime).
+     * @ param[out] total_queued Total queued elements in kernel running.
+     * @ param[out] search_depth Search depth (number of super-steps).
+     * @ param[out] avg_duty Average kernel duty (kernel time/kernel lifetime).
+     * spaces between @ and name are to eliminate doxygen warnings
      */
     /*template <typename VertexId>
     void GetStatistics(
@@ -761,7 +762,7 @@ public:
 
         if (DEBUG) printf("\nGPU SSSP Done.\n");
         return retval;
-    } 
+    }
 
     typedef gunrock::oprtr::filter::KernelPolicy<
         Problem,                            // Problem data type

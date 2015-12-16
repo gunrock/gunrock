@@ -172,11 +172,12 @@ public:
      */
 
     /**
-     * @brief Obtain statistics about the last BFS search enacted.
+     * @ brief Obtain statistics about the last BFS search enacted.
      *
-     * @param[out] total_queued Total queued elements in BFS kernel running.
-     * @param[out] search_depth Search depth of BFS algorithm.
-     * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
+     * @ param[out] total_queued Total queued elements in BFS kernel running.
+     * @ param[out] search_depth Search depth of BFS algorithm.
+     * @ param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
+     * spaces between @ and name are to eliminate doxygen warnings
      */
     /*template <typename VertexId>
     void GetStatistics(
