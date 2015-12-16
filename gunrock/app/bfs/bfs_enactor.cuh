@@ -720,7 +720,7 @@ public:
         32,                                 // WARP_GATHER_THRESHOLD
         128 * 4,                            // CTA_GATHER_THRESHOLD
         7,                                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::advance::LB>
+        gunrock::oprtr::advance::LB_LIGHT>
     LBAdvanceKernelPolicy_IDEM;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
@@ -737,7 +737,7 @@ public:
         32,                                 // WARP_GATHER_THRESHOLD
         128 * 4,                            // CTA_GATHER_THRESHOLD
         7,                                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::advance::LB>
+        gunrock::oprtr::advance::LB_LIGHT>
     LBAdvanceKernelPolicy;
 
     /**

@@ -382,81 +382,80 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     false,
                     input_inverse_graph,
                     output_inverse_graph);
-            //if (!get_output_length || (get_output_length && frontier_attribute.output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD))
+            if (!get_output_length || (get_output_length && frontier_attribute.output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD))
             {
                 gunrock::oprtr::edge_map_partitioned::RelaxLightEdges<LBPOLICY, ProblemData, Functor>
-                <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(
-                        frontier_attribute.queue_reset,
-                        frontier_attribute.queue_index,
-                        enactor_stats.iteration,
-                        d_row_offsets,
-                        d_column_offsets,
-                        d_column_indices,
-                        d_row_indices,
-                        partitioned_scanned_edges, // TODO: +1?
-                        d_in_key_queue,
-                        d_out_key_queue,
-                        data_slice,
-                        frontier_attribute.queue_length,
-                        frontier_attribute.output_length.GetPointer(util::DEVICE),
-                        max_in,
-                        max_out,
-                        work_progress,
-                        enactor_stats.advance_kernel_stats,
-                        ADVANCE_TYPE,
-                        input_inverse_graph,
-                        output_inverse_graph,
-                        R_TYPE,
-                        R_OP,
-                        d_value_to_reduce,
-                        d_reduce_frontier);
-           }
-            //disable lb_over_edges for now, need more detailed performance characterization.
-            //else if (/*get_output_length &&*/ frontier_attribute.output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
-            /*{
+                    <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(
+                            frontier_attribute.queue_reset,
+                            frontier_attribute.queue_index,
+                            enactor_stats.iteration,
+                            d_row_offsets,
+                            d_column_offsets,
+                            d_column_indices,
+                            d_row_indices,
+                            partitioned_scanned_edges, // TODO: +1?
+                            d_in_key_queue,
+                            d_out_key_queue,
+                            data_slice,
+                            frontier_attribute.queue_length,
+                            frontier_attribute.output_length.GetPointer(util::DEVICE),
+                            max_in,
+                            max_out,
+                            work_progress,
+                            enactor_stats.advance_kernel_stats,
+                            ADVANCE_TYPE,
+                            input_inverse_graph,
+                            output_inverse_graph,
+                            R_TYPE,
+                            R_OP,
+                            d_value_to_reduce,
+                            d_reduce_frontier);
+            }
+            else if (/*get_output_length &&*/ frontier_attribute.output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
+            {
                 unsigned int split_val = (frontier_attribute.output_length[0] + KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
                 util::MemsetIdxKernel<<<128, 128>>>(enactor_stats.node_locks.GetPointer(util::DEVICE), KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
                 SortedSearch<MgpuBoundsLower>(
-                enactor_stats.node_locks.GetPointer(util::DEVICE),
-                KernelPolicy::LOAD_BALANCED::BLOCKS,
-                partitioned_scanned_edges,
-                frontier_attribute.queue_length,
-                enactor_stats.node_locks_out.GetPointer(util::DEVICE),
-                context);
+                        enactor_stats.node_locks.GetPointer(util::DEVICE),
+                        KernelPolicy::LOAD_BALANCED::BLOCKS,
+                        partitioned_scanned_edges,
+                        frontier_attribute.queue_length,
+                        enactor_stats.node_locks_out.GetPointer(util::DEVICE),
+                        context);
 
                 gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges2<typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
-                <<< KernelPolicy::LOAD_BALANCED::BLOCKS, KernelPolicy::LOAD_BALANCED::THREADS >>>(
-                                        frontier_attribute.queue_reset,
-                                        frontier_attribute.queue_index,
-                                        enactor_stats.iteration,
-                                        d_row_offsets,
-                                        d_column_offsets,
-                                        d_column_indices,
-                                        d_row_indices,
-                                        partitioned_scanned_edges,
-                                        enactor_stats.node_locks_out.GetPointer(util::DEVICE),
-                                        KernelPolicy::LOAD_BALANCED::BLOCKS,
-                                        //d_done,
-                                        d_in_key_queue,
-                                        d_out_key_queue,
-                                        data_slice,
-                                        frontier_attribute.queue_length,
-                                        frontier_attribute.output_length.GetPointer(util::DEVICE),
-                                        split_val,
-                                        max_in,
-                                        max_out,
-                                        work_progress,
-                                        enactor_stats.advance_kernel_stats,
-                                        ADVANCE_TYPE,
-                                        input_inverse_graph,
-                                        output_inverse_graph,
-                                        R_TYPE,
-                                        R_OP,
-                                        d_value_to_reduce,
-                                        d_reduce_frontier);
+                    <<< KernelPolicy::LOAD_BALANCED::BLOCKS, KernelPolicy::LOAD_BALANCED::THREADS >>>(
+                            frontier_attribute.queue_reset,
+                            frontier_attribute.queue_index,
+                            enactor_stats.iteration,
+                            d_row_offsets,
+                            d_column_offsets,
+                            d_column_indices,
+                            d_row_indices,
+                            partitioned_scanned_edges,
+                            enactor_stats.node_locks_out.GetPointer(util::DEVICE),
+                            KernelPolicy::LOAD_BALANCED::BLOCKS,
+                            //d_done,
+                            d_in_key_queue,
+                            d_out_key_queue,
+                            data_slice,
+                            frontier_attribute.queue_length,
+                            frontier_attribute.output_length.GetPointer(util::DEVICE),
+                            split_val,
+                            max_in,
+                            max_out,
+                            work_progress,
+                            enactor_stats.advance_kernel_stats,
+                            ADVANCE_TYPE,
+                            input_inverse_graph,
+                            output_inverse_graph,
+                            R_TYPE,
+                            R_OP,
+                            d_value_to_reduce,
+                            d_reduce_frontier);
 
                 //util::DisplayDeviceResults(d_out_key_queue, output_queue_len);
-            }*/
+            }
             // TODO: switch REDUCE_OP for different reduce operators
             // Do segreduction using d_scanned_edges and d_reduce_frontier
             /*if (R_TYPE != gunrock::oprtr::advance::EMPTY && d_value_to_reduce && d_reduce_frontier) {
