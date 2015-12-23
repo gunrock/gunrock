@@ -174,6 +174,7 @@ fi
 
 # Switch to gh-pages branch, and check if documentation for that version exists or not
 
+echo "Switching to gh-pages (warnings on external submodules can be ignored)..."
 git stash > /dev/null 2>&1;
 git checkout gh-pages > /dev/null || error "Cannot switch to gh-pages branch!"
 prev_doc_revs=$($FIND ./ -maxdepth 1 -type d -printf "%f\n" | $GREP "[0-9][0-9]*\.[0-9][0-9]*" | tr '\n' ' ')
