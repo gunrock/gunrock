@@ -243,7 +243,7 @@ add_test(NAME TEST_CC COMMAND connected_component market
 set_tests_properties(TEST_CC PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
 add_test(NAME TEST_SSSP COMMAND single_source_shortest_path market
-  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
+  ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx --undirected --src=0)
 set_tests_properties(TEST_SSSP PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
 add_test(NAME TEST_PAGERANK COMMAND pagerank market

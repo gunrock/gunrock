@@ -89,7 +89,7 @@ cudaError_t ComputeOutputLength(
     }
 
     SizeT num_block = (frontier_attribute->queue_length + KernelPolicy::LOAD_BALANCED::THREADS - 1)/KernelPolicy::LOAD_BALANCED::THREADS;
-    if (KernelPolicy::ADVANCE_MODE == LB_BACKWARD)
+    if (KernelPolicy::ADVANCE_MODE == LB_BACKWARD || KernelPolicy::ADVANCE_MODE == TWC_BACKWARD)
     {
         gunrock::oprtr::edge_map_partitioned_backward::GetEdgeCounts
             <typename KernelPolicy::LOAD_BALANCED, Problem, Functor>
@@ -105,7 +105,8 @@ cudaError_t ComputeOutputLength(
         //util::DisplayDeviceResults(partitioned_scanned_edges, frontier_attribute->queue_length);
     }
     else if (KernelPolicy::ADVANCE_MODE == LB ||
-             KernelPolicy::ADVANCE_MODE == LB_LIGHT)
+             KernelPolicy::ADVANCE_MODE == LB_LIGHT ||
+             KernelPolicy::ADVANCE_MODE == TWC_FORWARD)
     {
         gunrock::oprtr::edge_map_partitioned::GetEdgeCounts
             <typename KernelPolicy::LOAD_BALANCED, Problem, Functor>
@@ -472,7 +473,6 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                     R_OP,
                     d_value_to_reduce,
                     d_reduce_frontier);
-
                 //util::DisplayDeviceResults(d_out_key_queue, output_queue_len);
             }
             // TODO: switch REDUCE_OP for different reduce operators

@@ -126,7 +126,15 @@ int ReadMarketStream(
             }
 
             // Allocate coo graph
-            coo = (EdgeTupleType*)malloc(sizeof(EdgeTupleType) * edges);
+            unsigned long long allo_size = sizeof(EdgeTupleType);
+            allo_size = allo_size * edges;
+            coo = (EdgeTupleType*)malloc(allo_size);
+            if (coo == NULL)
+            {
+                fprintf(stderr, "Error parsing MARKET graph:"
+                    "coo allocation failed, sizeof(EdgeTupleType) = %d, edges = %d, allo_size = %lld\n", sizeof(EdgeTupleType), edges, allo_size);
+                return -1;
+            }
 
             edges_read++;
 
@@ -157,7 +165,7 @@ int ReadMarketStream(
             {
                 if ((num_input = sscanf(
                                      line, "%lld %lld %lld",
-                                     &ll_col, &ll_row, &ll_value)) < 2)
+                                     &ll_row, &ll_col, &ll_value)) < 2)
                 {
                     fprintf(stderr,
                             "Error parsing MARKET graph: badly formed edge\n");

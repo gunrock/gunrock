@@ -385,7 +385,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     for (int iter = 0; iter < iterations; ++iter)
     {
         util::GRError(problem->Reset(
-                          src, enactor->GetFrontierType(), max_queue_sizing),
+                          src, enactor->GetFrontierType(), max_queue_sizing, max_queue_sizing1),
                       "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
         util::GRError(enactor->Reset(),
                       "SSSP Enactor Reset failed", __FILE__, __LINE__);

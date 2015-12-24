@@ -296,27 +296,39 @@ struct BFSIteration : public IterationBase <
         bool                            out_inv = false)
     {
         cudaError_t retval = cudaSuccess;
+        //printf("SIZE_CHECK = %s\n", Enactor::SIZE_CHECK ? "true" : "false");
         bool over_sized = false;
-        if (retval = Check_Size<Enactor::SIZE_CHECK, SizeT, SizeT> (
-            "scanned_edges", frontier_attribute->queue_length, partitioned_scanned_edges, over_sized, -1, -1, -1, false)) return retval;
-        retval = gunrock::oprtr::advance::ComputeOutputLength
-            <AdvanceKernelPolicy, Problem, BfsFunctor>(
-            frontier_attribute,
-            d_offsets,
-            d_indices,
-            d_inv_offsets,
-            d_inv_indices,
-            d_in_key_queue,
-            partitioned_scanned_edges->GetPointer(util::DEVICE),
-            max_in,
-            max_out,
-            context,
-            stream,
-            ADVANCE_TYPE,
-            express,
-            in_inv,
-            out_inv);
-        return retval;
+        if (!Enactor::SIZE_CHECK &&
+            (AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_FORWARD ||
+             AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_BACKWARD))
+        {
+            return retval;
+
+        } else {
+            //printf("Size check runs\n");
+            if (retval = Check_Size<Enactor::SIZE_CHECK, SizeT, SizeT> (
+                "scanned_edges", frontier_attribute->queue_length,
+                partitioned_scanned_edges, over_sized, -1, -1, -1, false))
+                return retval;
+            retval = gunrock::oprtr::advance::ComputeOutputLength
+                <AdvanceKernelPolicy, Problem, BfsFunctor>(
+                frontier_attribute,
+                d_offsets,
+                d_indices,
+                d_inv_offsets,
+                d_inv_indices,
+                d_in_key_queue,
+                partitioned_scanned_edges->GetPointer(util::DEVICE),
+                max_in,
+                max_out,
+                context,
+                stream,
+                ADVANCE_TYPE,
+                express,
+                in_inv,
+                out_inv);
+            return retval;
+        }
     }
 
     /*
@@ -478,13 +490,14 @@ public:
      */
 
     /**
-     * @brief Obtain statistics about the last primitive enacted.
+     * @ brief Obtain statistics about the last primitive enacted.
      *
-     * @tparam VertexId Vertex identifier type.
+     * @ tparam VertexId Vertex identifier type.
      *
-     * @param[out] total_queued Total queued elements in kernel running.
-     * @param[out] search_depth Search depth (number of super-steps).
-     * @param[out] avg_duty Average kernel duty (kernel time/kernel lifetime).
+     * @ param[out] total_queued Total queued elements in kernel running.
+     * @ param[out] search_depth Search depth (number of super-steps).
+     * @ param[out] avg_duty Average kernel duty (kernel time/kernel lifetime).
+     * spaces between @ and name are to eliminate doxygen warnings
      */
     /*template <typename VertexId>
     void GetStatistics(
@@ -708,7 +721,7 @@ public:
         32,                                 // WARP_GATHER_THRESHOLD
         128 * 4,                            // CTA_GATHER_THRESHOLD
         7,                                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::advance::LB>
+        gunrock::oprtr::advance::LB_LIGHT>
     LBAdvanceKernelPolicy_IDEM;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
@@ -725,7 +738,7 @@ public:
         32,                                 // WARP_GATHER_THRESHOLD
         128 * 4,                            // CTA_GATHER_THRESHOLD
         7,                                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::advance::LB>
+        gunrock::oprtr::advance::LB_LIGHT>
     LBAdvanceKernelPolicy;
 
     /**
@@ -746,7 +759,7 @@ public:
         int traversal_mode = 0)
     {
         int min_sm_version = -1;
-        for (int i = 0; i < this->num_gpus; i++) 
+        for (int i = 0; i < this->num_gpus; i++)
         {
             if (min_sm_version == -1 ||
                 this->cuda_props[i].device_sm_version < min_sm_version)
@@ -757,24 +770,24 @@ public:
 
         if (min_sm_version >= 300)
         {
-            if (Problem::ENABLE_IDEMPOTENCE) 
+            if (Problem::ENABLE_IDEMPOTENCE)
             {
-                if (traversal_mode == 0) 
+                if (traversal_mode == 0)
                 {
                     return EnactBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
                 }
-                else 
+                else
                 {
                     return EnactBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
                 }
-            } 
-            else 
+            }
+            else
             {
-                if (traversal_mode == 0) 
+                if (traversal_mode == 0)
                 {
                     return EnactBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(src);
                 }
-                else 
+                else
                 {
                     return EnactBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(src);
                 }
@@ -816,29 +829,29 @@ public:
             }
         }
 
-        if (min_sm_version >= 300) 
+        if (min_sm_version >= 300)
         {
-            if (Problem::ENABLE_IDEMPOTENCE) 
+            if (Problem::ENABLE_IDEMPOTENCE)
             {
-                if (traversal_mode == 0) 
+                if (traversal_mode == 0)
                 {
                     return InitBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
                             context, problem, max_grid_size, size_check);
                 }
-                else 
+                else
                 {
                     return InitBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
                             context, problem, max_grid_size, size_check);
                 }
-            } 
-            else 
+            }
+            else
             {
-                if (traversal_mode == 0) 
+                if (traversal_mode == 0)
                 {
                     return InitBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(
                             context, problem, max_grid_size, size_check);
                 }
-                else 
+                else
                 {
                     return InitBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(
                             context, problem, max_grid_size, size_check);

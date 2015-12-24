@@ -44,9 +44,9 @@ class SALSAEnactor : public EnactorBase <typename _Problem::SizeT, _DEBUG, _SIZE
 {
 public:
     typedef _Problem                   Problem;
-    typedef typename Problem::SizeT    SizeT   ;   
-    typedef typename Problem::VertexId VertexId;   
-    typedef typename Problem::Value    Value   ;   
+    typedef typename Problem::SizeT    SizeT   ;
+    typedef typename Problem::VertexId VertexId;
+    typedef typename Problem::Value    Value   ;
     static const bool INSTRUMENT = _INSTRUMENT;
     static const bool DEBUG      = _DEBUG;
     static const bool SIZE_CHECK = _SIZE_CHECK;
@@ -73,7 +73,7 @@ public:
     {
         typedef typename ProblemData::SizeT         SizeT;
         typedef typename ProblemData::VertexId      VertexId;
-        
+
         cudaError_t retval = cudaSuccess;
 
         return retval;
@@ -115,7 +115,7 @@ public:
         }
 
         //swap rank_curr and rank_next
-        util::MemsetCopyVectorKernel<<<128, 128>>>(rank_curr, rank_next, nodes); 
+        util::MemsetCopyVectorKernel<<<128, 128>>>(rank_curr, rank_next, nodes);
 
         util::MemsetKernel<<<128, 128>>>(rank_next, (Value)0.0, nodes);
 
@@ -128,10 +128,11 @@ public:
      */
 
     /**
-     * @brief Obtain statistics about the last SALSA search enacted.
+     * @ brief Obtain statistics about the last SALSA search enacted.
      *
-     * @param[out] total_queued Total queued elements in SALSA kernel running.
-     * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
+     * @ param[out] total_queued Total queued elements in SALSA kernel running.
+     * @ param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
+     * spaces between @ and name are to eliminate doxygen warnings
      */
     /*void GetStatistics(
         long long &total_queued,
@@ -140,7 +141,7 @@ public:
         cudaThreadSynchronize();
 
         total_queued = this->enactor_stats->total_queued[0];
-        
+
         avg_duty = (this->enactor_stats->total_lifetimes >0) ?
             double(this->enactor_stats->total_runtimes) / this->enactor_stats->total_lifetimes : 0.0;
     }*/
@@ -234,7 +235,7 @@ public:
                                             FilterKernelPolicy::CTA_OCCUPANCY))
                                             break;
 
-            //cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>(); 
+            //cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
 
             frontier_attribute->queue_length     = graph_slice->nodes;
             frontier_attribute->queue_index      = 0;
@@ -248,7 +249,7 @@ public:
                                 "SALSAProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
             }
 
-            // Step through SALSA iterations 
+            // Step through SALSA iterations
             {
 
                 /*if (retval = util::GRError(cudaBindTexture(
@@ -329,7 +330,7 @@ public:
             //util::DisplayDeviceResults(problem->data_slices[0]->d_hub_predecessors, graph_slice->edges);
             //util::DisplayDeviceResults(problem->data_slices[0]->d_auth_predecessors, graph_slice->edges);
 
-            while (true) { 
+            while (true) {
 
 
                 util::MemsetIdxKernel<<<128, 128>>>(frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), graph_slice->edges);
@@ -367,7 +368,7 @@ public:
                 if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
 
                 //if (retval = work_progress.GetQueueLength(frontier_attribute.queue_index, frontier_attribute.queue_length)) break;
-                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length); 
+                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[frontier_attribute.selector], frontier_attribute.queue_length);
 
 
                 NormalizeRank<SALSAProblem>(problem, context[0], 0, graph_slice->nodes);
@@ -397,7 +398,7 @@ public:
                     graph_slice->column_offsets.GetPointer(util::DEVICE),
                     graph_slice->row_indices.GetPointer(util::DEVICE),
                     graph_slice->row_offsets.GetPointer(util::DEVICE),
-                    graph_slice->column_indices.GetPointer(util::DEVICE), 
+                    graph_slice->column_indices.GetPointer(util::DEVICE),
                     graph_slice->edges,//frontier_queue->keys[frontier_attribute->selector  ].GetSize(),//graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
                     graph_slice->edges * 10000,//graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
                     work_progress[0],
@@ -421,15 +422,15 @@ public:
                         enactor_stats->total_lifetimes)) break;
                 }
 
-                NormalizeRank<SALSAProblem>(problem, context[0], 1, graph_slice->nodes); 
-                
-                
-                enactor_stats->iteration++; 
+                NormalizeRank<SALSAProblem>(problem, context[0], 1, graph_slice->nodes);
+
+
+                enactor_stats->iteration++;
 
                 if (enactor_stats->iteration >= max_iteration) break;
 
                 if (DEBUG) printf("\n%lld", (long long) enactor_stats->iteration);
-            
+
             }
 
             if (retval) break;
@@ -528,4 +529,3 @@ public:
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-

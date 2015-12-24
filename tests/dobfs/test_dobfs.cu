@@ -277,6 +277,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     int max_grid_size       = info->info["max_grid_size"].get_int();
     int num_gpus            = info->info["num_gpus"].get_int();
     double max_queue_sizing = info->info["max_queue_sizing"].get_real();
+    double max_queue_sizing1 = info->info["max_queue_sizing1"].get_real();
     bool quiet_mode         = info->info["quiet_mode"].get_bool();
     bool quick_mode         = info->info["quick_mode"].get_bool();
     bool undirected         = info->info["undirected"].get_bool();
@@ -292,7 +293,15 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
-    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
+    for (int i = 0; i < num_gpus; i++) 
+        gpu_idx[i] = device_list[i].get_int();
+    size_t *org_size = new size_t[num_gpus];
+    for (int gpu = 0; gpu < num_gpus; gpu++)
+    {   
+        size_t dummy;
+        cudaSetDevice(gpu_idx[gpu]);
+        cudaMemGetInfo(&(org_size[gpu]), &dummy);
+    }   
 
     // TODO: remove after merge mgpu-cq
     ContextPtr *context = (ContextPtr*)info->context;
@@ -344,7 +353,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     for (int iter = 0; iter < iterations; ++iter)
     {
         util::GRError(problem->Reset(
-                          src, enactor.GetFrontierType(), max_queue_sizing),
+                          src, enactor.GetFrontierType(), max_queue_sizing, max_queue_sizing1),
                       "DOBFS Problem Data Reset Failed", __FILE__, __LINE__);
         gpu_timer.Start();
         util::GRError(enactor.template Enact<Problem>(
@@ -386,13 +395,85 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     info->CollectInfo();  // collected all the info and put into JSON mObject
 
+    if (!quiet_mode)
+    {
+        printf("\n\tMemory Usage(B)\t");
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+            if (num_gpus > 1)
+            {
+                if (gpu != 0)
+                {
+                    printf(" #keys%d,0\t #keys%d,1\t #ins%d,0\t #ins%d,1",
+                           gpu, gpu, gpu, gpu);
+                }
+                else
+                {
+                    printf(" #keys%d,0\t #keys%d,1", gpu, gpu);
+                }
+            }
+            else
+            {
+                printf(" #keys%d,0\t #keys%d,1", gpu, gpu);
+            }
+        if (num_gpus > 1)
+        {
+            printf(" #keys%d", num_gpus);
+        }
+        printf("\n");
+        double max_queue_sizing_[2] = {0, 0 }, max_in_sizing_ = 0;
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {   
+            size_t gpu_free, dummy;
+            cudaSetDevice(gpu_idx[gpu]);
+            cudaMemGetInfo(&gpu_free, &dummy);
+            printf("GPU_%d\t %ld", gpu_idx[gpu], org_size[gpu] - gpu_free);
+            for (int i = 0; i < num_gpus; i++)
+            {   
+                for (int j = 0; j < 2; j++)
+                {   
+                    SizeT x = problem->data_slices[gpu]->frontier_queues[i].keys[j].GetSize();
+                    printf("\t %lld", (long long) x); 
+                    double factor = 1.0 * x / (num_gpus > 1 ? problem->graph_slices[gpu]->in_counter[i] : problem->graph_slices[gpu]->nodes);
+                    if (factor > max_queue_sizing_[j])
+                    {   
+                        max_queue_sizing_[j] = factor;
+                    }   
+                }   
+                if (num_gpus > 1 && i != 0 ) 
+                {   
+                    for (int t = 0; t < 2; t++)
+                    {   
+                        SizeT x = problem->data_slices[gpu][0].keys_in[t][i].GetSize();
+                        printf("\t %lld", (long long) x); 
+                        double factor = 1.0 * x / problem->graph_slices[gpu]->in_counter[i];
+                        if (factor > max_in_sizing_)
+                        {
+                            max_in_sizing_ = factor;
+                        }
+                    }
+                }
+            }
+            if (num_gpus > 1)
+            {
+                printf("\t %lld", (long long)(problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize()));
+            }
+            printf("\n");
+        }
+        printf("\t queue_sizing =\t %lf \t %lf", max_queue_sizing_[0], max_queue_sizing_[1]);
+        if (num_gpus > 1)
+        {
+            printf("\t in_sizing =\t %lf", max_in_sizing_);
+        }
+        printf("\n");
+    }
+
     // Clean up
     if (problem) delete problem;
     if (reference_labels) free(reference_labels);
     if (h_labels) free(h_labels);
     if (h_preds) free(h_preds);
 
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
 }
 
 /**
@@ -552,6 +633,7 @@ void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 
 int main( int argc, char** argv)
 {
+    cudaDeviceReset();
     CommandLineArgs args(argc, argv);
     int graph_args = argc - args.ParsedArgc() - 1;
     if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
@@ -574,6 +656,7 @@ int main( int argc, char** argv)
     info->Init("DOBFS", args, csr, csc);  // initialize Info structure
     RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test
 
+    cudaDeviceReset();
     return 0;
 }
 
