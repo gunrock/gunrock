@@ -2,6 +2,8 @@
 
 # set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -g;-G)
 
+find_package(CUDA REQUIRED)
+
 if(mgpu_INCLUDE_DIRS)
   include_directories(${mgpu_INCLUDE_DIRS})
 else()
