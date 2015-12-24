@@ -26,6 +26,10 @@ namespace filter {
 
 /**
  * @brief Structure for invoking CTA processing tile over all elements.
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct SweepPass
@@ -33,7 +37,7 @@ struct SweepPass
     static __device__ __forceinline__ void Invoke(
         typename KernelPolicy::VertexId         &iteration,
         typename KernelPolicy::VertexId         &queue_index,
-        int                                     &num_gpus,
+        //int                                     &num_gpus,
         typename KernelPolicy::VertexId         *&d_in,
         typename KernelPolicy::VertexId         *&d_pred_in,
         typename KernelPolicy::VertexId         *&d_out,
@@ -43,6 +47,7 @@ struct SweepPass
         util::CtaWorkProgress                   &work_progress,
         util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition,
         typename KernelPolicy::SizeT            &max_out_frontier)
+        //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *&t_bitmask)
     {
         typedef Cta<KernelPolicy, ProblemData, Functor>     Cta;
         typedef typename KernelPolicy::SizeT                SizeT;
@@ -62,7 +67,7 @@ struct SweepPass
         Cta cta(
             iteration,
             queue_index,
-            num_gpus,
+            //num_gpus,
             smem_storage,
             d_in,
             d_pred_in,
@@ -71,6 +76,7 @@ struct SweepPass
             d_visited_mask,
             work_progress,
             max_out_frontier);
+	    //t_bitmask);
 
         // Process full tiles
         while (work_limits.offset < work_limits.guarded_offset) {
@@ -94,8 +100,12 @@ struct SweepPass
 
 /**
  * Not valid for this arch (default)
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
+ * @tparam VALID.
  */
-
 template <
     typename    KernelPolicy,
     typename    ProblemData,
@@ -111,9 +121,9 @@ struct Dispatch
             VertexId &iteration,
             bool &queue_reset,
             VertexId &queue_index,
-            int &num_gpus,
+            //int &num_gpus,
             SizeT &num_elements,
-            volatile int *&d_done,
+            //volatile int *&d_done,
             VertexId *&d_in_queue,
             VertexId *&d_out_queue,
             DataSlice *&problem,
@@ -129,9 +139,9 @@ struct Dispatch
         VertexId                    &iteration,
         bool                        &queue_reset,
         VertexId                    &queue_index,
-        int                         &num_gpus,
+        //int                         &num_gpus,
         SizeT                       &num_elements,
-        volatile int                *&d_done,
+        //volatile int                *&d_done,
         VertexId                    *&d_in,
         VertexId                    *&d_pred_in,
         VertexId                    *&d_out,
@@ -141,6 +151,7 @@ struct Dispatch
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
         util::KernelRuntimeStats    &kernel_stats)
+        //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *&ts_bitmask)
     {
         // empty
     }
@@ -148,7 +159,11 @@ struct Dispatch
 
 
 /**
- * @brief Kernel dispatch code for different architectures
+ * @brief Kernel dispatch code for different architectures.
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Dispatch<KernelPolicy, ProblemData, Functor, true>
@@ -161,9 +176,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         VertexId                    &iteration,
         bool                        &queue_reset,
         VertexId                    &queue_index,
-        int                         &num_gpus,
+        //int                         &num_gpus,
         SizeT                       &num_elements,
-        volatile int                *&d_done,
+        //volatile int                *&d_done,
         VertexId                    *&d_in,
         VertexId                    *&d_pred_in,
         VertexId                    *&d_out,
@@ -173,6 +188,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
         util::KernelRuntimeStats    &kernel_stats)
+        //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *&t_bitmask)
     {
 
         // Shared storage for the kernel
@@ -205,17 +221,18 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
                 // Check if we previously overflowed
                 if (num_elements >= max_in_frontier) {
+                    //printf(" num_elements >= max_in_frontier, num_elements = %d, max_in_frontier = %d\n", num_elements, max_in_frontier);
                     num_elements = 0;
                 }
 
                 // Signal to host that we're done
-                if ((num_elements == 0) ||
-                        (KernelPolicy::SATURATION_QUIT && (num_elements <= gridDim.x * KernelPolicy::SATURATION_QUIT)))
-                {
-                    if (d_done) d_done[0] = num_elements;
-                }
+                //if ((num_elements == 0) ||
+                //        (KernelPolicy::SATURATION_QUIT && (num_elements <= gridDim.x * KernelPolicy::SATURATION_QUIT)))
+                //{
+                //    if (d_done) d_done[0] = num_elements;
+                //}
             }
-
+            
             // Initialize work decomposition in smem
             smem_storage.state.work_decomposition.template Init<KernelPolicy::LOG_SCHEDULE_GRANULARITY>(
                     num_elements, gridDim.x);
@@ -231,7 +248,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         SweepPass<KernelPolicy, ProblemData, Functor>::Invoke(
                 iteration,
                 queue_index,
-                num_gpus,
+                //num_gpus,
                 d_in,
                 d_pred_in,
                 d_out,
@@ -241,6 +258,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 work_progress,
                 smem_storage.state.work_decomposition,
                 max_out_frontier);
+		//t_bitmask);
 
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
             kernel_stats.MarkStop();
@@ -252,9 +270,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             VertexId &iteration,
             bool &queue_reset,
             VertexId &queue_index,
-            int &num_gpus,
+            //int &num_gpus,
             SizeT &num_elements,
-            volatile int *&d_done,
+            //volatile int *&d_done,
             VertexId *&d_in_queue,
             VertexId *&d_out_queue,
             DataSlice *&problem,
@@ -363,9 +381,7 @@ void Kernel(
     typename KernelPolicy::VertexId         iteration,
     bool                                    queue_reset,
     typename KernelPolicy::VertexId         queue_index,                
-    int                                     num_gpus,                  
     typename KernelPolicy::SizeT            num_elements,             
-    volatile int                            *d_done,                 
     typename KernelPolicy::VertexId         *d_in_queue,            
     typename KernelPolicy::VertexId         *d_in_predecessor_queue,
     typename KernelPolicy::VertexId         *d_out_queue,          
@@ -382,9 +398,9 @@ void Kernel(
                 iteration,
                 queue_reset,
                 queue_index,
-                num_gpus,
+                //num_gpus,
                 num_elements,
-                d_done,
+                //d_done,
                 d_in_queue,
                 d_in_predecessor_queue,
                 d_out_queue,
@@ -399,9 +415,9 @@ void Kernel(
                 iteration,
                 queue_reset,
                 queue_index,
-                num_gpus,
+                //num_gpus,
                 num_elements,
-                d_done,
+                //d_done,
                 d_in_queue,
                 d_out_queue,
                 problem,

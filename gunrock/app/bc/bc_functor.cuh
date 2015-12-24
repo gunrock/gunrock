@@ -24,20 +24,20 @@ namespace bc {
 /**
  * @brief Structure contains device functions in forward traversal pass.
  *
- * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32
- * @tparam Value               Type of float or double to use for computing BC value.
- * @tparam ProblemData         Problem data type which contains data slice for BC problem
+ * @tparam VertexId    Type of signed integer to use as vertex identifier.
+ * @tparam SizeT       Type of unsigned integer to use for array indexing.
+ * @tparam Value       Type of float or double to use for computed values.
+ * @tparam ProblemData Problem data type which contains data slice for problem.
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct ForwardFunctor
-{
+template <
+    typename VertexId, typename SizeT, typename Value, typename ProblemData >
+struct ForwardFunctor {
     typedef typename ProblemData::DataSlice DataSlice;
 
     /**
-     * @brief Forward Edge Mapping condition function. Check if the destination node
-     * has been claimed as someone else's child.
+     * @brief Forward Edge Mapping condition function. Check if the
+     * destination node has been claimed as someone else's child.
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
@@ -45,15 +45,16 @@ struct ForwardFunctor
      * @param[in] e_id output edge id
      * @param[in] e_id_in input edge id
      *
-     * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
+     * \return Whether or not to load the apply function.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-    {
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId s_id, VertexId d_id, DataSlice *problem,
+        VertexId e_id = 0, VertexId e_id_in = 0) {
         // Check if the destination node has been claimed as someone's child
-        bool child_available = (atomicCAS(&problem->d_preds[d_id], -2, s_id) == -2) ? true : false;
+        bool child_available =
+            (atomicCAS(problem->preds + d_id, -2, s_id) == -2) ? true : false;
 
-        if (!child_available)
-        {
+        if (!child_available) {
             //Two conditions will lead the code here.
             //1) multiple parents try to claim a same child,
             //and some parent other than you succeeded. In
@@ -65,20 +66,18 @@ struct ForwardFunctor
             //labeled.
             VertexId label;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    label, problem->d_labels + s_id);
-            atomicCAS(&problem->d_labels[d_id], -1, label+1);
+                label, problem->labels + s_id);
+            atomicCAS(problem->labels + d_id, -1, label + 1);
             VertexId label_d;
             util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    label_d, problem->d_labels + d_id);
-            if (label_d == label + 1)
-            {
+                label_d, problem->labels + d_id);
+            if (label_d == label + 1) {
                 //Accumulate sigma value
-                atomicAdd(&problem->d_sigmas[d_id], problem->d_sigmas[s_id]);
+                atomicAdd(problem->sigmas + d_id, problem->sigmas[s_id]);
             }
             return false;
-        }
-        else {
-        return true;
+        } else {
+            return true;
         }
     }
 
@@ -94,42 +93,44 @@ struct ForwardFunctor
      * @param[in] e_id_in input edge id
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-    {
-            // Succeeded in claiming child, safe to set label to child
-            VertexId label;
-            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    label, problem->d_labels + s_id);
-            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    label+1, problem->d_labels + d_id);
-            atomicAdd(&problem->d_sigmas[d_id], problem->d_sigmas[s_id]);
-
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId s_id, VertexId d_id, DataSlice *problem,
+        VertexId e_id = 0, VertexId e_id_in = 0) {
+        // Succeeded in claiming child, safe to set label to child
+        VertexId label;
+        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+            label, problem->labels + s_id);
+        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+            label + 1, problem->labels + d_id);
+        atomicAdd(problem->sigmas + d_id, problem->sigmas[s_id]);
     }
 
     /**
      * @brief Forward vertex mapping condition function. Check if the Vertex Id is valid (not equal to -1).
      *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     * @param[in] v auxiliary value
+     * @param[in] node Vertex identifier.
+     * @param[in] problem Data slice object.
+     * @param[in] v auxiliary value.
+     * @param[in] nid Vertex index.
      *
-     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
+     * \return Whether or not to load the apply function.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-    {
+    static __device__ __forceinline__ bool CondFilter(
+        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         return node != -1;
     }
 
     /**
-     * @brief Forward vertex mapping apply function. Doing nothing for BC problem.
+     * @brief Forward vertex mapping apply function. Doing nothing for BC.
      *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     * @param[in] v auxiliary value
+     * @param[in] node Vertex identifier.
+     * @param[in] problem Data slice object.
+     * @param[in] v auxiliary value.
+     * @param[in] nid Vertex index.
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-    {
+    static __device__ __forceinline__ void ApplyFilter(
+        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         // Doing nothing here
     }
 };
@@ -137,15 +138,15 @@ struct ForwardFunctor
 /**
  * @brief Structure contains device functions in backward traversal pass.
  *
- * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam Value               Type of float or double to use for computing BC value.
- * @tparam ProblemData         Problem data type which contains data slice for BC problem
+ * @tparam VertexId    Type of signed integer to use as vertex identifier.
+ * @tparam SizeT       Type of unsigned integer to use for array indexing.
+ * @tparam Value       Type of float or double to use for computed values.
+ * @tparam ProblemData Problem data type which contains data slice for problem.
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct BackwardFunctor
-{
+template <
+    typename VertexId, typename SizeT, typename Value, typename ProblemData >
+struct BackwardFunctor {
     typedef typename ProblemData::DataSlice DataSlice;
 
     /**
@@ -160,16 +161,16 @@ struct BackwardFunctor
      *
      * \return Whether to load the apply function for the edge.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-    {
-
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId s_id, VertexId d_id, DataSlice *problem,
+        VertexId e_id = 0, VertexId e_id_in = 0) {
         VertexId s_label;
         VertexId d_label;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                s_label, problem->d_labels + s_id);
+            s_label, problem->labels + s_id);
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                d_label, problem->d_labels + d_id);
-       return (d_label == s_label + 1);
+            d_label, problem->labels + d_id);
+        return (d_label == s_label + 1);
     }
 
     /**
@@ -184,58 +185,59 @@ struct BackwardFunctor
      * @param[in] e_id_in input edge id
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-    {
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId s_id, VertexId d_id, DataSlice *problem,
+        VertexId e_id = 0, VertexId e_id_in = 0) {
         //set d_labels[d_id] to be d_labels[s_id]+1
         Value from_sigma;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            from_sigma, problem->d_sigmas + s_id);
+            from_sigma, problem->sigmas + s_id);
 
         Value to_sigma;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            to_sigma, problem->d_sigmas + d_id);
+            to_sigma, problem->sigmas + d_id);
 
         Value to_delta;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            to_delta, problem->d_deltas + d_id);
+            to_delta, problem->deltas + d_id);
 
         Value result = from_sigma / to_sigma * (1.0 + to_delta);
 
         //Accumulate delta value
 
         //Accumulate bc value
-        //atomicAdd(&problem->d_ebc_values[e_id], result);
+        //atomicAdd(problem->ebc_values + e_id, result);
 
-        if (s_id != problem->d_src_node[0]) {
-            atomicAdd(&problem->d_deltas[s_id], result);
-            atomicAdd(&problem->d_bc_values[s_id], result);
+        if (s_id != problem->src_node[0]) {
+            atomicAdd(problem->deltas + s_id, result);
+            atomicAdd(problem->bc_values + s_id, result);
         }
     }
 
     /**
      * @brief Backward vertex mapping condition function. Check if the Vertex Id is valid (equal to 0).
      *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     * @param[in] v auxiliary value
+     * @param[in] node Vertex identifier.
+     * @param[in] problem Data slice object.
+     * @param[in] v auxiliary value.
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0)
-    {
-        return problem->d_labels[node] == 0;
+    static __device__ __forceinline__ bool CondFilter(
+        VertexId node, DataSlice *problem, Value v = 0) {
+        return problem->labels + node == 0;
     }
 
     /**
      * @brief Backward vertex mapping apply function. doing nothing here.
      *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     * @param[in] v auxiliary value
+     * @param[in] node Vertex identifier.
+     * @param[in] problem Data slice object.
+     * @param[in] v auxiliary value.
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0)
-    {
+    static __device__ __forceinline__ void ApplyFilter(
+        VertexId node, DataSlice *problem, Value v = 0) {
         // Doing nothing here
     }
 };
@@ -243,15 +245,15 @@ struct BackwardFunctor
 /**
  * @brief Structure contains device functions in backward traversal pass.
  *
- * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam Value               Type of float or double to use for computing BC value.
- * @tparam ProblemData         Problem data type which contains data slice for BC problem
+ * @tparam VertexId    Type of signed integer to use as vertex identifier.
+ * @tparam SizeT       Type of unsigned integer to use for array indexing.
+ * @tparam Value       Type of float or double to use for computed values.
+ * @tparam ProblemData Problem data type which contains data slice for problem.
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct BackwardFunctor2
-{
+template <
+    typename VertexId, typename SizeT, typename Value, typename ProblemData >
+struct BackwardFunctor2 {
     typedef typename ProblemData::DataSlice DataSlice;
 
     /**
@@ -266,16 +268,17 @@ struct BackwardFunctor2
      *
      * \return Whether to load the apply function for the edge.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-    {
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId s_id, VertexId d_id, DataSlice *problem,
+        VertexId e_id = 0, VertexId e_id_in = 0) {
 
         VertexId s_label;
         VertexId d_label;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                s_label, problem->d_labels + s_id);
+            s_label, problem->labels + s_id);
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                d_label, problem->d_labels + d_id);
-       return (d_label == s_label + 1);
+            d_label, problem->labels + d_id);
+        return (d_label == s_label + 1);
     }
 
     /**
@@ -290,27 +293,28 @@ struct BackwardFunctor2
      * @param[in] e_id_in input edge id
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
-    {
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId s_id, VertexId d_id, DataSlice *problem,
+        VertexId e_id = 0, VertexId e_id_in = 0) {
         //set d_labels[d_id] to be d_labels[s_id]+1
         Value from_sigma;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            from_sigma, problem->d_sigmas + s_id);
+            from_sigma, problem->sigmas + s_id);
 
         Value to_sigma;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            to_sigma, problem->d_sigmas + d_id);
+            to_sigma, problem->sigmas + d_id);
 
         Value to_delta;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            to_delta, problem->d_deltas + d_id);
+            to_delta, problem->deltas + d_id);
 
         //Value result = from_sigma / to_sigma * (1.0 + to_delta);
 
         //Accumulate delta value
 
         //Accumulate bc value
-        //atomicAdd(&problem->d_ebc_values[e_id], result);
+        //atomicAdd(problem->ebc_values + e_id, result);
 
         /*if (s_id != problem->d_src_node[0]) {
             atomicAdd(&problem->d_deltas[s_id], result);
@@ -321,27 +325,29 @@ struct BackwardFunctor2
     /**
      * @brief Backward vertex mapping condition function. Check if the Vertex Id is valid (equal to 0).
      *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     * @param[in] v auxiliary value
+     * @param[in] node Vertex identifier.
+     * @param[in] problem Data slice object.
+     * @param[in] v auxiliary value.
+     * @param[in] nid Vertex index.
      *
-     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
+     * \return Whether or not to load the apply function.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-    {
-        return problem->d_labels[node] == 0;
+    static __device__ __forceinline__ bool CondFilter(
+        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        return problem->labels[node] == 0;
     }
 
     /**
      * @brief Backward vertex mapping apply function. doing nothing here.
      *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     * @param[in] v auxiliary value
+     * @param[in] node Vertex identifier.
+     * @param[in] problem Data slice object.
+     * @param[in] v auxiliary value.
+     * @param[in] nid Vertex index.
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-    {
+    static __device__ __forceinline__ void ApplyFilter(
+        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         // Doing nothing here
     }
 };

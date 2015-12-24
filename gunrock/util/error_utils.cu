@@ -26,9 +26,27 @@ cudaError_t gunrock::util::GRError(
     bool print)
 {
     if (error && print) {
-        fprintf(stderr, "[%s, %d] %s (CUDA error %d: %s)\n", filename, line, message, error, cudaGetErrorString(error));
+        int gpu;
+        cudaGetDevice(&gpu);
+        fprintf(stderr, "[%s, %d @ gpu %d] %s (CUDA error %d: %s)\n", filename, line, gpu, message, error, cudaGetErrorString(error));
         fflush(stderr);
     }
+    return error;
+}
+
+cudaError_t gunrock::util::GRError(
+    cudaError_t error,
+    std::string message,
+    const char *filename,
+    int line,
+    bool print)
+{
+    if (error && print) {
+        int gpu;
+        cudaGetDevice(&gpu);
+        fprintf(stderr, "[%s, %d @ gpu %d] %s (CUDA error %d: %s)\n", filename, line, gpu, message.c_str(), error, cudaGetErrorString(error));
+        fflush(stderr);
+    }   
     return error;
 }
 
@@ -43,8 +61,25 @@ cudaError_t gunrock::util::GRError(
 {
     cudaError_t error = cudaGetLastError();
     if (error && print) {
+        int gpu;
+        cudaGetDevice(&gpu);
+        fprintf(stderr, "[%s, %d @ gpu %d] %s (CUDA error %d: %s)\n", filename, line, gpu, message, error, cudaGetErrorString(error));
+        fflush(stderr);
+    }
+    return error;
+}
 
-        fprintf(stderr, "[%s, %d] %s (CUDA error %d: %s)\n", filename, line, message, error, cudaGetErrorString(error));
+cudaError_t gunrock::util::GRError(
+    std::string message,
+    const char *filename,
+    int line,
+    bool print)
+{
+    cudaError_t error = cudaGetLastError();
+    if (error && print) {
+        int gpu;
+        cudaGetDevice(&gpu);
+        fprintf(stderr, "[%s, %d @ gpu %d] %s (CUDA error %d: %s)\n", filename, line, gpu, message.c_str(), error, cudaGetErrorString(error));
         fflush(stderr);
     }
     return error;
@@ -58,7 +93,9 @@ cudaError_t gunrock::util::GRError(
     bool print)
 {
     if (error && print) {
-        fprintf(stderr, "(CUDA error %d: %s)\n", error, cudaGetErrorString(error));
+        int gpu;
+        cudaGetDevice(&gpu);
+        fprintf(stderr, "[@ gpu %d] (CUDA error %d: %s)\n", gpu, error, cudaGetErrorString(error));
         fflush(stderr);
     }
     return error;
@@ -72,7 +109,34 @@ cudaError_t gunrock::util::GRError(
 {
     cudaError_t error = cudaGetLastError();
     if (error && print) {
-        fprintf(stderr, "(CUDA error %d: %s)\n", error, cudaGetErrorString(error));
+        int gpu;
+        cudaGetDevice(&gpu);
+        fprintf(stderr, "[@ gpu %d] (CUDA error %d: %s)\n", gpu, error, cudaGetErrorString(error));
+        fflush(stderr);
+    }
+    return error;
+}
+
+std::string gunrock::util::GetErrorString(gunrock::util::gunrockError_t error)
+{
+    switch (error) {
+    case gunrock::util::GR_UNSUPPORTED_INPUT_DATA:
+        return "unsupported input data";
+        default:
+        return "unknown error";
+    }
+}
+gunrock::util::gunrockError_t gunrock::util::GRError(
+    gunrock::util::gunrockError_t error,
+    std::string message,
+    const char *filename,
+    int line,
+    bool print)
+{
+    if (error && print) {
+        int gpu;
+        cudaGetDevice(&gpu);
+        fprintf(stderr, "[%s, %d @ gpu %d] %s Gunrock error: %s.\n", filename, line, gpu, message.c_str(), GetErrorString(error).c_str());
         fflush(stderr);
     }
     return error;

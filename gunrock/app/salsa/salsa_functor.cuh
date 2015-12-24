@@ -40,6 +40,8 @@ struct HFORWARDFunctor
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id Output edge index
+     * @param[in] e_id_in Input edge index
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
@@ -56,12 +58,14 @@ struct HFORWARDFunctor
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id Output edge index
+     * @param[in] e_id_in Input edge index
      *
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-            s_id, problem->d_hub_predecessors+e_id);
+            s_id, problem->hub_predecessors + e_id);
     }
 
 };
@@ -86,14 +90,16 @@ struct HBACKWARDFunctor
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id Output edge index
+     * @param[in] e_id_in Input edge index
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        VertexId v_id = problem->d_hub_predecessors[e_id_in];
-        bool flag = (problem->d_out_degrees[v_id] != 0);
-        if (!flag) problem->d_hrank_next[v_id] = 0;
+        VertexId v_id = problem->hub_predecessors[e_id_in];
+        bool flag = (problem->out_degrees[v_id] != 0);
+        if (!flag) problem->hrank_next[v_id] = 0;
         return flag;
     }
 
@@ -105,14 +111,16 @@ struct HBACKWARDFunctor
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id Output edge index
+     * @param[in] e_id_in Input edge index
      *
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        Value hrank_dst = problem->d_hrank_curr[d_id] / (problem->d_in_degrees[s_id] * problem->d_out_degrees[d_id]);
-        VertexId v_id = problem->d_hub_predecessors[e_id_in];
-        //printf("v:%d, s:%d, d:%d in(s):%d, out(d):%d, H(d):%5f\n", v_id, s_id, d_id, problem->d_in_degrees[s_id], problem->d_out_degrees[d_id], problem->d_hrank_curr[d_id]);
-        atomicAdd(&problem->d_hrank_next[v_id], hrank_dst);
+        Value hrank_dst = (problem->in_degrees[s_id] == 0 || problem->out_degrees[d_id] == 0) ? 0 : problem->hrank_curr[d_id] / (problem->in_degrees[s_id] * problem->out_degrees[d_id]);
+        VertexId v_id = problem->hub_predecessors[e_id_in];
+        //printf("hub: eid_in:%d, v:%d, s:%d, d:%d in(s):%d, out(d):%d, H(d):%5f\n", e_id_in, v_id, s_id, d_id, problem->in_degrees[s_id], problem->out_degrees[d_id], problem->hrank_curr[d_id]);
+        atomicAdd(&problem->hrank_next[v_id], hrank_dst);
     }
 };
 
@@ -136,6 +144,8 @@ struct AFORWARDFunctor
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id Output edge index
+     * @param[in] e_id_in Input edge index
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
@@ -152,12 +162,14 @@ struct AFORWARDFunctor
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id Output edge index
+     * @param[in] e_id_in Input edge index
      *
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-            s_id, problem->d_auth_predecessors+e_id);
+            s_id, problem->auth_predecessors+e_id);
     }
 
 };
@@ -182,14 +194,16 @@ struct ABACKWARDFunctor
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id Output edge index
+     * @param[in] e_id_in Input edge index
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
     static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        VertexId v_id = problem->d_auth_predecessors[e_id_in];
-        bool flag = (problem->d_in_degrees[v_id] != 0);
-        if (!flag) problem->d_arank_next[v_id] = 0;
+        VertexId v_id = problem->auth_predecessors[e_id_in];
+        bool flag = (problem->in_degrees[v_id] != 0);
+        if (!flag) problem->arank_next[v_id] = 0;
         return flag;
     }
 
@@ -201,15 +215,15 @@ struct ABACKWARDFunctor
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
      * @param[in] problem Data slice object
+     * @param[in] e_id Output edge index
+     * @param[in] e_id_in Input edge index
      *
      */
     static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        Value arank_dst = problem->d_arank_curr[d_id] / (problem->d_out_degrees[s_id] * problem->d_in_degrees[d_id]);
-        VertexId v_id = problem->d_auth_predecessors[e_id_in];
-        //printf("v:%d, s:%d, d:%d\n",v_id, s_id, d_id);
-        //printf("out(s):%d, in(d):%d, A(d):%5f\n", problem->d_out_degrees[s_id], problem->d_in_degrees[d_id], problem->d_arank_curr[d_id]);
-        atomicAdd(&problem->d_arank_next[v_id], arank_dst);
+        Value arank_dst = (problem->out_degrees[s_id] == 0 || problem->in_degrees[d_id] == 0) ? 0 : problem->arank_curr[d_id] / (problem->out_degrees[s_id] * problem->in_degrees[d_id]);
+        VertexId v_id = problem->auth_predecessors[e_id_in];
+        atomicAdd(&problem->arank_next[v_id], arank_dst);
     }
 };
 
@@ -222,3 +236,4 @@ struct ABACKWARDFunctor
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
+

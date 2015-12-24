@@ -204,29 +204,44 @@ public:
         int grid_size,
         unsigned long long &total_runtimes,
         unsigned long long &total_lifetimes,
-        unsigned long long &total_aggregate)
+        unsigned long long &total_aggregate,
+        bool               check_gpu = true,
+        cudaStream_t       stream = 0)
     {
         cudaError_t retval = cudaSuccess;
 
         do {
 
             unsigned long long *h_stat = (unsigned long long*) malloc(stat_bytes);
-
-            // Save current gpu
             int current_gpu;
-            if (retval = util::GRError(cudaGetDevice(&current_gpu),
-                "KernelRuntimeStatsLifetime cudaGetDevice failed: ", __FILE__, __LINE__)) break;
 
-            if (retval = util::GRError(cudaSetDevice(gpu),
-                "KernelRuntimeStatsLifetime cudaSetDevice failed: ", __FILE__, __LINE__)) break;
+            if (check_gpu)
+            {
+                // Save current gpu
+                if (retval = util::GRError(cudaGetDevice(&current_gpu),
+                    "KernelRuntimeStatsLifetime cudaGetDevice failed: ", __FILE__, __LINE__)) break;
+
+                if (retval = util::GRError(cudaSetDevice(gpu),
+                    "KernelRuntimeStatsLifetime cudaSetDevice failed: ", __FILE__, __LINE__)) break;
+            }
 
             // Copy out stats
-            if (retval = util::GRError(cudaMemcpy(h_stat, d_stat, stat_bytes, cudaMemcpyDeviceToHost),
-                "KernelRuntimeStatsLifetime d_stat failed", __FILE__, __LINE__)) break;
+            if (stream == 0)
+            {
+                if (retval = util::GRError(cudaMemcpy(h_stat, d_stat, stat_bytes, cudaMemcpyDeviceToHost),
+                    "KernelRuntimeStatsLifetime d_stat failed", __FILE__, __LINE__)) break;
+            } else {
+                if (retval = util::GRError(cudaMemcpyAsync(h_stat, d_stat, stat_bytes, cudaMemcpyDeviceToHost, stream),
+                    "KernelRuntimeStatsLifetime d_stat failed", __FILE__, __LINE__)) break;
+                //cudaStreamSynchronize(stream);
+            }
 
-            // Restore current gpu
-            if (retval = util::GRError(cudaSetDevice(current_gpu),
-                "KernelRuntimeStatsLifetime cudaSetDevice failed: ", __FILE__, __LINE__)) break;
+            if (check_gpu)
+            {
+                // Restore current gpu
+                if (retval = util::GRError(cudaSetDevice(current_gpu),
+                    "KernelRuntimeStatsLifetime cudaSetDevice failed: ", __FILE__, __LINE__)) break;
+            }
 
             // Compute runtimes, find max
             unsigned long long max_runtime = 0;
@@ -260,16 +275,14 @@ public:
     cudaError_t Accumulate(
         int grid_size,
         unsigned long long &total_runtimes,
-        unsigned long long &total_lifetimes)
+        unsigned long long &total_lifetimes,
+        bool check_gpu = true,
+        cudaStream_t stream = 0)
     {
         unsigned long long total_aggregate = 0;
-        return Accumulate(grid_size, total_runtimes, total_lifetimes, total_aggregate);
+        return Accumulate(grid_size, total_runtimes, total_lifetimes, total_aggregate, check_gpu, stream);
     }
 };
 
-
-
-
 } // namespace util
 } // namespace gunrock
-

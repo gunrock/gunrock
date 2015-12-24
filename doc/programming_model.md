@@ -9,16 +9,16 @@ Operators                       {#operators}
 Gunrock supports two operators that form the basis of graph computation:
 
 + Advance:
-This operator represents the most common operation in graph: advancing from one
+This operator represents the most common operation in graphs: advancing from one
 frontier to another through edges. It takes either a vertex frontier or an edge
-frontier as the input, visits the edges connect to the elements in the
-frontier, and returns a new frontier which contains either the edges or the
+frontier as the input, visits the edges connected to the elements in the
+frontier, and returns a new frontier that contains either the edges or the
 vertices it reaches.
 
 + Filter:
-This operator inputs a queue of elements, culls some elements by testing
+This operator inputs a frontier of elements, culls some elements by testing
 whether it meets the criteria defined by users, and outputs the rest into a new
-queue. It can also do computations while visiting the elements in the queue and
+frontier. It can also do computations while visiting the elements in the queue and
 doing the validation test.
 
 
@@ -48,4 +48,6 @@ id value, etc. Then we map the algorithm into the combination of the above
 three operators. Next, we need to write different functors for these operators.
 Some graph algorithms require only one functor (BFS), but some graph algorithms
 need more (CC needs seven). Finally, we write an enactor to load the proper
-operator with the proper functor.
+operator with the proper functor. We provide a graph primitive template. The
+problem, functor, and enactor files are under gunrock/app/template, and the
+driver code is under tests/template.

@@ -484,9 +484,7 @@ template <typename KernelPolicy, typename ProblemData, typename PriorityQueue, t
 
     int block_num = (input_queue_length + KernelPolicy::THREADS - 1) / KernelPolicy::THREADS;
     unsigned int close_size[1];
-    unsigned int far_size[1];
     close_size[0] = 0;
-    far_size[0] = 0;
     if(input_queue_length > 0)
     {
         MarkVisit<KernelPolicy, ProblemData, PriorityQueue, Functor><<<block_num, KernelPolicy::THREADS>>>(vertex_in, problem, input_queue_length, node_num);

@@ -28,14 +28,14 @@ DOXYFILE_ENCODING      = UTF-8
 # identify the project. Note that if you do not use Doxywizard you need
 # to put quotes around the project name if it contains spaces.
 
-PROJECT_NAME           = gunrock
+PROJECT_NAME           = Gunrock
 =======
 
 # The PROJECT_NUMBER tag can be used to enter a project or revision number.
 # This could be handy for archiving the generated documentation or
 # if some version control system is used.
 
-PROJECT_NUMBER         = 0.2
+PROJECT_NUMBER         = 0.3
 
 # Using the PROJECT_BRIEF tag one can provide an optional one line description
 # for a project that appears at the top of each page and should give viewer
@@ -155,7 +155,6 @@ STRIP_FROM_PATH        = ./ \
                          ./app/dobfs \
                          ./app/pr \
                          ./app/sssp \
-                         ./simple_example
 
 # The STRIP_FROM_INC_PATH tag can be used to strip a user-defined part of
 # the path mentioned in the documentation of a class, which tells
@@ -266,7 +265,7 @@ OPTIMIZE_OUTPUT_VHDL   = NO
 # that for custom extensions you also need to set FILE_PATTERNS otherwise the
 # files are not read by doxygen.
 
-EXTENSION_MAPPING      =
+EXTENSION_MAPPING      = cu=C++ cuh=C++
 
 # If MARKDOWN_SUPPORT is enabled (the default) then doxygen pre-processes all
 # comments according to the Markdown format, which allows for more readable
@@ -680,11 +679,13 @@ WARN_LOGFILE           = warn.log
 INPUT                  = ../README.md \
                          ../gunrock \
                          ../tests \
-                         ../simple_example \
-                         ./simple_example.dox \
                          ./building_gunrock.md \
                          ./programming_model.md \
-                         ../FAQ.md
+                         ./gunrock_to_json.md \
+                         ./why-gunrock.md \
+                         ./release_notes.md \
+                         ../FAQ.md \
+                         vegademo.md
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding, which is
@@ -794,7 +795,7 @@ EXAMPLE_RECURSIVE      = YES
 # directories that contain image that are included in the documentation (see
 # the \image command).
 
-IMAGE_PATH             =
+IMAGE_PATH             = graphs
 
 # The INPUT_FILTER tag can be used to specify a program that doxygen should
 # invoke to filter for each input file. Doxygen will invoke the filter program
@@ -839,7 +840,7 @@ FILTER_SOURCE_PATTERNS =
 # (index.html). This can be useful if you have a project on for instance GitHub
 # and want reuse the introduction page also for the doxygen output.
 
-USE_MDFILE_AS_MAINPAGE =
+USE_MDFILE_AS_MAINPAGE = ../README.md
 
 #---------------------------------------------------------------------------
 # configuration options related to source browsing
@@ -952,13 +953,13 @@ HTML_FILE_EXTENSION    = .html
 # have to redo this when upgrading to a newer version of doxygen or when
 # changing the value of configuration settings such as GENERATE_TREEVIEW!
 
-HTML_HEADER            =
+HTML_HEADER            = resources/header.html
 
 # The HTML_FOOTER tag can be used to specify a personal HTML footer for
 # each generated HTML page. If it is left blank doxygen will generate a
 # standard footer.
 
-HTML_FOOTER            =
+HTML_FOOTER            = resources/footer.html
 
 # The HTML_STYLESHEET tag can be used to specify a user-defined cascading
 # style sheet that is used by each HTML page. It can be used to
@@ -977,7 +978,7 @@ HTML_STYLESHEET        =
 # robust against future updates. Doxygen will copy the style sheet file to
 # the output directory.
 
-HTML_EXTRA_STYLESHEET  =
+HTML_EXTRA_STYLESHEET  = resources/customdoxygen.css
 
 # The HTML_EXTRA_FILES tag can be used to specify one or more extra images or
 # other source files which should be copied to the HTML output directory. Note
@@ -986,7 +987,10 @@ HTML_EXTRA_STYLESHEET  =
 # files. In the HTML_STYLESHEET file, use the file name only. Also note that
 # the files will be copied as-is; there are no commands or markers available.
 
-HTML_EXTRA_FILES       =
+HTML_EXTRA_FILES       = resources/doxy-boot.js \
+                         resources/bootstrap.min.css \
+                         resources/bootstrap.min.js
+                         
 
 # The HTML_COLORSTYLE_HUE tag controls the color of the HTML output.
 # Doxygen will adjust the colors in the style sheet and background images

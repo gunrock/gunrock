@@ -52,6 +52,7 @@ struct PrepareInputFrontierMapFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      * @param[in] v auxiliary value
+     * @param[in] nid node id
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -89,6 +90,7 @@ struct PrepareUnvisitedQueueFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      * @param[in] v auxiliary value
+     * @param[in] nid node id
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -96,8 +98,8 @@ struct PrepareUnvisitedQueueFunctor
     {
         VertexId label;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            label, problem->d_labels + node);
-        return (label == -1);
+            label, problem->labels + node);
+        return (label == -1 || label == util::MaxValue<Value>()-1);
     }
 
     /**
@@ -145,7 +147,7 @@ struct ReverseBFSFunctor
         //return (atomicCAS(&problem->d_preds[d_id], -2, s_id) == -2) ? true : false;
         if (ProblemData::MARK_PREDECESSORS)
             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    s_id, problem->d_preds + d_id);
+                    s_id, problem->preds + d_id);
         return true; 
     }
 
@@ -167,9 +169,9 @@ struct ReverseBFSFunctor
         VertexId label = s_id;
         if (ProblemData::MARK_PREDECESSORS)
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            label, problem->d_labels + s_id);
+            label, problem->labels + s_id);
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-            label+1, problem->d_labels + d_id);
+            label+1, problem->labels + d_id);
         
         //printf("src:%d, dst:%d, label:%d\n", s_id, d_id, problem->d_labels[d_id]);
     }
@@ -180,6 +182,7 @@ struct ReverseBFSFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      * @param[in] v auxiliary value
+     * @param[in] nid node id
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -220,6 +223,7 @@ struct SwitchToNormalFunctor
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      * @param[in] v auxiliary value
+     * @param[in] nid node id
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */

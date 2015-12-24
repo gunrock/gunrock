@@ -14,12 +14,17 @@
 
 #pragma once
 
+//#include <boost/timer/timer.hpp>
+//#include <boost/chrono/chrono.hpp>
+//#include <boost/detail/lightweight_main.hpp>
 #include <stdarg.h>
 #include <gunrock/util/test_utils.h>
 #include <gunrock/util/error_utils.cuh>
 
-namespace gunrock {
-namespace util {
+namespace gunrock
+{
+namespace util
+{
 
 /******************************************************************************
  * Templated routines for printing keys/values to the console
@@ -248,6 +253,44 @@ void DisplayDeviceResults(
     if (h_data) free(h_data);
 }
 
+/**
+ * Verify the contents of a device array match those
+ * of a host array
+ */
+template <typename DATATYPE, typename INDEXTYPE>
+void DisplayDeviceResults(
+    DATATYPE *d_data,
+    INDEXTYPE *d_indices,
+    size_t num_elements,
+    size_t num_indices)
+{
+    printf("num_elements: %zu\n", num_elements);
+    printf("num_indices: %zu\n", num_indices);
+    // Allocate array on host
+    DATATYPE *h_data = (DATATYPE*) malloc(num_elements * sizeof(DATATYPE));
+    INDEXTYPE *h_indices = (INDEXTYPE*) malloc(num_indices * sizeof(INDEXTYPE));
+
+    // Reduction data back
+    cudaMemcpy(h_data, d_data, sizeof(DATATYPE) * num_elements, cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_indices, d_indices, sizeof(INDEXTYPE) * num_indices, cudaMemcpyDeviceToHost);
+
+    // Display data
+    printf("\n\nData:\n");
+    for (int i = 0; i < num_indices; i++)
+    {
+        PrintValue(h_indices[i]);
+        printf(":");
+        assert(h_indices[i] < num_elements);
+        PrintValue(h_data[h_indices[i]]);
+        printf(", ");
+    }
+    printf("\n\n");
+
+    // Cleanup
+    if (h_data) free(h_data);
+    if (h_indices) free(h_indices);
+}
+
 /******************************************************************************
  * Timing
  ******************************************************************************/
@@ -293,8 +336,21 @@ inline bool EnoughDeviceMemory(unsigned int mem_needed)
 {
     size_t free_mem, total_mem;
     if (util::GRError(cudaMemGetInfo(&free_mem, &total_mem),
-                "cudaMemGetInfo failed", __FILE__, __LINE__)) return false;
+                      "cudaMemGetInfo failed", __FILE__, __LINE__))
+        return false;
     return (mem_needed <= free_mem);
+}
+
+template <typename T>
+__device__ __host__ __forceinline__ T MaxValue()
+{
+    return 0;
+}
+
+template <>
+__device__ __host__ __forceinline__ int MaxValue<int>()
+{
+    return INT_MAX;
 }
 
 /******************************************************************************
@@ -307,60 +363,76 @@ inline bool EnoughDeviceMemory(unsigned int mem_needed)
  */
 
 /**
- * @brief Compares the equivalence of two arrays. If incorrect, print the location
- * of the first incorrect value appears, the incorrect value, and the reference
- * value.
+ * @brief Compares the equivalence of two arrays. If incorrect, print the
+ * location of the first incorrect value appears, the incorrect value, and
+ * the reference value.
  *
  * @tparam T datatype of the values being compared with.
  * @tparam SizeT datatype of the array length.
  *
  * @param[in] computed Vector of values to be compared.
- * @param[in] reference Vector of reference values
- * @param[in] len Vector length
+ * @param[in] reference Vector of reference values.
+ * @param[in] len Vector length.
  * @param[in] verbose Whether to print values around the incorrect one.
+ * @param[in] quiet Don't print out anything unless specified.
  *
- * \return Zero if two vectors are exactly the same, non-zero if there is any difference.
+ * \return Zero if two vectors are exactly the same, non-zero if there is any
+ * difference.
  *
  */
 template <typename T, typename SizeT>
-int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
+int CompareResults(
+    T* computed,
+    T* reference,
+    SizeT len,
+    bool verbose = true,
+    bool quiet = false)
 {
     int flag = 0;
     for (SizeT i = 0; i < len; i++)
     {
         if (computed[i] != reference[i] && flag == 0)
         {
-            printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
-            PrintValue<T>(computed[i]);
-            printf(" != ");
-            PrintValue<T>(reference[i]);
-
-            if (verbose)
+            if (!quiet)
             {
-                printf("\nresult[...");
-                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
+                PrintValue<T>(computed[i]);
+                printf(" != ");
+                PrintValue<T>(reference[i]);
+
+                if (verbose)
                 {
-                    PrintValue<T>(computed[j]);
-                    printf(", ");
+                    printf("\nresult[...");
+                    for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                    {
+                        PrintValue<T>(computed[j]);
+                        printf(", ");
+                    }
+                    printf("...]");
+                    printf("\nreference[...");
+                    for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                    {
+                        PrintValue<T>(reference[j]);
+                        printf(", ");
+                    }
+                    printf("...]");
                 }
-                printf("...]");
-                printf("\nreference[...");
-                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
-                {
-                    PrintValue<T>(reference[j]);
-                    printf(", ");
-                }
-                printf("...]");
             }
             flag += 1;
             //return flag;
         }
-        if (computed[i] != reference[i] && flag > 0) flag+=1;
+        if (computed[i] != reference[i] && flag > 0) flag += 1;
     }
-    printf("\n");
+    if (!quiet)
+    {
+        printf("\n");
+    }
     if (flag == 0)
     {
-        printf("CORRECT");
+        if (!quiet)
+        {
+            printf("CORRECT");
+        }
     }
     return flag;
 }
@@ -371,13 +443,13 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
  * float type. If incorrect, print the location of the first incorrect value
  * appears, the incorrect value, and the reference value.
  *
- * @tparam T datatype of the values being compared with.
  * @tparam SizeT datatype of the array length.
  *
  * @param[in] computed Vector of values to be compared.
  * @param[in] reference Vector of reference values
  * @param[in] len Vector length
  * @param[in] verbose Whether to print values around the incorrect one.
+ * @param[in] quiet Don't print out anything unless specified.
  *
  * \return Zero if difference between each element of the two vectors are less
  * than a certain threshold, non-zero if any difference is equal to or larger
@@ -386,7 +458,11 @@ int CompareResults(T* computed, T* reference, SizeT len, bool verbose = true)
  */
 template <typename SizeT>
 int CompareResults(
-    float* computed, float* reference, SizeT len, bool verbose = true)
+    float* computed,
+    float* reference,
+    SizeT len,
+    bool verbose = true,
+    bool quiet = false)
 {
     float THRESHOLD = 0.05f;
     int flag = 0;
@@ -403,49 +479,64 @@ int CompareResults(
         }
         else
         {
-            if (fabs((computed[i] - reference[i])/reference[i]) > THRESHOLD)
+            if (fabs((computed[i] - reference[i]) / reference[i]) > THRESHOLD)
             {
                 is_right = false;
             }
         }
-        if (!is_right && flag == 0)
-        {
-            printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
-            PrintValue<float>(computed[i]);
-            printf(" != ");
-            PrintValue<float>(reference[i]);
 
-            if (verbose)
+        if (!is_right)
+        {
+            if (!quiet)
             {
-                printf("\nresult[...");
-                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
+                PrintValue<float>(computed[i]);
+                printf(" != ");
+                PrintValue<float>(reference[i]);
+
+                if (verbose)
                 {
-                    PrintValue<float>(computed[j]);
-                    printf(", ");
+                    printf("\nresult[...");
+                    for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                    {
+                        PrintValue<float>(computed[j]);
+                        printf(", ");
+                    }
+                    printf("...]");
+                    printf("\nreference[...");
+                    for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                    {
+                        PrintValue<float>(reference[j]);
+                        printf(", ");
+                    }
+                    printf("...]");
                 }
-                printf("...]");
-                printf("\nreference[...");
-                for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
-                {
-                    PrintValue<float>(reference[j]);
-                    printf(", ");
-                }
-                printf("...]");
             }
             flag += 1;
-            //return flag;
         }
         if (!is_right && flag > 0) flag += 1;
     }
-    printf("\n");
+    if (!quiet)
+    {
+        printf("\n");
+    }
     if (!flag)
     {
-        printf("CORRECT");
+        if (!quiet)
+        {
+            printf("CORRECT");
+        }
     }
     return flag;
 }
 
 /** @} */
 
-}// namespace util
-}// namespace gunrock
+}  // namespace util
+}  // namespace gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

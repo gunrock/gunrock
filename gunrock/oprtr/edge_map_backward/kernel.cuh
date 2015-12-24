@@ -28,13 +28,16 @@ namespace edge_map_backward {
 
 /**
  * @brief Structure for invoking CTA processing tile over all elements.
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Sweep
 {
     static __device__ __forceinline__ void Invoke(
         typename KernelPolicy::VertexId         &queue_index,
-        int                                     &num_gpus,
         typename KernelPolicy::VertexId         *&d_unvisited_node_queue,
         typename KernelPolicy::VertexId         *&d_unvisited_index_queue,
         bool                                    *&d_frontier_bitmap_in,
@@ -64,7 +67,6 @@ struct Sweep
             // CTA processing abstraction
             Cta cta(
                 queue_index,
-                num_gpus,
                 smem_storage,
                 d_unvisited_node_queue,
                 d_unvisited_index_queue,
@@ -97,6 +99,11 @@ struct Sweep
 
 /**
  * Not valid for this arch (default)
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
+ * @tparam VALID
  */
 template<
     typename    KernelPolicy,
@@ -112,9 +119,7 @@ struct Dispatch
     static __device__ __forceinline__ void Kernel(
         bool                        &queue_reset,
         VertexId                    &queue_index,
-        int                         &num_gpus,
         SizeT                       &num_elements,
-        volatile int                *&d_done,
         VertexId                    *&d_unvisited_node_queue,
         VertexId                    *&d_unvisited_index_queue,
         bool                        *&d_frontier_bitmap_in,
@@ -132,7 +137,11 @@ struct Dispatch
 };
 
 /**
- * @brief Kernel dispatch code for different architectures
+ * @brief Kernel dispatch code for different architectures.
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Dispatch<KernelPolicy, ProblemData, Functor, true>
@@ -144,9 +153,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     static __device__ __forceinline__ void Kernel(
         bool                        &queue_reset,
         VertexId                    &queue_index,
-        int                         &num_gpus,
         SizeT                       &num_elements,
-        volatile int                *&d_done,
         VertexId                    *&d_unvisited_node_queue,
         VertexId                    *&d_unvisited_index_queue,
         bool                        *&d_frontier_bitmap_in,
@@ -188,9 +195,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 num_elements = work_progress.template LoadQueueLength<SizeT>(queue_index);
 
                 // Signal to host that we're done
-                if (num_elements == 0) {
-                    if (d_done) d_done[0] = num_elements;
-                }
+                //if (num_elements == 0) {
+                //    if (d_done) d_done[0] = num_elements;
+                //}
             }
 
             // Initialize work decomposition in smem
@@ -207,7 +214,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         Sweep<KernelPolicy, ProblemData, Functor>::Invoke(
                 queue_index,
-                num_gpus,
+                //num_gpus,
                 d_unvisited_node_queue,
                 d_unvisited_index_queue,
                 d_frontier_bitmap_in,
@@ -237,9 +244,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  *
  * @param[in] queue_reset               If reset queue counter
  * @param[in] queue_index               Current frontier queue counter index
- * @param[in] num_gpus                  Number of GPUs
  * @param[in] num_elements              Number of elements
- * @param[in] d_done                    Flag to set when we detect incoming frontier is empty
  * @param[in] d_unvisited_node_queue    Incoming frontier queue
  * @param[in] d_unvisited_index_queue   Incoming frontier index queue
  * @param[in] d_frontier_bitmap_in      Incoming frontier bitmap (set for nodes in the frontier)
@@ -256,9 +261,7 @@ __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
 void Kernel(
         bool                                    queue_reset,                // If reset queue
         typename KernelPolicy::VertexId         queue_index,                // Current frontier queue counter index
-        int                                     num_gpus,                   // Number of GPUs
         typename KernelPolicy::SizeT            num_elements,               // Number of Elements
-        volatile int                            *d_done,                    // Flag to set when we detect incoming edge frontier is empty
         typename KernelPolicy::VertexId         *d_unvisited_node_queue,    // Incoming and output unvisited node queue
         typename KernelPolicy::VertexId         *d_unvisited_index_queue,
         bool                                    *d_frontier_bitmap_in,      // Incoming frontier bitmap
@@ -273,9 +276,7 @@ void Kernel(
     Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
             queue_reset,    
             queue_index,
-            num_gpus,
             num_elements,
-            d_done,
             d_unvisited_node_queue,
             d_unvisited_index_queue,
             d_frontier_bitmap_in,

@@ -8,16 +8,15 @@
 /**
  * @file bc_app.cu
  *
- * @brief Gunrock Betweeness Centrality Implementation
+ * @brief Gunrock betweeness centrality (BC) application
  */
 
-#include <stdio.h>
 #include <gunrock/gunrock.h>
 
-// Graph construction utils
+// graph construction utilities
 #include <gunrock/graphio/market.cuh>
 
-// BC includes
+// betweeness centrality includes
 #include <gunrock/app/bc/bc_enactor.cuh>
 #include <gunrock/app/bc/bc_problem.cuh>
 #include <gunrock/app/bc/bc_functor.cuh>
@@ -30,189 +29,365 @@ using namespace gunrock::oprtr;
 using namespace gunrock::app::bc;
 
 /**
- * @brief Run betweenness centrality tests
+ * @brief BC_Parameter structure
+ */
+struct BC_Parameter : gunrock::app::TestParameter_Base
+{
+public:
+    std::string ref_filename;
+    double max_queue_sizing1;
+
+    BC_Parameter()
+    {
+        ref_filename = "";
+        max_queue_sizing1 = -1.0;
+    }
+
+    ~BC_Parameter()
+    {
+    }
+};
+
+/**
+ * @brief Graph edge properties (bundled properties)
+ */
+struct EdgeProperties
+{
+    int weight;
+};
+
+template <
+    typename VertexId,
+    typename Value,
+    typename SizeT,
+    bool INSTRUMENT,
+    bool DEBUG,
+    bool SIZE_CHECK >
+void runBC(GRGraph* output, BC_Parameter *parameter);
+
+/**
+ * @brief Run test
  *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ * @tparam DEBUG      Keep debug statics
  *
- * @param[out] ggraph_out Pointer to the output CSR graph object
- * @param[in] graph Reference to the CSR graph object defined in main driver
- * @param[in] source
- * @param[in] max_grid_size
- * @param[in] num_gpus
- * @param[in] max_queue_sizing
- * @param[in] context Reference to CudaContext used by moderngpu functions
+ * @param[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
+template <
+    typename      VertexId,
+    typename      Value,
+    typename      SizeT,
+    bool          INSTRUMENT,
+    bool          DEBUG >
+void RunTests_size_check(GRGraph* output, BC_Parameter *parameter)
+{
+    if (parameter->size_check)
+        runBC<VertexId, Value, SizeT, INSTRUMENT,
+              DEBUG,  true>(output, parameter);
+    else
+        runBC<VertexId, Value, SizeT, INSTRUMENT,
+              DEBUG, false>(output, parameter);
+}
+
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ *
+ * @param[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
+template <
+    typename    VertexId,
+    typename    Value,
+    typename    SizeT,
+    bool        INSTRUMENT >
+void RunTests_debug(GRGraph* output, BC_Parameter *parameter)
+{
+    if (parameter->debug)
+        RunTests_size_check<VertexId, Value, SizeT,
+                            INSTRUMENT,  true>(output, parameter);
+    else
+        RunTests_size_check<VertexId, Value, SizeT,
+                            INSTRUMENT, false> (output, parameter);
+}
+
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId Vertex identifier type
+ * @tparam Value    Attribute type
+ * @tparam SizeT    Graph size type
+ *
+ * @param[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
+template <
+    typename      VertexId,
+    typename      Value,
+    typename      SizeT >
+void RunTests_instrumented(GRGraph* output, BC_Parameter *parameter)
+{
+    if (parameter->instrumented)
+        RunTests_debug<VertexId, Value, SizeT,  true>(output, parameter);
+    else
+        RunTests_debug<VertexId, Value, SizeT, false>(output, parameter);
+}
+
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ * @tparam DEBUG      Keep debug statics
+ * @tparam SIZE_CHECK Enable size check
+ *
+ * @param[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
  */
 template <
     typename VertexId,
     typename Value,
-    typename SizeT >
-void run_bc(
-    GunrockGraph *ggraph_out,
-    const Csr<VertexId, Value, SizeT> &graph,
-    VertexId source,
-    int      max_grid_size,
-    int      num_gpus,
-    double   max_queue_sizing,
-    CudaContext& context) {
-    typedef BCProblem <
-        VertexId,
-        SizeT,
-        Value,
-        true, // MARK_PREDECESSORS
-        false > Problem; //does not use double buffer
+    typename SizeT,
+    bool INSTRUMENT,
+    bool DEBUG,
+    bool SIZE_CHECK >
+void runBC(GRGraph* output, BC_Parameter *parameter)
+{
+    typedef BCProblem <VertexId,
+            SizeT,
+            Value,
+            true,               // MARK_PREDECESSORS
+            false > BcProblem;  // Does not use double buffer
 
-    // Allocate host-side array (for both reference and gpu-computed results)
-    Value *h_sigmas     = (Value*)malloc(sizeof(Value) * graph.nodes);
-    Value *h_bc_values  = (Value*)malloc(sizeof(Value) * graph.nodes);
-    Value *h_ebc_values = (Value*)malloc(sizeof(Value) * graph.edges);
+    typedef BCEnactor <BcProblem,
+            INSTRUMENT,
+            DEBUG,
+            SIZE_CHECK > BcEnactor;
 
-    // Allocate BC enactor map
-    BCEnactor<false> bc_enactor(false);
+    Csr<VertexId, Value, SizeT> *graph =
+        (Csr<VertexId, Value, SizeT>*)parameter->graph;
+    bool          quiet              = parameter -> g_quiet;
+    VertexId      src                = (VertexId)parameter -> src;
+    int           max_grid_size      = parameter -> max_grid_size;
+    int           num_gpus           = parameter -> num_gpus;
+    double        max_queue_sizing   = parameter -> max_queue_sizing;
+    double        max_queue_sizing1  = parameter -> max_queue_sizing1;
+    double        max_in_sizing      = parameter -> max_in_sizing;
+    ContextPtr   *context            = (ContextPtr*)parameter -> context;
+    std::string   partition_method   = parameter -> partition_method;
+    int          *gpu_idx            = parameter -> gpu_idx;
+    cudaStream_t *streams            = parameter -> streams;
+    float         partition_factor   = parameter -> partition_factor;
+    int           partition_seed     = parameter -> partition_seed;
+    bool          g_stream_from_host = parameter -> g_stream_from_host;
+    size_t       *org_size           = new size_t  [num_gpus];
+    // Allocate host-side arrays
+    Value        *h_sigmas           = new Value   [graph->nodes];
+    Value        *h_bc_values        = new Value   [graph->nodes];
+    Value        *h_ebc_values       = new Value   [graph->edges];
+    VertexId     *h_labels           = new VertexId[graph->nodes];
 
-    // Allocate problem on GPU
-    Problem *csr_problem = new Problem;
-    util::GRError(csr_problem->Init(
-                      false,
-                      graph,
-                      num_gpus),
-                  "BC Problem Initialization Failed", __FILE__, __LINE__);
+    for (int gpu = 0; gpu < num_gpus; gpu++)
+    {
+        size_t dummy;
+        cudaSetDevice(gpu_idx[gpu]);
+        cudaMemGetInfo(&(org_size[gpu]), &dummy);
+    }
+
+    BcEnactor* enactor = new BcEnactor(num_gpus, gpu_idx);  // BC enactor map
+    BcProblem* problem = new BcProblem;  // Allocate problem on GPU
+
+    util::GRError(
+        problem->Init(
+            g_stream_from_host,
+            graph,
+            NULL,
+            num_gpus,
+            gpu_idx,
+            partition_method,
+            streams,
+            max_queue_sizing,
+            max_in_sizing,
+            partition_factor,
+            partition_seed),
+        "BC Problem Initialization Failed", __FILE__, __LINE__);
+    util::GRError(
+        enactor->Init(context, problem, max_grid_size),
+        "BC Enactor init failed", __FILE__, __LINE__);
 
     // Perform BC
-    GpuTimer gpu_timer;
+    CpuTimer cpu_timer;
+    VertexId start_src;
+    VertexId end_src;
 
-    VertexId start_source;
-    VertexId end_source;
-    if (source == -1) {
-        start_source = 0;
-        end_source = graph.nodes;
-    } else {
-        start_source = source;
-        end_source = source + 1;
+    if (src == -1)
+    {
+        start_src = 0;
+        end_src = graph->nodes;
+    }
+    else
+    {
+        start_src = src;
+        end_src = src + 1;
     }
 
-    gpu_timer.Start();
-    for (VertexId i = start_source; i < end_source; ++i) {
-        util::GRError(csr_problem->Reset(
-                          i, bc_enactor.GetFrontierType(), max_queue_sizing),
-                      "BC Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(bc_enactor.template Enact<Problem>(
-                          context, csr_problem, i, max_grid_size),
-                      "BC Problem Enact Failed", __FILE__, __LINE__);
+    for (int gpu = 0; gpu < num_gpus; gpu++)
+    {
+        util::SetDevice(gpu_idx[gpu]);
+        util::MemsetKernel <<< 128, 128 >>> (
+            problem->data_slices[gpu]->bc_values.GetPointer(util::DEVICE),
+            (Value)0.0f, (int)(problem->sub_graphs[gpu].nodes));
+    }
+    util::GRError(
+        problem->Reset(0, enactor->GetFrontierType(),
+                       max_queue_sizing, max_queue_sizing1),
+        "BC Problem Data Reset Failed", __FILE__, __LINE__);
+
+    cpu_timer.Start();
+    for (VertexId i = start_src; i < end_src; ++i)
+    {
+        util::GRError(
+            problem->Reset(i, enactor->GetFrontierType(),
+                           max_queue_sizing, max_queue_sizing1),
+            "BC Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(
+            enactor ->Reset(), "BC Enactor Reset failed", __FILE__, __LINE__);
+        util::GRError(
+            enactor ->Enact(i), "BC Problem Enact Failed", __FILE__, __LINE__);
     }
 
-    util::MemsetScaleKernel <<< 128, 128>>>(
-        csr_problem->data_slices[0]->d_bc_values, (Value)0.5f, (int)graph.nodes);
+    for (int gpu = 0; gpu < num_gpus; gpu++)
+    {
+        util::SetDevice(gpu_idx[gpu]);
+        util::MemsetScaleKernel <<< 128, 128 >>> (
+            problem->data_slices[gpu]->bc_values.GetPointer(util::DEVICE),
+            (Value)0.5f, (int)(problem->sub_graphs[gpu].nodes));
+    }
+    cpu_timer.Stop();
 
-    gpu_timer.Stop();
+    float elapsed = cpu_timer.ElapsedMillis();
 
-    float elapsed = gpu_timer.ElapsedMillis();
+    // Copy out results
+    util::GRError(
+        problem->Extract(h_sigmas, h_bc_values, h_ebc_values, h_labels),
+        "BC Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    //double avg_duty = 0.0;
-    //bc_enactor.GetStatistics(avg_duty);
+    output->node_value1 = (Value*)&h_bc_values[0];
+    output->edge_value1 = (Value*)&h_ebc_values[0];
 
-    // Copy out results to Host Device
-    util::GRError(csr_problem->Extract(h_sigmas, h_bc_values, h_ebc_values),
-                  "BC Problem Data Extraction Failed", __FILE__, __LINE__);
+    if (!quiet)
+    {
+        printf(" GPU Betweenness Centrality finished in %lf msec.\n", elapsed);
+    }
 
-    // copy h_bc_values per node to GunrockGraph output
-    ggraph_out->node_values = (float*)&h_bc_values[0];
-    // copy h_ebc_values per edge to GunrockGraph output
-    ggraph_out->edge_values = (float*)&h_ebc_values[0];
-
-    printf("GPU Betweeness Centrality finished in %lf msec.\n", elapsed);
-
-    // Cleanup
-    if (csr_problem) delete csr_problem;
-    //if (h_sigmas) free(h_sigmas);
-    //if (h_bc_values) free(h_bc_values);
-
-    cudaDeviceSynchronize();
+    // Clean up
+    if (org_size) { delete[] org_size; org_size = NULL; }
+    if (problem ) { delete   problem ; problem  = NULL; }
+    if (enactor ) { delete   enactor ; enactor  = NULL; }
+    if (h_sigmas) { delete[] h_sigmas; h_sigmas = NULL; }
+    if (h_labels) { delete[] h_labels; h_labels = NULL; }
 }
 
 /**
- * @brief dispatch function to handle data_types
+ * @brief Dispatch function to handle configurations
  *
- * @param[out] ggraph_out GunrockGraph type output
- * @param[in]  ggraph_in  GunrockGraph type input graph
- * @param[in]  bc_config  bc specific configurations
- * @param[in]  data_type  bc data_type configurations
- * @param[in]  context    moderngpu context
+ * @param[out] grapho  Pointer to output graph structure of the problem
+ * @param[in]  graphi  Pointer to input graph we need to process on
+ * @param[in]  config  Primitive-specific configurations
+ * @param[in]  data_t  Data type configurations
+ * @param[in]  context ModernGPU context
+ * @param[in]  streams CUDA stream
  */
-void dispatch_bc(
-    GunrockGraph       *ggraph_out,
-    const GunrockGraph *ggraph_in,
-    GunrockConfig      bc_config,
-    GunrockDataType    data_type,
-    CudaContext&       context) {
-    switch (data_type.VTXID_TYPE) {
-    case VTXID_INT: {
-        switch (data_type.SIZET_TYPE) {
-        case SIZET_INT: {
-            switch (data_type.VALUE_TYPE) {
-            case VALUE_INT: {
-                // template type = <int, int, int>
+void dispatchBC(
+    GRGraph*        grapho,
+    const GRGraph*  graphi,
+    const GRSetup   config,
+    const GRTypes   data_t,
+    ContextPtr*     context,
+    cudaStream_t*   streams)
+{
+    BC_Parameter* parameter = new BC_Parameter;
+    parameter->g_quiet  = config.quiet;
+    parameter->context  = context;
+    parameter->streams  = streams;
+    parameter->num_gpus = config.num_devices;
+    parameter->gpu_idx  = config.device_list;
+
+    switch (data_t.VTXID_TYPE)
+    {
+    case VTXID_INT:
+    {
+        switch (data_t.SIZET_TYPE)
+        {
+        case SIZET_INT:
+        {
+            switch (data_t.VALUE_TYPE)
+            {
+            case VALUE_INT:    // template type = <int, int, int>
+            {
                 // not support yet
                 printf("Not Yet Support This DataType Combination.\n");
                 break;
             }
-            case VALUE_UINT: {
-                // template type = <int, uint, int>
+            case VALUE_UINT:    // template type = <int, uint, int>
+            {
                 // not support yet
                 printf("Not Yet Support This DataType Combination.\n");
                 break;
             }
-            case VALUE_FLOAT: {
-                // template type = <int, float, int>
+            case VALUE_FLOAT:    // template type = <int, float, int>
+            {
                 // build input csr format graph
-                Csr<int, float, int> csr_graph(false);
-                csr_graph.nodes = ggraph_in->num_nodes;
-                csr_graph.edges = ggraph_in->num_edges;
-                csr_graph.row_offsets    = (int*)ggraph_in->row_offsets;
-                csr_graph.column_indices = (int*)ggraph_in->col_indices;
+                Csr<int, int, int> csr(false);
+                csr.nodes = graphi->num_nodes;
+                csr.edges = graphi->num_edges;
+                csr.row_offsets    = (int*)graphi->row_offsets;
+                csr.column_indices = (int*)graphi->col_indices;
+                parameter->graph = &csr;
 
-                // bc configurations
-                int   src_node         =  -1; //!< Use whatever the specified graph-type's default is
-                int   max_grid_size    =   0; //!< maximum grid size (0: leave it up to the enactor)
-                int   num_gpus         =   1; //!< Number of GPUs for multi-gpu enactor to use
-                float max_queue_sizing = 1.0; //!< Maximum size scaling factor for work queues
-
-                // determine source vertex to start bc
-                switch (bc_config.src_mode) {
-                case randomize: {
-                    src_node = graphio::RandomNode(csr_graph.nodes);
+                // determine source vertex to start
+                switch (config.source_mode)
+                {
+                case randomize:
+                {
+                    parameter->src = graphio::RandomNode(csr.nodes);
                     break;
                 }
-                case largest_degree: {
+                case largest_degree:
+                {
                     int max_deg = 0;
-                    src_node = csr_graph.GetNodeWithHighestDegree(max_deg);
+                    parameter->src = csr.GetNodeWithHighestDegree(max_deg);
                     break;
                 }
-                case manually: {
-                    src_node = bc_config.src_node;
+                case manually:
+                {
+                    parameter->src = config.source_vertex;
                     break;
                 }
-                default: {
-                    src_node = 0;
+                default:
+                {
+                    parameter->src = 0;
                     break;
                 }
                 }
-                max_queue_sizing = bc_config.queue_size;
+                if (!parameter->g_quiet)
+                {
+                    printf(" source: %lld\n", (long long) parameter->src);
+                }
+                RunTests_instrumented<int, float, int>(grapho, parameter);
 
-                // lunch bc function
-                run_bc<int, float, int>(
-                    ggraph_out,
-                    csr_graph,
-                    src_node,
-                    max_grid_size,
-                    num_gpus,
-                    max_queue_sizing,
-                    context);
-
-                // reset for free memory
-                csr_graph.row_offsets    = NULL;
-                csr_graph.column_indices = NULL;
+                csr.row_offsets    = NULL;
+                csr.column_indices = NULL;
                 break;
             }
             }
@@ -225,31 +400,97 @@ void dispatch_bc(
 }
 
 /*
- * @brief gunrock_bc function
+ * @brief Entry of gunrock_bc function
  *
- * @param[out] ggraph_out output of bc problem
- * @param[in]  ggraph_in  input graph need to process on
- * @param[in]  bc_config  gunrock primitive specific configurations
- * @param[in]  data_type  gunrock datatype struct
+ * @param[out] grapho Pointer to output graph structure of the problem
+ * @param[in]  graphi Pointer to input graph we need to process on
+ * @param[in]  config Gunrock primitive specific configurations
+ * @param[in]  data_t Gunrock data type structure
  */
-void gunrock_bc_func(
-    GunrockGraph       *ggraph_out,
-    const GunrockGraph *ggraph_in,
-    GunrockConfig      bc_config,
-    GunrockDataType    data_type) {
+void gunrock_bc(
+    GRGraph       *grapho,
+    const GRGraph *graphi,
+    const GRSetup  config,
+    const GRTypes  data_t)
+{
+    // GPU-related configurations
+    int           num_gpus =    0;
+    int           *gpu_idx = NULL;
+    ContextPtr    *context = NULL;
+    cudaStream_t  *streams = NULL;
 
-    // moderngpu preparations
-    int device = 0;
-    device = bc_config.device;
-    ContextPtr context = mgpu::CreateCudaDevice(device);
+    num_gpus = config.num_devices;
+    gpu_idx  = new int [num_gpus];
+    for (int i = 0; i < num_gpus; ++i)
+    {
+        gpu_idx[i] = config.device_list[i];
+    }
 
-    // lunch dispatch function
-    dispatch_bc(
-        ggraph_out,
-        ggraph_in,
-        bc_config,
-        data_type,
-        *context);
+    // Create streams and MordernGPU context for each GPU
+    streams = new cudaStream_t[num_gpus * num_gpus * 2];
+    context = new ContextPtr[num_gpus * num_gpus];
+    if (!config.quiet) { printf(" using %d GPUs:", num_gpus); }
+    for (int gpu = 0; gpu < num_gpus; ++gpu)
+    {
+        if (!config.quiet) { printf(" %d ", gpu_idx[gpu]); }
+        util::SetDevice(gpu_idx[gpu]);
+        for (int i = 0; i < num_gpus * 2; ++i)
+        {
+            int _i = gpu * num_gpus * 2 + i;
+            util::GRError(cudaStreamCreate(&streams[_i]),
+                          "cudaStreamCreate fialed.", __FILE__, __LINE__);
+            if (i < num_gpus)
+            {
+                context[gpu * num_gpus + i] =
+                    mgpu::CreateCudaDeviceAttachStream(gpu_idx[gpu],
+                                                       streams[_i]);
+            }
+        }
+    }
+    if (!config.quiet) { printf("\n"); }
+
+    dispatchBC(grapho, graphi, config, data_t, context, streams);
+}
+
+/*
+ * @brief Simple interface take in CSR arrays as input
+ *
+ * @param[out] bc_scores   Return BC node centrality per nodes
+ * @param[in]  num_nodes   Number of nodes of the input graph
+ * @param[in]  num_edges   Number of edges of the input graph
+ * @param[in]  row_offsets CSR-formatted graph input row offsets
+ * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[in]  source      Source to begin traverse/computation
+ */
+void bc(
+    float*     bc_scores,
+    const int  num_nodes,
+    const int  num_edges,
+    const int* row_offsets,
+    const int* col_indices,
+    const int  source)
+{
+    struct GRTypes data_t;            // primitive-specific data types
+    data_t.VTXID_TYPE = VTXID_INT;    // integer vertex identifier
+    data_t.SIZET_TYPE = SIZET_INT;    // integer graph size type
+    data_t.VALUE_TYPE = VALUE_FLOAT;  // float attributes type
+
+    struct GRSetup config = InitSetup();  // primitive-specific configures
+    config.source_vertex = source;        // source vertex to start
+
+    struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+
+    graphi->num_nodes   = num_nodes;  // setting graph nodes
+    graphi->num_edges   = num_edges;  // setting graph edges
+    graphi->row_offsets = (void*)&row_offsets[0];  // setting row_offsets
+    graphi->col_indices = (void*)&col_indices[0];  // setting col_indices
+
+    gunrock_bc(grapho, graphi, config, data_t);
+    memcpy(bc_scores, (float*)grapho->node_value1, num_nodes * sizeof(float));
+
+    if (graphi) free(graphi);
+    if (grapho) free(grapho);
 }
 
 // Leave this at the end of the file

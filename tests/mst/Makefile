@@ -1,9 +1,9 @@
-#-------------------------------------------------------------------------------
+# ----------------------------------------------------------------
 # Gunrock -- Fast and Efficient GPU Graph Library
-#-------------------------------------------------------------------------------
+# ----------------------------------------------------------------
 # This source code is distributed under the terms of LICENSE.TXT
 # in the root directory of this source distribution.
-#-------------------------------------------------------------------------------
+# ----------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
 # Build script for project
@@ -11,7 +11,6 @@
 
 force64 = 1
 NVCC = "$(shell which nvcc)"
-#NVCC = "/usr/local/cuda-6.5/bin/nvcc"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
 KERNELS =
@@ -23,10 +22,10 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 # Gen targets
 #-------------------------------------------------------------------------------
 
+GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\"
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
-SM_TARGETS = $(GEN_SM30)
-#$(GEN_SM35)
+SM_TARGETS = $(GEN_SM35) #$(GEN_SM37)
 
 #-------------------------------------------------------------------------------
 # Libs
@@ -37,11 +36,13 @@ SM_TARGETS = $(GEN_SM30)
 # Includes
 #-------------------------------------------------------------------------------
 
-CUDA_INC  = "$(shell dirname $(NVCC))/../include"
-MGPU_INC  = "../../externals/moderngpu/include"
-BOOST_INC = "../../../boost_1_53_0"
-CUB_INC   = "../../externals/cub"
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) -I$(BOOST_INC) -I.. -I../..
+CUDA_INC = "$(shell dirname $(NVCC))/../include"
+MGPU_INC = "../../externals/moderngpu/include"
+CUB_INC = "../../externals/cub"
+BOOST_DEPS = -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -lboost_filesystem
+OMP_DEPS = -Xcompiler -fopenmp -Xlinker -lgomp
+METIS_DEPS = -Xlinker -lmetis
+INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -62,18 +63,12 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -Xptxas -v -Xcudafe -\#
+NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo -ccbin=g++-4.8
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
 endif
 
-#ifeq (,$(findstring 3.0, $(NVCC_VERSION)))
-#ifneq ($(abi), 1)
-	# Disable the ABI by default for 3.1+
-	#NVCCFLAGS += -Xptxas -abi=no
-#endif
-#endif
 
 ifeq ($(verbose), 1)
     NVCCFLAGS += -v
@@ -91,28 +86,26 @@ endif
 # Dependency Lists
 #-------------------------------------------------------------------------------
 
-DEPS =			./Makefile \
-				$(wildcard ../../gunrock/util/*.cuh) \
-				$(wildcard ../../gunrock/util/**/*.cuh) \
-				$(wildcard ../../gunrock/*.cuh) \
-				$(wildcard ../../gunrock/graphio/*.cuh) \
-				$(wildcard ../../gunrock/oprtr/*.cuh) \
-				$(wildcard ../../gunrock/oprtr/**/*.cuh) \
-				$(wildcard ../../gunrock/app/*.cuh) \
-				$(wildcard ../../gunrock/app/**/*.cuh)
-
-
-
+DEPS = ./Makefile \
+	$(wildcard ../../gunrock/util/*.cuh) \
+	$(wildcard ../../gunrock/util/**/*.cuh) \
+	$(wildcard ../../gunrock/*.cuh) \
+	$(wildcard ../../gunrock/graphio/*.cuh) \
+	$(wildcard ../../gunrock/oprtr/*.cuh) \
+	$(wildcard ../../gunrock/oprtr/**/*.cuh) \
+	$(wildcard ../../gunrock/app/*.cuh) \
+	$(wildcard ../../gunrock/app/**/*.cuh)
 
 #-------------------------------------------------------------------------------
 # (make test) Test driver for
 #-------------------------------------------------------------------------------
 
-test: bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX)
+ALGO = mst
+test: bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_mst.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(DEPS)
+bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_$(ALGO).cu  ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp ../../gunrock/util/gitsha1.c $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_mst.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp $(NVCCFLAGS) $(ARCH) $(INC) -O3
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_$(ALGO).cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp ../../gunrock/util/gitsha1.c $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean
@@ -121,9 +114,3 @@ bin/test_mst_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_mst.cu ../../gunrock/util/err
 clean :
 	rm -f bin/*_$(NVCC_VERSION)_$(ARCH_SUFFIX)*
 	rm -f *.i* *.cubin *.cu.c *.cudafe* *.fatbin.c *.ptx *.hash *.cu.cpp *.o
-
-# Leave this at the end of the file
-# Local Variables:
-# mode:c++
-# c-file-style: "NVIDIA"
-# End:

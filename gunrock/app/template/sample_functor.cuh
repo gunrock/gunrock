@@ -48,7 +48,7 @@ struct SampleFunctor {
     static __device__ __forceinline__ bool
     CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem,
              VertexId e_id = 0, VertexId e_id_in = 0) {
-        return true;  // TODO: advance condition function
+        return true;  // TODO(developer): advance condition function
     }
 
     /**
@@ -64,7 +64,7 @@ struct SampleFunctor {
     static __device__ __forceinline__ void
     ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem,
               VertexId e_id = 0, VertexId e_id_in = 0) {
-        // TODO: advance apply function
+        // TODO(developer): advance apply function
     }
 
     /**
@@ -73,13 +73,14 @@ struct SampleFunctor {
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      * @param[in] v Auxiliary value
+     * @param[in] nid 
      *
      * \return Whether to load the apply function for the node and
      *         include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool
     CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
-        return true;  // TODO: filter condition function
+        return true;  // TODO(developer): filter condition function
     }
 
     /**
@@ -88,11 +89,12 @@ struct SampleFunctor {
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
      * @param[in] v Auxiliary value
+     * @param[in] nid
      *
      */
     static __device__ __forceinline__ void
     ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
-        // TODO: filter apply function
+        // TODO(developer): filter apply function
     }
 };
 

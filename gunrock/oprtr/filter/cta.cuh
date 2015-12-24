@@ -43,7 +43,6 @@ struct BitmaskTex
 template <typename VisitedMask>
 texture<VisitedMask, cudaTextureType1D, cudaReadModeElementType> BitmaskTex<VisitedMask>::ref;
 
-
 /**
  * @brief CTA tile-processing abstraction for the filter operator.
  *
@@ -66,6 +65,7 @@ struct Cta
     typedef typename KernelPolicy::SmemStorage      SmemStorage;
 
     typedef typename ProblemData::DataSlice         DataSlice;
+    typedef typename ProblemData::Value             Value;
 
     /**
      * Members
@@ -83,7 +83,7 @@ struct Cta
     VertexId                queue_index;                // Current frontier queue counter index
     util::CtaWorkProgress   &work_progress;             // Atomic workstealing and queueing counters
     SizeT                   max_out_frontier;           // Maximum size (in elements) of outgoing frontier
-    int                     num_gpus;                   // Number of GPUs
+    //int                     num_gpus;                   // Number of GPUs
 
     // Operational details for raking_scan_grid
     RakingDetails           raking_details;
@@ -93,6 +93,7 @@ struct Cta
 
     // Whether or not to perform bitmask culling (incurs extra latency on small frontiers)
     bool                    bitmask_cull;
+    //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *t_bitmask;
 
     //---------------------------------------------------------------------
     // Helper Structures
@@ -176,7 +177,7 @@ struct Cta
 
                     // Read byte from visited mask in tex
                     unsigned char tex_mask_byte = tex1Dfetch(
-                        BitmaskTex<unsigned char>::ref,
+                        BitmaskTex<unsigned char>::ref,//cta->t_bitmask[0],
                         mask_byte_offset);
 
                     if (mask_bit & tex_mask_byte) {
@@ -184,8 +185,9 @@ struct Cta
                         tile->element_id[LOAD][VEC] = -1;
                     } else {
                         unsigned char mask_byte;
-                        util::io::ModifiedLoad<util::io::ld::cg>::Ld(
-                            mask_byte, cta->d_visited_mask + mask_byte_offset);
+                        //util::io::ModifiedLoad<util::io::ld::cg>::Ld(
+                        //    mask_byte, cta->d_visited_mask + mask_byte_offset);
+                        mask_byte = cta->d_visited_mask[mask_byte_offset];
 
                         mask_byte |= tex_mask_byte;
 
@@ -208,6 +210,8 @@ struct Cta
 
             /**
              * @brief Set vertex id to -1 if we want to cull this vertex from the outgoing frontier.
+             * @param[in] cta
+             * @param[in] tile
              *
              */
             static __device__ __forceinline__ void VertexCull(
@@ -216,12 +220,12 @@ struct Cta
             {
                 if (ProblemData::ENABLE_IDEMPOTENCE && cta->iteration != -1) {
                     if (tile->element_id[LOAD][VEC] >= 0) {
-                        VertexId row_id = (tile->element_id[LOAD][VEC]&KernelPolicy::ELEMENT_ID_MASK)/cta->num_gpus;
+                        VertexId row_id = (tile->element_id[LOAD][VEC]&KernelPolicy::ELEMENT_ID_MASK);///cta->num_gpus;
 
                         VertexId label;
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                                     label,
-                                                    (VertexId*)cta->problem->d_labels + row_id);
+                                                    cta->problem->labels + row_id);
                         if (label != -1) {
                             // Seen it
                             tile->element_id[LOAD][VEC] = -1;
@@ -238,7 +242,7 @@ struct Cta
                 } else {
                     if (tile->element_id[LOAD][VEC] >= 0) {
                         // Row index on our GPU (for multi-gpu, element ids are striped across GPUs)
-                        VertexId row_id = (tile->element_id[LOAD][VEC]) / cta->num_gpus;
+                        VertexId row_id = (tile->element_id[LOAD][VEC]);// / cta->num_gpus;
                         SizeT node_id = threadIdx.x * LOADS_PER_TILE*LOAD_VEC_SIZE + LOAD*LOAD_VEC_SIZE+VEC;
                         if (Functor::CondFilter(row_id, cta->problem, cta->iteration, node_id)) {
                             // ApplyFilter(row_id)
@@ -420,7 +424,7 @@ struct Cta
     __device__ __forceinline__ Cta(
         VertexId                iteration,
         VertexId                queue_index,
-        int                     num_gpus,
+        //int                     num_gpus,
         SmemStorage             &smem_storage,
         VertexId                *d_in,
         VertexId                *d_pred_in,
@@ -428,10 +432,11 @@ struct Cta
         DataSlice               *problem,
         unsigned char           *d_visited_mask,
         util::CtaWorkProgress   &work_progress,
-        SizeT                   max_out_frontier) :
+        SizeT                   max_out_frontier):
+        //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *t_bitmask):
             iteration(iteration),
             queue_index(queue_index),
-            num_gpus(num_gpus),
+            //num_gpus(num_gpus),
             raking_details(
                 smem_storage.state.raking_elements,
                 smem_storage.state.warpscan,
@@ -444,6 +449,7 @@ struct Cta
             d_visited_mask(d_visited_mask),
             work_progress(work_progress),
             max_out_frontier(max_out_frontier),
+	    //t_bitmask(t_bitmask),
             bitmask_cull(
                 (KernelPolicy::END_BITMASK_CULL < 0) ?
                     true :
@@ -524,6 +530,7 @@ struct Cta
         
         // Check updated queue offset for overflow due to redundant expansion
         if (new_queue_offset >= max_out_frontier) {
+            //printf(" new_queue_offset >= max_out_frontier, new_queue_offset = %d, max_out_frontier = %d\n", new_queue_offset, max_out_frontier);
             work_progress.SetOverflow<SizeT>();
             util::ThreadExit();
         }
@@ -536,10 +543,10 @@ struct Cta
                 KernelPolicy::LOG_LOAD_VEC_SIZE,
                 KernelPolicy::THREADS,
                 ProblemData::QUEUE_WRITE_MODIFIER>::Scatter(
-                        d_out,
-                        tile.element_id,
-                        tile.flags,
-                        tile.ranks);
+                    d_out,
+                    tile.element_id,
+                    tile.flags,
+                    tile.ranks);
         }
     }
 };

@@ -1,4 +1,8 @@
-#!/bin/sh
+#!/bin/bash
+
+OPTION[0]="--src=largestdegree --device=0 --partition_method=random"
+
+MARK[0]=""
 
 #get all execution files in ./bin
 files=(./bin/*)
@@ -16,20 +20,31 @@ do
 done
 
 #put OS and Device type here
-SUFFIX="ubuntu12.04.k40c"
+SUFFIX="ubuntu12.04_k40c"
+EXCUTION=$exe_file
+DATADIR="/data/gunrock_dataset/large"
 
 mkdir -p eval/$SUFFIX
 
 for i in ak2010 belgium_osm coAuthorsDBLP delaunay_n13 delaunay_n21 soc-LiveJournal1 kron_g500-logn21 webbase-1M
 do
-    echo $exe_file market ../../dataset/large/$i/$i.mtx --src=largestdegree
-         $exe_file market ../../dataset/large/$i/$i.mtx --src=largestdegree --device=0 > eval/$SUFFIX/$i.$SUFFIX.txt
-    sleep 1
+    for j in 0
+    do
+        echo $EXCUTION market $DATADIR/$i/$i.mtx ${OPTION[$j]} "> eval/$SUFFIX/$i.$SUFFIX${MARK[$j]}.txt"
+             $EXCUTION market $DATADIR/$i/$i.mtx ${OPTION[$j]}  > eval/$SUFFIX/$i.$SUFFIX${MARK[$j]}.txt
+        sleep 1
+    done
 done
+
+OPTION[0]="--src=-1 --device=0 --partition_method=random"
+MARK[0]=""
 
 for i in chesapeake test_bc
 do
-    echo $exe_file market ../../dataset/small/$i.mtx --src=-1
-         $exe_file market ../../dataset/small/$i.mtx --src=-1 --device=0 > eval/$SUFFIX/$i.$SUFFIX.txt
-    sleep 1
+    for j in 0
+    do
+        echo $EXCUTION market $DATADIR/../small/$i.mtx ${OPTION[$j]} "> eval/$SUFFIX/$i.$SUFFIX${MARK[$j]}.txt"
+             $EXCUTION market $DATADIR/../small/$i.mtx ${OPTION[$j]}  > eval/$SUFFIX/$i.$SUFFIX${MARK[$j]}.txt
+        sleep 1
+    done
 done

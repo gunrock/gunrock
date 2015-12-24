@@ -15,31 +15,38 @@
 #pragma once
 
 #if defined(_WIN32) || defined(_WIN64)
-    #include <windows.h>
-    #undef small            // Windows is terrible for polluting macro namespace
+#include <windows.h>
+#undef small            // Windows is terrible for polluting macro namespace
+#elif defined(CLOCK_PROCESS_CPUTIME_ID)
+#include <sys/time.h>
 #else
-    #include <time.h>
-    #include <sys/resource.h>
-    #include <time.h>
+#include <sys/resource.h>
 #endif
 
 #include <stdio.h>
 #include <math.h>
 #include <float.h>
 
+#include <cassert>
 #include <map>
 #include <string>
 #include <vector>
+#include <stack>
 #include <sstream>
 #include <iostream>
 #include <fstream>
 #include <algorithm>
 #include <utility>
+#include <boost/timer/timer.hpp>
 #include <gunrock/util/random_bits.h>
 #include <gunrock/util/basic_utils.h>
 
-namespace gunrock {
-namespace util {
+// #include <gunrock/util/gitsha1.cpp>
+
+namespace gunrock
+{
+namespace util
+{
 
 /******************************************************************************
  * Command-line parsing functionality
@@ -50,6 +57,9 @@ namespace util {
  */
 class CommandLineArgs
 {
+private:
+    int argc;
+    char ** argv;
 protected:
 
     std::map<std::string, std::string> pairs;
@@ -57,22 +67,26 @@ protected:
 public:
 
     // Constructor
-    CommandLineArgs(int argc, char **argv)
+    CommandLineArgs(int _argc, char **_argv) : argc(_argc), argv(_argv)
     {
         for (int i = 1; i < argc; i++)
         {
             std::string arg = argv[i];
 
-            if ((arg[0] != '-') || (arg[1] != '-')) {
+            if ((arg[0] != '-') || (arg[1] != '-'))
+            {
                 continue;
             }
 
             std::string::size_type pos;
             std::string key, val;
-            if ((pos = arg.find('=')) == std::string::npos) {
+            if ((pos = arg.find('=')) == std::string::npos)
+            {
                 key = std::string(arg, 2, arg.length() - 2);
                 val = "";
-            } else {
+            }
+            else
+            {
                 key = std::string(arg, 2, pos - 2);
                 val = std::string(arg, pos + 1, arg.length() - 1);
             }
@@ -84,17 +98,20 @@ public:
     bool CheckCmdLineFlag(const char* arg_name)
     {
         std::map<std::string, std::string>::iterator itr;
-        if ((itr = pairs.find(arg_name)) != pairs.end()) {
+        if ((itr = pairs.find(arg_name)) != pairs.end())
+        {
             return true;
         }
         return false;
     }
 
-    // Returns the value specified for a given commandline parameter --<flag>=<value>
+    // Returns the value specified for a given commandline
+    // parameter --<flag>=<value>
     template <typename T>
     void GetCmdLineArgument(const char *arg_name, T &val);
 
-    // Returns the values specified for a given commandline parameter --<flag>=<value>,<value>*
+    // Returns the values specified for a given commandline
+    // parameter --<flag>=<value>,<value>*
     template <typename T>
     void GetCmdLineArguments(const char *arg_name, std::vector<T> &vals);
 
@@ -103,9 +120,43 @@ public:
     {
         return pairs.size();
     }
+
+    std::string GetEntireCommandLine() const
+    {
+        std::string commandLineStr = "";
+        for (int i = 0; i < argc; i++)
+        {
+            commandLineStr.append(std::string(argv[i]).append((i < argc - 1) ? " " : ""));
+        }
+        return commandLineStr;
+    }
+
+    template <typename T>
+    void ParseArgument(const char *name, T &val)
+    {
+        if (CheckCmdLineFlag(name))
+        {
+            GetCmdLineArgument(name, val);
+        }
+    }
+
+    char * GetCmdLineArgvGraphType()
+    {
+        char * graph_type = argv[1];
+        return graph_type;
+    }
+
+    char * GetCmdLineArgvDataset()
+    {
+        char * market_filename;
+        size_t graph_args = argc - pairs.size() - 1;
+        market_filename =  (graph_args == 2) ? argv[2] : NULL; 
+        return market_filename;
+    }
 };
 
 void DeviceInit(CommandLineArgs &args);
+cudaError_t SetDevice(int dev);
 
 template <typename T>
 void CommandLineArgs::GetCmdLineArgument(
@@ -113,7 +164,8 @@ void CommandLineArgs::GetCmdLineArgument(
     T &val)
 {
     std::map<std::string, std::string>::iterator itr;
-    if ((itr = pairs.find(arg_name)) != pairs.end()) {
+    if ((itr = pairs.find(arg_name)) != pairs.end())
+    {
         std::istringstream str_stream(itr->second);
         str_stream >> val;
     }
@@ -124,9 +176,10 @@ void CommandLineArgs::GetCmdLineArguments(
     const char *arg_name,
     std::vector<T> &vals)
 {
-     // Recover multi-value string
+    // Recover multi-value string
     std::map<std::string, std::string>::iterator itr;
-    if ((itr = pairs.find(arg_name)) != pairs.end()) {
+    if ((itr = pairs.find(arg_name)) != pairs.end())
+    {
 
         // Clear any default values
         vals.clear();
@@ -138,9 +191,11 @@ void CommandLineArgs::GetCmdLineArguments(
 
         // Iterate comma-separated values
         T val;
-        while ((new_pos = val_string.find(',', old_pos)) != std::string::npos) {
+        while ((new_pos = val_string.find(',', old_pos)) != std::string::npos)
+        {
 
-            if (new_pos != old_pos) {
+            if (new_pos != old_pos)
+            {
                 str_stream.width(new_pos - old_pos);
                 str_stream >> val;
                 vals.push_back(val);
@@ -218,53 +273,47 @@ struct CpuTimer
 
 #elif defined(CLOCK_PROCESS_CPUTIME_ID)
 
-    timespec start;
-    timespec stop;
+    double start;
+    double stop;
 
     void Start()
     {
-        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
+        static struct timeval tv;
+        static struct timezone tz;
+        gettimeofday(&tv, &tz);
+        start = tv.tv_sec + 1.e-6 * tv.tv_usec;
     }
 
     void Stop() 
     {
-        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop);
+        static struct timeval tv;
+        static struct timezone tz;
+        gettimeofday(&tv, &tz);
+        stop = tv.tv_sec + 1.e-6 * tv.tv_usec;
     }
 
-    float ElapsedMillis()
+    double ElapsedMillis()
     {
-	timespec temp;
-	if ((stop.tv_nsec-start.tv_nsec)<0) {
-            temp.tv_sec = stop.tv_sec-start.tv_sec-1;
-	    temp.tv_nsec = 1000000000+stop.tv_nsec-start.tv_nsec;
-	} else {
-	    temp.tv_sec = stop.tv_sec-start.tv_sec;
-	    temp.tv_nsec = stop.tv_nsec-start.tv_nsec;
-	}
-	return temp.tv_nsec/1000000.0;
+        return 1000 * (stop - start);
     }
 
 #else
 
-    rusage start;
-    rusage stop;
+    boost::timer::cpu_timer::cpu_timer cpu_t;
 
     void Start()
     {
-        getrusage(RUSAGE_SELF, &start);
+        cpu_t.start();
     }
 
     void Stop()
     {
-        getrusage(RUSAGE_SELF, &stop);
+        cpu_t.stop();
     }
 
     float ElapsedMillis()
     {
-        float sec = stop.ru_utime.tv_sec - start.ru_utime.tv_sec;
-        float usec = stop.ru_utime.tv_usec - start.ru_utime.tv_usec;
-
-	return (sec*1000)+(usec/1000);
+        return cpu_t.elapsed().wall / 1000000.0;
     }
 
 #endif
@@ -283,5 +332,11 @@ struct KeyValuePair
     }
 };
 
-} //util
-} //gunrock
+}  // namespace util
+}  // namespace gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

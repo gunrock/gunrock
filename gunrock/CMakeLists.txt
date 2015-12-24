@@ -20,20 +20,32 @@ set(HFILES_PUBLIC
   gunrock.h)
 
 set(CUFILES
-  app/topk/topk_app.cu
   app/bfs/bfs_app.cu
   app/bc/bc_app.cu
   app/cc/cc_app.cu
-  app/sssp/sssp_app.cu
   app/pr/pr_app.cu
+  app/sssp/sssp_app.cu
   util/test_utils.cu
   util/error_utils.cu
-  ${mgpu_SOURCE_FILES})
+  util/misc_utils.cu
+  ${mgpu_SOURCE_FILES}
+  util/gitsha1.c)
 
 cuda_add_library(gunrock ${LIB_TYPE}
-  ${CCFILES}
   ${HFILES}
   ${CUHFILES}
   ${HFILES_PUBLIC}
   ${CUFILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
+
+target_link_libraries(gunrock ${Boost_LIBRARIES})
+target_link_libraries(gunrock ${METIS_LIBRARY})
+
+# OpenMP on OS X/clang
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    link_directories("/opt/local/lib")
+    include_directories("/opt/local/include")
+    target_link_libraries(gunrock "omp")
+  endif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")

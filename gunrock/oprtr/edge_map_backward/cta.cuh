@@ -97,7 +97,7 @@ namespace edge_map_backward {
             // Work progress
             VertexId                queue_index;                // Current frontier queue counter index
             util::CtaWorkProgress   &work_progress;             // Atomic queueing counters
-            int                     num_gpus;                   // Number of GPUs
+            //int                     num_gpus;                   // Number of GPUs
 
             // Operational details for raking grid
             RakingSoaDetails        raking_soa_details;
@@ -179,7 +179,7 @@ namespace edge_map_backward {
                                 if (tile->vertex_id[LOAD][VEC] != -1) {
 
                                         // Translate vertex-id into local gpu row-id (currently stride of num_gpu)
-                                        VertexId row_id = tile->vertex_id[LOAD][VEC] / cta->num_gpus;
+                                        VertexId row_id = tile->vertex_id[LOAD][VEC] ; // / cta->num_gpus;
 
                                         // Load neighbor row range from d_row_offsets
                                         Vec2SizeT   row_range;
@@ -604,7 +604,7 @@ namespace edge_map_backward {
              */
             __device__ __forceinline__ Cta(
                 VertexId                    queue_index,
-                int                         num_gpus,
+                //int                         num_gpus,
                 SmemStorage                 &smem_storage,
                 VertexId                    *d_queue,
                 VertexId                    *d_index,
@@ -617,7 +617,7 @@ namespace edge_map_backward {
                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE) :
 
                 queue_index(queue_index),
-                num_gpus(num_gpus),
+                //num_gpus(num_gpus),
                 smem_storage(smem_storage),
                 raking_soa_details(
                         typename RakingSoaDetails::GridStorageSoa(

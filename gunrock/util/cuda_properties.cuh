@@ -60,10 +60,12 @@ namespace util {
                                                          GR_SM10_SMEM_BYTES())      
 
 // Physical threads per SM
+#define GR_SM30_SM_THREADS()            (2048)      // 2048 threads on SM3.0+
 #define GR_SM20_SM_THREADS()            (1536)      // 1536 threads on SM2.0+
 #define GR_SM12_SM_THREADS()            (1024)      // 1024 threads on SM1.2-SM1.3
 #define GR_SM10_SM_THREADS()            (768)       // 768 threads on SM1.0-SM1.1
-#define GR_SM_THREADS(arch)         ((arch >= 200) ? GR_SM20_SM_THREADS() :     \
+#define GR_SM_THREADS(arch)         ((arch >= 300) ? GR_SM30_SM_THREADS() : \
+                                         (arch >= 200) ? GR_SM20_SM_THREADS() :     \
                                          (arch >= 130) ? GR_SM12_SM_THREADS() :     \
                                                          GR_SM10_SM_THREADS())
 
@@ -74,18 +76,22 @@ namespace util {
                                                          GR_SM10_LOG_CTA_THREADS())
 
 // Max CTAs per SM
+#define GR_SM30_SM_CTAS()               (16)     // 16 CTAs on SM3.0+
 #define GR_SM20_SM_CTAS()               (8)     // 8 CTAs on SM2.0+
 #define GR_SM12_SM_CTAS()               (8)     // 8 CTAs on SM1.2-SM1.3
 #define GR_SM10_SM_CTAS()               (8)     // 8 CTAs on SM1.0-SM1.1
-#define GR_SM_CTAS(arch)                ((arch >= 200) ? GR_SM20_SM_CTAS() :    \
+#define GR_SM_CTAS(arch)                ((arch >= 300) ? GR_SM30_SM_CTAS() :    \
+                                         (arch >= 200) ? GR_SM20_SM_CTAS() :    \
                                          (arch >= 130) ? GR_SM12_SM_CTAS() :    \
                                                          GR_SM10_SM_CTAS())
 
 // Max registers per SM
+#define GR_SM30_SM_REGISTERS()      (65536)     // 65536 registers on SM3.0+
 #define GR_SM20_SM_REGISTERS()      (32768)     // 32768 registers on SM2.0+
 #define GR_SM12_SM_REGISTERS()      (16384)     // 16384 registers on SM1.2-SM1.3
 #define GR_SM10_SM_REGISTERS()      (8192)      // 8192 registers on SM1.0-SM1.1
-#define GR_SM_REGISTERS(arch)           ((arch >= 200) ? GR_SM20_SM_REGISTERS() :   \
+#define GR_SM_REGISTERS(arch)           ((arch >= 300) ? GR_SM30_SM_REGISTERS() :   \
+                                         (arch >= 200) ? GR_SM20_SM_REGISTERS() :   \
                                          (arch >= 130) ? GR_SM12_SM_REGISTERS() :   \
                                                          GR_SM10_SM_REGISTERS())
 
@@ -132,24 +138,18 @@ public:
     int                 kernel_ptx_version;
     
 public:
-    
-    // Default constructor
-    CudaProperties() 
+
+    CudaProperties()        {           }
+    CudaProperties(int gpu) {Setup(gpu);}
+    void Setup()
     {
-        // Get current device properties 
         int current_device;
         cudaGetDevice(&current_device);
-        cudaGetDeviceProperties(&device_props, current_device);
-        device_sm_version = device_props.major * 100 + device_props.minor * 10;
-    
-        // Get SM version of compiled kernel assemblies
-        cudaFuncAttributes flush_kernel_attrs;
-        cudaFuncGetAttributes(&flush_kernel_attrs, FlushKernel<void>);
-        kernel_ptx_version = flush_kernel_attrs.ptxVersion * 10;
+        Setup(current_device);
     }
 
     // Constructor
-    CudaProperties(int gpu)
+    void Setup(int gpu)
     {
         // Get current device properties
         cudaGetDeviceProperties(&device_props, gpu);

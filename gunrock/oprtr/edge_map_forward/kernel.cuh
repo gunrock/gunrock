@@ -30,17 +30,23 @@ namespace edge_map_forward {
 
 /**
  * @brief Structure for invoking CTA processing tile over all elements.
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
+ * @tparam VALID
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Sweep
 {
     static __device__ __forceinline__ void Invoke(
         typename KernelPolicy::VertexId         &queue_index,
-        int                                     &num_gpus,
+        //int                                     &num_gpus,
         int                                     &label,
         typename KernelPolicy::VertexId         *&d_in_queue,
         typename KernelPolicy::VertexId         *&d_pred_out,
         typename KernelPolicy::VertexId         *&d_out_queue,
+        typename KernelPolicy::SizeT            *&d_row_offsets,
         typename KernelPolicy::VertexId         *&d_column_indices,
         typename KernelPolicy::VertexId         *&d_inverse_column_indices,
         typename ProblemData::DataSlice         *&problem,
@@ -72,12 +78,12 @@ struct Sweep
             // CTA processing abstraction
             Cta cta(
                 queue_index,
-                num_gpus,
                 label,
                 smem_storage,
                 d_in_queue,
                 d_pred_out,
                 d_out_queue,
+                d_row_offsets,
                 d_column_indices,
                 d_inverse_column_indices,
                 problem,
@@ -111,6 +117,11 @@ struct Sweep
 
 /**
  * Not valid for this arch (default)
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
+ * @tparam VALID.
  */
 template<
     typename    KernelPolicy,
@@ -126,13 +137,12 @@ struct Dispatch
     static __device__ __forceinline__ void Kernel(
         bool                        &queue_reset,
         VertexId                    &queue_index,
-        int                         &num_gpus,
         int                         &label,
         SizeT                       &num_elements,
-        volatile int                *&d_done,
         VertexId                    *&d_in_queue,
         VertexId                    *&d_pred_out,
         VertexId                    *&d_out_queue,
+        SizeT                       *&d_row_offsets,
         VertexId                    *&d_column_indices,
         VertexId                    *&d_inverse_column_indices,
         DataSlice                   *&problem,
@@ -153,7 +163,11 @@ struct Dispatch
 };
 
 /**
- * @brief Kernel dispatch code for different architectures
+ * @brief Kernel dispatch code for different architectures.
+ *
+ * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
+ * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Functor Functor type for the specific problem type.
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Dispatch<KernelPolicy, ProblemData, Functor, true>
@@ -165,13 +179,12 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     static __device__ __forceinline__ void Kernel(
         bool                        &queue_reset,
         VertexId                    &queue_index,
-        int                         &num_gpus,
         int                         &label,
         SizeT                       &num_elements,
-        volatile int                *&d_done,
         VertexId                    *&d_in_queue,
         VertexId                    *&d_pred_out,
         VertexId                    *&d_out_queue,
+        SizeT                       *&d_row_offsets,
         VertexId                    *&d_column_indices,
         VertexId                    *&d_inverse_column_indices,
         DataSlice                   *&problem,
@@ -222,9 +235,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 }
 
                 // Signal to host that we're done
-                if (num_elements == 0) {
-                    if (d_done) d_done[0] = num_elements;
-                }
+                //if (num_elements == 0) {
+                //    if (d_done) d_done[0] = num_elements;
+                //}
             }
 
             // Initialize work decomposition in smem
@@ -243,11 +256,11 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         Sweep<KernelPolicy, ProblemData, Functor>::Invoke(
                 queue_index,
-                num_gpus,
                 label,
                 d_in_queue,
                 d_pred_out,
-                d_out_queue, 
+                d_out_queue,
+                d_row_offsets, 
                 d_column_indices,
                 d_inverse_column_indices,
                 problem,
@@ -279,10 +292,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  *
  * @param[in] queue_reset       If reset queue counter
  * @param[in] queue_index       Current frontier queue counter index
- * @param[in] num_gpus          Number of GPUs
  * @param[in] label             Distance from source (label) of current frontier
  * @param[in] num_elements      Number of elements
- * @param[in] d_done            Pointer of volatile int to the flag to set when we detect incoming frontier is empty
  * @param[in] d_in_queue        Device pointer of VertexId to the incoming frontier queue
  * @param[in] d_pred_out         Device pointer of VertexId to the outgoing predecessor queue (only used when both mark_pred and enable_idempotence are set)
  * @param[in] d_out_queue       Device pointer of VertexId to the outgoing frontier queue
@@ -299,13 +310,12 @@ __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
 void Kernel(
         bool                                    queue_reset,
         typename KernelPolicy::VertexId         queue_index,
-        int                                     num_gpus,
         int                                     label,
         typename KernelPolicy::SizeT            num_elements,
-        volatile int                            *d_done, 
         typename KernelPolicy::VertexId         *d_in_queue,
         typename KernelPolicy::VertexId         *d_pred_out,
         typename KernelPolicy::VertexId         *d_out_queue,
+        typename KernelPolicy::SizeT            *d_row_offsets,
         typename KernelPolicy::VertexId         *d_column_indices,
         typename KernelPolicy::VertexId         *d_inverse_column_indices,
         typename ProblemData::DataSlice         *problem,
@@ -323,13 +333,12 @@ void Kernel(
     Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
             queue_reset,    
             queue_index,
-            num_gpus,
             label,
             num_elements,
-            d_done,
             d_in_queue,
             d_pred_out,
             d_out_queue,
+            d_row_offsets,
             d_column_indices,
             d_inverse_column_indices,
             problem,

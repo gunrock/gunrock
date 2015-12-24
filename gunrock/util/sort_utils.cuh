@@ -63,94 +63,94 @@ namespace util {
       //Key Value Pair sort (according to keys)
       if (is_ascend)
       {
-	if (util::GRError((retval = cub::DeviceRadixSort::SortPairs(
-	  d_temp_storage,
-	  temp_storage_bytes,
-	  key_buffer,
-	  value_buffer,
-	  num_elements)),
-	  "cub::DeviceRadixSort::SortPairs failed",
-	  __FILE__, __LINE__)) return retval;
-	if (util::GRError((retval = cudaMalloc(
+    if (util::GRError((retval = cub::DeviceRadixSort::SortPairs(
+      d_temp_storage,
+      temp_storage_bytes,
+      key_buffer,
+      value_buffer,
+      num_elements)),
+      "cub::DeviceRadixSort::SortPairs failed",
+      __FILE__, __LINE__)) return retval;
+    if (util::GRError((retval = cudaMalloc(
           &d_temp_storage, temp_storage_bytes)),
           "CUB RadixSort malloc d_temp_storage failed",
-	  __FILE__, __LINE__)) return retval;
-	if (util::GRError((retval = cub::DeviceRadixSort::SortPairs(
-	  d_temp_storage,
-	  temp_storage_bytes,
-	  key_buffer,
-	  value_buffer,
-	  num_elements)),
-	  "cub::DeviceRadixSort::SortPairs failed",
-	  __FILE__, __LINE__)) return retval;
+      __FILE__, __LINE__)) return retval;
+    if (util::GRError((retval = cub::DeviceRadixSort::SortPairs(
+      d_temp_storage,
+      temp_storage_bytes,
+      key_buffer,
+      value_buffer,
+      num_elements)),
+      "cub::DeviceRadixSort::SortPairs failed",
+      __FILE__, __LINE__)) return retval;
       }
       else
       {
-	if (util::GRError((retval = cub::DeviceRadixSort::SortPairsDescending(
-	  d_temp_storage,
-	  temp_storage_bytes,
-	  key_buffer,
-	  value_buffer,
-	  num_elements)),
-	  "cub::DeviceRadixSort::SortPairsDescending failed",
-	  __FILE__, __LINE__)) return retval;
-	if (util::GRError((retval = cudaMalloc(
-	  &d_temp_storage, temp_storage_bytes)),
-	  "CUB RadixSort malloc d_temp_storage failed",
-	  __FILE__, __LINE__)) return retval;
-	if (util::GRError((retval = cub::DeviceRadixSort::SortPairsDescending(
-	  d_temp_storage,
-	  temp_storage_bytes,
-	  key_buffer,
-	  value_buffer,
-	  num_elements)),
-	  "cub::DeviceRadixSort::SortPairsDescending failed",
-	  __FILE__, __LINE__)) return retval;
+    if (util::GRError((retval = cub::DeviceRadixSort::SortPairsDescending(
+      d_temp_storage,
+      temp_storage_bytes,
+      key_buffer,
+      value_buffer,
+      num_elements)),
+      "cub::DeviceRadixSort::SortPairsDescending failed",
+      __FILE__, __LINE__)) return retval;
+    if (util::GRError((retval = cudaMalloc(
+      &d_temp_storage, temp_storage_bytes)),
+      "CUB RadixSort malloc d_temp_storage failed",
+      __FILE__, __LINE__)) return retval;
+    if (util::GRError((retval = cub::DeviceRadixSort::SortPairsDescending(
+      d_temp_storage,
+      temp_storage_bytes,
+      key_buffer,
+      value_buffer,
+      num_elements)),
+      "cub::DeviceRadixSort::SortPairsDescending failed",
+      __FILE__, __LINE__)) return retval;
       }
     }
     else
     {
       if (is_ascend)
       {
-	if (util::GRError((retval = cub::DeviceRadixSort::SortKeys(
-	  d_temp_storage,
-	  temp_storage_bytes,
-	  key_buffer,
-	  num_elements)),
-	  "cub::DeviceRadixSort::SortKeyss failed",
-	  __FILE__, __LINE__)) return retval;
-	if (util::GRError((retval = cudaMalloc(
-	  &d_temp_storage, temp_storage_bytes)),
-	  "cub RadixSort malloc d_temp_storage failed",
-	  __FILE__, __LINE__)) return retval;
-	if (util::GRError((retval = cub::DeviceRadixSort::SortKeys(
-	  d_temp_storage,
-	  temp_storage_bytes,
-	  key_buffer,
-	  num_elements)),
-	  "cub::DeviceRadixSort::SortKeys failed",
-	  __FILE__, __LINE__)) return retval;
+    if (util::GRError((retval = cub::DeviceRadixSort::SortKeys(
+      d_temp_storage,
+      temp_storage_bytes,
+      key_buffer,
+      num_elements)),
+      "cub::DeviceRadixSort::SortKeyss failed",
+      __FILE__, __LINE__)) return retval;
+    if (util::GRError((retval = cudaMalloc(
+      &d_temp_storage, temp_storage_bytes)),
+      "cub RadixSort malloc d_temp_storage failed",
+      __FILE__, __LINE__)) return retval;
+    if (util::GRError((retval = cub::DeviceRadixSort::SortKeys(
+      d_temp_storage,
+      temp_storage_bytes,
+      key_buffer,
+      num_elements)),
+      "cub::DeviceRadixSort::SortKeys failed",
+      __FILE__, __LINE__)) return retval;
       }
       else
       {
-	if (util::GRError((retval = cub::DeviceRadixSort::SortKeysDescending(
-	  d_temp_storage,
-	  temp_storage_bytes,
-	  key_buffer,
-	  num_elements)),
-	  "cub::DeviceRadixSort::SortKeysDescending failed",
-	  __FILE__, __LINE__)) return retval;
-	if (util::GRError((retval = cudaMalloc(
-	  &d_temp_storage, temp_storage_bytes)),
-	  "CUB RadixSort malloc d_temp_storage failed",
-	  __FILE__, __LINE__)) return retval;
-	if (util::GRError((retval = cub::DeviceRadixSort::SortKeysDescending(
-	  d_temp_storage,
-	  temp_storage_bytes,
-	  key_buffer,
-	  num_elements)),
-	  "cub::DeviceRadixSort::SortKeysDescending failed",
-	  __FILE__, __LINE__)) return retval;
+    if (util::GRError((retval = cub::DeviceRadixSort::SortKeysDescending(
+      d_temp_storage,
+      temp_storage_bytes,
+      key_buffer,
+      num_elements)),
+      "cub::DeviceRadixSort::SortKeysDescending failed",
+      __FILE__, __LINE__)) return retval;
+    if (util::GRError((retval = cudaMalloc(
+      &d_temp_storage, temp_storage_bytes)),
+      "CUB RadixSort malloc d_temp_storage failed",
+      __FILE__, __LINE__)) return retval;
+    if (util::GRError((retval = cub::DeviceRadixSort::SortKeysDescending(
+      d_temp_storage,
+      temp_storage_bytes,
+      key_buffer,
+      num_elements)),
+      "cub::DeviceRadixSort::SortKeysDescending failed",
+      __FILE__, __LINE__)) return retval;
       }
     }
 
@@ -164,13 +164,13 @@ namespace util {
 
     if (d_value)
     {
-	if (util::GRError((retval = cudaMemcpy(
-	    d_value,
-	    value_buffer.Current(),
-	    sizeof(ValueType)*num_elements,
-	    cudaMemcpyDeviceToDevice)),
-	    "CUB RadixSort copy back values failed",
-	    __FILE__, __LINE__)) return retval;
+    if (util::GRError((retval = cudaMemcpy(
+        d_value,
+        value_buffer.Current(),
+        sizeof(ValueType)*num_elements,
+        cudaMemcpyDeviceToDevice)),
+        "CUB RadixSort copy back values failed",
+        __FILE__, __LINE__)) return retval;
     }
 
     if (util::GRError((retval = cudaFree(d_temp_storage)),
@@ -181,9 +181,9 @@ namespace util {
       __FILE__, __LINE__)) return retval;
     if (d_value)
     {
-	if (util::GRError((retval = cudaFree(value)),
-	    "CUB Radixsort free value failed",
-	    __FILE__, __LINE__)) return retval;
+    if (util::GRError((retval = cudaFree(value)),
+        "CUB Radixsort free value failed",
+        __FILE__, __LINE__)) return retval;
     }
 
     return retval;
@@ -212,21 +212,21 @@ namespace util {
     if (d_val)
     {
       mgpu::SegSortPairsFromIndices(
-	d_key,
-	d_val,
-	num_elements,
-	d_indices,
-	num_indices,
-	context);
+    d_key,
+    d_val,
+    num_elements,
+    d_indices,
+    num_indices,
+    context);
     }
     else
     {
       mgpu::SegSortKeysFromIndices(
-	d_key,
-	num_elements,
-	d_indices,
-	num_indices,
-	context);
+    d_key,
+    num_elements,
+    d_indices,
+    num_indices,
+    context);
     }
 
     return retval;
@@ -242,3 +242,4 @@ namespace util {
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
+

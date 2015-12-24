@@ -22,10 +22,10 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 # Gen targets
 #-------------------------------------------------------------------------------
 
+GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\"
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
-SM_TARGETS = $(GEN_SM35)
-#$(GEN_SM35)
+SM_TARGETS = $(GEN_SM35) $(GEN_SM37)
 
 #-------------------------------------------------------------------------------
 # Libs
@@ -37,9 +37,12 @@ SM_TARGETS = $(GEN_SM35)
 #-------------------------------------------------------------------------------
 
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
-BOOST_INC = "../../../boost_1_53_0"
 MGPU_INC = "../../externals/moderngpu/include"
-INC = -I$(CUDA_INC) -I$(BOOST_INC) -I$(MGPU_INC) -I.. -I../..
+CUB_INC = "../../externals/cub"
+BOOST_DEPS = -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -lboost_filesystem
+OMP_DEPS = -Xcompiler -fopenmp -Xlinker -lgomp
+METIS_DEPS = -Xlinker -lmetis
+INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -60,11 +63,12 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -Xptxas -v -Xcudafe -\#
+NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo -ccbin=g++-4.8
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
 endif
+
 
 ifeq ($(verbose), 1)
     NVCCFLAGS += -v
@@ -96,11 +100,12 @@ DEPS = 			./Makefile \
 # (make test) Test driver for
 #-------------------------------------------------------------------------------
 
-test: bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX)
+ALGO = cc
+test: bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_cc.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu $(DEPS)
+bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_$(ALGO).cu  ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp ../../gunrock/util/gitsha1.c $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_cc_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_cc.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu $(NVCCFLAGS) $(ARCH) $(INC) -O3
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_$(ALGO).cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp ../../gunrock/util/gitsha1.c $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 #-------------------------------------------------------------------------------
 # Clean
