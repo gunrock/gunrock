@@ -654,6 +654,7 @@ public:
             char *market_filename = args.GetCmdLineArgvDataset();
             if (market_filename == NULL)
             {
+                printf("YZH Log.");
                 fprintf(stderr, "Input graph does not exist.\n");
                 return 1;
             }

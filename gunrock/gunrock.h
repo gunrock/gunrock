@@ -16,6 +16,7 @@
 
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 /**
  * @brief VertexId data type enumerators.

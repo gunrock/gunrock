@@ -291,12 +291,15 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter)
     float elapsed = 0.0f;
     for (int i = 0; i < num_iters; ++i)
     {
+        printf("%d round of bfs.\n", i);
         util::GRError(
                 problem->Reset(parameter->src[i], enactor->GetFrontierType(),
                     max_queue_sizing, max_queue_sizing1),
                 "BFS Problem Data Reset Failed", __FILE__, __LINE__);
+        printf("before enactor reset.\n");
         util::GRError(
                 enactor->Reset(), "BFS Enactor Reset failed", __FILE__, __LINE__);
+        printf("after enactor reset.\n");
 
         cpu_timer.Start();
 
@@ -305,6 +308,8 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter)
                 "BFS Problem Enact Failed", __FILE__, __LINE__);
 
         cpu_timer.Stop();
+
+        printf("after enactor run.\n");
 
         elapsed += cpu_timer.ElapsedMillis();
     }
