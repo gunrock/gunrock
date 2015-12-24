@@ -72,9 +72,12 @@ and Windows.
 Requirements
 ------------
 
-Gunrock has not been tested with any CUDA version < 5.5.
+CUDA version 5.5 (or greater) and compute capability 3.0 (or greater) is
+required.
 
-Several graph primitives' CPU validation code uses Boost Graph Library (> v1.53.0).
+Several graph primitives' CPU validation code uses Boost Graph Library.
+We are also using Boost Spirit, filesystem, and timer in our utility code.
+A boost version > 1.53.0 is required.
 
 CUDA
 ====
@@ -165,8 +168,10 @@ functions in Gunrock are derived from the
 algorithm is described in his PPoPP '12 paper *Scalable GPU Graph
 Traversal* ([DOI](http://dx.doi.org/10.1145/2370036.2145832)). Thanks
 to Erich Elsen and Vishal Vaidyanathan from
-[Royal Caliber](http://www.royal-caliber.com/) for their discussion on
-library development and the dataset auto-generating code.
+[Royal Caliber](http://www.royal-caliber.com/) and the [Onu](http://www.onu.io/) Team for their discussion on
+library development and the dataset auto-generating code. Thanks to
+Adam McLaughlin for his technical discussion. Thanks to Oded Green
+on his technical discussion and an optimization in CC primitive.
 
 This work was funded by the DARPA XDATA program under AFRL Contract
 FA8750-13-C-0002, by NSF awards CCF-1017399 and OCI-1032859, and by

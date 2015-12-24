@@ -116,3 +116,28 @@ cudaError_t gunrock::util::GRError(
     }
     return error;
 }
+
+std::string gunrock::util::GetErrorString(gunrock::util::gunrockError_t error)
+{
+    switch (error) {
+    case gunrock::util::GR_UNSUPPORTED_INPUT_DATA:
+        return "unsupported input data";
+        default:
+        return "unknown error";
+    }
+}
+gunrock::util::gunrockError_t gunrock::util::GRError(
+    gunrock::util::gunrockError_t error,
+    std::string message,
+    const char *filename,
+    int line,
+    bool print)
+{
+    if (error && print) {
+        int gpu;
+        cudaGetDevice(&gpu);
+        fprintf(stderr, "[%s, %d @ gpu %d] %s Gunrock error: %s.\n", filename, line, gpu, message.c_str(), GetErrorString(error).c_str());
+        fflush(stderr);
+    }
+    return error;
+}

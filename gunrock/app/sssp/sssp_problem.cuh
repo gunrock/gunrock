@@ -85,6 +85,13 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             sssp_marker   .Release();
         }
 
+        bool HasNegativeValue(Value* vals, size_t len)
+        {
+            for (int i = 0; i < len; ++i)
+                if (vals[i] < 0.0) return true;
+            return false;
+        }
+
         /**
          * @brief initialization function.
          *
@@ -116,6 +123,16 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             float in_sizing    = 1.0)
         {
             cudaError_t retval  = cudaSuccess;
+
+            // Check if there are negative weights.
+            if (HasNegativeValue(graph->edge_values, graph->edges)) {
+                GRError(gunrock::util::GR_UNSUPPORTED_INPUT_DATA,
+                        "Contains edges with negative weights. Dijkstra's algorithm"
+                        "doesn't support the input data.",
+                        __FILE__,
+                        __LINE__);
+                return retval;
+            }
             if (retval = DataSliceBase<SizeT, VertexId, Value>::Init(
                 num_gpus,
                 gpu_idx,

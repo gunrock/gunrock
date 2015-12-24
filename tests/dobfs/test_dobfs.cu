@@ -100,7 +100,7 @@ void Usage()
         "[--alpha=<alpha>]         Alpha factor for direction-optimizing.\n"
         "                          Switching to backward approach.\n"
         "[--beta=<beta>]           Beta factor for direction-optimizing.\n"
-        "                          Switching back to the forward approach.\n"
+        "                          Switching back to the forward approach.\n" 
         "[--quiet]                 No output (unless --json is specified).\n"
         "[--json]                  Output JSON-format statistics to STDOUT.\n"
         "[--jsonfile=<name>]       Output JSON-format statistics to file <name>\n"

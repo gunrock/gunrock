@@ -385,10 +385,9 @@ struct Csr
             SizeT new_edge   = 0;
             for (edge = edge_start; edge < edge_end; edge++)
             {
-                //if (((coo[i+1].col != coo[i].col) || (coo[i+1].row != coo[i].row)) && (coo[i+1].col != coo[i+1].row))
                 VertexId col = coo[edge].col;
                 VertexId row = coo[edge].row;
-                if ((col != row) && (edge == 0 || col != coo[edge - 1].col || row != coo[edge - 1].row))
+                //if ((col != row) && (edge == 0 || col != coo[edge - 1].col || row != coo[edge - 1].row))
                 {
                     new_coo[new_edge].col = col;
                     new_coo[new_edge].row = row;
