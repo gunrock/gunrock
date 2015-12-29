@@ -1074,10 +1074,11 @@ public:
     }
 
     /**
-     * @brief Obtain statistics about the last primitive enacted.
+     * @ brief Obtain statistics about the last primitive enacted.
      *
-     * @param[out] total_queued Total queued elements in kernel running.
-     * @param[out] avg_duty Average kernel duty (kernel time/kernel lifetime).
+     * @ param[out] total_queued Total queued elements in kernel running.
+     * @ param[out] avg_duty Average kernel duty (kernel time/kernel lifetime).
+     * spaces between @ and name are to eliminate doxygen warnings
      */
     /*void GetStatistics(
         long long &total_queued,

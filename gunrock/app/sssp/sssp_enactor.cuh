@@ -100,10 +100,10 @@ __global__ void Expand_Incoming_SSSP (
 
         keys_out[x]=key;
 
-        #pragma unrool
+        #pragma unroll
         for (SizeT i=1;i<NUM_VALUE__ASSOCIATES;i++)
             s_value__associate_org[i][key]=s_value__associate_in[i][x];
-        #pragma unrool
+        #pragma unroll
         for (SizeT i=0;i<NUM_VERTEX_ASSOCIATES;i++)
             s_vertex_associate_org[i][key]=s_vertex_associate_in[i][x];
         x+=STRIDE;
@@ -225,55 +225,64 @@ struct SSSPIteration : public IterationBase <
 
         //TODO: split the output queue into near/far pile, put far pile in far queue, put near pile as the input queue
         //for next round.
-        /*out_length = 0;
-        if (frontier_attribute->queue_length > 0) {
-            out_length = gunrock::priority_queue::Bisect
-                <PriorityQueueKernelPolicy, SSSPProblem, NearFarPriorityQueue, PqFunctor>(
-                (int*)graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE),
-                pq,
-                (unsigned int)frontier_attribute->queue_length,
-                d_data_slice,
-                graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
-                pq->queue_length,
-                pq_level,
-                (pq_level+1),
-                context[0],
-                graph_slice->nodes);
-            //printf("out:%d, pq_length:%d\n", out_length, pq->queue_length);
-            if (retval = work_progress->SetQueueLength(frontier_attribute->queue_index, out_length)) break;
-        }
-        //
-        //If the output queue is empty and far queue is not, then add priority level and split the far pile.
-        if ( out_length == 0 && pq->queue_length > 0) {
-            while (pq->queue_length > 0 && out_length == 0) {
-                pq->selector ^= 1;
-                pq_level++;
+        if (data_slice->num_gpus == 1)
+        { // when #gpus == 1, use priority queue
+            frontier_attribute->queue_index ++;
+            frontier_attribute->selector ^= 1;
+            /*if (enactor_stats->retval = util::GRError(
+                work_progress -> GetQueueLength(frointer_attribute->queue_index,
+                frontier_attribute->queue_length, true, stream),
+                "work_progress -> GetQueueLength failed", __FILE__, __LINE__))
+                return;
+            out_length = 0;
+
+            if (frontier_attribute->queue_length > 0) {
                 out_length = gunrock::priority_queue::Bisect
-                    <PriorityQueueKernelPolicy, SSSPProblem, NearFarPriorityQueue, PqFunctor>(
-                    (int*)pq->nf_pile[0]->d_queue[pq->selector^1],
+                    <PriorityQueueKernelPolicy, SSSPProblem,
+                    NearFarPriorityQueue, PqFunctor>(
+                    (int*)frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE),
                     pq,
-                    (unsigned int)pq->queue_length,
+                    (unsigned int)frontier_attribute->queue_length,
                     d_data_slice,
-                    graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1],
-                    0,
+                    frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
+                    pq->queue_length,
                     pq_level,
                     (pq_level+1),
                     context[0],
                     graph_slice->nodes);
-                //printf("out after p:%d, pq_length:%d\n", out_length, pq->queue_length);
-                if (out_length > 0) {
-                    if (retval = work_progress->SetQueueLength(frontier_attribute->queue_index, out_length)) break;
-                }
+                //printf("out:%d, pq_length:%d\n", out_length, pq->queue_length);
+                if (retval = work_progress->SetQueueLength(frontier_attribute->queue_index, out_length)) break;
             }
-        }
-        */
-
-        frontier_attribute->queue_index++;
-        frontier_attribute->selector ^= 1;
-
-        if (data_slice->num_gpus == 1)
-        {
-            util::MemsetKernel<<<128, 128, 0, stream>>> (data_slice -> sssp_marker.GetPointer(util::DEVICE), (int)0, graph_slice->nodes);
+            //
+            //If the output queue is empty and far queue is not, then add priority level and split the far pile.
+            if ( out_length == 0 && pq->queue_length > 0) {
+                while (pq->queue_length > 0 && out_length == 0) {
+                    pq->selector ^= 1;
+                    pq_level++;
+                    out_length = gunrock::priority_queue::Bisect
+                        <PriorityQueueKernelPolicy, SSSPProblem, NearFarPriorityQueue, PqFunctor>(
+                        (int*)pq->nf_pile[0]->d_queue[pq->selector^1],
+                        pq,
+                        (unsigned int)pq->queue_length,
+                        d_data_slice,
+                        graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1],
+                        0,
+                        pq_level,
+                        (pq_level+1),
+                        context[0],
+                        graph_slice->nodes);
+                    //printf("out after p:%d, pq_length:%d\n", out_length, pq->queue_length);
+                    if (out_length > 0) {
+                        if (retval = work_progress->SetQueueLength(frontier_attribute->queue_index, out_length)) break;
+                    }
+                }
+            }*/
+            util::MemsetKernel<<<128, 128, 0, stream>>> (
+                data_slice -> sssp_marker.GetPointer(util::DEVICE),
+                (int)0, graph_slice->nodes);
+        } else { // #gpus != 1
+            frontier_attribute->queue_index++;
+            frontier_attribute->selector ^= 1;
         }
     }
 
@@ -584,13 +593,14 @@ public:
      */
 
     /**
-     * @brief Obtain statistics about the last primitive enacted.
+     * @ brief Obtain statistics about the last primitive enacted.
      *
-     * @tparam VertexId Vertex identifiler type.
+     * @ tparam VertexId Vertex identifiler type.
      *
-     * @param[out] total_queued Total queued elements in kernel running.
-     * @param[out] search_depth Search depth (number of super-steps).
-     * @param[out] avg_duty Average kernel duty (kernel time/kernel lifetime).
+     * @ param[out] total_queued Total queued elements in kernel running.
+     * @ param[out] search_depth Search depth (number of super-steps).
+     * @ param[out] avg_duty Average kernel duty (kernel time/kernel lifetime).
+     * spaces between @ and name are to eliminate doxygen warnings
      */
     /*template <typename VertexId>
     void GetStatistics(
@@ -752,7 +762,7 @@ public:
 
         if (DEBUG) printf("\nGPU SSSP Done.\n");
         return retval;
-    } 
+    }
 
     typedef gunrock::oprtr::filter::KernelPolicy<
         Problem,                            // Problem data type

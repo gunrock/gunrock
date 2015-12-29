@@ -44,9 +44,9 @@ class HITSEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_C
 {
 public:
     typedef _Problem                   Problem;
-    typedef typename Problem::SizeT    SizeT   ;   
-    typedef typename Problem::VertexId VertexId;   
-    typedef typename Problem::Value    Value   ;   
+    typedef typename Problem::SizeT    SizeT   ;
+    typedef typename Problem::VertexId VertexId;
+    typedef typename Problem::Value    Value   ;
     static const bool INSTRUMENT = _INSTRUMENT;
     static const bool DEBUG      = _DEBUG;
     static const bool SIZE_CHECK = _SIZE_CHECK;
@@ -78,7 +78,7 @@ public:
     {
         //typedef typename ProblemData::SizeT         SizeT;
         //typedef typename ProblemData::VertexId      VertexId;
-        
+
         cudaError_t retval = cudaSuccess;
 
         return retval;
@@ -120,7 +120,7 @@ public:
         }
 
         //swap rank_curr and rank_next
-        util::MemsetCopyVectorKernel<<<128, 128>>>(rank_curr, rank_next, nodes); 
+        util::MemsetCopyVectorKernel<<<128, 128>>>(rank_curr, rank_next, nodes);
 
         util::MemsetKernel<<<128, 128>>>(rank_next, (Value)0.0, nodes);
 
@@ -133,10 +133,11 @@ public:
      */
 
     /**
-     * @brief Obtain statistics about the last HITS search enacted.
+     * @ brief Obtain statistics about the last HITS search enacted.
      *
-     * @param[out] total_queued Total queued elements in HITS kernel running.
-     * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
+     * @ param[out] total_queued Total queued elements in HITS kernel running.
+     * @ param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
+     * spaces between @ and name are to eliminate doxygen warnings
      */
     /*void GetStatistics(
         long long &total_queued,
@@ -145,7 +146,7 @@ public:
         cudaThreadSynchronize();
 
         total_queued = this->enactor_stats->total_queued[0];
-        
+
         avg_duty = (this->enactor_stats->total_lifetimes >0) ?
             double(this->enactor_stats->total_runtimes) / this->enactor_stats->total_lifetimes : 0.0;
     }*/
@@ -230,15 +231,15 @@ public:
             //typename HITSProblem::DataSlice *data_slice = problem->d_data_slices[0];
 
             // Bind row-offsets texture
-            //cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>(); 
+            //cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
 
             frontier_attribute->queue_length         = graph_slice->nodes;
             frontier_attribute->queue_index          = 0;        // Work queue index
             frontier_attribute->selector             = 0;
             frontier_attribute->queue_reset          = true;
 
-            // Step through HITS iterations 
-            while (true) { 
+            // Step through HITS iterations
+            while (true) {
 
                 /*if (retval = util::GRError(cudaBindTexture(
                     0,
@@ -283,7 +284,7 @@ public:
 
 
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next,graph_slice->nodes);
-                NormalizeRank<HITSProblem>(problem, context[0], 1, graph_slice->nodes); 
+                NormalizeRank<HITSProblem>(problem, context[0], 1, graph_slice->nodes);
 
                 /*if (retval = util::GRError(cudaBindTexture(
                     0,
@@ -340,11 +341,11 @@ public:
                 }
 
                 NormalizeRank<HITSProblem>(problem, context[0], 0, graph_slice->nodes);
-                
+
 
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_next,graph_slice->nodes);
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_curr,
-                //    graph_slice->nodes); 
+                //    graph_slice->nodes);
 
                 /*if (INSTRUMENT || DEBUG) {
                     if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
@@ -358,7 +359,7 @@ public:
                     }
                 }*/
 
-                enactor_stats->iteration++; 
+                enactor_stats->iteration++;
 
                 if (enactor_stats->iteration >= max_iteration) break;
 
@@ -460,5 +461,3 @@ public:
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-
-

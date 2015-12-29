@@ -648,6 +648,15 @@ static bool Stop_Condition(
         return false;
     }*/
 
+    bool past_max_iter = true;
+    for (int gpu=0; gpu<num_gpus*num_gpus; gpu++)
+    if (enactor_stats[gpu].iteration < data_slice[0].max_iter)
+    {
+        past_max_iter = false;
+        break;
+    }
+    if (past_max_iter) return true;
+
     for (int gpu=0; gpu<num_gpus; gpu++)
         if (data_slice[gpu]->to_continue && frontier_attribute[gpu*num_gpus].queue_length !=0)
     {
@@ -1351,7 +1360,7 @@ static CUT_THREADPROC PRThread(
                 data_slice->keys_out[0].GetPointer(util::DEVICE),
                 data_slice->local_nodes);
             enactor_stats->iteration++;
-            PushNeibor <PrEnactor::SIZE_CHECK, SizeT, VertexId, Value, GraphSlice, DataSlice, 0, 1> (
+            PushNeighbor <PrEnactor::SIZE_CHECK, SizeT, VertexId, Value, GraphSlice, DataSlice, 0, 1> (
                 thread_num,
                 0,
                 data_slice->local_nodes,

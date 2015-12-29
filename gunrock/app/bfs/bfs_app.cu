@@ -53,7 +53,7 @@ public:
 template<typename VertexId, typename Value, typename SizeT,
          bool INSTRUMENT, bool DEBUG, bool SIZE_CHECK,
          bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE>
-void runBFS(GRGraph* output, BFS_Parameter *parameter);
+float runBFS(GRGraph* output, BFS_Parameter *parameter);
 
 /**
  * @brief Run test
@@ -77,13 +77,13 @@ template <
     bool        DEBUG,
     bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS >
-void RunTests_enable_idempotence(GRGraph* output, BFS_Parameter *parameter)
+float RunTests_enable_idempotence(GRGraph* output, BFS_Parameter *parameter)
 {
     if (parameter->enable_idempotence)
-        runBFS<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
+        return runBFS<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
                SIZE_CHECK, MARK_PREDECESSORS,  true>(output, parameter);
     else
-        runBFS<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
+        return runBFS<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
                SIZE_CHECK, MARK_PREDECESSORS, false>(output, parameter);
 }
 
@@ -107,13 +107,13 @@ template <
     bool        INSTRUMENT,
     bool        DEBUG,
     bool        SIZE_CHECK >
-void RunTests_mark_predecessors(GRGraph* output, BFS_Parameter *parameter)
+float RunTests_mark_predecessors(GRGraph* output, BFS_Parameter *parameter)
 {
     if (parameter->mark_predecessors)
-        RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
+        return RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
                                     SIZE_CHECK,  true>(output, parameter);
     else
-        RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
+        return RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
                                     SIZE_CHECK, false>(output, parameter);
 }
 
@@ -135,13 +135,13 @@ template <
     typename      SizeT,
     bool          INSTRUMENT,
     bool          DEBUG >
-void RunTests_size_check(GRGraph* output, BFS_Parameter *parameter)
+float RunTests_size_check(GRGraph* output, BFS_Parameter *parameter)
 {
     if (parameter->size_check)
-        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
+        return RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
                                    DEBUG,  true>(output, parameter);
     else
-        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
+        return RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
                                    DEBUG, false>(output, parameter);
 }
 
@@ -161,13 +161,13 @@ template <
     typename    Value,
     typename    SizeT,
     bool        INSTRUMENT >
-void RunTests_debug(GRGraph* output, BFS_Parameter *parameter)
+float RunTests_debug(GRGraph* output, BFS_Parameter *parameter)
 {
     if (parameter->debug)
-        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,
+        return RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,
                             true>(output, parameter);
     else
-        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,
+        return RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,
                             false>(output, parameter);
 }
 
@@ -185,12 +185,12 @@ template <
     typename      VertexId,
     typename      Value,
     typename      SizeT >
-void RunTests_instrumented(GRGraph* output, BFS_Parameter *parameter)
+float RunTests_instrumented(GRGraph* output, BFS_Parameter *parameter)
 {
     if (parameter->instrumented)
-        RunTests_debug<VertexId, Value, SizeT,  true>(output, parameter);
+        return RunTests_debug<VertexId, Value, SizeT,  true>(output, parameter);
     else
-        RunTests_debug<VertexId, Value, SizeT, false>(output, parameter);
+        return RunTests_debug<VertexId, Value, SizeT, false>(output, parameter);
 }
 
 /**
@@ -217,7 +217,7 @@ template <
     bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS,
     bool        ENABLE_IDEMPOTENCE >
-void runBFS(GRGraph* output, BFS_Parameter *parameter)
+float runBFS(GRGraph* output, BFS_Parameter *parameter)
 {
     typedef BFSProblem < VertexId,
             SizeT,
@@ -236,9 +236,9 @@ void runBFS(GRGraph* output, BFS_Parameter *parameter)
     Csr<VertexId, Value, SizeT> *graph =
         (Csr<VertexId, Value, SizeT>*)parameter->graph;
     bool          quiet                = parameter -> g_quiet;
-    VertexId      src                  = (VertexId)parameter -> src;
     int           max_grid_size        = parameter -> max_grid_size;
     int           num_gpus             = parameter -> num_gpus;
+    int           num_iters            = parameter -> iterations;
     double        max_queue_sizing     = parameter -> max_queue_sizing;
     double        max_queue_sizing1    = parameter -> max_queue_sizing1;
     double        max_in_sizing        = parameter -> max_in_sizing;
@@ -288,23 +288,31 @@ void runBFS(GRGraph* output, BFS_Parameter *parameter)
         "BFS Enactor init failed", __FILE__, __LINE__);
 
     CpuTimer cpu_timer;
+    float elapsed = 0.0f;
+    for (int i = 0; i < num_iters; ++i)
+    {
+        printf("%d round of bfs.\n", i);
+        util::GRError(
+                problem->Reset(parameter->src[i], enactor->GetFrontierType(),
+                    max_queue_sizing, max_queue_sizing1),
+                "BFS Problem Data Reset Failed", __FILE__, __LINE__);
+        printf("before enactor reset.\n");
+        util::GRError(
+                enactor->Reset(), "BFS Enactor Reset failed", __FILE__, __LINE__);
+        printf("after enactor reset.\n");
 
-    util::GRError(
-        problem->Reset(src, enactor->GetFrontierType(),
-                       max_queue_sizing, max_queue_sizing1),
-        "BFS Problem Data Reset Failed", __FILE__, __LINE__);
-    util::GRError(
-        enactor->Reset(), "BFS Enactor Reset failed", __FILE__, __LINE__);
+        cpu_timer.Start();
 
-    cpu_timer.Start();
+        util::GRError(
+                enactor->Enact(parameter->src[i], traversal_mode),
+                "BFS Problem Enact Failed", __FILE__, __LINE__);
 
-    util::GRError(
-        enactor->Enact(src, traversal_mode),
-        "BFS Problem Enact Failed", __FILE__, __LINE__);
+        cpu_timer.Stop();
 
-    cpu_timer.Stop();
+        printf("after enactor run.\n");
 
-    float elapsed = cpu_timer.ElapsedMillis();
+        elapsed += cpu_timer.ElapsedMillis();
+    }
 
     // Copy out results
     util::GRError(
@@ -323,6 +331,8 @@ void runBFS(GRGraph* output, BFS_Parameter *parameter)
     if (org_size) delete[] org_size; org_size = NULL;
     if (enactor ) delete   enactor ; enactor  = NULL;
     if (problem ) delete   problem ; problem  = NULL;
+
+    return elapsed;
 }
 
 /**
@@ -335,7 +345,7 @@ void runBFS(GRGraph* output, BFS_Parameter *parameter)
  * @param[in]  context ModernGPU context
  * @param[in]  streams CUDA stream
  */
-void dispatch_bfs(
+float dispatch_bfs(
     GRGraph*       grapho,
     const GRGraph* graphi,
     const GRSetup  config,
@@ -344,6 +354,8 @@ void dispatch_bfs(
     cudaStream_t*  streams)
 {
     BFS_Parameter *parameter = new BFS_Parameter;
+    parameter->iterations = config.num_iters;
+    parameter->src = (long long*)malloc(sizeof(long long)*config.num_iters);
     parameter->context  = context;
     parameter->streams  = streams;
     parameter->g_quiet  = config.quiet;
@@ -351,6 +363,8 @@ void dispatch_bfs(
     parameter->gpu_idx  = config.device_list;
     parameter->mark_predecessors  = config.mark_predecessors;
     parameter->enable_idempotence = config.enable_idempotence;
+
+    float elapsed_time;
 
     switch (data_t.VTXID_TYPE)
     {
@@ -377,32 +391,50 @@ void dispatch_bfs(
                 {
                 case randomize:
                 {
-                    parameter->src = graphio::RandomNode(csr.nodes);
+                    for (int i = 0; i < parameter->iterations; ++i)
+                    {
+                        parameter->src[i] = graphio::RandomNode(csr.nodes);
+                    }
                     break;
                 }
                 case largest_degree:
                 {
                     int max_deg = 0;
-                    parameter->src = csr.GetNodeWithHighestDegree(max_deg);
+                    int node_id = csr.GetNodeWithHighestDegree(max_deg);
+                    for (int i = 0; i < config.num_iters; ++i)
+                    {
+                        parameter->src[i] = node_id;
+                    }
                     break;
                 }
                 case manually:
                 {
-                    parameter->src = config.source_vertex;
+                    for (int i = 0; i < parameter->iterations; ++i)
+                    {
+                        parameter->src[i] = config.source_vertex[i];
+                    }
                     break;
                 }
                 default:
                 {
-                    parameter->src = 0;
+                    for (int i = 0; i < parameter->iterations; ++i)
+                    {
+                        parameter->src[i] = 0;
+                    }
                     break;
                 }
                 }
                 if (!parameter->g_quiet)
                 {
-                    printf(" source: %lld\n", (long long) parameter->src);
+                    printf(" source: %lld", (long long) parameter->src[0]);
+                    for (int i = 1; i < config.num_iters; ++i)
+                    {
+                        printf(",%lld", (long long) parameter->src[i]);
+                    }
+                    printf("\n");
                 }
 
-                RunTests_instrumented<int, int, int>(grapho, parameter);
+                elapsed_time = RunTests_instrumented<int, int, int>(grapho, parameter);
 
                 // reset for free memory
                 csr.row_offsets    = NULL;
@@ -428,6 +460,8 @@ void dispatch_bfs(
         break;
     }
     }
+    free(parameter->src);
+    return elapsed_time;
 }
 
 /*
@@ -438,7 +472,7 @@ void dispatch_bfs(
  * @param[in]  config Gunrock primitive specific configurations
  * @param[in]  data_t Gunrock data type structure
  */
-void gunrock_bfs(
+float gunrock_bfs(
     GRGraph*       grapho,
     const GRGraph* graphi,
     const GRSetup  config,
@@ -480,36 +514,44 @@ void gunrock_bfs(
     }
     if (!config.quiet) { printf("\n"); }
 
-    dispatch_bfs(grapho, graphi, config, data_t, context, streams);
+    return dispatch_bfs(grapho, graphi, config, data_t, context, streams);
 }
 
 /*
  * @brief Simple interface take in CSR arrays as input
  *
- * @param[out] bfs_label   Return BFS label (depth) per nodes
- * @param[in]  num_nodes   Number of nodes of the input graph
- * @param[in]  num_edges   Number of edges of the input graph
- * @param[in]  row_offsets CSR-formatted graph input row offsets
- * @param[in]  col_indices CSR-formatted graph input column indices
- * @param[in]  source      Source to begin traverse
+ * @param[out] bfs_label            Return BFS label (depth) per nodes or the predecessor per nodes
+ * @param[in]  num_nodes            Number of nodes of the input graph
+ * @param[in]  num_edges            Number of edges of the input graph
+ * @param[in]  row_offsets          CSR-formatted graph input row offsets
+ * @param[in]  col_indices          CSR-formatted graph input column indices
+ * @param[in]  num_iters            Number of BFS runs. Note if num_iters > 1, the bfs_lbel will only store the results from the last run
+ * @param[in]  source               Sources to begin traverse
+ * @param[in]  source_mode          Enumerator of source mode: manually, randomize, largest_degree
+ * @param[in]  mark_predecessors    If the flag is set, mark predecessors instead of bfs label
+ * @param[in]  enable_idempotence   If the flag is set, use optimizations that allow idempotence operation (will usually bring better performance)
  */
-void bfs(
+float bfs(
     int*       bfs_label,
     const int  num_nodes,
     const int  num_edges,
     const int* row_offsets,
     const int* col_indices,
-    const int  source)
+    const int  num_iters,
+    int* source,
+    enum SrcMode source_mode,
+    const bool mark_predecessors,
+    const bool enable_idempotence)
 {
     struct GRTypes data_t;          // primitive-specific data types
     data_t.VTXID_TYPE = VTXID_INT;  // integer vertex identifier
     data_t.SIZET_TYPE = SIZET_INT;  // integer graph size type
     data_t.VALUE_TYPE = VALUE_INT;  // integer attributes type
 
-    struct GRSetup config = InitSetup();  // primitive-specific configures
-    config.source_vertex = source;        // source vertex to start
-    config.mark_predecessors  = false;    // do not mark predecessors
-    config.enable_idempotence = false;    // wether enable idempotence
+    struct GRSetup config = InitSetup(num_iters, source);  // primitive-specific configures
+    config.mark_predecessors  = mark_predecessors;    // do not mark predecessors
+    config.enable_idempotence = enable_idempotence;    // wether enable idempotence
+    config.source_mode = source_mode;
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));
@@ -519,11 +561,13 @@ void bfs(
     graphi->row_offsets = (void*)&row_offsets[0];  // setting row_offsets
     graphi->col_indices = (void*)&col_indices[0];  // setting col_indices
 
-    gunrock_bfs(grapho, graphi, config, data_t);
+    float elapsed_time = gunrock_bfs(grapho, graphi, config, data_t);
     memcpy(bfs_label, (int*)grapho->node_value1, num_nodes * sizeof(int));
 
     if (graphi) free(graphi);
     if (grapho) free(grapho);
+
+    return elapsed_time;
 }
 
 // Leave this at the end of the file

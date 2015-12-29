@@ -356,7 +356,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                   "BFS Problem Init failed", __FILE__, __LINE__);
 
     util::GRError(enactor->Init(
-                      context, problem, max_grid_size, traversal_mode),
+                      context, problem, max_grid_size, SIZE_CHECK, traversal_mode),
                   "BFS Enactor Init failed", __FILE__, __LINE__);
 
     // compute reference CPU BFS solution for source-distance

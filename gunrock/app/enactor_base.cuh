@@ -324,9 +324,9 @@ public:
             args.GetCmdLineArgument("iteration-num", num_iters);
             info["num_iteration"] = num_iters;
         }
-        if (args.CheckCmdLineFlag("max_iter"))
+        if (args.CheckCmdLineFlag("max-iter"))
         {
-            args.GetCmdLineArgument("max_iter", max_iters);
+            args.GetCmdLineArgument("max-iter", max_iters);
             info["max_iteration"] = max_iters;
         }
         if (args.CheckCmdLineFlag("queue-sizing"))
@@ -654,6 +654,7 @@ public:
             char *market_filename = args.GetCmdLineArgvDataset();
             if (market_filename == NULL)
             {
+                printf("YZH Log.");
                 fprintf(stderr, "Input graph does not exist.\n");
                 return 1;
             }
@@ -1564,7 +1565,7 @@ template <
     typename DataSlice,
     SizeT    num_vertex_associate,
     SizeT    num_value__associate>
-void PushNeibor(
+void PushNeighbor(
     int gpu,
     int peer,
     SizeT             queue_length,
@@ -1975,8 +1976,8 @@ void Iteration_Loop(
                             Set_Record(data_slice, iteration, peer_, 2, streams[peer__]);
                             stages[peer__]=2;
                         }
-                    } else { //Push Neibor
-                        PushNeibor <Enactor::SIZE_CHECK, SizeT, VertexId, Value, GraphSlice, DataSlice,
+                    } else { //Push Neighbor
+                        PushNeighbor <Enactor::SIZE_CHECK, SizeT, VertexId, Value, GraphSlice, DataSlice,
                                 NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES> (
                             thread_num,
                             peer,
@@ -2007,7 +2008,18 @@ void Iteration_Loop(
                         streams          [peer_],
                         gunrock::oprtr::advance::V2V, true, false, false)) break;
 
-                    frontier_attribute_->output_length.Move(util::DEVICE, util::HOST,1,0,streams[peer_]);
+                    if (!Enactor::SIZE_CHECK && 
+                        (Iteration::AdvanceKernelPolicy::ADVANCE_MODE 
+                            == oprtr::advance::TWC_FORWARD ||
+                         Iteration::AdvanceKernelPolicy::ADVANCE_MODE 
+                            == oprtr::advance::TWC_BACKWARD))
+                    {}
+                    else {
+                        //printf("moving output_length\n");
+                        frontier_attribute_ -> output_length.Move(
+                            util::DEVICE, util::HOST,1,0,streams[peer_]);
+                    }
+
                     if (Enactor::SIZE_CHECK)
                     {
                         Set_Record(data_slice, iteration, peer_, stages[peer_], streams[peer_]);
@@ -2021,6 +2033,15 @@ void Iteration_Loop(
                             data_slice, iteration, peer_,
                             stages[peer_]-1, stages[peer_], to_show[peer_])) break;
                         if (to_show[peer_]==false) break;
+                        if (Iteration::AdvanceKernelPolicy::ADVANCE_MODE 
+                            == oprtr::advance::TWC_FORWARD ||
+                            Iteration::AdvanceKernelPolicy::ADVANCE_MODE
+                            == oprtr::advance::TWC_BACKWARD)
+                        {
+                            frontier_attribute_->output_length[0] *= 1.1;
+                        }
+                        //printf("iteration = %lld, request_size = %d\n",
+                        //    enactor_stats_ -> iteration, frontier_attribute_->output_length[0]);
                         Iteration::Check_Queue_Size(
                             thread_num,
                             peer_,
@@ -2393,7 +2414,8 @@ protected:
             for (int peer=0;peer<num_gpus;peer++)
             {
                 work_progress     [gpu*num_gpus+peer].template Setup<SizeT>();
-                frontier_attribute[gpu*num_gpus+peer].output_length.Allocate(1, util::HOST | util::DEVICE);
+                //frontier_attribute[gpu*num_gpus+peer].output_length.Allocate(1, util::HOST | util::DEVICE);
+                frontier_attribute[gpu*num_gpus + peer].output_length.Init(1, util::HOST | util::DEVICE, true);
             }
         }
     }
@@ -2551,9 +2573,9 @@ protected:
  * @tparam _UPDATE_PREDECESSORS
  */
 template <
-    typename AdvanceKernelPolicy,
-    typename FilterKernelPolicy,
-    typename Enactor,
+    typename _AdvanceKernelPolicy,
+    typename _FilterKernelPolicy,
+    typename _Enactor,
     bool     _HAS_SUBQ,
     bool     _HAS_FULLQ,
     bool     _BACKWARD,
@@ -2562,6 +2584,9 @@ template <
 struct IterationBase
 {
 public:
+    typedef _Enactor            Enactor   ;
+    typedef _AdvanceKernelPolicy AdvanceKernelPolicy;
+    typedef _FilterKernelPolicy  FilterKernelPolicy;
     typedef typename Enactor::SizeT      SizeT     ;
     typedef typename Enactor::Value      Value     ;
     typedef typename Enactor::VertexId   VertexId  ;

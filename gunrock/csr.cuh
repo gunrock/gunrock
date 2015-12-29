@@ -385,7 +385,6 @@ struct Csr
             SizeT new_edge   = 0;
             for (edge = edge_start; edge < edge_end; edge++)
             {
-                //if (((coo[i+1].col != coo[i].col) || (coo[i+1].row != coo[i].row)) && (coo[i+1].col != coo[i+1].row))
                 VertexId col = coo[edge].col;
                 VertexId row = coo[edge].row;
                 if ((col != row) && (edge == 0 || col != coo[edge - 1].col || row != coo[edge - 1].row))
@@ -703,6 +702,19 @@ struct Csr
             average_degree = static_cast<SizeT>(mean);
         }
         return average_degree;
+    }
+
+    /**
+     * @brief Get the degrees of all the nodes in graph
+     * 
+     * @param[in] node_degrees node degrees to fill in
+     */
+    void GetNodeDegree(SizeT *node_degrees)
+    {
+	for(SizeT node=0; node < nodes; ++node)
+	{
+		node_degrees[node] = row_offsets[node+1]-row_offsets[node];
+	}
     }
 
     /**

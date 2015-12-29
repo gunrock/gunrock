@@ -2,7 +2,7 @@
 #testing borrowed from Royal Caliber
 
 #Each graph lives in its own directory
-SUBDIRS = ak2010 belgium_osm delaunay_n13 delaunay_n21 delaunay_n24 coAuthorsDBLP kron_g500-logn21 soc-LiveJournal1 webbase-1M europe_osm road_usa cit-Patents
+SUBDIRS = ak2010 belgium_osm delaunay_n13 delaunay_n21 delaunay_n24 coAuthorsDBLP kron_g500-logn21 soc-LiveJournal1 webbase-1M europe_osm road_usa cit-Patents soc-orkut indochina-2004 hollywood-2009 roadNet-CA
 
 .PHONY: $(GRAPHS)
 

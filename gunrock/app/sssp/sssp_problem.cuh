@@ -85,6 +85,13 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             sssp_marker   .Release();
         }
 
+        bool HasNegativeValue(Value* vals, size_t len)
+        {
+            for (int i = 0; i < len; ++i)
+                if (vals[i] < 0.0) return true;
+            return false;
+        }
+
         /**
          * @brief initialization function.
          *
@@ -116,6 +123,16 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             float in_sizing    = 1.0)
         {
             cudaError_t retval  = cudaSuccess;
+
+            // Check if there are negative weights.
+            if (HasNegativeValue(graph->edge_values, graph->edges)) {
+                GRError(gunrock::util::GR_UNSUPPORTED_INPUT_DATA,
+                        "Contains edges with negative weights. Dijkstra's algorithm"
+                        "doesn't support the input data.",
+                        __FILE__,
+                        __LINE__);
+                return retval;
+            }
             if (retval = DataSliceBase<SizeT, VertexId, Value>::Init(
                 num_gpus,
                 gpu_idx,
@@ -469,21 +486,24 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[in] src Source node to start.
      * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
      * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+     * @param[in] queue_sizing1
      *
      *  \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Reset(
             VertexId    src,
             FrontierType frontier_type,
-            double queue_sizing)
+            double queue_sizing,
+            double queue_sizing1 = -1)
     {
 
         cudaError_t retval = cudaSuccess;
+        if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
         for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             // Set device
             if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-            if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing)) return retval;
+            if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, queue_sizing1)) return retval;
             if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;
         }
 

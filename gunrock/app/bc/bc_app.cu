@@ -177,7 +177,7 @@ void runBC(GRGraph* output, BC_Parameter *parameter)
     Csr<VertexId, Value, SizeT> *graph =
         (Csr<VertexId, Value, SizeT>*)parameter->graph;
     bool          quiet              = parameter -> g_quiet;
-    VertexId      src                = (VertexId)parameter -> src;
+    VertexId      src                = (VertexId)parameter -> src[0];
     int           max_grid_size      = parameter -> max_grid_size;
     int           num_gpus           = parameter -> num_gpus;
     double        max_queue_sizing   = parameter -> max_queue_sizing;
@@ -317,6 +317,7 @@ void dispatchBC(
     cudaStream_t*   streams)
 {
     BC_Parameter* parameter = new BC_Parameter;
+    parameter->src = (long long*)malloc(sizeof(long long));
     parameter->g_quiet  = config.quiet;
     parameter->context  = context;
     parameter->streams  = streams;
@@ -360,29 +361,29 @@ void dispatchBC(
                 {
                 case randomize:
                 {
-                    parameter->src = graphio::RandomNode(csr.nodes);
+                    parameter->src[0] = graphio::RandomNode(csr.nodes);
                     break;
                 }
                 case largest_degree:
                 {
                     int max_deg = 0;
-                    parameter->src = csr.GetNodeWithHighestDegree(max_deg);
+                    parameter->src[0] = csr.GetNodeWithHighestDegree(max_deg);
                     break;
                 }
                 case manually:
                 {
-                    parameter->src = config.source_vertex;
+                    parameter->src[0] = config.source_vertex[0];
                     break;
                 }
                 default:
                 {
-                    parameter->src = 0;
+                    parameter->src[0] = 0;
                     break;
                 }
                 }
                 if (!parameter->g_quiet)
                 {
-                    printf(" source: %lld\n", (long long) parameter->src);
+                    printf(" source: %lld\n", (long long) parameter->src[0]);
                 }
                 RunTests_instrumented<int, float, int>(grapho, parameter);
 
@@ -397,6 +398,7 @@ void dispatchBC(
         break;
     }
     }
+    free(parameter->src);
 }
 
 /*
@@ -475,8 +477,8 @@ void bc(
     data_t.SIZET_TYPE = SIZET_INT;    // integer graph size type
     data_t.VALUE_TYPE = VALUE_FLOAT;  // float attributes type
 
-    struct GRSetup config = InitSetup();  // primitive-specific configures
-    config.source_vertex = source;        // source vertex to start
+    struct GRSetup config = InitSetup(1, NULL);  // primitive-specific configures
+    config.source_vertex[0] = source;        // source vertex to start
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));

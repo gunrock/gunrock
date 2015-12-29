@@ -284,7 +284,7 @@ struct CpuTimer
         start = tv.tv_sec + 1.e-6 * tv.tv_usec;
     }
 
-    void Stop()
+    void Stop() 
     {
         static struct timeval tv;
         static struct timezone tz;

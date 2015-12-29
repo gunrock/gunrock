@@ -172,11 +172,12 @@ public:
      */
 
     /**
-     * @brief Obtain statistics about the last BFS search enacted.
+     * @ brief Obtain statistics about the last BFS search enacted.
      *
-     * @param[out] total_queued Total queued elements in BFS kernel running.
-     * @param[out] search_depth Search depth of BFS algorithm.
-     * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
+     * @ param[out] total_queued Total queued elements in BFS kernel running.
+     * @ param[out] search_depth Search depth of BFS algorithm.
+     * @ param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
+     * spaces between @ and name are to eliminate doxygen warnings
      */
     /*template <typename VertexId>
     void GetStatistics(
@@ -292,10 +293,13 @@ public:
             SizeT num_unvisited_nodes = graph_slice->nodes - 1;
             SizeT current_frontier_size = 1;
 
-            if (retval = util::GRError(cudaMalloc(
-                            (void**)&d_scanned_edges,
-                            graph_slice->edges * sizeof(SizeT)),
-                        "PBFSProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
+            //if (retval = util::GRError(cudaMalloc(
+            //                (void**)&d_scanned_edges,
+            //                graph_slice->edges * sizeof(SizeT)),
+            //            "PBFSProblem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__)) return retval;
+            if (retval = data_slice -> scanned_edges[0].EnsureSize(graph_slice->edges))
+                return retval;
+            d_scanned_edges = data_slice -> scanned_edges[0].GetPointer(util::DEVICE);
 
             // Normal BFS
             {
@@ -791,7 +795,7 @@ public:
             }
 
         } while(0);
-        if (d_scanned_edges) cudaFree(d_scanned_edges);
+        //if (d_scanned_edges) cudaFree(d_scanned_edges);
 
         if (DEBUG) printf("\nGPU BFS Done.\n");
         return retval;

@@ -20,9 +20,9 @@ SUFFIX="ubuntu12.04.k40c"
 
 mkdir -p eval/$SUFFIX
 
-for i in test_bc
+for i in delaunay_n13
 do
-    echo $exe_file market ../../dataset/small/$i.mtx
-    $exe_file market ../../dataset/small/$i.mtx > eval/$SUFFIX/$i.$SUFFIX.txt
+    echo $exe_file market ../../dataset/large/$i/$i.mtx
+    $exe_file market ../../dataset/large/$i/$i.mtx > eval/$SUFFIX/$i.$SUFFIX.txt
     sleep 1
 done

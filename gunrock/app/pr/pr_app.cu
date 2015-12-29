@@ -43,7 +43,6 @@ public:
         delta    = 0.85f;
         error    = 0.01f;
         max_iter =    50;
-        src      =    -1;
     }
     ~PR_Parameter()
     {
@@ -180,7 +179,7 @@ void runPageRank(GRGraph *output, PR_Parameter *parameter)
     float         partition_factor   = parameter -> partition_factor;
     int           partition_seed     = parameter -> partition_seed;
     bool          g_stream_from_host = parameter -> g_stream_from_host;
-    VertexId      src                = parameter -> src;
+    VertexId      src                = parameter -> src[0];
     Value         delta              = parameter -> delta;
     Value         error              = parameter -> error;
     SizeT         max_iter           = parameter -> max_iter;
@@ -278,6 +277,8 @@ void dispatchPageRank(
     cudaStream_t*  streams)
 {
     PR_Parameter *parameter = new PR_Parameter;
+    parameter->src = (long long*)malloc(sizeof(long long));
+    parameter->src[0] = -1;
     parameter->context      =  context;
     parameter->streams      =  streams;
     parameter->g_quiet      = config.quiet;
@@ -332,6 +333,7 @@ void dispatchPageRank(
         break;
     }
     }
+    free(parameter->src);
 }
 
 /*
@@ -411,7 +413,7 @@ void pagerank(
     data_t.SIZET_TYPE = SIZET_INT;    // integer graph size type
     data_t.VALUE_TYPE = VALUE_FLOAT;  // float attributes type
 
-    struct GRSetup config = InitSetup();  // primitive-specific configures
+    struct GRSetup config = InitSetup(1, NULL);  // primitive-specific configures
     config.top_nodes      = 10;           // number of top nodes
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));

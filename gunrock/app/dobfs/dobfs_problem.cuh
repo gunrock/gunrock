@@ -355,25 +355,30 @@ struct DOBFSProblem : ProblemBase<_VertexId, _SizeT, _Value,
      *  @param[in] src Source node for one BFS computing pass.
      *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
      *  @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+     *  @param[in] queue_sizing1  Size scaling factor for work queue allocation
      *
      *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Reset(
             VertexId    src,
             FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
-            double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
+            double queue_sizing,
+            double queue_sizing1 = -1)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
     {
         //load ProblemBase Reset
         //BaseProblem::Reset(frontier_type, queue_sizing);
 
         cudaError_t retval = cudaSuccess;
+        if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
+        //printf("queue_sizing = %lf, %lf\n", queue_sizing, queue_sizing1);
         for (int gpu = 0; gpu < num_gpus; ++gpu) {
             // Set device
             if (retval = util::GRError(cudaSetDevice(gpu_idx[gpu]),
                         "BSFProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
 
-            data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, queue_sizing);
+            data_slices[gpu]->Reset(frontier_type,
+                this->graph_slices[gpu], queue_sizing, false, queue_sizing1);
             // Allocate output labels if necessary
             /*if (!data_slices[gpu]->d_labels) {
                 VertexId    *d_labels;

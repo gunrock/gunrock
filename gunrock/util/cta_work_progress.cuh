@@ -336,6 +336,7 @@ public:
                     cudaMemcpyDeviceToHost),
                 "CtaWorkProgress cudaMemcpy d_counters failed", __FILE__, __LINE__)) break;
             } else {
+                //printf("GetQueueLength using MemcpyAsync\n");
                 if (!DEBUG)
                     cudaMemcpyAsync(&queue_length, ((SizeT*)d_counters) + queue_length_idx, sizeof(SizeT), cudaMemcpyDeviceToHost,stream);
                 else if (retval = util::GRError(cudaMemcpyAsync(
