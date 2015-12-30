@@ -18,7 +18,6 @@
 #include <vector>
 #include <iostream>
 #include <cstdlib>
-#include <fstream>
 
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
@@ -376,9 +375,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     std::string ref_filename     = info->info["ref_filename"].get_str();
     Value delta                  = info->info["delta"].get_real();
     Value error                  = info->info["error"].get_real();
-    CpuTimer cpu_timer;
 
-    cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
@@ -421,12 +418,11 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     util::GRError(enactor->Init(
                       context, problem, traversal_mode, max_grid_size),
                   "PR Enactor Init failed", __FILE__, __LINE__);
-    cpu_timer.Stop();
-    info -> info["preprecess_time"] = cpu_timer.ElapsedMillis();
 
     double elapsed = 0.0f;
 
     // perform PageRank
+    CpuTimer cpu_timer;
 
     for (int iter = 0; iter < iterations; ++iter)
     {
@@ -453,7 +449,6 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     }
     elapsed /= iterations;
 
-    cpu_timer.Start();
     // copy out results
     util::GRError(problem->Extract(h_rank, h_node_id),
                   "PR Problem Data Extraction Failed", __FILE__, __LINE__);
@@ -512,6 +507,13 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     if (!quiet_mode)
     {
+        info->DisplayStats();  // display collected statistics
+    }
+
+    info->CollectInfo();  // collected all the info and put into JSON mObject
+
+    if (!quiet_mode)
+    {
         printf("\n\tMemory Usage(B)\t");
         for (int gpu = 0; gpu < num_gpus; gpu++)
             if (num_gpus > 1) {if (gpu != 0) printf(" #keys%d,0\t #keys%d,1\t #ins%d,0\t #ins%d,1", gpu, gpu, gpu, gpu); else printf(" #keys%d,0\t #keys%d,1", gpu, gpu);}
@@ -557,32 +559,8 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     if (enactor    ) { delete   enactor    ; enactor     = NULL; }
     if (ref_rank   ) { delete[] ref_rank   ; ref_rank    = NULL; }
     if (ref_node_id) { delete[] ref_node_id; ref_node_id = NULL; }
+    if (h_rank     ) { delete[] h_rank     ; h_rank      = NULL; }
     if (h_node_id  ) { delete[] h_node_id  ; h_node_id   = NULL; }
-    cpu_timer.Stop();
-    info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
-    
-    if (h_rank     ) 
-    {
-        if (info->info["output_filename"].get_str() !="")
-        {
-            cpu_timer.Start();
-            std::ofstream fout;
-            size_t buf_size = 1024 * 1024 * 16;
-            char *fout_buf = new char[buf_size];
-            fout.rdbuf() -> pubsetbuf(fout_buf, buf_size);
-            fout.open(info->info["output_filename"].get_str().c_str());
-
-            for (VertexId v=0; v<graph->nodes; v++)
-            {
-                fout<< v+1 << "," << h_rank[v] << std::endl;
-            }
-            fout.close();
-            delete[] fout_buf; fout_buf = NULL;
-            cpu_timer.Stop();
-            info->info["write_time"] = cpu_timer.ElapsedMillis();
-        }
-        delete[] h_rank     ; h_rank      = NULL; 
-    }
 }
 
 /**
@@ -672,9 +650,6 @@ void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 
 int main(int argc, char** argv)
 {
-    CpuTimer cpu_timer, cpu_timer2;
-
-    cpu_timer.Start();
     CommandLineArgs args(argc, argv);
     int graph_args = argc - args.ParsedArgc() - 1;
     if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
@@ -693,22 +668,8 @@ int main(int argc, char** argv)
     // graph construction or generation related parameters
     info->info["undirected"] = true;   // require undirected input graph
 
-    cpu_timer2.Start();
     info->Init("PageRank", args, csr);  // initialize Info structure
-    cpu_timer2.Stop();
-    info->info["load_time"] = cpu_timer2.ElapsedMillis();
-
     RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test
-
-    cpu_timer.Stop();
-    info->info["total_time"] = cpu_timer.ElapsedMillis();
-
-    if (!(info->info["quiet_mode"].get_bool()))
-    {
-        info->DisplayStats();  // display collected statistics
-    }
-
-    info->CollectInfo();  // collected all the info and put into JSON mObject
 
     return 0;
 }
