@@ -57,6 +57,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, VertexId      > labels        ;
         util::Array1D<SizeT, unsigned char > visited_mask  ;
         util::Array1D<SizeT, unsigned int  > temp_marker   ;
+        util::Array1D<SizeT, VertexId      > original_vertex;
 
         /*
          * @brief Default constructor
@@ -66,6 +67,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             labels          .SetName("labels"          );
             visited_mask    .SetName("visited_mask"    );
             temp_marker     .SetName("temp_marker"     );
+            original_vertex .SetName("original_vertex" );
         }
 
         /*
@@ -77,6 +79,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             labels        .Release();
             visited_mask  .Release();
             temp_marker   .Release();
+            original_vertex.Release();
         }
 
         /**
@@ -250,6 +253,10 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                     if (retval = this->preds.Allocate(nodes, util::DEVICE)) return retval;
                 util::MemsetKernel<<<128,128>>>(this->preds.GetPointer(util::DEVICE), -2, nodes);
             }
+            original_vertex.SetPointer(
+                graph_slice -> original_vertex.GetPointer(util::DEVICE),
+                graph_slice -> original_vertex.GetSize(),
+                util::DEVICE);
 
             if (_ENABLE_IDEMPOTENCE) {
                 SizeT visited_mask_bytes  = ((nodes * sizeof(unsigned char))+7)/8;
@@ -320,31 +327,40 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 }
 
             } else {
-                VertexId **th_labels=new VertexId*[this->num_gpus];
-                VertexId **th_preds =new VertexId*[this->num_gpus];
-                for (int gpu=0;gpu<this->num_gpus;gpu++)
+                VertexId **th_labels = new VertexId*[this->num_gpus];
+                VertexId **th_preds  = new VertexId*[this->num_gpus];
+                for (int gpu=0; gpu < this->num_gpus; gpu++)
                 {
-                    if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-                    if (retval = data_slices[gpu]->labels.Move(util::DEVICE,util::HOST)) return retval;
+                    if (retval = util::SetDevice(this->gpu_idx[gpu])) 
+                        return retval;
+                    if (retval = data_slices[gpu]->labels.Move(util::DEVICE,util::HOST)) 
+                        return retval;
                     th_labels[gpu]=data_slices[gpu]->labels.GetPointer(util::HOST);
                     if (_MARK_PREDECESSORS) {
-                        if (retval = data_slices[gpu]->preds.Move(util::DEVICE,util::HOST)) return retval;
+                        if (retval = data_slices[gpu]->preds.Move(util::DEVICE,util::HOST)) 
+                            return retval;
                         th_preds[gpu]=data_slices[gpu]->preds.GetPointer(util::HOST);
                     }
                 } //end for(gpu)
 
-                for (VertexId node=0;node<this->nodes;node++)
-                if (this-> partition_tables[0][node]>=0 && this-> partition_tables[0][node]<this->num_gpus &&
-                    this->convertion_tables[0][node]>=0 && this->convertion_tables[0][node]<data_slices[this->partition_tables[0][node]]->labels.GetSize())
-                    h_labels[node]=th_labels[this->partition_tables[0][node]][this->convertion_tables[0][node]];
-                else {
-                    printf("OutOfBound: node = %d, partition = %d, convertion = %d\n",
-                           node, this->partition_tables[0][node], this->convertion_tables[0][node]);
-                    fflush(stdout);
+                for (VertexId v=0; v < this->nodes; v++)
+                {
+                    int      gpu = this ->  partition_tables[0][v];
+                    VertexId v_  = this -> convertion_tables[0][v];
+                    if (gpu >= 0 && gpu <  this->num_gpus &&
+                        v_ >= 0 && v_ <  data_slices[gpu]->labels.GetSize())
+                    {
+                        h_labels[v] = th_labels[gpu][v_];
+                        if (_MARK_PREDECESSORS)
+                            h_preds[v] = th_preds[gpu][v_];
+                    }
+                    else {
+                        printf("OutOfBound: node = %d, partition = %d, convertion = %d\n",
+                            v, gpu, v_);
+                        fflush(stdout);
+                    }
                 }
-                if (_MARK_PREDECESSORS)
-                    for (VertexId node=0;node<this->nodes;node++)
-                        h_preds[node]=th_preds[this->partition_tables[0][node]][this->convertion_tables[0][node]];
+
                 for (int gpu=0;gpu<this->num_gpus;gpu++)
                 {
                     if (retval = data_slices[gpu]->labels.Release(util::HOST)) return retval;
