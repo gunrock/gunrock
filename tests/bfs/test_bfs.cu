@@ -436,7 +436,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
         if (MARK_PREDECESSORS)
         {
-            printf("Predecessor Validity: \n");
+            printf("Predecessor Validity: ");
             num_errors = 0;
             for (VertexId v=0; v<graph->nodes; v++)
             {

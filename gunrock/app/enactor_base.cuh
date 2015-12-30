@@ -1378,11 +1378,11 @@ __global__ void Make_Out(
             s_keys_outs[0][pos]=key;
         } else {
             s_keys_outs[target][pos]=convertion_table[key];
-            #pragma unroll
+            #pragma unrool
             for (int i=0;i<num_vertex_associates;i++)
                 s_vertex_associate_outss[target*num_vertex_associates+i][pos]
                     =s_vertex_associate_orgs[i][key];
-            #pragma unroll
+            #pragma unrool
             for (int i=0;i<num_value__associates;i++)
                 s_value__associate_outss[target*num_value__associates+i][pos]
                     =s_value__associate_orgs[i][key];
@@ -1460,11 +1460,11 @@ __global__ void Make_Out_Backward(
                 s_keys_outs[0][pos]=key;
             } else {
                 s_keys_outs[target][pos]=convertion_table[j];
-                #pragma unroll
+                #pragma unrool
                 for (int i=0;i<num_vertex_associates;i++)
                     s_vertex_associate_outss[target*num_vertex_associates+i][pos]
                         =s_vertex_associate_orgs[i][key];
-                #pragma unroll
+                #pragma unrool
                 for (int i=0;i<num_value__associates;i++)
                     s_value__associate_outss[target*num_value__associates+i][pos]
                         =s_value__associate_orgs[i][key];
