@@ -183,8 +183,8 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
   if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     #added for Boost and OpenMP on OS X
-    link_directories("/opt/local/lib" "/opt/local/lib/libomp")
-    include_directories("/opt/local/include" "/opt/local/include/libomp")
+    link_directories("/opt/local/lib")
+    include_directories("/opt/local/include")
   endif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 
 endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
