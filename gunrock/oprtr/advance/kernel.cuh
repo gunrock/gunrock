@@ -150,7 +150,7 @@ cudaError_t ComputeOutputLength(
     //        frontier_attribute->output_length.GetPointer(util::DEVICE),
     //        0, 1);
     //}
-    return cudaSuccess;
+    //return cudaSuccess;
 }
 
 /**

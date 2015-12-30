@@ -346,7 +346,7 @@ public:
         }
     } // ShrinkSize(...)
 
-    Value* GetPointer(unsigned int target = HOST)
+    __host__ __device__ __forceinline__ Value* GetPointer(unsigned int target = HOST)
     {
         if (target == HOST  )
         {

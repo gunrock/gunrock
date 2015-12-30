@@ -97,7 +97,7 @@ __global__ void Expand_Incoming_BFS (
            }
         }
         keys_out[x]=key;
-        if (NUM_VERTEX_ASSOCIATES == 2)
+        if (NUM_VERTEX_ASSOCIATES == 2 && s_vertex_associate_org[0][key] == t)
             s_vertex_associate_org[1][key]=s_vertex_associate_in[1][x];
         x+=STRIDE;
     }
@@ -375,6 +375,28 @@ struct BFSIteration : public IterationBase <
         }
     }
 
+    /*
+     * @brief Iteration_Update_Preds function.
+     *
+     * @param[in] graph_slice Pointer to the graph slice we process on.
+     * @param[in] data_slice Pointer to the data slice we process on.
+     * @param[in] frontier_attribute Pointer to the frontier attribute.
+     * @param[in] frontier_queue Pointer to the frontier queue.
+     * @param[in] num_elements Number of elements.
+     * @param[in] stream CUDA stream.
+     */
+    static void Iteration_Update_Preds(
+        GraphSlice                    *graph_slice,
+        DataSlice                     *data_slice,
+        FrontierAttribute<SizeT>
+                                      *frontier_attribute,
+        util::DoubleBuffer<SizeT, VertexId, Value>
+                                      *frontier_queue,
+        SizeT                          num_elements,
+        cudaStream_t                   stream)
+    {
+        return ;
+    }
 };
 
 /**

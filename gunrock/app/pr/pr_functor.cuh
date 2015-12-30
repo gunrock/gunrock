@@ -157,7 +157,7 @@ struct PRFunctor {
         //VertexId src_node  = problem->src_node ;
         //Value    old_value = problem->rank_next[node];
         //problem->rank_next[node] = (delta * problem->rank_next[node]) + (1.0-delta) * ((src_node == node || src_node == -1) ? 1 : 0);
-        problem->rank_next[node] = (1.0 - delta) + delta * problem->rank_next[node];
+        problem->rank_next[node] = problem->reset_value + delta * problem->rank_next[node];
         Value diff = fabs(problem->rank_next[node] - problem->rank_curr[node]);
 
         //if (TO_TRACK)
