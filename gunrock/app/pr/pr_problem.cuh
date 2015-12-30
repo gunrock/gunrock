@@ -31,8 +31,7 @@ namespace pr {
 template <
     typename    VertexId,
     typename    SizeT,
-    typename    Value,
-    bool        NORMALIZED>
+    typename    Value>
 struct PRProblem : ProblemBase<VertexId, SizeT, Value,
     true,  // _MARK_PREDECESSORS
     false, // _ENABLE_IDEMPOTENCE
@@ -62,8 +61,6 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, VertexId> *temp_keys_out;
         Value    threshold;               /**< Used for recording accumulated error */
         Value    delta;
-        Value    init_value;
-        Value    reset_value;
         VertexId src_node;
         bool     to_continue;
         SizeT    local_nodes;
@@ -333,7 +330,6 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST)) return retval;
                 DataSlice* data_slice_ = data_slices[gpu].GetPointer(util::HOST);
                 data_slice_->streams.SetPointer(&streams[gpu*num_gpus*2], num_gpus*2);
-                data_slice_->init_value = 1.0 / graph->nodes ;
                 if (this->num_gpus > 1) data_slice_->local_nodes = local_nodes[gpu];
                 if (retval = data_slice_->Init(
                     this->num_gpus,
@@ -413,16 +409,10 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             // Initial rank_next = 0
             //util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_rank_curr,
             //    (Value)1.0/nodes, nodes);
-            data_slices[gpu] -> init_value = NORMALIZED ? 
-                (1.0 / this->org_graph->nodes) : (1.0 - delta);
-            data_slices[gpu] -> reset_value = NORMALIZED ?
-                ((1.0 - delta) / this->org_graph->nodes) : (1.0 - delta);
             util::MemsetKernel<<<128, 128>>>(
-                data_slices[gpu]->rank_next.GetPointer(util::DEVICE), 
-                NORMALIZED ? (Value) 0.0 : (Value)(1.0 - delta), nodes);
+                data_slices[gpu]->rank_next.GetPointer(util::DEVICE), (Value)(1.0 - delta), nodes);
             util::MemsetKernel<<<128, 128>>>(
-                data_slices[gpu]->rank_curr.GetPointer(util::DEVICE), 
-                data_slices[gpu]->init_value, nodes);
+                data_slices[gpu]->rank_curr.GetPointer(util::DEVICE), (Value)(1.0 - delta), nodes);
 
             // Compute degrees
             util::MemsetKernel<<<128, 128>>>(

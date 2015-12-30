@@ -228,7 +228,6 @@ public:
         info["alpha"]              = 6.0f;   // default alpha for DOBFS
         info["beta"]               = 6.0f;   // default beta for DOBFS
         info["top_nodes"]          = 0;      // default number of nodes for top-k primitive
-        info["normalized"]         = false;  // default normalized for PageRank
         // info["gpuinfo"]
         // info["device_list"]
         // info["sysinfo"]
@@ -267,7 +266,6 @@ public:
         info["quiet_mode"] =  args.CheckCmdLineFlag("quiet");
         info["idempotent"] =  args.CheckCmdLineFlag("idempotence");       // BFS
         info["mark_predecessors"] =  args.CheckCmdLineFlag("mark-pred");  // BFS
-        info["normalized"] =  args.CheckCmdLineFlag("normalized"); // PR
 
         info["json"] = args.CheckCmdLineFlag("json");
         if (args.CheckCmdLineFlag("jsonfile"))
@@ -413,7 +411,6 @@ public:
             args.GetCmdLineArgument("output_filename", output_filename);
             info["output_filename"] = output_filename;
         }
-        
         // parse device count and device list
         info["device_list"] = GetDeviceList(args);
 

@@ -343,14 +343,12 @@ template <
     typename SizeT,
     bool INSTRUMENT,
     bool DEBUG,
-    bool SIZE_CHECK,
-    bool NORMALIZED>
+    bool SIZE_CHECK >
 void RunTests(Info<VertexId, Value, SizeT> *info)
 {
     typedef PRProblem <VertexId,
             SizeT,
-            Value,
-            NORMALIZED> PrProblem;
+            Value > PrProblem;
 
     typedef PREnactor <PrProblem,
             INSTRUMENT,
@@ -595,35 +593,6 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
  * @tparam SizeT
  * @tparam INSTRUMENT
  * @tparam DEBUG
- * @tparam SIZE_CHECK
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename VertexId,
-    typename Value,
-    typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK >
-void RunTests_normalized(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["normalized"].get_bool())
-    {
-        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,  true>(info);
-    } else {
-        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK, false>(info);
-    }
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
  *
  * @param[in] info Pointer to info contains parameters and statistics.
  */
@@ -637,11 +606,11 @@ void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["size_check"].get_bool())
     {
-        RunTests_normalized<VertexId, Value, SizeT, INSTRUMENT, DEBUG,  true>(info);
+        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG,  true>(info);
     }
     else
     {
-        RunTests_normalized<VertexId, Value, SizeT, INSTRUMENT, DEBUG, false>(info);
+        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, false>(info);
     }
 }
 
