@@ -422,44 +422,67 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                   "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // verify the result
-    if (reference_check_label != NULL)
+    if ((!quick_mode) && (!quiet_mode))
     {
-        if (!ENABLE_IDEMPOTENCE)
+        printf("Label Validity: ");
+        int num_errors = CompareResults(
+            h_labels, reference_check_label,
+            graph->nodes, true, quiet_mode);
+        if (num_errors > 0)
         {
-            if (!quiet_mode)
-            {
-                printf("Label Validity: ");
-            }
-            int error_num = CompareResults(
-                                h_labels, reference_check_label,
-                                graph->nodes, true, quiet_mode);
-            if (error_num > 0)
-            {
-                if (!quiet_mode)
-                {
-                    printf("%d errors occurred.\n", error_num);
-                }
-            }
+            printf("%d errors occurred.", num_errors);
         }
-        else
+        printf("\n");
+
+        if (MARK_PREDECESSORS)
         {
-            if (!MARK_PREDECESSORS)
+            printf("Predecessor Validity: ");
+            num_errors = 0;
+            for (VertexId v=0; v<graph->nodes; v++)
             {
-                if (!quiet_mode)
+                if (h_labels[v] == 
+                    (ENABLE_IDEMPOTENCE ? -1 : util::MaxValue<VertexId>() - 1)) 
+                    continue; // unvisited vertex
+                if (v == src && h_preds[v] == -1) continue; // source vertex
+                VertexId pred = h_preds[v];
+                if (pred >= graph->nodes || pred < 0)
                 {
-                    printf("Label Validity: ");
+                    //if (num_errors == 0)
+                        printf("INCORRECT: pred[%d] : %d out of bound\n", v, pred);
+                    num_errors ++;
+                    continue;
                 }
-                int error_num = CompareResults(
-                                    h_labels, reference_check_label,
-                                    graph->nodes, true, quiet_mode);
-                if (error_num > 0)
+                if (h_labels[v] != h_labels[pred] + 1)
                 {
-                    if (!quiet_mode)
-                    {
-                        printf("%d errors occurred.\n", error_num);
-                    }
+                    //if (num_errors == 0)
+                        printf("INCORRECT: label[%d] (%d) != label[%d] (%d) + 1\n", 
+                            v, h_labels[v], pred, h_labels[pred]);
+                    num_errors ++;
+                    continue;
+                }
+                
+                bool v_found = false;
+                for (SizeT t = graph->row_offsets[pred]; t < graph->row_offsets[pred+1]; t++)
+                if (v == graph->column_indices[t])
+                {
+                    v_found = true;
+                    break;
+                }
+                if (!v_found)
+                {
+                    //if (num_errors == 0)
+                        printf("INCORRECT: Vertex %d not in Vertex %d's neighbor list\n",
+                            v, pred);
+                    num_errors ++;
+                    continue;
                 }
             }
+
+            if (num_errors > 0)
+            {
+                printf("%d errors occurred.", num_errors);
+            } else printf("CORRECT");
+            printf("\n");
         }
     }
 

@@ -132,7 +132,9 @@ int ReadMarketStream(
             if (coo == NULL)
             {
                 fprintf(stderr, "Error parsing MARKET graph:"
-                    "coo allocation failed, sizeof(EdgeTupleType) = %d, edges = %lld, allo_size = %lld\n", sizeof(EdgeTupleType), edges, allo_size);
+                    "coo allocation failed, sizeof(EdgeTupleType) = %lu,"
+                    " edges = %lld, allo_size = %lld\n", 
+                    sizeof(EdgeTupleType), (long long)edges, (long long)allo_size);
                 return -1;
             }
 
