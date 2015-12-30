@@ -126,10 +126,10 @@ cudaError_t ComputeOutputLength(
         //util::DisplayDeviceResults(partitioned_scanned_edges, frontier_attribute->queue_length);
     }
 
-    if (KernelPolicy::ADVANCE_MODE == LB ||
-        KernelPolicy::ADVANCE_MODE == LB_LIGHT ||
-        KernelPolicy::ADVANCE_MODE == LB_BACKWARD)
-    {
+    //if (KernelPolicy::ADVANCE_MODE == LB ||
+    //    KernelPolicy::ADVANCE_MODE == LB_LIGHT ||
+    //    KernelPolicy::ADVANCE_MODE == LB_BACKWARD)
+    //{
         Scan<mgpu::MgpuScanTypeInc>(
             (SizeT*)partitioned_scanned_edges,
             frontier_attribute->queue_length, // TODO: +1?
@@ -145,11 +145,11 @@ cudaError_t ComputeOutputLength(
             partitioned_scanned_edges + frontier_attribute->queue_length - 1, // TODO: +1?
             sizeof(SizeT), cudaMemcpyDeviceToDevice, stream),
             "cudaMemcpyAsync failed", __FILE__, __LINE__);
-    } else {
-        util::MemsetKernel<<<1,1,0,stream>>>(
-            frontier_attribute->output_length.GetPointer(util::DEVICE),
-            0, 1);
-    }
+    //} else {
+    //    util::MemsetKernel<<<1,1,0,stream>>>(
+    //        frontier_attribute->output_length.GetPointer(util::DEVICE),
+    //        0, 1);
+    //}
     return cudaSuccess;
 }
 
