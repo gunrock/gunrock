@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
     // return shortest distance for each vertex from given source
     sssp(sssp_dist, nodes, edges, rows, cols, vals, /*source=*/ 0);
     // return top-ranked nodes and their PageRank values of floats
-    pagerank(top_nodes, top_ranks, nodes, edges, rows, cols);
+    pagerank(top_nodes, top_ranks, nodes, edges, rows, cols, false);
 
     ///////////////////////////////////////////////////////////////////////////
     // demo prints allow at most ten nodes

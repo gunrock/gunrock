@@ -101,6 +101,7 @@ struct GRSetup
     unsigned int   top_nodes;  // K value for top k / PageRank problem
     float     pagerank_delta;  // PageRank specific value
     float     pagerank_error;  // PageRank specific value
+    bool pagerank_normalized;  // PageRank specific flag
     float   max_queue_sizing;  // Setting frontier queue size
     int       traversal_mode;  // Traversal mode: 0 for LB, 1 TWC
     enum SrcMode source_mode;  // Source mode rand/largest_degree
@@ -137,6 +138,7 @@ inline struct GRSetup InitSetup(int num_iters, int* source)
     configurations.top_nodes = 10;
     configurations.pagerank_delta = 0.85f;
     configurations.pagerank_error = 0.01f;
+    configurations.pagerank_normalized = false;
     configurations.max_queue_sizing = 1.0;
     configurations.traversal_mode = 0;
     configurations.source_mode = manually;
@@ -317,7 +319,8 @@ void pagerank(
     const int  num_nodes,     // Input graph number of nodes
     const int  num_edges,     // Input graph number of edges
     const int* row_offsets,   // Input graph row_offsets
-    const int* col_indices);  // Input graph col_indices
+    const int* col_indices,   // Input graph col_indices
+    bool       normalized);   // 
 
 // TODO Add other primitives
 

@@ -19,6 +19,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <fstream>
+#include <algorithm>
 
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
@@ -172,9 +173,9 @@ int CompareResults_(
     float* reference,
     SizeT len,
     bool verbose = true,
-    bool quiet = false)
+    bool quiet = false,
+    float threshold = 0.05f)
 {
-    float THRESHOLD = 0.05f;
     int flag = 0;
     for (SizeT i = 0; i < len; i++)
     {
@@ -184,12 +185,12 @@ int CompareResults_(
         if (fabs(computed[i]) < 0.01f && fabs(reference[i] - 1) < 0.01f) continue;
         if (fabs(computed[i] - 0.0) < 0.01f)
         {
-            if (fabs(computed[i] - reference[i]) > THRESHOLD)
+            if (fabs(computed[i] - reference[i]) > threshold)
                 is_right = false;
         }
         else
         {
-            if (fabs((computed[i] - reference[i]) / reference[i]) > THRESHOLD)
+            if (fabs((computed[i] - reference[i]) / reference[i]) > threshold)
                 is_right = false;
         }
         if (!is_right && flag == 0)
@@ -198,6 +199,7 @@ int CompareResults_(
             {
                 printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
                 PrintValue<float>(computed[i]);
+                printf(" != ");
                 PrintValue<float>(reference[i]);
 
                 if (verbose)
@@ -322,6 +324,148 @@ void SimpleReferencePageRank(
     }
 
     free(pr_list);
+    if (!quiet) { printf("CPU PageRank finished in %lf msec.\n", elapsed); }
+}
+
+/*template <
+    typename VertexId,
+    typename Value>
+class Sort_Pair {
+public:
+    VertexId v;
+    Value val;
+};
+
+template <
+    typename VertexId,
+    typename Value>
+inline bool operator< (const Sort_Pair<VertexId, Value>& lhs, const Sort_Pair<VertexId, Value>& rhs)
+{
+    if (lhs.val < rhs.val) return true;
+    if (rhs.val < lhs.val) return false;
+    return false;
+}*/
+
+/**
+ * @brief A simple CPU-based reference Page Rank implementation.
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ *
+ * @param[in] graph Reference to the CSR graph we process on
+ * @param[in] node_id Source node for personalized PageRank (if any)
+ * @param[in] rank Host-side vector to store CPU computed labels for each node
+ * @param[in] delta Delta for computing PR
+ * @param[in] error Error threshold
+ * @param[in] max_iteration Maximum iteration to go
+ * @param[in] directed Whether the graph is directed
+ * @param[in] quiet Don't print out anything to stdout
+ */
+template <
+    typename VertexId,
+    typename Value,
+    typename SizeT >
+void SimpleReferencePageRank_Normalized(
+    const Csr<VertexId, Value, SizeT> &graph,
+    VertexId                          *node_id,
+    Value                             *rank,
+    Value                             delta,
+    Value                             error,
+    SizeT                             max_iteration,
+    bool                              directed,
+    bool                              quiet = false)
+{
+    //typedef Sort_Pair<VertexId, Value> SPair;
+    SizeT nodes = graph.nodes;
+    //SizeT edges = graph.edges;
+    Value *rank_current = (Value*) malloc (sizeof(Value) * nodes);
+    Value *rank_next    = (Value*) malloc (sizeof(Value) * nodes);
+    //SPair *sort_pairs   = (SPair*) malloc (sizeof(SPair) * nodes);
+    bool  to_continue   = true;
+    SizeT iteration     = 0;
+    Value reset_value   = (1-delta) / nodes;
+    CpuTimer cpu_timer;
+
+    cpu_timer.Start();
+    //#pragma omp parallel
+    {
+        #pragma omp parallel for
+        for (VertexId v=0; v<nodes; v++)
+        {
+            rank_current[v] = 1.0 / nodes;
+            rank_next   [v] = 0;
+        }
+
+        while (to_continue)
+        {
+            to_continue = false;
+
+            #pragma omp parallel for
+            for (VertexId src=0; src<nodes; src++)
+            {
+                SizeT start_e = graph.row_offsets[src];
+                SizeT end_e   = graph.row_offsets[src+1];
+                if (start_e == end_e) continue; // 0 out degree vertex
+                Value dist_rank = rank_current[src] / (end_e - start_e);
+
+                for (SizeT e = start_e; e < end_e; e++)
+                {
+                    VertexId dest = graph.column_indices[e];
+                    #pragma omp atomic
+                        rank_next[dest] += dist_rank;
+                }
+            }
+
+            iteration ++;
+
+            #pragma omp parallel for
+            for (VertexId v=0; v<nodes; v++)
+            {
+                Value rank_new = reset_value + delta * rank_next[v];
+                if (iteration <= max_iteration &&
+                    fabs(rank_new - rank_current[v]) > error)
+                {
+                    to_continue = true;
+                }
+                rank_current[v] = rank_new;
+                rank_next   [v] = 0;
+            }
+
+            //#pragma omp single
+            //{
+            //    iteration ++;
+            //}
+        }    
+    }
+    cpu_timer.Stop();
+    float elapsed = cpu_timer.ElapsedMillis();
+
+    // Sort the top ranked vertices
+    RankPair<SizeT, Value> *pr_list =
+        (RankPair<SizeT, Value>*)malloc(
+            sizeof(RankPair<SizeT, Value>) * nodes);
+
+    #pragma omp parallel for
+    for (VertexId i = 0; i < nodes; ++i)
+    {
+        pr_list[i].vertex_id = i;
+        pr_list[i].page_rank = rank_current[i];
+    }
+
+    std::stable_sort(pr_list, pr_list + nodes, 
+                     PRCompare<RankPair<SizeT, Value> >);
+
+    #pragma omp parallel for
+    for (VertexId i = 0; i < nodes; ++i)
+    {
+        node_id[i] = pr_list[i].vertex_id;
+        rank[i] = pr_list[i].page_rank;
+    }
+
+    free(pr_list     ); pr_list      = NULL;
+    free(rank_current); rank_current = NULL;
+    free(rank_next   ); rank_next    = NULL;
     if (!quiet) { printf("CPU PageRank finished in %lf msec.\n", elapsed); }
 }
 
@@ -462,49 +606,122 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     if (!quiet_mode)
     {
-        float total_pr = 0;
-        for (int i = 0; i < graph->nodes; ++i)
+        double total_pr = 0;
+        for (SizeT i = 0; i < graph->nodes; ++i)
         {
             total_pr += h_rank[i];
         }
-        printf("Total rank : %f\n", total_pr);
+        printf("Total rank : %lf\n", total_pr);
     }
 
     // compute reference CPU solution
-    if (ref_check != NULL)
+    if (!quick_mode)
     {
         if (!quiet_mode) { printf("Computing reference value ...\n"); }
-        SimpleReferencePageRank <VertexId, Value, SizeT>(
-            *graph,
-            ref_node_id,
-            ref_check,
-            delta,
-            error,
-            max_iteration,
-            !undirected,
-            quiet_mode);
+        if (NORMALIZED)
+            SimpleReferencePageRank_Normalized <VertexId, Value, SizeT>(
+                *graph,
+                ref_node_id,
+                ref_check,
+                delta,
+                error,
+                max_iteration,
+                !undirected,
+                quiet_mode);
+        else SimpleReferencePageRank <VertexId, Value, SizeT>(
+                *graph,
+                ref_node_id,
+                ref_check,
+                delta,
+                error,
+                max_iteration,
+                !undirected,
+                quiet_mode);
         if (!quiet_mode) { printf("\n"); }
-    }
 
-    // Verify the result
-    if (ref_check != NULL)
-    {
-        if (!quiet_mode) { printf("Validity Rank: "); }
-        int errors_count = CompareResults_(
-                               h_rank, ref_check,
-                               graph->nodes, true, quiet_mode);
+        // Verify the result
+        if (!quiet_mode) { printf("Validity Rank: \n"); }
+        Value *unorder_rank = new Value[graph->nodes];
+        int   *v_count      = new int  [graph->nodes];
+        SizeT  error_count  = 0;
+        for (VertexId i=0; i<graph->nodes; i++)
+            v_count[i] = 0;
+
+        for (VertexId i=0; i<graph->nodes; i++)
+        {
+            VertexId v = h_node_id[i];
+            if (v < 0 || v >= graph->nodes)
+            {
+                if (error_count == 0 && !quiet_mode)
+                    printf("INCORRECT : node_id[%d] (%d) is out of bound\n", i, v);
+                error_count ++;
+                continue;
+            }
+            if (v_count[v] > 0)
+            {
+                if (error_count == 0 && !quiet_mode)
+                    printf("INCORRECT : node_id[%d] (%d) appears more than once\n", i, v);
+                error_count ++;
+                continue;
+            }
+            v_count[v] ++;
+            unorder_rank[v] = h_rank[i];
+        }
+        for (VertexId v=0; v<graph->nodes; v++)
+        if (v_count[v] == 0)
+        {
+            if (error_count == 0 && !quiet_mode)
+                printf("INCORRECT : vertex %d does not appear in result\n", v);
+            error_count ++;
+        }
+        for (VertexId i=0; i<graph->nodes; i++)
+        {
+            VertexId v = ref_node_id[i];
+            if (fabs(ref_rank[i] - unorder_rank[v]) > error)
+            {
+                if (error_count == 0 && !quiet_mode)
+                    printf("INCORRECT : rank[%d] (%f) != %f\n",
+                        v, unorder_rank[v], ref_rank[i]);
+                error_count ++;
+            }
+        }
+        if (error_count == 0 && !quiet_mode)
+            printf("CORRECT\n");
+        else if (!quiet_mode)
+            printf("number of errors : %lld\n", (long long) error_count);
+        delete[] unorder_rank; unorder_rank = NULL;
+        
+
+        if (!quiet_mode) { printf("Validity Order: \n"); }
+        error_count = 0;
+        for (SizeT i=0; i<graph->nodes-1; i++)
+        if (h_rank[i] < h_rank[i+1])
+        {
+            if (error_count == 0 && !quiet_mode)
+                printf("INCORRECT : rank[%d] (%f), place %d < rank[%d] (%f), place %d\n",
+                    h_node_id[i], h_rank[i], i, h_node_id[i+1], h_rank[i+1], i+1);
+            error_count ++;
+        }
+        if (error_count == 0 && !quiet_mode)
+            printf("CORRECT\n");
+        else if (!quiet_mode)
+            printf("number of errors : %lld\n", (long long) error_count);
+
+        /*SizeT errors_count = CompareResults_(
+                           h_rank, ref_check,
+                           graph->nodes, true, quiet_mode, error);
         if (errors_count > 0)
         {
             if (!quiet_mode)
             {
                 printf("number of errors : %lld\n", (long long) errors_count);
             }
-        }
+        }*/
     }
 
     if (!quiet_mode)
     {
-        printf("\nFirst 40 labels of the GPU result.");
+        //printf("\nFirst 40 labels of the GPU result.");
         // Display Solution
         DisplaySolution(h_node_id, h_rank, graph->nodes);
     }
@@ -559,7 +776,6 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     if (enactor    ) { delete   enactor    ; enactor     = NULL; }
     if (ref_rank   ) { delete[] ref_rank   ; ref_rank    = NULL; }
     if (ref_node_id) { delete[] ref_node_id; ref_node_id = NULL; }
-    if (h_node_id  ) { delete[] h_node_id  ; h_node_id   = NULL; }
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
     
@@ -574,9 +790,9 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             fout.rdbuf() -> pubsetbuf(fout_buf, buf_size);
             fout.open(info->info["output_filename"].get_str().c_str());
 
-            for (VertexId v=0; v<graph->nodes; v++)
+            for (VertexId i=0; i<graph->nodes; i++)
             {
-                fout<< v+1 << "," << h_rank[v] << std::endl;
+                fout<< h_node_id[i]+1 << "," << h_rank[i] << std::endl;
             }
             fout.close();
             delete[] fout_buf; fout_buf = NULL;
@@ -585,6 +801,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         }
         delete[] h_rank     ; h_rank      = NULL; 
     }
+    if (h_node_id  ) { delete[] h_node_id  ; h_node_id   = NULL; }
 }
 
 /**

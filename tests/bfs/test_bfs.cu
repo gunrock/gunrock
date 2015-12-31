@@ -447,14 +447,14 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                 VertexId pred = h_preds[v];
                 if (pred >= graph->nodes || pred < 0)
                 {
-                    //if (num_errors == 0)
+                    if (num_errors == 0)
                         printf("INCORRECT: pred[%d] : %d out of bound\n", v, pred);
                     num_errors ++;
                     continue;
                 }
                 if (h_labels[v] != h_labels[pred] + 1)
                 {
-                    //if (num_errors == 0)
+                    if (num_errors == 0)
                         printf("INCORRECT: label[%d] (%d) != label[%d] (%d) + 1\n", 
                             v, h_labels[v], pred, h_labels[pred]);
                     num_errors ++;
@@ -470,7 +470,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                 }
                 if (!v_found)
                 {
-                    //if (num_errors == 0)
+                    if (num_errors == 0)
                         printf("INCORRECT: Vertex %d not in Vertex %d's neighbor list\n",
                             v, pred);
                     num_errors ++;
