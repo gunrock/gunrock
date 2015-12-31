@@ -16,6 +16,20 @@
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/app/pr/pr_problem.cuh>
 
+// atomic addition from Jon Cohen at NVIDIA
+__device__ static double atomicAdd(double *addr, double val)
+{
+    double old=*addr, assumed;
+    do {
+        assumed = old;
+        old = __longlong_as_double(
+        atomicCAS((unsigned long long int*)addr,
+               __double_as_longlong(assumed),
+               __double_as_longlong(val + assumed)));
+    } while( assumed!=old );
+    return old; 
+}
+
 namespace gunrock {
 namespace app {
 namespace pr {
@@ -153,16 +167,19 @@ struct PRFunctor {
      */
     static __device__ __forceinline__ bool CondFilter(
         VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
-        Value    delta     = problem->delta    ;
+        //Value    delta     = problem->delta    ;
         //VertexId src_node  = problem->src_node ;
-        //Value    old_value = problem->rank_next[node];
+        Value    old_value = problem->rank_curr[node];
+        Value    new_value = problem->reset_value + problem -> delta * problem->rank_next[node];
         //problem->rank_next[node] = (delta * problem->rank_next[node]) + (1.0-delta) * ((src_node == node || src_node == -1) ? 1 : 0);
-        problem->rank_next[node] = problem->reset_value + delta * problem->rank_next[node];
-        Value diff = fabs(problem->rank_next[node] - problem->rank_curr[node]);
+        //problem->rank_next[node] = problem->reset_value + delta * problem->rank_next[node];
+        //Value diff = fabs(problem->rank_next[node] - problem->rank_curr[node]);
+        //Value diff = fabs(new_value - old_value);
+        problem -> rank_next[node] = new_value;
 
         //if (TO_TRACK)
         //if (to_track(node)) printf("%d \tr[%d] \t%f \t-> %f \t(%f)\n", problem->gpu_idx, node, problem->rank_curr[node], problem->rank_next[node], old_value);
-        return (diff >= problem->threshold);
+        return (fabs(new_value - old_value) >= problem->threshold * old_value);
     }
 
     /**

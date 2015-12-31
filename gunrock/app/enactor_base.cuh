@@ -2075,6 +2075,7 @@ void Iteration_Loop(
                             frontier_attribute_,
                             enactor_stats_,
                             graph_slice);
+                        if (enactor_stats_ -> retval) break;
                     }
 
                     Iteration::SubQueue_Core(
@@ -2104,7 +2105,8 @@ void Iteration_Loop(
                 case 3: //Copy
                     if (num_gpus <=1)
                     {
-                        if (enactor_stats_-> retval = util::GRError(cudaStreamSynchronize(streams[peer_]), "cudaStreamSynchronize failed",__FILE__, __LINE__)) break;
+                        if (enactor_stats_-> retval = util::GRError(cudaStreamSynchronize(streams[peer_]), 
+                            "cudaStreamSynchronize failed",__FILE__, __LINE__)) break;
                         Total_Length = frontier_attribute_->queue_length;
                         to_show[peer_]=false;break;
                     }
@@ -2120,12 +2122,20 @@ void Iteration_Loop(
                         if (Iteration::HAS_SUBQ)
                         {
                             if (enactor_stats_->retval =
-                                Check_Size<false, SizeT, VertexId> ("queue3", frontier_attribute_->output_length[0]+2, &frontier_queue_->keys  [selector^1], over_sized, thread_num, iteration, peer_, false)) break;
+                                Check_Size<false, SizeT, VertexId> ("queue3", 
+                                    frontier_attribute_->output_length[0]+2, 
+                                    &frontier_queue_->keys  [selector^1], 
+                                    over_sized, thread_num, iteration, peer_, false)) 
+                                break;
                         }
                         if (frontier_attribute_->queue_length ==0) break;
 
                         if (enactor_stats_->retval =
-                            Check_Size<false, SizeT, VertexId> ("total_queue", Total_Length + frontier_attribute_->queue_length, &data_slice->frontier_queues[num_gpus].keys[0], over_sized, thread_num, iteration, peer_, false)) break;
+                            Check_Size<false, SizeT, VertexId> ("total_queue", 
+                                Total_Length + frontier_attribute_->queue_length, 
+                                &data_slice->frontier_queues[num_gpus].keys[0], 
+                                over_sized, thread_num, iteration, peer_, false)) 
+                            break;
 
                         util::MemsetCopyVectorKernel<<<256,256, 0, streams[peer_]>>>(
                             data_slice->frontier_queues[num_gpus].keys[0].GetPointer(util::DEVICE) + Total_Length,
@@ -2203,10 +2213,18 @@ void Iteration_Loop(
             if (Enactor::SIZE_CHECK)
             {
                 if (enactor_stats[0]. retval =
-                    Check_Size<true, SizeT, VertexId> ("total_queue", Total_Length, &data_slice->frontier_queues[0].keys[frontier_attribute[0].selector], over_sized, thread_num, iteration, num_gpus, true)) break;
+                    Check_Size<true, SizeT, VertexId> ("total_queue", 
+                        Total_Length, 
+                        &data_slice->frontier_queues[0].keys[frontier_attribute[0].selector], 
+                        over_sized, thread_num, iteration, num_gpus, true)) 
+                    break;
                 if (Problem::USE_DOUBLE_BUFFER)
                     if (enactor_stats[0].retval =
-                        Check_Size<true, SizeT, Value> ("total_queue", Total_Length, &data_slice->frontier_queues[0].values[frontier_attribute[0].selector], over_sized, thread_num, iteration, num_gpus, true)) break;
+                        Check_Size<true, SizeT, Value> ("total_queue", 
+                            Total_Length, 
+                            &data_slice->frontier_queues[0].values[frontier_attribute[0].selector], 
+                            over_sized, thread_num, iteration, num_gpus, true)) 
+                        break;
 
                 offset=frontier_attribute[0].queue_length;
                 for (peer_=1;peer_<num_gpus;peer_++)
@@ -2300,7 +2318,7 @@ void Iteration_Loop(
                             frontier_attribute_,
                             enactor_stats_,
                             graph_slice);
-
+                        if (enactor_stats_ -> retval) break;
                     }
 
                     Iteration::FullQueue_Core(
@@ -2320,7 +2338,11 @@ void Iteration_Loop(
                     if (!Enactor::SIZE_CHECK)
                     {
                         if (enactor_stats_->retval =
-                            Check_Size<false, SizeT, VertexId> ("queue3", frontier_attribute->output_length[0]+2, &frontier_queue_->keys[selector^1], over_sized, thread_num, iteration, peer_, false)) break;
+                            Check_Size<false, SizeT, VertexId> ("queue3", 
+                                frontier_attribute->output_length[0]+2, 
+                                &frontier_queue_->keys[selector^1], 
+                                over_sized, thread_num, iteration, peer_, false)) 
+                            break;
                     }
                     selector = frontier_attribute[peer_].selector;
                     Total_Length = frontier_attribute[peer_].queue_length;

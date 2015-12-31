@@ -147,7 +147,7 @@ void DisplaySolution(VertexId *node, Value *rank, SizeT nodes)
     printf("\nTop %d Ranked Vertices and PageRanks:\n", top);
     for (int i = 0; i < top; ++i)
     {
-        printf("Vertex ID: %d, PageRank: %5f\n", node[i], rank[i]);
+        printf("Vertex ID: %d, PageRank: %.8le\n", node[i], (double)rank[i]);
     }
 }
 
@@ -167,14 +167,14 @@ void DisplaySolution(VertexId *node, Value *rank, SizeT nodes)
  *
  * \return Zero if two vectors are exactly the same, non-zero if there is any difference.
  */
-template <typename SizeT>
+template <typename SizeT, typename Value>
 int CompareResults_(
-    float* computed,
-    float* reference,
+    Value* computed,
+    Value* reference,
     SizeT len,
     bool verbose = true,
     bool quiet = false,
-    float threshold = 0.05f)
+    Value threshold = 0.05f)
 {
     int flag = 0;
     for (SizeT i = 0; i < len; i++)
@@ -198,23 +198,23 @@ int CompareResults_(
             if (!quiet)
             {
                 printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
-                PrintValue<float>(computed[i]);
+                PrintValue<Value>(computed[i]);
                 printf(" != ");
-                PrintValue<float>(reference[i]);
+                PrintValue<Value>(reference[i]);
 
                 if (verbose)
                 {
                     printf("\nresult[...");
-                    for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                    for (SizeT j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
                     {
-                        PrintValue<float>(computed[j]);
+                        PrintValue<Value>(computed[j]);
                         printf(", ");
                     }
                     printf("...]");
                     printf("\nreference[...");
-                    for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                    for (SizeT j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
                     {
-                        PrintValue<float>(reference[j]);
+                        PrintValue<Value>(reference[j]);
                         printf(", ");
                     }
                     printf("...]");
@@ -424,7 +424,7 @@ void SimpleReferencePageRank_Normalized(
             {
                 Value rank_new = reset_value + delta * rank_next[v];
                 if (iteration <= max_iteration &&
-                    fabs(rank_new - rank_current[v]) > error)
+                    fabs(rank_new - rank_current[v]) > error * rank_current[v])
                 {
                     to_continue = true;
                 }
@@ -538,7 +538,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     Value        *h_rank             = new Value   [graph->nodes];
     VertexId     *h_node_id          = new VertexId[graph->nodes];
     VertexId     *ref_node_id        = new VertexId[graph->nodes];
-    Value        *ref_check          = (quick_mode) ? NULL : ref_rank;
+    //Value        *ref_check          = (quick_mode) ? NULL : ref_rank;
 
     size_t *org_size = new size_t[num_gpus];
     for (int gpu = 0; gpu < num_gpus; gpu++)
@@ -568,7 +568,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                       context, problem, traversal_mode, max_grid_size),
                   "PR Enactor Init failed", __FILE__, __LINE__);
     cpu_timer.Stop();
-    info -> info["preprecess_time"] = cpu_timer.ElapsedMillis();
+    info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
     double elapsed = 0.0f;
 
@@ -578,7 +578,8 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     {
         util::GRError(problem->Reset(
                           src, delta, error, max_iteration,
-                          enactor->GetFrontierType(), max_queue_sizing),
+                          enactor->GetFrontierType(), max_queue_sizing,
+                          max_queue_sizing1, traversal_mode == 1 ? true : false),
                       "PR Problem Data Reset Failed", __FILE__, __LINE__);
         util::GRError(enactor->Reset(),
                       "PR Enactor Reset Reset failed", __FILE__, __LINE__);
@@ -611,7 +612,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         {
             total_pr += h_rank[i];
         }
-        printf("Total rank : %lf\n", total_pr);
+        printf("Total rank : %.10lf\n", total_pr);
     }
 
     // compute reference CPU solution
@@ -622,7 +623,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             SimpleReferencePageRank_Normalized <VertexId, Value, SizeT>(
                 *graph,
                 ref_node_id,
-                ref_check,
+                ref_rank,
                 delta,
                 error,
                 max_iteration,
@@ -631,7 +632,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         else SimpleReferencePageRank <VertexId, Value, SizeT>(
                 *graph,
                 ref_node_id,
-                ref_check,
+                ref_rank,
                 delta,
                 error,
                 max_iteration,
@@ -674,23 +675,58 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                 printf("INCORRECT : vertex %d does not appear in result\n", v);
             error_count ++;
         }
+        double ref_total_rank = 0;
+        double max_diff       = 0;
+        VertexId max_diff_pos = graph->nodes;
+        double max_rdiff      = 0;
+        VertexId max_rdiff_pos= graph->nodes;
         for (VertexId i=0; i<graph->nodes; i++)
         {
             VertexId v = ref_node_id[i];
-            if (fabs(ref_rank[i] - unorder_rank[v]) > error)
+            ref_total_rank += ref_rank[i];
+            Value diff = fabs(ref_rank[i] - unorder_rank[v]);
+            if ((ref_rank[i] > 1e-12 && diff > error * ref_rank[i]) ||
+                (ref_rank[i] <= 1e-12 && diff > error))
             {
                 if (error_count == 0 && !quiet_mode)
-                    printf("INCORRECT : rank[%d] (%f) != %f\n",
-                        v, unorder_rank[v], ref_rank[i]);
+                    printf("INCORRECT : rank[%d] (%.8le) != %.8le\n",
+                        v, (double)unorder_rank[v], (double)ref_rank[i]);
                 error_count ++;
+            }
+            if (diff > max_diff)
+            {
+                max_diff = diff;
+                max_diff_pos = i;
+            }
+            if (ref_rank[i] > 1e-12)
+            {
+                Value rdiff = diff / ref_rank[i];
+                if (rdiff > max_rdiff)
+                {
+                    max_rdiff = rdiff;
+                    max_rdiff_pos = i;
+                }
             }
         }
         if (error_count == 0 && !quiet_mode)
             printf("CORRECT\n");
         else if (!quiet_mode)
             printf("number of errors : %lld\n", (long long) error_count);
-        delete[] unorder_rank; unorder_rank = NULL;
-        
+        printf("Reference total rank : %.10lf\n", ref_total_rank);
+        printf("Maximum difference : "); 
+        if (max_diff_pos < graph->nodes)
+            printf("rank[%d] %.8le vs. %.8le, ",
+                ref_node_id[max_diff_pos], 
+                (double)unorder_rank[ref_node_id[max_diff_pos]], 
+                (double)ref_rank[max_diff_pos]);
+        printf("%.8le\n", (double)max_diff);
+        printf("Maximum relative difference :");
+        if (max_rdiff_pos < graph->nodes)
+            printf("rank[%d] %.8le vs. %.8le, ",
+                ref_node_id[max_rdiff_pos],
+                (double)unorder_rank[ref_node_id[max_rdiff_pos]],
+                (double)ref_rank[max_rdiff_pos]);
+        printf("%.8lf %%\n", (double)max_rdiff * 100);
 
         if (!quiet_mode) { printf("Validity Order: \n"); }
         error_count = 0;
@@ -698,14 +734,15 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         if (h_rank[i] < h_rank[i+1])
         {
             if (error_count == 0 && !quiet_mode)
-                printf("INCORRECT : rank[%d] (%f), place %d < rank[%d] (%f), place %d\n",
-                    h_node_id[i], h_rank[i], i, h_node_id[i+1], h_rank[i+1], i+1);
+                printf("INCORRECT : rank[%d] (%.8le), place %d < rank[%d] (%.8le), place %d\n",
+                    h_node_id[i], (double)h_rank[i], i, h_node_id[i+1], (double)h_rank[i+1], i+1);
             error_count ++;
         }
         if (error_count == 0 && !quiet_mode)
             printf("CORRECT\n");
         else if (!quiet_mode)
             printf("number of errors : %lld\n", (long long) error_count);
+        delete[] unorder_rank; unorder_rank = NULL;
 
         /*SizeT errors_count = CompareResults_(
                            h_rank, ref_check,
@@ -939,7 +976,9 @@ int main(int argc, char** argv)
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
     // graph construction or generation related parameters
-    info->info["undirected"] = true;   // require undirected input graph
+    if (args.CheckCmdLineFlag("normalized"))
+        info->info["undirected"] = args.CheckCmdLineFlag("undirected");
+    else info->info["undirected"] = true;   // require undirected input graph when unnormalized
 
     cpu_timer2.Start();
     info->Init("PageRank", args, csr);  // initialize Info structure
