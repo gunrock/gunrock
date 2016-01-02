@@ -6,7 +6,8 @@ running parameters and datasets. If more accurate numbers (e.g. for comparison
 in a paper), or results with different parameters / datasets, please contact
 the developers of Gunrock.
 
-General remarks :
+General remarks
+-----------------
 - All timings are shown in Millisecond (ms).
 - Abreviation:
   CSR   = compressed sparse row
@@ -33,8 +34,9 @@ clean-up time
 is not optimized for data load / write performance). The processing time may be a better 
 indicator of performance.
 
-Breadth-First Search (BFS) {#results_bfs}
+Breadth-First Search (BFS)                                {#results_bfs}
 =================
+
 | No. |          Dataset            |  graph type |     |V|     |      |E|      | root vertex | |iteration| | process time |   MTEPS   |   MTVPS   |  load time  | preprocess time | postprocess time |  write time |  total time  |     condition     |
 |-----|-----------------------------|-------------|-------------|---------------|-------------|-------------|--------------|-----------|-----------|-------------|-----------------|------------------|-------------|--------------|-------------------|
 |   1 | friendster_edges_small_2hop | SOC, CSR, D | 121,674,532 |        20,509 |   3,546,566 |           6 |      17.2760 |    1.1871 |    0.4893 | 12,590.6990 |     17,114.5179 |                  |    112.5512 |  31,016.4499 | H1 + S1 + G1 + P1 |
@@ -44,14 +46,17 @@ Breadth-First Search (BFS) {#results_bfs}
 |   5 | com_LiveJournal             | SOC, CSR, D |   4,036,537 |    34,681,189 |       9,766 |          17 |      49.9380 |  694.4850 |  191.7421 | 12,260.1349 |      1,461.0670 |                  | 12,260.1349 |  18,522.2769 | H1 + S1 + G1 + P1 |
 
 Parameters
+-----------------
 - P1 = --traversal-mode=0 --device=0,1,2,3 --src=largestdegree --mark-pred --quick --output_filename=some_valid_filename
 
 Remarks
+-----------------
 - Idempotence is disabled when --mark-pred (mark predecessors) is used.
 
 
-Page Rank (PR) {#results_pr}
+Page Rank (PR)                                           {#results_pr}
 =================
+
 | No. |          Dataset            |  graph type |     |V|     |      |E|      | |iteration| | process time |   MTEPS   |   MTVPS   |  load time  | preprocess time | postprocess time |  write time  |  total time  |     condition     |
 |-----|-----------------------------|-------------|-------------|---------------|-------------|--------------|-----------|-----------|-------------|-----------------|------------------|--------------|--------------|-------------------|
 |   1 | friendster_edges_small_2hop | SOC, CSR, D | 121,674,532 |        20,509 |          18 |   5,287.1938 |    0.0698 |  414.2352 | 10,758.1401 |        241.4210 |                  | 235,052.1171 | 251,862.2911 | H2 + S1 + G1 + P1 |
@@ -61,9 +66,11 @@ Page Rank (PR) {#results_pr}
 |   5 | com_LiveJournal             | SOC, CSR, D |   4,036,537 |    34,681,189 |          23 |   2,333.8479 |  341.7821 |  369.7800 |  8,339.2031 |        100.7540 |                  |   7,719.7220 |  18,512.9559 | H2 + S1 + G1 + P1 |
 
 Paramters
+-----------------
 - P1 = --traversal-mode=1 --device=2 --quick --delta=0.85 --error=0.001 --max-iter=100 --normalized --queue-sizing=1 --queue-sizing1=0
 
 Remarks
+-----------------
 - PR has two formulations, and Gunrock has both implemented. The 
 unnormalized one is the one describled by the original PR paper; 
 it does not converge and can be called by not passing --normalized 
@@ -77,12 +84,16 @@ vertices. This should make the total rank always equal to 1 (when using
 the normalized formular), but we have not implemented this yet.
 
 Hardware
+-----------------
 H1 = 4 x NVIDIA Tesla K40c, 2 x Intel Xeon E5-2637 v2, 256 GB DDR3 RAM with ECC
+
 H2 = 1 x NVIDIA Telsa K40c, 2 x Intel Xeon E5-2637 v2, 256 GB DDR3 RAM with ECC
 
 Software
+-----------------
 S1 = ubuntu 14.04.3 LTS (GNU/Linux 3.13.0-62-generic x86_64), NVIDIA GPU driver 352.30, CUDA 7.5, gcc 4.8.4
 
 Gunrock version
+-----------------
 G1 = dev, bc761f0c78ac855e33587c4be55e2cf672013de5, 2015.12.31
 
