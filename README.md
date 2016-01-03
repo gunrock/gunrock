@@ -76,9 +76,9 @@ Requirements
 CUDA version 5.5 (or greater) and compute capability 3.0 (or greater) is
 required.
 
-Several graph primitives' CPU validation code uses Boost Graph Library.
-We are also using Boost Spirit, filesystem, and timer in our utility code.
-A boost version > 1.53.0 is required.
+Several graph primitives' CPU validation code uses Boost Graph
+Library.  We are also using Boost Spirit, filesystem, predef, chrono,
+and timer in our utility code.  A boost version > 1.53.0 is required.
 
 CUDA
 ====
