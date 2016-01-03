@@ -257,13 +257,12 @@ public:
         info["gpuinfo"] = gpuinfo.getGpuinfo();
         util::Userinfo userinfo;
         info["userinfo"] = userinfo.getUserinfo();
-        if (BOOST_COMP_GNUC) {
-            info["compiler"] = BOOST_COMP_GNUC_NAME;
-            info["compiler_version"] = BOOST_COMP_GNUC_DETECTION;
-        }
         if (BOOST_COMP_CLANG) {
             info["compiler"] = BOOST_COMP_CLANG_NAME;
             info["compiler_version"] = BOOST_COMP_CLANG_DETECTION;
+        } else if (BOOST_COMP_GNUC) {
+            info["compiler"] = BOOST_COMP_GNUC_NAME;
+            info["compiler_version"] = BOOST_COMP_GNUC_DETECTION;
         }
         time_t now = time(NULL); info["time"] = ctime(&now);
         info["gunrock_version"] = XSTR(GUNROCKVERSION);
