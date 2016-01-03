@@ -15,6 +15,8 @@
 #pragma once
 #include <time.h>
 
+#include <boost/predef.h>
+
 #include <gunrock/util/cuda_properties.cuh>
 #include <gunrock/util/cta_work_progress.cuh>
 #include <gunrock/util/error_utils.cuh>
@@ -175,6 +177,8 @@ public:
         info["algorithm"]          = "";     // algorithm/primitive name
         info["average_duty"]       = 0.0f;   // average runtime duty
         info["command_line"]       = "";     // entire command line
+        info["compiler"]           = "";     // what compiled this program?
+        info["compiler_version"]   = "";     // what version compiler?
         info["debug_mode"]         = false;  // verbose flag print debug info
         info["dataset"]            = "";     // dataset name used in test
         info["edges_visited"]      = 0;      // number of edges touched
@@ -253,6 +257,14 @@ public:
         info["gpuinfo"] = gpuinfo.getGpuinfo();
         util::Userinfo userinfo;
         info["userinfo"] = userinfo.getUserinfo();
+        if (BOOST_COMP_GNUC) {
+            info["compiler"] = BOOST_COMP_GNUC_NAME;
+            info["compiler_version"] = BOOST_COMP_GNUC_DETECTION;
+        }
+        if (BOOST_COMP_CLANG) {
+            info["compiler"] = BOOST_COMP_CLANG_NAME;
+            info["compiler_version"] = BOOST_COMP_CLANG_DETECTION;
+        }
         time_t now = time(NULL); info["time"] = ctime(&now);
         info["gunrock_version"] = XSTR(GUNROCKVERSION);
         info["git_commit_sha1"] = g_GIT_SHA1;
@@ -418,7 +430,7 @@ public:
             args.GetCmdLineArgument("output_filename", output_filename);
             info["output_filename"] = output_filename;
         }
-        
+
         // parse device count and device list
         info["device_list"] = GetDeviceList(args);
 
@@ -2033,10 +2045,10 @@ void Iteration_Loop(
                         streams          [peer_],
                         gunrock::oprtr::advance::V2V, true, false, false)) break;
 
-                    if (!Enactor::SIZE_CHECK && 
-                        (Iteration::AdvanceKernelPolicy::ADVANCE_MODE 
+                    if (!Enactor::SIZE_CHECK &&
+                        (Iteration::AdvanceKernelPolicy::ADVANCE_MODE
                             == oprtr::advance::TWC_FORWARD ||
-                         Iteration::AdvanceKernelPolicy::ADVANCE_MODE 
+                         Iteration::AdvanceKernelPolicy::ADVANCE_MODE
                             == oprtr::advance::TWC_BACKWARD))
                     {}
                     else {
@@ -2058,7 +2070,7 @@ void Iteration_Loop(
                             data_slice, iteration, peer_,
                             stages[peer_]-1, stages[peer_], to_show[peer_])) break;
                         if (to_show[peer_]==false) break;
-                        if (Iteration::AdvanceKernelPolicy::ADVANCE_MODE 
+                        if (Iteration::AdvanceKernelPolicy::ADVANCE_MODE
                             == oprtr::advance::TWC_FORWARD ||
                             Iteration::AdvanceKernelPolicy::ADVANCE_MODE
                             == oprtr::advance::TWC_BACKWARD)
@@ -2105,7 +2117,7 @@ void Iteration_Loop(
                 case 3: //Copy
                     if (num_gpus <=1)
                     {
-                        if (enactor_stats_-> retval = util::GRError(cudaStreamSynchronize(streams[peer_]), 
+                        if (enactor_stats_-> retval = util::GRError(cudaStreamSynchronize(streams[peer_]),
                             "cudaStreamSynchronize failed",__FILE__, __LINE__)) break;
                         Total_Length = frontier_attribute_->queue_length;
                         to_show[peer_]=false;break;
@@ -2122,19 +2134,19 @@ void Iteration_Loop(
                         if (Iteration::HAS_SUBQ)
                         {
                             if (enactor_stats_->retval =
-                                Check_Size<false, SizeT, VertexId> ("queue3", 
-                                    frontier_attribute_->output_length[0]+2, 
-                                    &frontier_queue_->keys  [selector^1], 
-                                    over_sized, thread_num, iteration, peer_, false)) 
+                                Check_Size<false, SizeT, VertexId> ("queue3",
+                                    frontier_attribute_->output_length[0]+2,
+                                    &frontier_queue_->keys  [selector^1],
+                                    over_sized, thread_num, iteration, peer_, false))
                                 break;
                         }
                         if (frontier_attribute_->queue_length ==0) break;
 
                         if (enactor_stats_->retval =
-                            Check_Size<false, SizeT, VertexId> ("total_queue", 
-                                Total_Length + frontier_attribute_->queue_length, 
-                                &data_slice->frontier_queues[num_gpus].keys[0], 
-                                over_sized, thread_num, iteration, peer_, false)) 
+                            Check_Size<false, SizeT, VertexId> ("total_queue",
+                                Total_Length + frontier_attribute_->queue_length,
+                                &data_slice->frontier_queues[num_gpus].keys[0],
+                                over_sized, thread_num, iteration, peer_, false))
                             break;
 
                         util::MemsetCopyVectorKernel<<<256,256, 0, streams[peer_]>>>(
@@ -2213,17 +2225,17 @@ void Iteration_Loop(
             if (Enactor::SIZE_CHECK)
             {
                 if (enactor_stats[0]. retval =
-                    Check_Size<true, SizeT, VertexId> ("total_queue", 
-                        Total_Length, 
-                        &data_slice->frontier_queues[0].keys[frontier_attribute[0].selector], 
-                        over_sized, thread_num, iteration, num_gpus, true)) 
+                    Check_Size<true, SizeT, VertexId> ("total_queue",
+                        Total_Length,
+                        &data_slice->frontier_queues[0].keys[frontier_attribute[0].selector],
+                        over_sized, thread_num, iteration, num_gpus, true))
                     break;
                 if (Problem::USE_DOUBLE_BUFFER)
                     if (enactor_stats[0].retval =
-                        Check_Size<true, SizeT, Value> ("total_queue", 
-                            Total_Length, 
-                            &data_slice->frontier_queues[0].values[frontier_attribute[0].selector], 
-                            over_sized, thread_num, iteration, num_gpus, true)) 
+                        Check_Size<true, SizeT, Value> ("total_queue",
+                            Total_Length,
+                            &data_slice->frontier_queues[0].values[frontier_attribute[0].selector],
+                            over_sized, thread_num, iteration, num_gpus, true))
                         break;
 
                 offset=frontier_attribute[0].queue_length;
@@ -2338,10 +2350,10 @@ void Iteration_Loop(
                     if (!Enactor::SIZE_CHECK)
                     {
                         if (enactor_stats_->retval =
-                            Check_Size<false, SizeT, VertexId> ("queue3", 
-                                frontier_attribute->output_length[0]+2, 
-                                &frontier_queue_->keys[selector^1], 
-                                over_sized, thread_num, iteration, peer_, false)) 
+                            Check_Size<false, SizeT, VertexId> ("queue3",
+                                frontier_attribute->output_length[0]+2,
+                                &frontier_queue_->keys[selector^1],
+                                over_sized, thread_num, iteration, peer_, false))
                             break;
                     }
                     selector = frontier_attribute[peer_].selector;
