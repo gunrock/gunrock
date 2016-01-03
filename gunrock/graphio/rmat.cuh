@@ -184,7 +184,8 @@ int BuildRmatGraph(
 
     if ((nodes < 0) || (edges < 0))
     {
-        fprintf(stderr, "Invalid graph size: nodes=%d, edges=%d", nodes, edges);
+        fprintf(stderr, "Invalid graph size: nodes=%lld, edges=%lld", 
+            (long long)nodes, (long long)edges);
         return -1;
     }
 

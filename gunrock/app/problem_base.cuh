@@ -232,7 +232,7 @@ struct GraphSlice
                 this->out_degrees.GetPointer(util::DEVICE),
                 this->row_offsets.GetPointer(util::DEVICE),
                 this->row_offsets.GetPointer(util::DEVICE) + 1,
-                -1, nodes);
+                (SizeT)-1, nodes);
 
 
             if (inverstgraph != NULL)
@@ -245,14 +245,14 @@ struct GraphSlice
                 if (retval = this->row_indices.Allocate(edges     , util::DEVICE)) break;
                 if (retval = this->row_indices.Move    (util::HOST, util::DEVICE)) break;
 
-                // Allocate in degrees for each node
+
                 if (retval = this->in_degrees .Allocate(nodes,  util::DEVICE)) break;
                 // count number of in-going degrees for each node
                 util::MemsetMadVectorKernel <<< 128, 128>>>(
                     this->in_degrees    .GetPointer(util::DEVICE),
                     this->column_offsets.GetPointer(util::DEVICE),
                     this->column_offsets.GetPointer(util::DEVICE) + 1,
-                    -1, nodes);
+                    (SizeT)-1, nodes);
             }
 
             // For multi-GPU cases

@@ -134,7 +134,8 @@ void DisplaySolution(
 
     if (num_nodes > 40) { num_nodes = 40; }
 
-    printf("\nFirst %d labels of the GPU result:\n", num_nodes);
+    printf("\nFirst %lld labels of the GPU result:\n", 
+        (long long)num_nodes);
 
     printf("[");
     for (VertexId i = 0; i < num_nodes; ++i)
@@ -776,7 +777,7 @@ int main(int argc, char** argv)
 
     typedef int VertexId;  // Use int as the vertex identifier
     typedef int Value;     // Use int as the value type
-    typedef int SizeT;     // Use int as the graph size type
+    typedef long long SizeT;     // Use int as the graph size type
 
     Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;

@@ -357,10 +357,13 @@ struct BFSIteration : public IterationBase <
         int  iteration  = enactor_stats -> iteration;
 
         if (Enactor::DEBUG)
-            printf("%d\t %d\t %d\t queue_length = %d, output_length = %d\n",
+        {
+            printf("%d\t %d\t %d\t queue_length = %lld, output_length = %lld\n",
                 thread_num, iteration, peer_,
-                frontier_queue->keys[selector^1].GetSize(),
-                request_length);fflush(stdout);
+                (long long)frontier_queue->keys[selector^1].GetSize(),
+                (long long)request_length);
+            fflush(stdout);
+        }
 
         if (enactor_stats->retval =
             Check_Size<true, SizeT, VertexId > ("queue3", request_length, &frontier_queue->keys  [selector^1], over_sized, thread_num, iteration, peer_, false)) return;

@@ -133,10 +133,10 @@ cudaError_t ComputeOutputLength(
         Scan<mgpu::MgpuScanTypeInc>(
             (SizeT*)partitioned_scanned_edges,
             frontier_attribute->queue_length, // TODO: +1?
-            (int )0,
+            (SizeT)0,
             mgpu::plus<SizeT>(),
-            (int*)0,
-            (int*)0,
+            (SizeT*)0,
+            (SizeT*)0,
             (SizeT*)partitioned_scanned_edges,
             context);
 
@@ -431,9 +431,10 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             {
                 unsigned int split_val = (frontier_attribute.output_length[0] + 
                     KernelPolicy::LOAD_BALANCED::BLOCKS - 1) / KernelPolicy::LOAD_BALANCED::BLOCKS;
-                util::MemsetIdxKernel<<<128, 128, 0, stream>>>(
+                util::MemsetIdxKernel<unsigned int, int> <<<128, 128, 0, stream>>>(
                     enactor_stats.node_locks.GetPointer(util::DEVICE),
-                    KernelPolicy::LOAD_BALANCED::BLOCKS, split_val);
+                    (int)KernelPolicy::LOAD_BALANCED::BLOCKS, 
+                    split_val);
                 SortedSearch<MgpuBoundsLower>(
                     enactor_stats.node_locks.GetPointer(util::DEVICE),
                     KernelPolicy::LOAD_BALANCED::BLOCKS,

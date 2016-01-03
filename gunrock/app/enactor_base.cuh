@@ -734,10 +734,10 @@ public:
             info["rmat_c"] = rmat_c;
             info["rmat_d"] = rmat_d;
             info["rmat_seed"] = rmat_seed;
-            info["rmat_scale"] = rmat_scale;
-            info["rmat_nodes"] = rmat_nodes;
-            info["rmat_edges"] = rmat_edges;
-            info["rmat_edgefactor"] = rmat_edgefactor;
+            info["rmat_scale"] = (int64_t)rmat_scale;
+            info["rmat_nodes"] = (int64_t)rmat_nodes;
+            info["rmat_edges"] = (int64_t)rmat_edges;
+            info["rmat_edgefactor"] = (int64_t)rmat_edgefactor;
 
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
@@ -796,8 +796,8 @@ public:
 
             // put everything into mObject info
             info["rgg_seed"]        = rgg_seed;
-            info["rgg_scale"]       = rgg_scale;
-            info["rgg_nodes"]       = rgg_nodes;
+            info["rgg_scale"]       = (int64_t)rgg_scale;
+            info["rgg_nodes"]       = (int64_t)rgg_nodes;
             info["rgg_thfactor"]    = rgg_thfactor;
             info["rgg_threshold"]   = rgg_threshold;
             info["rgg_vmultipiler"] = rgg_vmultipiler;
@@ -1553,8 +1553,9 @@ cudaError_t Check_Size(
 
     if (target_length > array->GetSize())
     {
-        printf("%d\t %d\t %d\t %s \t oversize :\t %d ->\t %d\n",
-        thread_num, iteration, peer_, name, array->GetSize(), target_length);
+        printf("%d\t %d\t %d\t %s \t oversize :\t %lld ->\t %lld\n",
+            thread_num, iteration, peer_, name, 
+            (long long)array->GetSize(), (long long)target_length);
         oversized=true;
         if (SIZE_CHECK)
         {
@@ -1730,7 +1731,11 @@ void ShowDebugInfo(
         queue_length = frontier_attribute->queue_length;
     //else if (enactor_stats->retval = util::GRError(work_progress->GetQueueLength(frontier_attribute->queue_index, queue_length, false, stream), "work_progress failed", __FILE__, __LINE__)) return;
     //util::cpu_mt::PrintCPUArray<SizeT, SizeT>((check_name+" Queue_Length").c_str(), &(queue_length), 1, thread_num, enactor_stats->iteration);
-    printf("%d\t %lld\t %d\t stage%d\t %s\t Queue_Length = %d\n", thread_num, enactor_stats->iteration, peer_, data_slice->stages[peer_], check_name.c_str(), queue_length);fflush(stdout);
+    printf("%d\t %lld\t %d\t stage%d\t %s\t Queue_Length = %lld\n", 
+        thread_num, enactor_stats->iteration, peer_, 
+        data_slice->stages[peer_], check_name.c_str(), 
+        (long long)queue_length);
+    fflush(stdout);
     //printf("%d \t %d\t \t peer_ = %d, selector = %d, length = %d, p = %p\n",thread_num, enactor_stats->iteration, peer_, frontier_attribute->selector,queue_length,graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE));fflush(stdout);
     //util::cpu_mt::PrintGPUArray<SizeT, VertexId>((check_name+" keys").c_str(), data_slice->frontier_queues[peer_].keys[frontier_attribute->selector].GetPointer(util::DEVICE), queue_length, thread_num, enactor_stats->iteration,peer_, stream);
     //if (graph_slice->frontier_queues.values[frontier_attribute->selector].GetPointer(util::DEVICE)!=NULL)
@@ -2215,8 +2220,8 @@ void Iteration_Loop(
 
             if (Enactor::DEBUG)
             {
-                printf("%d\t %lld\t \t Subqueue finished. Total_Length= %d\n",
-                    thread_num, enactor_stats[0].iteration, Total_Length);
+                printf("%d\t %lld\t \t Subqueue finished. Total_Length= %lld\n",
+                    thread_num, enactor_stats[0].iteration, (long long)Total_Length);
                 fflush(stdout);
             }
 
@@ -2366,8 +2371,8 @@ void Iteration_Loop(
                 }
                 if (Enactor::DEBUG)
                 {
-                    printf("%d\t %lld\t \t Fullqueue finished. Total_Length= %d\n",
-                        thread_num, enactor_stats[0].iteration, Total_Length);
+                    printf("%d\t %lld\t \t Fullqueue finished. Total_Length= %lld\n",
+                        thread_num, enactor_stats[0].iteration, (long long)Total_Length);
                     fflush(stdout);
                 }
                 frontier_queue_ = &(data_slice->frontier_queues[Enactor::SIZE_CHECK?0:num_gpus]);

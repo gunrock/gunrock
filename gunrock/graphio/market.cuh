@@ -154,8 +154,8 @@ int ReadMarketStream(
             {
                 fprintf(stderr,
                         "Error parsing MARKET graph:"
-                        "encountered more than %d edges\n",
-                        edges);
+                        "encountered more than %lld edges\n",
+                        (long long)edges);
                 if (coo) free(coo);
                 return -1;
             }
@@ -235,8 +235,8 @@ int ReadMarketStream(
     if (edges_read != edges)
     {
         fprintf(stderr,
-                "Error parsing MARKET graph: only %d/%d edges read\n",
-                edges_read, edges);
+                "Error parsing MARKET graph: only %lld/%lld edges read\n",
+                (long long)edges_read, (long long)edges);
         if (coo) free(coo);
         return -1;
     }
