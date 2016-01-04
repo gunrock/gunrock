@@ -22,6 +22,7 @@
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/test_utils.cuh>
 #include <gunrock/util/array_utils.cuh>
+#include <gunrock/util/sharedmem.cuh>
 #include <gunrock/app/problem_base.cuh>
 
 #include <gunrock/oprtr/advance/kernel.cuh>
@@ -1267,7 +1268,7 @@ __global__ void Update_Preds (
  * @param[in] partition_table Pointer to the partition table.
  * @param[out] marker
  */
-template <typename VertexId, typename SizeT>
+template <typename VertexId, class SizeT>
 __global__ void Assign_Marker(
     const SizeT            num_elements,
     const int              num_gpus,
@@ -1277,9 +1278,11 @@ __global__ void Assign_Marker(
 {
     VertexId key;
     int gpu;
-    extern __shared__ SizeT* s_marker[];
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    SizeT x= blockIdx.x * blockDim.x + threadIdx.x;
+    //extern __shared__ SizeT* s_marker[];
+    SharedMemory<SizeT*> smem;
+    SizeT** s_marker = smem.getPointer();
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x= (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
     if (threadIdx.x < num_gpus)
         s_marker[threadIdx.x]=marker[threadIdx.x];
     __syncthreads();
@@ -1307,7 +1310,7 @@ __global__ void Assign_Marker(
  * @param[in] partition_table Pointer to the partition table.
  * @param[out] marker
  */
-template <typename VertexId, typename SizeT>
+template <typename VertexId, class SizeT>
 __global__ void Assign_Marker_Backward(
     const SizeT            num_elements,
     const int              num_gpus,
@@ -1317,9 +1320,11 @@ __global__ void Assign_Marker_Backward(
           SizeT**          marker)
 {
     VertexId key;
-    extern __shared__ SizeT* s_marker[];
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    SizeT x= blockIdx.x * blockDim.x + threadIdx.x;
+    //extern __shared__ SizeT* s_marker[];
+    SharedMemory<SizeT*> smem;
+    SizeT** s_marker = smem.getPointer();
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x= (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
     if (threadIdx.x < num_gpus)
         s_marker[threadIdx.x]=marker[threadIdx.x];
     __syncthreads();
@@ -1327,7 +1332,7 @@ __global__ void Assign_Marker_Backward(
     while (x < num_elements)
     {
         key = keys_in[x];
-        for (int gpu=0;gpu<num_gpus;gpu++)
+        for (int gpu=0; gpu<num_gpus; gpu++)
             s_marker[gpu][x]=0;
         if (key!=-1) for (SizeT i=offsets[key];i<offsets[key+1];i++)
             s_marker[partition_table[i]][x]=1;

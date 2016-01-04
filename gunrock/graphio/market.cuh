@@ -388,7 +388,10 @@ int BuildMarketGraph(
     if (undirected)
     {
         char ud[256];  // undirected graph
-        sprintf(ud, "%s/.%s.ud.%d.bin", file_path, file_name, (LOAD_VALUES?1:0));
+        sprintf(ud, "%s/.%s.ud.%d.%s%s%sbin", file_path, file_name, (LOAD_VALUES?1:0),
+            ((sizeof(VertexId) == 8) ? "64bVe." : ""), 
+            ((sizeof(Value   ) == 8) ? "64bVa." : ""), 
+            ((sizeof(SizeT   ) == 8) ? "64bSi." : ""));
         if (BuildMarketGraph<LOAD_VALUES>(file_in, ud, graph,
                     true, false, quiet) != 0)
             return 1;
@@ -396,7 +399,10 @@ int BuildMarketGraph(
     else if (!undirected && reversed)
     {
         char rv[256];  // reversed graph
-        sprintf(rv, "%s/.%s.rv.%d.bin", file_path, file_name, (LOAD_VALUES?1:0));
+        sprintf(rv, "%s/.%s.rv.%d.%s%s%sbin", file_path, file_name, (LOAD_VALUES?1:0),
+            ((sizeof(VertexId) == 8) ? "64bVe." : ""), 
+            ((sizeof(Value   ) == 8) ? "64bVa." : ""), 
+            ((sizeof(SizeT   ) == 8) ? "64bSi." : ""));
         if (BuildMarketGraph<LOAD_VALUES>(file_in, rv, graph,
                     false, true, quiet) != 0)
             return 1;
@@ -404,7 +410,10 @@ int BuildMarketGraph(
     else if (!undirected && !reversed)
     {
         char di[256];  // directed graph
-        sprintf(di, "%s/.%s.di.%d.bin", file_path, file_name, (LOAD_VALUES?1:0));
+        sprintf(di, "%s/.%s.di.%d.%s%s%sbin", file_path, file_name, (LOAD_VALUES?1:0),
+            ((sizeof(VertexId) == 8) ? "64bVe." : ""), 
+            ((sizeof(Value   ) == 8) ? "64bVa." : ""), 
+            ((sizeof(SizeT   ) == 8) ? "64bSi." : ""));
         if (BuildMarketGraph<LOAD_VALUES>(file_in, di, graph,
                     false, false, quiet) != 0)
             return 1;

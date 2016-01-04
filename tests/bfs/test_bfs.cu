@@ -762,31 +762,27 @@ void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 * Main
 ******************************************************************************/
 
-int main(int argc, char** argv)
+template <
+    typename VertexId,
+    typename Value,
+    typename SizeT>
+int main_(CommandLineArgs *args)
 {
     CpuTimer cpu_timer, cpu_timer2;
 
     cpu_timer.Start();
-    CommandLineArgs args(argc, argv);
-    int graph_args = argc - args.ParsedArgc() - 1;
-    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
-    {
-        Usage();
-        return 1;
-    }
-
-    typedef int VertexId;  // Use int as the vertex identifier
-    typedef int Value;     // Use int as the value type
-    typedef long long SizeT;     // Use int as the graph size type
+    //typedef int VertexId;  // Use int as the vertex identifier
+    //typedef int Value;     // Use int as the value type
+    //typedef long long SizeT;     // Use int as the graph size type
 
     Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
     // graph construction or generation related parameters
-    info->info["undirected"] = args.CheckCmdLineFlag("undirected");
+    info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
 
     cpu_timer2.Start();
-    info->Init("BFS", args, csr);  // initialize Info structure
+    info->Init("BFS", *args, csr);  // initialize Info structure
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
@@ -804,6 +800,44 @@ int main(int argc, char** argv)
     return 0;
 }
 
+template <
+    typename VertexId,
+    typename Value>   // the value type, usually int or long long
+int main_SizeT(CommandLineArgs *args)
+{
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+         return main_<VertexId, Value, long long>(args);
+    else return main_<VertexId, Value, int      >(args);
+}
+
+template <
+    typename VertexId> // the vertex identifier type, usually int or long long
+int main_Value(CommandLineArgs *args)
+{
+    /*if (args -> CheckCmdLineFlag("64bit-Value"))
+         return main_SizeT<VertexId, long long>(args);
+    else*/ return main_SizeT<VertexId, int      >(args);
+}
+
+int main_VertexId(CommandLineArgs *args)
+{
+    /*if (args -> CheckCmdLineFlag("64bit-VertexId"))
+         return main_Value<long long>(args);
+    else*/ return main_Value<int      >(args);
+}
+
+int main(int argc, char** argv)
+{
+    CommandLineArgs args(argc, argv);
+    int graph_args = argc - args.ParsedArgc() - 1;
+    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
+    {
+        Usage();
+        return 1;
+    }
+
+    return main_VertexId(&args);
+}
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++
