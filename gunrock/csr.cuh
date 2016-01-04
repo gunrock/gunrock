@@ -354,8 +354,9 @@ struct Csr
     {
         if (!quiet)
         {
-            printf("  Converting %d vertices, %d directed edges (%s tuples) "
-                   "to CSR format...\n", coo_nodes, coo_edges,
+            printf("  Converting %lld vertices, %lld directed edges (%s tuples) "
+                   "to CSR format...\n", 
+                    (long long)coo_nodes, (long long)coo_edges,
                    ordered_rows ? "ordered" : "unordered");
         }
 
@@ -537,12 +538,14 @@ struct Csr
         }
         printf("\nDegree Histogram (%lld vertices, %lld edges):\n",
                (long long) nodes, (long long) edges);
-        printf("    Degree   0: %d (%.2f%%)\n", log_counts[0],
+        printf("    Degree   0: %lld (%.2f%%)\n", 
+               (long long) log_counts[0],
                (float) log_counts[0] * 100.0 / nodes);
         for (int i = 0; i < max_log_length + 1; i++)
         {
-            printf("    Degree 2^%i: %d (%.2f%%)\n", i, log_counts[i + 1],
-                   (float) log_counts[i + 1] * 100.0 / nodes);
+            printf("    Degree 2^%i: %lld (%.2f%%)\n", 
+                i, (long long)log_counts[i + 1],
+                (float) log_counts[i + 1] * 100.0 / nodes);
         }
         printf("\n");
         fflush(stdout);

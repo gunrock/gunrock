@@ -371,7 +371,9 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             Value    threshold,
             SizeT    max_iter,
             FrontierType frontier_type, // The frontier type (i.e., edge/vertex/mixed)
-            double   queue_sizing)
+            double   queue_sizing,
+            double   queue_sizing1 = -1.0,
+            bool     skip_scanned_edges = false)
     {
         cudaError_t retval = cudaSuccess;
         SizeT *temp_in_counter = new SizeT[this->num_gpus+1];
@@ -390,7 +392,10 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             }
 
             // Allocate output page ranks if necessary
-            if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, false)) return retval;
+            if (retval = data_slices[gpu]->Reset(
+                frontier_type, this->graph_slices[gpu], 
+                queue_sizing, false, queue_sizing1, skip_scanned_edges)) 
+                return retval;
             for (int peer = 1; peer < this->num_gpus; peer++)
                 this->graph_slices[gpu]->in_counter[peer] = temp_in_counter[peer];
 
@@ -476,6 +481,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             data_slices[gpu]->max_iter    = max_iter;
             data_slices[gpu]->final_event_set = false;
             data_slices[gpu]->PR_queue_length = 1;
+            if (retval = data_slices[gpu]->degrees_pong.Release()) return retval; // save sapce when not using R0DIteration
             if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;
         }
 

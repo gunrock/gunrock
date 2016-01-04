@@ -70,6 +70,8 @@ struct DOBFSProblem : ProblemBase<_VertexId, _SizeT, _Value,
         bool            *d_frontier_map_out;    /**< Output frontier bitmap */
         VertexId        *d_index_queue;         /**< Index of unvisited queue */
         unsigned char   *d_visited_mask;        /**< Used for bitmask for visited nodes */
+
+        util::Array1D<SizeT, VertexId>      original_vertex;
     };
 
     // Members

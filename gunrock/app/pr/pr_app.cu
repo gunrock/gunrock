@@ -37,13 +37,16 @@ public:
     float    delta          ;  // Delta value for PageRank
     float    error          ;  // Error threshold PageRank
     int      max_iter       ;  // Maximum number of iteration
+    bool     normalized     ;
 
     PR_Parameter()
     {
         delta    = 0.85f;
         error    = 0.01f;
         max_iter =    50;
+        normalized = false;
     }
+
     ~PR_Parameter()
     {
     }
@@ -55,8 +58,39 @@ template <
     typename SizeT,
     bool INSTRUMENT,
     bool DEBUG,
-    bool SIZE_CHECK >
+    bool SIZE_CHECK,
+    bool NORMALIZED>
 void runPageRank(GRGraph *output, PR_Parameter *parameter);
+
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ * @tparam INSTRUMENT Keep kernels statics
+ * @tparam DEBUG      Keep debug statics
+ *
+ * @param[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ */
+template <
+    typename      VertexId,
+    typename      Value,
+    typename      SizeT,
+    bool          INSTRUMENT,
+    bool          DEBUG,
+    bool          SIZE_CHECK >
+void normalizedPageRank(GRGraph *output, PR_Parameter *parameter)
+{
+    if (parameter -> normalized)
+        runPageRank<VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
+            true > (output, parameter);
+    else
+        runPageRank<VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
+            false> (output, parameter);
+}
+
 
 /**
  * @brief Run test
@@ -79,10 +113,10 @@ template <
 void sizeCheckPageRank(GRGraph *output, PR_Parameter *parameter)
 {
     if (parameter->size_check)
-        runPageRank<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
+        normalizedPageRank<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
                     true > (output, parameter);
     else
-        runPageRank<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
+        normalizedPageRank<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
                     false> (output, parameter);
 }
 
@@ -153,12 +187,14 @@ template <
     typename SizeT,
     bool INSTRUMENT,
     bool DEBUG,
-    bool SIZE_CHECK >
+    bool SIZE_CHECK,
+    bool NORMALIZED >
 void runPageRank(GRGraph *output, PR_Parameter *parameter)
 {
     typedef PRProblem < VertexId,
             SizeT,
-            Value > PrProblem;
+            Value,
+            NORMALIZED > PrProblem;
 
     typedef PREnactor < PrProblem,
             INSTRUMENT,
@@ -287,6 +323,7 @@ void dispatchPageRank(
     parameter->delta        = config.pagerank_delta;
     parameter->error        = config.pagerank_error;
     parameter->max_iter     = config.max_iters;
+    parameter->normalized   = config.pagerank_normalized;
     parameter->g_undirected = true;
 
     switch (data_t.VTXID_TYPE)
@@ -406,7 +443,8 @@ void pagerank(
     const int           num_nodes,
     const int           num_edges,
     const int*          row_offsets,
-    const int*          col_indices)
+    const int*          col_indices,
+    bool                normalized)
 {
     struct GRTypes data_t;            // primitive-specific data types
     data_t.VTXID_TYPE = VTXID_INT;    // integer vertex identifier
@@ -415,6 +453,7 @@ void pagerank(
 
     struct GRSetup config = InitSetup(1, NULL);  // primitive-specific configures
     config.top_nodes      = 10;           // number of top nodes
+    config.pagerank_normalized     = normalized;
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));

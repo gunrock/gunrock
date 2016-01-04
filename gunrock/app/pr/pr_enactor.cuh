@@ -892,7 +892,7 @@ static void FullQueue_Core(
             NULL,
             work_progress[0],
             frontier_queue->keys[frontier_attribute->selector  ].GetSize(),           // max_in_queue
-            frontier_queue->keys[frontier_attribute->selector^1].GetSize(),         // max_out_queue
+            util::MaxValue<VertexId>(), //frontier_queue->keys[frontier_attribute->selector^1].GetSize(),         // max_out_queue
             enactor_stats->filter_kernel_stats);
 
         //if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
@@ -902,7 +902,11 @@ static void FullQueue_Core(
         //enactor_stats->iteration++;
         frontier_attribute->queue_index++;
 
-        if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, stream)) return;
+        if (enactor_stats->retval = work_progress -> GetQueueLength(
+            frontier_attribute->queue_index, 
+            frontier_attribute->queue_length, 
+            false, stream)) 
+            return;
         //num_elements = queue_length;
 
         //swap rank_curr and rank_next
@@ -914,23 +918,27 @@ static void FullQueue_Core(
             data_slice->rank_next.GetPointer(util::DEVICE),
             (Value)0.0, graph_slice->nodes);
 
-        if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed", __FILE__, __LINE__));
+        if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream), 
+            "cudaStreamSynchronize failed", __FILE__, __LINE__)) 
+            return;
         data_slice->PR_queue_length = frontier_attribute->queue_length;
+
         //enactor_stats      -> Accumulate(
         //    work_progress  -> GetQueueLengthPointer<unsigned int,SizeT>(frontier_attribute->queue_index), stream);
         //printf("queue_length = %d\n", frontier_attribute->queue_length);fflush(stdout);
-        if (false) {//if (INSTRUMENT || DEBUG) {
+        //if (false) {
+        //    if (INSTRUMENT || DEBUG) {
             //if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length,false,stream)) return;
             //enactor_stats->total_queued += frontier_attribute->queue_length;
             //if (DEBUG) printf(", %lld", (long long) frontier_attribute.queue_length);
-            if (Enactor::INSTRUMENT) {
-                if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
-                    enactor_stats->filter_grid_size,
-                    enactor_stats->total_runtimes,
-                    enactor_stats->total_lifetimes,
-                    false, stream)) return;
-            }
-        }
+        //    if (Enactor::INSTRUMENT) {
+        //        if (enactor_stats->retval = enactor_stats->filter_kernel_stats.Accumulate(
+        //            enactor_stats->filter_grid_size,
+        //            enactor_stats->total_runtimes,
+        //            enactor_stats->total_lifetimes,
+        //            false, stream)) return;
+        //    }
+        //}
     }
 
     //if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index, edge_map_queue_len)) return;
@@ -969,8 +977,14 @@ static void FullQueue_Core(
         false,
         false);
 
-    if (enactor_stats->retval = work_progress->GetQueueLength(frontier_attribute->queue_index+1, frontier_attribute->queue_length, false, stream, true)) return;
-    if (enactor_stats->retval = cudaStreamSynchronize(stream)) return;
+    if (enactor_stats->retval = work_progress->GetQueueLength(
+        frontier_attribute->queue_index+1, 
+        frontier_attribute->queue_length, 
+        false, stream, true)) 
+        return;
+    if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream),
+        "cudaStreamSynchronize failed", __FILE__, __LINE__)) 
+        return;
     enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
     frontier_attribute->queue_length = data_slice->edge_map_queue_len;
     //printf("Advance end.\n");fflush(stdout);
@@ -1046,6 +1060,30 @@ static cudaError_t Compute_OutputLength(
     //printf("Compute_OutputLength end.\n");fflush(stdout);
     return retval;
 }
+
+    /*   
+     * @brief Check frontier queue size function.
+     *
+     * @param[in] thread_num Number of threads.
+     * @param[in] peer_ Peer GPU index.
+     * @param[in] request_length Request frontier queue length.
+     * @param[in] frontier_queue Pointer to the frontier queue.
+     * @param[in] frontier_attribute Pointer to the frontier attribute.
+     * @param[in] enactor_stats Pointer to the enactor statistics.
+     * @param[in] graph_slice Pointer to the graph slice we process on.
+     */
+    static void Check_Queue_Size(
+        int                            thread_num,
+        int                            peer_,
+        SizeT                          request_length,
+        util::DoubleBuffer<SizeT, VertexId, Value>
+                                      *frontier_queue,
+        FrontierAttribute<SizeT>      *frontier_attribute,
+        EnactorStats                  *enactor_stats,
+        GraphSlice                    *graph_slice)
+    { 
+        return ; // no need to check queue size for PR
+    }
 
 template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
 static void Expand_Incoming(
@@ -1405,6 +1443,13 @@ static CUT_THREADPROC PRThread(
                 //util::cpu_mt::PrintGPUArray("keys_in", data_slice->keys_in[peer_iteration%2][peer].GetPointer(util::DEVICE), problem->data_slices[peer]->local_nodes, thread_num, peer_iteration, peer);
                 //util::cpu_mt::PrintGPUArray("ranks_in", data_slice->value__associate_in[peer_iteration%2][peer][0].GetPointer(util::DEVICE), problem->data_slices[peer]->local_nodes, thread_num, peer_iteration, peer);
             }
+
+            // release some space on GPU, will be allocated again during Reset
+            data_slice -> frontier_queues[0].keys[0].Release();
+            data_slice -> frontier_queues[0].keys[1].Release();
+            data_slice -> rank_next.Release();
+            data_slice -> degrees.Release();
+
             // sort according to the rank of nodes
             util::CUBRadixSort<Value, VertexId>(
                 false, graph_slice->nodes,
