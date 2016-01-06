@@ -28,6 +28,7 @@
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/multithread_utils.cuh>
 #include <gunrock/util/sort_omp.cuh>
+#include <gunrock/coo.cuh>
 
 namespace gunrock {
 

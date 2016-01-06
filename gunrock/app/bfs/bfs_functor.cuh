@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <gunrock/util/track_utils.cuh>
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/app/bfs/bfs_problem.cuh>
 
@@ -49,19 +50,23 @@ struct BFSFunctor {
      */
     static __device__ __forceinline__ bool CondEdge(
         VertexId s_id, VertexId d_id, DataSlice *problem,
-        VertexId e_id = 0, VertexId e_id_in = 0) {
+        VertexId e_id = 0, VertexId e_id_in = 0) 
+    {
         if (ProblemData::ENABLE_IDEMPOTENCE) {
             return true;
         } else {
             // Check if the destination node has been claimed as someone's child
-            Value new_weight;
+            Value new_weight, old_weight;
             if (ProblemData::MARK_PREDECESSORS) {
-                Value label;
                 util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    label, problem->labels + s_id);
-                new_weight = label + 1;
-            } else new_weight = s_id + 1;
+                    new_weight, problem->labels + s_id);
+            } else new_weight = s_id;
+            new_weight = new_weight + 1;
+            old_weight = problem -> labels[d_id];
             bool result = new_weight < atomicMin(problem->labels + d_id, new_weight);
+            if (result && TO_TRACK && util::to_track(problem -> gpu_idx, d_id))
+                 printf("%d\t %s: labels[%d] (%d) -> %d = labels[%d] + 1\n", 
+                    problem -> gpu_idx, __func__, d_id, old_weight, new_weight, s_id);
             return result;
         }
     }
@@ -80,7 +85,8 @@ struct BFSFunctor {
      */
     static __device__ __forceinline__ void ApplyEdge(
         VertexId s_id, VertexId d_id, DataSlice *problem,
-        VertexId e_id = 0, VertexId e_id_in = 0) {
+        VertexId e_id = 0, VertexId e_id_in = 0) 
+    {
         if (ProblemData::ENABLE_IDEMPOTENCE) {
             // do nothing here
         } else {
@@ -104,7 +110,10 @@ struct BFSFunctor {
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) 
+    {
+        if (TO_TRACK && util::to_track(problem -> gpu_idx, node))
+                printf("%d\t %s: [%d] past\n", problem -> gpu_idx, __func__, node);
         return node != -1;
     }
 

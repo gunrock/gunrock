@@ -1330,7 +1330,7 @@ struct ProblemBase
                              partition_seed);
                 cpu_timer.Stop();
 
-                // printf("partition end. (%f ms)\n", cpu_timer.ElapsedMillis());
+                printf("partition end. (%f ms)\n", cpu_timer.ElapsedMillis());
 
                 /*graph->DisplayGraph("org_graph",graph->nodes);
                 util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);

@@ -22,6 +22,7 @@
 
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
+#include <gunrock/util/track_utils.cuh>
 
 // BFS includes
 #include <gunrock/app/bfs/bfs_enactor.cuh>
@@ -485,6 +486,38 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             } else printf("CORRECT");
             printf("\n");
         }
+
+    }
+
+    if (!quick_mode && TO_TRACK)
+    {
+        VertexId **v_ = NULL;
+        if (num_gpus > 1)
+        {
+            v_ = new VertexId*[num_gpus];
+            for (int gpu=0; gpu<num_gpus; gpu++)
+            {
+                v_[gpu] = new VertexId[graph->nodes];
+                for (VertexId v=0; v<graph->nodes; v++)
+                    v_[gpu][v] = -1;
+                for (VertexId v=0; v<problem->sub_graphs[gpu].nodes; v++)
+                    v_[gpu][problem->original_vertexes[gpu][v]] = v;
+            }
+        }
+        util::Track_Results(graph, num_gpus, 0, h_labels, reference_check_label, 
+            problem->partition_tables[0], v_);
+        char file_name[512];
+        sprintf(file_name, "./eval/error_dump/error_%lld.txt", (long long)time(NULL));
+        util::Output_Errors(file_name, graph -> nodes, num_gpus, 0, h_labels, reference_check_label,
+            problem->partition_tables[0], v_);
+        if (num_gpus > 1)
+        {
+            for (int gpu=0; gpu<num_gpus; gpu++)
+            {
+                delete[] v_[gpu]; v_[gpu] = NULL;
+            }
+            delete[] v_; v_=NULL;
+        }
     }
 
     // display Solution
@@ -630,16 +663,16 @@ template <
     bool        MARK_PREDECESSORS >
 void RunTests_enable_idempotence(Info<VertexId, Value, SizeT> *info)
 {
-    if (info->info["idempotent"].get_bool())
-    {
-        RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
-                 MARK_PREDECESSORS, true > (info);
-    }
-    else
-    {
+    //if (info->info["idempotent"].get_bool())
+    //{
+    //    RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
+    //             MARK_PREDECESSORS, true > (info);
+   // }
+    //else
+    //{
         RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
                  MARK_PREDECESSORS, false> (info);
-    }
+    //}
 }
 
 /**
@@ -663,16 +696,16 @@ template <
     bool        SIZE_CHECK >
 void RunTests_mark_predecessors(Info<VertexId, Value, SizeT> *info)
 {
-    if (info->info["mark_predecessors"].get_bool())
-    {
-        RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
-                                    DEBUG, SIZE_CHECK,  true> (info);
-    }
-    else
-    {
+    //if (info->info["mark_predecessors"].get_bool())
+    //{
+    //    RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
+    //                                DEBUG, SIZE_CHECK,  true> (info);
+    //}
+    //else
+    //{
         RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
                                     DEBUG, SIZE_CHECK, false> (info);
-    }
+    //}
 }
 
 /**
@@ -694,16 +727,16 @@ template <
     bool          DEBUG >
 void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
 {
-    if (info->info["size_check"].get_bool())
-    {
+    //if (info->info["size_check"].get_bool())
+    //{
         RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
                                    DEBUG,  true>(info);
-    }
-    else
-    {
-        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
-                                   DEBUG, false>(info);
-    }
+    //}
+    //else
+    //{
+    //    RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
+    //                               DEBUG, false>(info);
+    //}
 }
 
 /**
@@ -805,9 +838,9 @@ template <
     typename Value>   // the value type, usually int or long long
 int main_SizeT(CommandLineArgs *args)
 {
-    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+    /*if (args -> CheckCmdLineFlag("64bit-SizeT"))
          return main_<VertexId, Value, long long>(args);
-    else return main_<VertexId, Value, int      >(args);
+    else*/ return main_<VertexId, Value, int      >(args);
 }
 
 template <
