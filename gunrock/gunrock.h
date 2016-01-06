@@ -108,8 +108,10 @@ struct GRSetup
  * @brief Initialization function for GRSetup.
  * \return Initialized configurations object.
  */
-#ifdef __clang__
+// Proper way to check for C99
+#if __STDC_VERSION__ >= 199901L
 // http://clang.llvm.org/compatibility.html#inline
+// Link mentions is an issue with C99, not a clang specific issue
 static
 #endif
 inline struct GRSetup InitSetup()
