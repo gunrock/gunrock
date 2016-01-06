@@ -20,20 +20,58 @@ namespace gunrock {
 namespace util {
 
 #define TO_TRACK true
-#define NUM_TO_TRACK 5
+#define NUM_TO_TRACK 38
 
 template <typename VertexId>
 static __device__ __host__ __inline__ bool to_track(
     int gpu_num, VertexId node)
 {
     /*for BFS, market /data/gunrock_dataset/large/soc-LiveJournal1/soc-LiveJournal1.mtx --src=largestdegree --traversal-mode=1 --device=0,1 --queue-sizing=7.0 --queue-sizing1=8.0 --in-sizing=0.5 --partition-seed=1451953615 --v
-    NUM_TO_TRACK = 5*/
+    NUM_TO_TRACK = 38*/
     const VertexId node_to_track[NUM_TO_TRACK][3] = {
         { 541845,  271043, 2569951}, 
         { 569068,  284715, 2953294},
         {4016145, 2008346, 3872477},
         {  40641,   20374, 2555548},
-        {  40885,   20494, 2579834}
+        {  40885,   20494, 2579834},
+
+        {   1077,     518, 2441318},
+        {   1421,     692, 2432176},
+        {   1432, 2442039,     733},
+        {   4494,    2201, 2432178},
+        {   7327, 2424483,    3718},
+        {  11142, 2424090,    5558},
+        {  17218, 2442240,    8597},
+        {  17649,    8828, 2445489},
+        {  25287, 2442048,   12597},
+        { 253814, 2623718,  126782},
+        {2590170, 2479765, 1294485},
+
+        {  19137, 2463137,    9576},
+        {  23900,   11956, 2510031},
+        {  24364, 2494127,   12157},
+        {  40830, 2582274,   20366},
+        { 260110,  130220, 3107660},
+
+        {    501,     240, 2453050},
+        {   1426, 2494049,     730},
+        {   1772,     857, 2432012},
+        {   9983,    4979, 2445486},
+        {  17204,    8613, 2558446},
+        {  67433, 2430736,   33588},
+        { 265677, 2582262,  132629},
+
+        {  36852, 2533935,   18350},
+        {  99110,   49699, 2681560},
+        { 109806, 2732830,   54796},
+        { 175832, 2696177,   87747},
+        { 227015,  113648, 2426409},
+        { 569018, 2905970,  284333},
+        { 624385, 2904043,  311822},
+        {1402946, 2912942,  701003},
+
+        {1402948, 3381721,  701005},
+        {1404916, 3517695,  701958}
     };
 
     if (!TO_TRACK) return false;
@@ -244,28 +282,45 @@ static __device__ __forceinline__ void Store_d_out(
     int       checkpoint_num,
     SizeT     offset1,
     SizeT     offset2,
-    int       gpu_idx,
+    typename ProblemData::DataSlice *data_slice,
     VertexId  queue_index)
-{    
+{
+    SizeT offset = offset1 + offset2;
     if (!TO_TRACK)
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-            new_value,
-            d_out + offset1 + offset2); 
+            new_value, d_out + offset); 
     else {
-        VertexId old_value = atomicCAS(d_out + offset1 + offset2, -2, new_value);
-        if (old_value != -2)
+        VertexId old_value = atomicCAS(d_out + offset, -2, new_value);
+        if (old_value != -2 && util::to_track(data_slice -> gpu_idx, new_value))
         {    
             printf("%d\t %d\t %d\t Storing conflict: [%d] -> %p + %lld, old_value = [%d], "
-                "offset1 = %lld, offset2 = %lld, blockIdx.x = %d, threadIdx.x = %d\n",
-                gpu_idx, queue_index, checkpoint_num, new_value, d_out, 
-                (long long)offset1 + offset2, old_value, (long long)offset1, 
-                (long long)offset2, blockIdx.x, threadIdx.x);
+                "offset1 = %lld, offset2 = %lld, blockIdx.x = %d, threadIdx.x = %d,"
+                "org_cp = %d, org_q_idx = %d, org_d_out = %p, org_offset1 = %lld,"
+                "org_offset2 = %lld, org_blockIdx.x = %d, org_threadIdx.x = %d\n",
+                data_slice -> gpu_idx, queue_index, checkpoint_num, new_value, d_out, 
+                (long long)offset, old_value, (long long)offset1, 
+                (long long)offset2, blockIdx.x, threadIdx.x,
+                data_slice -> org_checkpoint[offset],
+                data_slice -> org_queue_idx [offset],
+                data_slice -> org_d_out     [offset],
+                (long long)data_slice -> org_offset1   [offset],
+                (long long)data_slice -> org_offset2   [offset],
+                data_slice -> org_block_idx [offset],
+                data_slice -> org_thread_idx[offset]);
+        } else {
+            data_slice -> org_checkpoint[offset] = checkpoint_num;
+            data_slice -> org_d_out     [offset] = d_out         ;
+            data_slice -> org_offset1   [offset] = offset1       ;
+            data_slice -> org_offset2   [offset] = offset2       ;
+            data_slice -> org_queue_idx [offset] = queue_index   ;
+            data_slice -> org_block_idx [offset] = blockIdx.x    ;
+            data_slice -> org_thread_idx[offset] = threadIdx.x   ;
         }    
-        if (util::to_track(gpu_idx, new_value))
+        if (util::to_track(data_slice -> gpu_idx, new_value))
         {    
             printf("%d\t %d\t %d\t Storing [%d] -> %p + %lld\n",
-                gpu_idx, queue_index, checkpoint_num, new_value, 
-                d_out, (long long)offset1 + offset2);
+                data_slice -> gpu_idx, queue_index, checkpoint_num, new_value, 
+                d_out, (long long)offset);
         }
     }    
 } 

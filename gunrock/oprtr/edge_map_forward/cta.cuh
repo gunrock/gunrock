@@ -329,7 +329,7 @@ struct Cta
                                     //    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank); 
                                     util::Store_d_out<VertexId, SizeT, ProblemData>(
                                         neighbor_id, cta->d_out, 1, cta->smem_storage.state.coarse_enqueue_offset,
-                                        coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                                        coop_rank, cta->problem, cta->queue_index);
                                 } else if (cta->advance_type == gunrock::oprtr::advance::V2E
                                         ||cta->advance_type == gunrock::oprtr::advance::E2E) {
                                     //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -337,7 +337,7 @@ struct Cta
                                     //    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
                                     util::Store_d_out<VertexId, SizeT, ProblemData>(
                                         coop_offset + threadIdx.x, cta->d_out, 2, cta->smem_storage.state.coarse_enqueue_offset,
-                                        coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                                        coop_rank, cta->problem, cta->queue_index);
                                }
                             }
                             if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
@@ -366,7 +366,7 @@ struct Cta
                                 //    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
                                 util::Store_d_out<VertexId, SizeT, ProblemData>(
                                     -1, cta->d_out, 3, cta->smem_storage.state.coarse_enqueue_offset,
-                                    coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                                    coop_rank, cta->problem, cta->queue_index);
                             }
                             if (cta->d_value_to_reduce != NULL) {
                                 switch (cta->r_op) {
@@ -439,7 +439,7 @@ struct Cta
                                     //        cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank); 
                                     util::Store_d_out<VertexId, SizeT, ProblemData>(
                                         neighbor_id, cta->d_out, 4, cta->smem_storage.state.coarse_enqueue_offset,
-                                        coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                                        coop_rank, cta->problem, cta->queue_index);
                                 } else if (cta->advance_type == gunrock::oprtr::advance::V2E
                                          ||cta->advance_type == gunrock::oprtr::advance::E2E) {
                                     //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -447,7 +447,7 @@ struct Cta
                                     //        cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
                                     util::Store_d_out<VertexId, SizeT, ProblemData>(
                                         coop_offset + threadIdx.x, cta->d_out, 5, cta->smem_storage.state.coarse_enqueue_offset,
-                                        coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                                        coop_rank, cta->problem, cta->queue_index);
                                 }
                             }
                             if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
@@ -476,7 +476,7 @@ struct Cta
                                 //    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
                                 util::Store_d_out<VertexId, SizeT, ProblemData>(
                                     -1, cta->d_out, 6, cta->smem_storage.state.coarse_enqueue_offset,
-                                    coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                                    coop_rank, cta->problem, cta->queue_index);
                             }
                             if (cta->d_value_to_reduce != NULL) {
                                 switch (cta->r_op) {
@@ -678,7 +678,7 @@ struct Cta
                                 //        cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
                                 util::Store_d_out<VertexId, SizeT, ProblemData>(
                                     neighbor_id, cta->d_out, 7, cta->smem_storage.state.coarse_enqueue_offset,
-                                    coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                                    coop_rank, cta->problem, cta->queue_index);
                             }
 
                             coop_offset += GR_WARP_THREADS(KernelPolicy::CUDA_ARCH);
@@ -777,7 +777,7 @@ struct Cta
                                 //        cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
                                 util::Store_d_out<VertexId, SizeT, ProblemData>(
                                     neighbor_id, cta->d_out, 8, cta->smem_storage.state.coarse_enqueue_offset,
-                                    coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                                    coop_rank, cta->problem, cta->queue_index);
                             }
                         }
                     }
@@ -1039,6 +1039,14 @@ struct Cta
             smem_storage.state.coarse_enqueue_offset = enqueue_offset;
             smem_storage.state.fine_enqueue_offset = enqueue_offset + coarse_count;
 
+            if (TO_TRACK)
+                printf("%d\t %d\t smem Setting\t blockIdx.x = %d, coarse_enqueue_offset = %lld,"
+                    "enqueue_amt = %lld, fine_enqueue_offset = %lld\n",
+                    problem -> gpu_idx, queue_index + 1, blockIdx.x,
+                    (long long)smem_storage.state.coarse_enqueue_offset,
+                    (long long)enqueue_amt,
+                    (long long)smem_storage.state.fine_enqueue_offset);
+
             // Check for queue overflow due to redundant expansion
             if (enqueue_offset + enqueue_amt > max_out_frontier) {
                 smem_storage.state.overflowed = true;
@@ -1177,7 +1185,7 @@ struct Cta
                      //       d_out + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
                      util::Store_d_out<VertexId, SizeT, ProblemData>(
                         neighbor_id, d_out, 9, smem_storage.state.fine_enqueue_offset,
-                        tile.progress + scratch_offset, problem->gpu_idx, queue_index);
+                        tile.progress + scratch_offset, problem, queue_index);
                 }
 
                 if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && d_pred_out != NULL) {

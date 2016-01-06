@@ -159,10 +159,16 @@ struct BFSIteration : public IterationBase <
     {
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration, peer_);
         if (TO_TRACK)
+        {
             util::MemsetKernel<<<256, 256, 0, stream>>>(
                 frontier_queue -> keys[frontier_attribute -> selector^1].GetPointer(util::DEVICE),
                 (VertexId)-2,
                 frontier_queue -> keys[frontier_attribute -> selector^1].GetSize());
+            util::Check_Exist<<<256, 256, 0, stream>>>(
+                frontier_attribute -> queue_length,
+                data_slice->gpu_idx, 2, enactor_stats -> iteration,
+                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));       
+        }
         frontier_attribute->queue_reset = true;
         enactor_stats     ->nodes_queued[0] += frontier_attribute->queue_length;
         // Edge Map
@@ -207,8 +213,7 @@ struct BFSIteration : public IterationBase <
                 work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
                     frontier_attribute->queue_index),
                 data_slice->gpu_idx, 5, enactor_stats -> iteration);
-            util::Check_Exist_<<<enactor_stats -> filter_grid_size,
-                FilterKernelPolicy::THREADS, 0, stream>>>(
+            util::Check_Exist_<<<256, 256, 0, stream>>>(
                 work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
                     frontier_attribute->queue_index),
                 data_slice->gpu_idx, 3, enactor_stats -> iteration,
