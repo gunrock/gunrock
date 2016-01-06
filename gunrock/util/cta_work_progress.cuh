@@ -86,6 +86,10 @@ public:
     __device__ __forceinline__ void Reset()
     {
         SizeT reset_val = 0;
+        if (((SizeT*)d_counters)[threadIdx.x] != reset_val)
+            printf("d_counters = %p, d_counters[%d] %lld -> %lld, blockIdx.x = %d\n", 
+                d_counters, threadIdx.x, (long long)((SizeT*)d_counters)[threadIdx.x], 
+                (long long)reset_val, blockIdx.x);
         util::io::ModifiedStore<util::io::st::cg>::St(
             reset_val, ((SizeT *) d_counters) + threadIdx.x);
     }
@@ -98,7 +102,7 @@ public:
     // the offset of that work (from zero) and incrementing it by count.
     // Typically called by thread-0
     template <typename SizeT>
-    __device__ __forceinline__ SizeT Steal(int count)
+    __device__ __forceinline__ SizeT Steal(SizeT count)
     {
         SizeT* d_steal_counters = ((SizeT*) d_counters) + QUEUE_COUNTERS;
         return util::AtomicInt<SizeT>::Add(d_steal_counters + progress_selector, count);
@@ -108,7 +112,7 @@ public:
     // offset of that work (from zero) and incrementing it by count.
     // Typically called by thread-0
     template <typename SizeT, typename IterationT>
-    __device__ __forceinline__ SizeT Steal(int count, IterationT iteration)
+    __device__ __forceinline__ SizeT Steal(SizeT count, IterationT iteration)
     {
         SizeT* d_steal_counters = ((SizeT*) d_counters) + QUEUE_COUNTERS;
         return util::AtomicInt<SizeT>::Add(d_steal_counters + (iteration & 1), count);
@@ -172,9 +176,12 @@ public:
     template <typename SizeT, typename IterationT>
     __device__ __forceinline__ SizeT Enqueue(SizeT count, IterationT iteration)
     {
-        return util::AtomicInt<SizeT>::Add(
+        SizeT old_value = util::AtomicInt<SizeT>::Add(
             GetQueueCounter<SizeT>(iteration),
             count);
+        printf("d_counters = %p, iteration = %lld, old_value = %lld, count = %lld, blockIdx.x = %d\n",
+            d_counters, (long long) iteration, (long long) old_value, (long long)count, blockIdx.x);
+        return old_value;
     }
 
     // Sets the overflow counter to non-zero
@@ -323,7 +330,7 @@ public:
         cudaError_t retval = cudaSuccess;
 
         do {
-            int queue_length_idx = iteration & 0x3;
+            IterationT queue_length_idx = iteration & 0x3;
 
             if (stream == 0)
             {
@@ -351,7 +358,7 @@ public:
     template <typename IndexT, typename SizeT>
     SizeT* GetQueueLengthPointer(IndexT index)
     {
-        int queue_length_idx = index & 0x3;
+        IndexT queue_length_idx = index & 0x3;
         return ((SizeT*)d_counters) + queue_length_idx;
     }
         
@@ -366,7 +373,7 @@ public:
         cudaError_t retval = cudaSuccess;
 
         do {
-            int queue_length_idx = iteration & 0x3;
+            IterationT queue_length_idx = iteration & 0x3;
             if (stream == 0)
             {
                 if (!DEBUG)

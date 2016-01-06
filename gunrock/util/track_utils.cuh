@@ -297,7 +297,7 @@ static __device__ __forceinline__ void Store_d_out(
                 "offset1 = %lld, offset2 = %lld, blockIdx.x = %d, threadIdx.x = %d,"
                 "org_cp = %d, org_q_idx = %d, org_d_out = %p, org_offset1 = %lld,"
                 "org_offset2 = %lld, org_blockIdx.x = %d, org_threadIdx.x = %d\n",
-                data_slice -> gpu_idx, queue_index, checkpoint_num, new_value, d_out, 
+                data_slice -> gpu_idx, queue_index+1, checkpoint_num, new_value, d_out, 
                 (long long)offset, old_value, (long long)offset1, 
                 (long long)offset2, blockIdx.x, threadIdx.x,
                 data_slice -> org_checkpoint[offset],
@@ -312,14 +312,14 @@ static __device__ __forceinline__ void Store_d_out(
             data_slice -> org_d_out     [offset] = d_out         ;
             data_slice -> org_offset1   [offset] = offset1       ;
             data_slice -> org_offset2   [offset] = offset2       ;
-            data_slice -> org_queue_idx [offset] = queue_index   ;
+            data_slice -> org_queue_idx [offset] = queue_index+1 ;
             data_slice -> org_block_idx [offset] = blockIdx.x    ;
             data_slice -> org_thread_idx[offset] = threadIdx.x   ;
         }    
         if (util::to_track(data_slice -> gpu_idx, new_value))
         {    
             printf("%d\t %d\t %d\t Storing [%d] -> %p + %lld\n",
-                data_slice -> gpu_idx, queue_index, checkpoint_num, new_value, 
+                data_slice -> gpu_idx, queue_index+1, checkpoint_num, new_value, 
                 d_out, (long long)offset);
         }
     }    
