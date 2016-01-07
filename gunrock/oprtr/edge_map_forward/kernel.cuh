@@ -211,9 +211,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         // Reset work_progress
         if (queue_reset)
         {
-            if (threadIdx.x < util::CtaWorkProgress::COUNTERS) {
+            if (threadIdx.x < util::CtaWorkProgress::COUNTERS) 
+            {
                 //Reset all counters
-                work_progress.template Reset<SizeT>();
+                //work_progress.template Reset<SizeT>();
             }   
         }
 
@@ -248,7 +249,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
 
             work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
-
         }
 
         // Barrier to protect work decomposition

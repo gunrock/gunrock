@@ -235,6 +235,11 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
     {
         case TWC_FORWARD:
         {
+            if (frontier_attribute.queue_reset)
+            {
+                work_progress.template Reset_<typename KernelPolicy::SizeT>(0, stream);
+            }
+
             // Load Thread Warp CTA Forward Kernel
             gunrock::oprtr::edge_map_forward::Kernel
                 <typename KernelPolicy::THREAD_WARP_CTA_FORWARD, ProblemData, Functor>

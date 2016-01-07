@@ -1039,13 +1039,13 @@ struct Cta
             smem_storage.state.coarse_enqueue_offset = enqueue_offset;
             smem_storage.state.fine_enqueue_offset = enqueue_offset + coarse_count;
 
-            if (TO_TRACK)
+            /*if (TO_TRACK)
                 printf("%d\t %d\t smem Setting\t blockIdx.x = %d, coarse_enqueue_offset = %lld,"
                     "enqueue_amt = %lld, fine_enqueue_offset = %lld\n",
                     problem -> gpu_idx, queue_index + 1, blockIdx.x,
                     (long long)smem_storage.state.coarse_enqueue_offset,
                     (long long)enqueue_amt,
-                    (long long)smem_storage.state.fine_enqueue_offset);
+                    (long long)smem_storage.state.fine_enqueue_offset);*/
 
             // Check for queue overflow due to redundant expansion
             if (enqueue_offset + enqueue_amt > max_out_frontier) {
