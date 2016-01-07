@@ -663,16 +663,16 @@ template <
     bool        MARK_PREDECESSORS >
 void RunTests_enable_idempotence(Info<VertexId, Value, SizeT> *info)
 {
-    //if (info->info["idempotent"].get_bool())
-    //{
-    //    RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
-    //             MARK_PREDECESSORS, true > (info);
-   // }
-    //else
-    //{
+    if (info->info["idempotent"].get_bool())
+    {
+        RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
+                 MARK_PREDECESSORS, true > (info);
+    }
+    else
+    {
         RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
                  MARK_PREDECESSORS, false> (info);
-    //}
+    }
 }
 
 /**
@@ -696,16 +696,16 @@ template <
     bool        SIZE_CHECK >
 void RunTests_mark_predecessors(Info<VertexId, Value, SizeT> *info)
 {
-    //if (info->info["mark_predecessors"].get_bool())
-    //{
-    //    RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
-    //                                DEBUG, SIZE_CHECK,  true> (info);
-    //}
-    //else
-    //{
+    if (info->info["mark_predecessors"].get_bool())
+    {
+        RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
+                                    DEBUG, SIZE_CHECK,  true> (info);
+    }
+    else
+    {
         RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
                                     DEBUG, SIZE_CHECK, false> (info);
-    //}
+    }
 }
 
 /**
@@ -727,16 +727,16 @@ template <
     bool          DEBUG >
 void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
 {
-    //if (info->info["size_check"].get_bool())
-    //{
+    if (info->info["size_check"].get_bool())
+    {
         RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
                                    DEBUG,  true>(info);
-    //}
-    //else
-    //{
-    //    RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
-    //                               DEBUG, false>(info);
-    //}
+    }
+    else
+    {
+        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
+                                   DEBUG, false>(info);
+    }
 }
 
 /**
@@ -838,9 +838,9 @@ template <
     typename Value>   // the value type, usually int or long long
 int main_SizeT(CommandLineArgs *args)
 {
-    /*if (args -> CheckCmdLineFlag("64bit-SizeT"))
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
          return main_<VertexId, Value, long long>(args);
-    else*/ return main_<VertexId, Value, int      >(args);
+    else return main_<VertexId, Value, int      >(args);
 }
 
 template <

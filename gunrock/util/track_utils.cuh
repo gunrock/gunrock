@@ -19,15 +19,15 @@
 namespace gunrock {
 namespace util {
 
-#define TO_TRACK true
-#define NUM_TO_TRACK 38
+#define TO_TRACK false
+#define NUM_TO_TRACK 0
 
 template <typename VertexId>
 static __device__ __host__ __inline__ bool to_track(
     int gpu_num, VertexId node)
 {
     /*for BFS, market /data/gunrock_dataset/large/soc-LiveJournal1/soc-LiveJournal1.mtx --src=largestdegree --traversal-mode=1 --device=0,1 --queue-sizing=7.0 --queue-sizing1=8.0 --in-sizing=0.5 --partition-seed=1451953615 --v
-    NUM_TO_TRACK = 38*/
+    NUM_TO_TRACK = 38
     const VertexId node_to_track[NUM_TO_TRACK][3] = {
         { 541845,  271043, 2569951}, 
         { 569068,  284715, 2953294},
@@ -72,10 +72,13 @@ static __device__ __host__ __inline__ bool to_track(
 
         {1402948, 3381721,  701005},
         {1404916, 3517695,  701958}
-    };
+    };*/
+
 
     if (!TO_TRACK) return false;
     else {
+        const VertexId node_to_track[NUM_TO_TRACK > 0 ? NUM_TO_TRACK : 1][3] = {};
+
         #pragma unroll
         for (int i=0; i<NUM_TO_TRACK; i++)
             //if (gpu_num == gpu_to_track[i] &&
@@ -101,8 +104,7 @@ void Track_Results (
 {
     if (references == NULL) return;
     if (!TO_TRACK) return;
-
-    for (VertexId v=0; v<graph->nodes; v++)
+    else for (VertexId v=0; v<graph->nodes; v++)
     {
         if (!to_track(-1, v)) continue;
         printf("Vertex %d, ", v);
