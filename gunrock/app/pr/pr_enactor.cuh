@@ -1196,7 +1196,7 @@ static void Make_Output(
             (bool*    )NULL,
             scanned_edges->GetPointer(util::DEVICE),
             frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_in_queue
-            frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+            NULL, //frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
             (VertexId*)NULL,
             (VertexId*)NULL,
             graph_slice->row_offsets   .GetPointer(util::DEVICE),
