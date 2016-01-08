@@ -862,12 +862,12 @@ template <
     bool SIZE_CHECK >
 void RunTests_normalized(Info<VertexId, Value, SizeT> *info)
 {
-    if (info->info["normalized"].get_bool())
-    {
+    //if (info->info["normalized"].get_bool())
+    //{
         RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,  true>(info);
-    } else {
-        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK, false>(info);
-    }
+    //} else {
+    //    RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK, false>(info);
+    //}
 }
 
 /**
@@ -889,14 +889,14 @@ template <
     bool          DEBUG >
 void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
 {
-    if (info->info["size_check"].get_bool())
-    {
+    //if (info->info["size_check"].get_bool())
+    //{
         RunTests_normalized<VertexId, Value, SizeT, INSTRUMENT, DEBUG,  true>(info);
-    }
-    else
-    {
-        RunTests_normalized<VertexId, Value, SizeT, INSTRUMENT, DEBUG, false>(info);
-    }
+    //}
+    //else
+    //{
+    //    RunTests_normalized<VertexId, Value, SizeT, INSTRUMENT, DEBUG, false>(info);
+    //}
 }
 
 /**
@@ -941,14 +941,14 @@ template <
     typename      SizeT >
 void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 {
-    if (info->info["instrument"].get_bool())
-    {
-        RunTests_debug<VertexId, Value, SizeT,  true>(info);
-    }
-    else
-    {
+    //if (info->info["instrument"].get_bool())
+    //{
+    //    RunTests_debug<VertexId, Value, SizeT,  true>(info);
+    //}
+    //else
+    //{
         RunTests_debug<VertexId, Value, SizeT, false>(info);
-    }
+    //}
 }
 
 /******************************************************************************

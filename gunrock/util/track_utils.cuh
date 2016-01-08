@@ -20,12 +20,22 @@ namespace gunrock {
 namespace util {
 
 #define TO_TRACK false
-#define NUM_TO_TRACK 0
+#define NUM_TO_TRACK 10
+
+template <typename VertexId>
+static __device__ __host__ bool to_track(VertexId node) {
+    const int num_to_track = 4;
+    const VertexId node_to_track[] = {0, 1, 2, 3}; 
+    for (int i = 0; i < num_to_track; i++)
+        if (node == node_to_track[i]) return true;
+    return false;
+}
 
 template <typename VertexId>
 static __device__ __host__ __inline__ bool to_track(
     int gpu_num, VertexId node)
 {
+    //const VertexId node_to_track[NUM_TO_TRACK > 0 ? NUM_TO_TRACK : 1][3] = {};
     /*for BFS, market /data/gunrock_dataset/large/soc-LiveJournal1/soc-LiveJournal1.mtx --src=largestdegree --traversal-mode=1 --device=0,1 --queue-sizing=7.0 --queue-sizing1=8.0 --in-sizing=0.5 --partition-seed=1451953615 --v
     NUM_TO_TRACK = 38
     const VertexId node_to_track[NUM_TO_TRACK][3] = {
@@ -74,10 +84,23 @@ static __device__ __host__ __inline__ bool to_track(
         {1404916, 3517695,  701958}
     };*/
 
+    // for BFS, market /data/gunrock_dataset/large/soc-LiveJournal1/soc-LiveJournal1.mtx --src=largestdegree --traversal-mode=1 --undirected --device=0,1,2,3 --queue-sizing=8.0 --in-sizing=0.5 --idempotence --v --partition-seed=1452208768
+    
+    const VertexId node_to_track[NUM_TO_TRACK][5] = {
+        {  5487,    1370, 1239278, 1212000, 1238478},
+        {  5503,    1377, 1531518, 1236984, 1238502},
+        {  5520,    1381, 1309968, 1236988, 1482071},
+        {  5842, 2313598, 2078214,    1454, 2916472},
+        {  6110, 2938440, 3162369, 2915808,    1523},
+        { 22727, 3051939, 3633847, 2969441,    5630},
+        {228833, 2377430, 2375217,   57405, 3215261},
+        {228837,   57428, 1536317, 1536368, 1537966},
+        {228845,   57431, 1536319, 1536371, 1537967},
+        {228852,   57433, 1536331, 1536372, 1537968}
+    };
 
     if (!TO_TRACK) return false;
     else {
-        const VertexId node_to_track[NUM_TO_TRACK > 0 ? NUM_TO_TRACK : 1][3] = {};
 
         #pragma unroll
         for (int i=0; i<NUM_TO_TRACK; i++)

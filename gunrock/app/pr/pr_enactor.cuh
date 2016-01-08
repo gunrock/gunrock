@@ -1177,12 +1177,14 @@ static void Make_Output(
 
     if (num_gpus > 1 && enactor_stats->iteration==0)
     {
-        util::MemsetKernel<<<grid_size, block_size, 0, stream>>>(data_slice[0]->markers.GetPointer(util::DEVICE), (SizeT)0, graph_slice->nodes);
-        frontier_attribute->queue_length = data_slice[0]->edge_map_queue_len;
+        util::MemsetKernel<<<grid_size, block_size, 0, stream>>>(
+            data_slice[0]->markers.GetPointer(util::DEVICE), 
+            (SizeT)0, graph_slice->nodes);
+        frontier_attribute -> queue_length = data_slice[0]->edge_map_queue_len;
         //util::cpu_mt::PrintGPUArray("keys", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, -1, stream);
         //util::cpu_mt::PrintGPUArray("row_offsets", graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration, -1, stream);
         //printf("Advance start.\n");fflush(stdout);
-        frontier_attribute->queue_reset = true;
+        frontier_attribute -> queue_reset = true;
         // Edge Map
         gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, PrMarkerFunctor>(
             //d_done,
@@ -1214,7 +1216,10 @@ static void Make_Output(
         //util::cpu_mt::PrintGPUArray("markers", data_slice[0]->markers.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, -1, stream);
 
         for (peer_ = 0; peer_<num_gpus; peer_++)
-            util::MemsetKernel<<<128, 128, 0, stream>>> ( data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE), 0, graph_slice->nodes);
+            util::MemsetKernel<<<128, 128, 0, stream>>> ( 
+                data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE), 
+                0, graph_slice->nodes);
+
         Assign_Marker_PR<VertexId, SizeT>
             <<<grid_size, block_size, num_gpus * sizeof(SizeT*), stream>>> (
             graph_slice->nodes,
@@ -1236,12 +1241,16 @@ static void Make_Output(
         //    util::cpu_mt::PrintGPUArray("keys_marker1", data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, -1, stream);
 
         SizeT temp_length = data_slice[0]->out_length[0];
-        if (graph_slice->nodes > 0) for (peer_ = 0; peer_<num_gpus; peer_++)
+        if (graph_slice->nodes > 0)
         {
-            cudaMemcpyAsync(
-                &data_slice[0]->out_length[peer_],
-                data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE) + (graph_slice->nodes -1),
-                sizeof(SizeT), cudaMemcpyDeviceToHost, stream);
+            for (peer_ = 0; peer_<num_gpus; peer_++)
+            {
+                cudaMemcpyAsync(
+                    &data_slice[0]->out_length[peer_],
+                    data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE) 
+                        + (graph_slice->nodes -1),
+                    sizeof(SizeT), cudaMemcpyDeviceToHost, stream);
+            }
         } else {
             for (peer_ = 1; peer_<num_gpus; peer_++)
                 data_slice[0]->out_length[peer_] = 0;
@@ -1256,13 +1265,20 @@ static void Make_Output(
                 data_slice[0]->temp_keys_out[peer_] = util::Array1D<SizeT, VertexId>();
             }
             if (enactor_stats->retval = Check_Size<Enactor::SIZE_CHECK, SizeT, VertexId> (
-                "keys_out", data_slice[0]->out_length[peer_], &data_slice[0]->keys_out[peer_], over_sized, thread_num, enactor_stats->iteration, peer_)) return;
+                "keys_out", data_slice[0]->out_length[peer_], 
+                &data_slice[0]->keys_out[peer_], 
+                over_sized, thread_num, enactor_stats->iteration, peer_)) 
+                return;
             if (peer_>0)
                 if (enactor_stats->retval = Check_Size<Enactor::SIZE_CHECK, SizeT, Value> (
-                    "values_out", data_slice[0]->out_length[peer_], &data_slice[0]->value__associate_out[peer_][0], over_sized, thread_num, enactor_stats->iteration, peer_)) return;
+                    "values_out", data_slice[0]->out_length[peer_], 
+                    &data_slice[0]->value__associate_out[peer_][0], 
+                    over_sized, thread_num, enactor_stats->iteration, peer_)) 
+                    return;
             data_slice[0]->keys_outs[peer_] = data_slice[0]->keys_out[peer_].GetPointer(util::DEVICE);
             if (!over_sized) continue;
-            data_slice[0]->value__associate_outs[peer_][0] = data_slice[0]->value__associate_out[peer_][0].GetPointer(util::DEVICE);
+            data_slice[0]->value__associate_outs[peer_][0] 
+                = data_slice[0]->value__associate_out[peer_][0].GetPointer(util::DEVICE);
             data_slice[0]->value__associate_outs[peer_].Move(util::HOST, util::DEVICE, -1, 0, stream);
         }
         data_slice[0]->keys_outs.Move(util::HOST, util::DEVICE, -1, 0, stream);

@@ -58,13 +58,6 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, unsigned char > visited_mask  ;
         util::Array1D<SizeT, unsigned int  > temp_marker   ;
         util::Array1D<SizeT, VertexId      > original_vertex;
-        util::Array1D<SizeT, int           > org_checkpoint;
-        util::Array1D<SizeT, VertexId*     > org_d_out     ;
-        util::Array1D<SizeT, SizeT         > org_offset1   ;
-        util::Array1D<SizeT, SizeT         > org_offset2   ;
-        util::Array1D<SizeT, VertexId      > org_queue_idx ;
-        util::Array1D<SizeT, int           > org_block_idx ;
-        util::Array1D<SizeT, int           > org_thread_idx;
 
         /*
          * @brief Default constructor
@@ -75,13 +68,6 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             visited_mask    .SetName("visited_mask"    );
             temp_marker     .SetName("temp_marker"     );
             original_vertex .SetName("original_vertex" );
-            org_checkpoint  .SetName("org_checkpoint"  );
-            org_d_out       .SetName("org_d_out"       );
-            org_offset1     .SetName("org_offset1"     );
-            org_offset2     .SetName("org_offset2"     );
-            org_queue_idx   .SetName("org_queue_idx"   );
-            org_block_idx   .SetName("org_block_idx"   );
-            org_thread_idx  .SetName("org_thread_idx"  );
         }
 
         /*
@@ -94,13 +80,6 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             visited_mask  .Release();
             temp_marker   .Release();
             original_vertex.Release();
-            org_checkpoint.Release();
-            org_d_out     .Release();
-            org_offset1   .Release();
-            org_offset2   .Release();
-            org_queue_idx .Release();
-            org_block_idx .Release();
-            org_thread_idx.Release();
         }
 
         /**
@@ -302,19 +281,19 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
 
             if (TO_TRACK)
             {
-                if (retval = org_checkpoint.Allocate(max_queue_length, util::DEVICE))
+                if (retval = this -> org_checkpoint.Allocate(max_queue_length, util::DEVICE))
                     return retval;
-                if (retval = org_d_out     .Allocate(max_queue_length, util::DEVICE))
+                if (retval = this -> org_d_out     .Allocate(max_queue_length, util::DEVICE))
                     return retval;
-                if (retval = org_offset1   .Allocate(max_queue_length, util::DEVICE))
+                if (retval = this -> org_offset1   .Allocate(max_queue_length, util::DEVICE))
                     return retval;
-                if (retval = org_offset2   .Allocate(max_queue_length, util::DEVICE))
+                if (retval = this -> org_offset2   .Allocate(max_queue_length, util::DEVICE))
                     return retval;
-                if (retval = org_queue_idx .Allocate(max_queue_length, util::DEVICE))
+                if (retval = this -> org_queue_idx .Allocate(max_queue_length, util::DEVICE))
                     return retval;
-                if (retval = org_block_idx .Allocate(max_queue_length, util::DEVICE))
+                if (retval = this -> org_block_idx .Allocate(max_queue_length, util::DEVICE))
                     return retval;
-                if (retval = org_thread_idx.Allocate(max_queue_length, util::DEVICE))
+                if (retval = this -> org_thread_idx.Allocate(max_queue_length, util::DEVICE))
                     return retval;
             }
             if (_ENABLE_IDEMPOTENCE) {
