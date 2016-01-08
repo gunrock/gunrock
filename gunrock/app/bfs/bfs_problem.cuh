@@ -54,7 +54,6 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
      */
     struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
     {
-        util::Array1D<SizeT, VertexId      > labels        ;
         util::Array1D<SizeT, unsigned char > visited_mask  ;
         util::Array1D<SizeT, unsigned int  > temp_marker   ;
         util::Array1D<SizeT, VertexId      > original_vertex;
@@ -64,7 +63,6 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
          */
         DataSlice()
         {
-            labels          .SetName("labels"          );
             visited_mask    .SetName("visited_mask"    );
             temp_marker     .SetName("temp_marker"     );
             original_vertex .SetName("original_vertex" );
@@ -76,7 +74,6 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         ~DataSlice()
         {
             if (util::SetDevice(this->gpu_idx)) return;
-            labels        .Release();
             visited_mask  .Release();
             temp_marker   .Release();
             original_vertex.Release();
@@ -122,7 +119,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 in_sizing)) return retval;
 
             // Create SoA on device
-            if (retval = labels       .Allocate(graph->nodes,util::DEVICE)) return retval;
+            if (retval = this->labels       .Allocate(graph->nodes,util::DEVICE)) return retval;
 
             if (_MARK_PREDECESSORS)
             {
@@ -137,7 +134,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
 
             if (num_gpus > 1)
             {
-                this->vertex_associate_orgs[0] = labels.GetPointer(util::DEVICE);
+                this->vertex_associate_orgs[0] = this->labels.GetPointer(util::DEVICE);
                 if (_MARK_PREDECESSORS)
                     this->vertex_associate_orgs[1] = this->preds.GetPointer(util::DEVICE);
                 if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;

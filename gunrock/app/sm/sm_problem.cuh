@@ -52,7 +52,7 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
      
     struct DataSlice : DataSliceBase<SizeT, VertexId, Value>{
         // device storage arrays
-	util::Array1D<SizeT, VertexId> labels;  // Used for ...
+	//util::Array1D<SizeT, VertexId> labels;  // Used for ...
         util::Array1D<SizeT, VertexId> d_query_labels;  /** < Used for query graph labels */
 	util::Array1D<SizeT, VertexId> d_data_labels;   /** < Used for data graph labels */
 	util::Array1D<SizeT, SizeT> d_query_nodeIDs;        /** < Used for query node indices */    
@@ -75,7 +75,7 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
          */
         DataSlice()
         {
-	    labels		.SetName("labels");
+	    //labels		.SetName("labels");
 	    d_query_labels	.SetName("d_query_labels");
 	    d_data_labels	.SetName("d_data_labels");
 	    d_query_nodeIDs	.SetName("d_query_nodeIDs"); 
@@ -161,7 +161,7 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
                     "~Problem cudaSetDevice failed",
                     __FILE__, __LINE__)) break;
 		
-	    data_slices[i]->labels.Release();
+	    //data_slices[i]->labels.Release();
 	    data_slices[i]->d_query_labels.Release();
 	    data_slices[i]->d_data_labels.Release();
 	    data_slices[i]->d_query_nodeIDs.Release();

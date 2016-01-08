@@ -17,6 +17,7 @@
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
 #include <gunrock/util/sort_utils.cuh>
+#include <gunrock/util/sharedmem.cuh>
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
@@ -231,7 +232,9 @@ __global__ void Assign_Marker_PR(
     const int*      partition_table,
           SizeT**   key_markers)
 {
-    extern __shared__ SizeT* s_marker[];
+    //extern __shared__ SizeT* s_marker[];
+    SharedMemory<SizeT*> smem;
+    SizeT** s_marker = smem.getPointer();
     int   gpu = 0;
     SizeT x = blockIdx.x * blockDim.x + threadIdx.x;
     const SizeT STRIDE = gridDim.x * blockDim.x;
@@ -264,8 +267,8 @@ __global__ void Assign_Keys_PR (
           SizeT**        keys_markers,
           VertexId**     keys_outs)
 {
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    SizeT x = blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
 
     while (x < num_elements)
     {
@@ -1218,7 +1221,7 @@ static void Make_Output(
         for (peer_ = 0; peer_<num_gpus; peer_++)
             util::MemsetKernel<<<128, 128, 0, stream>>> ( 
                 data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE), 
-                0, graph_slice->nodes);
+                (SizeT)0, graph_slice->nodes);
 
         Assign_Marker_PR<VertexId, SizeT>
             <<<grid_size, block_size, num_gpus * sizeof(SizeT*), stream>>> (
@@ -1232,10 +1235,10 @@ static void Make_Output(
 
         for (peer_ = 0; peer_<num_gpus;peer_++)
             Scan<mgpu::MgpuScanTypeInc>(
-                (int*)(data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE)),
+                (SizeT*)(data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE)),
                 graph_slice->nodes,
-                (int)0, mgpu::plus<int>(), (int*)0, (int*)0,
-                (int*)(data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE)),
+                (SizeT)0, mgpu::plus<SizeT>(), (SizeT*)0, (SizeT*)0,
+                (SizeT*)(data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE)),
                 context[0]);
         //for (peer_ = 0; peer_<num_gpus;peer_++)
         //    util::cpu_mt::PrintGPUArray("keys_marker1", data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, -1, stream);

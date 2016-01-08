@@ -57,7 +57,6 @@ struct TOPKProblem : ProblemBase<_VertexId, _SizeT, _Value,
 
     // device storage arrays
     //SizeT       *d_labels;
-    util::Array1D<SizeT, VertexId> labels;
     VertexId    *d_node_id;   //!< top k node ids
     Value       *d_degrees_s; //!< sum/total degrees
     Value       *d_degrees_i; //!< in-going  degrees
@@ -281,7 +280,6 @@ struct TOPKProblem : ProblemBase<_VertexId, _SizeT, _Value,
                 NULL,
                 NULL);
 
-            data_slices[0]->labels.SetName("labels");
 
             // Create SoA on device
             VertexId    *d_node_id;

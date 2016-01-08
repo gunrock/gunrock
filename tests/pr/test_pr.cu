@@ -734,8 +734,9 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         if (h_rank[i] < h_rank[i+1])
         {
             if (error_count == 0 && !quiet_mode)
-                printf("INCORRECT : rank[%d] (%.8le), place %d < rank[%d] (%.8le), place %d\n",
-                    h_node_id[i], (double)h_rank[i], i, h_node_id[i+1], (double)h_rank[i+1], i+1);
+                printf("INCORRECT : rank[%lld] (%.8le), place %lld < rank[%lld] (%.8le), place %lld\n",
+                    (long long)h_node_id[i  ], (double)h_rank[i  ], (long long)i, 
+                    (long long)h_node_id[i+1], (double)h_rank[i+1], (long long)i+1);
             error_count ++;
         }
         if (error_count == 0 && !quiet_mode)
@@ -955,33 +956,29 @@ void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
  * Main
  ******************************************************************************/
 
-int main(int argc, char** argv)
+template<
+    typename VertexId,
+    typename Value,
+    typename SizeT>
+int main_(CommandLineArgs *args)
 {
     CpuTimer cpu_timer, cpu_timer2;
 
     cpu_timer.Start();
-    CommandLineArgs args(argc, argv);
-    int graph_args = argc - args.ParsedArgc() - 1;
-    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
-    {
-        Usage();
-        return 1;
-    }
-
-    typedef int VertexId;  // use int as the vertex identifier
-    typedef float Value;   // use float as the value type
-    typedef int SizeT;     // use int as the graph size type
+    //typedef int VertexId;  // use int as the vertex identifier
+    //typedef float Value;   // use float as the value type
+    //typedef int SizeT;     // use int as the graph size type
 
     Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
     // graph construction or generation related parameters
-    if (args.CheckCmdLineFlag("normalized"))
-        info->info["undirected"] = args.CheckCmdLineFlag("undirected");
+    if (args -> CheckCmdLineFlag("normalized"))
+        info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
     else info->info["undirected"] = true;   // require undirected input graph when unnormalized
 
     cpu_timer2.Start();
-    info->Init("PageRank", args, csr);  // initialize Info structure
+    info->Init("PageRank", *args, csr);  // initialize Info structure
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
@@ -998,6 +995,45 @@ int main(int argc, char** argv)
     info->CollectInfo();  // collected all the info and put into JSON mObject
 
     return 0;
+}
+
+template <
+    typename VertexId,
+    typename Value>   // the value type, usually int or long long
+int main_SizeT(CommandLineArgs *args)
+{
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+         return main_<VertexId, Value, long long>(args);
+    else return main_<VertexId, Value, int      >(args);
+}
+
+template <
+    typename VertexId> // the vertex identifier type, usually int or long long
+int main_Value(CommandLineArgs *args)
+{
+    if (args -> CheckCmdLineFlag("64bit-Value"))
+         return main_SizeT<VertexId, double>(args);
+    else return main_SizeT<VertexId, float >(args);
+}
+
+int main_VertexId(CommandLineArgs *args)
+{
+    /*if (args -> CheckCmdLineFlag("64bit-VertexId"))
+         return main_Value<long long>(args);
+    else*/ return main_Value<int      >(args);
+}
+
+int main(int argc, char** argv)
+{
+    CommandLineArgs args(argc, argv);
+    int graph_args = argc - args.ParsedArgc() - 1;
+    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
+    {   
+        Usage();
+        return 1;
+    }   
+
+    return main_VertexId(&args);
 }
 
 // Leave this at the end of the file

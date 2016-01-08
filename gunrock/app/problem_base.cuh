@@ -381,6 +381,7 @@ struct DataSliceBase
     util::Array1D<SizeT, char        >  *expand_incoming_array   ; // compressed data structure for expand_incoming kernel
     util::Array1D<SizeT, VertexId    >   preds                   ; // predecessors of vertices
     util::Array1D<SizeT, VertexId    >   temp_preds              ; // temporary storages for predecessors
+    util::Array1D<SizeT, VertexId    >   labels                  ; // Used for source distance
 
     //Frontier queues. Used to track working frontier.
     util::DoubleBuffer<SizeT, VertexId, Value>  *frontier_queues ; // frontier queues
@@ -445,6 +446,7 @@ struct DataSliceBase
         streams                .SetName("streams"                );
         preds                  .SetName("preds"                  );
         temp_preds             .SetName("temp_preds"             );
+        labels                 .SetName("labels"                 );
         org_checkpoint         .SetName("org_checkpoint"         );  
         org_d_out              .SetName("org_d_out"              );  
         org_offset1            .SetName("org_offset1"            );  
@@ -645,6 +647,7 @@ struct DataSliceBase
         make_out_array.Release();
         preds         .Release();
         temp_preds    .Release();
+        labels        .Release();
 
         org_checkpoint.Release();
         org_d_out     .Release();

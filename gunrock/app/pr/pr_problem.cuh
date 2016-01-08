@@ -56,7 +56,6 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, Value   > rank_next;           /**< Used for ping-pong page rank value */
         util::Array1D<SizeT, SizeT   > degrees;             /**< Used for keeping out-degree for each vertex */
         util::Array1D<SizeT, SizeT   > degrees_pong;
-        util::Array1D<SizeT, SizeT   > labels;
         util::Array1D<SizeT, VertexId> node_ids;
         util::Array1D<SizeT, SizeT   > markers;
         util::Array1D<SizeT, VertexId> *temp_keys_out;
@@ -82,7 +81,6 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             rank_next   .SetName("rank_next"   );
             degrees     .SetName("degrees"     );
             degrees_pong.SetName("degrees_pong");
-            labels      .SetName("labels"      );
             node_ids    .SetName("node_ids"    );
             markers     .SetName("markers"     );
             temp_keys_out      = NULL;
@@ -108,7 +106,6 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             rank_next   .Release();
             degrees     .Release();
             degrees_pong.Release();
-            labels      .Release();
             node_ids    .Release();
             markers     .Release();
             delete[] temp_keys_out; temp_keys_out = NULL;
@@ -431,14 +428,14 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
 
             // Compute degrees
             util::MemsetKernel<<<128, 128>>>(
-                data_slices[gpu]->degrees  .GetPointer(util::DEVICE), 0, nodes);
+                data_slices[gpu]->degrees  .GetPointer(util::DEVICE), (SizeT)0, nodes);
 
             if (this->num_gpus == 1)
             {
                 util::MemsetMadVectorKernel <<<128, 128>>>(
                     data_slices[gpu]->degrees.GetPointer(util::DEVICE),
                     this->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
-                    this->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE)+1, -1, nodes);
+                    this->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE)+1, (SizeT)-1, nodes);
                 data_slices[gpu]->local_nodes = nodes;
 
                 if (retval = data_slices[gpu]->frontier_queues[0].keys[0].EnsureSize(nodes)) return retval;
@@ -449,7 +446,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
                 util::MemsetMadVectorKernel <<<128, 128>>>(
                     data_slices[gpu]->degrees.GetPointer(util::DEVICE),
                     data_slices[gpu]->degrees_pong.GetPointer(util::DEVICE),
-                    data_slices[gpu]->degrees_pong.GetPointer(util::DEVICE)+1, -1, nodes);
+                    data_slices[gpu]->degrees_pong.GetPointer(util::DEVICE)+1, (SizeT)-1, nodes);
                 data_slices[gpu]->degrees_pong.UnSetPointer(util::HOST);
 
                 if (retval = data_slices[gpu]->frontier_queues[0].keys[0].EnsureSize(data_slices[gpu]->local_nodes)) return retval;
