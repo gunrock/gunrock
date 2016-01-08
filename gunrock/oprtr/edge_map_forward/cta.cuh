@@ -1085,9 +1085,9 @@ struct Cta
             __syncthreads();
 
             // Copy scratch space into queue
-            int scratch_remainder = GR_MIN(SmemStorage::GATHER_ELEMENTS, tile.fine_count - tile.progress);
+            SizeT scratch_remainder = GR_MIN(SmemStorage::GATHER_ELEMENTS, tile.fine_count - tile.progress);
 
-            for (int scratch_offset = threadIdx.x;
+            for (SizeT scratch_offset = threadIdx.x;
                     scratch_offset < scratch_remainder;
                     scratch_offset += KernelPolicy::THREADS)
             {

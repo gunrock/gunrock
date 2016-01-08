@@ -1207,8 +1207,8 @@ __global__ void Copy_Preds (
     const VertexId* in_preds,
           VertexId* out_preds)
 {
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    VertexId x = blockIdx.x*blockDim.x+threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    VertexId x = (SizeT)blockIdx.x*blockDim.x+threadIdx.x;
     VertexId t;
 
     while (x<num_elements)
@@ -1241,8 +1241,8 @@ __global__ void Update_Preds (
     const VertexId* in_preds,
           VertexId* out_preds)
 {
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    VertexId x = blockIdx.x*blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    VertexId x = (SizeT)blockIdx.x*blockDim.x + threadIdx.x;
     VertexId t, p;
 
     while (x<num_elements)
@@ -1367,7 +1367,7 @@ __global__ void Make_Out(
           char*             array)
 {
     extern __shared__ char s_array[];
-    const SizeT STRIDE = gridDim.x * blockDim.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
     size_t     offset                  = 0;
     SizeT**    s_marker                = (SizeT**   )&(s_array[offset]);
     offset+=sizeof(SizeT*   )*num_gpus;
@@ -1391,7 +1391,7 @@ __global__ void Make_Out(
     }
     __syncthreads();
 
-    x= blockIdx.x * blockDim.x + threadIdx.x;
+    x= (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
     while (x<num_elements)
     {
         VertexId key    = keys_in [x];
@@ -1446,7 +1446,7 @@ __global__ void Make_Out_Backward(
           char*             array)
 {
     extern __shared__ char s_array[];
-    const SizeT STRIDE = gridDim.x * blockDim.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
     size_t     offset                  = 0;
     SizeT**    s_marker                = (SizeT**   )&(s_array[offset]);
     offset+=sizeof(SizeT*   )*num_gpus;
@@ -1470,7 +1470,7 @@ __global__ void Make_Out_Backward(
     }
     __syncthreads();
 
-    x= blockIdx.x * blockDim.x + threadIdx.x;
+    x= (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
     while (x<num_elements)
     {
         VertexId key    = keys_in [x];
@@ -1509,7 +1509,7 @@ __global__ void Make_Out_Backward(
  * @param[in] keys
  * @param[in] market
  */
-template <typename VertexId, typename SizeT>
+/*template <typename VertexId, typename SizeT>
 __global__ void Mark_Queue (
     const SizeT     num_elements,
     const VertexId* keys,
@@ -1517,7 +1517,7 @@ __global__ void Mark_Queue (
 {
     VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
     if (x< num_elements) marker[keys[x]]=1;
-}
+}*/
 
 /*
  * @brief Check size function.

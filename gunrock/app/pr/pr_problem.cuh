@@ -167,9 +167,14 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
                 // printf("Allocating keys_out[0] %d\n", local_nodes);fflush(stdout);
                 if (retval = this->keys_out[0].Allocate(local_nodes, util::DEVICE)) return retval;
                 this->keys_outs[0] = this->keys_out[0].GetPointer(util::DEVICE);
-                for (int peer_ = 0; peer_ < num_gpus; peer_++)
+                for (int peer_ = 0; peer_ < num_gpus; peer_++) 
                 {
-                    if (retval = this->keys_marker[peer_].EnsureSize(nodes)) return retval;
+                    if (peer_ == 0)
+                    {// only need the first one, can be reused
+                        if (retval = this->keys_marker[peer_].EnsureSize(nodes)) return retval;
+                    } else {
+                        if (retval = this->keys_marker[peer_].Release()) return retval;
+                    }
                     this->keys_markers[peer_] = this->keys_marker[peer_].GetPointer(util::DEVICE);
                 }
                 this->keys_markers.Move(util::HOST, util::DEVICE);
@@ -192,7 +197,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = rank_next   .Allocate(nodes, util::DEVICE)) return retval;
             if (retval = degrees     .Allocate(nodes, util::DEVICE)) return retval;
             if (retval = degrees_pong.Allocate(nodes+1, util::DEVICE)) return retval;
-            if (retval = node_ids    .Allocate(nodes, util::DEVICE)) return retval;
+            //if (retval = node_ids    .Allocate(nodes, util::DEVICE)) return retval;
             if (retval = markers     .Allocate(nodes, util::DEVICE)) return retval;
             return retval;
        }
@@ -327,6 +332,9 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             {
                 data_slices[gpu].SetName("data_slices[]");
                 if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
+                if (retval = this->graph_slices[gpu]->out_degrees.Release()) return retval;
+                if (retval = this->graph_slices[gpu]->original_vertex.Release()) return retval;
+                if (retval = this->graph_slices[gpu]->convertion_table.Release()) return retval;
                 if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST)) return retval;
                 DataSlice* data_slice_ = data_slices[gpu].GetPointer(util::HOST);
                 data_slice_->streams.SetPointer(&streams[gpu*num_gpus*2], num_gpus*2);
@@ -393,6 +401,9 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
                 frontier_type, this->graph_slices[gpu], 
                 queue_sizing, false, queue_sizing1, skip_scanned_edges)) 
                 return retval;
+
+            if (retval = data_slices[gpu]->node_ids.Release(util::DEVICE)) return retval;
+
             for (int peer = 1; peer < this->num_gpus; peer++)
                 this->graph_slices[gpu]->in_counter[peer] = temp_in_counter[peer];
 
@@ -402,8 +413,8 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             if (data_slices[gpu]->rank_next.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->rank_next.Allocate(nodes, util::DEVICE)) return retval;
 
-            if (data_slices[gpu]->node_ids .GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->node_ids .Allocate(nodes, util::DEVICE)) return retval;
+            //if (data_slices[gpu]->node_ids .GetPointer(util::DEVICE) == NULL)
+            //    if (retval = data_slices[gpu]->node_ids .Allocate(nodes, util::DEVICE)) return retval;
 
             // Allocate degrees if necessary
             if (data_slices[gpu]->degrees  .GetPointer(util::DEVICE) == NULL)
@@ -468,8 +479,8 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             util::MemsetCopyVectorKernel<<<128, 128>>>(
                 data_slices[gpu]->degrees_pong.GetPointer(util::DEVICE),
                 data_slices[gpu]->degrees     .GetPointer(util::DEVICE), nodes);
-            util::MemsetIdxKernel       <<<128, 128>>>(
-                data_slices[gpu]->node_ids    .GetPointer(util::DEVICE), nodes);
+            //util::MemsetIdxKernel       <<<128, 128>>>(
+            //    data_slices[gpu]->node_ids    .GetPointer(util::DEVICE), nodes);
 
             data_slices[gpu]->delta       = delta    ; //data_slices[gpu]->delta    .Move(util::HOST, util::DEVICE);
             data_slices[gpu]->threshold   = threshold; //data_slices[gpu]->threshold.Move(util::HOST, util::DEVICE);
