@@ -36,7 +36,7 @@ static const unsigned int GPU        = 0x12;
 static const unsigned int DISK       = 0x14;
 static const unsigned int TARGETALL  = 0x1F;
 
-#define ARRAY_DEBUG true
+#define ARRAY_DEBUG false
 
 template <
     typename _SizeT,
