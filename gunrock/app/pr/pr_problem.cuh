@@ -71,6 +71,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
         SizeT    PR_queue_length;
         int      PR_queue_selector;
         bool     final_event_set;
+        DataSlice* d_data_slice;
 
         /*
          * @brief Default constructor
@@ -208,12 +209,18 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice> *data_slices;
 
+    // whether to use the scaling feature
+    bool scaled; 
+
     // Methods
 
     /**
      * @brief PRProblem default constructor
      */
-    PRProblem(): data_slices(NULL) {}
+    PRProblem(): 
+        data_slices(NULL ),
+        scaled     (false)
+    {}
 
     /**
      * @brief PRProblem default destructor
@@ -337,6 +344,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = this->graph_slices[gpu]->convertion_table.Release()) return retval;
                 if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST)) return retval;
                 DataSlice* data_slice_ = data_slices[gpu].GetPointer(util::HOST);
+                data_slice_->d_data_slice = data_slices[gpu].GetPointer(util::DEVICE);
                 data_slice_->streams.SetPointer(&streams[gpu*num_gpus*2], num_gpus*2);
                 data_slice_->init_value = 1.0 / graph->nodes ;
                 if (this->num_gpus > 1) data_slice_->local_nodes = local_nodes[gpu];
@@ -427,9 +435,11 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             //util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_rank_curr,
             //    (Value)1.0/nodes, nodes);
             data_slices[gpu] -> init_value = NORMALIZED ? 
-                (1.0 / this->org_graph->nodes) : (1.0 - delta);
+                (scaled ? 1.0 : (1.0 / (Value)(this->org_graph->nodes))) 
+                : (1.0 - delta);
             data_slices[gpu] -> reset_value = NORMALIZED ?
-                ((1.0 - delta) / this->org_graph->nodes) : (1.0 - delta);
+                (scaled ? (1.0 - delta) : ((1.0 - delta) / (Value)(this->org_graph->nodes))) 
+                : (1.0 - delta);
             util::MemsetKernel<<<128, 128>>>(
                 data_slices[gpu]->rank_next.GetPointer(util::DEVICE), 
                 NORMALIZED ? (Value) 0.0 : (Value)(1.0 - delta), nodes);

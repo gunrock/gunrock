@@ -38,21 +38,6 @@ template <typename Problem, bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK> cla
 /*
  * @brief Make_Queue function.
  *
- * @tparam DataSlice
- *
- * @param[in] data_slice Data slice we process on.
- */
-template <typename DataSlice>
-__global__ void Print_Const (
-    const DataSlice* const data_slice)
-{
-    printf("delta = %f, threshold = %f, src_node = %d\n",
-            data_slice->delta, data_slice->threshold, data_slice->src_node);
-}
-
-/*
- * @brief Make_Queue function.
- *
  * @tparam VertexId
  * @tparam SizeT
  *
@@ -169,6 +154,54 @@ __global__ void Clear_Zero_R0D (
     }
 }
 
+template <
+    typename VertexId,
+    typename SizeT,
+    typename Value>
+__global__ void Selective_Reset_PR(
+    const SizeT        num_elements,
+    const VertexId* const keys,
+    const Value        reset_value,
+    const SizeT* const markers,
+    const Value* const rank_next,
+          Value*       rank_curr)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+    while (x < num_elements)
+    {
+        VertexId key = keys[x];
+        if (markers[key] == 0)
+            rank_curr[key] = reset_value;
+        else
+            rank_curr[key] = rank_next[key];
+        x += STRIDE;
+    }
+}
+
+template <
+    typename VertexId,
+    typename SizeT,
+    typename Value>
+__global__ void Selective_Reset_PR2(
+    const SizeT        num_elements,
+    const VertexId* const keys,
+    const SizeT* const markers,
+    const Value* const rank_next,
+          Value*       rank_curr)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+    while (x < num_elements)
+    {
+        VertexId key = keys[x];
+        if (markers[key] == 1)
+            rank_curr[key] = rank_next[key];
+        x += STRIDE;
+    }
+}
+
+
 /*
  * @brief Expand incoming function.
  *
@@ -193,7 +226,8 @@ __global__ void Expand_Incoming_PR (
     const SizeT           num_elements,
     const VertexId* const keys_in,
     const size_t          array_size,
-          char*           array)
+          char*           array,
+          SizeT*          markers)
 {
     extern __shared__ char s_array[];
     const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
@@ -215,9 +249,14 @@ __global__ void Expand_Incoming_PR (
     while (x < num_elements)
     {
         VertexId key = keys_in[x];
-        Value old_value=atomicAdd(s_value__associate_org[0] + key, s_value__associate_in[0][x]);
-        if (TO_TRACK)
-        if (to_track(key)) printf("rank[%d] = %f + %f \n", key, old_value, s_value__associate_in[0][x]);
+        Value add_value = s_value__associate_in[0][x];
+        //if (isfinite(add_value))
+        //{
+        Value old_value = atomicAdd(s_value__associate_org[0] + key, add_value);
+        markers[key] = 1;
+            //if (to_track(key)) printf("rank[%d] = %.8le + %.8le = %.8le\n", 
+            //    key, old_value, s_value__associate_in[0][x], old_value + s_value__associate_in[0][x]);
+        //}
         x+=STRIDE;
     }
 }
@@ -822,26 +861,26 @@ static void Make_Output(
 }; // end R0DIteration
 
 template <
-typename AdvanceKernelPolicy,
-typename FilterKernelPolicy,
-typename Enactor>
+    typename AdvanceKernelPolicy,
+    typename FilterKernelPolicy,
+    typename Enactor>
 struct PRIteration : public IterationBase <
-AdvanceKernelPolicy, FilterKernelPolicy, Enactor,
-false, //HAS_SUBQ
-true,  //HAS_FULLQ
-false, //BACKWARD
-true,  //FORWARD
-false> //UPDATE_PREDECESSORS
+    AdvanceKernelPolicy, FilterKernelPolicy, Enactor,
+    false, //HAS_SUBQ
+    true,  //HAS_FULLQ
+    false, //BACKWARD
+    true,  //FORWARD
+    false> //UPDATE_PREDECESSORS
 {
-public:
-typedef typename Enactor::SizeT      SizeT     ;
-typedef typename Enactor::Value      Value     ;
-typedef typename Enactor::VertexId   VertexId  ;
-typedef typename Enactor::Problem    Problem   ;
-typedef typename Problem::DataSlice  DataSlice ;
-typedef GraphSlice     <SizeT, VertexId, Value> GraphSlice;
-typedef PRFunctor      <VertexId, SizeT, Value, Problem> PrFunctor;
-typedef PRMarkerFunctor<VertexId, SizeT, Value, Problem> PrMarkerFunctor;
+    public:
+    typedef typename Enactor::SizeT      SizeT     ;
+    typedef typename Enactor::Value      Value     ;
+    typedef typename Enactor::VertexId   VertexId  ;
+    typedef typename Enactor::Problem    Problem   ;
+    typedef typename Problem::DataSlice  DataSlice ;
+    typedef GraphSlice     <SizeT, VertexId, Value> GraphSlice;
+    typedef PRFunctor      <VertexId, SizeT, Value, Problem> PrFunctor;
+    typedef PRMarkerFunctor<VertexId, SizeT, Value, Problem> PrMarkerFunctor;
 
 /*
  * @brief FullQueue_Core function.
@@ -916,11 +955,27 @@ static void FullQueue_Core(
         //num_elements = queue_length;
 
         //swap rank_curr and rank_next
-        util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
-            data_slice->rank_curr.GetPointer(util::DEVICE),
-            data_slice->rank_next.GetPointer(util::DEVICE),
-            graph_slice->nodes);
-        util::MemsetKernel<<<128, 128, 0, stream>>>(
+        //util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
+        //    data_slice->rank_curr.GetPointer(util::DEVICE),
+        //    data_slice->rank_next.GetPointer(util::DEVICE),
+        //    graph_slice->nodes);
+        /*if (enactor_stats -> iteration == 1)
+            Selective_Reset_PR <<<256, 256, 0, stream>>>(
+                data_slice -> edge_map_queue_len,
+                frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
+                data_slice -> reset_value,
+                data_slice -> markers  .GetPointer(util::DEVICE),
+                data_slice -> rank_next.GetPointer(util::DEVICE),
+                data_slice -> rank_curr.GetPointer(util::DEVICE));
+        else
+            Selective_Reset_PR2<<<256, 256, 0, stream>>>(
+                data_slice -> edge_map_queue_len,
+                frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
+                data_slice -> markers  .GetPointer(util::DEVICE),
+                data_slice -> rank_next.GetPointer(util::DEVICE),
+                data_slice -> rank_curr.GetPointer(util::DEVICE));*/
+ 
+        util::MemsetKernel<<<256, 256, 0, stream>>>(
             data_slice->rank_next.GetPointer(util::DEVICE),
             (Value)0.0, graph_slice->nodes);
 
@@ -983,16 +1038,59 @@ static void FullQueue_Core(
         false,
         false);
 
-    if (enactor_stats->retval = work_progress->GetQueueLength(
-        frontier_attribute->queue_index+1, 
-        frontier_attribute->queue_length, 
-        false, stream, true)) 
-        return;
+    //if (enactor_stats->retval = work_progress->GetQueueLength(
+    //    frontier_attribute->queue_index+1, 
+    //    frontier_attribute->queue_length, 
+    //    false, stream, true)) 
+    //    return;
+    //enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
+    enactor_stats -> AccumulateEdges(
+        work_progress -> GetQueueLengthPointer<unsigned int, SizeT>(
+            frontier_attribute -> queue_index + 1), stream);
+    frontier_attribute -> queue_length = data_slice->edge_map_queue_len;
+
+    if (enactor_stats -> iteration == 0)
+    {
+        util::MemsetKernel<<<256, 256, 0, stream>>>(
+            data_slice->markers.GetPointer(util::DEVICE), 
+            (SizeT)0, graph_slice->nodes);
+        //util::cpu_mt::PrintGPUArray("keys", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, -1, stream);
+        //util::cpu_mt::PrintGPUArray("row_offsets", graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration, -1, stream);
+        //printf("Advance start.\n");fflush(stdout);
+        frontier_attribute -> queue_reset = true;
+        // Edge Map
+        gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, PrMarkerFunctor>(
+            //d_done,
+            enactor_stats[0],
+            frontier_attribute[0],
+            d_data_slice,
+            (VertexId*)NULL,
+            (bool*    )NULL,
+            (bool*    )NULL,
+            scanned_edges->GetPointer(util::DEVICE),
+            frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_in_queue
+            NULL, //frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+            (VertexId*)NULL,
+            (VertexId*)NULL,
+            graph_slice->row_offsets   .GetPointer(util::DEVICE),
+            graph_slice->column_indices.GetPointer(util::DEVICE),
+            (SizeT*   )NULL,
+            (VertexId*)NULL,
+            graph_slice->nodes,  //graph_slice->frontier_elements[frontier_attribute.selector],  // max_in_queue
+            graph_slice->edges,  //graph_slice->frontier_elements[frontier_attribute.selector^1],// max_out_queue
+            work_progress[0],
+            context[0],
+            stream,
+            gunrock::oprtr::advance::V2V,
+            false,
+            false,
+            true);
+        //printf("Advance end.\n");fflush(stdout);
+        //util::cpu_mt::PrintGPUArray("markers", data_slice[0]->markers.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, -1, stream);
+    }
     if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream),
         "cudaStreamSynchronize failed", __FILE__, __LINE__)) 
         return;
-    enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
-    frontier_attribute->queue_length = data_slice->edge_map_queue_len;
     //printf("Advance end.\n");fflush(stdout);
 
     //if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
@@ -1111,7 +1209,8 @@ static void Expand_Incoming(
         num_elements,
         keys_in,
         array_size,
-        array);
+        array,
+        data_slice -> markers.GetPointer(util::DEVICE));
     num_elements = 0;
 }
 
@@ -1183,44 +1282,6 @@ static void Make_Output(
 
     if (num_gpus > 1 && enactor_stats->iteration==0)
     {
-        util::MemsetKernel<<<grid_size, block_size, 0, stream>>>(
-            data_slice[0]->markers.GetPointer(util::DEVICE), 
-            (SizeT)0, graph_slice->nodes);
-        frontier_attribute -> queue_length = data_slice[0]->edge_map_queue_len;
-        //util::cpu_mt::PrintGPUArray("keys", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, -1, stream);
-        //util::cpu_mt::PrintGPUArray("row_offsets", graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration, -1, stream);
-        //printf("Advance start.\n");fflush(stdout);
-        frontier_attribute -> queue_reset = true;
-        // Edge Map
-        gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, PrMarkerFunctor>(
-            //d_done,
-            enactor_stats[0],
-            frontier_attribute[0],
-            data_slice->GetPointer(util::DEVICE),
-            (VertexId*)NULL,
-            (bool*    )NULL,
-            (bool*    )NULL,
-            scanned_edges->GetPointer(util::DEVICE),
-            frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_in_queue
-            NULL, //frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
-            (VertexId*)NULL,
-            (VertexId*)NULL,
-            graph_slice->row_offsets   .GetPointer(util::DEVICE),
-            graph_slice->column_indices.GetPointer(util::DEVICE),
-            (SizeT*   )NULL,
-            (VertexId*)NULL,
-            graph_slice->nodes,  //graph_slice->frontier_elements[frontier_attribute.selector],  // max_in_queue
-            graph_slice->edges,  //graph_slice->frontier_elements[frontier_attribute.selector^1],// max_out_queue
-            work_progress[0],
-            context[0],
-            stream,
-            gunrock::oprtr::advance::V2V,
-            false,
-            false,
-            true);
-        //printf("Advance end.\n");fflush(stdout);
-        //util::cpu_mt::PrintGPUArray("markers", data_slice[0]->markers.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, -1, stream);
-
         SizeT temp_length = data_slice[0]->out_length[0];
         for (peer_ = 0; peer_<num_gpus; peer_++)
         {
@@ -1358,6 +1419,7 @@ static CUT_THREADPROC PRThread(
     do {
         // printf("PRThread entered\n");fflush(stdout);
         if (enactor_stats[0].retval = util::SetDevice(gpu_idx)) break;
+        int *markers = new int [num_gpus];
         thread_data->stats = 1;
         while (thread_data->stats !=2) sleep(0);
         thread_data->stats = 3;
@@ -1401,11 +1463,14 @@ static CUT_THREADPROC PRThread(
         {
             bool over_sized = false;
             if (enactor_stats->retval = Check_Size<PrEnactor::SIZE_CHECK, SizeT, Value>(
-                "values_out", data_slice->local_nodes, &data_slice->value__associate_out[1][0], over_sized, thread_num, enactor_stats->iteration, -1)) break;
+                "values_out", data_slice->local_nodes, &data_slice->value__associate_out[1][0], 
+                over_sized, thread_num, enactor_stats->iteration, -1)) break;
             if (enactor_stats->retval = Check_Size<PrEnactor::SIZE_CHECK, SizeT, VertexId>(
-                "keys_out", data_slice->local_nodes, &data_slice->keys_out[1], over_sized, thread_num, enactor_stats->iteration, -1)) break;
+                "keys_out", data_slice->local_nodes, &data_slice->keys_out[1], 
+                 over_sized, thread_num, enactor_stats->iteration, -1)) break;
             if (enactor_stats->retval = Check_Size<PrEnactor::SIZE_CHECK, SizeT, VertexId>(
-                "keys_out", data_slice->local_nodes, &data_slice->keys_out[0], over_sized, thread_num, enactor_stats->iteration, -1)) break;
+                "keys_out", data_slice->local_nodes, &data_slice->keys_out[0],
+                over_sized, thread_num, enactor_stats->iteration, -1)) break;
             Assign_Values_PR <VertexId, SizeT, Value>
                 <<<128, 128, 0, data_slice->streams[0]>>> (
                 data_slice->local_nodes,
@@ -1433,7 +1498,6 @@ static CUT_THREADPROC PRThread(
             //util::cpu_mt::PrintGPUArray("values_out", data_slice->value__associate_out[1][0].GetPointer(util::DEVICE), data_slice->local_nodes, thread_num, enactor_stats->iteration, -1, data_slice->streams[0]);
         } else {
             int counter = 0;
-            int *markers = new int [num_gpus];
             for (int peer=0; peer<num_gpus; peer++) markers[peer] = 0;
             while (counter < num_gpus-1)
             {
@@ -1478,6 +1542,14 @@ static CUT_THREADPROC PRThread(
                 false, graph_slice->nodes,
                 data_slice->rank_curr.GetPointer(util::DEVICE),
                 data_slice->node_ids.GetPointer(util::DEVICE));
+
+            if (problem -> scaled)
+            {
+                util::MemsetScaleKernel<<<128, 128>>>(
+                    data_slice->rank_curr.GetPointer(util::DEVICE),
+                    (Value) (1.0 / (Value) (problem->org_graph->nodes)),
+                    graph_slice -> nodes);
+            }
         }
 
     } while(0);

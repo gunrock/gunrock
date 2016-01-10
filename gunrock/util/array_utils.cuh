@@ -191,14 +191,14 @@ public:
             if ((setted    & (~(target    | DISK)) == NONE) &&
                 (allocated & (~(allocated | DISK)) == NONE)) this->size=size;
 
-            if (ARRAY_DEBUG)
+            /*if (ARRAY_DEBUG)
             {
                 printf("%s\t allocating on DEVICE, length =\t %lld,"
                        "size =\t %lld bytes, pointer =\t %p\n",
                        name.c_str(), (long long) size,
                        (long long) size*sizeof(Value), d_pointer);
                 fflush(stdout);
-            }
+            }*/
             if (size!=0) {
                 retval = GRError(
                     cudaMalloc((void**)&(d_pointer), sizeof(Value) * size),
@@ -206,6 +206,14 @@ public:
                 if (retval) return retval;
             }
             allocated = allocated | DEVICE;
+            if (ARRAY_DEBUG)
+            {
+                printf("%s\t allocated on DEVICE, length =\t %lld, "
+                    "size =\t %lld bytes, pointer =\t %p\n",
+                    name.c_str(), (long long) size, 
+                    (long long) size*sizeof(Value), d_pointer);
+                fflush(stdout);
+            }
         }
         //}
         this->size=size;

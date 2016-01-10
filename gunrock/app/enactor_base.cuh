@@ -230,6 +230,7 @@ public:
         info["delta_factor"]       = 16;     // default delta-factor for SSSP
         info["delta"]              = 0.85f;  // default delta for PageRank
         info["error"]              = 0.01f;  // default error for PageRank
+        info["scaled"]             = false;  // default scaled for PageRank
         info["alpha"]              = 6.0f;   // default alpha for DOBFS
         info["beta"]               = 6.0f;   // default beta for DOBFS
         info["top_nodes"]          = 0;      // default number of nodes for top-k primitive
@@ -280,6 +281,7 @@ public:
         info["idempotent"] =  args.CheckCmdLineFlag("idempotence");       // BFS
         info["mark_predecessors"] =  args.CheckCmdLineFlag("mark-pred");  // BFS
         info["normalized"] =  args.CheckCmdLineFlag("normalized"); // PR
+        info["scaled"    ] =  args.CheckCmdLineFlag("scaled"    ); // PR
 
         info["json"] = args.CheckCmdLineFlag("json");
         if (args.CheckCmdLineFlag("jsonfile"))

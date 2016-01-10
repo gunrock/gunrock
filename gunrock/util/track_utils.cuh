@@ -20,14 +20,21 @@ namespace gunrock {
 namespace util {
 
 #define TO_TRACK false
-#define NUM_TO_TRACK 10
+#define NUM_TO_TRACK 4
 
 template <typename VertexId>
-static __device__ __host__ bool to_track(VertexId node) {
-    const int num_to_track = 4;
-    const VertexId node_to_track[] = {0, 1, 2, 3}; 
-    for (int i = 0; i < num_to_track; i++)
-        if (node == node_to_track[i]) return true;
+static __device__ __host__ __inline__ bool to_track(VertexId node) {
+    const VertexId node_to_track[] = {
+        81561706,
+        48459810, 
+        18876984,
+        1902};
+    if (!TO_TRACK) return false;
+    else { 
+        #pragma unroll
+        for (int i = 0; i < NUM_TO_TRACK; i++)
+            if (node == node_to_track[i]) return true;
+    }
     return false;
 }
 
@@ -86,7 +93,7 @@ static __device__ __host__ __inline__ bool to_track(
 
     // for BFS, market /data/gunrock_dataset/large/soc-LiveJournal1/soc-LiveJournal1.mtx --src=largestdegree --traversal-mode=1 --undirected --device=0,1,2,3 --queue-sizing=8.0 --in-sizing=0.5 --idempotence --v --partition-seed=1452208768
     
-    const VertexId node_to_track[NUM_TO_TRACK][5] = {
+    const VertexId node_to_track[][5] = {
         {  5487,    1370, 1239278, 1212000, 1238478},
         {  5503,    1377, 1531518, 1236984, 1238502},
         {  5520,    1381, 1309968, 1236988, 1482071},
