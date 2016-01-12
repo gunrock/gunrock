@@ -26,6 +26,7 @@
 #include <gunrock/oprtr/intersection/cta.cuh>
 
 #include <gunrock/oprtr/intersection/kernel_policy.cuh>
+#include <cub/cub.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -70,10 +71,7 @@ struct Dispatch
                             SizeT       *&d_row_offsets,
                             VertexId    *&d_src_node_ids,
                             VertexId    *&d_dst_node_ids,
-                            SizeT       *&d_src_nl_sizes,
-                            SizeT       *&d_dst_nl_sizes,
-                            SizeT       &fine_counts,
-                            SizeT       &coarse_counts,
+                            SizeT       *&d_flags,
                             SizeT       &input_length,
                             SizeT       &num_vertex,
                             SizeT       &num_edge)
@@ -158,19 +156,24 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     // coarse_counts (for balanced-path per-block method)
     static __device__ __forceinline__ void Inspect(
                             SizeT       *&d_row_offsets,
-                            VertexId    *&d_column_indices,
                             VertexId    *&d_src_node_ids,
                             VertexId    *&d_dst_node_ids,
-                            SizeT       *&d_src_nl_sizes,
-                            SizeT       *&d_dst_nl_sizes,
-                            SizeT       &fine_counts,
-                            SizeT       &coarse_counts,
+                            SizeT       *&d_flags,
                             SizeT       &input_length,
                             SizeT       &num_vertex,
                             SizeT       &num_edge)
     {
         // Compute d_src_nl_sizes and d_dst_nl_sizes;
-        // Compute fine_counts and coarse_counts
+        VertexId idx = threadIdx.x + blockIdx.x * blockDim.x;
+        if (idx >= input_length) return;
+        SizeT src_nl_size = GetNeighborListLength(d_row_offsets, 
+                                                  d_src_node_ids[idx], 
+                                                  num_vertex, num_edge);
+        SizeT dst_nl_size = GetNeighborListLength(d_row_offsets, 
+                                                  d_dst_node_ids[idx], 
+                                                  num_vertex, num_edge);
+        d_flags[idx] = (src_nl_size > KernelPolicy::NL_THRESDHOLD
+                     && dst_nl_size > KernelPolicy::NL_THRESHOLD) ? 1 : 0;
     }
 
     static __device__ void IntersectTwoSmallNL(
@@ -234,42 +237,35 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @tparam Functor Functor type for the specific problem type.
  *
  * @param[in] d_row_offset      Device pointer of SizeT to the row offsets queue
- * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
- * @param[in] d_src_node_ids    Device pointer of VertexId to the incoming frontier queue (source node ids)
- * @param[in] d_dst_node_ids    Device pointer of VertexId to the incoming frontier queue (destination node ids)
- * @param[out] d_src_nl_sizes   Device pointer of SizeT to the output neighbor list (nl) size for src node ids
- * @param[out] d_dst_nl_sizes   Device pointer of SizeT to the output neighbor list (nl) size for dst node ids
- * @param[out] fine_counts      Counts of neighbor list pairs we will use per-thread intersect methods
- * @param[out] coarse_counts    Counts of neibhbor list pairs we will use per-block intersect methods
- * @param[in] input_queue_len   Length of the incoming frontier queues (d_src_node_ids and d_dst_node_ids should have the same length)
- * @param[in] max_vertices      Maximum number of elements we can place into the incoming frontier
- * @param[in] max_edges         Maximum number of elements we can place into the outgoing frontier
+ * @param[in] d_src_node_ids    Device pointer of VertexId to the incoming frontier
+ *                              queue (source node ids)
+ * @param[in] d_dst_node_ids    Device pointer of VertexId to the incoming frontier 
+ *                              queue (destination node ids)
+ * @param[out] d_flags          Device pointer of SizeT to the partition flag queue
+ * @param[in] input_queue_len   Length of the incoming frontier queues(d_src_node_ids 
+ *                              and d_dst_node_ids should have the same length)
+ * @param[in] max_vertices      Maximum number of elements we can place into the
+ *                              incoming frontier
+ * @param[in] max_edges         Maximum number of elements we can place into the 
+ *                              outgoing frontier
  */
     template <typename KernelPolicy, typename ProblemData, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
     __global__
 void Inspect(
         typename KernelPolicy::SizeT            *d_row_offsets,
-        typename KernelPolicy::VertexId         *d_column_indices,
         typename KernelPolicy::VertexId         *d_src_node_ids,
         typename KernelPolicy::VertexId         *d_dst_node_ids,
-        typename KernelPolicy::SizeT            *d_src_nl_sizes,
-        typename KernelPolicy::SizeT            *d_dst_nl_sizes,
-        typename KernelPolicy::SizeT            &fine_counts,
-        typename KernelPolicy::SizeT            &coarse_counts,
+        typename KernelPolicy::SizeT            *d_flags,
         typename KernelPolicy::SizeT            input_queue_len,
         typename KernelPolicy::SizeT            max_vertices,
         typename KernelPolicy::SizeT            max_edges)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::Inspect(
             d_row_offsets,
-            d_column_indices,
             d_src_node_ids,
             d_dst_node_ids,
-            d_src_nl_sizes,
-            d_dst_nl_sizes,
-            fine_counts,
-            coarse_counts,
+            d_flags,
             input_queue_len,
             max_vertices,
             max_edges);
@@ -295,7 +291,7 @@ void Inspect(
  *
  */
 
-  template<typename KernelPolicy, typeame ProblemData, typename Functor>
+  template<typename KernelPolicy, typename ProblemData, typename Functor>
   __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
   __global__
   void IntersectTwoSmallNL(
@@ -320,7 +316,7 @@ void Inspect(
             d_dst_nl_sizes,
             problem,
             d_output_counts,
-            input__length,
+            input_length,
             num_vertex,
             num_edge);
 }
@@ -345,7 +341,7 @@ void Inspect(
  *
  */
 
-  template<typename KernelPolicy, typeame ProblemData, typename Functor>
+  template<typename KernelPolicy, typename ProblemData, typename Functor>
   __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
   __global__
   void IntersectOneSmallNL(
@@ -370,7 +366,7 @@ void Inspect(
             d_dst_nl_sizes,
             problem,
             d_output_counts,
-            input__length,
+            input_length,
             num_vertex,
             num_edge);
 }
@@ -395,7 +391,7 @@ void Inspect(
  *
  */
 
-  template<typename KernelPolicy, typeame ProblemData, typename Functor>
+  template<typename KernelPolicy, typename ProblemData, typename Functor>
   __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
   __global__
   void IntersectTwoLargeNL(
@@ -420,7 +416,7 @@ void Inspect(
             d_dst_nl_sizes,
             problem,
             d_output_counts,
-            input__length,
+            input_length,
             num_vertex,
             num_edge);
 }
@@ -436,8 +432,9 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         typename KernelPolicy::VertexId         *d_column_indices,
         typename KernelPolicy::VertexId         *d_src_node_ids,
         typename KernelPolicy::VertexId         *d_dst_node_ids,
-        typename KernelPolicy::SizeT            *d_src_nl_sizes,
-        typename KernelPolicy::SizeT            *d_dst_nl_sizes,
+        typename KernelPolicy::VertexId         *d_src_node_ids_partitioned,
+        typename KernelPolicy::VertexId         *d_dst_node_ids_partitioned,
+        typename KernelPolicy::SizeT            *d_flags,
         typename KernelPolicy::SizeT            *d_output_counts,
         typename KernelPolicy::SizeT            input_length,
         typename KernelPolicy::SizeT            max_vertex,
@@ -446,6 +443,62 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         CudaContext                             &context,
         cudaStream_t                            stream)
 {
+
+    typedef typename KernelPolicy::SizeT        SizeT;
+    typedef typename KernelPolicy::VertexId     VertexId;
+    typedef typename KernelPolicy::Value        Value;
+
+    // Inspect 
+    size_t block_num = (input_length + KernelPolicy::THREADS - 1)
+                        >> KernelPolicy::LOG_THREADS;
+    
+    Inspect<KernelPolicy, ProblemData, Functor>
+    <<<block_num, KernelPolicy::THREADS>>>(
+            d_row_offsets,
+            d_src_node_ids,
+            d_dst_node_ids,
+            d_flags,
+            input_length,
+            max_vertex,
+            max_edge);
+
+    // Partition d_src_node_ids and d_dst_node_ids. Compute coarse_counts and
+    // fine_counts.
+    void *d_temp_storage = NULL;
+    size_t temp_storage_bytes = 0;
+    SizeT coarse_counts = 0;
+    cub::DevicePartition::Flagged(d_temp_storage,
+                                  temp_storage_bytes,
+                                  d_src_node_ids,
+                                  d_flags, 
+                                  d_src_node_ids_partitioned, 
+                                  coarse_counts, 
+                                  input_length);
+    cudaMalloc(&d_temp_storage, temp_storage_bytes);
+
+    cub::DevicePartition::Flagged(d_temp_storage, 
+                                  temp_storage_bytes, 
+                                  d_src_node_ids,
+                                  d_flags, 
+                                  d_src_node_ids_partitioned, 
+                                  coarse_counts, 
+                                  input_length);
+
+    cub::DevicePartition::Flagged(d_temp_storage, 
+                                  temp_storage_bytes, 
+                                  d_src_node_ids,
+                                  d_flags, 
+                                  d_src_node_ids_partitioned, 
+                                  coarse_counts, 
+                                  input_length);
+
+    SizeT fine_counts = input_length - coarse_counts;
+
+    if (coarse_counts > 0) {
+        // Use IntersectTwoLargeNL
+    }
+    // Use IntersectOneSmallNL
+    // Use IntersectTwoSmallNL
 }
 
 }  // intersection

@@ -92,8 +92,7 @@ struct KernelPolicy
      */
     struct SmemStorage
     {
-        enum {
-            // 
+        enum { 
             MAX_SCRATCH_BYTES_PER_CTA       = GR_SMEM_BYTES(CUDA_ARCH)/MIN_CTA_OCCUPANCY,
 
             SCRATCH_ELEMENT_SIZE            = sizeof(SizeT),
