@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <thread>
 #include <gunrock/util/multithreading.cuh>
 #include <gunrock/util/multithread_utils.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
@@ -468,7 +469,11 @@ static CUT_THREADPROC BFSThread(
     do {
         if (enactor_stats[0].retval = util::SetDevice(gpu_idx)) break;
         thread_data->stats = 1;
-        while (thread_data->stats != 2) sleep(0);
+        while (thread_data->stats != 2) 
+        {
+            //sleep(0);
+            std::this_thread::yield();
+        }
         thread_data->stats=3;
 
         for (int peer=0;peer<num_gpus;peer++)
@@ -696,16 +701,28 @@ public:
 
             for (int gpu=0; gpu< this->num_gpus; gpu++)
             {
-                while (thread_slices[gpu].stats!=1) sleep(0);
+                while (thread_slices[gpu].stats!=1) 
+                {
+                    //sleep(0);
+                    std::this_thread::yield();
+                }
                 thread_slices[gpu].stats=2;
             }
             for (int gpu=0; gpu< this->num_gpus; gpu++)
             {
-                while (thread_slices[gpu].stats!=4) sleep(0);
+                while (thread_slices[gpu].stats!=4) 
+                {
+                    //sleep(0);
+                    std::this_thread::yield();
+                }
             }
 
             for (int gpu=0;gpu<this->num_gpus;gpu++)
-            if (this->enactor_stats[gpu].retval!=cudaSuccess) {retval=this->enactor_stats[gpu].retval;break;}
+            if (this->enactor_stats[gpu].retval!=cudaSuccess) 
+            {
+                retval=this->enactor_stats[gpu].retval;
+                break;
+            }
         } while(0);
 
         if (DEBUG) printf("\nGPU BFS Done.\n");

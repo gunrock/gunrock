@@ -251,14 +251,19 @@ public:
     void InitBase(std::string algorithm_name, util::CommandLineArgs &args)
     {
         // put basic information into info
+        printf("InitBase 0\n");fflush(stdout);
         info["engine"] = "Gunrock";
         info["command_line"] = json_spirit::mValue(args.GetEntireCommandLine());
+        printf("InitBase 1\n");fflush(stdout);
         util::Sysinfo sysinfo;  // get machine / OS / user / time info
         info["sysinfo"] = sysinfo.getSysinfo();
+        printf("InitBase 2\n");fflush(stdout);
         util::Gpuinfo gpuinfo;
         info["gpuinfo"] = gpuinfo.getGpuinfo();
+        printf("InitBase 3\n");fflush(stdout);
         util::Userinfo userinfo;
         info["userinfo"] = userinfo.getUserinfo();
+        printf("InitBase 4\n");fflush(stdout);
 #if BOOST_COMP_CLANG
         info["compiler"] = BOOST_COMP_CLANG_NAME;
         info["compiler_version"] = BOOST_COMP_CLANG_DETECTION;
@@ -432,6 +437,7 @@ public:
             args.GetCmdLineArgument("output_filename", output_filename);
             info["output_filename"] = output_filename;
         }
+        printf("InitBase 10\n");fflush(stdout);
 
         // parse device count and device list
         info["device_list"] = GetDeviceList(args);
@@ -490,6 +496,7 @@ public:
         Csr<VertexId, Value, SizeT> &csr_ref)
     {
         // load or generate input graph
+        printf("loading graph\n");fflush(stdout);
         if (info["edge_value"].get_bool())
         {
             LoadGraph<true, false>(args, csr_ref);  // load graph with weighs
@@ -499,6 +506,7 @@ public:
             LoadGraph<false, false>(args, csr_ref);  // load without weights
         }
         csr_ptr = &csr_ref;  // set graph pointer
+        printf("load graph done\n");fflush(stdout);
         InitBase(algorithm_name, args);
     }
 

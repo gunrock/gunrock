@@ -19,8 +19,8 @@
 namespace gunrock {
 namespace util {
 
-#define TO_TRACK false
-#define NUM_TO_TRACK 4
+#define TO_TRACK true
+#define NUM_TO_TRACK 0
 
 template <typename VertexId>
 static __device__ __host__ __inline__ bool to_track(VertexId node) {
