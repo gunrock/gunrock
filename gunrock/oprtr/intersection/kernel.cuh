@@ -83,9 +83,8 @@ struct Dispatch
                             VertexId    *&d_column_indices,
                             VertexId    *&d_src_node_ids,
                             VertexId    *&d_dst_node_ids,
-                            SizeT       *&d_src_nl_sizes,
-                            SizeT       *&d_dst_nl_sizes,
                             DataSlice   *&problem,
+                            SizeT       *&d_output_counts,
                             SizeT       &input_length,
                             SizeT       &num_vertex,
                             SizeT       &num_edge)
@@ -181,8 +180,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             VertexId    *&d_column_indices,
                             VertexId    *&d_src_node_ids,
                             VertexId    *&d_dst_node_ids,
-                            SizeT       *&d_src_nl_sizes,
-                            SizeT       *&d_dst_nl_sizes,
                             DataSlice   *&problem,
                             SizeT       *&d_output_counts,
                             SizeT       &input_length,
@@ -191,6 +188,33 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     {
         // each thread process NV edge pairs
         // Each block get a block-wise intersect count
+        VertexId idx = threadIdx.x + blockIdx.x * blockDim.x;
+        SizeT count = 0;
+
+        typedef cub::BlockReduce<SizeT, KernelPolicy::THREADS> BlockReduceT;
+        __shared__ typename BlockReduceT::TempStorage temp_storage;
+
+        for (;idx < input_length; idx += KernelPolicy::THREADS) {
+            // get nls start and end index for two ids
+            SizeT src_it = d_row_offsets[d_src_node_ids[idx]];
+            SizeT src_end = d_row_offsets[d_src_node_ids[idx]+1];
+            SizeT dst_it = d_row_offsets[d_dst_node_ids[idx]];
+            SizeT dst_end = d_row_offsets[d_dst_node_ids[idx]+1];
+            VertexId src_edge = d_column_indices[src_it];
+            VertexId dst_edge = d_column_indices[dst_it];
+            while (src_it < src_end && dst_it < dst_end) {
+                VertexId diff = src_edge - dst_edge;
+                src_edge = (diff <= 0) ? d_column_indices[++src_it] : src_edge;
+                dst_edge = (diff >= 0) ? d_column_indices[++dst_it] : dst_edge;
+                count = (diff == 0) ? count+1 : count;
+            }
+        }
+
+        SizeT aggregate = BlockReduceT(temp_storage).Sum(count);
+        if (threadIdx.x == 0)
+        {
+            d_output_counts[blockIdx.x] = aggregate;
+        } 
     }
 
     static __device__ void IntersectOneSmallNL(
@@ -198,8 +222,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             VertexId    *&d_column_indices,
                             VertexId    *&d_src_node_ids,
                             VertexId    *&d_dst_node_ids,
-                            SizeT       *&d_src_nl_sizes,
-                            SizeT       *&d_dst_nl_sizes,
                             DataSlice   *&problem,
                             SizeT       *&d_output_counts,
                             SizeT       &input_length,
@@ -282,9 +304,8 @@ void Inspect(
  * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
  * @param[in] d_src_node_ids    Device pointer of VertexId to the incoming frontier queue (source node ids)
  * @param[in] d_dst_node_ids    Device pointer of VertexId to the incoming frontier queue (destination node ids)
- * @param[in] d_src_nl_sizes    Device pointer of SizeT to the output neighbor list (nl) size for src node ids
- * @param[in] d_dst_nl_sizes    Device pointer of SizeT to the output neighbor list (nl) size for dst node ids
  * @param[in] problem           Device pointer to the problem object
+ * @param[out] d_output_counts  Device pointer to the output counts array
  * @param[in] input_length      Length of the incoming frontier queues (d_src_node_ids and d_dst_node_ids should have the same length)
  * @param[in] num_vertex        Maximum number of elements we can place into the incoming frontier
  * @param[in] num_edge          Maximum number of elements we can place into the outgoing frontier
@@ -299,8 +320,6 @@ void Inspect(
             typename KernelPolicy::VertexId     *d_column_indices,
             typename KernelPolicy::VertexId     *d_src_node_ids,
             typename KernelPolicy::VertexId     *d_dst_node_ids,
-            typename KernelPolicy::SizeT        *d_src_nl_sizes,
-            typename KernelPolicy::SizeT        *d_dst_nl_sizes,
             typename ProblemData::DataSlice     *problem,
             typename KernelPolicy::SizeT        *d_output_counts,
             typename KernelPolicy::SizeT        input_length,
@@ -312,8 +331,6 @@ void Inspect(
             d_column_indices,
             d_src_node_ids,
             d_dst_node_ids,
-            d_src_nl_sizes,
-            d_dst_nl_sizes,
             problem,
             d_output_counts,
             input_length,
@@ -496,9 +513,24 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
 
     if (coarse_counts > 0) {
         // Use IntersectTwoLargeNL
-    }
+    } 
+    block_num = (fine_counts + KernelPolicy::THREADS - 1)
+                        >> KernelPolicy::LOG_THREADS;
+    
     // Use IntersectOneSmallNL
-    // Use IntersectTwoSmallNL
+
+    // Use IntersectTwoSmallNL 
+    IntersectTwoSmallNL<KernelPolicy, ProblemData, Functor>
+    <<<block_num, KernelPolicy::THREADS>>>(
+            d_row_offsets,
+            d_column_indices,
+            &d_src_node_ids_partitioned[coarse_counts],
+            &d_dst_node_ids_partitioned[coarse_counts],
+            data_slice,
+            &d_output_counts[2*KernelPolicy::BLOCKS],
+            fine_counts,
+            max_vertex,
+            max_edge);
 }
 
 }  // intersection
