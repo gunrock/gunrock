@@ -75,17 +75,14 @@ public:
         json_spirit::mObject info;
         cudaDeviceProp devProps;
 
-        printf("getGpuinfo 0\n");fflush(stdout);
         int deviceCount;
         cudaGetDeviceCount(&deviceCount);
-        printf("getGpuinfo 1\n");fflush(stdout);
         if (deviceCount == 0)   /* no valid devices */
         {
             return info;        /* empty */
         }
         int dev = 0;            /* currently assumes GPU 0 */
         cudaGetDeviceProperties(&devProps, dev);
-        printf("getGpuinfo 2\n");fflush(stdout);
         info["name"] = devProps.name;
         info["total_global_mem"] = int64_t(devProps.totalGlobalMem);
         info["major"] = devProps.major;
@@ -94,10 +91,8 @@ public:
         info["multi_processor_count"] = devProps.multiProcessorCount;
 
         int runtimeVersion, driverVersion;
-        printf("getGpuinfo 3\n");fflush(stdout);
         cudaRuntimeGetVersion(&runtimeVersion);
         cudaDriverGetVersion(&driverVersion);
-        printf("getGpuinfo 4\n");fflush(stdout);
         info["driver_api"] = CUDA_VERSION;
         info["driver_version"] = driverVersion;
         info["runtime_version"] = runtimeVersion;

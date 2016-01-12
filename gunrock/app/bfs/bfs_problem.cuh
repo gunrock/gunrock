@@ -264,7 +264,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 _ENABLE_IDEMPOTENCE?-1:(util::MaxValue<Value>()-1), nodes);
 
             // Allocate preds if necessary
-            if (_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE)
+            if (_MARK_PREDECESSORS)// && !_ENABLE_IDEMPOTENCE)
             {
                 if (this->preds.GetPointer(util::DEVICE)==NULL)
                     if (retval = this->preds.Allocate(nodes, util::DEVICE)) 
@@ -467,7 +467,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = _data_slice->Init(
                         this->num_gpus,
                         this->gpu_idx[gpu],
-                        this->num_gpus > 1? ((_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE)? 2 : 1) : 0,
+                        this->num_gpus > 1? ((_MARK_PREDECESSORS/* && !_ENABLE_IDEMPOTENCE*/)? 2 : 1) : 0,
                         0,
                         &(this->sub_graphs[gpu]),
                         this->num_gpus > 1? this->graph_slices[gpu]->in_counter.GetPointer(util::HOST) : NULL,
