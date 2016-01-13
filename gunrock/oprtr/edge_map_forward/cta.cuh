@@ -802,6 +802,7 @@ struct Cta
                 {
                     // Put gather offset into scratch space
                     cta->smem_storage.gather_offsets[scratch_offset] = tile->row_offset[LOAD][VEC] + tile->row_progress[LOAD][VEC];
+                    cta->smem_storage.gather_edges[scratch_offset] = tile->vertex_id[LOAD][VEC];
                     if (ProblemData::MARK_PREDECESSORS) {
                         if (cta->advance_type == gunrock::oprtr::advance::E2V || cta->advance_type == gunrock::oprtr::advance::E2E) {
                             cta->smem_storage.gather_predecessors[scratch_offset] = cta->inverse_graph ? cta->d_inverse_column_indices[tile->vertex_id[LOAD][VEC]]: cta->d_column_indices[tile->vertex_id[LOAD][VEC]];
@@ -1104,7 +1105,7 @@ struct Cta
                 // if Cond(neighbor_id) returns false or Apply returns false
                 // set neighbor_id to -1 for invalid
                 VertexId edge_id;
-                edge_id = smem_storage.gather_offsets[scratch_offset];
+                edge_id = smem_storage.gather_edges[scratch_offset];
                 if (Functor::CondEdge(predecessor_id, neighbor_id, problem, smem_storage.gather_offsets[scratch_offset], edge_id)) {
                     Functor::ApplyEdge(predecessor_id, neighbor_id, problem, smem_storage.gather_offsets[scratch_offset], edge_id);
                     if (advance_type == gunrock::oprtr::advance::V2E || advance_type == gunrock::oprtr::advance::E2E)
