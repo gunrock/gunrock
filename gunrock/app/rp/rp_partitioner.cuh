@@ -153,20 +153,34 @@ struct RandomPartitioner :
         else this->seed = seed;
         printf("Partition begin. seed=%d\n", this->seed); fflush(stdout);
 
-        srand(this->seed);
-        for (SizeT node = 0; node < nodes; node++)
+        #pragma omp parallel
         {
-            sort_list[node].value = rand();
-            sort_list[node].posit = node;
+            struct drand48_data rand_data;
+            int thread_num  = omp_get_thread_num();
+            int num_threads = omp_get_num_threads();
+            SizeT i_start   = (long long)(nodes) * thread_num / num_threads;
+            SizeT i_end     = (long long)(nodes) * (thread_num + 1) / num_threads;
+            unsigned int seed_ = this -> seed + 754 * thread_num;
+            srand48_r(seed_, &rand_data);
+            for (SizeT i = i_start; i < i_end; i++)
+            {
+                long int x;
+                lrand48_r(&rand_data, &x);
+                sort_list[i].value = x;
+                sort_list[i].posit = i;
+            }
         }
-        std::vector<sort_node<SizeT> > sort_vector(sort_list, sort_list + nodes);
-        std::sort(sort_vector.begin(), sort_vector.end()); //,compare_sort_node<SizeT>);
+        //std::vector<sort_node<SizeT> > sort_vector(sort_list, sort_list + nodes);
+        //std::sort(sort_vector.begin(), sort_vector.end()); //,compare_sort_node<SizeT>);
+        util::omp_sort(sort_list, nodes, compare_sort_node<SizeT>);
         for (int gpu = 0; gpu < this->num_gpus; gpu++) 
         {
-            for (SizeT pos = gpu == 0 ? 0 :
-                 weitage[gpu - 1] * nodes; pos < weitage[gpu]*nodes; pos++)
+            SizeT begin_pos = gpu == 0? 0 : weitage[gpu-1] * nodes;
+            SizeT end_pos = weitage[gpu] * nodes; 
+            for (SizeT pos = begin_pos; pos < end_pos; pos++)
             {
-                tpartition_table[sort_vector[pos].posit] = gpu;
+                //tpartition_table[sort_vector[pos].posit] = gpu;
+                tpartition_table[sort_list[pos].posit] = gpu;
             }
         }
         

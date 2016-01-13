@@ -64,7 +64,8 @@ __global__ void Expand_Incoming_BFS (
     const VertexId*  const keys_in,
           VertexId*        keys_out,
     const size_t           array_size,
-          char*            array)
+          char*            array,
+          int              gpu_idx)
 {
     extern __shared__ char s_array[];
     const SizeT STRIDE = gridDim.x * blockDim.x;
@@ -98,6 +99,9 @@ __global__ void Expand_Incoming_BFS (
            }
         }
         keys_out[x]=key;
+        if (util::to_track(gpu_idx, key))
+            printf("%d\t %s\t labels[%d] -> %d\n",
+                gpu_idx, __func__, key, t);
         if (NUM_VERTEX_ASSOCIATES == 2 && s_vertex_associate_org[0][key] == t)
             s_vertex_associate_org[1][key]=s_vertex_associate_in[1][x];
         x+=STRIDE;
@@ -161,10 +165,10 @@ struct BFSIteration : public IterationBase <
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration, peer_);
         if (TO_TRACK)
         {
-            util::MemsetKernel<<<256, 256, 0, stream>>>(
-                frontier_queue -> keys[frontier_attribute -> selector^1].GetPointer(util::DEVICE),
-                (VertexId)-2,
-                frontier_queue -> keys[frontier_attribute -> selector^1].GetSize());
+            //util::MemsetKernel<<<256, 256, 0, stream>>>(
+            //    frontier_queue -> keys[frontier_attribute -> selector^1].GetPointer(util::DEVICE),
+            //    (VertexId)-2,
+            //    frontier_queue -> keys[frontier_attribute -> selector^1].GetSize());
             util::Check_Exist<<<256, 256, 0, stream>>>(
                 frontier_attribute -> queue_length,
                 data_slice->gpu_idx, 2, enactor_stats -> iteration,
@@ -213,17 +217,17 @@ struct BFSIteration : public IterationBase <
             util::Check_Value<<<1,1,0,stream>>>(
                 work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
                     frontier_attribute->queue_index),
-                data_slice->gpu_idx, 5, enactor_stats -> iteration);
+                data_slice->gpu_idx, 3, enactor_stats -> iteration);
             util::Check_Exist_<<<256, 256, 0, stream>>>(
                 work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
                     frontier_attribute->queue_index),
                 data_slice->gpu_idx, 3, enactor_stats -> iteration,
                 frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
-            util::MemsetCASKernel<<<256, 256, 0, stream>>>(
-                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
-                -2, -1,
-                work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
-                    frontier_attribute->queue_index));
+            //util::MemsetCASKernel<<<256, 256, 0, stream>>>(
+            //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
+            //    -2, -1,
+            //    work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
+            //        frontier_attribute->queue_index));
         }
 
         // Filter
@@ -246,6 +250,19 @@ struct BFSIteration : public IterationBase <
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Filter end.", thread_num, enactor_stats->iteration);
         frontier_attribute->queue_index++;
         frontier_attribute->selector ^= 1;
+
+        if (TO_TRACK)
+        {
+            util::Check_Value<<<1,1,0,stream>>>(
+                work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
+                    frontier_attribute->queue_index),
+                data_slice->gpu_idx, 4, enactor_stats -> iteration);
+            util::Check_Exist_<<<256, 256, 0, stream>>>(
+                work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
+                    frontier_attribute->queue_index),
+                data_slice->gpu_idx, 4, enactor_stats -> iteration,
+                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
+        }
     }
 
     /*
@@ -288,7 +305,8 @@ struct BFSIteration : public IterationBase <
             keys_in,
             keys_out->GetPointer(util::DEVICE),
             array_size,
-            array);
+            array,
+            data_slice -> gpu_idx);
     }
 
     /*

@@ -20,7 +20,7 @@ namespace gunrock {
 namespace util {
 
 #define TO_TRACK true
-#define NUM_TO_TRACK 0
+#define NUM_TO_TRACK 56
 
 template <typename VertexId>
 static __device__ __host__ __inline__ bool to_track(VertexId node) {
@@ -93,7 +93,7 @@ static __device__ __host__ __inline__ bool to_track(
 
     // for BFS, market /data/gunrock_dataset/large/soc-LiveJournal1/soc-LiveJournal1.mtx --src=largestdegree --traversal-mode=1 --undirected --device=0,1,2,3 --queue-sizing=8.0 --in-sizing=0.5 --idempotence --v --partition-seed=1452208768
     
-    const VertexId node_to_track[][5] = {
+    /*const VertexId node_to_track[][5] = {
         {  5487,    1370, 1239278, 1212000, 1238478},
         {  5503,    1377, 1531518, 1236984, 1238502},
         {  5520,    1381, 1309968, 1236988, 1482071},
@@ -104,6 +104,67 @@ static __device__ __host__ __inline__ bool to_track(
         {228837,   57428, 1536317, 1536368, 1537966},
         {228845,   57431, 1536319, 1536371, 1537967},
         {228852,   57433, 1536331, 1536372, 1537968}
+    };*/
+
+    // for BFS, market /data/gunrock_dataset/large/soc-LiveJournal1/soc-LiveJournal1.mtx --src=largestdegree --traversal-mode=1 --undirected --device=0,1 --queue-sizing=7.0 --queue-sizing1=8.5 --idempotence --partition-seed=1452615167
+    const VertexId node_to_track[][5] = {
+        {1252566,  626153, 2873663},
+        {1252567, 3483619,  626413},
+        {1252568,  626154, 2601173},
+        {2168129, 3299550, 1084495},
+        { 417722, 3415075,  208995},
+        { 673597, 4847572,  336639},
+        {1533408, 4847572,  767025},
+        {1533411, 4847572,  767027},
+        {2527926, 3280482, 1264659},
+        {2949435, 1474568, 2893498},
+        {  15791, 2621277,    7862},
+        {  15792,    7929, 2634600},
+        {  16818, 2501728,    8366},
+        {  26081,   13056, 4285221},
+        {  26775, 2694940,   13370},
+
+        {  15789,    7928, 2634593},
+        {2332103, 1165431, 2634601},
+        {   3947,    1963, 2444884},
+        {   6168,    3085, 2521563},
+        {   4622,    2289, 2511546},
+        {   4639, 2501727,    2338},
+        {   4648, 2501743,    2346},
+        {  42787, 2501720,   21415},
+        {1617210, 2691935,  808783},
+        {2657850, 1328388, 2641350},
+        {2657855, 1328391, 2641353},
+        {  26054,   13038, 2593963},
+        {2682456, 2692087, 1341748},
+        {  26773, 2694881,   13368},
+        {  26777, 2694941,   13372},
+        {  26782, 2694942,   13374},
+        {  26784, 2694882,   13376},
+        {  26802,   13415, 2713197},
+        {  26803, 2694943,   13387},
+        { 434027,  216933, 2713220},
+        { 518973, 2446618,  259374},
+        { 548276,  274268, 2713221},
+        {1464833, 2611737,  732610},
+        {2278177, 1138503, 2713225},
+        {2650609, 1324690, 2713226},
+        {2683835, 1341400, 2713227},
+        {2683838, 3696777, 1342435},
+        {2683840, 3696778, 1342437},
+        {2683841, 3696779, 1342438},
+        {2683842, 1341403, 2713230},
+        {2683846, 3696780, 1342439},
+        {2683847, 4055014, 1342440},
+        {2683848, 1341407, 2713234},
+        {2683849, 3696781, 1342441},
+        {2683850, 1341408, 2713235},
+        { 301726,  150596, 2440086},
+        {  11723, 2428169,    5836},
+        { 359848,  179920, 2593632},
+        { 219110,  109174, 2692826},
+        { 209169,  104204, 3297101},
+        {  56958, 2552293,   28432}
     };
 
     if (!TO_TRACK) return false;
@@ -119,6 +180,14 @@ static __device__ __host__ __inline__ bool to_track(
     return false;
 }
 
+template <typename T>
+bool is_puer2(T x)
+{
+    if (x <= 2) return true;
+    if ((x%2) != 0) return false;
+    return is_puer2(x/2);
+}
+
 template <
     typename VertexId,
     typename Value,
@@ -132,39 +201,81 @@ void Track_Results (
     int*   partition_table,
     VertexId** convertion_tables)
 {
+    SizeT nodes = graph->nodes;
     if (references == NULL) return;
     if (!TO_TRACK) return;
-    else for (VertexId v=0; v<graph->nodes; v++)
-    {
-        if (!to_track(-1, v)) continue;
-        printf("Vertex %d, ", v);
-        if (fabs(results[v] - references[v]) > error_threshold)
-            printf("reference = %d, ", references[v]);
-        printf("result = %d, ", results[v]);
-        if (num_gpus > 1)
+    else {
+        VertexId *markers = new VertexId[graph->nodes];
+        VertexId *track_nodes = new VertexId[NUM_TO_TRACK + 1];
+        SizeT *incoming_counter = new SizeT[NUM_TO_TRACK];
+        SizeT counter = 0;
+        VertexId **preds = new VertexId*[NUM_TO_TRACK];
+
+        for (VertexId dest=0; dest<nodes; dest++)
+        if (to_track(-1, dest)) 
         {
-            printf("host = %d, v_ = ", partition_table[v]);
-            for (int gpu=0; gpu<num_gpus; gpu++)
-                printf("%d%s", convertion_tables[gpu][v], gpu == num_gpus-1? "" : ", ");
+            markers[dest] = counter;
+            track_nodes[counter] = dest;
+            incoming_counter[counter] = 0;
+            counter ++;
+        } else markers[dest] = NUM_TO_TRACK;
+
+        for (VertexId src=0; src<nodes; src++)
+        for (SizeT j = graph->row_offsets[src]; j < graph->row_offsets[src+1]; j++)
+        {
+            VertexId dest = graph -> column_indices[j];
+            VertexId dest_ = markers[dest];
+            if (dest_ == NUM_TO_TRACK) continue;
+            if (incoming_counter[dest_] == 0)
+            {
+                preds[dest_] = new VertexId[1];
+            } else if (is_puer2(incoming_counter[dest_]))
+            {
+                VertexId *temp_array = new VertexId[incoming_counter[dest_] * 2];
+                memcpy(temp_array, preds[dest_], sizeof(VertexId) * incoming_counter[dest_]);
+                delete[] preds[dest_];
+                preds[dest_] = temp_array;
+                temp_array = NULL;
+            }
+            preds[dest_][incoming_counter[dest_]] = src;
+            incoming_counter[dest_] ++;
         }
-        printf("\n");
-        for (SizeT j = graph->row_offsets[v]; j < graph->row_offsets[v+1]; j++)
+        
+        for (SizeT i=0; i<NUM_TO_TRACK; i++)
         {
-            VertexId u = graph -> column_indices[j];
-            if (references[u] != references[v] -1) continue; // bfs
-            printf("\t%d, ", u);
-            if (fabs(results[u] - references[u]) > error_threshold)
-                printf("reference = %d, ", references[u]);
-            printf("result = %d, ", results[u]);
+            VertexId dest = track_nodes[i];
+            printf("Vertex %d, ", dest);
+            if (fabs(results[dest] - references[dest]) >= error_threshold)
+                printf("reference = %d, ", references[dest]);
+            printf("result = %d, ", results[dest]);
             if (num_gpus > 1)
             {
-                printf("host = %d, u_ = ", partition_table[u]);
+                printf("host = %d, v_ = ", partition_table[dest]);
                 for (int gpu=0; gpu<num_gpus; gpu++)
-                    printf("%d%s", convertion_tables[gpu][u], gpu == num_gpus -1 ? "" : ", ");
+                    printf("%d%s", convertion_tables[gpu][dest], gpu == num_gpus-1? "" : ", ");
+            }
+            printf("\n");
+            for (SizeT j = 0; j < incoming_counter[i]; j++)
+            {
+                VertexId src = preds[i][j];
+                //if (references[src] != references[dest] -1 &&
+                //    fabs(results[src] - references[src]) < error_threshold) continue; // bfs
+                printf("\t{%d ", src);
+                if (num_gpus > 1)
+                {
+                    for (int gpu=0; gpu<num_gpus; gpu++)
+                        printf(", %d", convertion_tables[gpu][src]);
+                }
+                printf("},\n\t\t");
+                if (num_gpus > 1)
+                    printf("host = %d, ", partition_table[src]);
+                if (fabs(results[src] - references[src]) >= error_threshold)
+                    printf("reference = %d, ", references[src]);
+                printf("result = %d, ", results[src]);
+                printf("\n");
             }
             printf("\n");
         }
-        printf("\n");
     }
 }
 
@@ -318,10 +429,10 @@ static __device__ __forceinline__ void Store_d_out(
     VertexId  queue_index)
 {
     SizeT offset = offset1 + offset2;
-    if (!TO_TRACK)
+    //if (!TO_TRACK)
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
             new_value, d_out + offset); 
-    else {
+    /*else {
         VertexId old_value = atomicCAS(d_out + offset, -2, new_value);
         if (old_value != -2 && util::to_track(data_slice -> gpu_idx, new_value))
         {    
@@ -354,7 +465,7 @@ static __device__ __forceinline__ void Store_d_out(
                 data_slice -> gpu_idx, queue_index+1, checkpoint_num, new_value, 
                 d_out, (long long)offset);
         }
-    }    
+    }*/   
 } 
 
 } // namespace util

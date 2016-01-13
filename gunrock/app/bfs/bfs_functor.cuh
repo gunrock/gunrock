@@ -53,6 +53,9 @@ struct BFSFunctor {
         VertexId e_id = 0, VertexId e_id_in = 0) 
     {
         if (ProblemData::ENABLE_IDEMPOTENCE) {
+            if (util::to_track(problem -> gpu_idx, d_id))
+                printf("%d\t %s: %d -> %d\n",
+                    problem -> gpu_idx, __func__, e_id_in, d_id);
             return true;
         } else {
             // Check if the destination node has been claimed as someone's child
@@ -129,6 +132,9 @@ struct BFSFunctor {
     static __device__ __forceinline__ void ApplyFilter(
         VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         if (ProblemData::ENABLE_IDEMPOTENCE) {
+            if (TO_TRACK && util::to_track(problem -> gpu_idx, node))
+                printf("%d\t %s: labels[%d] -> %d\n",
+                problem -> gpu_idx, __func__, node, v);
             util::io::ModifiedStore<util::io::st::cg>::St(
                 v, problem->labels + node);
         } else {

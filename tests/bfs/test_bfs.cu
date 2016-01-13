@@ -504,7 +504,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                     v_[gpu][problem->original_vertexes[gpu][v]] = v;
             }
         }
-        util::Track_Results(graph, num_gpus, 0, h_labels, reference_check_label, 
+        util::Track_Results(graph, num_gpus, 1, h_labels, reference_check_label, 
             problem->partition_tables[0], v_);
         char file_name[512];
         sprintf(file_name, "./eval/error_dump/error_%lld.txt", (long long)time(NULL));
