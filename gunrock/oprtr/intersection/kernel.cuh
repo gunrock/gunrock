@@ -19,6 +19,33 @@
  */
 
 // TODO: stream the intersection keys to output too.
+//
+// Notes: For per-block method, here is the rough schema:
+// Input: two arrays with length: m stores node pairs.
+//        row_offsets
+//        column_indices
+// Expected output: a single integer as triangle count
+//
+// First, we divide the input arrays into p partitions, each block will compute
+// the intersects of m/p node pairs. For each of these pairs, a block will
+// perform the following phases:
+// 1) partition
+// 2) intersect per thread
+// 3) block reduce to get partial triangle counts
+//
+// partition:
+// nv_per_partition = (acount + bcount)/THREADS
+// use FindSetPartitions, KernelSetPartitions (search.cuh)
+// and BalancedPath (ctasearch.cuh) to create a partition array
+// parition_device[THREADS] in smem
+//
+// intersect:
+// Each thread will check nv_per_partition values and accumulate tc number
+// if we only need tc number, we can modify
+// DeviceComputeSetAvailability
+//
+// block reduce is simple
+//
 
 #pragma once
 #include <gunrock/util/cta_work_distribution.cuh>
