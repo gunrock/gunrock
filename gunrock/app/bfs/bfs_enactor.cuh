@@ -165,6 +165,10 @@ struct BFSIteration : public IterationBase <
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration, peer_);
         if (TO_TRACK)
         {
+            printf("%d\t %lld\t %d SubQueue_Core queue_length = %lld\n",
+                thread_num, (long long)enactor_stats->iteration, peer_,
+                (long long)frontier_attribute -> queue_length);
+            fflush(stdout);
             //util::MemsetKernel<<<256, 256, 0, stream>>>(
             //    frontier_queue -> keys[frontier_attribute -> selector^1].GetPointer(util::DEVICE),
             //    (VertexId)-2,
@@ -173,6 +177,12 @@ struct BFSIteration : public IterationBase <
                 frontier_attribute -> queue_length,
                 data_slice->gpu_idx, 2, enactor_stats -> iteration,
                 frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));       
+            util::Verify_Value<<<256, 256, 0, stream>>>(
+                data_slice -> gpu_idx, 2, frontier_attribute -> queue_length,
+                enactor_stats -> iteration,
+                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
+                data_slice -> labels.GetPointer(util::DEVICE),
+                (Value)(enactor_stats -> iteration));
         }
         frontier_attribute->queue_reset = true;
         enactor_stats     ->nodes_queued[0] += frontier_attribute->queue_length;
@@ -218,11 +228,19 @@ struct BFSIteration : public IterationBase <
                 work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
                     frontier_attribute->queue_index),
                 data_slice->gpu_idx, 3, enactor_stats -> iteration);
-            util::Check_Exist_<<<256, 256, 0, stream>>>(
-                work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
-                    frontier_attribute->queue_index),
-                data_slice->gpu_idx, 3, enactor_stats -> iteration,
-                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
+            //util::Check_Exist_<<<256, 256, 0, stream>>>(
+            //    work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
+            //        frontier_attribute->queue_index),
+            //    data_slice->gpu_idx, 3, enactor_stats -> iteration,
+            //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
+            //util::Verify_Value_<<<256, 256, 0, stream>>>(
+            //    data_slice -> gpu_idx, 3, 
+            //    work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
+            //        frontier_attribute -> queue_index),
+            //    enactor_stats -> iteration,
+            //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
+            //    data_slice -> labels.GetPointer(util::DEVICE),
+            //    enactor_stats -> iteration+1);
             //util::MemsetCASKernel<<<256, 256, 0, stream>>>(
             //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
             //    -2, -1,
@@ -231,8 +249,12 @@ struct BFSIteration : public IterationBase <
         }
 
         // Filter
-        gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, BfsFunctor>
-        <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+        gunrock::oprtr::filter::LaunchKernel
+            <FilterKernelPolicy, Problem, BfsFunctor>(
+            enactor_stats->filter_grid_size, 
+            FilterKernelPolicy::THREADS, 
+            0, 
+            stream,
             enactor_stats->iteration+1,
             frontier_attribute->queue_reset,
             frontier_attribute->queue_index,
@@ -262,6 +284,14 @@ struct BFSIteration : public IterationBase <
                     frontier_attribute->queue_index),
                 data_slice->gpu_idx, 4, enactor_stats -> iteration,
                 frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
+            //util::Verify_Value_<<<256, 256, 0, stream>>>(
+            //    data_slice -> gpu_idx, 4, 
+            //    work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
+            //        frontier_attribute -> queue_index),
+            //    enactor_stats -> iteration,
+            //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
+            //    data_slice -> labels.GetPointer(util::DEVICE),
+            //    (Value)enactor_stats -> iteration+1);
         }
     }
 
@@ -859,27 +889,19 @@ public:
 
         if (min_sm_version >= 300)
         {
-            if (Problem::ENABLE_IDEMPOTENCE)
+            //if (Problem::ENABLE_IDEMPOTENCE)
             {
-                if (traversal_mode == 0)
-                {
-                    return EnactBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
-                }
-                else
-                {
+                //if (traversal_mode == 0)
+                //    return EnactBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
+                //else
                     return EnactBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
-                }
             }
-            else
+            //else
             {
-                if (traversal_mode == 0)
-                {
-                    return EnactBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(src);
-                }
-                else
-                {
-                    return EnactBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(src);
-                }
+                //if (traversal_mode == 0)
+                //    return EnactBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(src);
+                //else
+                //    return EnactBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(src);
             }
         }
 
@@ -920,31 +942,23 @@ public:
 
         if (min_sm_version >= 300)
         {
-            if (Problem::ENABLE_IDEMPOTENCE)
+            //if (Problem::ENABLE_IDEMPOTENCE)
             {
-                if (traversal_mode == 0)
-                {
-                    return InitBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
-                            context, problem, max_grid_size, size_check);
-                }
-                else
-                {
+                //if (traversal_mode == 0)
+                //    return InitBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
+                //            context, problem, max_grid_size, size_check);
+                //else
                     return InitBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
                             context, problem, max_grid_size, size_check);
-                }
             }
-            else
+            //else
             {
-                if (traversal_mode == 0)
-                {
-                    return InitBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(
-                            context, problem, max_grid_size, size_check);
-                }
-                else
-                {
-                    return InitBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(
-                            context, problem, max_grid_size, size_check);
-                }
+                //if (traversal_mode == 0)
+                //    return InitBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(
+                //            context, problem, max_grid_size, size_check);
+                //else
+                //    return InitBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(
+                //            context, problem, max_grid_size, size_check);
             }
         }
 

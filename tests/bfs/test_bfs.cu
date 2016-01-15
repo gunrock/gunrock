@@ -505,9 +505,9 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             }
         }
         util::Track_Results(graph, num_gpus, 1, h_labels, reference_check_label, 
-            problem->partition_tables[0], v_);
+            num_gpus > 1 ? problem->partition_tables[0] : NULL, v_);
         char file_name[512];
-        sprintf(file_name, "./eval/error_dump/error_%lld.txt", (long long)time(NULL));
+        sprintf(file_name, "./eval/error_dump/error_%lld_%d.txt", (long long)time(NULL), gpu_idx[0]);
         util::Output_Errors(file_name, graph -> nodes, num_gpus, 0, h_labels, reference_check_label,
             num_gpus > 1 ? problem->partition_tables[0] : NULL, v_);
         if (num_gpus > 1)
@@ -744,9 +744,9 @@ template <
     bool        INSTRUMENT >
 void RunTests_debug(Info<VertexId, Value, SizeT> *info)
 {
-    if (info->info["debug_mode"].get_bool())
-        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,  true>(info);
-    else
+    //if (info->info["debug_mode"].get_bool())
+    //    RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,  true>(info);
+    //else
         RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT, false>(info);
 }
 

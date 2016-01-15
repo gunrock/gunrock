@@ -82,7 +82,7 @@ public:
      * Resets all counters.  Must be called by thread-0 through
      * thread-(COUNTERS - 1)
      */
-    template <typename SizeT>
+    /*template <typename SizeT>
     __device__ __forceinline__ void Reset()
     {
         SizeT reset_val = 0;
@@ -92,7 +92,7 @@ public:
         //        (long long)reset_val, blockIdx.x);
         util::io::ModifiedStore<util::io::st::cg>::St(
             reset_val, ((SizeT *) d_counters) + threadIdx.x);
-    }
+    }*/
 
     //---------------------------------------------------------------------
     // Work-stealing

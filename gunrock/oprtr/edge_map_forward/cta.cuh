@@ -284,6 +284,16 @@ struct Cta
                                                                                     : cta->d_column_indices[tile->vertex_id[LOAD][VEC]];
                         }
                         cta->smem_storage.state.warp_comm[0][4] = tile->vertex_id[LOAD][VEC];
+                        if (util::pred_to_track(1, tile->vertex_id[LOAD][VEC]))
+                            printf("%d\t %d\t CtaExpand0 (%d of %d, %d of %d)\t"
+                                " {%d, %d, %d, %d, %d}\n",
+                                cta -> problem -> gpu_idx, cta->label, 
+                                blockIdx.x, gridDim.x, threadIdx.x, blockDim.x,
+                                cta->smem_storage.state.warp_comm[0][0],
+                                cta->smem_storage.state.warp_comm[0][1],
+                                cta->smem_storage.state.warp_comm[0][2],
+                                cta->smem_storage.state.warp_comm[0][3],
+                                cta->smem_storage.state.warp_comm[0][4]);
 
                         // Unset row length
                         tile->row_length[LOAD][VEC] = 0;
@@ -307,6 +317,17 @@ struct Cta
 
                     VertexId neighbor_id;
 
+                    if (util::thread_to_track(1, edge_id))
+                        printf("%d\t %d\t CtaExpand1 (%d of %d, %d of %d)\t"
+                            " {%d, %d, %d, %d, %d}\n",
+                            cta->problem->gpu_idx, cta->label, 
+                            blockIdx.x, gridDim.x, threadIdx.x, blockDim.x,
+                            cta->smem_storage.state.warp_comm[0][0],
+                            cta->smem_storage.state.warp_comm[0][1],
+                            cta->smem_storage.state.warp_comm[0][2],
+                            cta->smem_storage.state.warp_comm[0][3],
+                            cta->smem_storage.state.warp_comm[0][4]);
+
                     while (coop_offset + KernelPolicy::THREADS < coop_oob) {
 
                         // Gather
@@ -314,6 +335,11 @@ struct Cta
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                 neighbor_id,
                                 cta->d_column_indices + coop_offset+threadIdx.x);
+                        //if (util::to_track(1, neighbor_id) && !util::pred_to_track(1, neighbor_id))
+                        //if (util::offset_to_track(1, coop_offset+threadIdx.x))
+                        //    printf("%d\t %d\t CtaExpand neighbor_id = %d, %d + %d\n",
+                        //        cta -> problem -> gpu_idx, cta->label,
+                        //        neighbor_id, coop_offset, threadIdx.x);
 
                         // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id) (done)
                         // if Cond(neighbor_id) returns true
@@ -424,6 +450,12 @@ struct Cta
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                                 neighbor_id,
                                 cta->d_column_indices + coop_offset+threadIdx.x);
+
+                        //if (util::to_track(1, neighbor_id) && !util::pred_to_track(1, neighbor_id))
+                        //if (util::offset_to_track(1, coop_offset+threadIdx.x))
+                        //    printf("%d\t %d\t CtaExpand neighbor_id2 = %d, %d + %d\n",
+                        //        cta -> problem -> gpu_idx, cta->label,
+                        //        neighbor_id, coop_offset, threadIdx.x);
 
                         // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
                         // if Cond(neighbor_id) returns true

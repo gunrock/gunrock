@@ -20,7 +20,8 @@ namespace gunrock {
 namespace util {
 
 #define TO_TRACK true
-#define NUM_TO_TRACK 56
+#define NUM_TO_TRACK 5
+#define MAX_GPU 0
 
 template <typename VertexId>
 static __device__ __host__ __inline__ bool to_track(VertexId node) {
@@ -107,6 +108,7 @@ static __device__ __host__ __inline__ bool to_track(
     };*/
 
     // for BFS, market /data/gunrock_dataset/large/soc-LiveJournal1/soc-LiveJournal1.mtx --src=largestdegree --traversal-mode=1 --undirected --device=0,1 --queue-sizing=7.0 --queue-sizing1=8.5 --idempotence --partition-seed=1452615167
+    /* NUM_TO_TRACK = 56
     const VertexId node_to_track[][5] = {
         {1252566,  626153, 2873663},
         {1252567, 3483619,  626413},
@@ -166,19 +168,230 @@ static __device__ __host__ __inline__ bool to_track(
         { 209169,  104204, 3297101},
         {  56958, 2552293,   28432}
     };
+    
+    const VertexId node_to_track[][5] = {
+        {243640, 121881, 3344179},
+        {330800, 2922799, 165211},
+        {497263, 3226907, 248563},
+        {575687, 287983, 2692910},
+        {769572, 2875850, 384909},
+        {860756, 430280, 2846303},
+        {1229164, 614416, 2667922},
+        {1229165, 614417, 3289893},
+        {1229166, 614418, 3591811},
+        {1229167, 614419, 3428648},
 
-    if (!TO_TRACK) return false;
-    else {
+        // {860756, 430280, 2846303},
+        {50632 , 2458866, 25223},
+        {51419 , 25811, 2443801},
+        {644000 , 322182, 2461938},
+        {983065 , 3401569, 491449},
+        {1098096 , 2859806, 549202},
+        {1516165 , 2675745, 758377},
 
+        // {769572, 2875850, 384909}
+        {769546 , 2863027, 384896}
+    };*/
+
+    // for BFS, market /data/gunrock_dataset/large/soc-LiveJournal1/soc-LiveJournal1.mtx --src=largestdegree --traversal-mode=1 --undirected --device=1 --queue-sizing=12.0 --idempotence 
+    const VertexId node_to_track[][MAX_GPU + 1] = {
+        {571021},
+        //{1046961},
+        //{2383788},
+        //{3489561},
+        //{3799683},
+        //{94386},
+        {473430},
+        //{616588},
+        //{620833},
+        //{620835},
+       
+        //{327529},
+        //{736107},
+        {821811},
+        //{821813},
+        //{821814},
+        //{155168},
+        //{156578},
+        //{167158},
+        {168044},
+        //{177768},
+
+        {91256},
+        //{4847570},
+
+        {32456 },
+        {182080 },
+        {134578 },
+        {613300 },
+        {604857 }
+    };
+
+    bool retval = false;
+    if (TO_TRACK)
+    {
+        gpu_num = -1;
         #pragma unroll
         for (int i=0; i<NUM_TO_TRACK; i++)
             //if (gpu_num == gpu_to_track[i] &&
             //    node == node_to_track[i]) 
             if (node_to_track[i][gpu_num+1] == node)
-                return true;
+                retval = true;
     }
-    return false;
+    return retval;
 }
+
+#define OFFSET_TO_TRACK 5
+
+template <typename SizeT>
+static __device__ __host__ __inline__ bool offset_to_track(
+    int gpu_num, SizeT offset)
+{
+    const SizeT offset_to_track[][MAX_GPU + 1] = {
+        {35771012},
+        //{35771163},
+        //{35771269},
+        //{35771272},
+        //{35771273},
+        //{35048294},
+        {35048419},
+        //{35771053},
+        //{35048667},
+        //{35048669},
+       
+        //{12544676},
+        //{12544809},
+        {12544939},
+        //{12544941},
+        //{12544942},
+        //{2659756},
+        //{2659757},
+        //{2659765},
+        {2659766},
+        //{2659771},
+
+        {15186681}
+        //{4847570},
+
+        //{32456 },
+        //{182080 },
+        //{134578 },
+        //{613300 },
+        //{604857 }
+    };
+
+    bool retval = false;
+    if (TO_TRACK)
+    {
+        gpu_num = -1;
+        #pragma unroll
+        for (int i=0; i<OFFSET_TO_TRACK; i++)
+            //if (gpu_num == gpu_to_track[i] &&
+            //    node == node_to_track[i]) 
+            if (offset_to_track[i][gpu_num+1] == offset)
+                retval = true;
+    }
+    return retval;
+}
+
+#define THREAD_TO_TRACK 5
+template <typename VertexId>
+static __device__ __host__ __inline__ bool thread_to_track(
+    int gpu_num, VertexId pred)
+{
+    const VertexId pred_to_track[][MAX_GPU + 1] = {
+        {613300 },
+        //{613300 },
+        //{613300 },
+        //{613300 },
+        //{613300 },
+        //{604857 },
+        {604857 },
+        //{613300 },
+        //{604857 },
+        //{604857 },
+       
+        //{134578 },
+        //{134578 },
+        {134578 },
+        //{134578 },
+        //{134578 },
+        //{32456 },
+        //{32456 },
+        //{32456 },
+        {32456 },
+        //{32456 },
+
+        {182080 }
+    };
+    const int thread_to_track[][MAX_GPU + 1] = {
+        {6},
+        //{29},
+        //{7},
+        //{10},
+        //{11},
+        //{24},
+        {21},
+        //{47},
+        //{13},
+        //{15},
+
+        //{72},
+        //{77},
+        {79},
+        //{81},
+        //{82},
+        //{68},
+        //{69},
+        //{77},
+        {78},
+        //{83},
+        
+        {33}
+    };
+
+    bool retval = false;
+    if (TO_TRACK) 
+    {
+        gpu_num = -1;
+        #pragma unroll
+        for (int i=0; i<THREAD_TO_TRACK; i++)
+            //if (gpu_num == gpu_to_track[i] &&
+            //    node == node_to_track[i]) 
+            if (pred_to_track[i][gpu_num+1] == pred &&
+                thread_to_track[i][gpu_num+1] == threadIdx.x)
+                retval = true;
+    }
+    return retval;
+}
+
+#define PRED_TO_TRACK 5
+template <typename VertexId>
+static __device__ __host__ __inline__ bool pred_to_track(
+    int gpu_num, VertexId node)
+{
+    const VertexId pred_to_track[][MAX_GPU + 1] = {
+         {32456 },
+        {182080 },
+        {134578 },
+        {613300 },
+        {604857 }
+    };
+
+    bool retval = false;
+    if (TO_TRACK)
+    {
+        gpu_num = -1;
+        #pragma unroll
+        for (int i=0; i<PRED_TO_TRACK; i++)
+            //if (gpu_num == gpu_to_track[i] &&
+            //    node == node_to_track[i]) 
+            if (pred_to_track[i][gpu_num+1] == node)
+                retval = true;
+    }
+    return retval;
+}
+
 
 template <typename T>
 bool is_puer2(T x)
@@ -186,6 +399,34 @@ bool is_puer2(T x)
     if (x <= 2) return true;
     if ((x%2) != 0) return false;
     return is_puer2(x/2);
+}
+
+template <
+    typename VertexId,
+    typename Value,
+    typename SizeT>
+void Print_Vertex(
+    VertexId v,
+    int    num_gpus,
+    Value  error_threshold,
+    Value* results,
+    Value* references,
+    int*   partition_table,
+    VertexId** convertion_tables)
+{
+    printf("{%d ", v);
+    if (num_gpus > 1)
+    {
+        for (int gpu=0; gpu<num_gpus; gpu++)
+            printf(", %d", convertion_tables[gpu][v]);
+    }
+    printf("},\n\t\t");
+    if (num_gpus > 1)
+        printf("host = %d, ", partition_table[v]);
+    if (fabs(results[v] - references[v]) >= error_threshold)
+        printf("reference = %d, ", references[v]);
+    printf("result = %d, ", results[v]);
+    printf("\n");
 }
 
 template <
@@ -244,35 +485,42 @@ void Track_Results (
         for (SizeT i=0; i<NUM_TO_TRACK; i++)
         {
             VertexId dest = track_nodes[i];
-            printf("Vertex %d, ", dest);
-            if (fabs(results[dest] - references[dest]) >= error_threshold)
-                printf("reference = %d, ", references[dest]);
-            printf("result = %d, ", results[dest]);
-            if (num_gpus > 1)
-            {
-                printf("host = %d, v_ = ", partition_table[dest]);
-                for (int gpu=0; gpu<num_gpus; gpu++)
-                    printf("%d%s", convertion_tables[gpu][dest], gpu == num_gpus-1? "" : ", ");
-            }
-            printf("\n");
+            if (pred_to_track(-1, dest)) continue;
+            printf("Vertex ");
+            Print_Vertex<VertexId, Value, SizeT>(
+                dest, num_gpus, error_threshold,
+                results, references, 
+                partition_table, convertion_tables);
             for (SizeT j = 0; j < incoming_counter[i]; j++)
             {
                 VertexId src = preds[i][j];
-                //if (references[src] != references[dest] -1 &&
+                //if (references[src] != references[dest] -1) continue;
                 //    fabs(results[src] - references[src]) < error_threshold) continue; // bfs
-                printf("\t{%d ", src);
-                if (num_gpus > 1)
-                {
-                    for (int gpu=0; gpu<num_gpus; gpu++)
-                        printf(", %d", convertion_tables[gpu][src]);
-                }
-                printf("},\n\t\t");
-                if (num_gpus > 1)
-                    printf("host = %d, ", partition_table[src]);
-                if (fabs(results[src] - references[src]) >= error_threshold)
-                    printf("reference = %d, ", references[src]);
-                printf("result = %d, ", results[src]);
-                printf("\n");
+                printf("\t");
+                Print_Vertex<VertexId, Value, SizeT>(
+                    src, num_gpus, error_threshold,
+                    results, references, 
+                    partition_table, convertion_tables);
+            }
+            printf("\n");
+        }
+
+        for (VertexId src=0; src< nodes; src++)
+        {
+            if (!pred_to_track(-1, src)) continue;
+            printf("Source ");
+            Print_Vertex<VertexId, Value, SizeT>(
+                src, num_gpus, error_threshold,
+                results, references, 
+                partition_table, convertion_tables);
+            for (SizeT j = graph->row_offsets[src]; j < graph->row_offsets[src+1]; j++)
+            {
+                VertexId dest = graph -> column_indices[j];
+                printf("\t");
+                Print_Vertex<VertexId, Value, SizeT>(
+                    dest, num_gpus, error_threshold,
+                    results, references, 
+                    partition_table, convertion_tables);
             }
             printf("\n");
         }
@@ -330,14 +578,14 @@ __global__ void Check_Queue(
     {
         VertexId key = keys[x];
         if (key >= num_nodes || keys < 0)
-            printf("%d\t %lld\t %s: x, key = %d, %d\n", gpu_num, iteration, __func__, x, key);
+            printf("%d\t %lld\t Check_Queue\t x, key = %d, %d\n", gpu_num, iteration, x, key);
         else {
             Value label = labels[key];
             if ((label != iteration+1 && label != iteration)
               || label < 0)
             {
-                printf("%d\t %lld\t %s: x, key, label = %d, %d, %d\n",
-                    gpu_num, iteration, __func__, x, key, label);
+                printf("%d\t %lld\t Check_Queue\t x, key, label = %d, %d, %d\n",
+                    gpu_num, iteration, x, key, label);
             }
         }
         x += STRIDE;
@@ -360,8 +608,8 @@ __global__ void Check_Range(
         Value value = values[x];
         if (value > upper_limit || value < lower_limit)
         {
-            printf("%d\t %lld\t %s: x = %d, %d not in (%d, %d)\n",
-                gpu_num, iteration, __func__, x, value, lower_limit, upper_limit);
+            printf("%d\t %lld\t Check_Range\t x = %d, %d not in (%d, %d)\n",
+                gpu_num, iteration, x, value, lower_limit, upper_limit);
         }
         x += STRIDE;
     }
@@ -381,8 +629,11 @@ __global__ void Check_Exist(
     {
         VertexId key = keys[x];
         if (to_track(gpu_num, key))
-            printf("%d\t %lld\t %s: [%d] presents at %d\n",
-                gpu_num, iteration, __func__, key, check_num);
+        {
+            if ((check_num != 3) || (!pred_to_track(gpu_num, key)))
+            printf("%d\t %lld\t Check_Exist\t [%d] presents at %d\n",
+                gpu_num, iteration, key, check_num);
+        }
         x += STRIDE;
     }
 }
@@ -395,14 +646,17 @@ __global__ void Check_Exist_(
     const long long iteration,
     const VertexId* keys)
 {
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    VertexId x = blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
     while (x < num_elements[0])
     {
         VertexId key = keys[x];
         if (to_track(gpu_num, key))
-            printf("%d\t %lld\t %s: [%d] presents at %d\n",
-                gpu_num, iteration, __func__, key, check_num);
+        {
+            if ((check_num !=3) || (!pred_to_track(gpu_num, key)))
+            printf("%d\t %lld\t Check_Exist\t [%d] presents at %d\n",
+                gpu_num, iteration, key, check_num);
+        }
         x += STRIDE;
     }
 }
@@ -414,8 +668,60 @@ __global__ void Check_Value(
     const int   check_num,
     const long long iteration)
 {
-    printf("%d\t %lld\t %s: %d at %d\n",
-        gpu_num, iteration, __func__, value[0], check_num);
+    printf("%d\t %lld\t Check_Value\t %d at %d\n",
+        gpu_num, iteration, value[0], check_num);
+}
+
+template <typename VertexId, typename SizeT, typename Value>
+__global__ void Verify_Value(
+    const int gpu_num,
+    const int check_num,
+    const SizeT num_elements,
+    const long long iteration,
+    const VertexId* keys,
+    const Value* values,
+    const Value value)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+
+    while (x < num_elements)
+    {
+        VertexId key = keys[x];
+        if (key != -1)
+        {
+            if (values[key] != value)
+                printf("%d\t %lld\t Verify_Value\t %d\t values[%d] (%d) != %lld\n",
+                    gpu_num, iteration, check_num, key, values[key], (long long)value); 
+        }
+        x += STRIDE;
+    }
+}
+
+template <typename VertexId, typename SizeT, typename Value>
+__global__ void Verify_Value_(
+    const int gpu_num,
+    const int check_num,
+    const SizeT *num_elements,
+    const long long iteration,
+    const VertexId* keys,
+    const Value* values,
+    const Value value)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+
+    while (x < num_elements[0])
+    {
+        VertexId key = keys[x];
+        if (key != -1)
+        {
+            if (values[key] != value)
+                printf("%d\t %lld\t Verify_Value\t %d\t values[%d] (%d) != %lld\n",
+                    gpu_num, iteration, check_num, key, values[key], (long long)value); 
+        }
+        x += STRIDE;
+    }
 }
 
 template <typename VertexId, typename SizeT, typename ProblemData>
@@ -429,43 +735,45 @@ static __device__ __forceinline__ void Store_d_out(
     VertexId  queue_index)
 {
     SizeT offset = offset1 + offset2;
+    //VertexId old_value = d_out[offset];
     //if (!TO_TRACK)
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
             new_value, d_out + offset); 
-    /*else {
-        VertexId old_value = atomicCAS(d_out + offset, -2, new_value);
-        if (old_value != -2 && util::to_track(data_slice -> gpu_idx, new_value))
-        {    
-            printf("%d\t %d\t %d\t Storing conflict: [%d] -> %p + %lld, old_value = [%d], "
-                "offset1 = %lld, offset2 = %lld, blockIdx.x = %d, threadIdx.x = %d,"
-                "org_cp = %d, org_q_idx = %d, org_d_out = %p, org_offset1 = %lld,"
-                "org_offset2 = %lld, org_blockIdx.x = %d, org_threadIdx.x = %d\n",
-                data_slice -> gpu_idx, queue_index+1, checkpoint_num, new_value, d_out, 
-                (long long)offset, old_value, (long long)offset1, 
-                (long long)offset2, blockIdx.x, threadIdx.x,
-                data_slice -> org_checkpoint[offset],
-                data_slice -> org_queue_idx [offset],
-                data_slice -> org_d_out     [offset],
-                (long long)data_slice -> org_offset1   [offset],
-                (long long)data_slice -> org_offset2   [offset],
-                data_slice -> org_block_idx [offset],
-                data_slice -> org_thread_idx[offset]);
-        } else {
-            data_slice -> org_checkpoint[offset] = checkpoint_num;
-            data_slice -> org_d_out     [offset] = d_out         ;
-            data_slice -> org_offset1   [offset] = offset1       ;
-            data_slice -> org_offset2   [offset] = offset2       ;
-            data_slice -> org_queue_idx [offset] = queue_index+1 ;
-            data_slice -> org_block_idx [offset] = blockIdx.x    ;
-            data_slice -> org_thread_idx[offset] = threadIdx.x   ;
-        }    
-        if (util::to_track(data_slice -> gpu_idx, new_value))
-        {    
-            printf("%d\t %d\t %d\t Storing [%d] -> %p + %lld\n",
-                data_slice -> gpu_idx, queue_index+1, checkpoint_num, new_value, 
-                d_out, (long long)offset);
-        }
-    }*/   
+    //else {
+    //    VertexId old_value = atomicCAS(d_out + offset, -2, new_value);
+    //    if (old_value != -2)// && util::to_track(data_slice -> gpu_idx, new_value))
+    //    {    
+    //        printf("%d\t %d\t %d\t Storing conflict: [%d] -> %p + %lld, old_value = [%d], "
+    //            "offset1 = %lld, offset2 = %lld, blockIdx.x = %d, threadIdx.x = %d\n",
+    //            "org_cp = %d, org_q_idx = %d, org_d_out = %p, org_offset1 = %lld,"
+    //            "org_offset2 = %lld, org_blockIdx.x = %d, org_threadIdx.x = %d\n",
+    //            data_slice -> gpu_idx, queue_index+1, checkpoint_num, new_value, d_out, 
+    //            (long long)offset, old_value, (long long)offset1, 
+    //            (long long)offset2, blockIdx.x, threadIdx.x);
+    //            data_slice -> org_checkpoint[offset],
+    //            data_slice -> org_queue_idx [offset],
+    //            data_slice -> org_d_out     [offset],
+    //            (long long)data_slice -> org_offset1   [offset],
+    //            (long long)data_slice -> org_offset2   [offset],
+    //            data_slice -> org_block_idx [offset],
+    //            data_slice -> org_thread_idx[offset]);
+    //    } else {
+    //        data_slice -> org_checkpoint[offset] = checkpoint_num;
+    //        data_slice -> org_d_out     [offset] = d_out         ;
+    //        data_slice -> org_offset1   [offset] = offset1       ;
+    //        data_slice -> org_offset2   [offset] = offset2       ;
+    //        data_slice -> org_queue_idx [offset] = queue_index+1 ;
+    //        data_slice -> org_block_idx [offset] = blockIdx.x    ;
+    //        data_slice -> org_thread_idx[offset] = threadIdx.x   ;
+    //    }    
+    //    if (util::to_track(data_slice -> gpu_idx, new_value) &&
+    //        !util::pred_to_track(data_slice -> gpu_idx, new_value))
+    //    {    
+    //        printf("%d\t %d\t %d\t Storing [%d] -> + %lld\n",
+    //            data_slice -> gpu_idx, queue_index+1, checkpoint_num, new_value, 
+    //            (long long)offset);
+    //    }
+    //}   
 } 
 
 } // namespace util
