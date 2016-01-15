@@ -529,8 +529,11 @@ static void FullQueue_Core(
     enactor_stats      -> AccumulateEdges(
         work_progress  -> GetQueueLengthPointer<unsigned int,SizeT>(frontier_attribute->queue_index+1), stream);
 
-    gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, RemoveZeroFunctor>
-        <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+    gunrock::oprtr::filter::LaunchKernel
+        <FilterKernelPolicy, Problem, RemoveZeroFunctor>(
+        enactor_stats->filter_grid_size, 
+        FilterKernelPolicy::THREADS, 
+        0, stream,
         enactor_stats->iteration,
         frontier_attribute->queue_reset,
         frontier_attribute->queue_index,
@@ -924,8 +927,11 @@ static void FullQueue_Core(
 
         //printf("Filter start.\n");fflush(stdout);
          // filter kernel
-        gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, PrFunctor>
-        <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+        gunrock::oprtr::filter::LaunchKernel
+            <FilterKernelPolicy, Problem, PrFunctor>(
+            enactor_stats->filter_grid_size, 
+            FilterKernelPolicy::THREADS, 
+            0, stream,
             enactor_stats->iteration,
             frontier_attribute->queue_reset,
             frontier_attribute->queue_index,

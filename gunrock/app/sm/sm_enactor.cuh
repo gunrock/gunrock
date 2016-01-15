@@ -188,8 +188,11 @@ class SMEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHE
 
 	    // Initial filtering based on node labels and degrees
 /*
-	    oprtr::filter::Kernel<FilterKernelPolicy, Problem, SMInitFunctor>
-		<<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS>>>(
+	    oprtr::filter::LaunchKernel
+            <FilterKernelPolicy, Problem, SMInitFunctor>(
+		    enactor_stats->filter_grid_size, 
+            FilterKernelPolicy::THREADS,
+            0, stream,
 			0,
 			frontier_attribute.queue_reset,
 			frontier_attribute.queue_index,
@@ -207,22 +210,24 @@ class SMEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHE
 			enactor_stats.filter_kernel_stats,
 			false);
 */
-	  oprtr::filter::Kernel<FilterKernelPolicy, Problem, SMInitFunctor><<<
-                enactor_stats->filter_grid_size,
-                FilterKernelPolicy::THREADS, 0, stream>>>(
-                enactor_stats->iteration + 1,
-                frontier_attribute->queue_reset,
-                frontier_attribute->queue_index,
-                frontier_attribute->queue_length,
-                frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
-                NULL,
-                frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
-                d_data_slice,
-                NULL,
-                work_progress[0],
-                frontier_queue->keys[frontier_attribute->selector  ].GetSize(),
-                frontier_queue->keys[frontier_attribute->selector^1].GetSize(),
-                enactor_stats->filter_kernel_stats);
+	    oprtr::filter::LaunchKernel
+            <FilterKernelPolicy, Problem, SMInitFunctor>(
+            enactor_stats->filter_grid_size,
+            FilterKernelPolicy::THREADS, 
+            0, stream,
+            enactor_stats->iteration + 1,
+            frontier_attribute->queue_reset,
+            frontier_attribute->queue_index,
+            frontier_attribute->queue_length,
+            frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
+            NULL,
+            frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
+            d_data_slice,
+            NULL,
+            work_progress[0],
+            frontier_queue->keys[frontier_attribute->selector  ].GetSize(),
+            frontier_queue->keys[frontier_attribute->selector^1].GetSize(),
+            enactor_stats->filter_kernel_stats);
 
 
 	    if(DEBUG && (retval = util::GRError(cudaThreadSynchronize(), 

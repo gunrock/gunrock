@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include <thread>
+//#include <thread>
 #include <gunrock/util/multithreading.cuh>
 #include <gunrock/util/multithread_utils.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
@@ -519,8 +519,8 @@ static CUT_THREADPROC BFSThread(
         thread_data->stats = 1;
         while (thread_data->stats != 2) 
         {
-            //sleep(0);
-            std::this_thread::yield();
+            sleep(0);
+            //std::this_thread::yield();
         }
         thread_data->stats=3;
 
@@ -751,8 +751,8 @@ public:
             {
                 while (thread_slices[gpu].stats!=1) 
                 {
-                    //sleep(0);
-                    std::this_thread::yield();
+                    sleep(0);
+                    //std::this_thread::yield();
                 }
                 thread_slices[gpu].stats=2;
             }
@@ -760,8 +760,8 @@ public:
             {
                 while (thread_slices[gpu].stats!=4) 
                 {
-                    //sleep(0);
-                    std::this_thread::yield();
+                    sleep(0);
+                    //std::this_thread::yield();
                 }
             }
 

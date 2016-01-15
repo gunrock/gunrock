@@ -204,8 +204,11 @@ struct SSSPIteration : public IterationBase <
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration, peer_);
 
         //Vertex Map
-        gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, SsspFunctor>
-            <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+        gunrock::oprtr::filter::LaunchKernel
+            <FilterKernelPolicy, Problem, SsspFunctor>(
+            enactor_stats->filter_grid_size, 
+            FilterKernelPolicy::THREADS, 
+            0, stream,
             enactor_stats->iteration+1,
             frontier_attribute->queue_reset,
             frontier_attribute->queue_index,
