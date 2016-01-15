@@ -8,7 +8,7 @@ namespace gunrock {
 namespace app {
 namespace cc {
 
-#define TO_TRACK false
+/*#define TO_TRACK false
 
 template <typename VertexId>
 static __device__ __host__ bool to_track(VertexId node) {
@@ -17,7 +17,7 @@ static __device__ __host__ bool to_track(VertexId node) {
     for (int i = 0; i < num_to_track; i++)
         if (node == node_to_track[i]) return true;
     return false;
-}
+}*/
 
 /**
  * @brief Structure contains device functions for doing mask update.

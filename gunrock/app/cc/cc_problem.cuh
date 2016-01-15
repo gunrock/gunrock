@@ -16,6 +16,7 @@
 
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/util/memset_kernel.cuh>
+#include <gunrock/util/track_utils.cuh>
 #include <gunrock/app/cc/cc_functor.cuh>
 
 namespace gunrock {
@@ -169,7 +170,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             for (int node=0; node<graph->nodes; node++)
             {
                 if (TO_TRACK)
-                if (to_track(node))
+                if (util::to_track(node))
                     printf("node %d @ gpu %d : %d -> %d\n", node, gpu_idx, graph->row_offsets[node], graph->row_offsets[node+1]);
                 int start_edge = graph->row_offsets[node], end_edge = graph->row_offsets[node+1];
                 for (int edge = start_edge; edge < end_edge; ++edge)
@@ -177,7 +178,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
                     froms[edge] = node;
                     //tos  [edge] = graph->column_indices[edge];
                     if (TO_TRACK)
-                    if (to_track(node) || to_track(tos[edge]))
+                    if (util::to_track(node) || util::to_track(tos[edge]))
                         printf("edge %d @ gpu %d : %d -> %d\n", edge, gpu_idx, froms[edge], tos[edge]);
                 }
             }

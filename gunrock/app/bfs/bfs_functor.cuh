@@ -53,12 +53,12 @@ struct BFSFunctor {
         VertexId e_id = 0, VertexId e_id_in = 0) 
     {
         if (ProblemData::ENABLE_IDEMPOTENCE) {
-            if (util::to_track(problem -> gpu_idx, d_id))
+            //if (util::to_track(problem -> gpu_idx, d_id))
             //    && !util::pred_to_track(problem -> gpu_idx, d_id))
                 //|| util::pred_to_track(problem -> gpu_idx, e_id_in))
-                printf("%d\t %d\t CondEdge (%d, %d)\t %d (%d) -> %d\n",
-                    problem -> gpu_idx, s_id, blockIdx.x, threadIdx.x,
-                    e_id_in, problem -> labels[e_id_in], d_id);
+            //    printf("%d\t %d\t CondEdge (%d, %d)\t %d (%d) -> %d\n",
+            //        problem -> gpu_idx, s_id, blockIdx.x, threadIdx.x,
+            //        e_id_in, problem -> labels[e_id_in], d_id);
             return true;
         } else {
             // Check if the destination node has been claimed as someone's child

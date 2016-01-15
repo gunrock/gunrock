@@ -314,6 +314,8 @@ struct Cta
                         pred_id = cta->smem_storage.state.warp_comm[0][3];
                     else
                         pred_id = cta->label;
+                    
+                    __syncthreads();
 
                     VertexId neighbor_id;
 

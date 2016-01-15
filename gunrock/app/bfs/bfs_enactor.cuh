@@ -177,12 +177,12 @@ struct BFSIteration : public IterationBase <
                 frontier_attribute -> queue_length,
                 data_slice->gpu_idx, 2, enactor_stats -> iteration,
                 frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));       
-            util::Verify_Value<<<256, 256, 0, stream>>>(
-                data_slice -> gpu_idx, 2, frontier_attribute -> queue_length,
-                enactor_stats -> iteration,
-                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
-                data_slice -> labels.GetPointer(util::DEVICE),
-                (Value)(enactor_stats -> iteration));
+            //util::Verify_Value<<<256, 256, 0, stream>>>(
+            //    data_slice -> gpu_idx, 2, frontier_attribute -> queue_length,
+            //    enactor_stats -> iteration,
+            //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
+            //    data_slice -> labels.GetPointer(util::DEVICE),
+            //    (Value)(enactor_stats -> iteration));
         }
         frontier_attribute->queue_reset = true;
         enactor_stats     ->nodes_queued[0] += frontier_attribute->queue_length;
