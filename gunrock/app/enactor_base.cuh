@@ -646,11 +646,14 @@ public:
             {
                 printf("Loading Matrix-market coordinate-formatted graph ...\n");
             }
+
             char *market_filename = args.GetCmdLineArgvDataset();
-            if (market_filename == NULL)
+
+            std::ifstream fp(market_filename);
+            if (market_filename == NULL||!fp.is_open())
             {
                 fprintf(stderr, "Input graph does not exist.\n");
-                return 1;
+                exit (EXIT_FAILURE);
             }
             boost::filesystem::path market_filename_path(market_filename);
             file_stem = market_filename_path.stem().string();
@@ -2002,10 +2005,10 @@ void Iteration_Loop(
                         streams          [peer_],
                         gunrock::oprtr::advance::V2V, true, false, false)) break;
 
-                    if (!Enactor::SIZE_CHECK && 
-                        (Iteration::AdvanceKernelPolicy::ADVANCE_MODE 
+                    if (!Enactor::SIZE_CHECK &&
+                        (Iteration::AdvanceKernelPolicy::ADVANCE_MODE
                             == oprtr::advance::TWC_FORWARD ||
-                         Iteration::AdvanceKernelPolicy::ADVANCE_MODE 
+                         Iteration::AdvanceKernelPolicy::ADVANCE_MODE
                             == oprtr::advance::TWC_BACKWARD))
                     {}
                     else {
@@ -2027,7 +2030,7 @@ void Iteration_Loop(
                             data_slice, iteration, peer_,
                             stages[peer_]-1, stages[peer_], to_show[peer_])) break;
                         if (to_show[peer_]==false) break;
-                        if (Iteration::AdvanceKernelPolicy::ADVANCE_MODE 
+                        if (Iteration::AdvanceKernelPolicy::ADVANCE_MODE
                             == oprtr::advance::TWC_FORWARD ||
                             Iteration::AdvanceKernelPolicy::ADVANCE_MODE
                             == oprtr::advance::TWC_BACKWARD)
