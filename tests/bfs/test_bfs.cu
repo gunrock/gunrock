@@ -18,7 +18,6 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
-#include <fstream>
 
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
@@ -306,9 +305,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     bool stream_from_host        = info->info["stream_from_host"].get_bool();
     int traversal_mode           = info->info["traversal_mode"].get_int();
     int iterations               = 1; //disable since doesn't support mgpu stop condition. info->info["num_iteration"].get_int();
-    CpuTimer cpu_timer;
 
-    cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
@@ -362,8 +359,6 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     util::GRError(enactor->Init(
                       context, problem, max_grid_size, SIZE_CHECK, traversal_mode),
                   "BFS Enactor Init failed", __FILE__, __LINE__);
-    cpu_timer.Stop();
-    info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
     // compute reference CPU BFS solution for source-distance
     if (reference_check_label != NULL)
@@ -384,6 +379,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     // perform BFS
     double elapsed = 0.0f;
+    CpuTimer cpu_timer;
 
     for (int iter = 0; iter < iterations; ++iter)
     {
@@ -417,29 +413,16 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     elapsed /= iterations;
 
-    cpu_timer.Start();
     // copy out results
     util::GRError(problem->Extract(h_labels, h_preds),
                   "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // verify the result
-    if ((!quick_mode) && (!quiet_mode))
+    if (reference_check_label != NULL)
     {
-        printf("Label Validity: ");
-        int num_errors = CompareResults(
-            h_labels, reference_check_label,
-            graph->nodes, true, quiet_mode);
-        if (num_errors > 0)
+        if (!ENABLE_IDEMPOTENCE)
         {
-            printf("%d errors occurred.", num_errors);
-        }
-        printf("\n");
-
-        if (MARK_PREDECESSORS)
-        {
-            printf("Predecessor Validity: \n");
-            num_errors = 0;
-            for (VertexId v=0; v<graph->nodes; v++)
+            if (!quiet_mode)
             {
                 if (h_labels[v] == 
                     (ENABLE_IDEMPOTENCE ? -1 : util::MaxValue<VertexId>() - 1)) 
@@ -461,15 +444,20 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                     num_errors ++;
                     continue;
                 }
-                
-                bool v_found = false;
-                for (SizeT t = graph->row_offsets[pred]; t < graph->row_offsets[pred+1]; t++)
-                if (v == graph->column_indices[t])
+            }
+        }
+        else
+        {
+            if (!MARK_PREDECESSORS)
+            {
+                if (!quiet_mode)
                 {
-                    v_found = true;
-                    break;
+                    printf("Label Validity: ");
                 }
-                if (!v_found)
+                int error_num = CompareResults(
+                                    h_labels, reference_check_label,
+                                    graph->nodes, true, quiet_mode);
+                if (error_num > 0)
                 {
                     if (num_errors == 0)
                         printf("INCORRECT: Vertex %d not in Vertex %d's neighbor list\n",
@@ -478,12 +466,6 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                     continue;
                 }
             }
-
-            if (num_errors > 0)
-            {
-                printf("%d errors occurred.", num_errors);
-            } else printf("CORRECT");
-            printf("\n");
         }
     }
 
@@ -497,6 +479,12 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     info->ComputeTraversalStats(  // compute running statistics
         enactor->enactor_stats.GetPointer(), elapsed, h_labels);
 
+    if (!quiet_mode)
+    {
+        info->DisplayStats();  // display collected statistics
+    }
+
+    info->CollectInfo();  // collected all the info and put into JSON mObject
 
     if (!quiet_mode)
     {
@@ -577,34 +565,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     if (reference_labels) {delete[] reference_labels; reference_labels = NULL;}
     if (reference_preds ) {delete[] reference_preds ; reference_preds  = NULL;}
     if (h_labels        ) {delete[] h_labels        ; h_labels         = NULL;}
-    cpu_timer.Stop();
-    info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
-
-    if (h_preds         ) 
-    {
-        if (info->info["output_filename"].get_str() != "")
-        {
-            cpu_timer.Start();
-            std::ofstream fout;
-            size_t buf_size = 1024 * 1024 * 16;
-            char *fout_buf = new char[buf_size];
-            fout.rdbuf() -> pubsetbuf(fout_buf, buf_size);
-            fout.open(info->info["output_filename"].get_str().c_str());
-
-            for (VertexId v=0; v<graph->nodes; v++)
-            {
-                if (v == src) fout<< v+1 << "," << v+1 << std::endl; // root node
-                else if (h_preds[v] != -2) // valid pred
-                    fout<< v+1 << "," << h_preds[v]+1 << std::endl;
-            }
-            
-            fout.close();
-            delete[] fout_buf; fout_buf = NULL;
-            cpu_timer.Stop();
-            info->info["write_time"] = cpu_timer.ElapsedMillis();
-        }
-        delete[] h_preds         ; h_preds          = NULL;
-    }
+    if (h_preds         ) {delete[] h_preds         ; h_preds          = NULL;}
 }
 
 /**
@@ -785,18 +746,8 @@ int main_(CommandLineArgs *args)
     info->Init("BFS", *args, csr);  // initialize Info structure
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
-
     RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test
 
-    cpu_timer.Stop();
-    info->info["total_time"] = cpu_timer.ElapsedMillis();
-
-    if (!(info->info["quiet_mode"].get_bool()))
-    {
-        info->DisplayStats();  // display collected statistics
-    }
-
-    info->CollectInfo();  // collected all the info and put into JSON mObject
     return 0;
 }
 
