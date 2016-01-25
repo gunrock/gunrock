@@ -652,7 +652,7 @@ public:
             std::ifstream fp(market_filename);
             if (market_filename == NULL||!fp.is_open())
             {
-                fprintf(stderr, "Input graph does not exist.\n");
+                fprintf(stderr, "Input graph file %s does not exist.\n",market_filename);
                 exit (EXIT_FAILURE);
             }
             boost::filesystem::path market_filename_path(market_filename);
