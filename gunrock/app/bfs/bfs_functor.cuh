@@ -93,7 +93,8 @@ struct BFSFunctor {
             //set preds[d_id] to be s_id
             if (ProblemData::MARK_PREDECESSORS) {
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    s_id, problem->preds + d_id);
+                    problem->original_vertex.GetPointer(util::DEVICE) == NULL ? s_id : problem->original_vertex[s_id], 
+                    problem->preds + d_id);
             }
         }
     }
