@@ -640,6 +640,8 @@ public:
         Csr<VertexId, Value, SizeT> &csr_ref)
     {
         std::string graph_type = args.GetCmdLineArgvGraphType();
+
+
         if (graph_type == "market")  // Matrix-market graph
         {
             if (!args.CheckCmdLineFlag("quiet"))
@@ -801,7 +803,7 @@ public:
         else
         {
             fprintf(stderr, "Unspecified graph type.\n");
-            return 1;
+            exit(EXIT_FAILURE);
         }
 
         if (!args.CheckCmdLineFlag("quiet"))
