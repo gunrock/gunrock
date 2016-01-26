@@ -339,7 +339,7 @@ struct Cta
                     }
                 }
                 
-                if (cta -> d_cout != NULL)
+                if (cta -> d_out != NULL)
                 {
                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         vertex_out,
@@ -376,7 +376,8 @@ struct Cta
             static __device__ __forceinline__ void CtaExpand(Cta *cta, Tile *tile)
             {
                 // CTA-based expansion/loading
-                while(true) {
+                while(true) 
+                {
 
                     //All threads in block vie for the control of the block
                     if (tile->row_length[LOAD][VEC] >= KernelPolicy::CTA_GATHER_THRESHOLD) {
@@ -418,16 +419,16 @@ struct Cta
                                 : cta -> d_column_indices[tile->vertex_id[LOAD][VEC]];
                         }
                         cta->smem_storage.state.warp_comm[0][4] = tile->vertex_id[LOAD][VEC];
-                        if (util::pred_to_track(1, tile->vertex_id[LOAD][VEC]))
-                            printf("%d\t %d\t CtaExpand0 (%d of %d, %d of %d)\t"
-                                " {%d, %d, %d, %d, %d}\n",
-                                cta -> problem -> gpu_idx, cta->label, 
-                                blockIdx.x, gridDim.x, threadIdx.x, blockDim.x,
-                                cta->smem_storage.state.warp_comm[0][0],
-                                cta->smem_storage.state.warp_comm[0][1],
-                                cta->smem_storage.state.warp_comm[0][2],
-                                cta->smem_storage.state.warp_comm[0][3],
-                                cta->smem_storage.state.warp_comm[0][4]);
+                        //if (util::pred_to_track(1, tile->vertex_id[LOAD][VEC]))
+                        //    printf("%d\t %d\t CtaExpand0 (%d of %d, %d of %d)\t"
+                        //        " {%d, %d, %d, %d, %d}\n",
+                        //        cta -> problem -> gpu_idx, cta->label, 
+                        //        blockIdx.x, gridDim.x, threadIdx.x, blockDim.x,
+                        //        cta->smem_storage.state.warp_comm[0][0],
+                        //        cta->smem_storage.state.warp_comm[0][1],
+                        //        cta->smem_storage.state.warp_comm[0][2],
+                        //        cta->smem_storage.state.warp_comm[0][3],
+                        //        cta->smem_storage.state.warp_comm[0][4]);
 
                         // Unset row length
                         tile->row_length[LOAD][VEC] = 0;
@@ -450,18 +451,18 @@ struct Cta
                     else
                         pred_id = cta->label;
                     
-                    __syncthreads();
+                    //__syncthreads();
 
-                    if (util::thread_to_track(1, edge_id))
-                        printf("%d\t %d\t CtaExpand1 (%d of %d, %d of %d)\t"
-                            " {%d, %d, %d, %d, %d}\n",
-                            cta->problem->gpu_idx, cta->label, 
-                            blockIdx.x, gridDim.x, threadIdx.x, blockDim.x,
-                            cta->smem_storage.state.warp_comm[0][0],
-                            cta->smem_storage.state.warp_comm[0][1],
-                            cta->smem_storage.state.warp_comm[0][2],
-                            cta->smem_storage.state.warp_comm[0][3],
-                            cta->smem_storage.state.warp_comm[0][4]);
+                    //if (util::thread_to_track(1, edge_id))
+                    //    printf("%d\t %d\t CtaExpand1 (%d of %d, %d of %d)\t"
+                    //        " {%d, %d, %d, %d, %d}\n",
+                    //        cta->problem->gpu_idx, cta->label, 
+                    //        blockIdx.x, gridDim.x, threadIdx.x, blockDim.x,
+                    //        cta->smem_storage.state.warp_comm[0][0],
+                    //        cta->smem_storage.state.warp_comm[0][1],
+                    //        cta->smem_storage.state.warp_comm[0][2],
+                    //        cta->smem_storage.state.warp_comm[0][3],
+                    //        cta->smem_storage.state.warp_comm[0][4]);
 
                     while (coop_offset + threadIdx.x < coop_oob) 
                     {
@@ -481,7 +482,8 @@ struct Cta
                     //        pred_id, edge_id,
                     //        cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
                     //}
-                }
+                } // end of while (true)
+                __syncthreads();
 
                 // Next vector element
                 Iterate<LOAD, VEC + 1>::CtaExpand(cta, tile);

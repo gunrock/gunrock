@@ -19,7 +19,7 @@
 namespace gunrock {
 namespace util {
 
-#define TO_TRACK true
+#define TO_TRACK false
 #define NUM_TO_TRACK 5
 #define MAX_GPU 0
 
