@@ -424,6 +424,7 @@ public:
             args.GetCmdLineArgument("output_filename", output_filename);
             info["output_filename"] = output_filename;
         }
+        
         // parse device count and device list
         info["device_list"] = GetDeviceList(args);
 
