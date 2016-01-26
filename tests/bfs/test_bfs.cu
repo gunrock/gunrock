@@ -814,7 +814,7 @@ int main_(CommandLineArgs *args)
     info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
 
     cpu_timer2.Start();
-    info->Init("BFS", args, csr);  // initialize Info structure
+    info->Init("BFS", *args, csr);  // initialize Info structure
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 

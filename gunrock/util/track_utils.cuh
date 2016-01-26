@@ -19,7 +19,7 @@
 namespace gunrock {
 namespace util {
 
-#define TO_TRACK true
+#define TO_TRACK false
 #define NUM_TO_TRACK 5
 
 template <typename VertexId>
@@ -48,6 +48,13 @@ static __device__ __host__ __inline__ bool to_track(
     return false;
 }
 
+template <typename VertexId>
+static __device__ __host__ __inline__ bool to_track(
+    VertexId node)
+{
+    return to_track(-1, node);
+}
+
 template <
     typename VertexId,
     typename Value,
@@ -62,39 +69,40 @@ void Track_Results (
     VertexId** convertion_tables)
 {
     if (references == NULL) return;
-    if (!TO_TRACK) return;
-
-    for (VertexId v=0; v<graph->nodes; v++)
+    if (TO_TRACK)
     {
-        if (!to_track(-1, v)) continue;
-        printf("Vertex %d, ", v);
-        if (fabs(results[v] - references[v]) > error_threshold)
-            printf("reference = %d, ", references[v]);
-        printf("result = %d, ", results[v]);
-        if (num_gpus > 1)
+        for (VertexId v=0; v<graph->nodes; v++)
         {
-            printf("host = %d, v_ = ", partition_table[v]);
-            for (int gpu=0; gpu<num_gpus; gpu++)
-                printf("%d%s", convertion_tables[gpu][v], gpu == num_gpus-1? "" : ", ");
-        }
-        printf("\n");
-        for (SizeT j = graph->row_offsets[v]; j < graph->row_offsets[v+1]; j++)
-        {
-            VertexId u = graph -> column_indices[j];
-            if (references[u] != references[v] -1) continue; // bfs
-            printf("\t%d, ", u);
-            if (fabs(results[u] - references[u]) > error_threshold)
-                printf("reference = %d, ", references[u]);
-            printf("result = %d, ", results[u]);
+            if (!to_track(-1, v)) continue;
+            printf("Vertex %d, ", v);
+            if (fabs(results[v] - references[v]) > error_threshold)
+                printf("reference = %d, ", references[v]);
+            printf("result = %d, ", results[v]);
             if (num_gpus > 1)
             {
-                printf("host = %d, u_ = ", partition_table[u]);
+                printf("host = %d, v_ = ", partition_table[v]);
                 for (int gpu=0; gpu<num_gpus; gpu++)
-                    printf("%d%s", convertion_tables[gpu][u], gpu == num_gpus -1 ? "" : ", ");
+                    printf("%d%s", convertion_tables[gpu][v], gpu == num_gpus-1? "" : ", ");
+            }
+            printf("\n");
+            for (SizeT j = graph->row_offsets[v]; j < graph->row_offsets[v+1]; j++)
+            {
+                VertexId u = graph -> column_indices[j];
+                if (references[u] != references[v] -1) continue; // bfs
+                printf("\t%d, ", u);
+                if (fabs(results[u] - references[u]) > error_threshold)
+                    printf("reference = %d, ", references[u]);
+                printf("result = %d, ", results[u]);
+                if (num_gpus > 1)
+                {
+                    printf("host = %d, u_ = ", partition_table[u]);
+                    for (int gpu=0; gpu<num_gpus; gpu++)
+                        printf("%d%s", convertion_tables[gpu][u], gpu == num_gpus -1 ? "" : ", ");
+                }
+                printf("\n");
             }
             printf("\n");
         }
-        printf("\n");
     }
 }
 

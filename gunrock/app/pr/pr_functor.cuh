@@ -34,17 +34,6 @@ namespace gunrock {
 namespace app {
 namespace pr {
 
-#define TO_TRACK false
-
-template <typename VertexId>
-static __device__ __host__ bool to_track(VertexId node) {
-    const int num_to_track = 4;
-    const VertexId node_to_track[] = {0, 1, 2, 3};
-    for (int i = 0; i < num_to_track; i++)
-        if (node == node_to_track[i]) return true;
-    return false;
-}
-
 /**
  * @brief Structure contains device functions in PR graph traverse.
  *
