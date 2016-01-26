@@ -144,17 +144,11 @@ cudaError_t ComputeOutputLength(
             (SizeT*)partitioned_scanned_edges,
             context);
 
-        return util::GRError(cudaMemcpyAsync(
-            frontier_attribute->output_length.GetPointer(util::DEVICE),
-            partitioned_scanned_edges + frontier_attribute->queue_length - 1, // TODO: +1?
-            sizeof(SizeT), cudaMemcpyDeviceToDevice, stream),
-            "cudaMemcpyAsync failed", __FILE__, __LINE__);
-    //} else {
-    //    util::MemsetKernel<<<1,1,0,stream>>>(
-    //        frontier_attribute->output_length.GetPointer(util::DEVICE),
-    //        0, 1);
-    //}
-    //return cudaSuccess;
+    return util::GRError(cudaMemcpyAsync(
+         frontier_attribute->output_length.GetPointer(util::DEVICE),
+         partitioned_scanned_edges + frontier_attribute->queue_length - 1, // TODO: +1?
+         sizeof(SizeT), cudaMemcpyDeviceToDevice, stream),
+         "cudaMemcpyAsync failed", __FILE__, __LINE__);
 }
 
 /**

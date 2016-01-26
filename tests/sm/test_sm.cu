@@ -104,7 +104,7 @@ void Usage()
  * @param[in] graph Reference to the CSR graph.
  */
 template<typename VertexId, typename SizeT, typename Value>
-void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph_query, 
+void DisplaySmSolution(const Csr<VertexId, Value, SizeT> &graph_query, 
 		     const Csr<VertexId, Value, SizeT> &graph_data,
 		     bool *h_c_set,
 		     unsigned int num_matches)
@@ -135,7 +135,7 @@ void SMReference(const Csr<VertexId, Value, SizeT> &graph_query,
 {
     // initialization
 
-    // perform calculation
+    // perform subgraph matching calculation
 
     CpuTimer cpu_timer;
     cpu_timer.Start();

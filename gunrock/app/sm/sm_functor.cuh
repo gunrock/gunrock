@@ -35,8 +35,8 @@ struct SMInitFunctor {
 
     /**
      * @brief Candidates initial filter condition function. 
-     * Check if the data node has the same label and larger 
-     * or equivalent degree as each query node.
+     * Check if each data node has the same label and larger 
+     * or equivalent degree as every query node.
      *
      * @param[in] node Vertex Id
      * @param[in] problem Data slice object
@@ -47,7 +47,11 @@ struct SMInitFunctor {
      */
     static __device__ __forceinline__ bool
     CondFilter(VertexId node, DataSlice *problem, Value v=0 , SizeT nid = 0) {
-        return true;  
+        for(VertexId i=0; i<problem->nodes_query; i++)
+	    if((problem->d_data_labels[node]==problem->d_query_labels[i]) &&
+		    (problem->d_data_degrees[node] >= problem->d_query_degrees[i]))
+	        return true;  
+	return false;
     }
 
     /**
@@ -160,7 +164,18 @@ struct PruneFunctor
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-	return true;
+	for(VertexId i=0; i<problem->nodes_query; i++)
+	    if(problem->d_c_set[s_id + i*problem->nodes_data]==1) // s_id is a candidate of i
+		// loop for i's neighbors (j) to check if d_id is a candidate of any j
+		for(int offset=problem->d_query_row[i], VertexId j=problem->d_query_col[offset];
+			offset<problem->d_query_row[i+1]; 
+			offset++, j=problem->d_query_col[offset])
+		    if(problem->d_c_set[d_id + j*problem->nodes_data]==1)
+			return true;
+	__syncthreads();		
+	// If d_id is no candidate of any i's neighbors, subtract 1 from s_id's degree
+	atomicSub(&problem->d_data_degrees[s_id],1);	
+	return false;
   }
 
  /**
@@ -176,58 +191,124 @@ struct PruneFunctor
     VertexId s_id,  VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    int query_node;
-    int temp;
     int neighbors;
-    __shared__ int ones;
-    if(threadIdx.x==0) ones=0;
-    __syncthreads();
     int offset;
-    int i,j;
-    bool save=false;
-    int num_iterations=3;
+    VertexId i,j;
+    int num_iterations=3; // the more iterations the more accurate
 	
     for(int it=0; it<num_iterations; it++){
-  	  for(i=0; i<problem->nodes_query; i++){
-		query_node = problem->d_temp_keys[i];
-		// check if there's a candidate for each neighbor of query node 
-      	 	// add the 1s together and compare with query node's #neigbors, if smaller prune out
-		neighbors = problem->d_query_row[query_node+1] - problem->d_query_row[query_node];
-
-		if(problem->d_c_set[query_node * problem->nodes_data+s_id]){
-	    	for(j=0; j < neighbors; j++){
-			offset = problem->d_query_row[query_node]+j;
-			if(problem->d_c_set[d_id+problem->nodes_data * problem->d_query_col[offset]])
-				save=true;
+        for(i=0; i<problem->nodes_query; i++){
+	//? do I need to store the ids of row offsets in a seperate array
+	//	query_node = problem->d_temp_keys[i]; 
 		
-			__syncthreads();
-			if(save) continue;
-			else break;
+	    // s_id is one of i's candidates
+	    if(problem->d_c_set[i * problem->nodes_data+s_id]==1){
+		neighbors = problem->d_query_row[i+1] - problem->d_query_row[i];
+		// If s_id's degree is smaller than i's degree
+		if(problem->d_data_degrees[s_id]<neighbors){ 
+		    d_c_set[i * problem->nodes_data+s_id]=0;
+		    atomicSub(&problem->d_data_degrees[d_id],1);
+		    continue;
+		}
+		// check if a candidate exits for each neighbor of i among s_id's neighbors
+	    	for(offset=problem->d_query_row[i]; offset<problem->d_query_row[i+1]; offset++){
+		    j = problem->d_query_col[offset];
+		    if(problem->d_c_set[d_id+problem->nodes_data * j]==1)
+		    	problem->d_temp_keys[s_id]++; // Competitive add
+		
+		    __syncthreads();
+	  	    if(d_temp_keys[s_id]>0) continue;
+		    else break;
 		
 	    	}
-	
-		       if(i<neighbors) problem->d_c_set[s_id + query_node * problem->nodes_data]=0;
-  			__syncthreads();
+	        // break happens: Not every i's neighbor can find a candidate among s_id's neighbors
+	        if(offset<problem->d_query_row[i+1]) 
+		    problem->d_c_set[s_id + i * problem->nodes_data]=0;
+		    atomicSub(&problem->d_data_degrees[d_id],1);
 		}
-
-		if(problem->d_c_set[query_node * problem->nodes_data+s_id]){
-	   	for(j=0; j<problem->nodes_query; j++){
-			temp = problem->d_temp_keys[i];
-			if(problem->d_c_set[d_id+temp*problem->nodes_data]) atomicAdd(&ones,1);
-	   		__syncthreads();
-	
-		   }	
-		   if(ones<neighbors) problem->d_c_set[s_id+query_node*problem->nodes_data]=0;
-		}
-	
-	    }
+	    __syncthreads();
+	}
+	__syncthreads();
+   }
   }
-}
 
 }; // PruneFunctor
 
+
+/**
+ * @brief Structure contains device functions in joining candidates into candidate subgraphs. 
+ *
+ * @tparam VertexId    Type used for vertex id (e.g., uint32)
+ * @tparam SizeT       Type used for array indexing. (e.g., uint32)
+ * @tparam Value       Type used for calculation values (e.g., float)
+ * @tparam ProblemData Problem data type which contains data slice for SM problem
+ *
+ */
+template<
+  typename VertexId,
+  typename SizeT,
+  typename Value,
+  typename ProblemData>
+struct JoinFunctor
+{
+  typedef typename ProblemData::DataSlice DataSlice;
+  /**
+   * @brief Forward Advance Kernel condition function.
+   *
+   * @param[in] s_id Vertex Id of the edge source node
+   * @param[in] d_id Vertex Id of the edge destination node
+   * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
+   *
+   * \return Whether to load the apply function for the edge and include
+   * the destination node in the next frontier.
+   */
+  static __device__ __forceinline__ bool CondEdge(
+    VertexId s_id, VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+  {
+	VertexId r_id=problem->d_vertex_cover[problem->iteration];
+	if(problem->d_c_set[s_id+r_id * problem->nodes_data]==1)  return true;
+	else return false;
+  }
+
+ /**
+   * @brief Forward Advance Kernel apply function.
+   *
+   * @param[in] s_id Vertex Id of the edge source node
+   * @param[in] d_id Vertex Id of the edge destination node
+   * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
+   */
+  static __device__ __forceinline__ void ApplyEdge(
+    VertexId s_id,  VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+  {
+    __shared__ int pos;
+    if(threadIdx.x==0) pos=0;
+    __syncthreads();
+    VertexId r_id = problem->d_vertex_cover[problem->iteration];
+
+    if(problem->iteration==0){	
+	for(int offset=problem->d_query_row[r_id]; offset < problem->d_query_row[r_id+1]; offset++){
+	    if(problem->d_c_set[d_id + problem->nodes_data * problem->d_query_col[offset]]==1){
+		problem->d_temp_keys[pos]=s_id * problem->nodes_data + d_id; // nodes_data-ary
+		atomicAdd(&pos,1);
+	    }
+	    __syncthreads();
+	}
+    }
+    else{
+	
+    }
+  }
+
+}; // JoinFunctor
+
 }  // namespace sm
-}  // nimespacewapp
+}  // namespace app
 }  // namespace gunrock
 
 // Leave this at the end of the file

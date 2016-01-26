@@ -125,40 +125,33 @@ class SMEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHE
     template <
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy,
-        typename Problem >
+        typename SMProblem >
     cudaError_t EnactSM(
         ContextPtr  context,
-        Problem*    problem,
+        SMProblem*    problem,
         int         max_grid_size = 0) {
-        typedef typename Problem::SizeT  SizeT;
-	typedef typename Problem::Value  Value;
-        typedef typename Problem::VertexId VertexId;
+        typedef typename SMProblem::SizeT  SizeT;
+	typedef typename SMProblem::Value  Value;
+        typedef typename SMProblem::VertexId VertexId;
 
         // Define functors used in SMProblem
-        typedef SMInitFunctor<VertexId, SizeT, Value, Problem> SMInitFunctor;
-      //  typedef EdgeWeightFunctor<VertexId, SizeT, Value, SMProblem> EdgeWeightFunctor;
-        typedef PruneFunctor<VertexId, SizeT, Value, Problem> PruneFunctor;
+        typedef SMInitFunctor<VertexId, SizeT, VertexId, SMProblem> SMInitFunctor;
+        //typedef EdgeWeightFunctor<VertexId, SizeT, Value, SMProblem> EdgeWeightFunctor;
+        typedef PruneFunctor<VertexId, SizeT, VertexId, SMProblem> PruneFunctor;
+	typedef JoinFunctor<VertexId, SizeT, VertexId, SMProblem> JoinFunctor;
 
         cudaError_t retval = cudaSuccess;
+	SizeT* d_scanned_edges = NULL;  // Used for LB
 
-	FrontierAttribute<SizeT>
-            *frontier_attribute = &this->frontier_attribute[0];
+	FrontierAttribute<SizeT> *frontier_attribute = &this->frontier_attribute[0];
         EnactorStats *enactor_stats = &this->enactor_stats[0];
-        typename Problem::DataSlice *data_slice = problem->data_slices[0];
+        typename SMProblem::DataSlice *data_slice = problem->data_slices[0];
 	util::DoubleBuffer<SizeT, VertexId, Value>*
             frontier_queue     = &data_slice->frontier_queues[0];
         util::CtaWorkProgressLifetime *work_progress = &this->work_progress[0];
         cudaStream_t stream = data_slice->streams[0];
 
         do {
-	    SizeT* d_scanned_edges = NULL;
-
-            if(DEBUG) {
-                printf("Iteration, Edge map queue, Vertex map queue\n");
-                printf("0");
-            }
-            fflush(stdout);
-
 	    // Lazy Initialization
 	    if (retval = Setup(problem)) break;
 	    
@@ -171,43 +164,22 @@ class SMEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHE
 
 	    // Single-gpu graph slice
 	    GraphSlice<SizeT, VertexId, Value> *graph_slice = problem->graph_slices[0];
-	    typename Problem::DataSlice *d_data_slice = problem->d_data_slices[0];
+	    typename SMProblem::DataSlice *d_data_slice = problem->d_data_slices[0];
 
-	    if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB)
-      	    {
-        	if (retval = util::GRError(cudaMalloc((void**)&d_scanned_edges,
-         	 graph_slice->edges * sizeof(unsigned int)),
+            if (retval = util::GRError(cudaMalloc((void**)&d_scanned_edges,
+         	 graph_slice->edges * sizeof(SizeT)),
           	"SMProblem cudaMalloc d_scanned_edges failed",
          	 __FILE__, __LINE__)) return retval;
-     	    }
 
-	    frontier_attribute->queue_length = graph_slice->nodes;
+	    ///////////////////////////////////////////////////////////////////////////
+	    // Initial filtering based on node labels and degrees 
+	    // And generate candidate sets for query nodes
 	    frontier_attribute->queue_index = 0; // work queue index
 	    frontier_attribute->selector = 0;
+	    frontier_attribute->queue_length = graph_slice->nodes;
 	    frontier_attribute->queue_reset = true;
 
-	    // Initial filtering based on node labels and degrees
-/*
-	    oprtr::filter::Kernel<FilterKernelPolicy, Problem, SMInitFunctor>
-		<<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS>>>(
-			0,
-			frontier_attribute.queue_reset,
-			frontier_attribute.queue_index,
-			enactor_stats.num_gpus,
-			frontier_attribute.queue_length,
-			d_done,
-			graph_slice->frontier_queues.d_keys[frontier_attribute.selector],
-			NULL,
-			NULL,
-			data_slice,
-			NULL,
-			work_progress,
-			graph_slice->frontier_elements[frontier_attribute.selector],
-			graph_slice->frontier_elements[frontier_attribute.selector^1],
-			enactor_stats.filter_kernel_stats,
-			false);
-*/
-	  oprtr::filter::Kernel<FilterKernelPolicy, Problem, SMInitFunctor><<<
+	    oprtr::filter::Kernel<FilterKernelPolicy, SMProblem, SMInitFunctor><<<
                 enactor_stats->filter_grid_size,
                 FilterKernelPolicy::THREADS, 0, stream>>>(
                 enactor_stats->iteration + 1,
@@ -226,16 +198,15 @@ class SMEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHE
 
 
 	    if(DEBUG && (retval = util::GRError(cudaThreadSynchronize(), 
-		"Initial Filtering failed", __FILE__, __LINE__))) break;
-//	    enactor_stats.iteration++;
-	    frontier_attribute->queue_index++;   	   
+		"Initial filtering filter::Kernel failed", __FILE__, __LINE__))) break;
+
+	    if(frontier_attribute->queue_reset)
+		
+	    frontier_attribute->queue_index++;
 	    frontier_attribute->selector ^= 1;
 
-            if (retval = work_progress->GetQueueLength(
-                frontier_attribute->queue_index,
-                frontier_attribute->queue_length)) break;
-	    
 	 /*   mgpu::SegReduceCsr(data_slice->d_c_set, 
+			       data_slice->d_temp_keys, 
 			       data_slice->d_temp_keys, 
 			       data_slice->nodes_query * data_slice->nodes_data,
 			       data_slice->nodes_query,
@@ -307,16 +278,29 @@ class SMEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHE
                   context,
                   gunrock::oprtr::advance::V2V);		
 */
-	oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, PruneFunctor>(
+
+
+	    ///////////////////////////////////////////////////////////////////////////
+	    // Prune out candidates by checking candidate neighbours 
+	    frontier_attribute->queue_index=0;   	   
+	    frontier_attribute->selector =0;
+	    frontier_attribute->queue_length = graph_slice->nodes;
+	    frontier_attribute->queue_reset = true;
+
+            if (retval = work_progress->GetQueueLength(
+                frontier_attribute->queue_index,
+                frontier_attribute->queue_length)) break;
+	    
+   	    oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SMProblem, PruneFunctor>(
                 enactor_stats[0],
                 frontier_attribute[0],
                 d_data_slice,
                 (VertexId*)NULL,
                 (bool*    )NULL,
                 (bool*    )NULL,
-                d_scanned_edges,
-                frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
+                d_scanned_edges,  // In order to use the output vertices from previous filter functor 
                 frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
+                frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
                 (VertexId*)NULL,
                 (VertexId*)NULL,
                 graph_slice->row_offsets   .GetPointer(util::DEVICE),
@@ -331,9 +315,8 @@ class SMEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHE
                 gunrock::oprtr::advance::V2V);
 
 	   if (DEBUG && (retval = util::GRError(cudaDeviceSynchronize(),
-          	"Advance::LaunchKernel failed", __FILE__, __LINE__))) break;
+          	"Prune Functor Advance::LaunchKernel failed", __FILE__, __LINE__))) break;
 
-	   frontier_attribute->queue_index++;
 
            if (true) {
                 if (retval = work_progress->GetQueueLength(
@@ -343,8 +326,42 @@ class SMEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHE
                        (long long) frontier_attribute->queue_length);
             }
 
-            // TODO: extract graph with proper format (edge list, csr, etc.)
+//TODO: need to preprocess a minimum vertex cover of the query graph beforehand, we need loop the JoinFunctor # of vertex cover times. Reset d_temp_keys to -1 before the loop
+	  for(; data_slice->iteration < data_slice->vetex_cover_size; data_slice->iteration++){ 
+	    //////////////////////////////////////////////////////////////////////////////////////
+            // Extract graph with proper format (edge list, csr, etc.) using JoinFunctor - advance
+	    // successor array holds the outgoing v for each u ??
+	    frontier_attribute->queue_index=0;   	   
+	    frontier_attribute->selector =0;
+	    frontier_attribute->queue_length = graph_slice->nodes;
+	    frontier_attribute->queue_reset = true;
+	    
+	    oprtr::advance:: LaunchKernel<AdvanceKernelPolicy, SMProblem, JoinFunctor>(
+                enactor_stats[0],
+                frontier_attribute[0],
+                d_data_slice,
+                (VertexId*)NULL,
+                (bool*    )NULL,
+                (bool*    )NULL,
+                d_scanned_edges,  // In order to use the output vertices from prevs filter functor 
+                frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
+                frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
+                (VertexId*)NULL,
+                (VertexId*)NULL,
+                graph_slice->row_offsets   .GetPointer(util::DEVICE),
+                graph_slice->column_indices.GetPointer(util::DEVICE),
+                (SizeT*   )NULL,
+                (VertexId*)NULL,
+                graph_slice->nodes,
+                graph_slice->edges,
+                work_progress[0],
+                context[0],
+                stream,
+                gunrock::oprtr::advance::V2V);
 
+	   if (DEBUG && (retval = util::GRError(cudaDeviceSynchronize(),
+          	"Prune Functor Advance::LaunchKernel failed", __FILE__, __LINE__))) break;
+	  }
             if (d_scanned_edges) cudaFree(d_scanned_edges);
 
         } while (0);

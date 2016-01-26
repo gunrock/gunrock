@@ -184,12 +184,6 @@ public:
         info["dataset"]            = "";     // dataset name used in test
         info["edges_visited"]      = 0;      // number of edges touched
         info["elapsed"]            = 0.0f;   // elapsed device running time
-        info["preprocess_time"]    = 0.0f;   // elapsed preprocessing time
-        info["postprocess_time"]   = 0.0f;   // postprocessing time
-        info["total_time"]         = 0.0f;   // total run time of the program
-        info["load_time"]          = 0.0f;   // data loading time
-        info["write_time"]         = 0.0f;   // output writing time
-        info["output_filename"]    = "";     // output filename
         info["engine"]             = "";     // engine name - Gunrock
         info["edge_value"]         = false;  // default don't load weights
         info["git_commit_sha1"]    = "";     // git commit sha1
@@ -233,7 +227,6 @@ public:
         info["alpha"]              = 6.0f;   // default alpha for DOBFS
         info["beta"]               = 6.0f;   // default beta for DOBFS
         info["top_nodes"]          = 0;      // default number of nodes for top-k primitive
-        info["normalized"]         = false;  // default normalized for PageRank
         // info["gpuinfo"]
         // info["device_list"]
         // info["sysinfo"]
@@ -279,7 +272,6 @@ public:
         info["quiet_mode"] =  args.CheckCmdLineFlag("quiet");
         info["idempotent"] =  args.CheckCmdLineFlag("idempotence");       // BFS
         info["mark_predecessors"] =  args.CheckCmdLineFlag("mark-pred");  // BFS
-        info["normalized"] =  args.CheckCmdLineFlag("normalized"); // PR
 
         info["json"] = args.CheckCmdLineFlag("json");
         if (args.CheckCmdLineFlag("jsonfile"))
@@ -671,18 +663,22 @@ public:
         Csr<VertexId, Value, SizeT> &csr_ref)
     {
         std::string graph_type = args.GetCmdLineArgvGraphType();
+
+
         if (graph_type == "market")  // Matrix-market graph
         {
             if (!args.CheckCmdLineFlag("quiet"))
             {
                 printf("Loading Matrix-market coordinate-formatted graph ...\n");
             }
+
             char *market_filename = args.GetCmdLineArgvDataset();
-            if (market_filename == NULL)
+
+            std::ifstream fp(market_filename);
+            if (market_filename == NULL||!fp.is_open())
             {
-                printf("YZH Log.");
-                fprintf(stderr, "Input graph does not exist.\n");
-                return 1;
+                fprintf(stderr, "Input graph file %s does not exist.\n",market_filename);
+                exit (EXIT_FAILURE);
             }
             boost::filesystem::path market_filename_path(market_filename);
             file_stem = market_filename_path.stem().string();
@@ -830,7 +826,7 @@ public:
         else
         {
             fprintf(stderr, "Unspecified graph type.\n");
-            return 1;
+            exit(EXIT_FAILURE);
         }
 
         if (!args.CheckCmdLineFlag("quiet"))
@@ -1005,11 +1001,6 @@ public:
         int64_t nodes_queued  = info["nodes_queued" ].get_int();
         double  nodes_redundance = info["nodes_redundance"].get_real();
         double  edges_redundance = info["edges_redundance"].get_real();
-        double  load_time        = info["load_time"       ].get_real();
-        double  preprocess_time  = info["preprocess_time" ].get_real();
-        double  postprocess_time = info["postprocess_time"].get_real();
-        double  write_time       = info["write_time"      ].get_real();
-        double  total_time       = info["total_time"      ].get_real();
 
         printf("\n [%s] finished.", info["algorithm"].get_str().c_str());
         printf("\n elapsed: %.4f ms\n iterations: %lld", elapsed, (long long)search_depth);
@@ -1051,12 +1042,6 @@ public:
                 {
                     printf("\n edges redundance: %.2f%%", edges_redundance);
                 }
-                printf("\n load time: %.4f ms", load_time);
-                printf("\n preprocess time: %.4f ms", preprocess_time);
-                printf("\n postprocess time: %.4f ms", postprocess_time);
-                if (info["output_filename"].get_str() != "")
-                    printf("\n write time: %.4f ms", write_time);
-                printf("\n total time: %.4f ms", total_time);
            }
         }
         printf("\n");
@@ -1403,11 +1388,11 @@ __global__ void Make_Out(
             s_keys_outs[0][pos]=key;
         } else {
             s_keys_outs[target][pos]=convertion_table[key];
-            #pragma unroll
+            #pragma unrool
             for (int i=0;i<num_vertex_associates;i++)
                 s_vertex_associate_outss[target*num_vertex_associates+i][pos]
                     =s_vertex_associate_orgs[i][key];
-            #pragma unroll
+            #pragma unrool
             for (int i=0;i<num_value__associates;i++)
                 s_value__associate_outss[target*num_value__associates+i][pos]
                     =s_value__associate_orgs[i][key];
@@ -1485,11 +1470,11 @@ __global__ void Make_Out_Backward(
                 s_keys_outs[0][pos]=key;
             } else {
                 s_keys_outs[target][pos]=convertion_table[j];
-                #pragma unroll
+                #pragma unrool
                 for (int i=0;i<num_vertex_associates;i++)
                     s_vertex_associate_outss[target*num_vertex_associates+i][pos]
                         =s_vertex_associate_orgs[i][key];
-                #pragma unroll
+                #pragma unrool
                 for (int i=0;i<num_value__associates;i++)
                     s_value__associate_outss[target*num_value__associates+i][pos]
                         =s_value__associate_orgs[i][key];
