@@ -568,11 +568,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                       context, problem, traversal_mode, max_grid_size),
                   "PR Enactor Init failed", __FILE__, __LINE__);
     cpu_timer.Stop();
-<<<<<<< HEAD
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
-=======
-    info -> info["preprecess_time"] = cpu_timer.ElapsedMillis();
->>>>>>> parent of e4adcc9... Revert "for BFS and PR: added load, preprocess, postprocess, write and total timers; added raw result output option"
 
     double elapsed = 0.0f;
 
@@ -817,7 +813,6 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     if (enactor    ) { delete   enactor    ; enactor     = NULL; }
     if (ref_rank   ) { delete[] ref_rank   ; ref_rank    = NULL; }
     if (ref_node_id) { delete[] ref_node_id; ref_node_id = NULL; }
-<<<<<<< HEAD
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
     
@@ -843,8 +838,6 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         }
         delete[] h_rank     ; h_rank      = NULL; 
     }
-=======
->>>>>>> parent of e4adcc9... Revert "for BFS and PR: added load, preprocess, postprocess, write and total timers; added raw result output option"
     if (h_node_id  ) { delete[] h_node_id  ; h_node_id   = NULL; }
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
@@ -870,35 +863,6 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             info->info["write_time"] = cpu_timer.ElapsedMillis();
         }
         delete[] h_rank     ; h_rank      = NULL; 
-    }
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- * @tparam SIZE_CHECK
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename VertexId,
-    typename Value,
-    typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK >
-void RunTests_normalized(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["normalized"].get_bool())
-    {
-        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,  true>(info);
-    } else {
-        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK, false>(info);
     }
 }
 
