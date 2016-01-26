@@ -184,6 +184,12 @@ public:
         info["dataset"]            = "";     // dataset name used in test
         info["edges_visited"]      = 0;      // number of edges touched
         info["elapsed"]            = 0.0f;   // elapsed device running time
+        info["preprocess_time"]    = 0.0f;   // elapsed preprocessing time
+        info["postprocess_time"]   = 0.0f;   // postprocessing time
+        info["total_time"]         = 0.0f;   // total run time of the program
+        info["load_time"]          = 0.0f;   // data loading time
+        info["write_time"]         = 0.0f;   // output writing time
+        info["output_filename"]    = "";     // output filename
         info["engine"]             = "";     // engine name - Gunrock
         info["edge_value"]         = false;  // default don't load weights
         info["git_commit_sha1"]    = "";     // git commit sha1
@@ -424,7 +430,7 @@ public:
             args.GetCmdLineArgument("output_filename", output_filename);
             info["output_filename"] = output_filename;
         }
-        
+
         // parse device count and device list
         info["device_list"] = GetDeviceList(args);
 
@@ -1003,6 +1009,11 @@ public:
         int64_t nodes_queued  = info["nodes_queued" ].get_int();
         double  nodes_redundance = info["nodes_redundance"].get_real();
         double  edges_redundance = info["edges_redundance"].get_real();
+        double  load_time        = info["load_time"       ].get_real();
+        double  preprocess_time  = info["preprocess_time" ].get_real();
+        double  postprocess_time = info["postprocess_time"].get_real();
+        double  write_time       = info["write_time"      ].get_real();
+        double  total_time       = info["total_time"      ].get_real();
 
         printf("\n [%s] finished.", info["algorithm"].get_str().c_str());
         printf("\n elapsed: %.4f ms\n iterations: %lld", elapsed, (long long)search_depth);
@@ -1044,6 +1055,12 @@ public:
                 {
                     printf("\n edges redundance: %.2f%%", edges_redundance);
                 }
+                printf("\n load time: %.4f ms", load_time);
+                printf("\n preprocess time: %.4f ms", preprocess_time);
+                printf("\n postprocess time: %.4f ms", postprocess_time);
+                if (info["output_filename"].get_str() != "")
+                    printf("\n write time: %.4f ms", write_time);
+                printf("\n total time: %.4f ms", total_time);
            }
         }
         printf("\n");
