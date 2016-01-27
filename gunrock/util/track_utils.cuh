@@ -24,22 +24,6 @@ namespace util {
 #define MAX_GPU 0
 
 template <typename VertexId>
-static __device__ __host__ __inline__ bool to_track(VertexId node) {
-    const VertexId node_to_track[] = {
-        81561706,
-        48459810, 
-        18876984,
-        1902};
-    if (!TO_TRACK) return false;
-    else { 
-        #pragma unroll
-        for (int i = 0; i < NUM_TO_TRACK; i++)
-            if (node == node_to_track[i]) return true;
-    }
-    return false;
-}
-
-template <typename VertexId>
 static __device__ __host__ __inline__ bool to_track(
     int gpu_num, VertexId node)
 {
