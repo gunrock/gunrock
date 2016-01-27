@@ -97,13 +97,13 @@ struct KernelPolicy
 
             SCRATCH_ELEMENT_SIZE            = sizeof(SizeT),
 
-            // should generate warning info if SCRATCH_ELEMENTS ended up smaller than THREADS.
-            SCRATCH_ELEMENTS                 = (THREADS > MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE) ? MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE : THREADS,
+            // for storing partition indices
+            SCRATCH_ELEMENTS                 = THREADS+1,
         };
 
         // Scratch elements
         struct {
-            SizeT                       s_counts[SCRATCH_ELEMENTS]; // stores block-wise intersection counts
+            SizeT                       s_partition_idx[SCRATCH_ELEMENTS]; // stores block-wise intersection counts
         };
     };
 

@@ -26,26 +26,6 @@
 //        column_indices
 // Expected output: a single integer as triangle count
 //
-// First, we divide the input arrays into p partitions, each block will compute
-// the intersects of m/p node pairs. For each of these pairs, a block will
-// perform the following phases:
-// 1) partition
-// 2) intersect per thread
-// 3) block reduce to get partial triangle counts
-//
-// partition:
-// nv_per_partition = (acount + bcount)/THREADS
-// use FindSetPartitions, KernelSetPartitions (search.cuh)
-// and BalancedPath (ctasearch.cuh) to create a partition array
-// parition_device[THREADS] in smem
-//
-// intersect:
-// Each thread will check nv_per_partition values and accumulate tc number
-// if we only need tc number, we can modify
-// DeviceComputeSetAvailability
-//
-// block reduce is simple
-//
 
 #pragma once
 #include <gunrock/util/cta_work_distribution.cuh>
@@ -246,7 +226,66 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             SizeT       &num_vertex,
                             SizeT       &num_edge)
     {
+        __shared__ typename KernelPolicy::SmemStorage smem_storage;
         // Each block uses balanced path to get intersect count
+        // First, we divide the input node ids of length input_length into p
+        // partitions, each block will compute the intersects of m/p node pairs.
+        // Now let's first assume that p=blockDim.x
+        SizeT pairs_per_block = (input_length + blockDim.x - 1) / blockDim.x;
+        
+        // Starting and ending index for this block
+        SizeT start = pairs_per_block * blockIdx.x;
+        SizeT end = (pairs_per_block * (blockIdx.x+1) > input_length) ? input_length
+                                            : pairs_per_block*(blockIdx.x+1);
+
+        
+        // partition:
+        // nv_per_partition = (acount + bcount)/THREADS
+        // use FindSetPartitions, KernelSetPartitions (search.cuh)
+        // and BalancedPath (ctasearch.cuh) to create a partition array
+        // parition_device[THREADS] in smem
+        //
+        // intersect:
+        // Each thread will check nv_per_partition values and accumulate tc number
+        // if we only need tc number, we can modify
+        // DeviceComputeSetAvailability
+        //
+        // block reduce is simple
+        //
+        for (int i = start; i < end; ++i) {
+            // For each of these pairs, a block will
+            // perform the following phases:
+            // 1) partition
+            // 2) intersect per thread
+            // 3) block reduce to get partial triangle counts
+            //
+            // partition:
+            // get acount and bcount
+            SizeT a_rowoffset = d_row_offsets[d_src_node_ids[i]];
+            SizeT b_rowoffset = d_row_offsets[d_dst_node_ids[i]];
+            SizeT acount  = d_src_nl_sizes[i];
+            SizeT bcount  = d_dst_nl_sizes[i];
+            VertexId *a_list = &d_column_indices[a_rowoffset];
+            VertexId *b_list = &d_column_indices[b_rowoffset];
+            int numPartitions = KernelPolicy::THREADS;
+            int numSearches = numPartitions+1;
+            int nv = (acount+bcount+numPartitions-1)/numPartitions;
+            //Duplicate = T, comp = mgpu::less<VertexId>, numSearches=numPartitions+1
+            int gid = threadIdx.x;
+            if (gid < numSearches) {
+                int diag = min(acount+bcount, gid * nv);
+                int2 bp = mgpu::BalancedPath<true, mgpu::int64>(a_list, acount,
+                b_list, bcount, diag, 4, mgpu::less<VertexId>());
+                if (bp.y) bp.x |= 0x80000000;
+                smem_storage.s_partition_idx[gid] = bp.x;
+            }
+
+            __syncthreads();
+
+            // intersect per thread
+
+        }
+
     }
 
 };
