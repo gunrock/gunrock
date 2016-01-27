@@ -268,13 +268,13 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         }
 
         // Reset work progress
-        if (queue_reset)
-        {
-            if (blockIdx.x == 0 && threadIdx.x < util::CtaWorkProgress::COUNTERS) {
+        //if (queue_reset)
+        //{
+        //    if (blockIdx.x == 0 && threadIdx.x < util::CtaWorkProgress::COUNTERS) {
                 //Reset all counters
-                work_progress.template Reset<SizeT>();
-            }
-        }
+        //        work_progress.template Reset<SizeT>();
+        //    }
+        //}
 
         // Determine work decomposition
         if (threadIdx.x == 0 && blockIdx.x == 0) {
@@ -345,15 +345,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             //    printf("start_partition+tid:%d < my_end_partition:%d ?, d_queue[%d]:%d\n", my_start_partition+tid, my_end_partition, my_start_partition+tid, d_queue[my_start_partition+tid]);
             if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
                 s_vertices[tid] = my_start_partition + tid < my_end_partition ? d_queue[my_start_partition+tid] : -1;
-                s_edge_ids[tid] = 0;
             }
             if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
                 if (input_inverse_graph)
                     s_vertices[tid] = my_start_partition + tid < my_end_partition ? d_inverse_column_indices[d_queue[my_start_partition+tid]] : max_vertices;
                 else
                     s_vertices[tid] = my_start_partition + tid < my_end_partition ? d_column_indices[d_queue[my_start_partition+tid]] : -1;
-                s_edge_ids[tid] = my_start_partition + tid < my_end_partition ? d_queue[my_start_partition+tid] : max_vertices;
             }
+            s_edge_ids[tid] = my_start_partition + tid < my_end_partition ? d_queue[my_start_partition+tid] : max_vertices;
 
             int last = my_start_partition + KernelPolicy::THREADS >= my_end_partition ? my_end_partition - my_start_partition - 1 : KernelPolicy::THREADS - 1;
 
@@ -579,13 +578,13 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         }
 
         // Reset work progress
-        if (queue_reset)
-        {
-            if (blockIdx.x == 0 && threadIdx.x < util::CtaWorkProgress::COUNTERS) {
+        //if (queue_reset)
+        //{
+        //    if (blockIdx.x == 0 && threadIdx.x < util::CtaWorkProgress::COUNTERS) {
                 //Reset all counters
-                work_progress.template Reset<SizeT>();
-            }
-        }
+        //        work_progress.template Reset<SizeT>();
+        //    }
+        //}
 
         // Determine work decomposition
         if (blockIdx.x == 0 && threadIdx.x == 0) {
@@ -634,15 +633,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         //printf("%d,%d,%d,%db\t", tid, my_id, range, d_scanned_edges[my_id] - offset);
         if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
             s_vertices[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
-            s_edge_ids[tid] = 0;
         }
         if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
             if (input_inverse_graph)
                 s_vertices[tid] = (my_id < range ? d_inverse_column_indices[d_queue[my_id]] : max_vertices);
             else
                 s_vertices[tid] = (my_id < range ? d_column_indices[d_queue[my_id]] : max_vertices);
-            s_edge_ids[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
         }
+        s_edge_ids[tid] = (my_id < range ? d_queue[my_id] : max_vertices);
 
         __syncthreads();
         //printf("%d,%d,%dB\t", threadIdx.x, end_id, max_edges);

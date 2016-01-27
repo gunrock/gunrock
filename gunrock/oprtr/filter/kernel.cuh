@@ -199,13 +199,13 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         }
     
         // workprogress reset
-        if (queue_reset)
-        {
-            if (threadIdx.x < gunrock::util::CtaWorkProgress::COUNTERS) {
+        //if (queue_reset)
+        //{
+        //    if (threadIdx.x < gunrock::util::CtaWorkProgress::COUNTERS) {
                 //Reset all counters
-                work_progress.template Reset<SizeT>();
-            }
-        }
+        //        work_progress.template Reset<SizeT>();
+        //    }
+        //}
 
 
         // Determine work decomposition
@@ -426,6 +426,48 @@ void Kernel(
                 max_out_queue,
                 kernel_stats);
     }
+}
+
+template <typename KernelPolicy, typename ProblemData, typename Functor>
+void LaunchKernel(
+    dim3                                    grid_size,
+    dim3                                    block_size,
+    size_t                                  shared_size,
+    cudaStream_t                            stream,
+    typename KernelPolicy::VertexId         iteration,
+    bool                                    queue_reset,
+    typename KernelPolicy::VertexId         queue_index,                
+    typename KernelPolicy::SizeT            num_elements,             
+    typename KernelPolicy::VertexId         *d_in_queue,            
+    typename KernelPolicy::VertexId         *d_in_predecessor_queue,
+    typename KernelPolicy::VertexId         *d_out_queue,          
+    typename ProblemData::DataSlice         *problem,
+    unsigned char                           *d_visited_mask,
+    util::CtaWorkProgress                   work_progress,        
+    typename KernelPolicy::SizeT            max_in_queue,        
+    typename KernelPolicy::SizeT            max_out_queue,      
+    util::KernelRuntimeStats                kernel_stats,
+    bool                                    filtering_flag = true)
+{
+    if (queue_reset)
+        work_progress.template Reset_<typename KernelPolicy::SizeT>(0, stream);
+
+    Kernel<KernelPolicy, ProblemData, Functor>
+        <<<grid_size, block_size, shared_size, stream>>>(
+        iteration,
+        queue_reset,
+        queue_index,
+        num_elements,
+        d_in_queue,
+        d_in_predecessor_queue,
+        d_out_queue,
+        problem,
+        d_visited_mask,
+        work_progress,
+        max_in_queue,
+        max_out_queue,
+        kernel_stats,
+        filtering_flag);
 }
 
 

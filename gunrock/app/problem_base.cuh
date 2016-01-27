@@ -40,6 +40,7 @@
 #include <gunrock/util/array_utils.cuh>
 #include <gunrock/util/test_utils.cuh>
 #include <gunrock/util/test_utils.h>
+#include <gunrock/util/track_utils.cuh>
 
 // Graph partitioner utilities
 #include <gunrock/app/rp/rp_partitioner.cuh>
@@ -380,10 +381,20 @@ struct DataSliceBase
     util::Array1D<SizeT, char        >  *expand_incoming_array   ; // compressed data structure for expand_incoming kernel
     util::Array1D<SizeT, VertexId    >   preds                   ; // predecessors of vertices
     util::Array1D<SizeT, VertexId    >   temp_preds              ; // temporary storages for predecessors
+    util::Array1D<SizeT, VertexId    >   labels                  ; // Used for source distance
 
     //Frontier queues. Used to track working frontier.
     util::DoubleBuffer<SizeT, VertexId, Value>  *frontier_queues ; // frontier queues
     util::Array1D<SizeT, SizeT       >  *scanned_edges           ; // length / offsets for offsets of the frontier queues
+
+    // arrays used to track data race, containing info about pervious assigment
+    util::Array1D<SizeT, int         > org_checkpoint            ; // checkpoint number
+    util::Array1D<SizeT, VertexId*   > org_d_out                 ; // d_out address
+    util::Array1D<SizeT, SizeT       > org_offset1               ; // offset1
+    util::Array1D<SizeT, SizeT       > org_offset2               ; // offset2
+    util::Array1D<SizeT, VertexId    > org_queue_idx             ; // queue index
+    util::Array1D<SizeT, int         > org_block_idx             ; // blockIdx.x
+    util::Array1D<SizeT, int         > org_thread_idx            ; // threadIdx.x
 
     /**
      * @brief DataSliceBase default constructor
@@ -435,6 +446,15 @@ struct DataSliceBase
         streams                .SetName("streams"                );
         preds                  .SetName("preds"                  );
         temp_preds             .SetName("temp_preds"             );
+        labels                 .SetName("labels"                 );
+        org_checkpoint         .SetName("org_checkpoint"         );  
+        org_d_out              .SetName("org_d_out"              );  
+        org_offset1            .SetName("org_offset1"            );  
+        org_offset2            .SetName("org_offset2"            );  
+        org_queue_idx          .SetName("org_queue_idx"          );  
+        org_block_idx          .SetName("org_block_idx"          );  
+        org_thread_idx         .SetName("org_thread_idx"         );  
+
         for (int i = 0; i < 4; i++)
         {
             events[i].SetName("events[]");
@@ -627,6 +647,15 @@ struct DataSliceBase
         make_out_array.Release();
         preds         .Release();
         temp_preds    .Release();
+        labels        .Release();
+
+        org_checkpoint.Release();
+        org_d_out     .Release();
+        org_offset1   .Release();
+        org_offset2   .Release();
+        org_queue_idx .Release();
+        org_block_idx .Release();
+        org_thread_idx.Release();
     } // end ~DataSliceBase()
 
     /**
@@ -850,6 +879,8 @@ struct DataSliceBase
         bool    skip_scanned_edges = false)
     {
         cudaError_t retval = cudaSuccess;
+        SizeT max_queue_length = 0;
+
         for (int peer = 0; peer < num_gpus; peer++)
             out_length[peer] = 1;
         if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
@@ -863,77 +894,115 @@ struct DataSliceBase
         // if (num_gpus > 1) util::cpu_mt::PrintCPUArray<int, SizeT>("in_counter", graph_slice->in_counter.GetPointer(util::HOST), num_gpus + 1, gpu_idx);
 
         for (int peer = 0; peer < (num_gpus > 1 ? num_gpus + 1 : 1); peer++)
-            for (int i = 0; i < 2; i++)
+        for (int i = 0; i < 2; i++)
+        {
+            double queue_sizing_ = i == 0 ? queue_sizing : queue_sizing1;
+            switch (frontier_type)
             {
-                double queue_sizing_ = i == 0 ? queue_sizing : queue_sizing1;
-                switch (frontier_type)
-                {
-                case VERTEX_FRONTIERS :
-                    // O(n) ping-pong global vertex frontiers
-                    new_frontier_elements[0] = double(num_gpus > 1 ? graph_slice->in_counter[peer] : graph_slice->nodes) * queue_sizing_ + 2;
-                    new_frontier_elements[1] = new_frontier_elements[0];
-                    break;
+            case VERTEX_FRONTIERS :
+                // O(n) ping-pong global vertex frontiers
+                new_frontier_elements[0] = ((num_gpus > 1) ? 
+                    graph_slice->in_counter[peer] : graph_slice->nodes) * queue_sizing_ + 2;
+                new_frontier_elements[1] = new_frontier_elements[0];
+                break;
 
-                case EDGE_FRONTIERS :
-                    // O(m) ping-pong global edge frontiers
-                    new_frontier_elements[0] = double(graph_slice->edges) * queue_sizing_ + 2;
-                    new_frontier_elements[1] = new_frontier_elements[0];
-                    break;
+            case EDGE_FRONTIERS :
+                // O(m) ping-pong global edge frontiers
+                new_frontier_elements[0] = graph_slice->edges * queue_sizing_ + 2;
+                new_frontier_elements[1] = new_frontier_elements[0];
+                break;
 
-                case MIXED_FRONTIERS :
-                    // O(n) global vertex frontier, O(m) global edge frontier
-                    new_frontier_elements[0] = double(num_gpus > 1 ? graph_slice->in_counter[peer] : graph_slice->nodes) * queue_sizing_ + 2;
-                    new_frontier_elements[1] = double(graph_slice->edges) * queue_sizing_ + 2;
-                    break;
-                }
-
-                // if froniter_queue is not big enough
-                if (frontier_queues[peer].keys[i].GetSize() < new_frontier_elements[i])
-                {
-
-                    // If previously allocated
-                    if (frontier_queues[peer].keys[i].GetPointer(util::DEVICE) != NULL && frontier_queues[peer].keys[i].GetSize() != 0)
-                    {
-                        if (retval = frontier_queues[peer].keys[i].EnsureSize(new_frontier_elements[i])) return retval;
-                    }
-                    else
-                    {
-                        if (retval = frontier_queues[peer].keys[i].Allocate(new_frontier_elements[i], util::DEVICE)) return retval;
-                    }
-
-                    // If use double buffer
-                    if (_USE_DOUBLE_BUFFER)
-                    {
-                        if (frontier_queues[peer].values[i].GetPointer(util::DEVICE) != NULL && frontier_queues[peer].values[i].GetSize() != 0)
-                        {
-                            if (retval = frontier_queues[peer].values[i].EnsureSize(new_frontier_elements[i])) return retval;
-                        }
-                        else
-                        {
-                            if (retval = frontier_queues[peer].values[i].Allocate(new_frontier_elements[i], util::DEVICE)) return retval;
-                        }
-                    }
-
-                } //end if
-
-                if (i == 1 || skip_scanned_edges) continue;
-
-                // Allocate scanned_edges
-                SizeT max_elements = new_frontier_elements[0];
-                if (new_frontier_elements[1] > max_elements) max_elements = new_frontier_elements[1];
-                if (scanned_edges[peer].GetSize() < max_elements)
-                {
-                    if (scanned_edges[peer].GetPointer(util::DEVICE) != NULL && scanned_edges[peer].GetSize() != 0)
-                    {
-                        if (retval = scanned_edges[peer].EnsureSize(max_elements)) return retval;
-                    }
-                    else
-                    {
-                        if (retval = scanned_edges[peer].Allocate(max_elements, util::DEVICE)) return retval;
-                    }
-                }
+            case MIXED_FRONTIERS :
+                // O(n) global vertex frontier, O(m) global edge frontier
+                new_frontier_elements[0] = ((num_gpus > 1) ? 
+                    graph_slice->in_counter[peer] : graph_slice->nodes) * queue_sizing_ + 2;
+                new_frontier_elements[1] = graph_slice->edges * queue_sizing_ + 2;
+                break;
             }
 
+            // if froniter_queue is not big enough
+            if (frontier_queues[peer].keys[i].GetSize() < new_frontier_elements[i])
+            {
+
+                // If previously allocated
+                if (frontier_queues[peer].keys[i].GetPointer(util::DEVICE) != NULL && 
+                    frontier_queues[peer].keys[i].GetSize() != 0)
+                {
+                    if (retval = frontier_queues[peer].keys[i].EnsureSize(
+                        new_frontier_elements[i])) 
+                        return retval;
+                }
+                else
+                {
+                    if (retval = frontier_queues[peer].keys[i].Allocate(
+                        new_frontier_elements[i], util::DEVICE)) 
+                        return retval;
+                }
+
+                // If use double buffer
+                if (_USE_DOUBLE_BUFFER)
+                {
+                    if (frontier_queues[peer].values[i].GetPointer(util::DEVICE) != NULL && 
+                        frontier_queues[peer].values[i].GetSize() != 0)
+                    {
+                        if (retval = frontier_queues[peer].values[i].EnsureSize(
+                            new_frontier_elements[i])) 
+                            return retval;
+                    }
+                    else
+                    {
+                        if (retval = frontier_queues[peer].values[i].Allocate(
+                            new_frontier_elements[i], util::DEVICE)) 
+                            return retval;
+                    }
+                }
+
+            } //end if
+
+            if (new_frontier_elements[0] > max_queue_length)
+                max_queue_length = new_frontier_elements[0];
+            if (new_frontier_elements[1] > max_queue_length)
+                max_queue_length = new_frontier_elements[1];
+
+            if (i == 1 || skip_scanned_edges) continue;
+
+            // Allocate scanned_edges
+            SizeT max_elements = new_frontier_elements[0];
+            if (new_frontier_elements[1] > max_elements) 
+                max_elements = new_frontier_elements[1];
+            if (scanned_edges[peer].GetSize() < max_elements)
+            {
+                if (scanned_edges[peer].GetPointer(util::DEVICE) != NULL && 
+                    scanned_edges[peer].GetSize() != 0)
+                {
+                    if (retval = scanned_edges[peer].EnsureSize(max_elements)) 
+                        return retval;
+                }
+                else
+                {
+                    if (retval = scanned_edges[peer].Allocate(max_elements, util::DEVICE)) 
+                        return retval;
+                }
+            }
+        }
+
+        if (TO_TRACK)
+        {
+            if (retval = org_checkpoint.Allocate(max_queue_length, util::DEVICE))
+                return retval;
+            if (retval = org_d_out     .Allocate(max_queue_length, util::DEVICE))
+                return retval;
+            if (retval = org_offset1   .Allocate(max_queue_length, util::DEVICE))
+                return retval;
+            if (retval = org_offset2   .Allocate(max_queue_length, util::DEVICE))
+                return retval;
+            if (retval = org_queue_idx .Allocate(max_queue_length, util::DEVICE))
+                return retval;
+            if (retval = org_block_idx .Allocate(max_queue_length, util::DEVICE))
+                return retval;
+            if (retval = org_thread_idx.Allocate(max_queue_length, util::DEVICE))
+                return retval;
+        }
         return retval;
     } // end Reset(...)
 

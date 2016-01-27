@@ -67,7 +67,6 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, _Value,
         Value   delta;
         Value   alpha;
         VertexId src_node;
-        util::Array1D<SizeT, SizeT   > labels;
         util::Array1D<SizeT, VertexId> node_ids;
         util::Array1D<SizeT, bool    > cot_map;     /**< Input frontier bitmap */
     };

@@ -16,6 +16,7 @@
 
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/util/memset_kernel.cuh>
+#include <gunrock/util/track_utils.cuh>
 #include <gunrock/app/cc/cc_functor.cuh>
 
 namespace gunrock {
@@ -60,9 +61,6 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, VertexId> tos;           /**< Size equals to edge number, to vertex of one edge */
         util::Array1D<SizeT, int     > vertex_flag;   /**< Finish flag for per-vertex kernels in CC algorithm */
         util::Array1D<SizeT, int     > edge_flag;     /**< Finish flag for per-edge kernels in CC algorithm */
-        util::Array1D<SizeT, VertexId> labels;
-        //util::Array1D<SizeT, VertexId> preds;
-        //util::Array1D<SizeT, VertexId> temp_preds;
         int turn;
         //DataSlice *d_pointer;
         bool has_change;
@@ -86,7 +84,6 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             //d_pointer     = NULL;
             //work_progress = NULL;
             has_change    = true;
-            //labels       .SetName("labels"       );
         }
 
         /*
@@ -106,7 +103,6 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             edge_flag    .Release();
             //d_pointer     = NULL;
             //work_progress = NULL;
-            //labels       .Release();
         }
 
         /**
