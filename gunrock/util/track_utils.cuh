@@ -69,37 +69,82 @@ void Track_Results (
     VertexId** convertion_tables)
 {
     if (references == NULL) return;
-    if (TO_TRACK)
-    {
-        for (VertexId v=0; v<graph->nodes; v++)
+    if (!TO_TRACK) return;
+    else {
+        VertexId *markers = new VertexId[graph->nodes];
+        VertexId *track_nodes = new VertexId[NUM_TO_TRACK + 1];
+        SizeT *incoming_counter = new SizeT[NUM_TO_TRACK];
+        SizeT counter = 0;
+        VertexId **preds = new VertexId*[NUM_TO_TRACK];
+
+        for (VertexId dest=0; dest<nodes; dest++)
+        if (to_track(-1, dest))
         {
-            if (!to_track(-1, v)) continue;
-            printf("Vertex %d, ", v);
-            if (fabs(results[v] - references[v]) > error_threshold)
-                printf("reference = %d, ", references[v]);
-            printf("result = %d, ", results[v]);
-            if (num_gpus > 1)
+            markers[dest] = counter;
+            track_nodes[counter] = dest;
+            incoming_counter[counter] = 0;
+            counter ++;
+        } else markers[dest] = NUM_TO_TRACK;
+
+        for (VertexId src=0; src<nodes; src++)
+        for (SizeT j = graph->row_offsets[src]; j < graph->row_offsets[src+1]; j++)
+        {
+            VertexId dest = graph -> column_indices[j];
+            VertexId dest_ = markers[dest];
+            if (dest_ == NUM_TO_TRACK) continue;
+            if (incoming_counter[dest_] == 0)
             {
-                printf("host = %d, v_ = ", partition_table[v]);
-                for (int gpu=0; gpu<num_gpus; gpu++)
-                    printf("%d%s", convertion_tables[gpu][v], gpu == num_gpus-1? "" : ", ");
+                preds[dest_] = new VertexId[1];
+            } else if (is_puer2(incoming_counter[dest_]))
+            {
+                VertexId *temp_array = new VertexId[incoming_counter[dest_] * 2];
+                memcpy(temp_array, preds[dest_], sizeof(VertexId) * incoming_counter[dest_]);
+                delete[] preds[dest_];
+                preds[dest_] = temp_array;
+                temp_array = NULL;
+            }
+            preds[dest_][incoming_counter[dest_]] = src;
+            incoming_counter[dest_] ++;
+        }
+
+        for (SizeT i=0; i<NUM_TO_TRACK; i++)
+        {
+            VertexId dest = track_nodes[i];
+            if (pred_to_track(-1, dest)) continue;
+            printf("Vertex ");
+            Print_Vertex<VertexId, Value, SizeT>(
+                dest, num_gpus, error_threshold,
+                results, references,
+                partition_table, convertion_tables);
+            for (SizeT j = 0; j < incoming_counter[i]; j++)
+            {                VertexId src = preds[i][j];
+                //if (references[src] != references[dest] -1) continue;
+                //    fabs(results[src] - references[src]) < error_threshold) continue; // bfs
+                printf("\t");
+                Print_Vertex<VertexId, Value, SizeT>(
+                    src, num_gpus, error_threshold,
+                    results, references,
+                    partition_table, convertion_tables);
             }
             printf("\n");
-            for (SizeT j = graph->row_offsets[v]; j < graph->row_offsets[v+1]; j++)
+        }
+
+        for (VertexId src=0; src< nodes; src++)
+        {
+            if (!pred_to_track(-1, src)) continue;
+            printf("Source ");
+            Print_Vertex<VertexId, Value, SizeT>(
+                src, num_gpus, error_threshold,
+                results, references,
+                partition_table, convertion_tables);
+            for (SizeT j = graph->row_offsets[src]; j < graph->row_offsets[src+1]; j++)
             {
-                VertexId u = graph -> column_indices[j];
-                if (references[u] != references[v] -1) continue; // bfs
-                printf("\t%d, ", u);
-                if (fabs(results[u] - references[u]) > error_threshold)
-                    printf("reference = %d, ", references[u]);
-                printf("result = %d, ", results[u]);
-                if (num_gpus > 1)
-                {
-                    printf("host = %d, u_ = ", partition_table[u]);
-                    for (int gpu=0; gpu<num_gpus; gpu++)
-                        printf("%d%s", convertion_tables[gpu][u], gpu == num_gpus -1 ? "" : ", ");
-                }
-                printf("\n");
+                VertexId dest = graph -> column_indices[j];
+                printf("\t");
+                Print_Vertex<VertexId, Value, SizeT>(
+                    dest, num_gpus, error_threshold,
+                    results, references,
+                    partition_table, convertion_tables);
             }
             printf("\n");
         }
