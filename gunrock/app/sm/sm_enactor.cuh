@@ -186,32 +186,8 @@ class SMEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHE
 	    frontier_attribute->selector = 0;
 	    frontier_attribute->queue_reset = true;
 
-	    // Initial filtering based on node labels and degrees
-/*
 	    oprtr::filter::LaunchKernel
-            <FilterKernelPolicy, Problem, SMInitFunctor>(
-		    enactor_stats->filter_grid_size, 
-            FilterKernelPolicy::THREADS,
-            0, stream,
-			0,
-			frontier_attribute.queue_reset,
-			frontier_attribute.queue_index,
-			enactor_stats.num_gpus,
-			frontier_attribute.queue_length,
-			d_done,
-			graph_slice->frontier_queues.d_keys[frontier_attribute.selector],
-			NULL,
-			NULL,
-			data_slice,
-			NULL,
-			work_progress,
-			graph_slice->frontier_elements[frontier_attribute.selector],
-			graph_slice->frontier_elements[frontier_attribute.selector^1],
-			enactor_stats.filter_kernel_stats,
-			false);
-*/
-	    oprtr::filter::LaunchKernel
-            <FilterKernelPolicy, Problem, SMInitFunctor>(
+            <FilterKernelPolicy, SMProblem, SMInitFunctor>(
             enactor_stats->filter_grid_size,
             FilterKernelPolicy::THREADS, 
             0, stream,
