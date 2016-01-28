@@ -179,24 +179,23 @@ class SMEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHE
 	    frontier_attribute->queue_length = graph_slice->nodes;
 	    frontier_attribute->queue_reset = true;
 
-	    oprtr::filter::LaunchKernel
-            <FilterKernelPolicy, SMProblem, SMInitFunctor>(
-            enactor_stats->filter_grid_size,
-            FilterKernelPolicy::THREADS, 
-            0, stream,
-            enactor_stats->iteration + 1,
-            frontier_attribute->queue_reset,
-            frontier_attribute->queue_index,
-            frontier_attribute->queue_length,
-            frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
-            NULL,
-            frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
-            d_data_slice,
-            NULL,
-            work_progress[0],
-            frontier_queue->keys[frontier_attribute->selector  ].GetSize(),
-            frontier_queue->keys[frontier_attribute->selector^1].GetSize(),
-            enactor_stats->filter_kernel_stats);
+	    oprtr::filter::Kernel<FilterKernelPolicy, SMProblem, SMInitFunctor><<<
+                enactor_stats->filter_grid_size,
+                FilterKernelPolicy::THREADS, 0, stream>>>(
+                enactor_stats->iteration + 1,
+                frontier_attribute->queue_reset,
+                frontier_attribute->queue_index,
+                frontier_attribute->queue_length,
+                frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
+                NULL,
+                frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
+                d_data_slice,
+                NULL,
+                work_progress[0],
+                frontier_queue->keys[frontier_attribute->selector  ].GetSize(),
+                frontier_queue->keys[frontier_attribute->selector^1].GetSize(),
+                enactor_stats->filter_kernel_stats);
+
 
 	    if(DEBUG && (retval = util::GRError(cudaThreadSynchronize(), 
 		"Initial filtering filter::Kernel failed", __FILE__, __LINE__))) break;

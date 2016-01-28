@@ -63,8 +63,7 @@ struct PRMarkerFunctor {
     static __device__ __forceinline__ bool CondEdge(
         VertexId s_id, VertexId d_id, DataSlice *problem,
         VertexId e_id = 0, VertexId e_id_in = 0) {
-        //return (problem->degrees[d_id] > 0 && problem->degrees[s_id] > 0);
-        return true;
+        return (problem->degrees[d_id] > 0 && problem->degrees[s_id] > 0);
     }
 
     /**
@@ -84,8 +83,6 @@ struct PRMarkerFunctor {
         VertexId e_id = 0, VertexId e_id_in = 0) {
         //atomicAdd(problem->rank_next + d_id, problem->rank_curr[s_id]/problem->degrees[s_id]);
         problem->markers[d_id] = 1;
-        //if (util::to_track(d_id))
-        //    printf("%d\t marker[%lld] -> 1\n", problem->gpu_idx, (long long)d_id);
     }
 };
 
@@ -140,17 +137,8 @@ struct PRFunctor {
         VertexId e_id = 0, VertexId e_id_in = 0) {
         //if (TO_TRACK)
         //if (to_track(d_id)) printf("%d \tr[%d] \t+= %f\t from %d,%f\n", problem->gpu_idx, d_id, problem->rank_curr[s_id] / problem->degrees[s_id], s_id, problem->rank_curr[s_id]);
-        Value add_value = problem->rank_curr[s_id] / (Value)problem->degrees[s_id];
-        if (isfinite(add_value))
-        {
-            Value old_value = atomicAdd(problem->rank_next + d_id, add_value);
-            //if (to_track(d_id))
-            //{
-            //    printf("%d\t rank_next[%d] += rank_curr[%d] (=%.8le) / %lld, old_value = %.8le\n",
-            //        problem -> gpu_idx, d_id, s_id, problem->rank_curr[s_id], 
-            //        (long long) problem->degrees[s_id], old_value);
-            //}
-        }
+        atomicAdd(problem->rank_next + d_id,
+                  problem->rank_curr[s_id] / problem->degrees[s_id]);
     }
 
     /**
@@ -170,22 +158,17 @@ struct PRFunctor {
         VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         //Value    delta     = problem->delta    ;
         //VertexId src_node  = problem->src_node ;
-        Value    old_value = problem -> rank_curr[node];
-        Value    new_value = problem -> delta * problem->rank_next[node];
-        if (!isfinite(new_value))
-            new_value = 0;
-        new_value = problem->reset_value + new_value;
+        Value    old_value = problem->rank_curr[node];
+        Value    new_value = problem->reset_value + problem -> delta * problem->rank_next[node];
         //problem->rank_next[node] = (delta * problem->rank_next[node]) + (1.0-delta) * ((src_node == node || src_node == -1) ? 1 : 0);
         //problem->rank_next[node] = problem->reset_value + delta * problem->rank_next[node];
         //Value diff = fabs(problem->rank_next[node] - problem->rank_curr[node]);
         //Value diff = fabs(new_value - old_value);
-        //if (to_track(node))
-        //    printf("%d\t rank_next[%d] %.8le -> %.8le + %.8le * %.8le = %.8le\n",
-        //        problem->gpu_idx, node, old_value, problem->reset_value, problem->delta, 
-        //        problem->rank_next[node], new_value);
+        problem -> rank_next[node] = new_value;
 
-        problem -> rank_curr[node] = new_value;
-        return (fabs(new_value - old_value) > (problem->threshold * old_value));
+        //if (TO_TRACK)
+        //if (to_track(node)) printf("%d \tr[%d] \t%f \t-> %f \t(%f)\n", problem->gpu_idx, node, problem->rank_curr[node], problem->rank_next[node], old_value);
+        return (fabs(new_value - old_value) >= problem->threshold * old_value);
     }
 
     /**

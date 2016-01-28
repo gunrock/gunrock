@@ -64,6 +64,7 @@ struct SALSAProblem : ProblemBase<_VertexId, _SizeT, _Value,
         util::Array1D<SizeT, VertexId> out_degrees;         /**< Used for keeping out-degree for each vertex */
         util::Array1D<SizeT, VertexId> hub_predecessors;        /**< Used for keeping the predecessor for each vertex */
         util::Array1D<SizeT, VertexId> auth_predecessors;        /**< Used for keeping the predecessor for each vertex */
+        util::Array1D<SizeT, SizeT   > labels;
     };
 
     // Members

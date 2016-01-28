@@ -64,6 +64,7 @@ struct HITSProblem : ProblemBase<_VertexId, _SizeT, _Value,
         util::Array1D<SizeT, VertexId> out_degrees;         /**< Used for keeping out-degree for each vertex */
         Value                          delta;
         VertexId                       src_node;
+        util::Array1D<SizeT, SizeT   > labels;
     };
 
     // Members

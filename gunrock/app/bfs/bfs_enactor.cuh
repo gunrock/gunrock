@@ -14,7 +14,6 @@
 
 #pragma once
 
-//#include <thread>
 #include <gunrock/util/multithreading.cuh>
 #include <gunrock/util/multithread_utils.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
@@ -64,8 +63,7 @@ __global__ void Expand_Incoming_BFS (
     const VertexId*  const keys_in,
           VertexId*        keys_out,
     const size_t           array_size,
-          char*            array,
-          int              gpu_idx)
+          char*            array)
 {
     extern __shared__ char s_array[];
     const SizeT STRIDE = gridDim.x * blockDim.x;
@@ -99,9 +97,6 @@ __global__ void Expand_Incoming_BFS (
            }
         }
         keys_out[x]=key;
-        if (util::to_track(gpu_idx, key))
-            printf("%d\t %s\t labels[%d] -> %d\n",
-                gpu_idx, __func__, key, t);
         if (NUM_VERTEX_ASSOCIATES == 2 && s_vertex_associate_org[0][key] == t)
             s_vertex_associate_org[1][key]=s_vertex_associate_in[1][x];
         x+=STRIDE;
@@ -164,26 +159,10 @@ struct BFSIteration : public IterationBase <
     {
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance begin",thread_num, enactor_stats->iteration, peer_);
         if (TO_TRACK)
-        {
-            printf("%d\t %lld\t %d SubQueue_Core queue_length = %lld\n",
-                thread_num, (long long)enactor_stats->iteration, peer_,
-                (long long)frontier_attribute -> queue_length);
-            fflush(stdout);
-            //util::MemsetKernel<<<256, 256, 0, stream>>>(
-            //    frontier_queue -> keys[frontier_attribute -> selector^1].GetPointer(util::DEVICE),
-            //    (VertexId)-2,
-            //    frontier_queue -> keys[frontier_attribute -> selector^1].GetSize());
-            util::Check_Exist<<<256, 256, 0, stream>>>(
-                frontier_attribute -> queue_length,
-                data_slice->gpu_idx, 2, enactor_stats -> iteration,
-                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));       
-            //util::Verify_Value<<<256, 256, 0, stream>>>(
-            //    data_slice -> gpu_idx, 2, frontier_attribute -> queue_length,
-            //    enactor_stats -> iteration,
-            //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
-            //    data_slice -> labels.GetPointer(util::DEVICE),
-            //    (Value)(enactor_stats -> iteration));
-        }
+            util::MemsetKernel<<<256, 256, 0, stream>>>(
+                frontier_queue -> keys[frontier_attribute -> selector^1].GetPointer(util::DEVICE),
+                (VertexId)-2,
+                frontier_queue -> keys[frontier_attribute -> selector^1].GetSize());
         frontier_attribute->queue_reset = true;
         enactor_stats     ->nodes_queued[0] += frontier_attribute->queue_length;
         // Edge Map
@@ -227,34 +206,23 @@ struct BFSIteration : public IterationBase <
             util::Check_Value<<<1,1,0,stream>>>(
                 work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
                     frontier_attribute->queue_index),
-                data_slice->gpu_idx, 3, enactor_stats -> iteration);
-            //util::Check_Exist_<<<256, 256, 0, stream>>>(
-            //    work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
-            //        frontier_attribute->queue_index),
-            //    data_slice->gpu_idx, 3, enactor_stats -> iteration,
-            //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
-            //util::Verify_Value_<<<256, 256, 0, stream>>>(
-            //    data_slice -> gpu_idx, 3, 
-            //    work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
-            //        frontier_attribute -> queue_index),
-            //    enactor_stats -> iteration,
-            //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
-            //    data_slice -> labels.GetPointer(util::DEVICE),
-            //    enactor_stats -> iteration+1);
-            //util::MemsetCASKernel<<<256, 256, 0, stream>>>(
-            //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
-            //    -2, -1,
-            //    work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
-            //        frontier_attribute->queue_index));
+                data_slice->gpu_idx, 5, enactor_stats -> iteration);
+            util::Check_Exist_<<<enactor_stats -> filter_grid_size,
+                FilterKernelPolicy::THREADS, 0, stream>>>(
+                work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
+                    frontier_attribute->queue_index),
+                data_slice->gpu_idx, 3, enactor_stats -> iteration,
+                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
+            util::MemsetCASKernel<<<256, 256, 0, stream>>>(
+                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
+                -2, -1,
+                work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
+                    frontier_attribute->queue_index));
         }
 
         // Filter
-        gunrock::oprtr::filter::LaunchKernel
-            <FilterKernelPolicy, Problem, BfsFunctor>(
-            enactor_stats->filter_grid_size, 
-            FilterKernelPolicy::THREADS, 
-            0, 
-            stream,
+        gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, BfsFunctor>
+        <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
             enactor_stats->iteration+1,
             frontier_attribute->queue_reset,
             frontier_attribute->queue_index,
@@ -272,27 +240,6 @@ struct BFSIteration : public IterationBase <
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Filter end.", thread_num, enactor_stats->iteration);
         frontier_attribute->queue_index++;
         frontier_attribute->selector ^= 1;
-
-        if (TO_TRACK)
-        {
-            util::Check_Value<<<1,1,0,stream>>>(
-                work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
-                    frontier_attribute->queue_index),
-                data_slice->gpu_idx, 4, enactor_stats -> iteration);
-            util::Check_Exist_<<<256, 256, 0, stream>>>(
-                work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
-                    frontier_attribute->queue_index),
-                data_slice->gpu_idx, 4, enactor_stats -> iteration,
-                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
-            //util::Verify_Value_<<<256, 256, 0, stream>>>(
-            //    data_slice -> gpu_idx, 4, 
-            //    work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
-            //        frontier_attribute -> queue_index),
-            //    enactor_stats -> iteration,
-            //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
-            //    data_slice -> labels.GetPointer(util::DEVICE),
-            //    (Value)enactor_stats -> iteration+1);
-        }
     }
 
     /*
@@ -335,8 +282,7 @@ struct BFSIteration : public IterationBase <
             keys_in,
             keys_out->GetPointer(util::DEVICE),
             array_size,
-            array,
-            data_slice -> gpu_idx);
+            array);
     }
 
     /*
@@ -517,11 +463,7 @@ static CUT_THREADPROC BFSThread(
     do {
         if (enactor_stats[0].retval = util::SetDevice(gpu_idx)) break;
         thread_data->stats = 1;
-        while (thread_data->stats != 2) 
-        {
-            sleep(0);
-            //std::this_thread::yield();
-        }
+        while (thread_data->stats != 2) sleep(0);
         thread_data->stats=3;
 
         for (int peer=0;peer<num_gpus;peer++)
@@ -749,28 +691,16 @@ public:
 
             for (int gpu=0; gpu< this->num_gpus; gpu++)
             {
-                while (thread_slices[gpu].stats!=1) 
-                {
-                    sleep(0);
-                    //std::this_thread::yield();
-                }
+                while (thread_slices[gpu].stats!=1) sleep(0);
                 thread_slices[gpu].stats=2;
             }
             for (int gpu=0; gpu< this->num_gpus; gpu++)
             {
-                while (thread_slices[gpu].stats!=4) 
-                {
-                    sleep(0);
-                    //std::this_thread::yield();
-                }
+                while (thread_slices[gpu].stats!=4) sleep(0);
             }
 
             for (int gpu=0;gpu<this->num_gpus;gpu++)
-            if (this->enactor_stats[gpu].retval!=cudaSuccess) 
-            {
-                retval=this->enactor_stats[gpu].retval;
-                break;
-            }
+            if (this->enactor_stats[gpu].retval!=cudaSuccess) {retval=this->enactor_stats[gpu].retval;break;}
         } while(0);
 
         if (DEBUG) printf("\nGPU BFS Done.\n");
@@ -892,16 +822,24 @@ public:
             if (Problem::ENABLE_IDEMPOTENCE)
             {
                 if (traversal_mode == 0)
+                {
                     return EnactBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
+                }
                 else
+                {
                     return EnactBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
+                }
             }
             else
             {
                 if (traversal_mode == 0)
+                {
                     return EnactBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(src);
+                }
                 else
+                {
                     return EnactBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(src);
+                }
             }
         }
 
@@ -945,20 +883,28 @@ public:
             if (Problem::ENABLE_IDEMPOTENCE)
             {
                 if (traversal_mode == 0)
+                {
                     return InitBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
                             context, problem, max_grid_size, size_check);
+                }
                 else
+                {
                     return InitBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
                             context, problem, max_grid_size, size_check);
+                }
             }
             else
             {
                 if (traversal_mode == 0)
+                {
                     return InitBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(
                             context, problem, max_grid_size, size_check);
+                }
                 else
+                {
                     return InitBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(
                             context, problem, max_grid_size, size_check);
+                }
             }
         }
 

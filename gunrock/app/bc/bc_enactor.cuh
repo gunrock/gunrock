@@ -310,11 +310,8 @@ public:
         if (Enactor::DEBUG) util::cpu_mt::PrintMessage("Advance end", thread_num, enactor_stats->iteration);
 
         // Filter
-        gunrock::oprtr::filter::LaunchKernel
-            <FilterKernelPolicy, Problem, ForwardFunctor>(
-            enactor_stats->filter_grid_size, 
-            FilterKernelPolicy::THREADS, 
-            0, stream,
+        gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, ForwardFunctor>
+            <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
             enactor_stats->iteration+1,
             frontier_attribute->queue_reset,
             frontier_attribute->queue_index,
@@ -603,11 +600,8 @@ public:
         // Fill in the frontier_queues
         util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[0], graph_slice->nodes);
         // Filter
-        gunrock::oprtr::filter::LaunchKernel
-            <FilterKernelPolicy, BCProblem, BackwardFunctor>(
-            enactor_stats.filter_grid_size,
-            FilterKernelPolicy::THREADS,
-            0, 0,
+        gunrock::oprtr::filter::Kernel<FilterKernelPolicy, BCProblem, BackwardFunctor>
+        <<<enactor_stats.filter_grid_size, FilterKernelPolicy::THREADS>>>(
             -1,
             frontier_attribute.queue_reset,
             frontier_attribute.queue_index,

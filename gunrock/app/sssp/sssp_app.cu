@@ -218,8 +218,8 @@ void runSSSP(GRGraph* output, SSSP_Parameter *parameter)
     int           delta_factor       = parameter -> delta_factor;
     int           traversal_mode     = parameter -> traversal_mode;
     size_t       *org_size           = new size_t[num_gpus];
-    // Allocate host-side distance arrays
-    Value    *h_distances = new Value[graph->nodes];
+    // Allocate host-side label arrays
+    Value    *h_labels = new Value[graph->nodes];
     VertexId *h_preds  = MARK_PREDECESSORS ? new VertexId[graph->nodes] : NULL;
 
     for (int gpu = 0; gpu < num_gpus; gpu++)
@@ -271,10 +271,10 @@ void runSSSP(GRGraph* output, SSSP_Parameter *parameter)
 
     // Copy out results
     util::GRError(
-        problem->Extract(h_distances, h_preds),
+        problem->Extract(h_labels, h_preds),
         "SSSP Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    output->node_value1 = (Value*)&h_distances[0];
+    output->node_value1 = (Value*)&h_labels[0];
     if (MARK_PREDECESSORS) output->node_value2 = (VertexId*)&h_preds[0];
 
     if (!quiet)

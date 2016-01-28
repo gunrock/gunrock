@@ -230,7 +230,6 @@ public:
         info["delta_factor"]       = 16;     // default delta-factor for SSSP
         info["delta"]              = 0.85f;  // default delta for PageRank
         info["error"]              = 0.01f;  // default error for PageRank
-        info["scaled"]             = false;  // default scaled for PageRank
         info["alpha"]              = 6.0f;   // default alpha for DOBFS
         info["beta"]               = 6.0f;   // default beta for DOBFS
         info["top_nodes"]          = 0;      // default number of nodes for top-k primitive
@@ -281,7 +280,6 @@ public:
         info["idempotent"] =  args.CheckCmdLineFlag("idempotence");       // BFS
         info["mark_predecessors"] =  args.CheckCmdLineFlag("mark-pred");  // BFS
         info["normalized"] =  args.CheckCmdLineFlag("normalized"); // PR
-        info["scaled"    ] =  args.CheckCmdLineFlag("scaled"    ); // PR
 
         info["json"] = args.CheckCmdLineFlag("json");
         if (args.CheckCmdLineFlag("jsonfile"))
@@ -1213,8 +1211,8 @@ __global__ void Copy_Preds (
     const VertexId* in_preds,
           VertexId* out_preds)
 {
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    VertexId x = (SizeT)blockIdx.x*blockDim.x+threadIdx.x;
+    const SizeT STRIDE = gridDim.x * blockDim.x;
+    VertexId x = blockIdx.x*blockDim.x+threadIdx.x;
     VertexId t;
 
     while (x<num_elements)
@@ -1247,8 +1245,8 @@ __global__ void Update_Preds (
     const VertexId* in_preds,
           VertexId* out_preds)
 {
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    VertexId x = (SizeT)blockIdx.x*blockDim.x + threadIdx.x;
+    const SizeT STRIDE = gridDim.x * blockDim.x;
+    VertexId x = blockIdx.x*blockDim.x + threadIdx.x;
     VertexId t, p;
 
     while (x<num_elements)
@@ -1373,7 +1371,7 @@ __global__ void Make_Out(
           char*             array)
 {
     extern __shared__ char s_array[];
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    const SizeT STRIDE = gridDim.x * blockDim.x;
     size_t     offset                  = 0;
     SizeT**    s_marker                = (SizeT**   )&(s_array[offset]);
     offset+=sizeof(SizeT*   )*num_gpus;
@@ -1397,7 +1395,7 @@ __global__ void Make_Out(
     }
     __syncthreads();
 
-    x= (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+    x= blockIdx.x * blockDim.x + threadIdx.x;
     while (x<num_elements)
     {
         VertexId key    = keys_in [x];
@@ -1452,7 +1450,7 @@ __global__ void Make_Out_Backward(
           char*             array)
 {
     extern __shared__ char s_array[];
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    const SizeT STRIDE = gridDim.x * blockDim.x;
     size_t     offset                  = 0;
     SizeT**    s_marker                = (SizeT**   )&(s_array[offset]);
     offset+=sizeof(SizeT*   )*num_gpus;
@@ -1476,7 +1474,7 @@ __global__ void Make_Out_Backward(
     }
     __syncthreads();
 
-    x= (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+    x= blockIdx.x * blockDim.x + threadIdx.x;
     while (x<num_elements)
     {
         VertexId key    = keys_in [x];
@@ -1515,7 +1513,7 @@ __global__ void Make_Out_Backward(
  * @param[in] keys
  * @param[in] market
  */
-/*template <typename VertexId, typename SizeT>
+template <typename VertexId, typename SizeT>
 __global__ void Mark_Queue (
     const SizeT     num_elements,
     const VertexId* keys,
@@ -1523,7 +1521,7 @@ __global__ void Mark_Queue (
 {
     VertexId x = ((blockIdx.y*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x;
     if (x< num_elements) marker[keys[x]]=1;
-}*/
+}
 
 /*
  * @brief Check size function.

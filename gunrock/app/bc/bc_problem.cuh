@@ -56,6 +56,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
     struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
     {
         // device storage arrays
+        util::Array1D<SizeT, VertexId  >  labels;              /**< Used for source distance */
         util::Array1D<SizeT, Value     >  bc_values;           /**< Used to store final BC values for each node */
         util::Array1D<SizeT, Value     >  ebc_values;          /**< Used to store final BC values for each edge */
         util::Array1D<SizeT, Value     >  sigmas;              /**< Accumulated sigma values for each node */
@@ -69,6 +70,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
          */
         DataSlice()
         {
+            labels      .SetName("labels"      );
             bc_values   .SetName("bc_values"   );
             ebc_values  .SetName("ebc_values"  );
             sigmas      .SetName("sigmas"      );
@@ -84,6 +86,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
         ~DataSlice()
         {
             if (util::SetDevice(this->gpu_idx)) return;
+            labels        .Release();
             bc_values     .Release();
             ebc_values    .Release();
             sigmas        .Release();
@@ -136,7 +139,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                 in_sizing)) return retval;
 
             // Create SoA on device
-            if (retval = this->labels    .Allocate(graph->nodes, util::DEVICE | util::HOST)) return retval;
+            if (retval = labels    .Allocate(graph->nodes, util::DEVICE | util::HOST)) return retval;
             if (retval = this->preds     .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = this->temp_preds.Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = bc_values .Allocate(graph->nodes, util::DEVICE)) return retval;

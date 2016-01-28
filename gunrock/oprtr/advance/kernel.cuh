@@ -229,10 +229,6 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         typename KernelPolicy::Value            *d_reduce_frontier = NULL,
         typename KernelPolicy::Value            *d_reduced_value   = NULL)
 {
-    if (frontier_attribute.queue_reset)
-    {
-        work_progress.template Reset_<typename KernelPolicy::SizeT>(0, stream);
-    }
     if (frontier_attribute.queue_length == 0) return;
 
     switch (KernelPolicy::ADVANCE_MODE)

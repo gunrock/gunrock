@@ -203,9 +203,7 @@ struct Cta
                     // Load neighbor row range from d_row_offsets
                     Vec2SizeT   row_range;
                     SizeT       row_id1;
-                    if (cta -> advance_type == gunrock::oprtr::advance::V2V || 
-                        cta -> advance_type == gunrock::oprtr::advance::V2E) 
-                    {
+                    if (cta->advance_type == gunrock::oprtr::advance::V2V || cta->advance_type == gunrock::oprtr::advance::V2E) {
                         //row_range.x = tex1Dfetch(cta->ts_rowoffset[0], row_id);
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                             row_range.x,
@@ -216,12 +214,8 @@ struct Cta
                             cta->d_row_offsets + row_id+1);
                     }
 
-                    if (cta -> advance_type == gunrock::oprtr::advance::E2V || 
-                        cta -> advance_type == gunrock::oprtr::advance::E2E) 
-                    {
-                        row_id1 = (cta->inverse_graph) 
-                            ? cta -> d_inverse_column_indices[row_id] 
-                            : cta -> d_column_indices[row_id];
+                    if (cta->advance_type == gunrock::oprtr::advance::E2V || cta->advance_type == gunrock::oprtr::advance::E2E) {
+                        row_id1 = (cta->inverse_graph) ? cta->d_inverse_column_indices[row_id] : cta->d_column_indices[row_id];
                         //row_range.x = tex1Dfetch(cta->ts_rowoffset[0], row_id1);
                         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                             row_range.x,
@@ -238,132 +232,15 @@ struct Cta
 
                 }
 
-                tile->fine_row_rank[LOAD][VEC] 
-                    = (tile->row_length[LOAD][VEC] < KernelPolicy::WARP_GATHER_THRESHOLD) 
-                    ? tile->row_length[LOAD][VEC] : 0;
+                tile->fine_row_rank[LOAD][VEC] = (tile->row_length[LOAD][VEC] < KernelPolicy::WARP_GATHER_THRESHOLD) ?
+                    tile->row_length[LOAD][VEC] : 0;
 
-                tile->coarse_row_rank[LOAD][VEC] 
-                    = (tile->row_length[LOAD][VEC] < KernelPolicy::WARP_GATHER_THRESHOLD) 
-                    ? 0 : tile->row_length[LOAD][VEC];
+                tile->coarse_row_rank[LOAD][VEC] = (tile->row_length[LOAD][VEC] < KernelPolicy::WARP_GATHER_THRESHOLD) ?
+                    0 : tile->row_length[LOAD][VEC];
 
                 Iterate<LOAD, VEC + 1>::Inspect(cta, tile);
 
             } // end of Inspect
-
-            template <typename Cta, typename Tile>
-            static __device__ __forceinline__ void ProcessNeighbor(
-                Cta* cta,
-                Tile* tile, 
-                SizeT neighbor_offset,
-                VertexId pred_id,
-                SizeT edge_id,
-                SizeT output_offset)
-            {
-                VertexId neighbor_id;
-                VertexId vertex_out;
-                Value value_reduced;
-                
-                // Gather
-                util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    neighbor_id,
-                    cta->d_column_indices + neighbor_offset);
-
-                // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id) (done)
-                // if Cond(neighbor_id) returns true
-                // if Cond(neighbor_id) returns false or Apply returns false
-                // set neighbor_id to -1 for invalid
-                if (Functor::CondEdge(pred_id, neighbor_id, cta->problem,
-                    neighbor_offset, edge_id)) 
-                {
-                    Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, 
-                        neighbor_offset, edge_id);
-                    if (cta->advance_type == gunrock::oprtr::advance::V2V) {
-                        vertex_out = neighbor_id;
-                    } else if (cta->advance_type == gunrock::oprtr::advance::V2E
-                            || cta->advance_type == gunrock::oprtr::advance::E2E) 
-                    {
-                        // TODO: fix this when SizeT and VertexID is not the
-                        // same type, othervise will have potential overflow
-                        // when neighbor_offset is larger than Max_Value<SizeT>
-                        vertex_out = neighbor_offset;
-                    }
-
-                    if (cta->d_value_to_reduce != NULL) 
-                    {
-                        if (cta->r_type == gunrock::oprtr::advance::VERTEX) 
-                        {
-                            value_reduced = cta->d_value_to_reduce[neighbor_id];
-                        } else if (cta->r_type == gunrock::oprtr::advance::EDGE) 
-                        {
-                            value_reduced = cta->d_value_to_reduce[neighbor_offset];
-                        }
-                    } else if (cta->r_type != gunrock::oprtr::advance::EMPTY) 
-                    { 
-                        // use user-specified function to generate value to reduce
-                    }
-                }
-                else {
-                    vertex_out = -1;
-                    if (cta->d_value_to_reduce != NULL) 
-                    {
-                        switch (cta->r_op) 
-                        {
-                        case gunrock::oprtr::advance::PLUS :
-                            value_reduced = 0;
-                            break;
-                        case gunrock::oprtr::advance::MULTIPLIES :
-                            value_reduced = 1;
-                            break;
-                        case gunrock::oprtr::advance::MAXIMUM :
-                            // TODO: change to adapt various Value type
-                            value_reduced = INT_MIN;
-                            break;
-                        case gunrock::oprtr::advance::MINIMUM :
-                            // TODO: change to adapt various Value type
-                            value_reduced = INT_MAX;
-                            break;
-                        case gunrock::oprtr::advance::BIT_OR :
-                            value_reduced = 0;
-                            break;
-                        case gunrock::oprtr::advance::BIT_AND :
-                            // TODO: change to adapt various Value type
-                            value_reduced = 0xffffffff;
-                            break;
-                        case gunrock::oprtr::advance::BIT_XOR :
-                            value_reduced = 0;
-                            break;
-                        default:
-                            value_reduced = 0;
-                            break;
-                        }
-                    }
-                }
-                
-                if (cta -> d_out != NULL)
-                {
-                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        vertex_out,
-                        cta->d_out + output_offset); 
-                    //util::Store_d_out<VertexId, SizeT, ProblemData>(
-                    //    neighbor_id, cta->d_out, 1, 
-                    //    cta->smem_storage.state.coarse_enqueue_offset,
-                    //    coop_rank, cta->problem, cta->queue_index);
-                }
-                if (//ProblemData::ENABLE_IDEMPOTENCE && 
-                    //ProblemData::MARK_PREDECESSORS && 
-                    cta->d_pred_out != NULL) 
-                {
-                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        pred_id,
-                        cta->d_pred_out + output_offset);
-                }
-                if (cta->d_value_to_reduce != NULL)
-                {
-                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                        value_reduced,
-                        cta->d_reduce_frontier + output_offset);
-                }
-            }
 
             /**
              * @brief Expand the node's neighbor list using the whole CTA.
@@ -376,8 +253,7 @@ struct Cta
             static __device__ __forceinline__ void CtaExpand(Cta *cta, Tile *tile)
             {
                 // CTA-based expansion/loading
-                while(true) 
-                {
+                while(true) {
 
                     //All threads in block vie for the control of the block
                     if (tile->row_length[LOAD][VEC] >= KernelPolicy::CTA_GATHER_THRESHOLD) {
@@ -397,45 +273,24 @@ struct Cta
 
                     if (owner == threadIdx.x) {
                         // Got control of the CTA: command it
-                        cta->smem_storage.state.warp_comm[0][0] 
-                            = tile -> row_offset[LOAD][VEC];      // start
-                        cta->smem_storage.state.warp_comm[0][1] 
-                            = tile -> coarse_row_rank[LOAD][VEC]; // queue rank
-                        cta->smem_storage.state.warp_comm[0][2] 
-                            = tile -> row_offset[LOAD][VEC] 
-                            + tile -> row_length[LOAD][VEC];      // oob
-                        if (cta -> advance_type == gunrock::oprtr::advance::V2V || 
-                            cta -> advance_type == gunrock::oprtr::advance::V2E) 
-                        {
-                            cta -> smem_storage.state.warp_comm[0][3] 
-                                = tile -> vertex_id[LOAD][VEC];
+                        cta->smem_storage.state.warp_comm[0][0] = tile->row_offset[LOAD][VEC];                                  // start
+                        cta->smem_storage.state.warp_comm[0][1] = tile->coarse_row_rank[LOAD][VEC];                             // queue rank
+                        cta->smem_storage.state.warp_comm[0][2] = tile->row_offset[LOAD][VEC] + tile->row_length[LOAD][VEC];    // oob
+                        if (cta->advance_type == gunrock::oprtr::advance::V2V || cta->advance_type == gunrock::oprtr::advance::V2E) {
+                            cta->smem_storage.state.warp_comm[0][3] = tile->vertex_id[LOAD][VEC];
+                            cta->smem_storage.state.warp_comm[0][4] = 0;
                         }
-                        if (cta -> advance_type == gunrock::oprtr::advance::E2V || 
-                            cta -> advance_type == gunrock::oprtr::advance::E2E) 
-                        {
-                            cta -> smem_storage.state.warp_comm[0][3] 
-                                = cta -> inverse_graph
-                                ? cta -> d_inverse_column_indices[tile->vertex_id[LOAD][VEC]]
-                                : cta -> d_column_indices[tile->vertex_id[LOAD][VEC]];
+                        if (cta->advance_type == gunrock::oprtr::advance::E2V || cta->advance_type == gunrock::oprtr::advance::E2E) {
+                            cta->smem_storage.state.warp_comm[0][3] = cta->inverse_graph ? cta->d_inverse_column_indices[tile->vertex_id[LOAD][VEC]]
+                                                                                    : cta->d_column_indices[tile->vertex_id[LOAD][VEC]];
+                            cta->smem_storage.state.warp_comm[0][4] = tile->vertex_id[LOAD][VEC];
                         }
-                        cta->smem_storage.state.warp_comm[0][4] = tile->vertex_id[LOAD][VEC];
-                        //if (util::pred_to_track(1, tile->vertex_id[LOAD][VEC]))
-                        //    printf("%d\t %d\t CtaExpand0 (%d of %d, %d of %d)\t"
-                        //        " {%d, %d, %d, %d, %d}\n",
-                        //        cta -> problem -> gpu_idx, cta->label, 
-                        //        blockIdx.x, gridDim.x, threadIdx.x, blockDim.x,
-                        //        cta->smem_storage.state.warp_comm[0][0],
-                        //        cta->smem_storage.state.warp_comm[0][1],
-                        //        cta->smem_storage.state.warp_comm[0][2],
-                        //        cta->smem_storage.state.warp_comm[0][3],
-                        //        cta->smem_storage.state.warp_comm[0][4]);
 
                         // Unset row length
                         tile->row_length[LOAD][VEC] = 0;
 
                         // Unset my command
-                        cta->smem_storage.state.cta_comm = KernelPolicy::THREADS;   
-                        // So that we won't repeatedly expand this node
+                        cta->smem_storage.state.cta_comm = KernelPolicy::THREADS;   // So that we won't repeatedly expand this node
                     }
                     __syncthreads();
 
@@ -450,40 +305,227 @@ struct Cta
                         pred_id = cta->smem_storage.state.warp_comm[0][3];
                     else
                         pred_id = cta->label;
-                    
-                    //__syncthreads();
 
-                    //if (util::thread_to_track(1, edge_id))
-                    //    printf("%d\t %d\t CtaExpand1 (%d of %d, %d of %d)\t"
-                    //        " {%d, %d, %d, %d, %d}\n",
-                    //        cta->problem->gpu_idx, cta->label, 
-                    //        blockIdx.x, gridDim.x, threadIdx.x, blockDim.x,
-                    //        cta->smem_storage.state.warp_comm[0][0],
-                    //        cta->smem_storage.state.warp_comm[0][1],
-                    //        cta->smem_storage.state.warp_comm[0][2],
-                    //        cta->smem_storage.state.warp_comm[0][3],
-                    //        cta->smem_storage.state.warp_comm[0][4]);
+                    VertexId neighbor_id;
 
-                    while (coop_offset + threadIdx.x < coop_oob) 
-                    {
-                        ProcessNeighbor(
-                            cta, tile,
-                            coop_offset + threadIdx.x,
-                            pred_id, edge_id,
-                            cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                    while (coop_offset + KernelPolicy::THREADS < coop_oob) {
+
+                        // Gather
+                        //neighbor_id = tex1Dfetch(ts_columnindices[0], coop_offset+threadIdx.x);
+                        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                neighbor_id,
+                                cta->d_column_indices + coop_offset+threadIdx.x);
+
+                        // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id) (done)
+                        // if Cond(neighbor_id) returns true
+                        // if Cond(neighbor_id) returns false or Apply returns false
+                        // set neighbor_id to -1 for invalid
+                        if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x, edge_id)) {
+                            Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x, edge_id);
+                            if (cta->d_out != NULL) {
+                                if (cta->advance_type == gunrock::oprtr::advance::V2V) {
+                                    //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    //    neighbor_id,
+                                    //    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank); 
+                                    util::Store_d_out<VertexId, SizeT, ProblemData>(
+                                        neighbor_id, cta->d_out, 1, cta->smem_storage.state.coarse_enqueue_offset,
+                                        coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                                } else if (cta->advance_type == gunrock::oprtr::advance::V2E
+                                        ||cta->advance_type == gunrock::oprtr::advance::E2E) {
+                                    //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    //    (VertexId)(coop_offset+threadIdx.x),
+                                    //    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                    util::Store_d_out<VertexId, SizeT, ProblemData>(
+                                        coop_offset + threadIdx.x, cta->d_out, 2, cta->smem_storage.state.coarse_enqueue_offset,
+                                        coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                               }
+                            }
+                            if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            pred_id,
+                                            cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                }
+                            if (cta->d_value_to_reduce != NULL) {
+                                if (cta->r_type == gunrock::oprtr::advance::VERTEX) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            cta->d_value_to_reduce[neighbor_id],
+                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                } else if (cta->r_type == gunrock::oprtr::advance::EDGE) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            cta->d_value_to_reduce[coop_offset+threadIdx.x],
+                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                }
+                            } else if (cta->r_type != gunrock::oprtr::advance::EMPTY) { 
+                                // use user-specified function to generate value to reduce
+                            }
+                        }
+                        else {
+                            if (cta->d_out != NULL) {
+                                //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                //    -1,
+                                //    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                util::Store_d_out<VertexId, SizeT, ProblemData>(
+                                    -1, cta->d_out, 3, cta->smem_storage.state.coarse_enqueue_offset,
+                                    coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                            }
+                            if (cta->d_value_to_reduce != NULL) {
+                                switch (cta->r_op) {
+                                    case gunrock::oprtr::advance::PLUS :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                    case gunrock::oprtr::advance::MULTIPLIES :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)1, 
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                    case gunrock::oprtr::advance::MAXIMUM :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)INT_MIN,
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                    case gunrock::oprtr::advance::MINIMUM :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)INT_MAX,
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                    case gunrock::oprtr::advance::BIT_OR :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                    case gunrock::oprtr::advance::BIT_AND :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0xffffffff,
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                    case gunrock::oprtr::advance::BIT_XOR :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                    default:
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                }
+                            }
+                        }
+
                         coop_offset += KernelPolicy::THREADS;
                         coop_rank += KernelPolicy::THREADS;
                     }
 
-                    //if (coop_offset + threadIdx.x < coop_oob) {
-                    //    ProcessNeighbor(
-                    //        cta, tile,
-                    //        coop_ofset + threadIdx.x,
-                    //        pred_id, edge_id,
-                    //        cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
-                    //}
-                } // end of while (true)
-                __syncthreads();
+                    if (coop_offset + threadIdx.x < coop_oob) {
+
+                        // Gather
+                        //neighbor_id = tex1Dfetch(ts_columnindices[0], coop_offset+threadIdx.x);
+                        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                neighbor_id,
+                                cta->d_column_indices + coop_offset+threadIdx.x);
+
+                        // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
+                        // if Cond(neighbor_id) returns true
+                        // if Cond(neighbor_id) returns false or Apply returns false
+                        // set neighbor_id to -1 for invalid
+                        if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x, edge_id)) {
+                            Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+threadIdx.x, edge_id);
+                            if (cta->d_out != NULL) {
+                                if (cta->advance_type == gunrock::oprtr::advance::V2V) {
+                                    //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    //        neighbor_id,
+                                    //        cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank); 
+                                    util::Store_d_out<VertexId, SizeT, ProblemData>(
+                                        neighbor_id, cta->d_out, 4, cta->smem_storage.state.coarse_enqueue_offset,
+                                        coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                                } else if (cta->advance_type == gunrock::oprtr::advance::V2E
+                                         ||cta->advance_type == gunrock::oprtr::advance::E2E) {
+                                    //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                    //        (VertexId)(coop_offset+threadIdx.x),
+                                    //        cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                    util::Store_d_out<VertexId, SizeT, ProblemData>(
+                                        coop_offset + threadIdx.x, cta->d_out, 5, cta->smem_storage.state.coarse_enqueue_offset,
+                                        coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                                }
+                            }
+                            if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        pred_id,
+                                        cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                            }
+                            if (cta->d_value_to_reduce != NULL) {
+                                if (cta->r_type == gunrock::oprtr::advance::VERTEX) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            cta->d_value_to_reduce[neighbor_id],
+                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                } else if (cta->r_type == gunrock::oprtr::advance::EDGE) {
+                                    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                            cta->d_value_to_reduce[coop_offset+threadIdx.x],
+                                            cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                }
+                            } else if (cta->r_type != gunrock::oprtr::advance::EMPTY) { 
+                                // use user-specified function to generate value to reduce
+                            }
+                        }
+                        else {
+                            if (cta->d_out != NULL) {
+                                //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                //    -1,
+                                //    cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                util::Store_d_out<VertexId, SizeT, ProblemData>(
+                                    -1, cta->d_out, 6, cta->smem_storage.state.coarse_enqueue_offset,
+                                    coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                            }
+                            if (cta->d_value_to_reduce != NULL) {
+                                switch (cta->r_op) {
+                                    case gunrock::oprtr::advance::PLUS :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                    case gunrock::oprtr::advance::MULTIPLIES :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)1, 
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                    case gunrock::oprtr::advance::MAXIMUM :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)INT_MIN,
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                    case gunrock::oprtr::advance::MINIMUM :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)INT_MAX,
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                    case gunrock::oprtr::advance::BIT_OR :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                    case gunrock::oprtr::advance::BIT_AND :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0xffffffff,
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                    case gunrock::oprtr::advance::BIT_XOR :
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                    default:
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                (Value)0,
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                        break;
+                                }
+                            }
+                        }
+
+                    }
+                }
 
                 // Next vector element
                 Iterate<LOAD, VEC + 1>::CtaExpand(cta, tile);
@@ -499,49 +541,37 @@ struct Cta
             template<typename Cta, typename Tile>
             static __device__ __forceinline__ void WarpExpand(Cta *cta, Tile *tile)
             {
-                if (KernelPolicy::WARP_GATHER_THRESHOLD < KernelPolicy::CTA_GATHER_THRESHOLD) 
-                {
+                if (KernelPolicy::WARP_GATHER_THRESHOLD < KernelPolicy::CTA_GATHER_THRESHOLD) {
                     // Warp-based expansion/loading
                     int warp_id = threadIdx.x >> GR_LOG_WARP_THREADS(KernelPolicy::CUDA_ARCH);
                     int lane_id = util::LaneId();
 
-                    while (::__any(tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD)) 
-                    {
-                        if (tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD) 
-                        {
+                    while (::__any(tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD)) {
+                        if (tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD) {
                             // All threads inside one warp vie for control of the warp
                             cta->smem_storage.state.warp_comm[warp_id][0] = lane_id;
                         }
 
-                        if (lane_id == cta->smem_storage.state.warp_comm[warp_id][0]) 
-                        {
+                        if (lane_id == cta->smem_storage.state.warp_comm[warp_id][0]) {
                             // Got control of the warp
-                            cta -> smem_storage.state.warp_comm[warp_id][0] 
-                                = tile -> row_offset[LOAD][VEC];       // start
-                            cta -> smem_storage.state.warp_comm[warp_id][1] 
-                                = tile -> coarse_row_rank[LOAD][VEC];  // queue rank
-                            cta -> smem_storage.state.warp_comm[warp_id][2] 
-                                = tile -> row_offset[LOAD][VEC] 
-                                + tile -> row_length[LOAD][VEC];      // oob
-                            if (cta -> advance_type == gunrock::oprtr::advance::V2V || 
-                                cta -> advance_type == gunrock::oprtr::advance::V2E) 
-                            {
-                                cta -> smem_storage.state.warp_comm[warp_id][3] 
-                                    = tile->vertex_id[LOAD][VEC];
-                            }
-                            if (cta -> advance_type == gunrock::oprtr::advance::E2V || 
-                                cta -> advance_type == gunrock::oprtr::advance::E2E) 
-                            {
-                                cta -> smem_storage.state.warp_comm[warp_id][3] 
-                                    = cta -> inverse_graph 
-                                    ? cta -> d_inverse_column_indices[tile->vertex_id[LOAD][VEC]]
-                                    : cta -> d_column_indices[tile->vertex_id[LOAD][VEC]];
-                            }
-                            cta -> smem_storage.state.warp_comm[warp_id][4] 
-                                = tile->vertex_id[LOAD][VEC];
+                            cta->smem_storage.state.warp_comm[warp_id][0] = tile->row_offset[LOAD][VEC];                                    // start
+                            cta->smem_storage.state.warp_comm[warp_id][1] = tile->coarse_row_rank[LOAD][VEC];                               // queue rank
+                            cta->smem_storage.state.warp_comm[warp_id][2] = tile->row_offset[LOAD][VEC] + tile->row_length[LOAD][VEC];      // oob
+                        if (cta->advance_type == gunrock::oprtr::advance::V2V || cta->advance_type == gunrock::oprtr::advance::V2E) {
+                            cta->smem_storage.state.warp_comm[warp_id][3] = tile->vertex_id[LOAD][VEC];
+                            cta->smem_storage.state.warp_comm[warp_id][4] = 0;
+                        }
+                        if (cta->advance_type == gunrock::oprtr::advance::E2V || cta->advance_type == gunrock::oprtr::advance::E2E) {
+                            cta->smem_storage.state.warp_comm[warp_id][3] = cta->inverse_graph ? cta->d_inverse_column_indices[tile->vertex_id[LOAD][VEC]]:
+                            cta->d_column_indices[tile->vertex_id[LOAD][VEC]];
+
+                            cta->smem_storage.state.warp_comm[warp_id][4] = tile->vertex_id[LOAD][VEC];
+                        }
                             // Unset row length
                             tile->row_length[LOAD][VEC] = 0; // So that we won't repeatedly expand this node
+
                         }
+
 
                         SizeT coop_offset   = cta->smem_storage.state.warp_comm[warp_id][0];
                         SizeT coop_rank     = cta->smem_storage.state.warp_comm[warp_id][1] + lane_id;
@@ -554,26 +584,202 @@ struct Cta
                         else
                             pred_id = cta->label;
 
-                        while (coop_offset + lane_id < coop_oob) 
-                        {
-                            ProcessNeighbor(
-                                cta, tile,
-                                coop_offset + lane_id,
-                                pred_id, edge_id,
-                                cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                        VertexId neighbor_id;
+                        while (coop_offset + GR_WARP_THREADS(KernelPolicy::CUDA_ARCH) < coop_oob) {
+
+                            // Gather
+                            //neighbor_id = tex1Dfetch(ts_columnindices[0], coop_offset+lane_id);
+                            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                    neighbor_id,
+                                    cta->d_column_indices + coop_offset+lane_id);
+
+                            // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
+                            // if Cond(neighbor_id) returns true
+                            // if Cond(neighbor_id) returns false or Apply returns false
+                            // set neighbor_id to -1 for invalid
+                            if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id, edge_id)) {
+                                Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id, edge_id);
+                                if (cta->advance_type == gunrock::oprtr::advance::V2E
+                                        ||cta->advance_type == gunrock::oprtr::advance::E2E) {
+                                    neighbor_id = coop_offset+lane_id;
+                                }
+                                if (cta->d_value_to_reduce != NULL) {
+                                    if (cta->r_type == gunrock::oprtr::advance::VERTEX) {
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                cta->d_value_to_reduce[neighbor_id],
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                    } else if (cta->r_type == gunrock::oprtr::advance::EDGE) {
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                cta->d_value_to_reduce[coop_offset+lane_id],
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                    }
+                                } else if (cta->r_type != gunrock::oprtr::advance::EMPTY) { 
+                                    // use user-specified function to generate value to reduce
+                                }
+                            }
+                            else {
+                                neighbor_id = -1;
+                                if (cta->d_value_to_reduce != NULL) {
+                                    switch (cta->r_op) {
+                                        case gunrock::oprtr::advance::PLUS :
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)0,
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                        case gunrock::oprtr::advance::MULTIPLIES :
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)1, 
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                        case gunrock::oprtr::advance::MAXIMUM :
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)INT_MIN,
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                        case gunrock::oprtr::advance::MINIMUM :
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)INT_MAX,
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                        case gunrock::oprtr::advance::BIT_OR :
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)0,
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                        case gunrock::oprtr::advance::BIT_AND :
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)0xffffffff,
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                        case gunrock::oprtr::advance::BIT_XOR :
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)0,
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                        default:
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)0,
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                    }
+                                }
+                            }
+
+                            if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        pred_id,
+                                        cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                            }
+
+                            // Scatter neighbor
+                            if (cta->d_out != NULL) {
+                                //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                //        neighbor_id,
+                                //        cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                util::Store_d_out<VertexId, SizeT, ProblemData>(
+                                    neighbor_id, cta->d_out, 7, cta->smem_storage.state.coarse_enqueue_offset,
+                                    coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                            }
 
                             coop_offset += GR_WARP_THREADS(KernelPolicy::CUDA_ARCH);
                             coop_rank += GR_WARP_THREADS(KernelPolicy::CUDA_ARCH);
                         }
 
-                        //if (coop_offset + lane_id < coop_oob) 
-                        //{
-                        //    ProcessNeighbor(
-                        //        cta, tile,
-                        //        coop_offet + lane_id,
-                        //        pred_id, edge_id,
-                        //        cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
-                        //}
+                        if (coop_offset + lane_id < coop_oob) {
+                            // Gather
+                            //neighbor_id = tex1Dfetch(ts_columnindices[0], coop_offset+lane_id);
+                            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                                    neighbor_id,
+                                    cta->d_column_indices + coop_offset+lane_id);
+
+                            // Users can insert a functor call here ProblemData::Apply(pred_id, neighbor_id)
+                            // if Cond(neighbor_id) returns true
+                            // if Cond(neighbor_id) returns false or Apply returns false
+                            // set neighbor_id to -1 for invalid
+                            if (Functor::CondEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id, edge_id)) {
+                                Functor::ApplyEdge(pred_id, neighbor_id, cta->problem, coop_offset+lane_id, edge_id);
+                                if (cta->advance_type == gunrock::oprtr::advance::V2E
+                                        ||cta->advance_type == gunrock::oprtr::advance::E2E) {
+                                    neighbor_id = coop_offset+lane_id;
+                                }
+                                if (cta->d_value_to_reduce != NULL) {
+                                    if (cta->r_type == gunrock::oprtr::advance::VERTEX) {
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                cta->d_value_to_reduce[neighbor_id],
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                    } else if (cta->r_type == gunrock::oprtr::advance::EDGE) {
+                                        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                cta->d_value_to_reduce[coop_offset+threadIdx.x],
+                                                cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                    }
+                                } else if (cta->r_type != gunrock::oprtr::advance::EMPTY) { 
+                                    // use user-specified function to generate value to reduce
+                                }
+                            }
+                            else {
+                                neighbor_id = -1;
+                                if (cta->d_value_to_reduce != NULL) {
+                                    switch (cta->r_op) {
+                                        case gunrock::oprtr::advance::PLUS :
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)0,
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                        case gunrock::oprtr::advance::MULTIPLIES :
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)1, 
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                        case gunrock::oprtr::advance::MAXIMUM :
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)INT_MIN,
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                        case gunrock::oprtr::advance::MINIMUM :
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)INT_MAX,
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                        case gunrock::oprtr::advance::BIT_OR :
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)0,
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                        case gunrock::oprtr::advance::BIT_AND :
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)0xffffffff,
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                        case gunrock::oprtr::advance::BIT_XOR :
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)0,
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                        default:
+                                            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                                    (Value)0,
+                                                    cta->d_reduce_frontier + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                            break;
+                                    }
+                                }
+                            }
+
+                            if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && cta->d_pred_out != NULL) {
+                                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                        pred_id,
+                                        cta->d_pred_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                            }
+
+                            // Scatter neighbor
+                            if (cta->d_out != NULL) {
+                                //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                                //        neighbor_id,
+                                //        cta->d_out + cta->smem_storage.state.coarse_enqueue_offset + coop_rank);
+                                util::Store_d_out<VertexId, SizeT, ProblemData>(
+                                    neighbor_id, cta->d_out, 8, cta->smem_storage.state.coarse_enqueue_offset,
+                                    coop_rank, cta->problem->gpu_idx, cta->queue_index);
+                            }
+                        }
                     }
 
                     // Next vector element
@@ -592,38 +798,24 @@ struct Cta
             static __device__ __forceinline__ void ThreadExpand(Cta *cta, Tile *tile)
             {
                 //Expand the neighbor list into scratch space
-                SizeT scratch_offset = tile->fine_row_rank[LOAD][VEC] 
-                    + tile->row_progress[LOAD][VEC] - tile->progress;
+                SizeT scratch_offset = tile->fine_row_rank[LOAD][VEC] + tile->row_progress[LOAD][VEC] - tile->progress;
 
                 while ((tile->row_progress[LOAD][VEC] < tile->row_length[LOAD][VEC]) &&
                         (scratch_offset < SmemStorage::GATHER_ELEMENTS))
                 {
                     // Put gather offset into scratch space
-                    cta -> smem_storage.gather_offsets[scratch_offset] 
-                        = tile -> row_offset  [LOAD][VEC] 
-                        + tile -> row_progress[LOAD][VEC];
-                    cta -> smem_storage.gather_edges  [scratch_offset] 
-                        = tile -> vertex_id   [LOAD][VEC];
-                    if (ProblemData::MARK_PREDECESSORS) 
-                    {
-                        if (cta -> advance_type == gunrock::oprtr::advance::E2V || 
-                            cta -> advance_type == gunrock::oprtr::advance::E2E) 
-                        {
-                            cta -> smem_storage.gather_predecessors[scratch_offset] 
-                                = cta -> inverse_graph 
-                                ? cta -> d_inverse_column_indices[tile->vertex_id[LOAD][VEC]]
-                                : cta -> d_column_indices[tile->vertex_id[LOAD][VEC]];
+                    cta->smem_storage.gather_offsets[scratch_offset] = tile->row_offset[LOAD][VEC] + tile->row_progress[LOAD][VEC];
+                    if (ProblemData::MARK_PREDECESSORS) {
+                        if (cta->advance_type == gunrock::oprtr::advance::E2V || cta->advance_type == gunrock::oprtr::advance::E2E) {
+                            cta->smem_storage.gather_predecessors[scratch_offset] = cta->inverse_graph ? cta->d_inverse_column_indices[tile->vertex_id[LOAD][VEC]]: cta->d_column_indices[tile->vertex_id[LOAD][VEC]];
 
-                            cta -> smem_storage.gather_edges[scratch_offset] 
-                                = tile -> vertex_id[LOAD][VEC];
+                            cta->smem_storage.gather_edges[scratch_offset] = tile->vertex_id[LOAD][VEC];
                         }
-                        if (cta -> advance_type == gunrock::oprtr::advance::V2V || 
-                            cta -> advance_type == gunrock::oprtr::advance::V2E)
-                            cta -> smem_storage.gather_predecessors[scratch_offset] 
-                                = tile -> vertex_id[LOAD][VEC];
+                        if (cta->advance_type == gunrock::oprtr::advance::V2V || cta->advance_type == gunrock::oprtr::advance::V2E)
+                            cta->smem_storage.gather_predecessors[scratch_offset] = tile->vertex_id[LOAD][VEC];
                     }
 
-                    tile -> row_progress[LOAD][VEC]++;
+                    tile->row_progress[LOAD][VEC]++;
                     scratch_offset++;
                 }
 
@@ -839,25 +1031,16 @@ struct Cta
         tile.fine_count = totals.t1;
 
         // Set input queue length and check for overflow
-        if (threadIdx.x == 0) 
-        {
+        if (threadIdx.x == 0) {
+
             SizeT enqueue_amt       = coarse_count + tile.fine_count;
             SizeT enqueue_offset    = work_progress.Enqueue(enqueue_amt, queue_index + 1);
 
             smem_storage.state.coarse_enqueue_offset = enqueue_offset;
             smem_storage.state.fine_enqueue_offset = enqueue_offset + coarse_count;
 
-            /*if (TO_TRACK)
-                printf("%d\t %d\t smem Setting\t blockIdx.x = %d, coarse_enqueue_offset = %lld,"
-                    "enqueue_amt = %lld, fine_enqueue_offset = %lld\n",
-                    problem -> gpu_idx, queue_index + 1, blockIdx.x,
-                    (long long)smem_storage.state.coarse_enqueue_offset,
-                    (long long)enqueue_amt,
-                    (long long)smem_storage.state.fine_enqueue_offset);*/
-
             // Check for queue overflow due to redundant expansion
-            if (enqueue_offset + enqueue_amt > max_out_frontier) 
-            {
+            if (enqueue_offset + enqueue_amt > max_out_frontier) {
                 smem_storage.state.overflowed = true;
                 work_progress.SetOverflow<SizeT>();
             }
@@ -871,7 +1054,7 @@ struct Cta
             util::ThreadExit();
         }
 
-        // TODO Verify threads in a block won't diverge here
+
         if (coarse_count > 0)
         {
             // Enqueue valid edge lists into outgoing queue by CTA
@@ -894,9 +1077,9 @@ struct Cta
             __syncthreads();
 
             // Copy scratch space into queue
-            SizeT scratch_remainder = GR_MIN(SmemStorage::GATHER_ELEMENTS, tile.fine_count - tile.progress);
+            int scratch_remainder = GR_MIN(SmemStorage::GATHER_ELEMENTS, tile.fine_count - tile.progress);
 
-            for (SizeT scratch_offset = threadIdx.x;
+            for (int scratch_offset = threadIdx.x;
                     scratch_offset < scratch_remainder;
                     scratch_offset += KernelPolicy::THREADS)
             {
@@ -916,7 +1099,11 @@ struct Cta
                 // if Cond(neighbor_id) returns false or Apply returns false
                 // set neighbor_id to -1 for invalid
                 VertexId edge_id;
-                edge_id = smem_storage.gather_edges[scratch_offset];
+                if (advance_type == gunrock::oprtr::advance::V2E || advance_type == gunrock::oprtr::advance::V2V)
+                    edge_id = 0;
+                if (advance_type == gunrock::oprtr::advance::E2E || advance_type == gunrock::oprtr::advance::E2V) {
+                    edge_id = smem_storage.gather_offsets[scratch_offset];
+                }
                 if (Functor::CondEdge(predecessor_id, neighbor_id, problem, smem_storage.gather_offsets[scratch_offset], edge_id)) {
                     Functor::ApplyEdge(predecessor_id, neighbor_id, problem, smem_storage.gather_offsets[scratch_offset], edge_id);
                     if (advance_type == gunrock::oprtr::advance::V2E || advance_type == gunrock::oprtr::advance::E2E)
@@ -990,7 +1177,7 @@ struct Cta
                      //       d_out + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
                      util::Store_d_out<VertexId, SizeT, ProblemData>(
                         neighbor_id, d_out, 9, smem_storage.state.fine_enqueue_offset,
-                        tile.progress + scratch_offset, problem, queue_index);
+                        tile.progress + scratch_offset, problem->gpu_idx, queue_index);
                 }
 
                 if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && d_pred_out != NULL) {

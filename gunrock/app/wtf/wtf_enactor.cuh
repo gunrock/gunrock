@@ -359,11 +359,8 @@ public:
                 //if (retval = work_progress.SetQueueLength(frontier_attribute.queue_index, edge_map_queue_len)) break;
 
                 // Vertex Map
-                gunrock::oprtr::filter::LaunchKernel
-                    <FilterKernelPolicy, WTFProblem, PrFunctor>(
-                    enactor_stats->filter_grid_size, 
-                    FilterKernelPolicy::THREADS,
-                    0, 0,
+                gunrock::oprtr::filter::Kernel<FilterKernelPolicy, WTFProblem, PrFunctor>
+                <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS>>>(
                     enactor_stats->iteration,
                     frontier_attribute->queue_reset,
                     frontier_attribute->queue_index,

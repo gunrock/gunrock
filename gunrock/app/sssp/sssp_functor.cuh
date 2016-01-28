@@ -63,24 +63,24 @@ struct SSSPFunctor {
     static __device__ __forceinline__ bool CondEdge(
         VertexId s_id, VertexId d_id, DataSlice *problem,
         VertexId e_id = 0, VertexId e_id_in = 0) {
-        Value distance, weight;
+        Value label, weight;
 
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            distance, problem->distances + s_id);
+            label, problem->labels + s_id);
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
             weight, problem->weights + e_id);
-        Value new_weight = weight + distance;
+        Value new_weight = weight + label;
 
         // Check if the destination node has been claimed as someone's child
-        Value old_weight = atomicMin(problem->distances + d_id, new_weight);
+        Value old_weight = atomicMin(problem->labels + d_id, new_weight);
         //if (to_track(s_id) || to_track(d_id))
-        //    printf("lable[%d] : %d t-> %d + %d @ %d = %d \t", d_id, old_weight, weight, distance, s_id, new_weight);
+        //    printf("lable[%d] : %d t-> %d + %d @ %d = %d \t", d_id, old_weight, weight, label, s_id, new_weight);
         return (new_weight < old_weight);
     }
 
     /**
      * @brief Forward Edge Mapping apply function. Now we know the source node
-     * has succeeded in claiming child, so it is safe to set distance to its child
+     * has succeeded in claiming child, so it is safe to set label to its child
      * node (destination node).
      *
      * @param[in] s_id Vertex Id of the edge source node
@@ -149,7 +149,7 @@ struct PQFunctor {
         VertexId node_id, DataSlice *problem) {
         Value weight;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            weight, problem->distances + node_id);
+            weight, problem->labels + node_id);
         float delta;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
             delta, problem->delta);

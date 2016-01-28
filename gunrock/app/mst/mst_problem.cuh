@@ -71,6 +71,7 @@ struct MSTProblem : ProblemBase <
     // data slice device-side arrays
     //
 
+    util::Array1D<SizeT, VertexId> labels; // does not used in MST
     util::Array1D<SizeT, int> done_flags;  // complete flag for jumping kernels
     util::Array1D<SizeT, int> mst_output;  // mask indicates selected MST edges
     util::Array1D<SizeT, unsigned int> flag_array;  // one for start of segment
@@ -441,6 +442,7 @@ struct MSTProblem : ProblemBase <
           data_slices[gpu]->super_idxs.GetPointer(util::DEVICE),
           (SizeT)0, nodes);
 
+        data_slices[0]->labels.SetName("labels");
         if (ret = data_slices[0]->labels.Allocate(nodes, util::DEVICE))
         {
           return ret;

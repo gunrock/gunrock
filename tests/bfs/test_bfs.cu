@@ -504,12 +504,12 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                     v_[gpu][problem->original_vertexes[gpu][v]] = v;
             }
         }
-        util::Track_Results(graph, num_gpus, 1, h_labels, reference_check_label, 
-            num_gpus > 1 ? problem->partition_tables[0] : NULL, v_);
+        util::Track_Results(graph, num_gpus, 0, h_labels, reference_check_label, 
+            problem->partition_tables[0], v_);
         char file_name[512];
-        sprintf(file_name, "./eval/error_dump/error_%lld_%d.txt", (long long)time(NULL), gpu_idx[0]);
+        sprintf(file_name, "./eval/error_dump/error_%lld.txt", (long long)time(NULL));
         util::Output_Errors(file_name, graph -> nodes, num_gpus, 0, h_labels, reference_check_label,
-            num_gpus > 1 ? problem->partition_tables[0] : NULL, v_);
+            problem->partition_tables[0], v_);
         if (num_gpus > 1)
         {
             for (int gpu=0; gpu<num_gpus; gpu++)
@@ -663,12 +663,16 @@ template <
     bool        MARK_PREDECESSORS >
 void RunTests_enable_idempotence(Info<VertexId, Value, SizeT> *info)
 {
-    if (info->info["idempotent"].get_bool())
-        RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
-                 MARK_PREDECESSORS, true > (info);
-    else
+    //if (info->info["idempotent"].get_bool())
+    //{
+    //    RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
+    //             MARK_PREDECESSORS, true > (info);
+   // }
+    //else
+    //{
         RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
                  MARK_PREDECESSORS, false> (info);
+    //}
 }
 
 /**
@@ -692,12 +696,16 @@ template <
     bool        SIZE_CHECK >
 void RunTests_mark_predecessors(Info<VertexId, Value, SizeT> *info)
 {
-    if (info->info["mark_predecessors"].get_bool())
-        RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
-                                    DEBUG, SIZE_CHECK,  true> (info);
-    else
+    //if (info->info["mark_predecessors"].get_bool())
+    //{
+    //    RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
+    //                                DEBUG, SIZE_CHECK,  true> (info);
+    //}
+    //else
+    //{
         RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
                                     DEBUG, SIZE_CHECK, false> (info);
+    //}
 }
 
 /**
@@ -719,12 +727,16 @@ template <
     bool          DEBUG >
 void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
 {
-    if (info->info["size_check"].get_bool())
+    //if (info->info["size_check"].get_bool())
+    //{
         RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
                                    DEBUG,  true>(info);
-    else
-        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
-                                   DEBUG, false>(info);
+    //}
+    //else
+    //{
+    //    RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
+    //                               DEBUG, false>(info);
+    //}
 }
 
 /**
@@ -745,9 +757,13 @@ template <
 void RunTests_debug(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["debug_mode"].get_bool())
+    {
         RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,  true>(info);
+    }
     else
+    {
         RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT, false>(info);
+    }
 }
 
 /**
@@ -766,9 +782,13 @@ template <
 void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["instrument"].get_bool())
+    {
         RunTests_debug<VertexId, Value, SizeT, true>(info);
+    }
     else
+    {
         RunTests_debug<VertexId, Value, SizeT, false>(info);
+    }
 }
 
 /******************************************************************************
@@ -817,28 +837,25 @@ template <
     typename Value>   // the value type, usually int or long long
 int main_SizeT(CommandLineArgs *args)
 {
-    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-        return main_<VertexId, Value, long long>(args);
-    else
-        return main_<VertexId, Value, int      >(args);
+    /*if (args -> CheckCmdLineFlag("64bit-SizeT"))
+         return main_<VertexId, Value, long long>(args);
+    else*/ return main_<VertexId, Value, int      >(args);
 }
 
 template <
     typename VertexId> // the vertex identifier type, usually int or long long
 int main_Value(CommandLineArgs *args)
 {
-    //if (args -> CheckCmdLineFlag("64bit-Value"))
-    //    return main_SizeT<VertexId, long long>(args);
-    //else 
-        return main_SizeT<VertexId, int      >(args);
+    /*if (args -> CheckCmdLineFlag("64bit-Value"))
+         return main_SizeT<VertexId, long long>(args);
+    else*/ return main_SizeT<VertexId, int      >(args);
 }
 
 int main_VertexId(CommandLineArgs *args)
 {
-    //if (args -> CheckCmdLineFlag("64bit-VertexId"))
-    //    return main_Value<long long>(args);
-    //else 
-        return main_Value<int      >(args);
+    /*if (args -> CheckCmdLineFlag("64bit-VertexId"))
+         return main_Value<long long>(args);
+    else*/ return main_Value<int      >(args);
 }
 
 int main(int argc, char** argv)

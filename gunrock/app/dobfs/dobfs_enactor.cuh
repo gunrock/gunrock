@@ -386,11 +386,8 @@ public:
                     if (frontier_attribute->queue_length == 0) break;
 
                     // Filter
-                    gunrock::oprtr::filter::LaunchKernel
-                        <FilterKernelPolicy, DOBFSProblem, BfsFunctor>(
-                        enactor_stats->filter_grid_size, 
-                        FilterKernelPolicy::THREADS,
-                        0, 0,
+                    gunrock::oprtr::filter::Kernel<FilterKernelPolicy, DOBFSProblem, BfsFunctor>
+                        <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS>>>(
                         enactor_stats->iteration + 1,
                         frontier_attribute->queue_reset,
                         frontier_attribute->queue_index,
@@ -455,11 +452,8 @@ public:
             frontier_attribute->queue_reset          = true;
 
             // Prepare unvisited queue
-            gunrock::oprtr::filter::LaunchKernel
-                <FilterKernelPolicy, DOBFSProblem, InputFrontierFunctor>(
-                enactor_stats->filter_grid_size, 
-                FilterKernelPolicy::THREADS,
-                0, 0,
+            gunrock::oprtr::filter::Kernel<FilterKernelPolicy, DOBFSProblem, InputFrontierFunctor>
+                <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS>>>(
                 -1,
                 frontier_attribute->queue_reset,
                 frontier_attribute->queue_index,
@@ -482,11 +476,8 @@ public:
             frontier_attribute->queue_index             = 0;        // Work queue index
             frontier_attribute->selector                = 0;
 
-            gunrock::oprtr::filter::LaunchKernel
-                <FilterKernelPolicy, DOBFSProblem, UnvisitedQueueFunctor>(
-                enactor_stats->filter_grid_size, 
-                FilterKernelPolicy::THREADS,
-                0, 0,
+            gunrock::oprtr::filter::Kernel<FilterKernelPolicy, DOBFSProblem, UnvisitedQueueFunctor>
+                <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS>>>(
                 -1,
                 frontier_attribute->queue_reset,
                 frontier_attribute->queue_index,
@@ -585,11 +576,8 @@ public:
 
                 enactor_stats -> edges_queued[0] += frontier_attribute -> queue_length;
                 // Vertex Map
-                gunrock::oprtr::filter::LaunchKernel
-                    <FilterKernelPolicy, DOBFSProblem, RBFSFunctor>(
-                    enactor_stats->filter_grid_size, 
-                    FilterKernelPolicy::THREADS,
-                    0, 0,
+                gunrock::oprtr::filter::Kernel<FilterKernelPolicy, DOBFSProblem, RBFSFunctor>
+                <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS>>>(
                     -1,
                     frontier_attribute->queue_reset,
                     frontier_attribute->queue_index,
@@ -662,11 +650,8 @@ public:
             frontier_attribute->selector             = 0;
             frontier_attribute->queue_reset          = true;
 
-            gunrock::oprtr::filter::LaunchKernel
-                <FilterKernelPolicy, DOBFSProblem, SwitchFunctor>(
-                enactor_stats->filter_grid_size, 
-                FilterKernelPolicy::THREADS,
-                0, 0,
+            gunrock::oprtr::filter::Kernel<FilterKernelPolicy, DOBFSProblem, SwitchFunctor>
+                <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS>>>(
                 -1,
                 frontier_attribute->queue_reset,
                 frontier_attribute->queue_index,
@@ -761,11 +746,8 @@ public:
                 enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
 
                 // Vertex Map
-                gunrock::oprtr::filter::LaunchKernel
-                    <FilterKernelPolicy, DOBFSProblem, BfsFunctor>(
-                    enactor_stats->filter_grid_size, 
-                    FilterKernelPolicy::THREADS,
-                    0, 0,
+                gunrock::oprtr::filter::Kernel<FilterKernelPolicy, DOBFSProblem, BfsFunctor>
+                <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS>>>(
                     enactor_stats->iteration + 1,
                     frontier_attribute->queue_reset,
                     frontier_attribute->queue_index,
