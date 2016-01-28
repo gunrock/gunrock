@@ -17,6 +17,7 @@
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
 #include <gunrock/util/sort_utils.cuh>
+#include <gunrock/util/sharedmem.cuh>
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
@@ -33,21 +34,6 @@ namespace app {
 namespace pr {
 
 template <typename Problem, bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK> class Enactor;
-
-/*
- * @brief Make_Queue function.
- *
- * @tparam DataSlice
- *
- * @param[in] data_slice Data slice we process on.
- */
-template <typename DataSlice>
-__global__ void Print_Const (
-    const DataSlice* const data_slice)
-{
-    printf("delta = %f, threshold = %f, src_node = %d\n",
-            data_slice->delta, data_slice->threshold, data_slice->src_node);
-}
 
 /*
  * @brief Make_Queue function.
@@ -69,8 +55,8 @@ __global__ void Mark_Queue_R0D (
     const SizeT*    const degrees,
           SizeT*          marker)
 {
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    VertexId x = blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    VertexId x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
 
     while ( x < num_elements)
     {
@@ -101,8 +87,8 @@ __global__ void Make_Queue_R0D (
     const SizeT*    const marker,
           VertexId*       keys_out)
 {
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    VertexId x = blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    VertexId x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
 
     while (x < num_elements)
     {
@@ -140,8 +126,8 @@ __global__ void Expand_Incoming_R0D (
     const VertexId* const keys_in,
           SizeT*          degrees)
 {
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    VertexId x = blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    VertexId x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
     while (x < num_elements)
     {
         VertexId key = keys_in[x];
@@ -158,8 +144,8 @@ __global__ void Clear_Zero_R0D (
     const SizeT* const degrees_curr,
           SizeT*       degrees_next)
 {
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    VertexId x = blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    VertexId x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
     while (x < num_elements)
     {
         if (degrees_curr[x] == 0)
@@ -167,6 +153,54 @@ __global__ void Clear_Zero_R0D (
         x += STRIDE;
     }
 }
+
+template <
+    typename VertexId,
+    typename SizeT,
+    typename Value>
+__global__ void Selective_Reset_PR(
+    const SizeT        num_elements,
+    const VertexId* const keys,
+    const Value        reset_value,
+    const SizeT* const markers,
+    const Value* const rank_next,
+          Value*       rank_curr)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+    while (x < num_elements)
+    {
+        VertexId key = keys[x];
+        if (markers[key] == 0)
+            rank_curr[key] = reset_value;
+        else
+            rank_curr[key] = rank_next[key];
+        x += STRIDE;
+    }
+}
+
+template <
+    typename VertexId,
+    typename SizeT,
+    typename Value>
+__global__ void Selective_Reset_PR2(
+    const SizeT        num_elements,
+    const VertexId* const keys,
+    const SizeT* const markers,
+    const Value* const rank_next,
+          Value*       rank_curr)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+    while (x < num_elements)
+    {
+        VertexId key = keys[x];
+        if (markers[key] == 1)
+            rank_curr[key] = rank_next[key];
+        x += STRIDE;
+    }
+}
+
 
 /*
  * @brief Expand incoming function.
@@ -192,10 +226,11 @@ __global__ void Expand_Incoming_PR (
     const SizeT           num_elements,
     const VertexId* const keys_in,
     const size_t          array_size,
-          char*           array)
+          char*           array,
+          SizeT*          markers)
 {
     extern __shared__ char s_array[];
-    const SizeT STRIDE = gridDim.x * blockDim.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
     size_t offset = 0;
     offset += sizeof(VertexId*) * NUM_VERTEX_ASSOCIATES;
     Value** s_value__associate_in  = (Value**)&(s_array[offset]);
@@ -210,13 +245,18 @@ __global__ void Expand_Incoming_PR (
     }
     __syncthreads();
 
-    x = blockIdx.x * blockDim.x + threadIdx.x;
+    x = (SizeT) blockIdx.x * blockDim.x + threadIdx.x;
     while (x < num_elements)
     {
         VertexId key = keys_in[x];
-        Value old_value=atomicAdd(s_value__associate_org[0] + key, s_value__associate_in[0][x]);
-        if (TO_TRACK)
-        if (to_track(key)) printf("rank[%d] = %f + %f \n", key, old_value, s_value__associate_in[0][x]);
+        Value add_value = s_value__associate_in[0][x];
+        //if (isfinite(add_value))
+        //{
+        Value old_value = atomicAdd(s_value__associate_org[0] + key, add_value);
+        markers[key] = 1;
+            //if (to_track(key)) printf("rank[%d] = %.8le + %.8le = %.8le\n", 
+            //    key, old_value, s_value__associate_in[0][x], old_value + s_value__associate_in[0][x]);
+        //}
         x+=STRIDE;
     }
 }
@@ -226,29 +266,34 @@ template <
     typename SizeT>
 __global__ void Assign_Marker_PR(
     const SizeT     num_elements,
-    const int       num_gpus,
+    const int       peer_,
     const SizeT*    markers,
     const int*      partition_table,
-          SizeT**   key_markers)
+          SizeT*    key_markers)
 {
-    extern __shared__ SizeT* s_marker[];
+    //extern __shared__ SizeT* s_marker[];
+    //SharedMemory<SizeT*> smem;
+    //SizeT** s_marker = smem.getPointer();
     int   gpu = 0;
-    SizeT x = blockIdx.x * blockDim.x + threadIdx.x;
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    if (threadIdx.x < num_gpus)
-        s_marker[threadIdx.x] = key_markers[threadIdx.x];
-    __syncthreads();
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    //if (threadIdx.x < num_gpus)
+    //    s_marker[threadIdx.x] = key_markers[threadIdx.x];
+    //__syncthreads();
 
     while (x < num_elements)
     {
         //gpu = num_gpus;
         gpu = partition_table[x];
-        if (markers[x] != 1 && gpu != 0)
-        {
-            gpu = num_gpus;
-        }
-        for (int i=0; i<num_gpus; i++)
-            s_marker[i][x] = (i==gpu)?1:0;
+        //if (markers[x] != 1 && gpu != 0)
+        //{
+        //    gpu = num_gpus;
+        //}
+        //for (int i=0; i<num_gpus; i++)
+        //    s_marker[i][x] = (i==gpu)?1:0;
+        if ((markers[x] == 1 || gpu == 0) && (gpu == peer_))
+            key_markers[x] = 1;
+        else key_markers[x] = 0;
         x+=STRIDE;
     }
 }
@@ -258,25 +303,25 @@ template <
     typename SizeT>
 __global__ void Assign_Keys_PR (
     const SizeT          num_elements,
-    const int            num_gpus,
+    const int            peer_,
     const int*           partition_table,
     const SizeT*         markers,
-          SizeT**        keys_markers,
-          VertexId**     keys_outs)
+          SizeT*         keys_marker,
+          VertexId*      keys_out)
 {
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    SizeT x = blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
 
     while (x < num_elements)
     {
         int gpu = partition_table[x];
-        if (markers[x] == 1 || gpu == 0)
+        if ((markers[x] == 1 || gpu == 0) && (gpu == peer_))
         {
             //if (gpu > 0)
             //{
-                SizeT pos = keys_markers[gpu][x]-1;
+                SizeT pos = keys_marker[x]-1;
                 //printf("keys_outs[%d][%d] <- %d \t", gpu, pos, x);
-                keys_outs[gpu][pos] = x;
+                keys_out[pos] = x;
             //}
         }
         x+=STRIDE;
@@ -293,8 +338,8 @@ __global__ void Assign_Values_PR (
     const Value*    const rank_next,
           Value*          rank_out)
 {
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    SizeT x = blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
 
     while (x < num_elements)
     {
@@ -326,8 +371,8 @@ __global__ void Expand_Incoming_Final (
     const Value*    const ranks_in,
           Value*          ranks_out)
 {
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    SizeT x = blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
     while (x < num_elements)
     {
         VertexId key = keys_in[x];
@@ -484,8 +529,11 @@ static void FullQueue_Core(
     enactor_stats      -> AccumulateEdges(
         work_progress  -> GetQueueLengthPointer<unsigned int,SizeT>(frontier_attribute->queue_index+1), stream);
 
-    gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, RemoveZeroFunctor>
-        <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+    gunrock::oprtr::filter::LaunchKernel
+        <FilterKernelPolicy, Problem, RemoveZeroFunctor>(
+        enactor_stats->filter_grid_size, 
+        FilterKernelPolicy::THREADS, 
+        0, stream,
         enactor_stats->iteration,
         frontier_attribute->queue_reset,
         frontier_attribute->queue_index,
@@ -816,26 +864,26 @@ static void Make_Output(
 }; // end R0DIteration
 
 template <
-typename AdvanceKernelPolicy,
-typename FilterKernelPolicy,
-typename Enactor>
+    typename AdvanceKernelPolicy,
+    typename FilterKernelPolicy,
+    typename Enactor>
 struct PRIteration : public IterationBase <
-AdvanceKernelPolicy, FilterKernelPolicy, Enactor,
-false, //HAS_SUBQ
-true,  //HAS_FULLQ
-false, //BACKWARD
-true,  //FORWARD
-false> //UPDATE_PREDECESSORS
+    AdvanceKernelPolicy, FilterKernelPolicy, Enactor,
+    false, //HAS_SUBQ
+    true,  //HAS_FULLQ
+    false, //BACKWARD
+    true,  //FORWARD
+    false> //UPDATE_PREDECESSORS
 {
-public:
-typedef typename Enactor::SizeT      SizeT     ;
-typedef typename Enactor::Value      Value     ;
-typedef typename Enactor::VertexId   VertexId  ;
-typedef typename Enactor::Problem    Problem   ;
-typedef typename Problem::DataSlice  DataSlice ;
-typedef GraphSlice     <SizeT, VertexId, Value> GraphSlice;
-typedef PRFunctor      <VertexId, SizeT, Value, Problem> PrFunctor;
-typedef PRMarkerFunctor<VertexId, SizeT, Value, Problem> PrMarkerFunctor;
+    public:
+    typedef typename Enactor::SizeT      SizeT     ;
+    typedef typename Enactor::Value      Value     ;
+    typedef typename Enactor::VertexId   VertexId  ;
+    typedef typename Enactor::Problem    Problem   ;
+    typedef typename Problem::DataSlice  DataSlice ;
+    typedef GraphSlice     <SizeT, VertexId, Value> GraphSlice;
+    typedef PRFunctor      <VertexId, SizeT, Value, Problem> PrFunctor;
+    typedef PRMarkerFunctor<VertexId, SizeT, Value, Problem> PrMarkerFunctor;
 
 /*
  * @brief FullQueue_Core function.
@@ -879,8 +927,11 @@ static void FullQueue_Core(
 
         //printf("Filter start.\n");fflush(stdout);
          // filter kernel
-        gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, PrFunctor>
-        <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+        gunrock::oprtr::filter::LaunchKernel
+            <FilterKernelPolicy, Problem, PrFunctor>(
+            enactor_stats->filter_grid_size, 
+            FilterKernelPolicy::THREADS, 
+            0, stream,
             enactor_stats->iteration,
             frontier_attribute->queue_reset,
             frontier_attribute->queue_index,
@@ -910,11 +961,27 @@ static void FullQueue_Core(
         //num_elements = queue_length;
 
         //swap rank_curr and rank_next
-        util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
-            data_slice->rank_curr.GetPointer(util::DEVICE),
-            data_slice->rank_next.GetPointer(util::DEVICE),
-            graph_slice->nodes);
-        util::MemsetKernel<<<128, 128, 0, stream>>>(
+        //util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
+        //    data_slice->rank_curr.GetPointer(util::DEVICE),
+        //    data_slice->rank_next.GetPointer(util::DEVICE),
+        //    graph_slice->nodes);
+        /*if (enactor_stats -> iteration == 1)
+            Selective_Reset_PR <<<256, 256, 0, stream>>>(
+                data_slice -> edge_map_queue_len,
+                frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
+                data_slice -> reset_value,
+                data_slice -> markers  .GetPointer(util::DEVICE),
+                data_slice -> rank_next.GetPointer(util::DEVICE),
+                data_slice -> rank_curr.GetPointer(util::DEVICE));
+        else
+            Selective_Reset_PR2<<<256, 256, 0, stream>>>(
+                data_slice -> edge_map_queue_len,
+                frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
+                data_slice -> markers  .GetPointer(util::DEVICE),
+                data_slice -> rank_next.GetPointer(util::DEVICE),
+                data_slice -> rank_curr.GetPointer(util::DEVICE));*/
+ 
+        util::MemsetKernel<<<256, 256, 0, stream>>>(
             data_slice->rank_next.GetPointer(util::DEVICE),
             (Value)0.0, graph_slice->nodes);
 
@@ -977,16 +1044,59 @@ static void FullQueue_Core(
         false,
         false);
 
-    if (enactor_stats->retval = work_progress->GetQueueLength(
-        frontier_attribute->queue_index+1, 
-        frontier_attribute->queue_length, 
-        false, stream, true)) 
-        return;
+    //if (enactor_stats->retval = work_progress->GetQueueLength(
+    //    frontier_attribute->queue_index+1, 
+    //    frontier_attribute->queue_length, 
+    //    false, stream, true)) 
+    //    return;
+    //enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
+    enactor_stats -> AccumulateEdges(
+        work_progress -> GetQueueLengthPointer<unsigned int, SizeT>(
+            frontier_attribute -> queue_index + 1), stream);
+    frontier_attribute -> queue_length = data_slice->edge_map_queue_len;
+
+    if (enactor_stats -> iteration == 0)
+    {
+        util::MemsetKernel<<<256, 256, 0, stream>>>(
+            data_slice->markers.GetPointer(util::DEVICE), 
+            (SizeT)0, graph_slice->nodes);
+        //util::cpu_mt::PrintGPUArray("keys", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, -1, stream);
+        //util::cpu_mt::PrintGPUArray("row_offsets", graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration, -1, stream);
+        //printf("Advance start.\n");fflush(stdout);
+        frontier_attribute -> queue_reset = true;
+        // Edge Map
+        gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, PrMarkerFunctor>(
+            //d_done,
+            enactor_stats[0],
+            frontier_attribute[0],
+            d_data_slice,
+            (VertexId*)NULL,
+            (bool*    )NULL,
+            (bool*    )NULL,
+            scanned_edges->GetPointer(util::DEVICE),
+            frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_in_queue
+            NULL, //frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+            (VertexId*)NULL,
+            (VertexId*)NULL,
+            graph_slice->row_offsets   .GetPointer(util::DEVICE),
+            graph_slice->column_indices.GetPointer(util::DEVICE),
+            (SizeT*   )NULL,
+            (VertexId*)NULL,
+            graph_slice->nodes,  //graph_slice->frontier_elements[frontier_attribute.selector],  // max_in_queue
+            graph_slice->edges,  //graph_slice->frontier_elements[frontier_attribute.selector^1],// max_out_queue
+            work_progress[0],
+            context[0],
+            stream,
+            gunrock::oprtr::advance::V2V,
+            false,
+            false,
+            true);
+        //printf("Advance end.\n");fflush(stdout);
+        //util::cpu_mt::PrintGPUArray("markers", data_slice[0]->markers.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, -1, stream);
+    }
     if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(stream),
         "cudaStreamSynchronize failed", __FILE__, __LINE__)) 
         return;
-    enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
-    frontier_attribute->queue_length = data_slice->edge_map_queue_len;
     //printf("Advance end.\n");fflush(stdout);
 
     //if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
@@ -1105,7 +1215,8 @@ static void Expand_Incoming(
         num_elements,
         keys_in,
         array_size,
-        array);
+        array,
+        data_slice -> markers.GetPointer(util::DEVICE));
     num_elements = 0;
 }
 
@@ -1177,105 +1288,78 @@ static void Make_Output(
 
     if (num_gpus > 1 && enactor_stats->iteration==0)
     {
-        util::MemsetKernel<<<grid_size, block_size, 0, stream>>>(data_slice[0]->markers.GetPointer(util::DEVICE), (SizeT)0, graph_slice->nodes);
-        frontier_attribute->queue_length = data_slice[0]->edge_map_queue_len;
-        //util::cpu_mt::PrintGPUArray("keys", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, -1, stream);
-        //util::cpu_mt::PrintGPUArray("row_offsets", graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration, -1, stream);
-        //printf("Advance start.\n");fflush(stdout);
-        frontier_attribute->queue_reset = true;
-        // Edge Map
-        gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, PrMarkerFunctor>(
-            //d_done,
-            enactor_stats[0],
-            frontier_attribute[0],
-            data_slice->GetPointer(util::DEVICE),
-            (VertexId*)NULL,
-            (bool*    )NULL,
-            (bool*    )NULL,
-            scanned_edges->GetPointer(util::DEVICE),
-            frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_in_queue
-            frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
-            (VertexId*)NULL,
-            (VertexId*)NULL,
-            graph_slice->row_offsets   .GetPointer(util::DEVICE),
-            graph_slice->column_indices.GetPointer(util::DEVICE),
-            (SizeT*   )NULL,
-            (VertexId*)NULL,
-            graph_slice->nodes,  //graph_slice->frontier_elements[frontier_attribute.selector],  // max_in_queue
-            graph_slice->edges,  //graph_slice->frontier_elements[frontier_attribute.selector^1],// max_out_queue
-            work_progress[0],
-            context[0],
-            stream,
-            gunrock::oprtr::advance::V2V,
-            false,
-            false,
-            true);
-        //printf("Advance end.\n");fflush(stdout);
-        //util::cpu_mt::PrintGPUArray("markers", data_slice[0]->markers.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, -1, stream);
-
-        for (peer_ = 0; peer_<num_gpus; peer_++)
-            util::MemsetKernel<<<128, 128, 0, stream>>> ( data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE), 0, graph_slice->nodes);
-        Assign_Marker_PR<VertexId, SizeT>
-            <<<grid_size, block_size, num_gpus * sizeof(SizeT*), stream>>> (
-            graph_slice->nodes,
-            num_gpus,
-            data_slice[0]->markers.GetPointer(util::DEVICE),
-            graph_slice->partition_table.GetPointer(util::DEVICE),
-            data_slice[0]->keys_markers.GetPointer(util::DEVICE));
-        //for (peer_ = 0; peer_<num_gpus;peer_++)
-        //    util::cpu_mt::PrintGPUArray("keys_marker0", data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, -1, stream);
-
-        for (peer_ = 0; peer_<num_gpus;peer_++)
-            Scan<mgpu::MgpuScanTypeInc>(
-                (int*)(data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE)),
-                graph_slice->nodes,
-                (int)0, mgpu::plus<int>(), (int*)0, (int*)0,
-                (int*)(data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE)),
-                context[0]);
-        //for (peer_ = 0; peer_<num_gpus;peer_++)
-        //    util::cpu_mt::PrintGPUArray("keys_marker1", data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, -1, stream);
-
         SizeT temp_length = data_slice[0]->out_length[0];
-        if (graph_slice->nodes > 0) for (peer_ = 0; peer_<num_gpus; peer_++)
-        {
-            cudaMemcpyAsync(
-                &data_slice[0]->out_length[peer_],
-                data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE) + (graph_slice->nodes -1),
-                sizeof(SizeT), cudaMemcpyDeviceToHost, stream);
-        } else {
-            for (peer_ = 1; peer_<num_gpus; peer_++)
-                data_slice[0]->out_length[peer_] = 0;
-        }
-        if (enactor_stats->retval = cudaStreamSynchronize(stream)) return;
-
         for (peer_ = 0; peer_<num_gpus; peer_++)
         {
+            util::MemsetKernel<<<128, 128, 0, stream>>> ( 
+                data_slice[0]->keys_marker[0].GetPointer(util::DEVICE), 
+                (SizeT)0, graph_slice->nodes);
+
+            Assign_Marker_PR<VertexId, SizeT>
+                <<<grid_size, block_size, 0, stream>>> (
+                graph_slice->nodes,
+                peer_,
+                data_slice[0]->markers.GetPointer(util::DEVICE),
+                graph_slice->partition_table.GetPointer(util::DEVICE),
+                data_slice[0]->keys_marker[0].GetPointer(util::DEVICE));
+            //for (peer_ = 0; peer_<num_gpus;peer_++)
+            //    util::cpu_mt::PrintGPUArray("keys_marker0", data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, -1, stream);
+
+            Scan<mgpu::MgpuScanTypeInc>(
+                (SizeT*)(data_slice[0]->keys_marker[0].GetPointer(util::DEVICE)),
+                graph_slice->nodes,
+                (SizeT)0, mgpu::plus<SizeT>(), (SizeT*)0, (SizeT*)0,
+                (SizeT*)(data_slice[0]->keys_marker[0].GetPointer(util::DEVICE)),
+                context[0]);
+            //for (peer_ = 0; peer_<num_gpus;peer_++)
+            //    util::cpu_mt::PrintGPUArray("keys_marker1", data_slice[0]->keys_marker[peer_].GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, -1, stream);
+
+            if (graph_slice->nodes > 0)
+            {
+                cudaMemcpyAsync(
+                    &data_slice[0]->out_length[peer_],
+                    data_slice[0]->keys_marker[0].GetPointer(util::DEVICE) 
+                        + (graph_slice->nodes -1),
+                    sizeof(SizeT), cudaMemcpyDeviceToHost, stream);
+            } else {
+                if (peer_ > 0)
+                    data_slice[0]->out_length[peer_] = 0;
+            }
+            if (enactor_stats->retval = cudaStreamSynchronize(stream)) return;
+
             bool over_sized = false;
             if (peer_>1) {
                 data_slice[0]->keys_out[peer_] = data_slice[0]->temp_keys_out[peer_];
                 data_slice[0]->temp_keys_out[peer_] = util::Array1D<SizeT, VertexId>();
             }
             if (enactor_stats->retval = Check_Size<Enactor::SIZE_CHECK, SizeT, VertexId> (
-                "keys_out", data_slice[0]->out_length[peer_], &data_slice[0]->keys_out[peer_], over_sized, thread_num, enactor_stats->iteration, peer_)) return;
+                "keys_out", data_slice[0]->out_length[peer_], 
+                &data_slice[0]->keys_out[peer_], 
+                over_sized, thread_num, enactor_stats->iteration, peer_)) 
+                return;
             if (peer_>0)
                 if (enactor_stats->retval = Check_Size<Enactor::SIZE_CHECK, SizeT, Value> (
-                    "values_out", data_slice[0]->out_length[peer_], &data_slice[0]->value__associate_out[peer_][0], over_sized, thread_num, enactor_stats->iteration, peer_)) return;
+                    "values_out", data_slice[0]->out_length[peer_], 
+                    &data_slice[0]->value__associate_out[peer_][0], 
+                    over_sized, thread_num, enactor_stats->iteration, peer_)) 
+                    return;
             data_slice[0]->keys_outs[peer_] = data_slice[0]->keys_out[peer_].GetPointer(util::DEVICE);
-            if (!over_sized) continue;
-            data_slice[0]->value__associate_outs[peer_][0] = data_slice[0]->value__associate_out[peer_][0].GetPointer(util::DEVICE);
+            //if (!over_sized) continue;
+            data_slice[0]->value__associate_outs[peer_][0] 
+                = data_slice[0]->value__associate_out[peer_][0].GetPointer(util::DEVICE);
             data_slice[0]->value__associate_outs[peer_].Move(util::HOST, util::DEVICE, -1, 0, stream);
+
+            Assign_Keys_PR <VertexId, SizeT>
+                <<<grid_size, block_size, 0, stream>>> (
+                graph_slice->nodes,
+                peer_,
+                graph_slice->partition_table  .GetPointer(util::DEVICE),
+                data_slice[0]->markers        .GetPointer(util::DEVICE),
+                data_slice[0]->keys_marker [0].GetPointer(util::DEVICE),
+                data_slice[0]->keys_out[peer_].GetPointer(util::DEVICE));
         }
         data_slice[0]->keys_outs.Move(util::HOST, util::DEVICE, -1, 0, stream);
         data_slice[0]->out_length[0] = temp_length;
-
-        Assign_Keys_PR <VertexId, SizeT>
-            <<<grid_size, block_size, num_gpus * sizeof(SizeT*) *2, stream>>> (
-            graph_slice->nodes,
-            num_gpus,
-            graph_slice->partition_table.GetPointer(util::DEVICE),
-            data_slice[0]->markers      .GetPointer(util::DEVICE),
-            data_slice[0]->keys_markers .GetPointer(util::DEVICE),
-            data_slice[0]->keys_outs    .GetPointer(util::DEVICE));
 
         //util::cpu_mt::PrintCPUArray("out_length", &data_slice[0]->out_length[0], num_gpus, thread_num, enactor_stats->iteration);
         //for (peer_ = 0; peer_<num_gpus; peer_++)
@@ -1341,6 +1425,7 @@ static CUT_THREADPROC PRThread(
     do {
         // printf("PRThread entered\n");fflush(stdout);
         if (enactor_stats[0].retval = util::SetDevice(gpu_idx)) break;
+        int *markers = new int [num_gpus];
         thread_data->stats = 1;
         while (thread_data->stats !=2) sleep(0);
         thread_data->stats = 3;
@@ -1384,9 +1469,14 @@ static CUT_THREADPROC PRThread(
         {
             bool over_sized = false;
             if (enactor_stats->retval = Check_Size<PrEnactor::SIZE_CHECK, SizeT, Value>(
-                "values_out", data_slice->local_nodes, &data_slice->value__associate_out[1][0], over_sized, thread_num, enactor_stats->iteration, -1)) break;
+                "values_out", data_slice->local_nodes, &data_slice->value__associate_out[1][0], 
+                over_sized, thread_num, enactor_stats->iteration, -1)) break;
             if (enactor_stats->retval = Check_Size<PrEnactor::SIZE_CHECK, SizeT, VertexId>(
-                "keys_out", data_slice->local_nodes, &data_slice->keys_out[1], over_sized, thread_num, enactor_stats->iteration, -1)) break;
+                "keys_out", data_slice->local_nodes, &data_slice->keys_out[1], 
+                 over_sized, thread_num, enactor_stats->iteration, -1)) break;
+            if (enactor_stats->retval = Check_Size<PrEnactor::SIZE_CHECK, SizeT, VertexId>(
+                "keys_out", data_slice->local_nodes, &data_slice->keys_out[0],
+                over_sized, thread_num, enactor_stats->iteration, -1)) break;
             Assign_Values_PR <VertexId, SizeT, Value>
                 <<<128, 128, 0, data_slice->streams[0]>>> (
                 data_slice->local_nodes,
@@ -1414,7 +1504,6 @@ static CUT_THREADPROC PRThread(
             //util::cpu_mt::PrintGPUArray("values_out", data_slice->value__associate_out[1][0].GetPointer(util::DEVICE), data_slice->local_nodes, thread_num, enactor_stats->iteration, -1, data_slice->streams[0]);
         } else {
             int counter = 0;
-            int *markers = new int [num_gpus];
             for (int peer=0; peer<num_gpus; peer++) markers[peer] = 0;
             while (counter < num_gpus-1)
             {
@@ -1449,12 +1538,24 @@ static CUT_THREADPROC PRThread(
             data_slice -> frontier_queues[0].keys[1].Release();
             data_slice -> rank_next.Release();
             data_slice -> degrees.Release();
+            if (enactor_stats -> retval = data_slice->node_ids.Allocate(graph_slice->nodes, util::DEVICE))
+                break;
+            util::MemsetIdxKernel<<<128, 128>>>(
+                data_slice-> node_ids.GetPointer(util::DEVICE), graph_slice->nodes);
 
             // sort according to the rank of nodes
             util::CUBRadixSort<Value, VertexId>(
                 false, graph_slice->nodes,
                 data_slice->rank_curr.GetPointer(util::DEVICE),
                 data_slice->node_ids.GetPointer(util::DEVICE));
+
+            if (problem -> scaled)
+            {
+                util::MemsetScaleKernel<<<128, 128>>>(
+                    data_slice->rank_curr.GetPointer(util::DEVICE),
+                    (Value) (1.0 / (Value) (problem->org_graph->nodes)),
+                    graph_slice -> nodes);
+            }
         }
 
     } while(0);

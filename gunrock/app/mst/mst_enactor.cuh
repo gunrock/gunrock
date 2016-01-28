@@ -493,10 +493,11 @@ class MSTEnactor :
           if (retval = problem->data_slices[0]->done_flags.Move(
             util::HOST, util::DEVICE)) return retval;
 
-          gunrock::oprtr::filter::Kernel
-            <FilterKernelPolicy, MSTProblem, PJmpFunctor>
-            <<<statistics->filter_grid_size,
-            FilterKernelPolicy::THREADS, 0, stream>>>(
+          gunrock::oprtr::filter::LaunchKernel
+            <FilterKernelPolicy, MSTProblem, PJmpFunctor>(
+            statistics->filter_grid_size,
+            FilterKernelPolicy::THREADS, 
+            0, stream,
             statistics->iteration + 1,
             attributes->queue_reset,
             attributes->queue_index,
@@ -747,10 +748,11 @@ class MSTEnactor :
         attributes->queue_length = graph_slice->edges;
         attributes->queue_reset  = true;
 
-        gunrock::oprtr::filter::Kernel
-          <FilterKernelPolicy, MSTProblem, EgRmFunctor>
-          <<<statistics->filter_grid_size,
-          FilterKernelPolicy::THREADS, 0, stream>>>(
+        gunrock::oprtr::filter::LaunchKernel
+          <FilterKernelPolicy, MSTProblem, EgRmFunctor>(
+          statistics->filter_grid_size,
+          FilterKernelPolicy::THREADS, 
+          0, stream,
           statistics->iteration + 1,
           attributes->queue_reset,
           attributes->queue_index,
@@ -833,10 +835,11 @@ class MSTEnactor :
         attributes->queue_length = graph_slice->edges;
         attributes->queue_reset  = true;
 
-        gunrock::oprtr::filter::Kernel
-          <FilterKernelPolicy, MSTProblem, RIdxFunctor>
-          <<<statistics->filter_grid_size,
-          FilterKernelPolicy::THREADS, 0, stream>>>(
+        gunrock::oprtr::filter::LaunchKernel
+          <FilterKernelPolicy, MSTProblem, RIdxFunctor>(
+          statistics->filter_grid_size,
+          FilterKernelPolicy::THREADS, 
+          0, stream,
           statistics->iteration + 1,
           attributes->queue_reset,
           attributes->queue_index,
