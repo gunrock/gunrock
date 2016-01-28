@@ -27,7 +27,7 @@ if (Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
   link_directories(${Boost_LIBRARY_DIRS})
 else()
-  message(WARNING "Boost was requested but support was not found, run /dependencies/install_boost.sh for installation.")
+  message(WARNING "Boost was requested but support was not found, run /dep/install_boost.sh for installation.")
 endif ()
 
 find_package(OpenMP)
@@ -40,7 +40,7 @@ endif()
 
 find_package(Metis 5.0 REQUIRED)
 if ( NOT Metis_FOUND )
-   message(WARNING "METIS was requested but support was not found, run /dependencies/install_metis.sh for installation.")
+   message(WARNING "METIS was requested but support was not found, run /dep/install_metis.sh for installation.")
 endif( NOT Metis_FOUND)
 
 # begin /* How can I pass git SHA1 to compiler as definition using cmake? */
