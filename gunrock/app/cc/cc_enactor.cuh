@@ -237,8 +237,11 @@ public:
             frontier_attribute->selector     = 0;
             frontier_attribute->queue_length = graph_slice->edges;
             frontier_attribute->queue_reset  = true;
-            gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, HookInitFunctor>
-                <<<frontier_attribute->queue_length/FilterKernelPolicy::THREADS+1, FilterKernelPolicy::THREADS, 0, stream>>>(
+            gunrock::oprtr::filter::LaunchKernel
+                <FilterKernelPolicy, Problem, HookInitFunctor>(
+                frontier_attribute->queue_length/FilterKernelPolicy::THREADS+1,
+                FilterKernelPolicy::THREADS, 
+                0, stream,
                 //<<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
                 0,  //iteration, not used in CC
                 frontier_attribute->queue_reset,
@@ -352,8 +355,11 @@ public:
             data_slice->vertex_flag[0] = 1;
             data_slice->vertex_flag.Move(util::HOST, util::DEVICE, 1, 0, stream);
 
-            gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, PtrJumpFunctor>
-                <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+            gunrock::oprtr::filter::LaunchKernel
+                <FilterKernelPolicy, Problem, PtrJumpFunctor>(
+                enactor_stats->filter_grid_size,
+                FilterKernelPolicy::THREADS, 
+                0, stream,
                 0,
                 frontier_attribute->queue_reset,
                 frontier_attribute->queue_index,
@@ -385,8 +391,11 @@ public:
         frontier_attribute->queue_length  = graph_slice->nodes;
         frontier_attribute->queue_reset   = true;
 
-        gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, UpdateMaskFunctor>
-            <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+        gunrock::oprtr::filter::LaunchKernel
+            <FilterKernelPolicy, Problem, UpdateMaskFunctor>(
+            enactor_stats->filter_grid_size, 
+            FilterKernelPolicy::THREADS, 
+            0, stream,
             0,
             frontier_attribute->queue_reset,
             frontier_attribute->queue_index,
@@ -415,8 +424,11 @@ public:
             data_slice->edge_flag.Move(util::HOST, util::DEVICE, 1, 0, stream);
 
             /*if (enactor_stats->iteration & 3) {
-                gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, HookMinFunctor>
-                    <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+                gunrock::oprtr::filter::LaunchKernel
+                    <FilterKernelPolicy, Problem, HookMinFunctor>(
+                    enactor_stats->filter_grid_size, 
+                    FilterKernelPolicy::THREADS, 
+                    0, stream,
                     0,
                     frontier_attribute->queue_reset,
                     frontier_attribute->queue_index,
@@ -431,8 +443,11 @@ public:
                     frontier_queue->keys[frontier_attribute->selector^1].GetSize(),         // max_out_queue
                     enactor_stats->filter_kernel_stats);
             } else {*/
-                gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, HookMaxFunctor>
-                    <<<frontier_attribute->queue_length/FilterKernelPolicy::THREADS+1, FilterKernelPolicy::THREADS, 0, stream>>>(
+                gunrock::oprtr::filter::LaunchKernel
+                    <FilterKernelPolicy, Problem, HookMaxFunctor>(
+                    frontier_attribute->queue_length/FilterKernelPolicy::THREADS+1, 
+                    FilterKernelPolicy::THREADS, 
+                    0, stream,
                     //<<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
                     0,
                     frontier_attribute->queue_reset,
@@ -473,8 +488,11 @@ public:
             {
                 data_slice->vertex_flag[0] = 1;
                 data_slice->vertex_flag.Move(util::HOST, util::DEVICE, 1, 0, stream);
-                gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, PtrJumpMaskFunctor>
-                    <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+                gunrock::oprtr::filter::LaunchKernel
+                    <FilterKernelPolicy, Problem, PtrJumpMaskFunctor>(
+                    enactor_stats->filter_grid_size, 
+                    FilterKernelPolicy::THREADS, 
+                    0, stream,
                     0,
                     frontier_attribute->queue_reset,
                     frontier_attribute->queue_index,
@@ -505,8 +523,11 @@ public:
             frontier_attribute->queue_length = graph_slice->nodes;
             frontier_attribute->queue_reset  = true;
 
-            gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, PtrJumpUnmaskFunctor>
-                <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+            gunrock::oprtr::filter::LaunchKernel
+                <FilterKernelPolicy, Problem, PtrJumpUnmaskFunctor>(
+                enactor_stats->filter_grid_size, 
+                FilterKernelPolicy::THREADS, 
+                0, stream,
                 0,
                 frontier_attribute->queue_reset,
                 frontier_attribute->queue_index,
@@ -523,8 +544,11 @@ public:
             if (Enactor::DEBUG && (enactor_stats->retval = util::GRError("filter::Kernel Pointer Jumping Unmask Operation failed", __FILE__, __LINE__))) return;
             enactor_stats -> nodes_queued[0] += frontier_attribute->queue_length;
 
-            gunrock::oprtr::filter::Kernel<FilterKernelPolicy, Problem, UpdateMaskFunctor>
-                <<<enactor_stats->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+            gunrock::oprtr::filter::LaunchKernel
+                <FilterKernelPolicy, Problem, UpdateMaskFunctor>(
+                enactor_stats->filter_grid_size, 
+                FilterKernelPolicy::THREADS, 
+                0, stream,
                 0,
                 frontier_attribute->queue_reset,
                 frontier_attribute->queue_index,

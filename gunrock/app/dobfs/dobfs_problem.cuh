@@ -63,9 +63,6 @@ struct DOBFSProblem : ProblemBase<_VertexId, _SizeT, _Value,
     struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
     {
         // device storage arrays
-        util::Array1D<SizeT, VertexId> labels;  /**< Used for source distance */
-        //VertexId        *d_labels;              /**< Used for source distance */
-        //VertexId        *d_preds;               /**< Used for predecessor */
         bool            *d_frontier_map_in;     /**< Input frontier bitmap */
         bool            *d_frontier_map_out;    /**< Output frontier bitmap */
         VertexId        *d_index_queue;         /**< Index of unvisited queue */
@@ -150,9 +147,6 @@ struct DOBFSProblem : ProblemBase<_VertexId, _SizeT, _Value,
         {
             if (util::GRError(cudaSetDevice(gpu_idx[i]),
                 "~DOBFSProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
-            data_slices[i]->labels.Release();
-            //if (data_slices[i]->d_labels)       util::GRError(cudaFree(data_slices[i]->d_labels), "GpuSlice cudaFree d_labels failed", __FILE__, __LINE__);
-            //if (data_slices[i]->d_preds)        util::GRError(cudaFree(data_slices[i]->d_preds), "GpuSlice cudaFree d_preds failed", __FILE__, __LINE__);
             if (data_slices[i]->d_frontier_map_in)  util::GRError(cudaFree(data_slices[i]->d_frontier_map_in), "GpuSlice cudaFree d_frontier_map_in failed", __FILE__, __LINE__);
             if (data_slices[i]->d_frontier_map_out)  util::GRError(cudaFree(data_slices[i]->d_frontier_map_out), "GpuSlice cudaFree d_frontier_map_out failed", __FILE__, __LINE__);
             if (data_slices[i]->d_index_queue)  util::GRError(cudaFree(data_slices[i]->d_index_queue), "GpuSlice cudaFree d_index_queue failed", __FILE__, __LINE__);

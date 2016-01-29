@@ -374,7 +374,8 @@ void SimpleReferencePageRank_Normalized(
     Value                             error,
     SizeT                             max_iteration,
     bool                              directed,
-    bool                              quiet = false)
+    bool                              quiet = false,
+    bool                              scaled = false)
 {
     //typedef Sort_Pair<VertexId, Value> SPair;
     SizeT nodes = graph.nodes;
@@ -384,7 +385,7 @@ void SimpleReferencePageRank_Normalized(
     //SPair *sort_pairs   = (SPair*) malloc (sizeof(SPair) * nodes);
     bool  to_continue   = true;
     SizeT iteration     = 0;
-    Value reset_value   = (1-delta) / nodes;
+    Value reset_value   = scaled ? 1.0 - delta : ((1.0 - delta) / (Value)nodes);
     CpuTimer cpu_timer;
 
     cpu_timer.Start();
@@ -393,7 +394,7 @@ void SimpleReferencePageRank_Normalized(
         #pragma omp parallel for
         for (VertexId v=0; v<nodes; v++)
         {
-            rank_current[v] = 1.0 / nodes;
+            rank_current[v] = scaled ? 1.0 : (1.0 / (Value)nodes);
             rank_next   [v] = 0;
         }
 
@@ -407,8 +408,8 @@ void SimpleReferencePageRank_Normalized(
                 SizeT start_e = graph.row_offsets[src];
                 SizeT end_e   = graph.row_offsets[src+1];
                 if (start_e == end_e) continue; // 0 out degree vertex
-                Value dist_rank = rank_current[src] / (end_e - start_e);
-
+                Value dist_rank = rank_current[src] / (Value)(end_e - start_e);
+                if (!isfinite(dist_rank)) continue;
                 for (SizeT e = start_e; e < end_e; e++)
                 {
                     VertexId dest = graph.column_indices[e];
@@ -422,7 +423,9 @@ void SimpleReferencePageRank_Normalized(
             #pragma omp parallel for
             for (VertexId v=0; v<nodes; v++)
             {
-                Value rank_new = reset_value + delta * rank_next[v];
+                Value rank_new = delta * rank_next[v];
+                if (!isfinite(rank_new)) rank_new = 0;
+                rank_new = rank_new + reset_value;
                 if (iteration <= max_iteration &&
                     fabs(rank_new - rank_current[v]) > error * rank_current[v])
                 {
@@ -460,13 +463,17 @@ void SimpleReferencePageRank_Normalized(
     for (VertexId i = 0; i < nodes; ++i)
     {
         node_id[i] = pr_list[i].vertex_id;
-        rank[i] = pr_list[i].page_rank;
+        rank[i] = scaled ? (pr_list[i].page_rank / (Value)nodes) : pr_list[i].page_rank;
     }
 
     free(pr_list     ); pr_list      = NULL;
     free(rank_current); rank_current = NULL;
     free(rank_next   ); rank_next    = NULL;
-    if (!quiet) { printf("CPU PageRank finished in %lf msec.\n", elapsed); }
+    if (!quiet) 
+    {
+        printf("CPU iteration : %lld\n", (long long)iteration); 
+        printf("CPU PageRank finished in %lf msec.\n", elapsed); 
+    }
 }
 
 /**
@@ -522,6 +529,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     std::string ref_filename     = info->info["ref_filename"].get_str();
     Value delta                  = info->info["delta"].get_real();
     Value error                  = info->info["error"].get_real();
+    bool  scaled                 = info->info["scaled"].get_bool();
     CpuTimer cpu_timer;
 
     cpu_timer.Start();
@@ -550,6 +558,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     PrEnactor* enactor = new PrEnactor(num_gpus, gpu_idx);  // enactor map
     PrProblem *problem = new PrProblem;  // allocate problem on GPU
+    problem -> scaled  = scaled;
 
     util::GRError(problem->Init(
                       stream_from_host,
@@ -628,7 +637,8 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                 error,
                 max_iteration,
                 !undirected,
-                quiet_mode);
+                quiet_mode,
+                scaled);
         else SimpleReferencePageRank <VertexId, Value, SizeT>(
                 *graph,
                 ref_node_id,
@@ -734,8 +744,9 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         if (h_rank[i] < h_rank[i+1])
         {
             if (error_count == 0 && !quiet_mode)
-                printf("INCORRECT : rank[%d] (%.8le), place %d < rank[%d] (%.8le), place %d\n",
-                    h_node_id[i], (double)h_rank[i], i, h_node_id[i+1], (double)h_rank[i+1], i+1);
+                printf("INCORRECT : rank[%lld] (%.8le), place %lld < rank[%lld] (%.8le), place %lld\n",
+                    (long long)h_node_id[i  ], (double)h_rank[i  ], (long long)i, 
+                    (long long)h_node_id[i+1], (double)h_rank[i+1], (long long)i+1);
             error_count ++;
         }
         if (error_count == 0 && !quiet_mode)
@@ -839,6 +850,31 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         delete[] h_rank     ; h_rank      = NULL; 
     }
     if (h_node_id  ) { delete[] h_node_id  ; h_node_id   = NULL; }
+    cpu_timer.Stop();
+    info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
+    
+    if (h_rank     ) 
+    {
+        if (info->info["output_filename"].get_str() !="")
+        {
+            cpu_timer.Start();
+            std::ofstream fout;
+            size_t buf_size = 1024 * 1024 * 16;
+            char *fout_buf = new char[buf_size];
+            fout.rdbuf() -> pubsetbuf(fout_buf, buf_size);
+            fout.open(info->info["output_filename"].get_str().c_str());
+
+            for (VertexId v=0; v<graph->nodes; v++)
+            {
+                fout<< v+1 << "," << h_rank[v] << std::endl;
+            }
+            fout.close();
+            delete[] fout_buf; fout_buf = NULL;
+            cpu_timer.Stop();
+            info->info["write_time"] = cpu_timer.ElapsedMillis();
+        }
+        delete[] h_rank     ; h_rank      = NULL; 
+    }
 }
 
 /**
@@ -863,11 +899,9 @@ template <
 void RunTests_normalized(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["normalized"].get_bool())
-    {
         RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,  true>(info);
-    } else {
+    else
         RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK, false>(info);
-    }
 }
 
 /**
@@ -890,13 +924,9 @@ template <
 void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["size_check"].get_bool())
-    {
         RunTests_normalized<VertexId, Value, SizeT, INSTRUMENT, DEBUG,  true>(info);
-    }
     else
-    {
         RunTests_normalized<VertexId, Value, SizeT, INSTRUMENT, DEBUG, false>(info);
-    }
 }
 
 /**
@@ -917,13 +947,9 @@ template <
 void RunTests_debug(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["debug_mode"].get_bool())
-    {
         RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,  true>(info);
-    }
     else
-    {
         RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT, false>(info);
-    }
 }
 
 /**
@@ -942,46 +968,38 @@ template <
 void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 {
     if (info->info["instrument"].get_bool())
-    {
         RunTests_debug<VertexId, Value, SizeT,  true>(info);
-    }
     else
-    {
         RunTests_debug<VertexId, Value, SizeT, false>(info);
-    }
 }
 
 /******************************************************************************
  * Main
  ******************************************************************************/
 
-int main(int argc, char** argv)
+template<
+    typename VertexId,
+    typename Value,
+    typename SizeT>
+int main_(CommandLineArgs *args)
 {
     CpuTimer cpu_timer, cpu_timer2;
 
     cpu_timer.Start();
-    CommandLineArgs args(argc, argv);
-    int graph_args = argc - args.ParsedArgc() - 1;
-    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
-    {
-        Usage();
-        return 1;
-    }
-
-    typedef int VertexId;  // use int as the vertex identifier
-    typedef float Value;   // use float as the value type
-    typedef int SizeT;     // use int as the graph size type
+    //typedef int VertexId;  // use int as the vertex identifier
+    //typedef float Value;   // use float as the value type
+    //typedef int SizeT;     // use int as the graph size type
 
     Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
     // graph construction or generation related parameters
-    if (args.CheckCmdLineFlag("normalized"))
-        info->info["undirected"] = args.CheckCmdLineFlag("undirected");
+    if (args -> CheckCmdLineFlag("normalized"))
+        info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
     else info->info["undirected"] = true;   // require undirected input graph when unnormalized
 
     cpu_timer2.Start();
-    info->Init("PageRank", args, csr);  // initialize Info structure
+    info->Init("PageRank", *args, csr);  // initialize Info structure
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
@@ -998,6 +1016,48 @@ int main(int argc, char** argv)
     info->CollectInfo();  // collected all the info and put into JSON mObject
 
     return 0;
+}
+
+template <
+    typename VertexId,
+    typename Value>   // the value type, usually int or long long
+int main_SizeT(CommandLineArgs *args)
+{
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_<VertexId, Value, long long>(args);
+    else 
+        return main_<VertexId, Value, int      >(args);
+}
+
+template <
+    typename VertexId> // the vertex identifier type, usually int or long long
+int main_Value(CommandLineArgs *args)
+{
+    if (args -> CheckCmdLineFlag("64bit-Value"))
+        return main_SizeT<VertexId, double>(args);
+    else 
+        return main_SizeT<VertexId, float >(args);
+}
+
+int main_VertexId(CommandLineArgs *args)
+{
+    //if (args -> CheckCmdLineFlag("64bit-VertexId"))
+    //    return main_Value<long long>(args);
+    //else 
+        return main_Value<int      >(args);
+}
+
+int main(int argc, char** argv)
+{
+    CommandLineArgs args(argc, argv);
+    int graph_args = argc - args.ParsedArgc() - 1;
+    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
+    {   
+        Usage();
+        return 1;
+    }   
+
+    return main_VertexId(&args);
 }
 
 // Leave this at the end of the file

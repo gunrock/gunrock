@@ -55,7 +55,6 @@ struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
      */
     struct DataSlice : DataSliceBase<SizeT, VertexId, Value> {
         // device storage arrays
-        util::Array1D<SizeT, VertexId> labels;  // Used for ...
 
         // TODO(developer): other primitive-specific device arrays here
     };
@@ -102,7 +101,6 @@ struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
                         "~Problem cudaSetDevice failed",
                         __FILE__, __LINE__)) break;
 
-            data_slices[i]->labels.Release();
             // TODO: code to clean up primitive-specific device arrays here
 
             if (d_data_slices[i]) {
@@ -230,7 +228,6 @@ struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
                     NULL);       // Number of out vertices
 
                 // create SoA on device
-                data_slices[0]->labels.SetName("labels");
                 if (retval = data_slices[0]->labels.Allocate(nodes, util::DEVICE)) {
                     return retval;
                 }

@@ -52,7 +52,7 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
      
     struct DataSlice : DataSliceBase<SizeT, VertexId, Value>{
         // device storage arrays
-	util::Array1D<SizeT, VertexId> labels;  // Used for ...
+	//util::Array1D<SizeT, VertexId> labels;  // Used for ...
         util::Array1D<SizeT, VertexId> d_query_labels;  /** < Used for query graph labels */
 	util::Array1D<SizeT, VertexId> d_data_labels;   /** < Used for data graph labels */
 	//util::Array1D<SizeT, SizeT> d_query_nodeIDs;        /** < Used for query node indices */    

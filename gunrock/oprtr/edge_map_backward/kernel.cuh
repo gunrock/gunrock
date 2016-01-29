@@ -174,13 +174,13 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         }
 
         // workprogress reset
-        if (queue_reset)
-        {
-            if (threadIdx.x < util::CtaWorkProgress::COUNTERS) {
+        //if (queue_reset)
+        //{
+        //    if (threadIdx.x < util::CtaWorkProgress::COUNTERS) {
                 //Reset all counters
-                work_progress.template Reset<SizeT>();
-            }
-        }
+        //        work_progress.template Reset<SizeT>();
+        //    }
+        //}
 
         // Determine work decomposition
         if (threadIdx.x == 0) {
