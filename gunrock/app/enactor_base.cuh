@@ -164,6 +164,8 @@ public:
     json_spirit::mObject info;  // test parameters and running statistics
     Csr<VertexId, Value, SizeT> *csr_ptr;  // pointer to CSR input graph
     Csr<VertexId, Value, SizeT> *csc_ptr;  // pointer to CSC input graph
+    Csr<VertexId, Value, SizeT> *csr_query_ptr; // pointer to CSR input query graph
+    Csr<VertexId, Value, SizeT> *csr_data_ptr; // pointer to CSR input data graph
 
     // TODO: following two already moved into Enactor in branch mgpu-cq
     void         *context;  // pointer to context array used by MordernGPU
@@ -234,6 +236,9 @@ public:
         info["beta"]               = 6.0f;   // default beta for DOBFS
         info["top_nodes"]          = 0;      // default number of nodes for top-k primitive
         info["normalized"]         = false;  // default normalized for PageRank
+	info["multi_graphs"]	   = false;  // default only one input graph
+	info["node_value"]	   = false;  // default don't load labels
+        info["label"]              = "";     // label file name used in test
         // info["gpuinfo"]
         // info["device_list"]
         // info["sysinfo"]
@@ -514,6 +519,9 @@ public:
         Csr<VertexId, Value, SizeT> &csr_ref,
         Csr<VertexId, Value, SizeT> &csc_ref)
     {
+	// Special initialization for SM problem
+	if(algorithm_name == "SM") return Init_SM(args,csr_ref,csc_ref);
+
          // load or generate input graph
         if (info["edge_value"].get_bool())
         {
@@ -546,6 +554,119 @@ public:
         InitBase(algorithm_name, args);
     }
 
+    /**
+     * @brief Utility function to load input graph.
+     *
+     * @tparam NODE_VALUE
+     *
+     * @param[in] args Command line arguments.
+     * @param[in] csr_ref Reference to the CSR graph.
+     *
+     * \return int whether successfully loaded the graph (0 success, 1 error).
+     */
+    template<bool NODE_VALUE>
+    int LoadGraph_SM(
+        util::CommandLineArgs &args,
+        Csr<VertexId, Value, SizeT> &csr_ref,
+	std::string type)
+    {
+        std::string graph_type = args.GetCmdLineArgvGraphType();
+        if (graph_type == "market")  // Matrix-market graph
+        {
+            if (!args.CheckCmdLineFlag("quiet"))
+            {
+                printf("Loading Matrix-market coordinate-formatted graph ...\n");
+            }
+	    char *market_filename = NULL;
+	    char *label_filename = NULL;
+
+	    if(type=="query"){
+	 	market_filename = args.GetCmdLineArgvQueryDataset();
+		if(NODE_VALUE)
+		    label_filename = args.GetCmdLineArgvQueryLabel();
+	    }
+            else 
+	    {
+	 	market_filename = args.GetCmdLineArgvDataDataset();
+		if(NODE_VALUE)
+		    label_filename = args.GetCmdLineArgvDataLabel();
+	    }
+
+            if (market_filename == NULL)
+            {
+                printf("Log.");
+                fprintf(stderr, "Input graph does not exist.\n");
+                return 1;
+            }
+
+            if (NODE_VALUE && label_filename == NULL)
+            {
+                printf("Log.");
+                fprintf(stderr, "Input graph labels does not exist.\n");
+                return 1;
+            }
+
+            boost::filesystem::path market_filename_path(market_filename);
+            file_stem = market_filename_path.stem().string();
+            info["dataset"] = file_stem;
+            if (graphio::BuildMarketGraph_SM<NODE_VALUE>(
+                        market_filename,
+			label_filename,
+                        csr_ref,
+                        info["undirected"].get_bool(),
+			false,
+                        args.CheckCmdLineFlag("quiet")) != 0)
+            {
+                return 1;
+            }
+        }
+	else
+        {
+            fprintf(stderr, "Unspecified graph type.\n");
+            return 1;
+        }
+
+        if (!args.CheckCmdLineFlag("quiet"))
+        {
+            csr_ref.GetAverageDegree();
+            csr_ref.PrintHistogram();
+            if (info["algorithm"].get_str().compare("SSSP") == 0)
+            {
+                csr_ref.GetAverageEdgeValue();
+                int max_degree;
+                csr_ref.GetNodeWithHighestDegree(max_degree);
+                printf("Maximum degree: %d\n", max_degree);
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * @brief SM Initialization process for Info.
+     *
+     * @param[in] algorithm_name Algorithm name.
+     * @param[in] args Command line arguments.
+     * @param[in] csr_query_ref Reference to the CSR structure.
+     * @param[in] csr_data_ref Reference to the CSR structure.
+     */
+    void Init_SM(
+	util::CommandLineArgs &args,
+	Csr<VertexId, Value, SizeT> &csr_query_ref,
+	Csr<VertexId, Value, SizeT> &csr_data_ref)
+    {
+	if(info["node_value"].get_bool()){
+            LoadGraph_SM<true>(args,csr_query_ref, "query");
+            LoadGraph_SM<true>(args,csr_data_ref, "data");
+        }
+	else{
+        LoadGraph_SM<false>(args,csr_query_ref, "query");
+        LoadGraph_SM<false>(args,csr_data_ref, "data");
+	}
+	csr_query_ptr = &csr_query_ref;
+        csr_data_ptr = &csr_data_ref;
+
+        InitBase("SM", args);
+    }
     /**
      * @brief Display JSON mObject info. Should be called after ComputeStats.
      */

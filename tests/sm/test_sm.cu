@@ -29,7 +29,6 @@
 // gunrock abstraction graph operators
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
-
 #include <moderngpu.cuh>
 
 using namespace gunrock;
@@ -44,7 +43,7 @@ using namespace gunrock::app::sm;
 void Usage()
 {
     printf(
-        "test <graph-type> [graph-type-arguments]\n"
+        "test <graph-type> <query graph file> <data graph file> [graph-type-arguments]\n"
         "Graph type and graph type arguments:\n"
         "    market <matrix-market-file-name>\n"
         "        Reads a Matrix-Market coordinate-formatted graph of\n"
@@ -104,13 +103,15 @@ void Usage()
  * @param[in] graph Reference to the CSR graph.
  */
 template<typename VertexId, typename SizeT, typename Value>
-void DisplaySmSolution(const Csr<VertexId, Value, SizeT> &graph_query, 
+void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph_query, 
 		     const Csr<VertexId, Value, SizeT> &graph_data,
-		     bool *h_c_set,
+		     VertexId *h_froms,
+		     VertexId *h_tos,
 		     unsigned int num_matches)
 {
-    printf("==> display solution: (currently missing)\n");
     // TODO(developer): code to print out results
+    printf("Number of matched subgraphs: %u.\n",num_matches);
+
 }
 
 // ----------------------------------------------------------------------------
@@ -131,7 +132,8 @@ void DisplaySmSolution(const Csr<VertexId, Value, SizeT> &graph_query,
 template<typename VertexId, typename SizeT, typename Value>
 void SMReference(const Csr<VertexId, Value, SizeT> &graph_query,
 		     const Csr<VertexId, Value, SizeT> &graph_data,
-		     bool *h_c_set) 
+		     VertexId *h_froms,
+		     VertexId *h_tos) 
 {
     // initialization
 
@@ -165,38 +167,36 @@ template <
     typename Value,
     bool DEBUG,
     bool SIZE_CHECK >
-void RunTest(Info<VertexId, Value, SizeT> *info_query, Info<VertexId, Value, SizeT> *info_data)
+void RunTest(Info<VertexId, Value, SizeT> *info)
 {
     typedef SMProblem < VertexId, SizeT, Value,
             true,   // MARK_PREDECESSORS
             false,  // ENABLE_IDEMPOTENCE
-            false > Problem;
+            true >  // USE_DOUBLE_BUFFER
+	    Problem;
 
-    Csr<VertexId, Value, SizeT>* csr_query = info_query->csr_ptr;
-    Csr<VertexId, Value, SizeT>* csr_data = info_data->csr_ptr;
+    Csr<VertexId, Value, SizeT>* csr_query = (Csr<VertexId, Value, SizeT>*)info->csr_query_ptr;
+    Csr<VertexId, Value, SizeT>* csr_data = (Csr<VertexId, Value, SizeT>*)info->csr_data_ptr;
 
-    std::string partition_method    = info_query->info["partition_method"].get_str();
-    int         max_grid_size       = info_query->info["max_grid_size"].get_int();
-    int         num_gpus            = info_query->info["num_gpus"].get_int();
+    std::string partition_method    = info->info["partition_method"].get_str();
+    int         max_grid_size       = info->info["max_grid_size"].get_int();
+    int         num_gpus            = info->info["num_gpus"].get_int();
     int         iterations          = 1; //force to 1 for now.
-    bool        quick_mode          = info_query->info["quick_mode"].get_bool();
-    bool        quiet_mode          = info_query->info["quiet_mode"].get_bool();
-    bool        stream_from_host    = info_query->info["stream_from_host"].get_bool();
-    double      max_queue_sizing    = info_query->info["max_queue_sizing"].get_real();
-
-    json_spirit::mArray device_list = info_query->info["device_list"].get_array();
+    bool        quick_mode          = info->info["quick_mode"].get_bool();
+    bool        quiet_mode          = info->info["quiet_mode"].get_bool();
+    bool        stream_from_host    = info->info["stream_from_host"].get_bool();
+    double      max_queue_sizing    = info->info["max_queue_sizing"].get_real();
+    json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
 
     // TODO: remove after merge mgpu-cq
-    ContextPtr* context             = (ContextPtr*)info_query -> context;
-    cudaStream_t *streams = (cudaStream_t*) info_query->streams;
+    ContextPtr* context             = (ContextPtr*)info->context;
+    cudaStream_t *streams = (cudaStream_t*) info->streams;
 
-    // allocate host-side array (for both reference and GPU-computed results)
-    VertexId *h_query_labels = (VertexId*)malloc(sizeof(VertexId) * csr_query->nodes);
-    VertexId *h_data_labels = (VertexId*)malloc(sizeof(VertexId) * csr_data->nodes);
-    bool     *h_c_set = new bool[csr_data->nodes * csr_query->nodes];
-    VertexId *reference_check = (quick_mode) ? NULL : h_query_labels;
+    //bool     *h_c_set = new bool[csr_data->nodes * csr_query->nodes];
+    VertexId *h_froms = (VertexId*)malloc(sizeof(VertexId) * csr_data->edges);
+    VertexId *h_tos = (VertexId*)malloc(sizeof(VertexId) * csr_data->edges);
     unsigned int ref_num_matches = 0;
 
     size_t *org_size = new size_t[num_gpus];
@@ -206,62 +206,62 @@ void RunTest(Info<VertexId, Value, SizeT> *info_query, Info<VertexId, Value, Siz
         cudaSetDevice(gpu_idx[gpu]);
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
-
+    if(!quiet_mode) printf("\nSUBGRAPH MATCHING TEST\n");
 
     SMEnactor <
     Problem,
     false,  // INSTRUMENT
-    false,  // DEBUG
-    true >  // SIZE_CHECK
-    sm_enactor(gpu_idx);  // allocate primitive enactor map
+    DEBUG,  // DEBUG
+    SIZE_CHECK >  // SIZE_CHECK
+    enactor(gpu_idx);  // allocate primitive enactor map
 
-    Problem *sm_problem = new Problem;  // allocate primitive problem on GPU
+    Problem *problem = new Problem;  // allocate primitive problem on GPU
 
+
+    // copy data from cpu to gpu initialize data members in DataSlice
     util::GRError(
-        sm_problem->Init(stream_from_host, *csr_query, *csr_data, h_query_labels, h_data_labels, num_gpus),
+        problem->Init(stream_from_host, *csr_query, *csr_data, num_gpus),
         "SM Problem Initialization Failed", __FILE__, __LINE__);
 	
 
     // TODO: compute reference CPU SM
-    if (reference_check != NULL)
-    {
-    	if (!quiet_mode) { printf("Computing reference value ...\n"); }
-//	ref_num_matches = ReferenceSM(*csr_query, *csr_data, refere_check, quiet_mode);
-	if (!quiet_mode) { printf("\n"); }
-    }
 
     //
-    // perform SM
+    // perform SM calculations
     //
 
-    GpuTimer gpu_timer;
+    GpuTimer gpu_timer;// record the kernel running time
 
     float elapsed = 0.0f;
-
     for (int iter = 0; iter < iterations; ++iter)
     {
+	// reset values in DataSlice
         util::GRError(
-            sm_problem->Reset(sm_enactor.GetFrontierType(),
+            problem->Reset(enactor.GetFrontierType(),
                            max_queue_sizing),
             		"SM Problem Data Reset Failed", __FILE__, __LINE__);
 
         gpu_timer.Start();
-
-	// launch sm enactor
+	// launch SM enactor
         util::GRError(
-            sm_enactor.template Enact<Problem>(*context, sm_problem, max_grid_size),
+            enactor.template Enact<Problem>(*context, problem, max_grid_size),
             "SM Problem Enact Failed", __FILE__, __LINE__);
-        gpu_timer.Stop();
 
+        gpu_timer.Stop();
 
         elapsed += gpu_timer.ElapsedMillis();
     }
 
     elapsed /= iterations;
 
-    // extract results
+    if (!quiet_mode)
+    {
+        printf("GPU - Computation Complete in %lf msec.\n", elapsed);
+    }
+
+    // extract results from GPU to CPU
     util::GRError(
-        sm_problem->Extract(h_c_set),
+        problem->Extract(h_froms,h_tos),
         "SM Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // TODO: validity
@@ -273,12 +273,12 @@ void RunTest(Info<VertexId, Value, SizeT> *info_query, Info<VertexId, Value, Siz
     if (!quick_mode)
     {
         if (!quiet_mode) printf("==> computing reference value ... (currently missing)\n");
-        SMReference<VertexId, SizeT, Value>(csr_query, csr_data, h_c_set);
+        SMReference<VertexId, SizeT, Value>(csr_query, csr_data, h_froms, h_tos);
         if (!quiet_mode) {printf("==> validation: (currently missing)\n");
 /*
     		if (reference_check != NULL)
    		{
-      		  if (ref_num_matches == sm_problem->num_matches)
+      		  if (ref_num_matches == problem->num_matches)
       		  {
             		if (!quiet_mode)
                			 printf("CORRECT. Matched Subgraph Count: %d\n", ref_num_matches);
@@ -290,25 +290,25 @@ void RunTest(Info<VertexId, Value, SizeT> *info_query, Info<VertexId, Value, Siz
                 		printf(
                     		"INCORRECT. Ref Match Count: %d, "
 		                "GPU Subgraph Matching Count: %d\n",
-                		ref_num_matches, sm_problem->num_matches);
+                		ref_num_matches, problem->num_matches);
            		}
        		  }
     		}
     		else
    		{
 		      if (!quiet_mode)
-           		 printf("Matched Subgraph  Count: %lld\n", (long long) sm_problem->num_matches);
+           		 printf("Matched Subgraph  Count: %lld\n", (long long) problem->num_matches);
    		} */
 	}
    }
 
-    if (!quiet_mode) DisplaySolution<VertexId, SizeT, Value>(csr_query, csr_data, h_c_set, sm_problem->num_matches);  // display solution
+    if (!quiet_mode) DisplaySolution<VertexId, SizeT, Value>(csr_query, csr_data, h_froms, h_tos, problem->num_matches);  // display solution
 
-    info_query->ComputeCommonStats(sm_enactor.enactor_stats.GetPointer(), elapsed);
+    info->ComputeCommonStats(enactor.enactor_stats.GetPointer(), elapsed);
 
-    if (!quiet_mode) info_query->DisplayStats();
+    if (!quiet_mode) info->DisplayStats(false); // display collected statistics
 
-    info_query->CollectInfo();
+    info->CollectInfo();
 
     if (!quiet_mode)
     {
@@ -332,20 +332,20 @@ void RunTest(Info<VertexId, Value, SizeT> *info_query, Info<VertexId, Value, Siz
             printf("GPU_%d\t %ld", gpu_idx[gpu], org_size[gpu] - gpu_free);
             for (int i = 0; i < num_gpus; i++)
             {
-                SizeT x = sm_problem->data_slices[gpu]->frontier_queues[i].keys[0].GetSize();
+                SizeT x = problem->data_slices[gpu]->frontier_queues[i].keys[0].GetSize();
                 printf("\t %d", x);
-                double factor = 1.0 * x / (num_gpus > 1 ? sm_problem->graph_slices[gpu]->in_counter[i] : sm_problem->graph_slices[gpu]->nodes);
+                double factor = 1.0 * x / (num_gpus > 1 ? problem->graph_slices[gpu]->in_counter[i] : problem->graph_slices[gpu]->nodes);
                 if (factor > max_key_sizing) max_key_sizing = factor;
                 if (num_gpus > 1 && i != 0 )
                     for (int t = 0; t < 2; t++)
                     {
-                        x = sm_problem->data_slices[gpu][0].keys_in[t][i].GetSize();
+                        x = problem->data_slices[gpu][0].keys_in[t][i].GetSize();
                         printf("\t %d", x);
-                        factor = 1.0 * x / sm_problem->graph_slices[gpu]->in_counter[i];
+                        factor = 1.0 * x / problem->graph_slices[gpu]->in_counter[i];
                         if (factor > max_in_sizing_) max_in_sizing_ = factor;
                     }
             }
-            if (num_gpus > 1) printf("\t %d", sm_problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
+            if (num_gpus > 1) printf("\t %d", problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
             printf("\n");
         }
         printf("\t key_sizing =\t %lf", max_key_sizing);
@@ -353,12 +353,11 @@ void RunTest(Info<VertexId, Value, SizeT> *info_query, Info<VertexId, Value, Siz
         printf("\n");
     }
 
-    // clean up
+    // clean up if necessarry
     if (org_size) {delete[] org_size; org_size=NULL;}
-    if (sm_problem)  { delete sm_problem; sm_problem = NULL;}
-    if (h_c_set)     { delete[] h_c_set; h_c_set = NULL; }
-    if (h_query_labels) { delete[] h_query_labels; h_query_labels = NULL; }
-    if (h_data_labels)  { delete[] h_data_labels; h_data_labels = NULL; }
+    if (problem)  { delete problem; problem = NULL;}
+    if (h_froms)     { delete[] h_froms; h_froms = NULL; }
+    if (h_tos)     { delete[] h_tos; h_tos = NULL; }
 
 }
 
@@ -377,12 +376,12 @@ template <
     typename      Value,
     typename      SizeT,
     bool          DEBUG >
-void RunTests_size_check(Info<VertexId, Value, SizeT> *info_query, Info<VertexId, Value, SizeT> *info_data)
+void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
 {
-    if (info_query->info["size_check"].get_bool())
-        RunTest <VertexId, Value, SizeT, DEBUG,  true>(info_query, info_data);
+    if (info->info["size_check"].get_bool())
+        RunTest <VertexId, Value, SizeT, DEBUG,  true>(info);
     else
-        RunTest <VertexId, Value, SizeT, DEBUG, false>(info_query, info_data);
+        RunTest <VertexId, Value, SizeT, DEBUG, false>(info);
 }
 
 /**
@@ -398,12 +397,12 @@ template <
     typename    VertexId,
     typename    Value,
     typename    SizeT >
-void RunTests_debug(Info<VertexId, Value, SizeT> *info_query, Info<VertexId, Value, SizeT> *info_data)
+void RunTests_debug(Info<VertexId, Value, SizeT> *info)
 {
-    if (info_query->info["debug_mode"].get_bool())
-        RunTests_size_check <VertexId, Value, SizeT,  true>(info_query, info_data);
+    if (info->info["debug_mode"].get_bool())
+        RunTests_size_check <VertexId, Value, SizeT,  true>(info);
     else
-        RunTests_size_check <VertexId, Value, SizeT, false>(info_query, info_data);
+        RunTests_size_check <VertexId, Value, SizeT, false>(info);
 }
 
 // ----------------------------------------------------------------------------
@@ -414,7 +413,8 @@ int main(int argc, char** argv)
 
     CommandLineArgs args(argc, argv);
     int graph_args = argc - args.ParsedArgc() - 1;
-    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
+    printf("number of graphs: %d\n", graph_args);
+    if (argc < 3 || graph_args < 2 || args.CheckCmdLineFlag("help"))
     {
         Usage();
         return 1;
@@ -426,15 +426,15 @@ int main(int argc, char** argv)
 
     Csr<VertexId, Value, SizeT> csr_query(false);  // query graph we process on
     Csr<VertexId, Value, SizeT> csr_data(false);  // data graph we process on
-    Info<VertexId, Value, SizeT> *info_query = new Info<VertexId, Value, SizeT>;
-    Info<VertexId, Value, SizeT> *info_data  = new Info<VertexId, Value, SizeT>;
+    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
 
     // graph construction or generation related parameters
-    info_query->info["undirected"] = args.CheckCmdLineFlag("undirected");
-    info_data->info["undirected"] = args.CheckCmdLineFlag("undirected");
-    info_query->Init("SM_QUERY", args, csr_query);  // initialize Info_query structure
-    info_data->Init("SM_DATA", args, csr_data);  // initialize Info_data structure
-    RunTests_debug<VertexId, Value, SizeT>(info_query, info_data);  // run test
+    info->info["undirected"] = true; // always converted to undirected
+    info->info["multi_graph"] = true; // always have two input graphs
+    if(graph_args==5) info->info["node_value"] = true; // node have label
+
+    info->Init("SM", args, csr_query, csr_data);  // initialize Info_query structure
+    RunTests_debug<VertexId, Value, SizeT>(info);  // run test
     
     return 0;
 }

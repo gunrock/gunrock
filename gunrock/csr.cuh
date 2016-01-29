@@ -145,6 +145,18 @@ struct Csr
         }
     }
 
+    void WriteBinary_SM(
+	char *file_name,
+	SizeT v,
+	Value *labels)
+    {
+	std::ofstream fout(file_name);
+	if(fout.is_open())
+	{
+	    fout.write(reinterpret_cast<const char*>(labels), v*sizeof(Value));
+	    fout.close();
+	}
+    }
     /**
      *
      * @brief Store graph information into a file.
@@ -327,6 +339,72 @@ struct Csr
         out_nodes = out_node;
     }
 
+    /**
+     * @brief (Specific for SM) Read from stored row_offsets, column_indices arrays.
+     *
+     * @tparam LOAD_NODE_VALUES Whether or not to load node values.
+     *
+     * @param[in] f_in Input graph file name.
+     * @param[in] f_label Input label file name.
+     * @param[in] quiet Don't print out anything.
+     */
+    template <bool LOAD_NODE_VALUES>
+    void FromCsr_SM(char *f_in, char *f_label, bool quiet = false)
+    {
+        if (!quiet)
+        {
+            printf("  Reading directly from stored binary CSR arrays ...\n");
+	    if(LOAD_NODE_VALUES)
+                printf("  Reading directly from stored binary label arrays ...\n");
+        }
+        time_t mark1 = time(NULL);
+
+        std::ifstream input(f_in);
+        std::ifstream input_label(f_label);
+
+        SizeT v, e;
+        input.read(reinterpret_cast<char*>(&v), sizeof(SizeT));
+        input.read(reinterpret_cast<char*>(&e), sizeof(SizeT));
+
+        FromScratch<false, LOAD_NODE_VALUES>(v, e);
+
+        input.read(reinterpret_cast<char*>(row_offsets), (v + 1)*sizeof(SizeT));
+        input.read(reinterpret_cast<char*>(column_indices), e * sizeof(VertexId));
+        if (LOAD_NODE_VALUES)
+        {
+            input_label.read(reinterpret_cast<char*>(node_values), v * sizeof(Value));
+        }
+	for(int i=0; i<v; i++) printf("%lld ", node_values[i]); printf("\n");
+
+        time_t mark2 = time(NULL);
+        if (!quiet)
+        {
+            printf("Done reading (%ds).\n", (int) (mark2 - mark1));
+        }
+
+        // compute out_nodes
+        SizeT out_node = 0;
+        for (SizeT node = 0; node < nodes; node++)
+        {
+            if (row_offsets[node + 1] - row_offsets[node] > 0)
+            {
+                ++out_node;
+            }
+        }
+        out_nodes = out_node;
+    }
+
+    template<bool LOAD_NODE_VALUES>
+    void FromLabels(
+	char *output_file,
+	Value *labels,
+	SizeT nodes,
+	bool quiet = false)
+    {
+	if(!quiet) printf("  Converting the labels of %lld vertices to binary format...\n", 
+				(long long)nodes);
+	if(LOAD_NODE_VALUES) WriteBinary_SM(output_file, nodes, labels);
+    }
     /**
      * @brief Build CSR graph from COO graph, sorted or unsorted
      *

@@ -14,6 +14,8 @@
 
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
+#include <gunrock/util/sort_utils.cuh>
+#include <gunrock/util/join.cuh>
 
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
@@ -28,6 +30,7 @@ namespace gunrock {
 namespace app {
 namespace sm {
 
+//TODO: preprocess data graph into edge list with edges source id< dest id using IntervalExpand in mgpu
 /**
  * @brief SM Primitive enactor class.
  *
@@ -138,7 +141,9 @@ class SMEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHE
         typedef SMInitFunctor<VertexId, SizeT, VertexId, SMProblem> SMInitFunctor;
         //typedef EdgeWeightFunctor<VertexId, SizeT, Value, SMProblem> EdgeWeightFunctor;
         typedef PruneFunctor<VertexId, SizeT, VertexId, SMProblem> PruneFunctor;
-	typedef JoinFunctor<VertexId, SizeT, VertexId, SMProblem> JoinFunctor;
+	typedef CountFunctor<VertexId, SizeT, VertexId, SMProblem> CountFunctor;
+	typedef CollectFunctor<VertexId, SizeT, VertexId, SMProblem> CollectFunctor;
+	//typedef JoinFunctor<VertexId, SizeT, VertexId, SMProblem> JoinFunctor;
 
         cudaError_t retval = cudaSuccess;
 	SizeT* d_scanned_edges = NULL;  // Used for LB
@@ -326,17 +331,19 @@ class SMEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHE
                        (long long) frontier_attribute->queue_length);
             }
 
-//TODO: need to preprocess a minimum vertex cover of the query graph beforehand, we need loop the JoinFunctor # of vertex cover times. Reset d_temp_keys to -1 before the loop
-	  for(; data_slice->iteration < data_slice->vetex_cover_size; data_slice->iteration++){ 
+	    // Reset d_temp_keys to 0 and store number of candidate edges for each query edge
+	    util::MemsetKernel<<<128, 128, 0, stream>>>(
+                    data_slice->d_temp_keys.GetPointer(util::DEVICE),
+                    0, data_slice->nodes_data);	   
+ 
 	    //////////////////////////////////////////////////////////////////////////////////////
-            // Extract graph with proper format (edge list, csr, etc.) using JoinFunctor - advance
-	    // successor array holds the outgoing v for each u ??
+            // Count number candidate edges for each query edge using CountFunctor
 	    frontier_attribute->queue_index=0;   	   
 	    frontier_attribute->selector =0;
 	    frontier_attribute->queue_length = graph_slice->nodes;
 	    frontier_attribute->queue_reset = true;
 	    
-	    oprtr::advance:: LaunchKernel<AdvanceKernelPolicy, SMProblem, JoinFunctor>(
+	    oprtr::advance:: LaunchKernel<AdvanceKernelPolicy, SMProblem, CountFunctor>(
                 enactor_stats[0],
                 frontier_attribute[0],
                 d_data_slice,
@@ -360,8 +367,57 @@ class SMEnactor : public EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHE
                 gunrock::oprtr::advance::V2V);
 
 	   if (DEBUG && (retval = util::GRError(cudaDeviceSynchronize(),
-          	"Prune Functor Advance::LaunchKernel failed", __FILE__, __LINE__))) break;
-	  }
+          	"Count Functor Advance::LaunchKernel failed", __FILE__, __LINE__))) break;
+
+	    // now the number of candidate edges are stored in d_temp_keys
+	    // sort the edge order based on number of candidate edges, from fewest to largest
+	    util::CUBRadixSort<VertexId, SizeT>(
+		true, problem->data_slices[0]->edges_query, 
+		problem->data_slices[0]->d_temp_keys.GetPointer(util::DEVICE),
+	   	problem->data_slices[0]->d_query_edgeId.GetPointer(util::DEVICE));
+	    //////////////////////////////////////////////////////////////////////////////////////
+            // Collect candidate edges for each query edge using CountFunctor
+            frontier_attribute->queue_index=0;
+            frontier_attribute->selector =0;
+            frontier_attribute->queue_length = graph_slice->nodes;
+            frontier_attribute->queue_reset = true;
+
+            oprtr::advance:: LaunchKernel<AdvanceKernelPolicy, SMProblem, CollectFunctor>(
+                enactor_stats[0],
+                frontier_attribute[0],
+                d_data_slice,
+                (VertexId*)NULL,
+                (bool*    )NULL,
+                (bool*    )NULL,
+                d_scanned_edges,  // In order to use the output vertices from prevs filter functor 
+                frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
+                frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),
+                (VertexId*)NULL,
+                (VertexId*)NULL,
+                graph_slice->row_offsets   .GetPointer(util::DEVICE),
+                graph_slice->column_indices.GetPointer(util::DEVICE),
+                (SizeT*   )NULL,
+                (VertexId*)NULL,
+                graph_slice->nodes,
+                graph_slice->edges,
+                work_progress[0],
+                context[0],
+                stream,
+                gunrock::oprtr::advance::V2V);
+
+           if (DEBUG && (retval = util::GRError(cudaDeviceSynchronize(),
+                "Collect Functor Advance::LaunchKernel failed", __FILE__, __LINE__))) break;
+
+	   // Kernel Join
+	   util::Join<<<128,128>>>(
+		problem->data_slices[0]->edges_query,
+	 	problem->data_slices[0]->d_temp_keys.GetPointer(util::DEVICE),
+		problem->data_slices[0]->froms_data.GetPointer(util::DEVICE),
+		problem->data_slices[0]->tos_data.GetPointer(util::DEVICE),
+		problem->data_slices[0]->flag.GetPointer(util::DEVICE),
+		problem->data_slices[0]->froms.GetPointer(util::DEVICE),
+		problem->data_slices[0]->tos.GetPointer(util::DEVICE));
+
             if (d_scanned_edges) cudaFree(d_scanned_edges);
 
         } while (0);

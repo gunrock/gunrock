@@ -164,17 +164,21 @@ struct PruneFunctor
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-	for(VertexId i=0; i<problem->nodes_query; i++)
+	VertexId i,j;
+	int offset;
+	
+	for(i=0; i<problem->nodes_query; i++)
 	    if(problem->d_c_set[s_id + i*problem->nodes_data]==1) // s_id is a candidate of i
 		// loop for i's neighbors (j) to check if d_id is a candidate of any j
-		for(int offset=problem->d_query_row[i], VertexId j=problem->d_query_col[offset];
-			offset<problem->d_query_row[i+1]; 
-			offset++, j=problem->d_query_col[offset])
+		for(offset = problem->d_query_row[i]; offset<problem->d_query_row[i+1]; ++offset)
+		{
+		    j = problem->d_query_col[offset];
 		    if(problem->d_c_set[d_id + j*problem->nodes_data]==1)
 			return true;
+		}
 	__syncthreads();		
 	// If d_id is no candidate of any i's neighbors, subtract 1 from s_id's degree
-	atomicSub(&problem->d_data_degrees[s_id],1);	
+	atomicSub(problem->d_data_degrees+s_id,1);	
 	return false;
   }
 
@@ -206,8 +210,8 @@ struct PruneFunctor
 		neighbors = problem->d_query_row[i+1] - problem->d_query_row[i];
 		// If s_id's degree is smaller than i's degree
 		if(problem->d_data_degrees[s_id]<neighbors){ 
-		    d_c_set[i * problem->nodes_data+s_id]=0;
-		    atomicSub(&problem->d_data_degrees[d_id],1);
+		    problem->d_c_set[i * problem->nodes_data+s_id]=0;
+		    atomicSub(problem->d_data_degrees+d_id,1);
 		    continue;
 		}
 		// check if a candidate exits for each neighbor of i among s_id's neighbors
@@ -217,14 +221,14 @@ struct PruneFunctor
 		    	problem->d_temp_keys[s_id]++; // Competitive add
 		
 		    __syncthreads();
-	  	    if(d_temp_keys[s_id]>0) continue;
+	  	    if(problem->d_temp_keys[s_id]>0) continue;
 		    else break;
 		
 	    	}
 	        // break happens: Not every i's neighbor can find a candidate among s_id's neighbors
 	        if(offset<problem->d_query_row[i+1]) 
 		    problem->d_c_set[s_id + i * problem->nodes_data]=0;
-		    atomicSub(&problem->d_data_degrees[d_id],1);
+		    atomicSub(problem->d_data_degrees+d_id,1);
 		}
 	    __syncthreads();
 	}
@@ -249,7 +253,79 @@ template<
   typename SizeT,
   typename Value,
   typename ProblemData>
-struct JoinFunctor
+struct CountFunctor
+{
+  typedef typename ProblemData::DataSlice DataSlice;
+  /**
+   * @brief Forward Advance Kernel condition function.
+   *
+   * @param[in] s_id Vertex Id of the edge source node
+   * @param[in] d_id Vertex Id of the edge destination node
+   * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
+   *
+   * \return Whether to load the apply function for the edge and include
+   * the destination node in the next frontier.
+   */
+  static __device__ __forceinline__ bool CondEdge(
+    VertexId s_id, VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+  {	
+    if(s_id < d_id){
+	for(int i=0; i<problem->edges_query; i++){
+	    VertexId source=problem->froms_query[i];
+	    VertexId dest=problem->tos_query[i];
+	    if(problem->d_c_set[s_id+source*problem->nodes_data]==1 && problem->d_c_set[d_id+dest*problem->nodes_data]==1)	 
+		return true;
+	}    
+	__syncthreads();
+	return false;
+    }
+    else return false;
+  }
+
+ /**
+   * @brief Forward Advance Kernel apply function.
+   *
+   * @param[in] s_id Vertex Id of the edge source node
+   * @param[in] d_id Vertex Id of the edge destination node
+   * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
+   */
+  static __device__ __forceinline__ void ApplyEdge(
+    VertexId s_id,  VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+  {
+	for(int i=0; i<problem->edges_query; i++){
+	    VertexId source=problem->froms_query[i];
+	    VertexId dest=problem->tos_query[i];
+	    if(problem->d_c_set[s_id+source*problem->nodes_data]==1 && problem->d_c_set[d_id+dest*problem->nodes_data]==1)	 
+	    {
+ 	    	atomicAdd(problem->d_temp_keys+i,1);
+	        break;
+ 	    }
+	}
+  }
+
+}; // CountFunctor
+
+/**
+ * @brief Structure contains device functions in joining candidates into candidate subgraphs. 
+ *
+ * @tparam VertexId    Type used for vertex id (e.g., uint32)
+ * @tparam SizeT       Type used for array indexing. (e.g., uint32)
+ * @tparam Value       Type used for calculation values (e.g., float)
+ * @tparam ProblemData Problem data type which contains data slice for SM problem
+ *
+ */
+template<
+  typename VertexId,
+  typename SizeT,
+  typename Value,
+  typename ProblemData>
+struct CollectFunctor
 {
   typedef typename ProblemData::DataSlice DataSlice;
   /**
@@ -268,9 +344,7 @@ struct JoinFunctor
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-	VertexId r_id=problem->d_vertex_cover[problem->iteration];
-	if(problem->d_c_set[s_id+r_id * problem->nodes_data]==1)  return true;
-	else return false;
+	return true;
   }
 
  /**
@@ -286,26 +360,26 @@ struct JoinFunctor
     VertexId s_id,  VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    __shared__ int pos;
-    if(threadIdx.x==0) pos=0;
-    __syncthreads();
-    VertexId r_id = problem->d_vertex_cover[problem->iteration];
-
-    if(problem->iteration==0){	
-	for(int offset=problem->d_query_row[r_id]; offset < problem->d_query_row[r_id+1]; offset++){
-	    if(problem->d_c_set[d_id + problem->nodes_data * problem->d_query_col[offset]]==1){
-		problem->d_temp_keys[pos]=s_id * problem->nodes_data + d_id; // nodes_data-ary
-		atomicAdd(&pos,1);
+	__shared__ int pos;
+        for(int i=0; i<problem->edges_query; i++){
+	    if(blockIdx.x * blockDim.x + threadIdx.x==0){ 
+		problem->d_temp_keys[i+1]+=problem->d_temp_keys[i];
+		pos=problem->d_temp_keys[i];
 	    }
 	    __syncthreads();
-	}
-    }
-    else{
-	
-    }
+	    VertexId source=problem->froms_query[problem->d_query_edgeId[i]];
+	    VertexId dest=problem->tos_query[problem->d_query_edgeId[i]];
+	    if(problem->d_c_set[s_id+source*problem->nodes_data]==1 && problem->d_c_set[d_id+dest*problem->nodes_data]==1)
+	    {
+		problem->froms_data[pos-1]=s_id;
+		problem->tos_data[pos-1]=d_id;
+		atomicSub(&pos,1);
+	    }
+        }
   }
 
-}; // JoinFunctor
+}; // CollectFunctor
+
 
 }  // namespace sm
 }  // namespace app
