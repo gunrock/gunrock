@@ -6,6 +6,7 @@ set(gunrock_VERSION_PATCH 0)
 add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MINOR}.${gunrock_VERSION_PATCH}")
 
 set(gunrock_REQUIRED_BOOST_VERSION 1.53)
+set(gunrock_REQUIRED_METIS_VERSION 5.0)
 
 cmake_minimum_required(VERSION 2.8)
 
@@ -27,7 +28,7 @@ if (Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
   link_directories(${Boost_LIBRARY_DIRS})
 else()
-  message(WARNING "Boost was requested but support was not found")
+  message(WARNING "Boost was requested but support was not found, run /dep/install_boost.sh for installation.")
 endif ()
 
 find_package(OpenMP)
@@ -38,7 +39,15 @@ else()
   message(WARNING "OpenMP was requested but support was not found")
 endif()
 
-find_package(Metis 5.0 REQUIRED)
+FIND_LIBRARY(METIS_LIB NAMES metis)
+find_package(Metis ${gunrock_REQUIRED_METIS_VERSION} REQUIRED)
+SET(METIS_FOUND FALSE)
+IF (METIS_LIB)
+  SET(METIS_FOUND TRUE)
+  message(STATUS "Found Metis")
+ELSE (METIS_LIB)
+  message(WARNING "Metis was requested but support was not found, run /dep/install_metis.sh for installation.")
+ENDIF (METIS_LIB)
 
 # begin /* How can I pass git SHA1 to compiler as definition using cmake? */
 # http://stackoverflow.com/questions/1435953/how-can-i-pass-git-sha1-to-compiler-as-definition-using-cmake/4318642#4318642
