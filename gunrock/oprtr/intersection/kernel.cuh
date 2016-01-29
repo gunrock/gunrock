@@ -20,6 +20,10 @@
 
 // TODO: stream the intersection keys to output too.
 //
+// TODO: Par yesterday's discussion with Carl, should add one large list
+// and one small list condition, since |n|log|N| would still be smaller
+// than |n|+|N| if n is small enough and N is large enough.
+//
 // Notes: For per-block method, here is the rough schema:
 // Input: two arrays with length: m stores node pairs.
 //        row_offsets
@@ -279,7 +283,6 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 if (bp.y) bp.x |= 0x80000000;
                 smem_storage.s_partition_idx[gid] = bp.x;
             }
-
             __syncthreads();
 
             // intersect per thread
