@@ -649,7 +649,7 @@ public:
             cpu_timer.Start();
 
             // generate R-MAT graph
-            if (graphio::BuildRmatGraph<EDGE_VALUE>(
+            if (graphio::rmat::BuildRmatGraph<EDGE_VALUE>(
                         rmat_nodes,
                         rmat_edges,
                         csr_ref,
@@ -712,7 +712,7 @@ public:
             cpu_timer.Start();
 
             // generate random geometry graph
-            if (graphio::BuildRggGraph<EDGE_VALUE>(
+            if (graphio::rgg::BuildRggGraph<EDGE_VALUE>(
                         rgg_nodes,
                         csr_ref,
                         rgg_threshold,

@@ -16,27 +16,29 @@
 #include <math.h>
 #include <stdio.h>
 #include <omp.h>
+#include <random>
 #include <time.h>
 
 #include <gunrock/graphio/utils.cuh>
 
 namespace gunrock {
 namespace graphio {
+namespace rmat {
+
+typedef std::mt19937 Engine;
+typedef std::uniform_real_distribution<double> Distribution;
 
 /**
  * @brief Utility function.
  *
  * @param[in] rand_data
  */
-inline double Sprng (struct drand48_data *rand_data)
+//inline double Sprng (struct drand48_data *rand_data)
+inline double Sprng (
+    Engine *engine, 
+    Distribution *distribution)
 {
-    double result;
-#ifdef USE_STD_RANDOM
-    result = rand_data->dist(rand_data->engine);
-#else
-    drand48_r(rand_data, &result);
-#endif
-    return result;
+    return (*distribution)(*engine);
 }
 
 /**
@@ -44,9 +46,12 @@ inline double Sprng (struct drand48_data *rand_data)
  *
  * @param[in] rand_data
  */
-inline bool Flip (struct drand48_data *rand_data)
+//inline bool Flip (struct drand48_data *rand_data)
+inline bool Flip (
+    Engine *engine,
+    Distribution *distribution)
 {
-    return Sprng(rand_data) >= 0.5;
+    return Sprng(engine, distribution) >= 0.5;
 }
 
 /**
@@ -64,10 +69,11 @@ inline bool Flip (struct drand48_data *rand_data)
 template <typename VertexId>
 inline void ChoosePartition (
     VertexId *u, VertexId *v, VertexId step,
-    double a, double b, double c, double d, struct drand48_data *rand_data)
+    double a, double b, double c, double d, 
+    Engine *engine, Distribution *distribution)
 {
     double p;
-    p = Sprng(rand_data);
+    p = Sprng(engine, distribution);
 
     if (p < a)
     {
@@ -98,44 +104,45 @@ inline void ChoosePartition (
  * @param[in] rand_data
  */
 inline void VaryParams(
-    double *a, double *b, double *c, double *d, drand48_data *rand_data)
+    double *a, double *b, double *c, double *d, 
+    Engine *engine, Distribution *distribution)
 {
     double v, S;
 
     // Allow a max. of 5% variation
     v = 0.05;
 
-    if (Flip(rand_data))
+    if (Flip(engine, distribution))
     {
-        *a += *a * v * Sprng(rand_data);
+        *a += *a * v * Sprng(engine, distribution);
     }
     else
     {
-        *a -= *a * v * Sprng(rand_data);
+        *a -= *a * v * Sprng(engine, distribution);
     }
-    if (Flip(rand_data))
+    if (Flip(engine, distribution))
     {
-        *b += *b * v * Sprng(rand_data);
-    }
-    else
-    {
-        *b -= *b * v * Sprng(rand_data);
-    }
-    if (Flip(rand_data))
-    {
-        *c += *c * v * Sprng(rand_data);
+        *b += *b * v * Sprng(engine, distribution);
     }
     else
     {
-        *c -= *c * v * Sprng(rand_data);
+        *b -= *b * v * Sprng(engine, distribution);
     }
-    if (Flip(rand_data))
+    if (Flip(engine, distribution))
     {
-        *d += *d * v * Sprng(rand_data);
+        *c += *c * v * Sprng(engine, distribution);
     }
     else
     {
-        *d -= *d * v * Sprng(rand_data);
+        *c -= *c * v * Sprng(engine, distribution);
+    }
+    if (Flip(engine, distribution))
+    {
+        *d += *d * v * Sprng(engine, distribution);
+    }
+    else
+    {
+        *d -= *d * v * Sprng(engine, distribution);
     }
 
     S = *a + *b + *c + *d;
@@ -201,29 +208,18 @@ int BuildRmatGraph(
         printf("rmat_seed = %lld\n", (long long)seed);
     }
 
-    //omp_set_num_threads(2);
     #pragma omp parallel
     {
-        struct drand48_data rand_data;
         int thread_num  = omp_get_thread_num();
         int num_threads = omp_get_num_threads();
         SizeT i_start   = (long long )(edges) * thread_num / num_threads;
         SizeT i_end     = (long long )(edges) * (thread_num + 1) / num_threads;
         unsigned int seed_ = seed + 616 * thread_num;
-#ifdef USE_STD_RANDOM
-        rand_data.engine = std::mt19937_64(seed_);
-        rand_data.dist = std::uniform_real_distribution<double>(0.0, 1.0);
-#else
-        srand48_r(seed_, &rand_data);
-#endif
+        Engine engine(seed_);
+        Distribution distribution(0.0, 1.0);
 
         for (SizeT i = i_start; i < i_end; i++)
         {
-            /*if ((i%10000)==0)
-            {
-                int thread_num = omp_get_thread_num();
-                printf("%d:%d \t",thread_num, i);//fflush(stdout);
-            }*/
             EdgeTupleType *coo_p = coo + i;
             double a = a0;
             double b = b0;
@@ -236,9 +232,9 @@ int BuildRmatGraph(
 
             while (step >= 1)
             {
-                ChoosePartition (&u, &v, step, a, b, c, d, &rand_data);
+                ChoosePartition (&u, &v, step, a, b, c, d, &engine, &distribution);
                 step /= 2;
-                VaryParams (&a, &b, &c, &d, &rand_data);
+                VaryParams (&a, &b, &c, &d, &engine, &distribution);
             }
 
             // create edge
@@ -246,13 +242,7 @@ int BuildRmatGraph(
             coo_p->col = v - 1; // zero-based
             if (WITH_VALUES)
             {
-                double t_value;
-#ifdef USE_STD_RANDOM
-                t_value = rand_data.dist(rand_data.engine);
-#else
-                drand48_r(&rand_data, &t_value);
-#endif
-                coo_p->val = t_value * vmultipiler + vmin;
+                coo_p->val = Sprng(&engine, &distribution) * vmultipiler + vmin;
             } else coo_p->val = 1;
 
             if (undirected)
@@ -263,13 +253,7 @@ int BuildRmatGraph(
                 cooi_p->col = coo_p->row;
                 if (WITH_VALUES)
                 {
-                    double t_value;
-#ifdef USE_STD_RANDOM
-                    t_value = rand_data.dist(rand_data.engine);
-#else
-                    drand48_r(&rand_data, &t_value);
-#endif
-                    cooi_p->val = t_value * vmultipiler + vmin;
+                    cooi_p->val = Sprng(&engine, &distribution) * vmultipiler + vmin;
                 } else coo_p->val = 1;
             }
         }
@@ -285,6 +269,7 @@ int BuildRmatGraph(
     return 0;
 }
 
+} // namespace rmat
 } // namespace graphio
 } // namespace gunrock
 

@@ -18,11 +18,16 @@
 #include <omp.h>
 #include <time.h>
 #include <list>
+#include <random>
 #include <gunrock/graphio/utils.cuh>
 #include <gunrock/util/sort_omp.cuh>
 
 namespace gunrock {
 namespace graphio {
+namespace rgg {
+
+typedef std::mt19937 Engine;
+typedef std::uniform_real_distribution<double> Distribution;
 
 template <typename T>
 inline T SqrtSum(T x, T y)
@@ -109,8 +114,6 @@ int BuildRggGraph(
         return -1;
     }
 
-    //double   *co_x          = new double[nodes];
-    //double   *co_y          = new double[nodes];
     int       reserved_size = 50;
     RggPoint *points        = new RggPoint[nodes+1];
     SizeT    *row_offsets   = new SizeT[nodes+1];
@@ -124,8 +127,6 @@ int BuildRggGraph(
     VertexId **blocks       = new VertexId* [row_length * row_length + 1];
     SizeT    *block_size    = new SizeT     [row_length * row_length + 1];
     SizeT    *block_length  = new SizeT     [row_length * row_length + 1];
-    //VertexId *t_array       = NULL;
-    //VertexId *block         = NULL;
     EdgeTupleType *coo      = NULL;
     long long reserved_factor2 = 8;
     long long initial_length   = reserved_factor2 * nodes / row_length / row_length;
@@ -135,18 +136,13 @@ int BuildRggGraph(
     if (initial_length <4) initial_length = 4;
     for (SizeT i=0; i< row_length * row_length +1; i++)
     {
-        //block_size  [i] = initial_length;
         block_size  [i] = 0;
         block_length[i] = 0;
-        //blocks      [i] = new VertexId[block_size[i]];
         blocks      [i] = NULL;
     }
-    //printf("row_length = %lld\n", row_length);
-    //printf("undirected = %s\n", undirected ? "true" : "false");
 
     #pragma omp parallel
     {
-        struct drand48_data rand_data;
         int       thread_num  = omp_get_thread_num();
         int       num_threads = omp_get_num_threads();
         SizeT     node_start  = (long long)(nodes) * thread_num / num_threads;
@@ -155,30 +151,16 @@ int BuildRggGraph(
         VertexId *col_index   = col_index_ + reserved_size * node_start;
         Value    *values      = WITH_VALUES ? values_ + reserved_size * node_start : NULL;
         unsigned int seed_    = seed + 805 * thread_num;
-#ifdef USE_STD_RANDOM
-        rand_data.engine = std::mt19937_64(seed_);
-        rand_data.dist = std::uniform_real_distribution<double>(0.0, 1.0);
-#else
-        srand48_r(seed_, &rand_data);
-#endif
+        Engine    engine(seed_);
+        Distribution distribution(0.0, 1.0);
+
         #pragma omp single
             offsets           = new SizeT[num_threads+1];
 
         for (VertexId node = node_start; node < node_end; node++)
         {
-            double t_value;
-#ifdef USE_STD_RANDOM
-            t_value = rand_data.dist(rand_data.engine);
-#else
-            drand48_r(&rand_data, &t_value);
-#endif
-            points[node].x = t_value;
-#ifdef USE_STD_RANDOM
-            t_value = rand_data.dist(rand_data.engine);
-#else
-            drand48_r(&rand_data, &t_value);
-#endif
-            points[node].y = t_value;
+            points[node].x = distribution(engine);
+            points[node].y = distribution(engine);
             points[node].node = node;
         }
 
@@ -205,9 +187,7 @@ int BuildRggGraph(
                 blocks[i] = new VertexId[block_size[i]];
         }
 
-        //#pragma omp single
         for (VertexId node = node_start; node < node_end; node++)
-        //for (VertexId node = 0; node < nodes; node++)
         {
             double co_x0 = points[node].x; //co_x[node];
             double co_y0 = points[node].y; //co_y[node];
@@ -251,22 +231,14 @@ int BuildRggGraph(
                     double   co_y1 = points[peer].y;//co_y[peer];
                     double   dis_x = co_x0 - co_x1;
                     double   dis_y = co_y0 - co_y1;
-                    //if (fabs(dis_x) + fabs(dis_y) > threshold) continue;
                     if (fabs(dis_x) > threshold || fabs(dis_y) > threshold) continue;
                     double   dis   = SqrtSum(dis_x, dis_y);
                     if (dis > threshold) continue;
 
                     col_index[counter] = peer;
-                    //if (WITH_VALUES) values[counter] = dis * value_multipiler;
                     if (WITH_VALUES)
                     {
-                        double t_value;
-#ifdef USE_STD_RANDOM
-                        t_value = rand_data.dist(rand_data.engine);
-#else
-                        drand48_r(&rand_data, &t_value);
-#endif
-                        values[counter] = t_value * value_multipiler + value_min;
+                        values[counter] = distribution(engine) * value_multipiler + value_min;
                     }
                     counter++;
                 }
@@ -280,16 +252,10 @@ int BuildRggGraph(
             offsets[0] = 0;
             for (int i=0; i<num_threads; i++)
                 offsets[i+1] += offsets[i];
-            //graph.template FromScratch<WITH_VALUES, false>(nodes, offsets[num_threads]);
             edges = offsets[num_threads] * (undirected ? 2 : 1);
             coo = (EdgeTupleType*) malloc (sizeof(EdgeTupleType) * edges);
         }
 
-        /*memcpy(graph.column_indices + offsets[thread_num], col_index, sizeof(VertexId) * counter);
-        if (WITH_VALUES) memcpy(graph.edge_values + offsets[thread_num], values, sizeof(VertexId) * counter);
-        SizeT offset = offsets[thread_num];
-        for (VertexId node = node_start; node < node_end; node++)
-            graph.row_offsets[node] = row_offsets[node] + offset;*/
         SizeT offset = offsets[thread_num] * (undirected ? 2 : 1);
         for (VertexId node = node_start; node < node_end; node++)
         {
@@ -309,16 +275,8 @@ int BuildRggGraph(
                     coo_p -> val = WITH_VALUES ? values[edge] : 1;
                 } else {
                     EdgeTupleType *coo_p = coo + offset + edge;
-                    //double rand_v;
-                    //drand48_r(&rand_data, &rand_v);
-                    //if (rand_v > 0.5)
-                    //{
-                        coo_p -> row = node;
-                        coo_p -> col = peer;
-                    //} else {
-                    //    coo_p -> row = peer;
-                    //    coo_p -> col = node;
-                    //}
+                    coo_p -> row = node;
+                    coo_p -> col = peer;
                     coo_p -> val = WITH_VALUES ? values[edge] : 1;
                 }
             }
@@ -327,7 +285,6 @@ int BuildRggGraph(
         col_index = NULL;
         values    = NULL;
     }
-    //graph.row_offsets[nodes] = graph.edges;
 
     SizeT counter = 0;
     for (SizeT i=0;  i < row_length * row_length; i++)
@@ -336,14 +293,11 @@ int BuildRggGraph(
         counter += block_length[i];
         if (blocks[i] != NULL) delete[] blocks[i]; blocks[i] = NULL;
     }
-    //printf("counter = %lld\n", (long long) counter);
 
     char *out_file = NULL;
     graph.template FromCoo<WITH_VALUES, EdgeTupleType>(
         out_file, coo, nodes, edges, false, undirected, false, quiet);
 
-    //delete[] co_x       ; co_x        = NULL;
-    //delete[] co_y       ; co_y        = NULL;
     delete[] row_offsets; row_offsets = NULL;
     delete[] offsets    ; offsets     = NULL;
     delete[] points     ; points      = NULL;
@@ -357,6 +311,7 @@ int BuildRggGraph(
     return 0;
 }
 
+} // namespace rgg
 } // namespace graphio
 } // namespace gunrock
 

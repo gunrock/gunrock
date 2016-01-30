@@ -18,6 +18,7 @@
 #include <time.h>
 #include <algorithm>
 #include <vector>
+#include <random>
 
 #include <gunrock/app/partitioner_base.cuh>
 #include <gunrock/util/memset_kernel.cuh>
@@ -26,6 +27,9 @@
 namespace gunrock {
 namespace app {
 namespace rp {
+
+typedef std::mt19937 Engine;
+typedef std::uniform_int_distribution<int> Distribution;
 
 template <typename SizeT>
 struct sort_node
@@ -145,7 +149,6 @@ struct RandomPartitioner :
     {
         cudaError_t retval = cudaSuccess;
         int*        tpartition_table = this->partition_tables[0];
-        //time_t      t = time(NULL);
         SizeT       nodes  = this->graph->nodes;
         sort_node<SizeT> *sort_list = new sort_node<SizeT>[nodes];
 
@@ -155,23 +158,22 @@ struct RandomPartitioner :
 
         #pragma omp parallel
         {
-            struct drand48_data rand_data;
             int thread_num  = omp_get_thread_num();
             int num_threads = omp_get_num_threads();
             SizeT i_start   = (long long)(nodes) * thread_num / num_threads;
             SizeT i_end     = (long long)(nodes) * (thread_num + 1) / num_threads;
             unsigned int seed_ = this -> seed + 754 * thread_num;
-            srand48_r(seed_, &rand_data);
+            Engine engine(seed_);
+            Distribution distribution(0, util::MaxValue<int>());
             for (SizeT i = i_start; i < i_end; i++)
             {
                 long int x;
-                lrand48_r(&rand_data, &x);
+                x = distribution(engine);
                 sort_list[i].value = x;
                 sort_list[i].posit = i;
             }
         }
-        //std::vector<sort_node<SizeT> > sort_vector(sort_list, sort_list + nodes);
-        //std::sort(sort_vector.begin(), sort_vector.end()); //,compare_sort_node<SizeT>);
+
         util::omp_sort(sort_list, nodes, compare_sort_node<SizeT>);
         for (int gpu = 0; gpu < this->num_gpus; gpu++) 
         {
@@ -179,7 +181,6 @@ struct RandomPartitioner :
             SizeT end_pos = weitage[gpu] * nodes; 
             for (SizeT pos = begin_pos; pos < end_pos; pos++)
             {
-                //tpartition_table[sort_vector[pos].posit] = gpu;
                 tpartition_table[sort_list[pos].posit] = gpu;
             }
         }

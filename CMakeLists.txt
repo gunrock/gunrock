@@ -180,6 +180,9 @@ if (CUDA_VERBOSE_PTXAS)
   set(VERBOSE_PTXAS --ptxas-options=-v)
 endif (CUDA_VERBOSE_PTXAS)
 
+# c++11 is required
+set(CUDA_NVCC_FLAGS -std=c++11)
+
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   # also see how to do overrides:
   # https://gist.github.com/robertmaynard/11297565
@@ -188,7 +191,6 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   # older settings: check the git history
   set(CUDA_PROPAGATE_HOST_FLAGS OFF)
   set(CMAKE_CXX_FLAGS -std=c++11)
-  set(CUDA_NVCC_FLAGS -std=c++11)
 
   if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     #added for Boost and OpenMP on OS X
