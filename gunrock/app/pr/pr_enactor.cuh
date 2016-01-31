@@ -925,7 +925,7 @@ static void FullQueue_Core(
         frontier_attribute->queue_length = data_slice -> edge_map_queue_len;
         enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
 
-        //printf("Filter start.\n");fflush(stdout);
+        printf("Filter start.\n");fflush(stdout);
          // filter kernel
         gunrock::oprtr::filter::LaunchKernel
             <FilterKernelPolicy, Problem, PrFunctor>(
@@ -1014,7 +1014,7 @@ static void FullQueue_Core(
     //if (enactor_stats->iteration == 0) util::cpu_mt::PrintGPUArray<SizeT, SizeT>("degrees", data_slice->degrees.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
     //util::cpu_mt::PrintGPUArray<SizeT, Value>("ranks", data_slice->rank_curr.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
 
-    //printf("Advance start.\n");fflush(stdout);
+    printf("Advance Prfunctor start.\n");fflush(stdout);
     // Edge Map
     frontier_attribute->queue_reset = true;
     gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, PrFunctor>(
@@ -1062,7 +1062,7 @@ static void FullQueue_Core(
             (SizeT)0, graph_slice->nodes);
         //util::cpu_mt::PrintGPUArray("keys", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, -1, stream);
         //util::cpu_mt::PrintGPUArray("row_offsets", graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1, thread_num, enactor_stats->iteration, -1, stream);
-        //printf("Advance start.\n");fflush(stdout);
+        printf("Advance PrMarkerFunctor start.\n");fflush(stdout);
         frontier_attribute -> queue_reset = true;
         // Edge Map
         gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, PrMarkerFunctor>(
@@ -1796,8 +1796,8 @@ public:
         INSTRUMENT,                         // INSTRUMENT
         1,                                  // MIN_CTA_OCCUPANCY
         10,                                 // LOG_THREADS
-        8,                                  // LOG_LOAD_VEC_SIZE
-        32*128,                             // LOG_LOADS_PER_TILE
+        8,                                  // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
         1,                                  // LOG_LOAD_VEC_SIZE
         0,                                  // LOG_LOADS_PER_TILE
         5,                                  // LOG_RAKING_THREADS
@@ -1811,10 +1811,10 @@ public:
         Problem,                            // Problem data type
         300,                                // CUDA_ARCH
         INSTRUMENT,                         // INSTRUMENT
-        8,                                  // MIN_CTA_OCCUPANCY
+        1,                                  // MIN_CTA_OCCUPANCY
         7,                                  // LOG_THREADS
-        10,                                 // LOG_BLOCKS
-        32*128,                             // LIGHT_EDGE_THRESHOLD
+        8,                                  // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
         1,                                  // LOG_LOAD_VEC_SIZE
         1,                                  // LOG_LOADS_PER_TILE
         5,                                  // LOG_RAKING_THREADS

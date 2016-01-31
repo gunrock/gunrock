@@ -453,7 +453,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
 
                 gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges2
                     <typename KernelPolicy::LOAD_BALANCED, ProblemData, Functor>
-                    <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(
+                    <<< KernelPolicy::LOAD_BALANCED::BLOCKS, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(
                     frontier_attribute.queue_reset,
                     frontier_attribute.queue_index,
                     enactor_stats.iteration,
