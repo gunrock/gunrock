@@ -141,11 +141,11 @@ struct MSTProblem : ProblemBase <
   // Members
 
   // Number of GPUs to be sliced over
-  int            num_gpus;
+  //int            num_gpus;
 
   // Size of the graph
-  SizeT          nodes;
-  SizeT          edges;
+  //SizeT          nodes;
+  //SizeT          edges;
 
   // Set of data slices (one for each GPU)
   DataSlice      **data_slices;
@@ -155,7 +155,7 @@ struct MSTProblem : ProblemBase <
   DataSlice      **d_data_slices;
 
   // Device indices for each data slice
-  int            *gpu_idx;
+  //int            *gpu_idx;
 
   // Methods
 
@@ -163,7 +163,11 @@ struct MSTProblem : ProblemBase <
    * @brief MSTProblem default constructor
    */
 
-  MSTProblem(): nodes(0), edges(0), num_gpus(0) {}
+  MSTProblem() : //nodes(0), edges(0), num_gpus(0) {}
+    data_slices  (NULL),
+    d_data_slices(NULL)
+  {
+  }
 
   /**
    * @brief MSTProblem constructor
@@ -172,23 +176,23 @@ struct MSTProblem : ProblemBase <
    * @param[in] graph Reference to the CSR graph object we process on.
    * @param[in] num_gpus Number of the GPUs used.
    */
-  MSTProblem(
+  /*MSTProblem(
     bool  stream_from_host,
     const Csr<VertexId, Value, SizeT> &graph,
     int   num_gpus) : num_gpus(num_gpus)
   {
     Init(stream_from_host, graph, num_gpus);
-  }
+  }*/
 
   /**
    * @brief MSTProblem default destructor
    */
   ~MSTProblem()
   {
-    for (int i = 0; i < num_gpus; ++i)
+    for (int i = 0; i < this -> num_gpus; ++i)
     {
       if (util::GRError(
-        cudaSetDevice(gpu_idx[i]),
+        cudaSetDevice(this -> gpu_idx[i]),
         "~MSTProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
 
       if (d_data_slices[i])
@@ -220,10 +224,10 @@ struct MSTProblem : ProblemBase <
     cudaError_t ret = cudaSuccess;
     do
     {
-      if (num_gpus == 1)
+      if ( this -> num_gpus == 1)
       {
         // Set device
-        if (util::GRError(cudaSetDevice(gpu_idx[0]),
+        if (util::GRError(cudaSetDevice(this -> gpu_idx[0]),
           "MSTProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
 
         data_slices[0]->mst_output.SetPointer(h_mst_output);
@@ -250,15 +254,15 @@ struct MSTProblem : ProblemBase <
    * all CUDA function calls.
    */
   cudaError_t Init(
-    bool  stream_from_host,
-    Csr<VertexId, Value, SizeT> &graph,
-    int   _num_gpus,
-    cudaStream_t* streams = NULL)
+    bool          stream_from_host,
+    Csr<VertexId, Value, SizeT> 
+                 &graph,
+    int           num_gpus = 1,
+    int          *gpu_idx  = NULL,
+    cudaStream_t *streams  = NULL)
   {
-    num_gpus = _num_gpus;
-
-    nodes = graph.nodes;
-    edges = graph.edges;
+    //nodes = graph.nodes;
+    //edges = graph.edges;
 
     ProblemBase < VertexId, SizeT, Value,
       _MARK_PREDECESSORS,
@@ -266,7 +270,13 @@ struct MSTProblem : ProblemBase <
       _USE_DOUBLE_BUFFER,
       false,  // _ENABLE_BACKWARD
       false,  // _KEEP_ORDER
-      false >::Init(stream_from_host, &graph, NULL, num_gpus, NULL, "random");
+      false >::Init(
+        stream_from_host, 
+        &graph, 
+        NULL, 
+        num_gpus, 
+        gpu_idx, 
+        "random");
 
     // No data in DataSlice needs to be copied from host
 
@@ -278,24 +288,18 @@ struct MSTProblem : ProblemBase <
     data_slices   = new DataSlice * [num_gpus];
     d_data_slices = new DataSlice * [num_gpus];
 
-    if (streams == NULL)
+    /*if (streams == NULL)
     {
       streams = new cudaStream_t[num_gpus];
       streams[0] = 0;
-    }
+    }*/
 
     do
     {
       if (num_gpus <= 1)
       {
-        gpu_idx = (int*)malloc(sizeof(int));
-
-        // create a single data slice for the currently-set GPU
-        int gpu;
-        if (ret = util::GRError(cudaGetDevice(&gpu),
-          "MSTProblem cudaGetDevice failed",
-          __FILE__, __LINE__)) break;
-        gpu_idx[0] = gpu;
+        int gpu = 0;
+        if (ret = util::SetDevice(this -> gpu_idx[0])) return ret;
 
         data_slices[0] = new DataSlice;
         if (ret = util::GRError(cudaMalloc(
@@ -304,7 +308,7 @@ struct MSTProblem : ProblemBase <
           "MSTProblem cudaMalloc d_data_slices failed",
           __FILE__, __LINE__)) return ret;
 
-        data_slices[0][0].streams.SetPointer(streams, 1);
+        data_slices[0][0].streams.SetPointer(streams, 1 * 2);
         data_slices[0]->Init(
           1,           // Number of GPUs
           gpu_idx[0],  // GPU indices
@@ -318,39 +322,39 @@ struct MSTProblem : ProblemBase <
         // allocate SoA on device
         //
 
-        if (ret = data_slices[gpu]->done_flags.Allocate(    1, util::DEVICE))
+        if (ret = data_slices[gpu]->done_flags.Allocate(            1, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->mst_output.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->mst_output.Allocate(this -> edges, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->flag_array.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->flag_array.Allocate(this -> edges, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->edge_flags.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->edge_flags.Allocate(this -> edges, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->keys_array.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->keys_array.Allocate(this -> edges, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->reduce_key.Allocate(nodes, util::DEVICE))
+        if (ret = data_slices[gpu]->reduce_key.Allocate(this -> nodes, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->successors.Allocate(nodes, util::DEVICE))
+        if (ret = data_slices[gpu]->successors.Allocate(this -> nodes, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->original_n.Allocate(nodes, util::DEVICE))
+        if (ret = data_slices[gpu]->original_n.Allocate(this -> nodes, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->original_e.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->original_e.Allocate(this -> edges, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->super_edge.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->super_edge.Allocate(this -> edges, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->colindices.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->colindices.Allocate(this -> edges, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->temp_index.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->temp_index.Allocate(this -> edges, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->temp_value.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->temp_value.Allocate(this -> edges, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->reduce_val.Allocate(nodes, util::DEVICE))
+        if (ret = data_slices[gpu]->reduce_val.Allocate(this -> nodes, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->edge_value.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->edge_value.Allocate(this -> edges, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->row_offset.Allocate(nodes+1, util::DEVICE))
+        if (ret = data_slices[gpu]->row_offset.Allocate(this -> nodes+1, util::DEVICE))
           return ret;
-        if (ret = data_slices[gpu]->super_idxs.Allocate(nodes, util::DEVICE))
+        if (ret = data_slices[gpu]->super_idxs.Allocate(this -> nodes, util::DEVICE))
           return ret;
 
         //
@@ -366,40 +370,40 @@ struct MSTProblem : ProblemBase <
         // initialize mst_output to a vector of zeros
         util::MemsetKernel<<<128, 128>>>(
           data_slices[gpu]->mst_output.GetPointer(util::DEVICE),
-          (int)0, edges);
+          (int)0, this -> edges);
 
         // initialize flag_array to a vector of zeros
         util::MemsetKernel<unsigned int><<<128, 128>>>(
           data_slices[gpu]->flag_array.GetPointer(util::DEVICE),
-          (unsigned int)0, edges);
+          (unsigned int)0, this -> edges);
 
         // initialize edge_flags to a vector of zeros
         util::MemsetKernel<unsigned int><<<128, 128>>>(
           data_slices[gpu]->edge_flags.GetPointer(util::DEVICE),
-          (unsigned int)0, edges);
+          (unsigned int)0, this -> edges);
 
         // initialize keys_array to a vector of zeros
         util::MemsetKernel<<<128, 128>>>(
           data_slices[gpu]->keys_array.GetPointer(util::DEVICE),
-          (VertexId)0, edges);
+          (VertexId)0, this -> edges);
 
         // initialize reduce_key to a vector of zeros
         util::MemsetKernel<<<128, 128>>>(
           data_slices[gpu]->reduce_key.GetPointer(util::DEVICE),
-          (VertexId)0, edges);
+          (VertexId)0, this -> edges);
 
         // initialize successors to a vector of zeros
         util::MemsetKernel<<<128, 128>>>(
           data_slices[gpu]->successors.GetPointer(util::DEVICE),
-          (VertexId)0, edges);
+          (VertexId)0, this -> edges);
 
         // initialize original node IDs from 0 to nodes
         util::MemsetIdxKernel<<<128, 128>>>(
-          data_slices[gpu]->original_n.GetPointer(util::DEVICE), nodes);
+          data_slices[gpu]->original_n.GetPointer(util::DEVICE), this -> nodes);
 
         // initialize original edge IDs from 0 to edges
         util::MemsetIdxKernel<<<128, 128>>>(
-          data_slices[gpu]->original_e.GetPointer(util::DEVICE), edges);
+          data_slices[gpu]->original_e.GetPointer(util::DEVICE), this -> edges);
 
         // initialize super edges with graph.column_indices
         data_slices[gpu]->super_edge.SetPointer(graph.column_indices);
@@ -414,17 +418,17 @@ struct MSTProblem : ProblemBase <
         // initialize temp_index to a vector of zeros
         util::MemsetKernel<<<128, 128>>>(
           data_slices[gpu]->temp_index.GetPointer(util::DEVICE),
-          (VertexId)0, edges);
+          (VertexId)0, this -> edges);
 
         // initialize temp_value to a vector of zeros
         util::MemsetKernel<<<128, 128>>>(
           data_slices[gpu]->temp_value.GetPointer(util::DEVICE),
-          (Value)0, edges);
+          (Value)0, this -> edges);
 
         // initialize reduce_val to a vector of zeros
         util::MemsetKernel<<<128, 128>>>(
           data_slices[gpu]->reduce_val.GetPointer(util::DEVICE),
-          (Value)0, edges);
+          (Value)0, this -> edges);
 
         // initialize edge_value with graph.column_indices
         data_slices[gpu]->edge_value.SetPointer(graph.edge_values);
@@ -439,9 +443,9 @@ struct MSTProblem : ProblemBase <
         // initialize super_idxs to a vector of zeros
         util::MemsetKernel<<<128, 128>>>(
           data_slices[gpu]->super_idxs.GetPointer(util::DEVICE),
-          (SizeT)0, nodes);
+          (SizeT)0, this -> nodes);
 
-        if (ret = data_slices[0]->labels.Allocate(nodes, util::DEVICE))
+        if (ret = data_slices[0]->labels.Allocate(this -> nodes, util::DEVICE))
         {
           return ret;
         }
@@ -466,11 +470,11 @@ struct MSTProblem : ProblemBase <
   {
     cudaError_t ret = cudaSuccess;
 
-    for (int gpu = 0; gpu < num_gpus; ++gpu)
+    for (int gpu = 0; gpu < this -> num_gpus; ++gpu)
     {
       // Set device
       if (ret = util::GRError(
-        cudaSetDevice(gpu_idx[gpu]),
+        cudaSetDevice( this -> gpu_idx[gpu]),
         "MSTProblem cudaSetDevice failed",
         __FILE__, __LINE__)) return ret;
 
@@ -489,74 +493,74 @@ struct MSTProblem : ProblemBase <
           return ret;
 
       if (data_slices[gpu]->mst_output.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->mst_output.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->mst_output.Allocate(this -> edges, util::DEVICE))
           return ret;
 
       if (data_slices[gpu]->flag_array.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->flag_array.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->flag_array.Allocate(this -> edges, util::DEVICE))
           return ret;
 
       if (data_slices[gpu]->edge_flags.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->edge_flags.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->edge_flags.Allocate(this -> edges, util::DEVICE))
           return ret;
 
       if (data_slices[gpu]->keys_array.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->keys_array.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->keys_array.Allocate(this -> edges, util::DEVICE))
           return ret;
 
       if (data_slices[gpu]->reduce_key.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->reduce_key.Allocate(nodes, util::DEVICE))
+        if (ret = data_slices[gpu]->reduce_key.Allocate(this -> nodes, util::DEVICE))
           return ret;
 
       if (data_slices[gpu]->successors.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->successors.Allocate(nodes, util::DEVICE))
+        if (ret = data_slices[gpu]->successors.Allocate(this -> nodes, util::DEVICE))
           return ret;
 
       if (data_slices[gpu]->original_n.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->original_n.Allocate(nodes, util::DEVICE))
+        if (ret = data_slices[gpu]->original_n.Allocate(this -> nodes, util::DEVICE))
           return ret;
 
       if (data_slices[gpu]->original_e.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->original_e.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->original_e.Allocate(this -> edges, util::DEVICE))
           return ret;
 
       if (data_slices[gpu]->super_edge.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->super_edge.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->super_edge.Allocate(this -> edges, util::DEVICE))
           return ret;
 
       if (data_slices[gpu]->colindices.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->colindices.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->colindices.Allocate(this -> edges, util::DEVICE))
           return ret;
 
       if (data_slices[gpu]->temp_index.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->temp_index.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->temp_index.Allocate(this -> edges, util::DEVICE))
           return ret;
 
       if (data_slices[gpu]->temp_value.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->temp_value.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->temp_value.Allocate(this -> edges, util::DEVICE))
           return ret;
 
       if (data_slices[gpu]->reduce_val.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->reduce_val.Allocate(nodes, util::DEVICE))
+        if (ret = data_slices[gpu]->reduce_val.Allocate(this -> nodes, util::DEVICE))
           return ret;
 
       if (data_slices[gpu]->edge_value.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->edge_value.Allocate(edges, util::DEVICE))
+        if (ret = data_slices[gpu]->edge_value.Allocate(this -> edges, util::DEVICE))
 
           return ret;
 
       if (data_slices[gpu]->row_offset.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->row_offset.Allocate(nodes+1, util::DEVICE))
+        if (ret = data_slices[gpu]->row_offset.Allocate(this -> nodes+1, util::DEVICE))
           return ret;
 
       if (data_slices[gpu]->super_idxs.GetPointer(util::DEVICE) == NULL)
-        if (ret = data_slices[gpu]->super_idxs.Allocate(nodes, util::DEVICE))
+        if (ret = data_slices[gpu]->super_idxs.Allocate(this -> nodes, util::DEVICE))
           return ret;
 
 
       if (data_slices[gpu]->labels.GetPointer(util::DEVICE) == NULL)
       {
-        if (ret = data_slices[gpu]->labels.Allocate(nodes, util::DEVICE))
+        if (ret = data_slices[gpu]->labels.Allocate(this -> nodes, util::DEVICE))
         {
           return ret;
         }
@@ -565,12 +569,12 @@ struct MSTProblem : ProblemBase <
       // put every vertex frontier queue used for mappings
       util::MemsetIdxKernel<<<128, 128>>>(
         data_slices[gpu]->frontier_queues[0].keys[0].GetPointer(util::DEVICE),
-        nodes);
+        this -> nodes);
 
       // put every edges frontier queue used for mappings
       util::MemsetIdxKernel<<<128, 128>>>(
         data_slices[gpu]->frontier_queues[0].values[0].GetPointer(util::DEVICE),
-        edges);
+        this -> edges);
 
       if (ret = util::GRError(cudaMemcpy(d_data_slices[gpu],
           data_slices[gpu], sizeof(DataSlice), cudaMemcpyHostToDevice),

@@ -269,10 +269,12 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
     double max_queue_sizing = info->info["max_queue_sizing"].get_real();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
-    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
+    for (int i = 0; i < num_gpus; i++) 
+        gpu_idx[i] = device_list[i].get_int();
 
     // TODO: remove after merge mgpu-cq
     ContextPtr* context = (ContextPtr*)info->context;
+    cudaStream_t *streams = (cudaStream_t*)info->streams;
 
     // allocate MST enactor map
     MSTEnactor < Problem,
@@ -287,10 +289,10 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
     // host results spaces
     VertexId * edge_mask = new VertexId[graph->edges];
 
-    if (!quiet_mode) { printf("\nMINIMUM SPANNING TREE TEST\n"); }
+    if (!quiet_mode) { printf("\nMINIMUM SPANNING TREE TEST\n"); fflush(stdout);}
 
     // copy data from CPU to GPU initialize data members in DataSlice
-    util::GRError(problem->Init(stream_from_host, *graph, num_gpus),
+    util::GRError(problem->Init(stream_from_host, *graph, num_gpus, gpu_idx, streams),
                   "Problem MST Initialization Failed", __FILE__, __LINE__);
 
     // perform calculations
@@ -448,6 +450,13 @@ void RunTest_connectivity_check(Info<VertexId, Value, SizeT> *info)
     data_t.VALUE_TYPE = VALUE_INT;  // attributes type
 
     struct GRSetup config = InitSetup(1, NULL);  // gunrock configurations
+    int num_gpus            = info->info["num_gpus"].get_int();
+    json_spirit::mArray device_list = info->info["device_list"].get_array();
+    int* gpu_idx = new int[num_gpus];
+    for (int i = 0; i < num_gpus; i++) 
+        gpu_idx[i] = device_list[i].get_int();
+    delete config.device_list;
+    config.device_list = gpu_idx;
 
     struct GRGraph *grapho = (GRGraph*)malloc(sizeof(GRGraph));
     struct GRGraph *graphi = (GRGraph*)malloc(sizeof(GRGraph));

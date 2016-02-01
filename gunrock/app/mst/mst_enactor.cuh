@@ -106,7 +106,7 @@ class MSTEnactor :
     EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHECK>(
       EDGE_FRONTIERS, 1, gpu_idx)
   {
-    vertex_flag = new int;
+    vertex_flag = new int[1];
     vertex_flag[0] = 0;
   }
 
@@ -115,7 +115,7 @@ class MSTEnactor :
    */
   virtual ~MSTEnactor()
   {
-    if (vertex_flag) delete vertex_flag;
+    if (vertex_flag) delete[] vertex_flag;
   }
 
   /**
