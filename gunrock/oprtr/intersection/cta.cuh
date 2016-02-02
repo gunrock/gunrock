@@ -30,7 +30,8 @@ namespace oprtr {
 namespace intersection {
 
 template<typename Value, typename VertexId, typename SizeT, bool RangeCheck, typename Comp>
-__device__ int SerialSetIntersection(const Value* data,
+__device__ int SerialSetIntersection(const Value* aData,
+                                     const Value* bData,
                                      VertexId aBegin,
                                      VertexId aEnd,
                                      VertexId bBegin,
@@ -48,8 +49,8 @@ __device__ int SerialSetIntersection(const Value* data,
                                        (i < MinIterations || (aBegin + bBegin < end));
 
                                        if (test) {
-                                        Value aKey = data[aBegin];
-                                        Value bKey = data[bBegin];
+                                        Value aKey = aData[aBegin];
+                                        Value bKey = bData[bBegin];
 
                                         bool pA = comp(aKey, bKey);
                                         bool pB = comp(bKey, aKey);

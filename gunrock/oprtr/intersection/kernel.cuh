@@ -286,7 +286,23 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             __syncthreads();
 
             // intersect per thread
+            // for each thread, put a_list[a_rowoffset+diag] to a_list[a_rowoffset+diag+s_partition_idx[gid]]
+            // and b_list[b_rowoffset+diag] to b_list[b_rowoffset+diag+nv-s_partition_idx[gid]] together.
+            // Then do serial intersection
+            VertexIdx aBegin = bBegin = 0;
+            VertexIdx aEnd = smem_storage.s_partition_idx[gid];
+            VertexIdx bEnd = nv - smem_storage.s_partition_idx[gid];
+            SizeT result = SerialSetIntersection(a_list[a_rowoffset+diag],
+                                  b_list[b_rowoffset+diag],
+                                  aBegin,
+                                  aEnd,
+                                  bBegin,
+                                  bEnd,
+                                  nv,
+                                  nv,
+                                  mgpu::less<VertexId>);
 
+            // Block reduce to get total result.
         }
 
     }
