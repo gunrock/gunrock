@@ -667,8 +667,8 @@ int BuildMarketGraph_SM(
             ((sizeof(VertexId) == 8) ? "64bVe." : ""), 
             ((sizeof(Value   ) == 8) ? "64bVa." : "")); 
       }
-       for(int i=0; ud[i]; i++) printf("%c",ud[i]); printf("\n");
-       for(int i=0; lb[i]; i++) printf("%c",lb[i]); printf("\n");
+       //for(int i=0; ud[i]; i++) printf("%c",ud[i]); printf("\n");
+       //for(int i=0; lb[i]; i++) printf("%c",lb[i]); printf("\n");
         if (BuildMarketGraph_SM<LOAD_VALUES>(file_in, file_label, ud, lb, graph,
                     true, reversed, quiet) != 0)
             return 1;
