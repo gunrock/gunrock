@@ -95,7 +95,9 @@ DEPS = 			./Makefile \
 				$(wildcard ../../gunrock/oprtr/*.cuh) \
 				$(wildcard ../../gunrock/oprtr/**/*.cuh) \
 				$(wildcard ../../gunrock/app/*.cuh) \
-				$(wildcard ../../gunrock/app/**/*.cuh)
+				$(wildcard ../../gunrock/app/**/*.cuh) \
+				$(wildcard ../../gunrock/global_indicator/*.cuh) \
+				$(wildcard ../../gunrock/global_indicator/**/*.cuh)
 
 #-------------------------------------------------------------------------------
 # (make test) Test driver for

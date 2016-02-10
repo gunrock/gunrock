@@ -33,6 +33,9 @@
 #include <gunrock/oprtr/filter/kernel.cuh>
 #include <gunrock/oprtr/intersection/kernel.cuh>
 
+#include <gunrock/global_indicator/tc/tc_enactor.cuh>
+#include <gunrock/global_indicator/tc/tc_problem.cuh>
+
 
 #include <moderngpu.cuh>
 

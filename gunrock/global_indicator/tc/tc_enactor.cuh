@@ -24,7 +24,7 @@
 #include <gunrock/global_indicator/tc/tc_problem.cuh>
 
 #include <moderngpu.cuh>
-#include <cub.cuh>
+#include <cub/cub.cuh>
 
 namespace gunrock {
 namespace global_indicator {
@@ -143,6 +143,7 @@ class TCEnactor :
       // 2) Do intersection using generated edge lists from the previous step.
       // 3) DeviceReduce the output to collect the triangle count.
 
+
       // end of the TC recursive loop
 
       if (d_scanned_edges) cudaFree(d_scanned_edges);
@@ -167,7 +168,7 @@ class TCEnactor :
   template <typename TCProblem>
   cudaError_t Enact(
     ContextPtr  context,
-    MSTProblem* problem,
+    TCProblem* problem,
     int         max_grid_size = 0)
   {
     int min_sm_version = -1;
