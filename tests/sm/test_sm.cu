@@ -35,6 +35,10 @@
 #include <gunrock/oprtr/filter/kernel.cuh>
 #include <moderngpu.cuh>
 
+// CPU reference include
+//#include <Escape/GraphIO.h>
+//#include <>
+
 using namespace gunrock;
 using namespace gunrock::app;
 using namespace gunrock::util;
@@ -364,7 +368,7 @@ int main(int argc, char** argv)
 
     // graph construction or generation related parameters
     info->info["undirected"] = true;  // always convert to undirected
-    //info->info["debug_mode"] = true;  // debug mode
+    info->info["debug_mode"] = true;  // debug mode
 
     if(graph_args == 5)  info->info["node_value"] = true;  // require per node label values
 

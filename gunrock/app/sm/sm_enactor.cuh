@@ -89,7 +89,6 @@ class SMEnactor :
    static const bool INSTRUMENT   =   _INSTRUMENT;
    static const bool DEBUG        =        _DEBUG;
    static const bool SIZE_CHECK   =   _SIZE_CHECK;
-
   /**
    * @brief SMEnactor constructor.
    */
@@ -211,8 +210,7 @@ class SMEnactor :
       //int tmp_select  = 0; // used for debug purpose
       //int tmp_length  = 0; // used for debug purpose
       unsigned int *num_selected = new unsigned int; // used in cub select
-
-        if (DEBUG)
+        if (debug_info)
         {
           printf("\nBEGIN ITERATION: %lld #NODES: %d #EDGES: %d\n",
             statistics->iteration+1,graph_slice->nodes,graph_slice->edges);
@@ -231,7 +229,6 @@ class SMEnactor :
 	///////////////////////////////////////////////////////////////////////////
         // Initial filtering based on node labels and degrees 
         // And generate candidate sets for query nodes
-
         attributes->queue_index  = 0;
         attributes->selector     = 0;
         attributes->queue_length = graph_slice->nodes;
@@ -261,9 +258,9 @@ class SMEnactor :
             statistics->filter_kernel_stats);
 
 
-            if(DEBUG && (retval = util::GRError(cudaThreadSynchronize(),
+            if(debug_info && (retval = util::GRError(cudaThreadSynchronize(),
                 "Initial filtering filter::Kernel failed", __FILE__, __LINE__))) break;
-
+if(i!=1){ //Last round doesn't need the following functor
         ///////////////////////////////////////////////////////////////////////////
         // Update each candidate node's valid degree by checking their neighbors
         attributes->queue_index  ++;
@@ -294,8 +291,11 @@ class SMEnactor :
                 stream,
                 gunrock::oprtr::advance::V2V);
 
-	if (DEBUG && (retval = util::GRError(cudaDeviceSynchronize(),
+	if (debug_info && (retval = util::GRError(cudaDeviceSynchronize(),
                 "Update Degree Functor Advance::LaunchKernel failed", __FILE__, __LINE__))) break;
+}
+
+
 	}
 	 /*   mgpu::SegReduceCsr(data_slice->d_c_set, 
                                data_slice->d_temp_keys, 
@@ -351,11 +351,10 @@ class SMEnactor :
         for(int i=0; i<2; i++){
         ///////////////////////////////////////////////////////////////////////////
         // Prune out candidates by checking candidate neighbors 
-        attributes->queue_index  ++;
-        attributes->selector     ^= 1;
-        attributes->queue_length = (graph_slice->nodes<graph_slice->edges)?
-					graph_slice->edges:graph_slice->nodes;
-        attributes->queue_reset  = false;
+        attributes->queue_index  =0;
+        attributes->selector     =0;
+        attributes->queue_length = graph_slice->edges;
+        attributes->queue_reset  = true;
 
 	gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, SMProblem, PruneFunctor>(
                 statistics[0],
@@ -380,8 +379,14 @@ class SMEnactor :
                 stream,
                 gunrock::oprtr::advance::V2V);
 
-	if (DEBUG && (retval = util::GRError(cudaDeviceSynchronize(),
+	if (debug_info && (retval = util::GRError(cudaDeviceSynchronize(),
                 "Prune Functor Advance::LaunchKernel failed", __FILE__, __LINE__))) break;
+	}
+	if(debug_info){
+	util::debug_init<<<128,128>>>(
+	     problem->data_slices[0]->d_c_set.GetPointer(util::DEVICE),
+	     problem->data_slices[0]->nodes_query,
+	     problem->data_slices[0]->nodes_data);
 	}
 	// Put the candidate index of each candidate edge into d_temp_keys at its e_id position
         // Fill the non-candidate edge positions with 0 in d_temp_keys
@@ -390,11 +395,10 @@ class SMEnactor :
 	    problem->data_slices[0]->d_temp_keys.GetPointer(util::DEVICE),
 	    0, (graph_slice->nodes<graph_slice->edges)?graph_slice->edges:graph_slice->nodes);
 
-        attributes->queue_index  ++;
-        attributes->selector     ^= 1;
-        attributes->queue_length = (graph_slice->nodes<graph_slice->edges)?graph_slice->edges:graph_slice->nodes;
-        attributes->queue_reset  = false;
-
+        attributes->queue_index  =0;
+        attributes->selector   =0;
+        attributes->queue_length = graph_slice->edges;
+        attributes->queue_reset  = true;
 
 	gunrock::oprtr::advance:: LaunchKernel<AdvanceKernelPolicy, SMProblem, LabelEdgeFunctor>(
                 statistics[0],
@@ -419,14 +423,19 @@ class SMEnactor :
                 stream,
                 gunrock::oprtr::advance::V2V);
 
-	if (DEBUG && (retval = util::GRError(cudaDeviceSynchronize(),
+	if (debug_info && (retval = util::GRError(cudaDeviceSynchronize(),
                 "Label Edge Functor Advance::LaunchKernel failed", __FILE__, __LINE__))) break;
-
+	if(debug_info){
+	util::debug_label<<<128,128>>>(
+		problem->data_slices[0]->d_temp_keys.GetPointer(util::DEVICE),
+		problem->data_slices[0]->edges_data);
+	}
 	// Use d_query_col to store the number of candidate edges for each query edge
 	util::MemsetKernel<<<128,128>>>(
 	    problem->data_slices[0]->d_query_col.GetPointer(util::DEVICE), 0, 
 		(problem->data_slices[0]->edges_query));
 
+	// collect candidate edges for each query edge
 	for(SizeT i=0; i<problem->data_slices[0]->edges_query; i++){
 
 	// Use d_data_degrees as flags of edge labels, initialized to 0
@@ -434,7 +443,7 @@ class SMEnactor :
 	    problem->data_slices[0]->d_data_degrees.GetPointer(util::DEVICE), 0, graph_slice->edges);
 
 
-	// Mark the candidate edges for the first query edge and store in d_data_degrees
+	// Mark the candidate edges for each query edge and store in d_data_degrees
 	util::Mark<<<128,128>>>(
 	    problem->data_slices[0]->edges_data,
 	    problem->data_slices[0]->d_temp_keys.GetPointer(util::DEVICE),
@@ -444,17 +453,18 @@ class SMEnactor :
 	    (int*)problem->data_slices[0]->d_data_degrees.GetPointer(util::DEVICE),
 	    problem->data_slices[0]->edges_data, (int)0, mgpu::plus<int>(), (int*)0, (int*)0,
 	    (int*)problem->data_slices[0]->d_data_degrees.GetPointer(util::DEVICE), context[0]);
-
+	// update the number of candidate edges for each query edge in d_query_col
 	util::Update<<<128,128>>>(
 	    i, problem->data_slices[0]->edges_query,
 	    problem->data_slices[0]->edges_data,
 	    problem->data_slices[0]->d_data_degrees.GetPointer(util::DEVICE),
 	    problem->data_slices[0]->d_temp_keys.GetPointer(util::DEVICE),
 	    problem->data_slices[0]->d_query_col.GetPointer(util::DEVICE));
+
 	//////////////////////////////////////////////////////////////////////////////////////
-        // Collect candidate edges for each query edge using CountFunctor
+        // Collect candidate edges for each query edge using CollectFunctor
 	attributes -> queue_reset = false;
-        attributes->queue_length = (graph_slice->nodes<graph_slice->edges)?graph_slice->edges:graph_slice->nodes;
+        attributes->queue_length = graph_slice->edges;
        // attributes -> queue_index++;
        // attributes -> selector ^= 1;
 
@@ -482,11 +492,11 @@ class SMEnactor :
                 stream,
                 gunrock::oprtr::advance::V2V);
 
-	if (DEBUG && (retval = util::GRError(cudaDeviceSynchronize(),
+	if (debug_info && (retval = util::GRError(cudaDeviceSynchronize(),
                 "Collect Functor Advance::LaunchKernel failed", __FILE__, __LINE__))) break;
-	}
-	if(DEBUG){
+	if(debug_info){
 	util::debug<<<128,128>>>(
+	    i,
 	    problem->data_slices[0]->froms_data.GetPointer(util::DEVICE), 
 	    problem->data_slices[0]->tos_data.GetPointer(util::DEVICE), 
 	    problem->data_slices[0]->froms_query.GetPointer(util::DEVICE), 
@@ -494,10 +504,14 @@ class SMEnactor :
 	    problem->data_slices[0]->d_query_col.GetPointer(util::DEVICE), 
 	    problem->data_slices[0]->edges_query, problem->data_slices[0]->edges_data);
 
-	if (DEBUG && (retval = util::GRError(cudaDeviceSynchronize(),
-                "Debug failed", __FILE__, __LINE__))) break;
 	}
 
+	if (debug_info && (retval = util::GRError(cudaDeviceSynchronize(),
+                "Debug failed", __FILE__, __LINE__))) break;
+	}  //end of for loop
+
+
+//Joining step
 	// Use d_query_row[0] to store the number of matched subgraphs in each join step
 	util::MemsetKernel<<<128,128>>>(
 	    problem->data_slices[0]->d_query_row.GetPointer(util::DEVICE), 0, 1);
@@ -505,7 +519,7 @@ class SMEnactor :
 	for(int i=0; i<problem->data_slices[0]->edges_query-1; i++){
 	// Use d_data_degrees as flags of success join, initialized to 0
 	util::MemsetKernel<<<128,128>>>(
-	    problem->data_slices[0]->d_data_degrees.GetPointer(util::DEVICE), 0, 1000);
+	    problem->data_slices[0]->d_data_degrees.GetPointer(util::DEVICE), 0, 3000);
 
 	/////////////////////////////////////////////////////////
         // Kernel Join
@@ -522,7 +536,7 @@ class SMEnactor :
                 problem->data_slices[0]->tos.GetPointer(util::DEVICE));
 
 
-       	if (DEBUG && (retval = util::GRError(cudaDeviceSynchronize(),
+       	if (debug_info && (retval = util::GRError(cudaDeviceSynchronize(),
                 "Join Kernel failed", __FILE__, __LINE__))) break;
 /*util::debug_0<<<128,128>>>(
 	problem->data_slices[0]->d_data_degrees.GetPointer(util::DEVICE),
@@ -530,24 +544,31 @@ class SMEnactor :
 */	
 	Scan<mgpu::MgpuScanTypeInc>(
 	    (int*)problem->data_slices[0]->d_data_degrees.GetPointer(util::DEVICE),
-	    1000, 
+	    3000, 
 	    (int)0, mgpu::plus<int>(), (int*)0, (int*)0,
 	    (int*)problem->data_slices[0]->d_data_degrees.GetPointer(util::DEVICE), context[0]);
 
+/*util::MemsetKernel<<<128,128>>>(problem->data_slices[0]->d_c_set.GetPointer(util::DEVICE),0,
+			problem->data_slices[0]->nodes_query*problem->data_slices[0]->nodes_data);
+
+	util::CUBSelect<SizeT, SizeT>(problem->data_slices[0]->d_c_set.GetPointer(util::DEVICE),1000,problem->d_data_slices[0]->d_data_degrees.GetPointer(util::DEVICE), (unsigned int*)problem->data_slices[0]->d_query_row.GetPointer(util::DEVICE));
+*/
 	// Collect the valid joined edges to consecutive places	
  	util::Collect<<<128,128>>>(
             problem->data_slices[0]->edges_query,
 	    i,
             problem->data_slices[0]->d_data_degrees.GetPointer(util::DEVICE),
+	    problem->data_slices[0]->froms_data.GetPointer(util::DEVICE),
+	    problem->data_slices[0]->tos_data.GetPointer(util::DEVICE),
 	    problem->data_slices[0]->froms.GetPointer(util::DEVICE),
 	    problem->data_slices[0]->tos.GetPointer(util::DEVICE),
             problem->data_slices[0]->d_query_col.GetPointer(util::DEVICE),
             problem->data_slices[0]->d_query_row.GetPointer(util::DEVICE));
  
-       	if (DEBUG && (retval = util::GRError(cudaDeviceSynchronize(),
+       	if (debug_info && (retval = util::GRError(cudaDeviceSynchronize(),
                 "Collect Kernel failed", __FILE__, __LINE__))) break;
         }
-	if(DEBUG){
+	if(debug_info){
 	util::debug_1<<<128,128>>>(
 	    problem->data_slices[0]->froms.GetPointer(util::DEVICE),
 	    problem->data_slices[0]->tos.GetPointer(util::DEVICE),

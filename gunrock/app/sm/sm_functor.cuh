@@ -66,6 +66,7 @@ struct SMInitFunctor {
      */
     static __device__ __forceinline__ void
     ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+    #pragma unroll
 	for(VertexId i=0; i < problem->nodes_query; i++){
 		if ((problem->d_data_labels[node] == problem->d_query_labels[i]) && 
 		    (problem->d_data_degrees[node] >= problem->d_query_degrees[i]))
@@ -117,6 +118,7 @@ struct UpdateDegreeFunctor
   {
     if(s_id<problem->nodes_data && d_id<problem->nodes_data)
     {
+	#pragma unroll
 	for(VertexId i=0; i < problem->nodes_query; i++)
 	    if(problem->d_c_set[s_id+i*problem->nodes_data]==1)
 	    	return true;
@@ -251,6 +253,7 @@ struct PruneFunctor
     VertexId s_id,  VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
+    //if(e_id<problem->edges_data)	printf("e_id:%d s_id:%d->d_id:%d\n",e_id, s_id, d_id);
 
 	for(VertexId i=0; i<problem->nodes_query; i++)
 	{
@@ -271,11 +274,11 @@ struct PruneFunctor
 		if(problem->d_c_set[s_id+i*problem->nodes_data]-1 <
 		   problem->d_query_row[i+1]-problem->d_query_row[i])
 		    problem->d_c_set[s_id + i*problem->nodes_data]=0;
-		else problem->d_c_set[s_id + i*problem->nodes_data]=1;
+		else 
+		    problem->d_c_set[s_id + i*problem->nodes_data]=1;
 			
 	    }
 	}
-
 
 
   }
@@ -315,8 +318,11 @@ struct LabelEdgeFunctor
   static __device__ __forceinline__ bool CondEdge(
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
-  {	
-    if(s_id >=0 && d_id >= 0 && s_id<problem->nodes_data && d_id<problem->nodes_data && s_id < d_id && e_id<problem->edges_data) return true;
+  {
+   // if(e_id<problem->edges_data)	printf("e_id:%d s_id:%d->d_id:%d\n",e_id, s_id, d_id);
+    if(s_id < d_id && e_id<problem->edges_data) 
+	return true;
+    
     else return false;
   }
 
@@ -336,8 +342,8 @@ struct LabelEdgeFunctor
 	for(int i=0; i<problem->edges_query; i++){
 	    VertexId source=problem->froms_query[i];
 	    VertexId dest=problem->tos_query[i];
-	    if(	problem->d_c_set[s_id+source*problem->nodes_data]!=0 && 
-		problem->d_c_set[d_id+dest*problem->nodes_data]!=0)
+	    if(	problem->d_c_set[s_id+source*problem->nodes_data]==1 && 
+		problem->d_c_set[d_id+dest*problem->nodes_data]==1)
 		problem->d_temp_keys[e_id]|=(1<<i); // label the candidate edge with the index of its query edge plus 1
 	}
   }
@@ -378,7 +384,7 @@ struct CollectFunctor
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    if(e_id<problem->edges_data)
+    if(s_id<d_id && e_id<problem->edges_data)
 	return true;
     else return false;
   }
