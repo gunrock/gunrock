@@ -106,7 +106,14 @@ public:
     json_spirit::mObject getUserinfo() const
     {
         json_spirit::mObject info;
-        info["login"] = getlogin();
+        const char * usernotfound = "Not Found";
+        if (getlogin())
+        {
+            info["login"] = getlogin();
+        } else
+        {
+            info["login"] = usernotfound;
+        }
         return info;
     }
 };
