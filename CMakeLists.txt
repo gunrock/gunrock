@@ -5,7 +5,7 @@ set(gunrock_VERSION_MINOR 3)
 set(gunrock_VERSION_PATCH 0)
 add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MINOR}.${gunrock_VERSION_PATCH}")
 
-set(gunrock_REQUIRED_BOOST_VERSION 1.53)
+set(gunrock_REQUIRED_BOOST_VERSION 1.58)
 set(gunrock_REQUIRED_METIS_VERSION 5.0)
 
 cmake_minimum_required(VERSION 2.8)
