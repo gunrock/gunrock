@@ -206,7 +206,7 @@ class SMEnactor :
 
       // debug configurations
       //SizeT num_edges_origin = graph_slice->edges;
-      bool debug_info = 0;   // used for debug purpose
+      bool debug_info = 1;   // used for debug purpose
       //int tmp_select  = 0; // used for debug purpose
       //int tmp_length  = 0; // used for debug purpose
       unsigned int *num_selected = new unsigned int; // used in cub select
@@ -382,12 +382,12 @@ if(i!=1){ //Last round doesn't need the following functor
 	if (debug_info && (retval = util::GRError(cudaDeviceSynchronize(),
                 "Prune Functor Advance::LaunchKernel failed", __FILE__, __LINE__))) break;
 	}
-	if(debug_info){
+
 	util::debug_init<<<128,128>>>(
 	     problem->data_slices[0]->d_c_set.GetPointer(util::DEVICE),
 	     problem->data_slices[0]->nodes_query,
 	     problem->data_slices[0]->nodes_data);
-	}
+
 	// Put the candidate index of each candidate edge into d_temp_keys at its e_id position
         // Fill the non-candidate edge positions with 0 in d_temp_keys
 	//////////////////////////////////////////////////////////////////////////////////////
@@ -425,11 +425,10 @@ if(i!=1){ //Last round doesn't need the following functor
 
 	if (debug_info && (retval = util::GRError(cudaDeviceSynchronize(),
                 "Label Edge Functor Advance::LaunchKernel failed", __FILE__, __LINE__))) break;
-	if(debug_info){
 	util::debug_label<<<128,128>>>(
 		problem->data_slices[0]->d_temp_keys.GetPointer(util::DEVICE),
 		problem->data_slices[0]->edges_data);
-	}
+
 	// Use d_query_col to store the number of candidate edges for each query edge
 	util::MemsetKernel<<<128,128>>>(
 	    problem->data_slices[0]->d_query_col.GetPointer(util::DEVICE), 0, 
@@ -551,8 +550,12 @@ if(i!=1){ //Last round doesn't need the following functor
 /*util::MemsetKernel<<<128,128>>>(problem->data_slices[0]->d_c_set.GetPointer(util::DEVICE),0,
 			problem->data_slices[0]->nodes_query*problem->data_slices[0]->nodes_data);
 
-	util::CUBSelect<SizeT, SizeT>(problem->data_slices[0]->d_c_set.GetPointer(util::DEVICE),1000,problem->d_data_slices[0]->d_data_degrees.GetPointer(util::DEVICE), (unsigned int*)problem->data_slices[0]->d_query_row.GetPointer(util::DEVICE));
-*/
+	util::CUBSelect_flagged<SizeT, SizeT>(problem->data_slices[0]->d_c_set.GetPointer(util::DEVICE),1000,problem->d_data_slices[0]->d_data_degrees.GetPointer(util::DEVICE), (unsigned int*)problem->data_slices[0]->d_query_row.GetPointer(util::DEVICE));
+
+	util::debug_select<<<128,128>>>(problem->data_slices[0]->d_c_set.GetPointer(util::DEVICE),
+		problem->data_slices[0]->d_data_degrees.GetPointer(util::DEVICE),
+		)*/
+
 	// Collect the valid joined edges to consecutive places	
  	util::Collect<<<128,128>>>(
             problem->data_slices[0]->edges_query,
@@ -568,7 +571,7 @@ if(i!=1){ //Last round doesn't need the following functor
        	if (debug_info && (retval = util::GRError(cudaDeviceSynchronize(),
                 "Collect Kernel failed", __FILE__, __LINE__))) break;
         }
-	if(debug_info){
+	/*if(debug_info){
 	util::debug_1<<<128,128>>>(
 	    problem->data_slices[0]->froms.GetPointer(util::DEVICE),
 	    problem->data_slices[0]->tos.GetPointer(util::DEVICE),
@@ -577,7 +580,7 @@ if(i!=1){ //Last round doesn't need the following functor
 	    problem->data_slices[0]->d_query_row.GetPointer(util::DEVICE),
 	    problem->data_slices[0]->edges_query);
         }
-
+*/
 
       if (d_scanned_edges) cudaFree(d_scanned_edges);
       if (retval) 

@@ -295,6 +295,16 @@ __global__ void debug_1(
     }
 }
 
+template<typename SizeT>
+__global__ void debug_select(
+    const SizeT* const d_c_set,
+    const SizeT* const flag,
+    const SizeT* const d_out,
+    const SizeT* const num_elements)
+{
+    SizeT x = blockIdx.x * blockDim.x + threadIdx.x;
+    if(x<num_elements) printf("d_out[%d]:%d	num_elements:%d\n",x,d_out[x],num_elements); 
+}
 
 
 } // namespace util
