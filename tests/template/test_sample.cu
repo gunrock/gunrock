@@ -104,7 +104,7 @@ void Usage()
  * @param[in] graph Reference to the CSR graph.
  */
 template<typename VertexId, typename SizeT, typename Value>
-void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph)
+void DisplaySolution(const Csr<VertexId, SizeT, Value> &graph)
 {
     printf("==> display solution: (currently missing)\n");
     // TODO(developer): code to print out results
@@ -124,7 +124,7 @@ void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph)
  * @param[in] graph Reference to the CSR graph we process on.
  */
 template<typename VertexId, typename SizeT, typename Value>
-void SimpleReference(const Csr<VertexId, Value, SizeT> &graph)
+void ReferenceSample(const Csr<VertexId, SizeT, Value> &graph)
 {
     // initialization
 
@@ -155,73 +155,98 @@ void SimpleReference(const Csr<VertexId, Value, SizeT> &graph)
 template <
     typename VertexId,
     typename SizeT,
-    typename Value,
-    bool DEBUG,
-    bool SIZE_CHECK >
-void RunTest(Info<VertexId, Value, SizeT> *info)
+    typename Value>
+    //bool DEBUG,
+    //bool SIZE_CHECK >
+void RunTest(Info<VertexId, SizeT, Value> *info)
 {
     typedef SampleProblem < VertexId, SizeT, Value,
             true,   // MARK_PREDECESSORS
-            false,  // ENABLE_IDEMPOTENCE
-            false > Problem;
+            false>  // ENABLE_IDEMPOTENCE
+            //false > 
+            Problem;
+    typedef SampleEnactor <Problem>
+            Enactor;
 
-    Csr<VertexId, Value, SizeT>* csr = info->csr_ptr;
+    Csr<VertexId, SizeT, Value>* csr = info->csr_ptr;
+    int      max_grid_size         = info->info["max_grid_size"     ].get_int  (); 
+    int      num_gpus              = info->info["num_gpus"          ].get_int  (); 
+    double   max_queue_sizing      = info->info["max_queue_sizing"  ].get_real (); 
+    double   max_queue_sizing1     = info->info["max_queue_sizing1" ].get_real (); 
+    double   max_in_sizing         = info->info["max_in_sizing"     ].get_real (); 
+    std::string partition_method   = info->info["partition_method"  ].get_str  (); 
+    double   partition_factor      = info->info["partition_factor"  ].get_real (); 
+    int      partition_seed        = info->info["partition_seed"    ].get_int  (); 
+    bool     quiet_mode            = info->info["quiet_mode"        ].get_bool (); 
+    bool     quick_mode            = info->info["quick_mode"        ].get_bool (); 
+    bool     stream_from_host      = info->info["stream_from_host"  ].get_bool (); 
+    bool     instrument            = info->info["instrument"        ].get_bool (); 
+    bool     debug                 = info->info["debug_mode"        ].get_bool (); 
+    bool     size_check            = info->info["size_check"        ].get_bool (); 
+    int      iterations            = 1; //disable since doesn't support mgpu stop condition. info->info["num_iteration"].get_int();
+    CpuTimer cpu_timer;
 
-    ContextPtr* context             = (ContextPtr*)info -> context;
-    std::string partition_method    = info->info["partition_method"].get_str();
-    int         max_grid_size       = info->info["max_grid_size"].get_int();
-    int         num_gpus            = info->info["num_gpus"].get_int();
-    int         iterations          = 1; //force to 1 for now.
-    bool        quick_mode          = info->info["quick_mode"].get_bool();
-    bool        quiet_mode          = info->info["quiet_mode"].get_bool();
-    bool        stream_from_host    = info->info["stream_from_host"].get_bool();
-    double      max_queue_sizing    = info->info["max_queue_sizing"].get_real();
-
+    cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
 
+    // TODO: remove after merge mgpu-cq
+    ContextPtr   *context = (ContextPtr*)  info->context;
+    cudaStream_t *streams = (cudaStream_t*)info->streams;
 
     // allocate host-side array (for both reference and GPU-computed results)
     VertexId *r_labels = (VertexId*)malloc(sizeof(VertexId) * csr->nodes);
     VertexId *h_labels = (VertexId*)malloc(sizeof(VertexId) * csr->nodes);
 
-    SampleEnactor <
-    Problem,
-    false,  // INSTRUMENT
-    false,  // DEBUG
-    true >  // SIZE_CHECK
-    enactor(gpu_idx);  // allocate primitive enactor map
-
-    Problem *problem = new Problem;  // allocate primitive problem on GPU
-    util::GRError(
-        problem->Init(stream_from_host, *csr, num_gpus),
+    Problem *problem = new Problem(false);  // allocate primitive problem on GPU
+    util::GRError(problem -> Init(
+        stream_from_host,
+        csr,
+        NULL,
+        num_gpus,
+        gpu_idx,
+        partition_method,
+        streams,
+        max_queue_sizing,
+        max_in_sizing,
+        partition_factor,
+        partition_seed),
         "Problem Initialization Failed", __FILE__, __LINE__);
 
+    // allocate primitive enactor map
+    Enactor *enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);
+    util::GRError(enactor->Init(
+        context, problem, max_grid_size),
+        "Enactor Init failed", __FILE__, __LINE__);
+    cpu_timer.Stop();
+    info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
+   
     //
     // perform calculation
     //
-
-    GpuTimer gpu_timer;
-
-    float elapsed = 0.0f;
+    double elapsed = 0.0;
 
     for (int iter = 0; iter < iterations; ++iter)
     {
-        util::GRError(
-            problem->Reset(enactor.GetFrontierType(),
-                           max_queue_sizing),
+        util::GRError(problem -> Reset(
+            enactor -> GetFrontierType(),
+            max_queue_sizing, max_queue_sizing1),
             "Problem Data Reset Failed", __FILE__, __LINE__);
-        gpu_timer.Start();
-        util::GRError(
-            enactor.template Enact<Problem>(*context, problem, max_grid_size),
+        util::GRError(enactor -> Reset(),
+            "Enactor Reset failed", __FILE__, __LINE__);
+
+        cpu_timer.Start();
+        util::GRError(enactor -> Enact(),
             "Problem Enact Failed", __FILE__, __LINE__);
-        gpu_timer.Stop();
-        elapsed += gpu_timer.ElapsedMillis();
+        cpu_timer.Stop();
+        elapsed += cpu_timer.ElapsedMillis();
     }
 
     elapsed /= iterations;
 
+    cpu_timer.Start();
     // extract results
     util::GRError(
         problem->Extract(h_labels),
@@ -231,74 +256,92 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
     if (!quick_mode)
     {
         if (!quiet_mode) printf("==> computing reference value ... (currently missing)\n");
-        SimpleReference<VertexId, SizeT, Value>(csr);
+        ReferenceSample<VertexId, SizeT, Value>(csr);
         if (!quiet_mode) printf("==> validation: (currently missing)\n");
     }
 
     if (!quiet_mode) DisplaySolution<VertexId, SizeT, Value>(csr);  // display solution
 
-    info->ComputeCommonStats(enactor.enactor_stats.GetPointer(), elapsed);
-
-    if (!quiet_mode) info->DisplayStats();
-
-    info->CollectInfo();
+    info->ComputeCommonStats(enactor -> enactor_stats.GetPointer(), elapsed, (VertexId*)NULL);
 
     // clean up
-    if (problem)  { delete problem; }
+    if (problem ) { delete problem; }
+    if (enactor ) { delete enactor; }
     if (r_labels) { free(r_labels); }
     if (h_labels) { free(h_labels); }
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam DEBUG
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT,
-    bool          DEBUG >
-void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["size_check"].get_bool())
-        RunTest <VertexId, Value, SizeT, DEBUG,  true>(info);
-    else
-        RunTest <VertexId, Value, SizeT, DEBUG, false>(info);
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT >
-void RunTests_debug(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["debug_mode"].get_bool())
-        RunTests_size_check <VertexId, Value, SizeT,  true>(info);
-    else
-        RunTests_size_check <VertexId, Value, SizeT, false>(info);
+    cpu_timer.Stop();
+    info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
 }
 
 // ----------------------------------------------------------------------------
 // Main
 // ----------------------------------------------------------------------------
+template <
+    typename VertexId,  // use int as the vertex identifier
+    typename SizeT   ,  // use int as the graph size type
+    typename Value   >  // use int as the value type
+int main_(CommandLineArgs *args)
+{
+    CpuTimer cpu_timer, cpu_timer2;
+    cpu_timer.Start();
+
+    Csr <VertexId, SizeT, Value> csr(false);  // graph we process on
+    Info<VertexId, SizeT, Value> *info = new Info<VertexId, SizeT, Value>;
+
+    // graph construction or generation related parameters
+    info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
+    cpu_timer2.Start();
+    info->Init("Primitive_Name", *args, csr);  // initialize Info structure
+    cpu_timer2.Stop();
+    info->info["load_time"] = cpu_timer2.ElapsedMillis();
+
+    RunTest<VertexId, SizeT, Value>(info);  // run test
+
+    cpu_timer.Stop();
+    info->info["total_time"] = cpu_timer.ElapsedMillis();
+
+    if (!(info->info["quiet_mode"].get_bool()))
+    {
+        info->DisplayStats();  // display collected statistics
+    }
+
+    info->CollectInfo();  // collected all the info and put into JSON mObject
+
+    return 0;
+}
+
+template <
+    typename VertexId, // the vertex identifier type, usually int or long long
+    typename SizeT   > // the size tyep, usually int or long long
+int main_Value(CommandLineArgs *args)
+{
+    if (args -> CheckCmdLineFlag("64bit-Value"))
+        return main_<VertexId, SizeT, long long>(args);
+    else
+        return main_<VertexId, SizeT, int      >(args);
+}
+
+template <
+    typename VertexId>
+int main_SizeT(CommandLineArgs *args)
+{
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_Value<VertexId, long long>(args);
+    else
+        return main_Value<VertexId, int      >(args);
+}
+
+int main_VertexId(CommandLineArgs *args)
+{
+    // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
+    //if (args -> CheckCmdLineFlag("64bit-VertexId"))
+    //    return main_SizeT<long long>(args);
+    //else 
+        return main_SizeT<int      >(args);
+}
+
 int main(int argc, char** argv)
 {
-
     CommandLineArgs args(argc, argv);
     int graph_args = argc - args.ParsedArgc() - 1;
     if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
@@ -307,18 +350,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    typedef int VertexId;  // use int as the vertex identifier
-    typedef int Value;   // use float as the value type
-    typedef int SizeT;     // use int as the graph size type
-
-    Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
-    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
-
-    // graph construction or generation related parameters
-    info->info["undirected"] = args.CheckCmdLineFlag("undirected");
-    info->Init("Primitive_Name", args, csr);  // initialize Info structure
-    RunTests_debug<VertexId, Value, SizeT>(info);  // run test
-    return 0;
+    return main_VertexId(&args);
 }
 
 // Leave this at the end of the file

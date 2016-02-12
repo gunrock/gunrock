@@ -169,9 +169,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
 
         // If instrument flag is set, track kernel stats
-        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
-            kernel_stats.MarkStart();
-        }
+        //if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+        //    kernel_stats.MarkStart();
+        //}
 
         // workprogress reset
         //if (queue_reset)
@@ -227,10 +227,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 smem_storage.state.work_decomposition,
                 ADVANCE_TYPE);
 
-        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
-            kernel_stats.MarkStop();
-            kernel_stats.Flush();
-        }
+        //if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+        //    kernel_stats.MarkStop();
+        //    kernel_stats.Flush();
+        //}
     }
 
 };

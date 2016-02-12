@@ -65,9 +65,9 @@ SizeT RandomNode (SizeT num_nodes)
     return node_id % num_nodes;
 }
 
-template <typename VertexId, typename Value, typename SizeT>
+template <typename VertexId, typename SizeT, typename Value>
 void RemoveStandaloneNodes(
-    Csr<VertexId, Value, SizeT>* graph, bool quiet = false)
+    Csr<VertexId, SizeT, Value>* graph, bool quiet = false)
 {
     SizeT nodes = graph->nodes;
     SizeT edges = graph->edges;

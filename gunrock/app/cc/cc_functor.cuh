@@ -365,7 +365,7 @@ struct PtrJumpMaskFunctor {
      */
     static __device__ __forceinline__ void ApplyFilter(
         VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
-        VertexId mask;
+        int mask;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
             mask, problem->masks + node);
         if (mask == 0) {
@@ -435,7 +435,7 @@ struct PtrJumpUnmaskFunctor {
      */
     static __device__ __forceinline__ void ApplyFilter(
         VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
-        VertexId mask;
+        int mask;
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
             mask, problem->masks + node);
         if (mask == 1) {

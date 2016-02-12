@@ -29,9 +29,9 @@ namespace sample {
  *
  */
 template<typename VertexId, typename SizeT,
-         typename Value, typename ProblemData>
+         typename Value, typename Problem>
 struct SampleFunctor {
-    typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
 
     /**
      * @brief Advance condition function
@@ -46,7 +46,7 @@ struct SampleFunctor {
      *         include the destination node in the next frontier.
      */
     static __device__ __forceinline__ bool
-    CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem,
+    CondEdge(VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
              VertexId e_id = 0, VertexId e_id_in = 0) {
         return true;  // TODO(developer): advance condition function
     }
@@ -62,7 +62,7 @@ struct SampleFunctor {
      *
      */
     static __device__ __forceinline__ void
-    ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem,
+    ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
               VertexId e_id = 0, VertexId e_id_in = 0) {
         // TODO(developer): advance apply function
     }
@@ -79,7 +79,7 @@ struct SampleFunctor {
      *         include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool
-    CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+    CondFilter(VertexId node, DataSlice *d_data_slice, Value v = 0, SizeT nid = 0) {
         return true;  // TODO(developer): filter condition function
     }
 
@@ -93,7 +93,7 @@ struct SampleFunctor {
      *
      */
     static __device__ __forceinline__ void
-    ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+    ApplyFilter(VertexId node, DataSlice *d_data_slice, Value v = 0, SizeT nid = 0) {
         // TODO(developer): filter apply function
     }
 };

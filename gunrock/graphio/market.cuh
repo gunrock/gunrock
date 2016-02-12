@@ -26,11 +26,11 @@ namespace gunrock {
 namespace graphio {
 
 
-template<bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
+template<bool LOAD_VALUES, typename VertexId, typename SizeT, typename Value>
 int ReadLabelStream(
     FILE *f_in,
     char *output_file,
-    Csr<VertexId, Value, SizeT> &csr_graph,
+    Csr<VertexId, SizeT, Value> &csr_graph,
     bool quiet = false)
 {
     SizeT lines_read = -1;
@@ -196,11 +196,11 @@ int ReadLabelStream(
  *
  * \return If there is any File I/O error along the way.
  */
-template<bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
+template<bool LOAD_VALUES, typename VertexId, typename SizeT, typename Value>
 int ReadMarketStream(
     FILE *f_in,
     char *output_file,
-    Csr<VertexId, Value, SizeT> &csr_graph,
+    Csr<VertexId, SizeT, Value> &csr_graph,
     bool undirected,
     bool reversed,
     bool quiet = false)
@@ -410,8 +410,8 @@ int ReadMarketStream(
  * @param[in] csr_graph     Csr graph object to store the graph data.
  * @param[in] undirected    Is the graph undirected or not?
  */
-template <bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
-int ReadCsrArrays_SM(char *f_in, char *f_label, Csr<VertexId, Value, SizeT> &csr_graph,
+template <bool LOAD_VALUES, typename VertexId, typename SizeT, typename Value>
+int ReadCsrArrays_SM(char *f_in, char *f_label, Csr<VertexId, SizeT, Value> &csr_graph,
                   bool undirected, bool quiet)
 {
     csr_graph.template FromCsr_SM<LOAD_VALUES>(f_in, f_label, quiet);
@@ -425,8 +425,8 @@ int ReadCsrArrays_SM(char *f_in, char *f_label, Csr<VertexId, Value, SizeT> &csr
  * @param[in] undirected    Is the graph undirected or not?
  * @param[in] reversed      Whether or not the graph is inversed.
  */
-template <bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
-int ReadCsrArrays(char *f_in, Csr<VertexId, Value, SizeT> &csr_graph,
+template <bool LOAD_VALUES, typename VertexId, typename SizeT, typename Value>
+int ReadCsrArrays(char *f_in, Csr<VertexId, SizeT, Value> &csr_graph,
                   bool undirected, bool reversed, bool quiet)
 {
     csr_graph.template FromCsr<LOAD_VALUES>(f_in, quiet);
@@ -452,11 +452,11 @@ int ReadCsrArrays(char *f_in, Csr<VertexId, Value, SizeT> &csr_graph,
  *
  * \return If there is any File I/O error along the way. 0 for no error.
  */
-template<bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
+template<bool LOAD_VALUES, typename VertexId, typename SizeT, typename Value>
 int BuildMarketGraph(
     char *mm_filename,
     char *output_file,
-    Csr<VertexId, Value, SizeT> &csr_graph,
+    Csr<VertexId, SizeT, Value> &csr_graph,
     bool undirected,
     bool reversed,
     bool quiet = false)
@@ -530,13 +530,13 @@ int BuildMarketGraph(
  *
  * \return If there is any File I/O error along the way. 0 for no error.
  */
-template<bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
+template<bool LOAD_VALUES, typename VertexId, typename SizeT, typename Value>
 int BuildMarketGraph_SM(
     char *mm_filename,
     char *label_filename,
     char *output_file,
     char *output_label,
-    Csr<VertexId, Value, SizeT> &csr_graph,
+    Csr<VertexId, SizeT, Value> &csr_graph,
     bool undirected,
     bool reversed,
     bool quiet = false)
@@ -631,11 +631,11 @@ int BuildMarketGraph_SM(
  *
  * \return int Whether error occurs (0 correct, 1 error)
  */
-template <bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
+template <bool LOAD_VALUES, typename VertexId, typename SizeT, typename Value>
 int BuildMarketGraph_SM(
     char *file_in,
     char *file_label,
-    Csr<VertexId, Value, SizeT> &graph,
+    Csr<VertexId, SizeT, Value> &graph,
     bool undirected,
     bool reversed,
     bool quiet = false)
@@ -667,8 +667,8 @@ int BuildMarketGraph_SM(
             ((sizeof(VertexId) == 8) ? "64bVe." : ""), 
             ((sizeof(Value   ) == 8) ? "64bVa." : "")); 
       }
-       for(int i=0; ud[i]; i++) printf("%c",ud[i]); printf("\n");
-       for(int i=0; lb[i]; i++) printf("%c",lb[i]); printf("\n");
+       //for(int i=0; ud[i]; i++) printf("%c",ud[i]); printf("\n");
+       //for(int i=0; lb[i]; i++) printf("%c",lb[i]); printf("\n");
         if (BuildMarketGraph_SM<LOAD_VALUES>(file_in, file_label, ud, lb, graph,
                     true, reversed, quiet) != 0)
             return 1;
@@ -696,10 +696,10 @@ int BuildMarketGraph_SM(
  *
  * \return int Whether error occurs (0 correct, 1 error)
  */
-template <bool LOAD_VALUES, typename VertexId, typename Value, typename SizeT>
+template <bool LOAD_VALUES, typename VertexId, typename SizeT, typename Value>
 int BuildMarketGraph(
     char *file_in,
-    Csr<VertexId, Value, SizeT> &graph,
+    Csr<VertexId, SizeT, Value> &graph,
     bool undirected,
     bool reversed,
     bool quiet = false)

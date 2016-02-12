@@ -24,12 +24,7 @@
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
 
-// Graph construction utils
-#include <gunrock/graphio/market.cuh>
-#include <gunrock/graphio/rmat.cuh>
-#include <gunrock/graphio/rgg.cuh>
-
-// BFS includes
+// PR includes
 #include <gunrock/app/pr/pr_enactor.cuh>
 #include <gunrock/app/pr/pr_problem.cuh>
 #include <gunrock/app/pr/pr_functor.cuh>
@@ -140,14 +135,14 @@ void Usage()
  * @param[in] rank Rank value for the node
  * @param[in] nodes Number of nodes in the graph.
  */
-template<typename VertexId, typename Value, typename SizeT>
+template<typename VertexId, typename SizeT, typename Value>
 void DisplaySolution(VertexId *node, Value *rank, SizeT nodes)
 {
-    int top = (nodes < 10) ? nodes : 10;  // at most top 10 ranked nodes
-    printf("\nTop %d Ranked Vertices and PageRanks:\n", top);
-    for (int i = 0; i < top; ++i)
+    SizeT top = (nodes < 10) ? nodes : 10;  // at most top 10 ranked nodes
+    printf("\nTop %lld Ranked Vertices and PageRanks:\n", (long long)top);
+    for (SizeT i = 0; i < top; ++i)
     {
-        printf("Vertex ID: %d, PageRank: %.8le\n", node[i], (double)rank[i]);
+        printf("Vertex ID: %lld, PageRank: %.8le\n", (long long)node[i], (double)rank[i]);
     }
 }
 
@@ -257,10 +252,10 @@ int CompareResults_(
  */
 template <
     typename VertexId,
-    typename Value,
-    typename SizeT >
-void SimpleReferencePageRank(
-    const Csr<VertexId, Value, SizeT> &graph,
+    typename SizeT,
+    typename Value >
+void ReferencePageRank(
+    const Csr<VertexId, SizeT, Value> &graph,
     VertexId                          *node_id,
     Value                             *rank,
     Value                             delta,
@@ -364,10 +359,10 @@ inline bool operator< (const Sort_Pair<VertexId, Value>& lhs, const Sort_Pair<Ve
  */
 template <
     typename VertexId,
-    typename Value,
-    typename SizeT >
-void SimpleReferencePageRank_Normalized(
-    const Csr<VertexId, Value, SizeT> &graph,
+    typename SizeT,
+    typename Value >
+void ReferencePageRank_Normalized(
+    const Csr<VertexId, SizeT, Value> &graph,
     VertexId                          *node_id,
     Value                             *rank,
     Value                             delta,
@@ -490,47 +485,51 @@ void SimpleReferencePageRank_Normalized(
  */
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK,
+    typename Value,
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK,
     bool NORMALIZED>
-void RunTests(Info<VertexId, Value, SizeT> *info)
+void RunTests(Info<VertexId, SizeT, Value> *info)
 {
     typedef PRProblem <VertexId,
             SizeT,
             Value,
-            NORMALIZED> PrProblem;
+            NORMALIZED> Problem;
 
-    typedef PREnactor <PrProblem,
-            INSTRUMENT,
-            DEBUG,
-            SIZE_CHECK > PrEnactor;
+    typedef PREnactor <Problem>
+            //INSTRUMENT,
+            //DEBUG,
+            //SIZE_CHECK > 
+            Enactor;
 
     // parse configurations from mObject info
-    Csr<VertexId, Value, SizeT> *graph = info->csr_ptr;
-    VertexId src                 = info->info["source_vertex"].get_int64();
-    bool undirected              = info->info["undirected"].get_bool();
-    bool quiet_mode              = info->info["quiet_mode"].get_bool();
-    bool quick_mode              = info->info["quick_mode"].get_bool();
-    bool stream_from_host        = info->info["stream_from_host"].get_bool();
-    int max_grid_size            = info->info["max_grid_size"].get_int();
-    int num_gpus                 = info->info["num_gpus"].get_int();
-    int max_iteration            = info->info["max_iteration"].get_int();
-    double max_queue_sizing      = info->info["max_queue_sizing"].get_real();
-    double max_queue_sizing1     = info->info["max_queue_sizing1"].get_real();
-    double max_in_sizing         = info->info["max_in_sizing"].get_real();
-    std::string partition_method = info->info["partition_method"].get_str();
-    double partition_factor      = info->info["partition_factor"].get_real();
-    int partition_seed           = info->info["partition_seed"].get_int();
-    int iterations               = 1; //force to 1 info->info["num_iteration"].get_int();
-    int traversal_mode           = info->info["traversal_mode"].get_int();
-    std::string ref_filename     = info->info["ref_filename"].get_str();
-    Value delta                  = info->info["delta"].get_real();
-    Value error                  = info->info["error"].get_real();
-    bool  scaled                 = info->info["scaled"].get_bool();
-    CpuTimer cpu_timer;
+    Csr<VertexId, SizeT, Value> *graph = info->csr_ptr;
+    VertexId    src                 = info->info["source_vertex"    ].get_int64();
+    bool        undirected          = info->info["undirected"       ].get_bool ();
+    bool        quiet_mode          = info->info["quiet_mode"       ].get_bool ();
+    bool        quick_mode          = info->info["quick_mode"       ].get_bool ();
+    bool        stream_from_host    = info->info["stream_from_host" ].get_bool ();
+    int         max_grid_size       = info->info["max_grid_size"    ].get_int  ();
+    int         num_gpus            = info->info["num_gpus"         ].get_int  ();
+    int         max_iteration       = info->info["max_iteration"    ].get_int  ();
+    double      max_queue_sizing    = info->info["max_queue_sizing" ].get_real ();
+    double      max_queue_sizing1   = info->info["max_queue_sizing1"].get_real ();
+    double      max_in_sizing       = info->info["max_in_sizing"    ].get_real ();
+    std::string partition_method    = info->info["partition_method" ].get_str  ();
+    double      partition_factor    = info->info["partition_factor" ].get_real ();
+    int         partition_seed      = info->info["partition_seed"   ].get_int  ();
+    bool        instrument          = info->info["instrument"       ].get_bool ();
+    bool        debug               = info->info["debug_mode"       ].get_bool ();
+    bool        size_check          = info->info["size_check"       ].get_bool ();
+    int         iterations          = 1; //force to 1 info->info["num_iteration"].get_int();
+    int         traversal_mode      = info->info["traversal_mode"   ].get_int  ();
+    std::string ref_filename        = info->info["ref_filename"     ].get_str  ();
+    Value       delta               = info->info["delta"            ].get_real ();
+    Value       error               = info->info["error"            ].get_real ();
+    bool        scaled              = info->info["scaled"           ].get_bool ();
+    CpuTimer    cpu_timer;
 
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
@@ -556,26 +555,26 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
 
-    PrEnactor* enactor = new PrEnactor(num_gpus, gpu_idx);  // enactor map
-    PrProblem *problem = new PrProblem;  // allocate problem on GPU
-    problem -> scaled  = scaled;
-
+    Problem *problem = new Problem(scaled);  // allocate problem on GPU
     util::GRError(problem->Init(
-                      stream_from_host,
-                      graph,
-                      NULL,
-                      num_gpus,
-                      gpu_idx,
-                      partition_method,
-                      streams,
-                      max_queue_sizing,
-                      max_in_sizing,
-                      partition_factor,
-                      partition_seed),
-                  "PR Problem Init failed", __FILE__, __LINE__);
+        stream_from_host,
+        graph,
+        NULL,
+        num_gpus,
+        gpu_idx,
+        partition_method,
+        streams,
+        max_queue_sizing,
+        max_in_sizing,
+        partition_factor,
+        partition_seed),
+        "PR Problem Init failed", __FILE__, __LINE__);
+
+    Enactor *enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
     util::GRError(enactor->Init(
-                      context, problem, traversal_mode, max_grid_size),
-                  "PR Enactor Init failed", __FILE__, __LINE__);
+        context, problem, traversal_mode, max_grid_size),
+        "PR Enactor Init failed", __FILE__, __LINE__);
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
@@ -586,12 +585,12 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     for (int iter = 0; iter < iterations; ++iter)
     {
         util::GRError(problem->Reset(
-                          src, delta, error, max_iteration,
-                          enactor->GetFrontierType(), max_queue_sizing,
-                          max_queue_sizing1, traversal_mode == 1 ? true : false),
-                      "PR Problem Data Reset Failed", __FILE__, __LINE__);
+            src, delta, error, max_iteration,
+            enactor->GetFrontierType(), max_queue_sizing,
+            max_queue_sizing1, traversal_mode == 1 ? true : false),
+            "PR Problem Data Reset Failed", __FILE__, __LINE__);
         util::GRError(enactor->Reset(),
-                      "PR Enactor Reset Reset failed", __FILE__, __LINE__);
+            "PR Enactor Reset Reset failed", __FILE__, __LINE__);
 
         if (!quiet_mode)
         {
@@ -612,7 +611,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     cpu_timer.Start();
     // copy out results
     util::GRError(problem->Extract(h_rank, h_node_id),
-                  "PR Problem Data Extraction Failed", __FILE__, __LINE__);
+        "PR Problem Data Extraction Failed", __FILE__, __LINE__);
 
     if (!quiet_mode)
     {
@@ -629,7 +628,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     {
         if (!quiet_mode) { printf("Computing reference value ...\n"); }
         if (NORMALIZED)
-            SimpleReferencePageRank_Normalized <VertexId, Value, SizeT>(
+            ReferencePageRank_Normalized <VertexId, SizeT, Value>(
                 *graph,
                 ref_node_id,
                 ref_rank,
@@ -639,7 +638,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                 !undirected,
                 quiet_mode,
                 scaled);
-        else SimpleReferencePageRank <VertexId, Value, SizeT>(
+        else ReferencePageRank <VertexId, SizeT, Value>(
                 *graph,
                 ref_node_id,
                 ref_rank,
@@ -653,7 +652,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         // Verify the result
         if (!quiet_mode) { printf("Validity Rank: \n"); }
         Value *unorder_rank = new Value[graph->nodes];
-        int   *v_count      = new int  [graph->nodes];
+        SizeT *v_count      = new SizeT[graph->nodes];
         SizeT  error_count  = 0;
         for (VertexId i=0; i<graph->nodes; i++)
             v_count[i] = 0;
@@ -664,14 +663,16 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             if (v < 0 || v >= graph->nodes)
             {
                 if (error_count == 0 && !quiet_mode)
-                    printf("INCORRECT : node_id[%d] (%d) is out of bound\n", i, v);
+                    printf("INCORRECT : node_id[%lld] (%lld) is out of bound\n", 
+                        (long long)i, (long long)v);
                 error_count ++;
                 continue;
             }
             if (v_count[v] > 0)
             {
                 if (error_count == 0 && !quiet_mode)
-                    printf("INCORRECT : node_id[%d] (%d) appears more than once\n", i, v);
+                    printf("INCORRECT : node_id[%lld] (%lld) appears more than once\n", 
+                        (long long)i, (long long)v);
                 error_count ++;
                 continue;
             }
@@ -682,7 +683,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         if (v_count[v] == 0)
         {
             if (error_count == 0 && !quiet_mode)
-                printf("INCORRECT : vertex %d does not appear in result\n", v);
+                printf("INCORRECT : vertex %lld does not appear in result\n", (long long)v);
             error_count ++;
         }
         double ref_total_rank = 0;
@@ -699,8 +700,8 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                 (ref_rank[i] <= 1e-12 && diff > error))
             {
                 if (error_count == 0 && !quiet_mode)
-                    printf("INCORRECT : rank[%d] (%.8le) != %.8le\n",
-                        v, (double)unorder_rank[v], (double)ref_rank[i]);
+                    printf("INCORRECT : rank[%lld] (%.8le) != %.8le\n",
+                        (long long)v, (double)unorder_rank[v], (double)ref_rank[i]);
                 error_count ++;
             }
             if (diff > max_diff)
@@ -725,15 +726,15 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         printf("Reference total rank : %.10lf\n", ref_total_rank);
         printf("Maximum difference : "); 
         if (max_diff_pos < graph->nodes)
-            printf("rank[%d] %.8le vs. %.8le, ",
-                ref_node_id[max_diff_pos], 
+            printf("rank[%lld] %.8le vs. %.8le, ",
+                (long long)ref_node_id[max_diff_pos], 
                 (double)unorder_rank[ref_node_id[max_diff_pos]], 
                 (double)ref_rank[max_diff_pos]);
         printf("%.8le\n", (double)max_diff);
         printf("Maximum relative difference :");
         if (max_rdiff_pos < graph->nodes)
-            printf("rank[%d] %.8le vs. %.8le, ",
-                ref_node_id[max_rdiff_pos],
+            printf("rank[%lld] %.8le vs. %.8le, ",
+                (long long)ref_node_id[max_rdiff_pos],
                 (double)unorder_rank[ref_node_id[max_rdiff_pos]],
                 (double)ref_rank[max_rdiff_pos]);
         printf("%.8lf %%\n", (double)max_rdiff * 100);
@@ -775,7 +776,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     }
 
     info->ComputeCommonStats(  // compute running statistics
-        enactor->enactor_stats.GetPointer(), elapsed, NULL, true);
+        enactor->enactor_stats.GetPointer(), elapsed, (VertexId*)NULL, true);
 
     if (!quiet_mode)
     {
@@ -891,86 +892,17 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
  */
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK >
-void RunTests_normalized(Info<VertexId, Value, SizeT> *info)
+    typename Value>
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK >
+void RunTests_normalized(Info<VertexId, SizeT, Value> *info)
 {
     if (info->info["normalized"].get_bool())
-        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,  true>(info);
+        RunTests<VertexId, SizeT, Value, true>(info);
     else
-        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK, false>(info);
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT,
-    bool          INSTRUMENT,
-    bool          DEBUG >
-void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["size_check"].get_bool())
-        RunTests_normalized<VertexId, Value, SizeT, INSTRUMENT, DEBUG,  true>(info);
-    else
-        RunTests_normalized<VertexId, Value, SizeT, INSTRUMENT, DEBUG, false>(info);
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT,
-    bool        INSTRUMENT >
-void RunTests_debug(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["debug_mode"].get_bool())
-        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,  true>(info);
-    else
-        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT, false>(info);
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT >
-void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["instrument"].get_bool())
-        RunTests_debug<VertexId, Value, SizeT,  true>(info);
-    else
-        RunTests_debug<VertexId, Value, SizeT, false>(info);
+        RunTests<VertexId, SizeT, Value, false>(info);
 }
 
 /******************************************************************************
@@ -979,8 +911,8 @@ void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 
 template<
     typename VertexId,
-    typename Value,
-    typename SizeT>
+    typename SizeT,
+    typename Value>
 int main_(CommandLineArgs *args)
 {
     CpuTimer cpu_timer, cpu_timer2;
@@ -990,12 +922,12 @@ int main_(CommandLineArgs *args)
     //typedef float Value;   // use float as the value type
     //typedef int SizeT;     // use int as the graph size type
 
-    Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
-    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
+    Csr <VertexId, SizeT, Value> csr(false);  // graph we process on
+    Info<VertexId, SizeT, Value> *info = new Info<VertexId, SizeT, Value>;
 
     // graph construction or generation related parameters
     if (args -> CheckCmdLineFlag("normalized"))
-        info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
+         info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
     else info->info["undirected"] = true;   // require undirected input graph when unnormalized
 
     cpu_timer2.Start();
@@ -1003,7 +935,7 @@ int main_(CommandLineArgs *args)
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
-    RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test
+    RunTests_normalized<VertexId, SizeT, Value>(info);  // run test
 
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
@@ -1019,32 +951,34 @@ int main_(CommandLineArgs *args)
 }
 
 template <
-    typename VertexId,
-    typename Value>   // the value type, usually int or long long
-int main_SizeT(CommandLineArgs *args)
-{
-    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-        return main_<VertexId, Value, long long>(args);
-    else 
-        return main_<VertexId, Value, int      >(args);
-}
-
-template <
-    typename VertexId> // the vertex identifier type, usually int or long long
+    typename VertexId, // the vertex identifier type, usually int or long long
+    typename SizeT>
 int main_Value(CommandLineArgs *args)
 {
     if (args -> CheckCmdLineFlag("64bit-Value"))
-        return main_SizeT<VertexId, double>(args);
+        return main_<VertexId, SizeT, double>(args);
     else 
-        return main_SizeT<VertexId, float >(args);
+        return main_<VertexId, SizeT, float >(args);
+}
+
+
+template <
+    typename VertexId>
+int main_SizeT(CommandLineArgs *args)
+{
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_Value<VertexId, long long>(args);
+    else 
+        return main_Value<VertexId, int      >(args);
 }
 
 int main_VertexId(CommandLineArgs *args)
 {
+    // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
     //if (args -> CheckCmdLineFlag("64bit-VertexId"))
-    //    return main_Value<long long>(args);
+    //    return main_SizeT<long long>(args);
     //else 
-        return main_Value<int      >(args);
+        return main_SizeT<int      >(args);
 }
 
 int main(int argc, char** argv)

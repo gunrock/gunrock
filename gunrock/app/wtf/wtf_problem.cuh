@@ -30,31 +30,32 @@ namespace wtf {
  * @tparam _Value               Type of float or double to use for computing WTF value.
  */
 template <
-    typename    _VertexId,                       
-    typename    _SizeT,                          
-    typename    _Value>
-struct WTFProblem : ProblemBase<_VertexId, _SizeT, _Value,
+    typename VertexId,                       
+    typename SizeT,                          
+    typename Value>
+struct WTFProblem : ProblemBase<VertexId, SizeT, Value,
     true,  // MARK_PREDECESSORS
-    false, // ENABLE_IDEMPOTENCE
-    false, // USE_DOUBLE_BUFFER = false
-    false, // ENABLE_BACKWARD
-    false, // KEEP_ORDER
-    false> // KEEP_NODE_NUM
+    false> // ENABLE_IDEMPOTENCE
+    //false, // USE_DOUBLE_BUFFER = false
+    //false, // ENABLE_BACKWARD
+    //false, // KEEP_ORDER
+    //false> // KEEP_NODE_NUM
 {
-
-    typedef _VertexId 			VertexId;
-	typedef _SizeT			    SizeT;
-	typedef _Value              Value;
-
     static const bool MARK_PREDECESSORS     = true;
     static const bool ENABLE_IDEMPOTENCE    = false;
+    static const int  MAX_NUM_VERTEX_ASSOCIATES = 0;  
+    static const int  MAX_NUM_VALUE__ASSOCIATES = 0;
+    typedef ProblemBase  <VertexId, SizeT, Value, 
+        MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem; 
+    typedef DataSliceBase<VertexId, SizeT, Value,
+        MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
 
     //Helper structures
 
     /**
      * @brief Data slice structure which contains WTF problem specific data.
      */
-    struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
+    struct DataSlice : BaseDataSlice
     {
         // device storage arrays
         util::Array1D<SizeT, Value   > rank_curr;           /**< Used for ping-pong page rank value */
@@ -69,29 +70,207 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, _Value,
         VertexId src_node;
         util::Array1D<SizeT, VertexId> node_ids;
         util::Array1D<SizeT, bool    > cot_map;     /**< Input frontier bitmap */
+
+        DataSlice() : BaseDataSlice()
+        {
+            rank_curr    .SetName("rank_curr"    );
+            rank_next    .SetName("rank_next"    );
+            refscore_curr.SetName("refscore_curr");
+            refscore_next.SetName("refscore_next");
+            out_degrees  .SetName("out_degrees"  );
+            in_degrees   .SetName("in_degrees"   );
+            node_ids     .SetName("node_ids"     );
+            cot_map      .SetName("cot_map"      );
+        }
+
+        ~DataSlice()
+        {
+            if (util::SetDevice(this -> gpu_idx)) return;
+            rank_curr    .Release();
+            rank_next    .Release();
+            refscore_curr.Release();
+            refscore_next.Release();
+            out_degrees  .Release();
+            in_degrees   .Release();
+            //threshold    .Release();
+            //delta        .Release();
+            cot_map      .Release();
+            node_ids     .Release();
+            //src_node     .Release();
+        }
+
+        cudaError_t Init(
+            int   num_gpus,
+            int   gpu_idx,
+            bool  use_double_buffer,
+            Csr<VertexId, SizeT, Value> *graph,
+            SizeT *num_in_nodes,
+            SizeT *num_out_nodes,
+            float queue_sizing = 2.0,
+            float in_sizing = 1.0)
+        {
+            cudaError_t retval = cudaSuccess;
+            if (retval = BaseDataSlice::Init(
+                num_gpus,
+                gpu_idx,
+                use_double_buffer,
+                graph,
+                num_in_nodes,
+                num_out_nodes,
+                in_sizing)) return retval;
+            
+            // Create SoA on device
+            SizeT nodes = graph -> nodes;
+            if (retval = rank_curr    .Allocate(nodes, util::DEVICE)) return retval;
+            if (retval = rank_next    .Allocate(nodes, util::DEVICE)) return retval;
+            if (retval = refscore_curr.Allocate(nodes, util::DEVICE)) return retval;
+            if (retval = refscore_next.Allocate(nodes, util::DEVICE)) return retval;
+            if (retval = out_degrees  .Allocate(nodes, util::DEVICE)) return retval;
+            if (retval = in_degrees   .Allocate(nodes, util::DEVICE)) return retval;
+            if (retval = node_ids     .Allocate(nodes, util::DEVICE)) return retval;
+            if (retval = cot_map      .Allocate(nodes, util::DEVICE)) return retval;
+
+            return retval;
+        }
+
+        /**
+         *  @brief Performs any initialization work needed for primitive.
+         *
+         *  @param[in] frontier_type Frontier type (i.e., edge / vertex / mixed).
+         *  @param[in] queue_sizing Size scaling factor for work queue allocation.
+         *  \return cudaError_t object indicates the success of all CUDA functions.
+         */
+        cudaError_t Reset(
+            VertexId src,
+            Value    delta,
+            Value    alpha,
+            Value    threshold,
+            FrontierType frontier_type,  // type (i.e., edge / vertex / mixed)
+            GraphSlice<VertexId, SizeT, Value>
+                    *graph_slice,
+            double   queue_sizing       = 1.0,
+            bool     use_double_buffer  = false,
+            double   queue_sizing1      = -1.0,
+            bool     skip_scanned_edges = false)
+        {
+            cudaError_t retval = cudaSuccess;
+            if (retval = BaseDataSlice::Reset(
+                frontier_type,
+                graph_slice,
+                queue_sizing,
+                use_double_buffer,
+                queue_sizing1,
+                skip_scanned_edges))
+                return retval;
+
+            SizeT nodes = graph_slice -> nodes;
+            // Allocate output page ranks if necessary
+            if (rank_curr    .GetPointer(util::DEVICE) == NULL)
+                if (retval = rank_curr    .Allocate(nodes, util::DEVICE)) 
+                    return retval;
+
+            if (rank_next    .GetPointer(util::DEVICE) == NULL)
+                if (retval = rank_next    .Allocate(nodes, util::DEVICE)) 
+                    return retval;
+
+            if (refscore_curr.GetPointer(util::DEVICE) == NULL)
+                if (retval = refscore_curr.Allocate(nodes, util::DEVICE)) 
+                    return retval;
+
+            if (refscore_next.GetPointer(util::DEVICE) == NULL)
+                if (retval = refscore_next.Allocate(nodes, util::DEVICE)) 
+                    return retval;
+
+            if (node_ids     .GetPointer(util::DEVICE) == NULL)
+                if (retval = node_ids     .Allocate(nodes, util::DEVICE)) 
+                    return retval;
+
+            if (out_degrees  .GetPointer(util::DEVICE) == NULL)
+                if (retval = out_degrees  .Allocate(nodes, util::DEVICE)) 
+                    return retval;
+
+            // Allocate d_in_degrees if necessary
+            if (in_degrees   .GetPointer(util::DEVICE) == NULL)
+                if (retval = in_degrees   .Allocate(nodes, util::DEVICE)) 
+                    return retval;
+
+            if (cot_map      .GetPointer(util::DEVICE) == NULL)
+                if (retval = cot_map      .Allocate(nodes, util::DEVICE)) 
+                    return retval;
+ 
+            util::MemsetKernel<<<128, 128>>>(
+                rank_next    .GetPointer(util::DEVICE), (Value)0.0      , nodes);
+
+            util::MemsetKernel<<<128, 128>>>(
+                rank_curr    .GetPointer(util::DEVICE), (Value)1.0/nodes, nodes);
+
+            util::MemsetKernel<<<128, 128>>>(
+                refscore_curr.GetPointer(util::DEVICE), (Value)0.0      , nodes);
+
+            util::MemsetKernel<<<128, 128>>>(
+                refscore_next.GetPointer(util::DEVICE), (Value)0.0      , nodes);
+          
+            // Compute degrees
+            util::MemsetKernel<<<128, 128>>>(
+                out_degrees  .GetPointer(util::DEVICE), (SizeT)0        , nodes);
+
+            util::MemsetMadVectorKernel<<<128, 128>>>(
+                out_degrees  .GetPointer(util::DEVICE), 
+                graph_slice -> row_offsets.GetPointer(util::DEVICE), 
+                graph_slice -> row_offsets.GetPointer(util::DEVICE) +1, 
+                (SizeT)-1, nodes);
+
+            util::MemsetKernel<<<128, 128>>>(
+                in_degrees   .GetPointer(util::DEVICE), (SizeT)0        , nodes);
+
+            //util::MemsetMadVectorKernel<<<128, 128>>>(
+            //    in_degrees   .GetPointer(util::DEVICE), 
+            //    graph_slice -> column_offsets.GetPointer(util::DEVICE), 
+            //    graph_slice -> column_offsets.GetPointer(util::DEVICE) +1, -1, nodes);
+ 
+            util::MemsetIdxKernel<<<128, 128>>>(
+                node_ids  .GetPointer(util::DEVICE), nodes);
+
+            util::MemsetKernel<<<128, 128>>>(
+                cot_map   .GetPointer(util::DEVICE), false, nodes);
+
+            // Fillin the initial input_queue for WTF problem, this needs to be modified
+            // in multi-GPU scene
+            // Put every vertex in there
+            util::MemsetIdxKernel<<<128, 128>>>(
+                this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes);
+
+            this->delta     = delta;
+            this->alpha     = alpha;
+            this->threshold = threshold;
+            this->src_node  = src;
+
+            return retval;
+        }
     };
 
     // Members
     
     // Number of GPUs to be sliced over
-    int                 num_gpus;
+    //int                 num_gpus;
 
     // Size of the graph
-    SizeT               nodes;
-    SizeT               edges;
+    //SizeT               nodes;
+    //SizeT               edges;
 
     // Selector, which d_rank array stores the final page rank?
     SizeT               selector;
 
     // Set of data slices (one for each GPU)
-    DataSlice           **data_slices;
+    //DataSlice           **data_slices;
+    util::Array1D<SizeT, DataSlice> *data_slices;
    
     // Nasty method for putting struct on device
     // while keeping the SoA structure
-    DataSlice           **d_data_slices;
+    //DataSlice           **d_data_slices;
 
     // Device indices for each data slice
-    int                 *gpu_idx;
+    //int                 *gpu_idx;
 
     // Methods
 
@@ -99,10 +278,16 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, _Value,
      * @brief WTFProblem default constructor
      */
 
-    WTFProblem():
-    nodes(0),
-    edges(0),
-    num_gpus(0) {}
+    WTFProblem() :
+        BaseProblem(
+            false, // use_double_buffer
+            false, // enable_backward
+            false, // keep_order
+            false), // keep_node_num
+        data_slices(NULL),
+        selector(0)
+    {
+    }
 
     /**
      * @brief WTFProblem constructor
@@ -111,7 +296,7 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, _Value,
      * @param[in] graph Reference to the CSR graph object we process on.
      * @param[in] num_gpus Number of the GPUs used.
      */
-    WTFProblem(bool        stream_from_host,       // Only meaningful for single-GPU
+    /*WTFProblem(bool        stream_from_host,       // Only meaningful for single-GPU
                const Csr<VertexId, Value, SizeT> &graph,
                int         num_gpus) :
         num_gpus(num_gpus)
@@ -120,32 +305,20 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, _Value,
             stream_from_host,
             graph,
             num_gpus);
-    }
+    }*/
 
     /**
      * @brief WTFProblem default destructor
      */
     ~WTFProblem()
     {
-        for (int i = 0; i < num_gpus; ++i)
+        if (data_slices == NULL) return;
+        for (int i = 0; i < this -> num_gpus; ++i)
         {
-            if (util::GRError(cudaSetDevice(gpu_idx[i]),
-                "~WTFProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
-            data_slices[i]->rank_curr    .Release();
-            data_slices[i]->rank_next    .Release();
-            data_slices[i]->refscore_curr.Release();
-            data_slices[i]->refscore_next.Release();
-            data_slices[i]->out_degrees  .Release();
-            data_slices[i]->in_degrees   .Release();
-            //data_slices[i]->threshold    .Release();
-            //data_slices[i]->delta        .Release();
-            data_slices[i]->cot_map      .Release();
-            data_slices[i]->node_ids     .Release();
-            //data_slices[i]->src_node     .Release();
-            if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
+            util::SetDevice(this -> gpu_idx[i]);
+            data_slices[i].Release();
         }
-        if (d_data_slices)  delete[] d_data_slices;
-        if (data_slices) delete[] data_slices;
+        delete[] data_slices; data_slices = NULL;
     }
 
     /**
@@ -165,35 +338,24 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, _Value,
     {
         cudaError_t retval = cudaSuccess;
 
-        do {
-            if (num_gpus == 1) {
+        if (this -> num_gpus == 1) 
+        {
+            int gpu = 0;
+            // Set device
+            if (retval = util::SetDevice( this -> gpu_idx[gpu]))
+                return retval;
 
-                // Set device
-                if (util::GRError(cudaSetDevice(gpu_idx[0]),
-                            "WTFProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
+            data_slices[gpu]->refscore_curr.SetPointer(h_rank);
+            if (retval = data_slices[gpu]->refscore_curr.Move(util::DEVICE, util::HOST)) 
+                return retval;
 
-                data_slices[0]->refscore_curr.SetPointer(h_rank);
-                if (retval = data_slices[0]->refscore_curr.Move(util::DEVICE, util::HOST)) return retval;
+            data_slices[gpu]->node_ids.SetPointer(h_node_id);
+            if (retval = data_slices[gpu]->node_ids.Move(util::DEVICE, util::HOST))
+                return retval;
 
-                data_slices[0]->node_ids.SetPointer(h_node_id);
-                if (retval = data_slices[0]->node_ids.Move(util::DEVICE, util::HOST)) return retval;
-                /*if (retval = util::GRError(cudaMemcpy(
-                                h_rank,
-                                data_slices[0]->d_refscore_curr,
-                                sizeof(Value) * nodes,
-                                cudaMemcpyDeviceToHost),
-                            "WTFProblem cudaMemcpy d_rank_curr failed", __FILE__, __LINE__)) break;
-        
-                if (retval = util::GRError(cudaMemcpy(
-                                h_node_id,
-                                data_slices[0]->d_node_ids,
-                                sizeof(VertexId) * nodes,
-                                cudaMemcpyDeviceToHost),
-                            "WTFProblem cudaMemcpy d_node_id failed", __FILE__, __LINE__)) break;*/
-            } else {
-                // TODO: multi-GPU extract result
-            } //end if (data_slices.size() ==1)
-        } while(0);
+        } else {
+            // TODO: multi-GPU extract result
+        } //end if (data_slices.size() ==1)
 
         return retval;
     }
@@ -209,164 +371,61 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, _Value,
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Init(
-            bool        stream_from_host,       // Only meaningful for single-GPU
-            Csr<VertexId, Value, SizeT> &graph,
-            int         _num_gpus,
-            cudaStream_t* streams = NULL)
+        bool        stream_from_host,       // Only meaningful for single-GPU
+        Csr<VertexId, SizeT, Value> *graph,
+        Csr<VertexId, SizeT, Value> *inv_graph = NULL,
+        int         num_gpus         = 1,
+        int*        gpu_idx          = NULL,
+        std::string partition_method ="random",
+        cudaStream_t* streams        = NULL,
+        float       queue_sizing     = 2.0f,
+        float       in_sizing        = 1.0f,
+        float       partition_factor = -1.0f,
+        int         partition_seed   = -1)
     {
-        num_gpus = _num_gpus;
-        nodes = graph.nodes;
-        edges = graph.edges;
-        //VertexId *h_row_offsets = graph.row_offsets;
-        //VertexId *h_column_indices = graph.column_indices;
-        ProblemBase<VertexId, SizeT, Value, 
-            true, false, false, false, false, false>
-          ::Init(stream_from_host,
-                 &graph,
-                 NULL,
-                 num_gpus,
-                 NULL,
-                 "random");
+        cudaError_t retval = cudaSuccess;
+        if (retval = BaseProblem::Init(
+            stream_from_host,
+            graph,
+            inv_graph,
+            num_gpus,
+            gpu_idx,
+            partition_method,
+            queue_sizing,
+            partition_factor,
+            partition_seed))
+            return retval;
 
         // No data in DataSlice needs to be copied from host
 
         /**
          * Allocate output labels/preds
          */
-        cudaError_t retval = cudaSuccess;
-        data_slices = new DataSlice*[num_gpus];
-        d_data_slices = new DataSlice*[num_gpus];
-        if (streams == NULL) {streams = new cudaStream_t[num_gpus]; streams[0] = 0;}
+        data_slices = new util::Array1D<SizeT,DataSlice>[this->num_gpus];
 
-        do {
-            if (num_gpus <= 1) {
-                gpu_idx = (int*)malloc(sizeof(int));
-                // Create a single data slice for the currently-set gpu
-                int gpu;
-                if (retval = util::GRError(cudaGetDevice(&gpu), "WTFProblem cudaGetDevice failed", __FILE__, __LINE__)) break;
-                gpu_idx[0] = gpu;
+        for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+        {
+            data_slices[gpu].SetName("data_slices[]");
+            if (retval = util::SetDevice(this -> gpu_idx[gpu]))
+                return retval;
+            if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST))
+                return retval;
+            DataSlice *data_slice
+                = data_slices[gpu].GetPointer(util::HOST);
+            GraphSlice<VertexId, SizeT, Value> *graph_slice
+                = this->graph_slices[gpu];
+            data_slice -> streams.SetPointer(streams + gpu * num_gpus * 2, num_gpus * 2);
 
-                data_slices[0] = new DataSlice;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_data_slices[0],
-                                sizeof(DataSlice)),
-                            "WTFProblem cudaMalloc d_data_slices failed", __FILE__, __LINE__)) return retval;
-                data_slices[0][0].streams.SetPointer(streams, 1);
-                data_slices[0]->Init(
-                    1,
-                    gpu_idx[0],
-                    0,
-                    0,
-                    &graph,
-                    NULL,
-                    NULL);
-
-                // Create SoA on device
-                /*Value    *d_rank1;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_rank1,
-                        nodes * sizeof(Value)),
-                    "WTFProblem cudaMalloc d_rank1 failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_rank_curr = d_rank1;*/
-                data_slices[0]->rank_curr.SetName("rank_curr");
-                if (retval = data_slices[0]->rank_curr.Allocate(nodes, util::DEVICE)) return retval;
-
-                /*Value    *d_rank2;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_rank2,
-                        nodes * sizeof(Value)),
-                    "WTFProblem cudaMalloc d_rank2 failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_rank_next = d_rank2;*/
-                data_slices[0]->rank_next.SetName("rank_next");
-                if (retval = data_slices[0]->rank_next.Allocate(nodes, util::DEVICE)) return retval;
-
-                /*Value    *d_rank3;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_rank3,
-                        nodes * sizeof(Value)),
-                    "WTFProblem cudaMalloc d_rank3 failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_refscore_curr = d_rank3;*/
-                data_slices[0]->refscore_curr.SetName("refscore_curr");
-                if (retval = data_slices[0]->refscore_curr.Allocate(nodes, util::DEVICE)) return retval;
-
-                /*Value    *d_rank4;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_rank4,
-                        nodes * sizeof(Value)),
-                    "WTFProblem cudaMalloc d_rank4 failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_refscore_next = d_rank4;*/
-                data_slices[0]->refscore_next.SetName("refscore_next");
-                if (retval = data_slices[0]->refscore_next.Allocate(nodes, util::DEVICE)) return retval;
- 
-                /*SizeT   *d_out_degrees;
-                    if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_out_degrees,
-                        nodes * sizeof(SizeT)),
-                    "WTFProblem cudaMalloc d_out_degrees failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_out_degrees = d_out_degrees;*/
-                data_slices[0]->out_degrees.SetName("out_degrees");
-                if (retval = data_slices[0]->out_degrees.Allocate(nodes, util::DEVICE)) return retval;
-
-                /*SizeT   *d_in_degrees;
-                    if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_in_degrees,
-                        nodes * sizeof(SizeT)),
-                    "WTFProblem cudaMalloc d_in_degrees failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_in_degrees = d_in_degrees;*/
-                data_slices[0]->in_degrees.SetName("in_degrees");
-                if (retval = data_slices[0]->in_degrees.Allocate(nodes, util::DEVICE)) return retval;
-
-                /*Value   *d_threshold;
-                    if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_threshold,
-                        1 * sizeof(Value)),
-                    "WTFProblem cudaMalloc d_threshold failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_threshold = d_threshold;*/
-
-                /*Value    *d_delta;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_delta,
-                        1 * sizeof(Value)),
-                    "WTFProblem cudaMalloc d_delta failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_delta = d_delta;*/
-
-                /*Value    *d_alpha;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_alpha,
-                        1 * sizeof(Value)),
-                    "WTFProblem cudaMalloc d_alpha failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_alpha = d_alpha;*/
-
-                /*VertexId    *d_node_ids;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_node_ids,
-                        nodes * sizeof(VertexId)),
-                    "WTFProblem cudaMalloc d_node_ids failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_node_ids = d_node_ids;*/
-                data_slices[0]->node_ids.SetName("node_ids");
-                if (retval = data_slices[0]->node_ids.Allocate(nodes, util::DEVICE)) return retval;
-
-                /*SizeT    *d_src_node;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_src_node,
-                        1 * sizeof(SizeT)),
-                    "WTFProblem cudaMalloc d_src_node failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_src_node = d_src_node;*/
-
-                /*bool    *d_cot_map;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_cot_map,
-                        nodes * sizeof(bool)),
-                    "DOBFSProblem cudaMalloc d_cot_map failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_cot_map = d_cot_map;*/
-                data_slices[0]->cot_map.SetName("cot_map");
-                if (retval = data_slices[0]->cot_map.Allocate(nodes, util::DEVICE)) return retval;
-
-                //data_slices[0]->d_labels = NULL;
-
-            }
-            //TODO: add multi-GPU allocation code
-        } while (0);
+            if (retval = data_slice->Init(
+                this -> num_gpus,
+                this -> gpu_idx[gpu],
+                this -> use_double_buffer,
+              &(this -> sub_graphs[gpu]),
+                this -> num_gpus > 1? graph_slice -> in_counter     .GetPointer(util::HOST) : NULL,
+                this -> num_gpus > 1? graph_slice -> out_counter    .GetPointer(util::HOST) : NULL,
+                in_sizing))
+                return retval;
+        }
 
         return retval;
     }
@@ -384,218 +443,35 @@ struct WTFProblem : ProblemBase<_VertexId, _SizeT, _Value,
      *  \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Reset(
-            VertexId src,
-            Value    delta,
-            Value    alpha,
-            Value    threshold,
-            FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
-            double  queue_sizing=1.0)
+        VertexId src,
+        Value    delta,
+        Value    alpha,
+        Value    threshold,
+        FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
+        double   queue_sizing  = 1.0,
+        double   queue_sizing1 = -1.0)
     {
-        //typedef ProblemBase<VertexId, SizeT, false> BaseProblem;
-        //load ProblemBase Reset
-        //BaseProblem::Reset(frontier_type, queue_sizing); // Default queue sizing is 1.0
-
         cudaError_t retval = cudaSuccess;
 
-        for (int gpu = 0; gpu < num_gpus; ++gpu) {
+        for (int gpu = 0; gpu < this -> num_gpus; ++gpu) 
+        {
             // Set device
-            if (retval = util::GRError(cudaSetDevice(gpu_idx[gpu]),
-              "BSFProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
-
-            data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, queue_sizing);
-
-            // Allocate output page ranks if necessary
-            /*if (!data_slices[gpu]->d_rank_curr) {
-                Value    *d_rank1;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_rank1,
-                                nodes * sizeof(Value)),
-                            "WTFProblem cudaMalloc d_rank1 failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_rank_curr = d_rank1;
-            }*/
-            if (data_slices[gpu]->rank_curr.GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->rank_curr.Allocate(nodes, util::DEVICE)) return retval;
-
-            /*if (!data_slices[gpu]->d_rank_next) {
-                Value    *d_rank2;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_rank2,
-                                nodes * sizeof(Value)),
-                            "WTFProblem cudaMalloc d_rank2 failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_rank_next = d_rank2;
-            }*/
-            if (data_slices[gpu]->rank_next.GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->rank_next.Allocate(nodes, util::DEVICE)) return retval;
-
-            /*if (!data_slices[gpu]->d_refscore_curr) {
-                Value    *d_rank3;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_rank3,
-                                nodes * sizeof(Value)),
-                            "WTFProblem cudaMalloc d_rank3 failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_refscore_curr = d_rank3;
-            }*/
-            if (data_slices[gpu]->refscore_curr.GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->refscore_curr.Allocate(nodes, util::DEVICE)) return retval;
-
-            /*if (!data_slices[gpu]->d_refscore_next) {
-                Value    *d_rank4;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_rank4,
-                                nodes * sizeof(Value)),
-                            "WTFProblem cudaMalloc d_rank4 failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_refscore_next = d_rank4;
-            }*/
-            if (data_slices[gpu]->refscore_next.GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->refscore_next.Allocate(nodes, util::DEVICE)) return retval;
-
-            /*if (!data_slices[gpu]->d_delta) {
-                Value    *d_delta;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_delta,
-                                1 * sizeof(Value)),
-                            "WTFProblem cudaMalloc d_delta failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_delta = d_delta;
-            }
-
-            if (!data_slices[gpu]->d_alpha) {
-                Value    *d_alpha;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_alpha,
-                                1 * sizeof(Value)),
-                            "WTFProblem cudaMalloc d_alpha failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_alpha = d_alpha;
-            }*/
-
-            /*if (!data_slices[gpu]->d_node_ids) {
-                VertexId    *d_node_ids;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_node_ids,
-                                nodes * sizeof(VertexId)),
-                            "WTFProblem cudaMalloc d_node_ids failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_node_ids = d_node_ids;
-            }*/
-            if (data_slices[gpu]->node_ids.GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->node_ids.Allocate(nodes, util::DEVICE)) return retval;
-
-            /*if (!data_slices[gpu]->d_threshold) {
-                Value    *d_threshold;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_threshold,
-                                1 * sizeof(Value)),
-                            "WTFProblem cudaMalloc d_threshold failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_threshold = d_threshold;
-            }
-
-            if (!data_slices[gpu]->d_src_node) {
-                SizeT    *d_src_node;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_src_node,
-                                1 * sizeof(SizeT)),
-                            "WTFProblem cudaMalloc d_src_node failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_src_node = d_src_node;
-            }*/
-
-            // Allocate d_out_degrees if necessary
-            /*if (!data_slices[gpu]->d_out_degrees) {
-                VertexId    *d_out_degrees;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_out_degrees,
-                                nodes * sizeof(VertexId)),
-                            "WTFProblem cudaMalloc d_out_degrees failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_out_degrees = d_out_degrees;
-            }*/
-            if (data_slices[gpu]->out_degrees.GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->out_degrees.Allocate(nodes, util::DEVICE)) return retval;
-
-            // Allocate d_in_degrees if necessary
-            /*if (!data_slices[gpu]->d_in_degrees) {
-                SizeT    *d_in_degrees;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_in_degrees,
-                                nodes * sizeof(SizeT)),
-                            "WTFProblem cudaMalloc d_in_degrees failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_in_degrees = d_in_degrees;
-            }*/
-            if (data_slices[gpu]->in_degrees.GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->in_degrees.Allocate(nodes, util::DEVICE)) return retval;
-
-            /*if (!data_slices[gpu]->d_cot_map) {
-                bool    *d_cot_map;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_cot_map,
-                        nodes * sizeof(bool)),
-                    "DOBFSProblem cudaMalloc d_cot_map failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_cot_map = d_cot_map;
-            }*/
-            if (data_slices[gpu]->cot_map.GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->cot_map.Allocate(nodes, util::DEVICE)) return retval;
-
-            //data_slices[gpu]->d_labels = NULL;
-
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->rank_next    .GetPointer(util::DEVICE), (Value)0.0      , nodes);
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->rank_curr    .GetPointer(util::DEVICE), (Value)1.0/nodes, nodes);
-
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->refscore_curr.GetPointer(util::DEVICE), (Value)0.0      , nodes);
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->refscore_next.GetPointer(util::DEVICE), (Value)0.0      , nodes);
-            
-            // Compute degrees
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->out_degrees  .GetPointer(util::DEVICE), (SizeT)0        , nodes);
-            util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->out_degrees.GetPointer(util::DEVICE), this->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE), this->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE) +1, -1, nodes);
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->in_degrees   .GetPointer(util::DEVICE), (SizeT)0        , nodes);
-            //util::MemsetMadVectorKernel<<<128, 128>>>(data_slices[gpu]->d_in_degrees, BaseProblem::graph_slices[0]->d_column_offsets, &BaseProblem::graph_slices[0]->d_column_offsets[1], -1, nodes);
- 
-            util::MemsetIdxKernel<<<128, 128>>>(data_slices[gpu]->node_ids  .GetPointer(util::DEVICE), nodes);
-
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->cot_map.GetPointer(util::DEVICE), false, nodes);
-
-            /*if (retval = util::GRError(cudaMemcpy(
-                            data_slices[gpu]->d_delta,
-                            (Value*)&delta,
-                            sizeof(Value),
-                            cudaMemcpyHostToDevice),
-                        "WTFProblem cudaMemcpy d_delta failed", __FILE__, __LINE__)) return retval;*/
-            data_slices[gpu]->delta = delta;
-
-            /*if (retval = util::GRError(cudaMemcpy(
-                            data_slices[gpu]->d_alpha,
-                            (Value*)&alpha,
-                            sizeof(Value),
-                            cudaMemcpyHostToDevice),
-                        "WTFProblem cudaMemcpy d_alpha failed", __FILE__, __LINE__)) return retval;*/
-            data_slices[gpu]->alpha = alpha;
-
-            /*if (retval = util::GRError(cudaMemcpy(
-                            data_slices[gpu]->d_threshold,
-                            (Value*)&threshold,
-                            sizeof(Value),
-                            cudaMemcpyHostToDevice),
-                        "WTFProblem cudaMemcpy d_threshold failed", __FILE__, __LINE__)) return retval;*/
-            data_slices[gpu]->threshold = threshold;
-
-            /*if (retval = util::GRError(cudaMemcpy(
-                            data_slices[gpu]->d_src_node,
-                            (VertexId*)&src,
-                            sizeof(VertexId),
-                            cudaMemcpyHostToDevice),
-                        "WTFProblem cudaMemcpy d_src_node failed", __FILE__, __LINE__)) return retval;*/
-            data_slices[gpu]->src_node = src;
-
-            if (retval = util::GRError(cudaMemcpy(
-                            d_data_slices[gpu],
-                            data_slices[gpu],
-                            sizeof(DataSlice),
-                            cudaMemcpyHostToDevice),
-                        "WTFProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
-
+            if (retval = util::SetDevice(this->gpu_idx[gpu]))
+                return retval;
+            if (retval = data_slices[gpu]->Reset(
+                src,
+                delta,
+                alpha,
+                threshold,
+                frontier_type,
+                this->graph_slices[gpu],
+                queue_sizing,
+                queue_sizing1))
+                return retval;
+            if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) 
+                return retval;
         }
         
-        // Fillin the initial input_queue for WTF problem, this needs to be modified
-        // in multi-GPU scene
-
-        // Put every vertex in there
-        util::MemsetIdxKernel<<<128, 128>>>(data_slices[0]->frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes);
-
         return retval;
     }
 

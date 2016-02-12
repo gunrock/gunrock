@@ -47,7 +47,7 @@ struct PartitionerBase
     typedef _VertexId  VertexId;
     typedef _SizeT     SizeT;
     typedef _Value     Value;
-    typedef Csr<VertexId,Value,SizeT> GraphT;
+    typedef Csr<VertexId,SizeT,Value> GraphT;
 
     // Members
 public:

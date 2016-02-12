@@ -34,17 +34,24 @@ template <
     typename SizeT,
     typename Value,
     bool _MARK_PREDECESSORS,
-    bool _ENABLE_IDEMPOTENCE,
-    bool _USE_DOUBLE_BUFFER >
+    bool _ENABLE_IDEMPOTENCE>
+    //bool _USE_DOUBLE_BUFFER >
 struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
     _MARK_PREDECESSORS,
-    _ENABLE_IDEMPOTENCE,
-    _USE_DOUBLE_BUFFER,
-    false,   // _ENABLE_BACKWARD
-    false,   // _KEEP_ORDER
-    false> { // _KEEP_NODE_NUM
+    _ENABLE_IDEMPOTENCE>
+    //_USE_DOUBLE_BUFFER,
+    //false,   // _ENABLE_BACKWARD
+    //false,   // _KEEP_ORDER
+    //false>   // _KEEP_NODE_NUM
+{
     static const bool MARK_PREDECESSORS  =  _MARK_PREDECESSORS;
     static const bool ENABLE_IDEMPOTENCE = _ENABLE_IDEMPOTENCE;
+    static const int  MAX_NUM_VERTEX_ASSOCIATES = 0; 
+    static const int  MAX_NUM_VALUE__ASSOCIATES = 0;
+    typedef ProblemBase  <VertexId, SizeT, Value, 
+        MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem; 
+    typedef DataSliceBase<VertexId, SizeT, Value,
+        MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
 
     /**
      * @brief Data slice structure which contains problem specific data.
@@ -53,29 +60,126 @@ struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
      * @tparam SizeT    Type of int / uint to use for array indexing.
      * @tparam Value    Type of float or double to use for attributes.
      */
-    struct DataSlice : DataSliceBase<SizeT, VertexId, Value> {
+    struct DataSlice : BaseDataSlice
+    {
         // device storage arrays
-
+        util::Array1D<SizeT, VertexId> sample_array;
         // TODO(developer): other primitive-specific device arrays here
+
+        DataSlice() : BaseDataSlice()
+        {
+            sample_array.SetName("sample_array");
+            //TODO(developer): primitive-specific array construtor code here
+        }
+
+        ~DataSlice()
+        {
+            if (util::SetDevice(this -> gpu_idx)) return;
+            sample_array.Release();
+            //TODO(developer): primitive-specific array clean-up code here
+        }
+
+        cudaError_t Init(
+            int   num_gpus,
+            int   gpu_idx,
+            bool  use_double_buffer,
+            Csr<VertexId, SizeT, Value> *graph,
+            SizeT *num_in_nodes,
+            SizeT *num_out_nodes,
+            float queue_sizing = 2.0,
+            float in_sizing = 1.0)
+        {
+            cudaError_t retval = cudaSuccess;
+            if (retval = BaseDataSlice::Init(
+                num_gpus,
+                gpu_idx,
+                use_double_buffer,
+                graph,
+                num_in_nodes,
+                num_out_nodes,
+                in_sizing)) return retval;
+
+            // Create SoA on device
+            if (retval = this -> labels.Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = sample_array  .Allocate(graph->nodes, util::DEVICE)) return retval;
+            //TODO(developer): primitive-specific array allocation code here
+
+            return retval;
+        }
+
+        /**  
+         * @brief Performs reset work needed for DataSliceBase. Must be called prior to each search
+         *
+         * @param[in] frontier_type      The frontier type (i.e., edge/vertex/mixed)
+         * @param[in] graph_slice        Pointer to the corresponding graph slice
+         * @param[in] queue_sizing       Sizing scaling factor for work queue allocation. 1.0 by default. Reserved for future use.
+         * @param[in] _USE_DOUBLE_BUFFER Whether to use double buffer
+         * @param[in] queue_sizing1      Scaling factor for frontier_queue1
+         *
+         * \return cudaError_t object which indicates the success of all CUDA function calls.
+         */
+        cudaError_t Reset(
+            FrontierType 
+                    frontier_type,
+            GraphSlice<VertexId, SizeT, Value>
+                   *graph_slice,
+            double  queue_sizing       = 2.0, 
+            bool    use_double_buffer  = false,
+            double  queue_sizing1      = -1.0,
+            bool    skip_scanned_edges = false)
+        {
+            cudaError_t retval = cudaSuccess;
+            if (retval = BaseDataSlice::Reset(
+                frontier_type,
+                graph_slice,
+                queue_sizing,
+                use_double_buffer,
+                queue_sizing1,
+                skip_scanned_edges))
+                return retval;
+
+            if (sample_array.GetPointer(util::DEVICE) == NULL)
+                if (retval = sample_array.Allocate(graph_slice -> nodes, util::DEVICE))
+                    return retval;
+            util::MemsetIdxKernel<<<128, 128>>>(
+                sample_array.GetPointer(util::DEVICE), graph_slice -> nodes);
+
+            util::MemsetKernel <<< 128, 128>>>(
+                this->labels.GetPointer(util::DEVICE),
+                ENABLE_IDEMPOTENCE ? (VertexId)-1 : (util::MaxValue<VertexId>() - 1), 
+                graph_slice -> nodes);
+
+            //TODO(developer): primitive-specific array reset code here
+            return retval;
+        }
     };
 
-    int       num_gpus;
-    SizeT     nodes;
-    SizeT     edges;
+    //int       num_gpus;
+    //SizeT     nodes;
+    //SizeT     edges;
 
     // data slices (one for each GPU)
-    DataSlice **data_slices;
+    //DataSlice **data_slices;
+    util::Array1D<SizeT, DataSlice> *data_slices;
 
     // putting structure on device while keeping the SoA structure
-    DataSlice **d_data_slices;
+    //DataSlice **d_data_slices;
 
     // device index for each data slice
-    int       *gpu_idx;
+    //int       *gpu_idx;
 
     /**
      * @brief Default constructor
      */
-    SampleProblem(): nodes(0), edges(0), num_gpus(0) {}
+    SampleProblem(bool use_double_buffer) :
+        BaseProblem(
+            use_double_buffer,
+            false, // enable_backward
+            false, // keep_order
+            false), // keep_node_num
+        data_slices(NULL)
+    {
+    }
 
     /**
      * @brief Constructor
@@ -84,33 +188,26 @@ struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[in] graph Reference to the CSR graph object we process on.
      * @param[in] num_gpus Number of the GPUs used.
      */
-    SampleProblem(bool  stream_from_host,  // only meaningful for single-GPU
-                  const Csr<VertexId, Value, SizeT> &graph,
-                  int   num_gpus) :
-        num_gpus(num_gpus) {
-        Init(stream_from_host, graph, num_gpus);
-    }
+    //SampleProblem(bool  stream_from_host,  // only meaningful for single-GPU
+    //              const Csr<VertexId, Value, SizeT> &graph,
+    //              int   num_gpus) :
+    //    num_gpus(num_gpus) 
+    //{
+    //    Init(stream_from_host, graph, num_gpus);
+    //}
 
     /**
      * @brief Default destructor
      */
-    ~SampleProblem() {
-        for (int i = 0; i < num_gpus; ++i) {
-            if (util::GRError(
-                        cudaSetDevice(gpu_idx[i]),
-                        "~Problem cudaSetDevice failed",
-                        __FILE__, __LINE__)) break;
-
-            // TODO: code to clean up primitive-specific device arrays here
-
-            if (d_data_slices[i]) {
-                util::GRError(cudaFree(d_data_slices[i]),
-                              "GpuSlice cudaFree data_slices failed",
-                              __FILE__, __LINE__);
-            }
+    ~SampleProblem() 
+    {
+        if (data_slices == NULL) return;
+        for (int i = 0; i < this -> num_gpus; ++i) 
+        {
+            util::SetDevice(this -> gpu_idx[i]);
+            data_slices[i].Release();
         }
-        if (d_data_slices) delete[] d_data_slices;
-        if (data_slices) delete[] data_slices;
+        delete[] data_slices; data_slices = NULL;
     }
 
     /**
@@ -124,30 +221,25 @@ struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[out] h_labels
      *\return cudaError_t object indicates the success of all CUDA functions.
      */
-    cudaError_t Extract(VertexId *h_labels) {
+    cudaError_t Extract(VertexId *h_labels)
+    {
         cudaError_t retval = cudaSuccess;
 
-        do {
-            if (num_gpus == 1) {
-                if (util::GRError(cudaSetDevice(gpu_idx[0]),
-                                  "Problem cudaSetDevice failed",
-                                  __FILE__, __LINE__)) break;
+        if (this -> num_gpus == 1) 
+        {
+            int gpu = 0;
+            if (retval = util::SetDevice(this -> gpu_idx[gpu]))
+                return retval;
 
-                if (retval = util::GRError(
-                                 cudaMemcpy(
-                                     h_labels,
-                                     data_slices[0]->labels.GetPointer(util::DEVICE),
-                                     sizeof(VertexId) * nodes,
-                                     cudaMemcpyDeviceToHost),
-                                 "Problem cudaMemcpy d_labels failed",
-                                 __FILE__, __LINE__)) break;
+            data_slices[gpu] -> labels.SetPointer(h_labels);
+            if (retval = data_slices[gpu] -> labels.Move(util::DEVICE, util::HOST))
+                return retval;
 
-                // TODO(developer): code to extract other results here
+            // TODO(developer): code to extract other results here
 
-            } else {
-                // multi-GPU extension code
-            }
-        } while (0);
+        } else {
+            // multi-GPU extension code
+        }
 
         return retval;
     }
@@ -163,79 +255,58 @@ struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
      * \return cudaError_t object indicates the success of all CUDA functions.
      */
     cudaError_t Init(
-        bool                         stream_from_host,
-        Csr<VertexId, Value, SizeT>& graph,
-        int                          _num_gpus,
-        cudaStream_t*                streams = NULL) {
-        num_gpus = _num_gpus;
-        nodes    = graph.nodes;
-        edges    = graph.edges;
-
-        ProblemBase <
-        VertexId, SizeT, Value,
-                  _MARK_PREDECESSORS,
-                  _ENABLE_IDEMPOTENCE,
-                  _USE_DOUBLE_BUFFER,
-                  false, // _ENABLE_BACKWARD
-                  false, // _KEEP_ORDER
-                  false >::Init(stream_from_host,
-                                &graph,
-                                NULL,
-                                num_gpus,
-                                NULL,
-                                "random");
+        bool        stream_from_host,       // Only meaningful for single-GPU
+        Csr<VertexId, SizeT, Value> *graph,
+        Csr<VertexId, SizeT, Value> *inversegraph = NULL,
+        int         num_gpus         = 1,
+        int*        gpu_idx          = NULL,
+        std::string partition_method ="random",
+        cudaStream_t* streams        = NULL,
+        float       queue_sizing     = 2.0f,
+        float       in_sizing        = 1.0f,
+        float       partition_factor = -1.0f,
+        int         partition_seed   = -1) 
+    {   
+        cudaError_t retval = cudaSuccess;
+        if (retval = BaseProblem::Init(
+            stream_from_host,
+            graph,
+            inversegraph,
+            num_gpus,
+            gpu_idx,
+            partition_method,
+            queue_sizing,
+            partition_factor,
+            partition_seed))
+            return retval;
 
         // no data in DataSlice needs to be copied from host
 
-        //
-        // Allocate output labels.
-        //
-        cudaError_t retval = cudaSuccess;
-        data_slices   = new DataSlice * [num_gpus];
-        d_data_slices = new DataSlice * [num_gpus];
-        if (streams == NULL) {
-            streams = new cudaStream_t[num_gpus];
-            streams[0] = 0;
+        data_slices = new util::Array1D<SizeT,DataSlice>[this->num_gpus];
+
+        for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+        {
+            data_slices[gpu].SetName("data_slices[]");
+            if (retval = util::SetDevice(this -> gpu_idx[gpu]))
+                return retval;
+            if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST))
+                return retval;
+            DataSlice *data_slice 
+                = data_slices[gpu].GetPointer(util::HOST);
+            GraphSlice<VertexId, SizeT, Value> *graph_slice 
+                = this->graph_slices[gpu];
+            data_slice -> streams.SetPointer(streams + gpu * num_gpus * 2, num_gpus * 2);
+
+            if (retval = data_slice->Init(
+                this -> num_gpus,
+                this -> gpu_idx[gpu],
+                this -> use_double_buffer,
+              &(this -> sub_graphs[gpu]),
+                this -> num_gpus > 1? graph_slice -> in_counter     .GetPointer(util::HOST) : NULL,
+                this -> num_gpus > 1? graph_slice -> out_counter    .GetPointer(util::HOST) : NULL,
+                in_sizing))
+                return retval;
         }
-
-        do {
-            if (num_gpus <= 1) {
-                gpu_idx = (int*)malloc(sizeof(int));
-
-                // create a single data slice for the currently-set GPU
-                int gpu;
-                if (retval = util::GRError(
-                                 cudaGetDevice(&gpu),
-                                 "Problem cudaGetDevice failed",
-                                 __FILE__, __LINE__)) break;
-                gpu_idx[0] = gpu;
-
-                data_slices[0] = new DataSlice;
-                if (retval = util::GRError(
-                                 cudaMalloc((void**)&d_data_slices[0],
-                                            sizeof(DataSlice)),
-                                 "Problem cudaMalloc d_data_slices failed",
-                                 __FILE__, __LINE__)) return retval;
-
-                data_slices[0][0].streams.SetPointer(streams, 1);
-                data_slices[0]->Init(
-                    1,           // Number of GPUs
-                    gpu_idx[0],  // GPU indices
-                    0,           // Number of vertex associate
-                    0,           // Number of value associate
-                    &graph,      // Pointer to CSR graph
-                    NULL,        // Number of in vertices
-                    NULL);       // Number of out vertices
-
-                // create SoA on device
-                if (retval = data_slices[0]->labels.Allocate(nodes, util::DEVICE)) {
-                    return retval;
-                }
-
-                // TODO(developer): code to initialize other device arrays here
-            }
-            // add multi-GPU allocation code
-        } while (0);
 
         return retval;
     }
@@ -249,44 +320,29 @@ struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
      */
     cudaError_t Reset(
         FrontierType frontier_type,  // type (i.e., edge / vertex / mixed)
-        double queue_sizing) {
+        double queue_sizing,
+        double queue_sizing1 = -1.0) 
+    {
         // size scaling factor for work queue allocation (e.g., 1.0 creates
         // n-element and m-element vertex and edge frontiers, respectively).
         // 0.0 is unspecified.
 
         cudaError_t retval = cudaSuccess;
 
-        for (int gpu = 0; gpu < num_gpus; ++gpu) {
-            // setting device
-            if (retval = util::GRError(
-                             cudaSetDevice(gpu_idx[gpu]),
-                             "Problem cudaSetDevice failed",
-                             __FILE__, __LINE__)) return retval;
+        if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
-            data_slices[gpu]->Reset(
-                frontier_type, this->graph_slices[gpu],
-                queue_sizing, queue_sizing);
-
-            // allocate output labels if necessary
-            if (data_slices[gpu]->labels.GetPointer(util::DEVICE) == NULL) {
-                if (retval = data_slices[gpu]->labels.Allocate(nodes, util::DEVICE)) {
-                    return retval;
-                }
-            }
-
-            util::MemsetKernel <<< 128, 128>>>(
-                data_slices[gpu]->labels.GetPointer(util::DEVICE),
-                _ENABLE_IDEMPOTENCE ? -1 : (util::MaxValue<Value>() - 1), nodes);
-
-            // TODO(developer): code to for other allocations here
-
-            if (retval = util::GRError(
-                             cudaMemcpy(d_data_slices[gpu],
-                                        data_slices[gpu],
-                                        sizeof(DataSlice),
-                                        cudaMemcpyHostToDevice),
-                             "Problem cudaMemcpy data_slices to d_data_slices failed",
-                             __FILE__, __LINE__)) return retval;
+        for (int gpu = 0; gpu < this->num_gpus; ++gpu) 
+        {
+            // Set device
+            if (retval = util::SetDevice(this->gpu_idx[gpu])) 
+                return retval;
+            if (retval = data_slices[gpu]->Reset(
+                frontier_type, 
+                this->graph_slices[gpu], 
+                queue_sizing, 
+                queue_sizing1)) 
+                return retval;
+            if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;
         }
 
         // TODO(developer): fill in the initial input_queue if necessary

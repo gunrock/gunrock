@@ -16,9 +16,46 @@
 
 #include <gunrock/util/cuda_properties.cuh>
 
+// atomic addition from Jon Cohen at NVIDIA
+__device__ static double atomicAdd(double *addr, double val)
+{
+    double old=*addr, assumed;
+    do {
+        assumed = old;
+        old = __longlong_as_double(
+        atomicCAS((unsigned long long int*)addr,
+               __double_as_longlong(assumed),
+               __double_as_longlong(val + assumed)));
+    } while( assumed!=old );
+    return old; 
+}
+
+__device__ static long long atomicCAS(long long *addr, long long comp, long long val)
+{
+    return (long long)atomicCAS(
+        (unsigned long long*)addr, 
+        (unsigned long long )comp, 
+        (unsigned long long ) val);
+}
+
+// TODO: verify overflow condition
+__device__ static long long atomicAdd(long long *addr, long long val)
+{
+    return (long long)atomicAdd(
+        (unsigned long long*)addr,
+        (unsigned long long )val);
+}
+
+// TODO: only works if both *addr and val are non-negetive
+//__device__ static long long atomicMin(long long *addr, long long val)
+//{
+//    return (long long)atomicMin(
+//        (unsigned long long*)addr,
+//        (unsigned long long )val);
+//}
+
 namespace gunrock {
 namespace util {
-
 
 /**
  * Terminates the calling thread

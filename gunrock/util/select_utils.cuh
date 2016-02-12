@@ -44,16 +44,16 @@ struct GreaterThan
  */
 template <typename T, typename SizeT>
 cudaError_t CUBSelect(
-    T            *d_input,
-    SizeT         num_elements,
+    T     *d_input,
+    SizeT  num_elements,
     T     *d_output,
-    unsigned int *num_selected)
+    SizeT *num_selected)
 {
     cudaError_t retval = cudaSuccess;
-    unsigned int *d_num_selected = NULL;
+    SizeT *d_num_selected = NULL;
 
     if (util::GRError(
-            (retval = cudaMalloc((void**)&d_num_selected, sizeof(unsigned int))),
+            (retval = cudaMalloc((void**)&d_num_selected, sizeof(SizeT))),
             "CUBSelect d_num_selected malloc failed",
             __FILE__, __LINE__)) return retval;
 
@@ -97,7 +97,7 @@ cudaError_t CUBSelect(
             (retval = cudaMemcpy(
                 num_selected,
                 d_num_selected,
-                sizeof(unsigned int),
+                sizeof(SizeT),
                 cudaMemcpyDeviceToHost)),
             "CUBSelect copy back num_selected failed",
             __FILE__, __LINE__)) return retval;

@@ -175,12 +175,12 @@ void DisplaySolution(
  */
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
+    typename Value,
     bool MARK_PREDECESSORS,
     bool ENABLE_IDEMPOTENCE >
 void ReferenceBFS(
-    const Csr<VertexId, Value, SizeT> *graph,
+    const Csr<VertexId, SizeT, Value> *graph,
     VertexId                          *source_path,
     VertexId                          *predecessor,
     VertexId                          src,
@@ -268,45 +268,48 @@ void ReferenceBFS(
  */
 template <
     typename    VertexId,
-    typename    Value,
     typename    SizeT,
-    bool        INSTRUMENT,
-    bool        DEBUG,
-    bool        SIZE_CHECK,
+    typename    Value,
+    //bool        INSTRUMENT,
+    //bool        DEBUG,
+    //bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS,
     bool        ENABLE_IDEMPOTENCE >
-void RunTests(Info<VertexId, Value, SizeT> *info)
+void RunTests(Info<VertexId, SizeT, Value> *info)
 {
     typedef BFSProblem < VertexId,
             SizeT,
             Value,
             MARK_PREDECESSORS,
-            ENABLE_IDEMPOTENCE,
-            (MARK_PREDECESSORS && ENABLE_IDEMPOTENCE) >
-            BfsProblem;  // does not use double buffer
+            ENABLE_IDEMPOTENCE>
+            //(MARK_PREDECESSORS && ENABLE_IDEMPOTENCE) >
+            Problem;  // does not use double buffer
 
-    typedef BFSEnactor < BfsProblem,
-            INSTRUMENT,
-            DEBUG,
-            SIZE_CHECK >
-            BfsEnactor;
+    typedef BFSEnactor < Problem>
+            //INSTRUMENT,
+            //DEBUG,
+            //SIZE_CHECK >
+            Enactor;
 
     // parse configurations from mObject info
-    Csr<VertexId, Value, SizeT> *graph = info->csr_ptr;
-    VertexId src                 = info->info["source_vertex"].get_int64();
-    int max_grid_size            = info->info["max_grid_size"].get_int();
-    int num_gpus                 = info->info["num_gpus"].get_int();
-    double max_queue_sizing      = info->info["max_queue_sizing"].get_real();
-    double max_queue_sizing1     = info->info["max_queue_sizing1"].get_real();
-    double max_in_sizing         = info->info["max_in_sizing"].get_real();
-    std::string partition_method = info->info["partition_method"].get_str();
-    double partition_factor      = info->info["partition_factor"].get_real();
-    int partition_seed           = info->info["partition_seed"].get_int();
-    bool quiet_mode              = info->info["quiet_mode"].get_bool();
-    bool quick_mode              = info->info["quick_mode"].get_bool();
-    bool stream_from_host        = info->info["stream_from_host"].get_bool();
-    int traversal_mode           = info->info["traversal_mode"].get_int();
-    int iterations               = 1; //disable since doesn't support mgpu stop condition. info->info["num_iteration"].get_int();
+    Csr<VertexId, SizeT, Value> *graph = info->csr_ptr;
+    VertexId src                   = info->info["source_vertex"     ].get_int64();
+    int      max_grid_size         = info->info["max_grid_size"     ].get_int  ();
+    int      num_gpus              = info->info["num_gpus"          ].get_int  ();
+    double   max_queue_sizing      = info->info["max_queue_sizing"  ].get_real ();
+    double   max_queue_sizing1     = info->info["max_queue_sizing1" ].get_real ();
+    double   max_in_sizing         = info->info["max_in_sizing"     ].get_real ();
+    std::string partition_method   = info->info["partition_method"  ].get_str  ();
+    double   partition_factor      = info->info["partition_factor"  ].get_real ();
+    int      partition_seed        = info->info["partition_seed"    ].get_int  ();
+    bool     quiet_mode            = info->info["quiet_mode"        ].get_bool ();
+    bool     quick_mode            = info->info["quick_mode"        ].get_bool ();
+    bool     stream_from_host      = info->info["stream_from_host"  ].get_bool ();
+    int      traversal_mode        = info->info["traversal_mode"    ].get_int  ();
+    bool     instrument            = info->info["instrument"        ].get_bool ();
+    bool     debug                 = info->info["debug_mode"        ].get_bool ();
+    bool     size_check            = info->info["size_check"        ].get_bool ();
+    int      iterations            = 1; //disable since doesn't support mgpu stop condition. info->info["num_iteration"].get_int();
     CpuTimer cpu_timer;
 
     cpu_timer.Start();
@@ -343,40 +346,43 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
 
-    BfsEnactor* enactor = new BfsEnactor(num_gpus, gpu_idx);  // enactor map
-    BfsProblem* problem = new BfsProblem;  // allocate problem on GPU
-
+    Problem* problem = new Problem;  // allocate problem on GPU
     util::GRError(problem->Init(
-                      stream_from_host,
-                      graph,
-                      NULL,
-                      num_gpus,
-                      gpu_idx,
-                      partition_method,
-                      streams,
-                      max_queue_sizing,
-                      max_in_sizing,
-                      partition_factor,
-                      partition_seed),
-                  "BFS Problem Init failed", __FILE__, __LINE__);
+        stream_from_host,
+        graph,
+        NULL,
+        num_gpus,
+        gpu_idx,
+        partition_method,
+        streams,
+        max_queue_sizing,
+        max_in_sizing,
+        partition_factor,
+        partition_seed),
+        "BFS Problem Init failed", __FILE__, __LINE__);
 
+    Enactor* enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
     util::GRError(enactor->Init(
-                      context, problem, max_grid_size, SIZE_CHECK, traversal_mode),
-                  "BFS Enactor Init failed", __FILE__, __LINE__);
+        context, problem, max_grid_size, traversal_mode),
+        "BFS Enactor Init failed", __FILE__, __LINE__);
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
     // compute reference CPU BFS solution for source-distance
-    if (reference_check_label != NULL)
+    if (!quick_mode)
     {
         if (!quiet_mode)
         {
             printf("Computing reference value ...\n");
         }
-        ReferenceBFS<VertexId, Value, SizeT,
-                     MARK_PREDECESSORS, ENABLE_IDEMPOTENCE>(
-                         graph, reference_check_label,
-                         reference_check_preds, src, quiet_mode);
+        ReferenceBFS<VertexId, SizeT, Value,
+            MARK_PREDECESSORS, ENABLE_IDEMPOTENCE>(
+            graph, 
+            reference_check_label,
+            reference_check_preds, 
+            src, 
+            quiet_mode);
         if (!quiet_mode)
         {
             printf("\n");
@@ -389,14 +395,12 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     for (int iter = 0; iter < iterations; ++iter)
     {
         util::GRError(problem->Reset(
-                          src, enactor->GetFrontierType(),
-                          max_queue_sizing, max_queue_sizing1),
-                      "BFS Problem Data Reset Failed", __FILE__, __LINE__);
+            src, enactor->GetFrontierType(),
+            max_queue_sizing, max_queue_sizing1),
+            "BFS Problem Data Reset Failed", __FILE__, __LINE__);
 
         util::GRError(enactor->Reset(),
-                      "BFS Enactor Reset failed", __FILE__, __LINE__);
-
-        util::GRError("Error before Enact", __FILE__, __LINE__);
+            "BFS Enactor Reset failed", __FILE__, __LINE__);
 
         if (!quiet_mode)
         {
@@ -504,11 +508,11 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
                     v_[gpu][problem->original_vertexes[gpu][v]] = v;
             }
         }
-        util::Track_Results(graph, num_gpus, 1, h_labels, reference_check_label, 
+        util::Track_Results(graph, num_gpus, (VertexId)1, h_labels, reference_check_label, 
             num_gpus > 1 ? problem->partition_tables[0] : NULL, v_);
         char file_name[512];
         sprintf(file_name, "./eval/error_dump/error_%lld_%d.txt", (long long)time(NULL), gpu_idx[0]);
-        util::Output_Errors(file_name, graph -> nodes, num_gpus, 0, h_labels, reference_check_label,
+        util::Output_Errors(file_name, graph -> nodes, num_gpus, (VertexId)0, h_labels, reference_check_label,
             num_gpus > 1 ? problem->partition_tables[0] : NULL, v_);
         if (num_gpus > 1)
         {
@@ -655,19 +659,19 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
  */
 template <
     typename    VertexId,
-    typename    Value,
     typename    SizeT,
-    bool        INSTRUMENT,
-    bool        DEBUG,
-    bool        SIZE_CHECK,
+    typename    Value,
+    //bool        INSTRUMENT,
+    //bool        DEBUG,
+    //bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS >
-void RunTests_enable_idempotence(Info<VertexId, Value, SizeT> *info)
+void RunTests_enable_idempotence(Info<VertexId, SizeT, Value> *info)
 {
     if (info->info["idempotent"].get_bool())
-        RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
+        RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
                  MARK_PREDECESSORS, true > (info);
     else
-        RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
+        RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
                  MARK_PREDECESSORS, false> (info);
 }
 
@@ -685,90 +689,19 @@ void RunTests_enable_idempotence(Info<VertexId, Value, SizeT> *info)
  */
 template <
     typename    VertexId,
-    typename    Value,
     typename    SizeT,
-    bool        INSTRUMENT,
-    bool        DEBUG,
-    bool        SIZE_CHECK >
-void RunTests_mark_predecessors(Info<VertexId, Value, SizeT> *info)
+    typename    Value>
+    //bool        INSTRUMENT,
+    //bool        DEBUG,
+    //bool        SIZE_CHECK >
+void RunTests_mark_predecessors(Info<VertexId, SizeT, Value> *info)
 {
     if (info->info["mark_predecessors"].get_bool())
-        RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
-                                    DEBUG, SIZE_CHECK,  true> (info);
+        RunTests_enable_idempotence<VertexId, SizeT, Value, /*INSTRUMENT,
+                                    DEBUG, SIZE_CHECK,*/  true> (info);
     else
-        RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
-                                    DEBUG, SIZE_CHECK, false> (info);
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT,
-    bool          INSTRUMENT,
-    bool          DEBUG >
-void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["size_check"].get_bool())
-        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
-                                   DEBUG,  true>(info);
-    else
-        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
-                                   DEBUG, false>(info);
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT,
-    bool        INSTRUMENT >
-void RunTests_debug(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["debug_mode"].get_bool())
-        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,  true>(info);
-    else
-        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT, false>(info);
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT >
-void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["instrument"].get_bool())
-        RunTests_debug<VertexId, Value, SizeT, true>(info);
-    else
-        RunTests_debug<VertexId, Value, SizeT, false>(info);
+        RunTests_enable_idempotence<VertexId, SizeT, Value,/* INSTRUMENT,
+                                    DEBUG, SIZE_CHECK,*/ false> (info);
 }
 
 /******************************************************************************
@@ -776,9 +709,9 @@ void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
 ******************************************************************************/
 
 template <
-    typename VertexId,
-    typename Value,
-    typename SizeT>
+    typename VertexId,  // use int as the vertex identifier
+    typename SizeT   ,  // use int as the graph size type
+    typename Value   >  // use int as the value type
 int main_(CommandLineArgs *args)
 {
     CpuTimer cpu_timer, cpu_timer2;
@@ -787,8 +720,8 @@ int main_(CommandLineArgs *args)
     //typedef int Value;     // Use int as the value type
     //typedef long long SizeT;     // Use int as the graph size type
 
-    Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
-    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
+    Csr<VertexId, SizeT, Value> csr(false);  // graph we process on
+    Info<VertexId, SizeT, Value> *info = new Info<VertexId, SizeT, Value>;
 
     // graph construction or generation related parameters
     info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
@@ -798,7 +731,7 @@ int main_(CommandLineArgs *args)
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
-    RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test
+    RunTests_mark_predecessors<VertexId, SizeT, Value>(info);  // run test
 
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
@@ -813,32 +746,33 @@ int main_(CommandLineArgs *args)
 }
 
 template <
-    typename VertexId,
-    typename Value>   // the value type, usually int or long long
-int main_SizeT(CommandLineArgs *args)
+    typename VertexId, // the vertex identifier type, usually int or long long
+    typename SizeT   > // the size tyep, usually int or long long
+int main_Value(CommandLineArgs *args)
 {
-    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-         return main_<VertexId, Value, long long>(args);
-    else
-        return main_<VertexId, Value, int      >(args);
+    if (args -> CheckCmdLineFlag("64bit-Value"))
+        return main_<VertexId, SizeT, long long>(args);
+    else 
+        return main_<VertexId, SizeT, int      >(args);
 }
 
 template <
-    typename VertexId> // the vertex identifier type, usually int or long long
-int main_Value(CommandLineArgs *args)
+    typename VertexId> 
+int main_SizeT(CommandLineArgs *args)
 {
-    //if (args -> CheckCmdLineFlag("64bit-Value"))
-    //    return main_SizeT<VertexId, long long>(args);
-    //else 
-        return main_SizeT<VertexId, int      >(args);
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_Value<VertexId, long long>(args);
+    else
+        return main_Value<VertexId, int      >(args);
 }
 
 int main_VertexId(CommandLineArgs *args)
 {
-    //if (args -> CheckCmdLineFlag("64bit-VertexId"))
-    //    return main_Value<long long>(args);
-    //else 
-        return main_Value<int      >(args);
+// disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
+//    if (args -> CheckCmdLineFlag("64bit-VertexId"))
+//        return main_SizeT<long long>(args);
+//    else 
+        return main_SizeT<int      >(args);
 }
 
 int main(int argc, char** argv)
