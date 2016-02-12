@@ -37,22 +37,30 @@ template <
     typename    SizeT,
     typename    Value,
     bool        _MARK_PREDECESSORS,
-    bool        _ENABLE_IDEMPOTENCE,
-    bool        _USE_DOUBLE_BUFFER>
+    bool        _ENABLE_IDEMPOTENCE>//,
+    //bool        _USE_DOUBLE_BUFFER>
 struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
     _MARK_PREDECESSORS,
-    _ENABLE_IDEMPOTENCE,
-    _USE_DOUBLE_BUFFER,
-    false, // _ENABLE_BACKWARD
-    false, // _KEEP_ORDER
-    false> // _KEEP_NODE_NUM
+    _ENABLE_IDEMPOTENCE>
+    //_USE_DOUBLE_BUFFER,
+    //false, // _ENABLE_BACKWARD
+    //false, // _KEEP_ORDER
+    //false> // _KEEP_NODE_NUM
 {
     //Helper structures
-
+    static const bool MARK_PREDECESSORS  = _MARK_PREDECESSORS;
+    static const bool ENABLE_IDEMPOTENCE = _ENABLE_IDEMPOTENCE;
+    static const int  MAX_NUM_VERTEX_ASSOCIATES = 
+        (MARK_PREDECESSORS/* && !_ENABLE_IDEMPOTENCE*/) ? 2 : 1;
+    static const int  MAX_NUM_VALUE__ASSOCIATES = 0;
+    typedef ProblemBase  <VertexId, SizeT, Value, 
+        MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem; 
+    typedef DataSliceBase<VertexId, SizeT, Value,
+        MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
     /**
      * @brief Data slice structure which contains BFS problem specific data.
      */
-    struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
+    struct DataSlice : BaseDataSlice
     {
         util::Array1D<SizeT, unsigned char > visited_mask  ;
         util::Array1D<SizeT, unsigned int  > temp_marker   ;
@@ -61,7 +69,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         /*
          * @brief Default constructor
          */
-        DataSlice()
+        DataSlice() : BaseDataSlice()
         {
             visited_mask    .SetName("visited_mask"    );
             temp_marker     .SetName("temp_marker"     );
@@ -98,9 +106,10 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         cudaError_t Init(
             int   num_gpus,
             int   gpu_idx,
-            int   num_vertex_associate,
-            int   num_value__associate,
-            Csr<VertexId, Value, SizeT> *graph,
+            bool  use_double_buffer,
+            //int   num_vertex_associate,
+            //int   num_value__associate,
+            Csr<VertexId, SizeT, Value> *graph,
             SizeT *num_in_nodes,
             SizeT *num_out_nodes,
             VertexId *original_vertex,
@@ -108,11 +117,12 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             float in_sizing = 1.0)
         {
             cudaError_t retval = cudaSuccess;
-            if (retval = DataSliceBase<SizeT, VertexId, Value>::Init(
+            if (retval = BaseDataSlice::Init(
                 num_gpus,
                 gpu_idx,
-                num_vertex_associate,
-                num_value__associate,
+                use_double_buffer,
+                //num_vertex_associate,
+                //num_value__associate,
                 graph,
                 num_in_nodes,
                 num_out_nodes,
@@ -121,23 +131,25 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             // Create SoA on device
             if (retval = this->labels       .Allocate(graph->nodes,util::DEVICE)) return retval;
 
-            if (_MARK_PREDECESSORS)
+            if (MARK_PREDECESSORS)
             {
                 if (retval = this->preds     .Allocate(graph->nodes,util::DEVICE)) return retval;
                 if (retval = this->temp_preds.Allocate(graph->nodes,util::DEVICE)) return retval;
             }
 
-            if (_ENABLE_IDEMPOTENCE)
+            if (ENABLE_IDEMPOTENCE)
             {
-                if (retval = visited_mask.Allocate((graph->nodes +7)/8, util::DEVICE)) return retval;
+                if (retval = visited_mask.Allocate((graph->nodes +7)/8, util::DEVICE)) 
+                    return retval;
             }
 
             if (num_gpus > 1)
             {
                 this->vertex_associate_orgs[0] = this->labels.GetPointer(util::DEVICE);
-                if (_MARK_PREDECESSORS)
+                if (MARK_PREDECESSORS)
                     this->vertex_associate_orgs[1] = this->preds.GetPointer(util::DEVICE);
-                if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
+                if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) 
+                    return retval;
                 if (retval = temp_marker. Allocate(graph->nodes, util::DEVICE)) return retval;
             }
             return retval;
@@ -155,7 +167,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
          */
         cudaError_t Reset(
             FrontierType frontier_type,
-            GraphSlice<SizeT, VertexId, Value>  *graph_slice,
+            GraphSlice<VertexId, SizeT, Value>  *graph_slice,
             double queue_sizing = 2.0,
             double queue_sizing1 = -1.0)
         {
@@ -180,7 +192,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             for (int i=0; i < 2; i++)
             {
                 double queue_sizing_ = (i==0 ? queue_sizing : queue_sizing1);
-                switch (frontier_type) {
+                switch (frontier_type) 
+                {
                 case VERTEX_FRONTIERS :
                     // O(n) ping-pong global vertex frontiers
                     new_frontier_elements[0] = ((this->num_gpus > 1) ? 
@@ -216,7 +229,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                             return retval;
 
                         // Free if previously allocated
-                        if (_USE_DOUBLE_BUFFER) {
+                        if (this -> use_double_buffer) {
                             if (retval = this->frontier_queues[peer].values[i].Release()) 
                                 return retval;
                         }
@@ -226,7 +239,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                         if (retval = this->frontier_queues[peer].keys[i].Allocate(
                             new_frontier_elements[i],util::DEVICE)) 
                             return retval;
-                        if (_USE_DOUBLE_BUFFER) 
+                        if (this -> use_double_buffer) 
                         {
                             if (retval = this->frontier_queues[peer].values[i].Allocate(
                                 new_frontier_elements[i],util::DEVICE)) 
@@ -261,15 +274,16 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = this->labels.Allocate(nodes, util::DEVICE)) 
                     return retval;
             util::MemsetKernel<<<128, 128>>>(this->labels.GetPointer(util::DEVICE), 
-                _ENABLE_IDEMPOTENCE?-1:(util::MaxValue<Value>()-1), nodes);
+                ENABLE_IDEMPOTENCE ? (VertexId)-1 : (util::MaxValue<VertexId>()-1), nodes);
 
             // Allocate preds if necessary
-            if (_MARK_PREDECESSORS)// && !_ENABLE_IDEMPOTENCE)
+            if (MARK_PREDECESSORS)// && !_ENABLE_IDEMPOTENCE)
             {
                 if (this->preds.GetPointer(util::DEVICE)==NULL)
                     if (retval = this->preds.Allocate(nodes, util::DEVICE)) 
                         return retval;
-                util::MemsetKernel<<<128,128>>>(this->preds.GetPointer(util::DEVICE), -2, nodes);
+                util::MemsetKernel<<<128,128>>>(
+                    this->preds.GetPointer(util::DEVICE), (VertexId)-2, nodes);
             }
             original_vertex.SetPointer(
                 graph_slice -> original_vertex.GetPointer(util::DEVICE),
@@ -293,7 +307,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = this -> org_thread_idx.Allocate(max_queue_length, util::DEVICE))
                     return retval;
             }
-            if (_ENABLE_IDEMPOTENCE) {
+            if (ENABLE_IDEMPOTENCE) {
                 SizeT visited_mask_bytes  = ((nodes * sizeof(unsigned char))+7)/8;
                 SizeT visited_mask_elements = visited_mask_bytes * sizeof(unsigned char);
                 util::MemsetKernel<<<128, 128>>>(this->visited_mask.GetPointer(util::DEVICE), 
@@ -312,7 +326,11 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
     /**
      * @brief BFSProblem default constructor
      */
-    BFSProblem()
+    BFSProblem() : BaseProblem(
+        MARK_PREDECESSORS && ENABLE_IDEMPOTENCE, // use_double_buffer
+        false,                                   // enable_backward
+        false,                                   // keep_order
+        false)                                   // keep_node_num
     {
         data_slices = NULL;
     }
@@ -348,64 +366,62 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
     {
         cudaError_t retval = cudaSuccess;
 
-        do {
-            if (this->num_gpus == 1) {
+        if (this->num_gpus == 1) 
+        {
+            // Set device
+            if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
 
-                // Set device
-                if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
+            data_slices[0]->labels.SetPointer(h_labels);
+            if (retval = data_slices[0]->labels.Move(util::DEVICE,util::HOST)) return retval;
 
-                data_slices[0]->labels.SetPointer(h_labels);
-                if (retval = data_slices[0]->labels.Move(util::DEVICE,util::HOST)) return retval;
+            if (_MARK_PREDECESSORS) {
+                data_slices[0]->preds.SetPointer(h_preds);
+                if (retval = data_slices[0]->preds.Move(util::DEVICE,util::HOST)) return retval;
+            }
 
+        } else {
+            VertexId **th_labels = new VertexId*[this->num_gpus];
+            VertexId **th_preds  = new VertexId*[this->num_gpus];
+            for (int gpu=0; gpu < this->num_gpus; gpu++)
+            {
+                if (retval = util::SetDevice(this->gpu_idx[gpu])) 
+                    return retval;
+                if (retval = data_slices[gpu]->labels.Move(util::DEVICE,util::HOST)) 
+                    return retval;
+                th_labels[gpu]=data_slices[gpu]->labels.GetPointer(util::HOST);
                 if (_MARK_PREDECESSORS) {
-                    data_slices[0]->preds.SetPointer(h_preds);
-                    if (retval = data_slices[0]->preds.Move(util::DEVICE,util::HOST)) return retval;
-                }
-
-            } else {
-                VertexId **th_labels = new VertexId*[this->num_gpus];
-                VertexId **th_preds  = new VertexId*[this->num_gpus];
-                for (int gpu=0; gpu < this->num_gpus; gpu++)
-                {
-                    if (retval = util::SetDevice(this->gpu_idx[gpu])) 
+                    if (retval = data_slices[gpu]->preds.Move(util::DEVICE,util::HOST)) 
                         return retval;
-                    if (retval = data_slices[gpu]->labels.Move(util::DEVICE,util::HOST)) 
-                        return retval;
-                    th_labels[gpu]=data_slices[gpu]->labels.GetPointer(util::HOST);
-                    if (_MARK_PREDECESSORS) {
-                        if (retval = data_slices[gpu]->preds.Move(util::DEVICE,util::HOST)) 
-                            return retval;
-                        th_preds[gpu]=data_slices[gpu]->preds.GetPointer(util::HOST);
-                    }
-                } //end for(gpu)
-
-                for (VertexId v=0; v < this->nodes; v++)
-                {
-                    int      gpu = this ->  partition_tables[0][v];
-                    VertexId v_  = this -> convertion_tables[0][v];
-                    if (gpu >= 0 && gpu <  this->num_gpus &&
-                        v_ >= 0 && v_ <  data_slices[gpu]->labels.GetSize())
-                    {
-                        h_labels[v] = th_labels[gpu][v_];
-                        if (_MARK_PREDECESSORS)
-                            h_preds[v] = th_preds[gpu][v_];
-                    }
-                    else {
-                        printf("OutOfBound: node = %d, partition = %d, convertion = %d\n",
-                            v, gpu, v_);
-                        fflush(stdout);
-                    }
+                    th_preds[gpu]=data_slices[gpu]->preds.GetPointer(util::HOST);
                 }
+            } //end for(gpu)
 
-                for (int gpu=0;gpu<this->num_gpus;gpu++)
+            for (VertexId v=0; v < this->nodes; v++)
+            {
+                int      gpu = this ->  partition_tables[0][v];
+                VertexId v_  = this -> convertion_tables[0][v];
+                if (gpu >= 0 && gpu <  this->num_gpus &&
+                    v_ >= 0 && v_ <  data_slices[gpu]->labels.GetSize())
                 {
-                    if (retval = data_slices[gpu]->labels.Release(util::HOST)) return retval;
-                    if (retval = data_slices[gpu]->preds.Release(util::HOST)) return retval;
+                    h_labels[v] = th_labels[gpu][v_];
+                    if (MARK_PREDECESSORS)
+                        h_preds[v] = th_preds[gpu][v_];
                 }
-                delete[] th_labels;th_labels=NULL;
-                delete[] th_preds ;th_preds =NULL;
-            } //end if (data_slices.size() ==1)
-        } while(0);
+                else {
+                    printf("OutOfBound: node = %d, partition = %d, convertion = %d\n",
+                        v, gpu, v_);
+                    fflush(stdout);
+                }
+            }
+
+            for (int gpu=0;gpu<this->num_gpus;gpu++)
+            {
+                if (retval = data_slices[gpu]->labels.Release(util::HOST)) return retval;
+                if (retval = data_slices[gpu]->preds.Release(util::HOST)) return retval;
+            }
+            delete[] th_labels;th_labels=NULL;
+            delete[] th_preds ;th_preds =NULL;
+        } //end if (data_slices.size() ==1)
 
         return retval;
     }
@@ -428,19 +444,19 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Init(
-            bool        stream_from_host,       // Only meaningful for single-GPU
-            Csr<VertexId, Value, SizeT> *graph,
-            Csr<VertexId, Value, SizeT> *inversegraph = NULL,
-            int         num_gpus         = 1,
-            int*        gpu_idx          = NULL,
-            std::string partition_method ="random",
-            cudaStream_t* streams        = NULL,
-            float       queue_sizing     = 2.0f,
-            float       in_sizing        = 1.0f,
-            float       partition_factor = -1.0f,
-            int         partition_seed   = -1)
+        bool        stream_from_host,       // Only meaningful for single-GPU
+        Csr<VertexId, SizeT, Value> *graph,
+        Csr<VertexId, SizeT, Value> *inversegraph = NULL,
+        int         num_gpus         = 1,
+        int*        gpu_idx          = NULL,
+        std::string partition_method ="random",
+        cudaStream_t* streams        = NULL,
+        float       queue_sizing     = 2.0f,
+        float       in_sizing        = 1.0f,
+        float       partition_factor = -1.0f,
+        int         partition_seed   = -1)
     {
-        ProblemBase<VertexId, SizeT,Value, _MARK_PREDECESSORS, _ENABLE_IDEMPOTENCE, _USE_DOUBLE_BUFFER, false, false, false>::Init(
+        BaseProblem::Init(
             stream_from_host,
             graph,
             inversegraph,
@@ -456,27 +472,31 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         cudaError_t retval = cudaSuccess;
         data_slices = new util::Array1D<SizeT,DataSlice>[this->num_gpus];
 
-        do {
-            for (int gpu=0;gpu<this->num_gpus;gpu++)
-            {
-                data_slices[gpu].SetName("data_slices[]");
-                if (retval = util::GRError(cudaSetDevice(this->gpu_idx[gpu]), "BFSProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
-                if (retval = data_slices[gpu].Allocate(1,util::DEVICE | util::HOST)) return retval;
-                DataSlice* _data_slice = data_slices[gpu].GetPointer(util::HOST);
-                _data_slice->streams.SetPointer(&streams[gpu*num_gpus*2],num_gpus*2);
-                if (retval = _data_slice->Init(
-                        this->num_gpus,
-                        this->gpu_idx[gpu],
-                        this->num_gpus > 1? ((_MARK_PREDECESSORS/* && !_ENABLE_IDEMPOTENCE*/)? 2 : 1) : 0,
-                        0,
-                        &(this->sub_graphs[gpu]),
-                        this->num_gpus > 1? this->graph_slices[gpu]->in_counter.GetPointer(util::HOST) : NULL,
-                        this->num_gpus > 1? this->graph_slices[gpu]->out_counter.GetPointer(util::HOST): NULL,
-                        this->num_gpus > 1? this->graph_slices[gpu]->original_vertex.GetPointer(util::HOST) : NULL,
-                        queue_sizing,
-                        in_sizing)) return retval;
-            } //end for(gpu)
-        } while (0);
+        for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+        {
+            data_slices[gpu].SetName("data_slices[]");
+            if (retval = util::SetDevice(this -> gpu_idx[gpu]))
+                return retval;
+            if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST)) 
+                return retval;
+            DataSlice *data_slice 
+                = data_slices[gpu].GetPointer(util::HOST);
+            GraphSlice<VertexId, SizeT, Value> *graph_slice 
+                = this->graph_slices[gpu];
+            data_slice -> streams.SetPointer(streams + gpu * num_gpus * 2, num_gpus * 2);
+
+            if (retval = data_slice->Init(
+                this -> num_gpus,
+                this -> gpu_idx[gpu],
+                this -> use_double_buffer,
+              &(this -> sub_graphs[gpu]),
+                this -> num_gpus > 1? graph_slice -> in_counter     .GetPointer(util::HOST) : NULL,
+                this -> num_gpus > 1? graph_slice -> out_counter    .GetPointer(util::HOST) : NULL,
+                this -> num_gpus > 1? graph_slice -> original_vertex.GetPointer(util::HOST) : NULL,
+                queue_sizing,
+                in_sizing)) 
+                return retval;
+        } //end for(gpu)
 
         return retval;
     }
@@ -504,9 +524,16 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
 
         for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             // Set device
-            if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-            if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, queue_sizing1)) return retval;
-            if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;
+            if (retval = util::SetDevice(this->gpu_idx[gpu])) 
+                return retval;
+            if (retval = data_slices[gpu]->Reset(
+                frontier_type, 
+                this->graph_slices[gpu], 
+                queue_sizing, 
+                queue_sizing1)) 
+                return retval;
+            if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE))
+                return retval;
         }
 
         // Fillin the initial input_queue for BFS problem
@@ -520,28 +547,34 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             tsrc= this->convertion_tables[0][src];
         }
         if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
+
         if (retval = util::GRError(cudaMemcpy(
-                        data_slices[gpu]->frontier_queues[0].keys[0].GetPointer(util::DEVICE),
-                        &tsrc,
-                        sizeof(VertexId),
-                        cudaMemcpyHostToDevice),
-                     "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
+            data_slices[gpu]->frontier_queues[0].keys[0].GetPointer(util::DEVICE),
+            &tsrc,
+            sizeof(VertexId),
+            cudaMemcpyHostToDevice),
+            "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) 
+            return retval;
+
         VertexId src_label = 0;
         if (retval = util::GRError(cudaMemcpy(
-                        data_slices[gpu]->labels.GetPointer(util::DEVICE)+tsrc,
-                        &src_label,
-                        sizeof(VertexId),
-                        cudaMemcpyHostToDevice),
-                    "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
+            data_slices[gpu]->labels.GetPointer(util::DEVICE) + tsrc,
+            &src_label,
+            sizeof(VertexId),
+            cudaMemcpyHostToDevice),
+            "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) 
+            return retval;
 
-       if (_MARK_PREDECESSORS && !_ENABLE_IDEMPOTENCE) {
+       if (MARK_PREDECESSORS && !ENABLE_IDEMPOTENCE) 
+        {
             VertexId src_pred = -1;
             if (retval = util::GRError(cudaMemcpy(
-                            data_slices[gpu]->preds.GetPointer(util::DEVICE)+tsrc,//data_slices[gpu]->d_preds+tsrc,
-                            &src_pred,
-                            sizeof(VertexId),
-                            cudaMemcpyHostToDevice),
-                        "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
+                data_slices[gpu]->preds.GetPointer(util::DEVICE) + tsrc,
+                &src_pred,
+                sizeof(VertexId),
+                cudaMemcpyHostToDevice),
+                "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) 
+                return retval;
        }
 
        return retval;

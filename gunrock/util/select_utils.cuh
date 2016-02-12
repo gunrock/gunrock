@@ -109,10 +109,10 @@ cudaError_t CUBSelect(
     unsigned int  *num_selected)
 {
     cudaError_t retval = cudaSuccess;
-    unsigned int *d_num_selected = NULL;
+    SizeT *d_num_selected = NULL;
 
     if (util::GRError(
-            (retval = cudaMalloc((void**)&d_num_selected, sizeof(unsigned int))),
+            (retval = cudaMalloc((void**)&d_num_selected, sizeof(SizeT))),
             "CUBSelect d_num_selected malloc failed",
             __FILE__, __LINE__)) return retval;
 
@@ -156,7 +156,7 @@ cudaError_t CUBSelect(
             (retval = cudaMemcpy(
                 num_selected,
                 d_num_selected,
-                sizeof(unsigned int),
+                sizeof(SizeT),
                 cudaMemcpyDeviceToHost)),
             "CUBSelect copy back num_selected failed",
             __FILE__, __LINE__)) return retval;

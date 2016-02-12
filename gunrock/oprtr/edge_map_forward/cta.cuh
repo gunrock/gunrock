@@ -99,7 +99,7 @@ struct Cta
 
     // Input and output device pointers
     VertexId                *d_in;                      // Incoming frontier
-    VertexId                *d_pred_out;                 // Incoming predecessor frontier
+    Value                   *d_value_out;               
     VertexId                *d_out;                     // Outgoing frontier
     SizeT                   *d_row_offsets;
     VertexId                *d_column_indices;
@@ -349,14 +349,14 @@ struct Cta
                     //    cta->smem_storage.state.coarse_enqueue_offset,
                     //    coop_rank, cta->problem, cta->queue_index);
                 }
-                if (//ProblemData::ENABLE_IDEMPOTENCE && 
-                    //ProblemData::MARK_PREDECESSORS && 
-                    cta->d_pred_out != NULL) 
+                /*if (ProblemData::ENABLE_IDEMPOTENCE && 
+                    ProblemData::MARK_PREDECESSORS && 
+                    cta->d_value_out != NULL) 
                 {
                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                         pred_id,
-                        cta->d_pred_out + output_offset);
-                }
+                        cta->d_value_out + output_offset);
+                }*/
                 if (cta->d_value_to_reduce != NULL)
                 {
                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -749,7 +749,7 @@ struct Cta
         int                         label,
         SmemStorage                 &smem_storage,
         VertexId                    *d_in_queue,
-        VertexId                    *d_pred_out,
+        Value                       *d_value_out,
         VertexId                    *d_out_queue,
         SizeT                       *d_row_offsets,
         VertexId                    *d_column_indices,
@@ -776,7 +776,7 @@ struct Cta
                 smem_storage.state.fine_warpscan),
             TileTuple(0,0)),
         d_in(d_in_queue),
-        d_pred_out(d_pred_out),
+        d_value_out(d_value_out),
         d_out(d_out_queue),
         d_row_offsets(d_row_offsets),
         d_column_indices(d_column_indices),
@@ -993,11 +993,11 @@ struct Cta
                         tile.progress + scratch_offset, problem, queue_index);
                 }
 
-                if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && d_pred_out != NULL) {
+                /*if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && d_value_out != NULL) {
                     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                             predecessor_id,
-                            d_pred_out + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
-                }
+                            d_value_out + smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset);
+                }*/
             }
 
             tile.progress += SmemStorage::GATHER_ELEMENTS;

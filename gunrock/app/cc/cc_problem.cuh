@@ -34,22 +34,31 @@ namespace cc {
 template <
     typename    VertexId,
     typename    SizeT,
-    typename    Value,
-    bool        _USE_DOUBLE_BUFFER>
+    typename    Value>
+    //bool        _USE_DOUBLE_BUFFER>
 struct CCProblem : ProblemBase<VertexId, SizeT, Value,
     false, // _MARK_PREDECESSORS
-    false, // _ENABLE_IDEMPOTENCE,
-    _USE_DOUBLE_BUFFER,
-    false, // _EnABLE_BACKWARD
-    false, // _KEEP_ORDER
-    true>  // _KEEP_NODE_NUM
+    false> // _ENABLE_IDEMPOTENCE,
+    //_USE_DOUBLE_BUFFER,
+    //false, // _EnABLE_BACKWARD
+    //false, // _KEEP_ORDER
+    //true>  // _KEEP_NODE_NUM
 {
+    static const bool MARK_PREDECESSORS     = false;
+    static const bool ENABLE_IDEMPOTENCE    = false;
+    static const int  MAX_NUM_VERTEX_ASSOCIATES = 1;
+    static const int  MAX_NUM_VALUE__ASSOCIATES = 0;
+    typedef ProblemBase   <VertexId, SizeT, Value,
+        MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem;
+    typedef DataSliceBase <VertexId, SizeT, Value,
+        MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
+
     //Helper structures
 
     /**
      * @brief Data slice structure which contains CC problem specific data.
      */
-    struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
+    struct DataSlice : BaseDataSlice
     {
         // device storage arrays
         util::Array1D<SizeT, VertexId> component_ids; /**< Used for component id */
@@ -124,9 +133,10 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
         cudaError_t Init(
             int   num_gpus,
             int   gpu_idx,
-            int   num_vertex_associate,
-            int   num_value__associate,
-            Csr<VertexId, Value, SizeT> *graph,
+            bool  use_double_buffer,
+            //int   num_vertex_associate,
+            //int   num_value__associate,
+            Csr<VertexId, SizeT, Value> *graph,
             SizeT *num_in_nodes,
             SizeT *num_out_nodes,
             VertexId *original_vertex,
@@ -140,25 +150,34 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             if (num_gpus>1) for (int gpu=0; gpu<num_gpus; gpu++)
             {
                 num_in_nodes [gpu] = nodes;
-                num_out_nodes[gpu] = gpu==1?nodes:0;
+                num_out_nodes[gpu] = gpu==1 ? nodes : 0;
             }
 
-            if (retval = DataSliceBase<SizeT, VertexId, Value>::Init(
+            if (retval = BaseDataSlice::Init(
                 num_gpus,
                 gpu_idx,
-                num_vertex_associate,
-                num_value__associate,
+                use_double_buffer,
+                //num_vertex_associate,
+                //num_value__associate,
                 graph,
                 num_in_nodes,
                 num_out_nodes,
                 in_sizing)) return retval;
+
             for (int peer_ = 2; peer_ < num_gpus; peer_++)
             {
-                this->keys_out [peer_].SetPointer(this->keys_out[1].GetPointer(util::DEVICE), this->keys_out[1].GetSize(), util::DEVICE);
-                this->keys_outs[peer_] = this->keys_out[1].GetPointer(util::DEVICE);
-                this->vertex_associate_out[peer_][0].SetPointer(this->vertex_associate_out[1][0].GetPointer(util::DEVICE), this->vertex_associate_out[1][0].GetSize(), util::DEVICE);
-                this->vertex_associate_outs[peer_][0] = this->vertex_associate_out[1][0].GetPointer(util::DEVICE);
-                if (retval = this->vertex_associate_outs[peer_].Move(util::HOST, util::DEVICE)) return retval;
+                this -> keys_out [peer_].SetPointer(
+                    this -> keys_out[1].GetPointer(util::DEVICE), 
+                    this -> keys_out[1].GetSize(), util::DEVICE);
+                this -> keys_outs[peer_] = 
+                    this -> keys_out[1].GetPointer(util::DEVICE);
+                this -> vertex_associate_out[peer_][0].SetPointer(
+                    this -> vertex_associate_out[1][0].GetPointer(util::DEVICE), 
+                    this -> vertex_associate_out[1][0].GetSize(), util::DEVICE);
+                this -> vertex_associate_outs[peer_][0] = 
+                    this -> vertex_associate_out[1][0].GetPointer(util::DEVICE);
+                if (retval = this->vertex_associate_outs[peer_].
+                    Move(util::HOST, util::DEVICE)) return retval;
             }
 
             //printf("@ gpu %d: nodes = %d, edges = %d\n", gpu_idx, nodes, edges);
@@ -167,19 +186,26 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = tos   .Allocate(edges, util::DEVICE)) return retval;
             if (retval = tos   .SetPointer(graph->column_indices)) return retval;
             // Construct coo from/to edge list from row_offsets and column_indices
-            for (int node=0; node<graph->nodes; node++)
+            for (VertexId node=0; node < graph->nodes; node++)
             {
+                SizeT start_edge = graph->row_offsets[node  ];
+                SizeT end_edge   = graph->row_offsets[node+1];
                 if (TO_TRACK)
                 if (util::to_track(node))
-                    printf("node %d @ gpu %d : %d -> %d\n", node, gpu_idx, graph->row_offsets[node], graph->row_offsets[node+1]);
-                int start_edge = graph->row_offsets[node], end_edge = graph->row_offsets[node+1];
-                for (int edge = start_edge; edge < end_edge; ++edge)
+                    printf("node %lld @ gpu %d : %lld -> %lld\n", 
+                        (long long) node, gpu_idx, 
+                        (long long) start_edge, 
+                        (long long) end_edge);
+                for (SizeT edge = start_edge; edge < end_edge; ++edge)
                 {
                     froms[edge] = node;
                     //tos  [edge] = graph->column_indices[edge];
                     if (TO_TRACK)
                     if (util::to_track(node) || util::to_track(tos[edge]))
-                        printf("edge %d @ gpu %d : %d -> %d\n", edge, gpu_idx, froms[edge], tos[edge]);
+                        printf("edge %lld @ gpu %d : %lld -> %lld\n", 
+                            (long long)edge, gpu_idx, 
+                            (long long)froms[edge], 
+                            (long long) tos[edge]);
                 }
             }
             if (retval = froms.Move(util::HOST, util::DEVICE)) return retval;
@@ -211,7 +237,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
     };
 
     // Members
-    unsigned int        num_components;
+    SizeT        num_components;
 
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice> *data_slices;
@@ -221,7 +247,11 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
     /**
      * @brief CCProblem default constructor
      */
-    CCProblem()
+    CCProblem(bool use_double_buffer) : BaseProblem(
+        use_double_buffer,
+        false, // enable_backward
+        false, // keep_order
+        true)  // keep_node_num
     {
         num_components = 0;
         data_slices    = NULL;
@@ -263,7 +293,8 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             if (this->num_gpus == 1) {
                 if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
                 data_slices[0]->component_ids.SetPointer(h_component_ids);
-                if (retval = data_slices[0]->component_ids.Move(util::DEVICE, util::HOST)) return retval;
+                if (retval = data_slices[0]->component_ids.Move(util::DEVICE, util::HOST)) 
+                    return retval;
                 num_components=0;
                 for (int node=0; node<this->nodes; node++)
                 if (marker[h_component_ids[node]] == 0)
@@ -278,7 +309,8 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
                 for (int gpu=0; gpu< this->num_gpus; gpu++)
                 {
                     if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-                    if (retval = data_slices[gpu]->component_ids.Move(util::DEVICE, util::HOST)) return retval;
+                    if (retval = data_slices[gpu]->component_ids.Move(util::DEVICE, util::HOST)) 
+                        return retval;
                     th_component_ids[gpu] = data_slices[gpu]->component_ids.GetPointer(util::HOST);
                 }
 
@@ -307,12 +339,15 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[out] h_histograms host-side vector to store histograms.
      *
      */
-    void ComputeCCHistogram(VertexId *h_component_ids, VertexId *h_roots, unsigned int *h_histograms)
+    void ComputeCCHistogram(
+        VertexId *h_component_ids, 
+        VertexId *h_roots, 
+        SizeT    *h_histograms)
     {
         //Get roots for each component and the total number of component
         //VertexId *min_nodes = new VertexId[this->nodes];
         VertexId *counter   = new VertexId[this->nodes];
-        for (int i = 0; i < this->nodes; i++)
+        for (SizeT i = 0; i < this->nodes; i++)
         {
             //min_nodes[i] = this->nodes;
             counter  [i] = 0;
@@ -320,7 +355,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
         //for (int i = 0; i < this->nodes; i++)
         //    if (min_nodes[h_component_ids[i]] > i) min_nodes[h_component_ids[i]] = i;
         num_components = 0;
-        for (int i = 0; i < this->nodes; i++)
+        for (SizeT i = 0; i < this->nodes; i++)
         {
             if (counter[h_component_ids[i]]==0)
             {
@@ -331,7 +366,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             }
             counter[h_component_ids[i]]++;
         }
-        for (int i = 0; i < num_components; i++)
+        for (SizeT i = 0; i < num_components; i++)
             h_histograms[i] = counter[h_component_ids[h_roots[i]]];
         /*for (int i = 0; i < this->nodes; ++i)
         {
@@ -377,10 +412,10 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
      */
     cudaError_t Init(
             bool          stream_from_host,       // Only meaningful for single-GPU
-            Csr<VertexId, Value, SizeT>
+            Csr<VertexId, SizeT, Value>
                          *graph,
-            Csr<VertexId, Value, SizeT>
-                         *inversegraph      = NULL,
+            Csr<VertexId, SizeT, Value>
+                         *inversegraph     = NULL,
             int           num_gpus         = 1,
             int          *gpu_idx          = NULL,
             std::string   partition_method = "random",
@@ -390,7 +425,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             float         partition_factor = -1.0f,
             int           partition_seed   = -1)
     {
-        ProblemBase<VertexId, SizeT, Value, false, false, _USE_DOUBLE_BUFFER, false, false, true>::Init(
+        BaseProblem::Init(
             stream_from_host,
             graph,
             inversegraph,
@@ -421,14 +456,16 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = data_slice_->Init(
                     this->num_gpus,
                     this->gpu_idx[gpu],
-                    this->num_gpus>1? 1:0,
-                    0,
+                    this->use_double_buffer,
+                    //this->num_gpus>1? 1:0,
+                    //0,
                     &(this->sub_graphs[gpu]),
                     this->num_gpus>1? this->graph_slices[gpu]->in_counter .GetPointer(util::HOST) : NULL,
                     this->num_gpus>1? this->graph_slices[gpu]->out_counter.GetPointer(util::HOST) : NULL,
                     this->num_gpus>1? this->graph_slices[gpu]->original_vertex.GetPointer(util::HOST) : NULL,
                     queue_sizing,
-                    in_sizing)) return retval;
+                    in_sizing))
+                    return retval;
             }
         } while (0);
 

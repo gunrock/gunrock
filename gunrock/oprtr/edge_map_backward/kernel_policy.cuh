@@ -62,7 +62,7 @@ template <
     // Machine parameters
     int _CUDA_ARCH,
     // Behavioral control parameters
-    bool _INSTRUMENT,
+    //bool _INSTRUMENT,
     // Tunable parameters
     int _MIN_CTA_OCCUPANCY,
     int _LOG_THREADS,
@@ -86,7 +86,7 @@ struct KernelPolicy
     enum {
 
         CUDA_ARCH                       = _CUDA_ARCH,
-        INSTRUMENT                      = _INSTRUMENT,
+        //INSTRUMENT                      = _INSTRUMENT,
 
         LOG_THREADS                     = _LOG_THREADS,
         THREADS                         = 1 << LOG_THREADS,

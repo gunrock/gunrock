@@ -403,8 +403,8 @@ bool is_puer2(T x)
 
 template <
     typename VertexId,
-    typename Value,
-    typename SizeT>
+    typename SizeT,
+    typename Value>
 void Print_Vertex(
     VertexId v,
     int    num_gpus,
@@ -431,14 +431,15 @@ void Print_Vertex(
 
 template <
     typename VertexId,
+    typename SizeT,
     typename Value,
-    typename SizeT>
+    typename T>
 void Track_Results (
-    const Csr<VertexId, Value, SizeT> *graph,
+    const Csr<VertexId, SizeT, Value> *graph,
     int    num_gpus,
-    Value  error_threshold,
-    Value* results,
-    Value* references,
+    T      error_threshold,
+    T     *results,
+    T     *references,
     int*   partition_table,
     VertexId** convertion_tables)
 {
@@ -487,7 +488,7 @@ void Track_Results (
             VertexId dest = track_nodes[i];
             if (pred_to_track(-1, dest)) continue;
             printf("Vertex ");
-            Print_Vertex<VertexId, Value, SizeT>(
+            Print_Vertex<VertexId, SizeT, T>(
                 dest, num_gpus, error_threshold,
                 results, references, 
                 partition_table, convertion_tables);
@@ -497,7 +498,7 @@ void Track_Results (
                 //if (references[src] != references[dest] -1) continue;
                 //    fabs(results[src] - references[src]) < error_threshold) continue; // bfs
                 printf("\t");
-                Print_Vertex<VertexId, Value, SizeT>(
+                Print_Vertex<VertexId, SizeT, T>(
                     src, num_gpus, error_threshold,
                     results, references, 
                     partition_table, convertion_tables);
@@ -509,7 +510,7 @@ void Track_Results (
         {
             if (!pred_to_track(-1, src)) continue;
             printf("Source ");
-            Print_Vertex<VertexId, Value, SizeT>(
+            Print_Vertex<VertexId, SizeT, T>(
                 src, num_gpus, error_threshold,
                 results, references, 
                 partition_table, convertion_tables);
@@ -517,7 +518,7 @@ void Track_Results (
             {
                 VertexId dest = graph -> column_indices[j];
                 printf("\t");
-                Print_Vertex<VertexId, Value, SizeT>(
+                Print_Vertex<VertexId, SizeT, T>(
                     dest, num_gpus, error_threshold,
                     results, references, 
                     partition_table, convertion_tables);
@@ -530,8 +531,8 @@ void Track_Results (
 //Output errors
 template <
     typename VertexId,
-    typename Value,
-    typename SizeT>
+    typename SizeT,
+    typename Value>
 void Output_Errors (
     const char* file_name,
     SizeT  num_nodes,

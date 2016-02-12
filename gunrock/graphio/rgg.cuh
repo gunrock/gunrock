@@ -95,10 +95,10 @@ bool PureTwoFactor(T x)
  * @param[in] value_min
  * @param[in] seed
  */
-template <bool WITH_VALUES, typename VertexId, typename Value, typename SizeT>
+template <bool WITH_VALUES, typename VertexId, typename SizeT, typename Value>
 int BuildRggGraph(
     SizeT nodes,
-    Csr<VertexId, Value, SizeT> &graph,
+    Csr<VertexId, SizeT, Value> &graph,
     double threshold  = -1,
     bool   undirected = true,
     double value_multipiler = 1,

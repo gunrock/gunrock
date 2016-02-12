@@ -43,8 +43,8 @@ namespace util {
  */
 template <
     int BUFFER_COUNT,
-    typename _SizeType,
     typename _KeyType,
+    typename _SizeType,
     typename _ValueType = util::NullType,
     unsigned int TARGET = util::DEVICE>
 struct MultipleBuffer
@@ -94,13 +94,13 @@ struct MultipleBuffer
  *
  */
 template <
-    typename SizeType,
     typename KeyType,
+    typename SizeType,
     typename ValueType = util::NullType,
     unsigned int TARGET = util::DEVICE>
-struct DoubleBuffer : MultipleBuffer<2, SizeType, KeyType, ValueType, TARGET>
+struct DoubleBuffer : MultipleBuffer<2, KeyType, SizeType, ValueType, TARGET>
 {
-    typedef MultipleBuffer<2, SizeType, KeyType, ValueType, TARGET> ParentType;
+    typedef MultipleBuffer<2, KeyType, SizeType, ValueType, TARGET> ParentType;
 
     // Constructor
     DoubleBuffer() : ParentType() {}
@@ -144,13 +144,13 @@ struct DoubleBuffer : MultipleBuffer<2, SizeType, KeyType, ValueType, TARGET>
  * Triple buffer version of the multi-buffer storage abstraction above.
  */
 template <
-    typename SizeType,
     typename KeyType,
+    typename SizeType,
     typename ValueType = util::NullType,
     unsigned int TARGET = util::DEVICE>
-struct TripleBuffer : MultipleBuffer<3, SizeType, KeyType, ValueType, TARGET>
+struct TripleBuffer : MultipleBuffer<3, KeyType, SizeType, ValueType, TARGET>
 {
-    typedef MultipleBuffer<3, SizeType, KeyType, ValueType, TARGET> ParentType;
+    typedef MultipleBuffer<3, KeyType, SizeType, ValueType, TARGET> ParentType;
 
     // Constructor
     TripleBuffer() : ParentType() {}

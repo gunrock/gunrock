@@ -58,88 +58,12 @@ struct EdgeProperties
 
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK >
+    typename Value>
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK >
 void runBC(GRGraph* output, BC_Parameter *parameter);
-
-/**
- * @brief Run test
- *
- * @tparam VertexId   Vertex identifier type
- * @tparam Value      Attribute type
- * @tparam SizeT      Graph size type
- * @tparam INSTRUMENT Keep kernels statics
- * @tparam DEBUG      Keep debug statics
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT,
-    bool          INSTRUMENT,
-    bool          DEBUG >
-void RunTests_size_check(GRGraph* output, BC_Parameter *parameter)
-{
-    if (parameter->size_check)
-        runBC<VertexId, Value, SizeT, INSTRUMENT,
-              DEBUG,  true>(output, parameter);
-    else
-        runBC<VertexId, Value, SizeT, INSTRUMENT,
-              DEBUG, false>(output, parameter);
-}
-
-/**
- * @brief Run test
- *
- * @tparam VertexId   Vertex identifier type
- * @tparam Value      Attribute type
- * @tparam SizeT      Graph size type
- * @tparam INSTRUMENT Keep kernels statics
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT,
-    bool        INSTRUMENT >
-void RunTests_debug(GRGraph* output, BC_Parameter *parameter)
-{
-    if (parameter->debug)
-        RunTests_size_check<VertexId, Value, SizeT,
-                            INSTRUMENT,  true>(output, parameter);
-    else
-        RunTests_size_check<VertexId, Value, SizeT,
-                            INSTRUMENT, false> (output, parameter);
-}
-
-/**
- * @brief Run test
- *
- * @tparam VertexId Vertex identifier type
- * @tparam Value    Attribute type
- * @tparam SizeT    Graph size type
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT >
-void RunTests_instrumented(GRGraph* output, BC_Parameter *parameter)
-{
-    if (parameter->instrumented)
-        RunTests_debug<VertexId, Value, SizeT,  true>(output, parameter);
-    else
-        RunTests_debug<VertexId, Value, SizeT, false>(output, parameter);
-}
 
 /**
  * @brief Run test
@@ -156,26 +80,27 @@ void RunTests_instrumented(GRGraph* output, BC_Parameter *parameter)
  */
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK >
+    typename Value>
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK >
 void runBC(GRGraph* output, BC_Parameter *parameter)
 {
     typedef BCProblem <VertexId,
             SizeT,
             Value,
-            true,               // MARK_PREDECESSORS
-            false > BcProblem;  // Does not use double buffer
+            true>               // MARK_PREDECESSORS
+            Problem;  // Does not use double buffer
 
-    typedef BCEnactor <BcProblem,
-            INSTRUMENT,
-            DEBUG,
-            SIZE_CHECK > BcEnactor;
+    typedef BCEnactor <Problem>
+            //INSTRUMENT,
+            //DEBUG,
+            //SIZE_CHECK >
+            Enactor;
 
-    Csr<VertexId, Value, SizeT> *graph =
-        (Csr<VertexId, Value, SizeT>*)parameter->graph;
+    Csr<VertexId, SizeT, Value> *graph =
+        (Csr<VertexId, SizeT, Value>*)parameter->graph;
     bool          quiet              = parameter -> g_quiet;
     VertexId      src                = (VertexId)parameter -> src[0];
     int           max_grid_size      = parameter -> max_grid_size;
@@ -190,6 +115,9 @@ void runBC(GRGraph* output, BC_Parameter *parameter)
     float         partition_factor   = parameter -> partition_factor;
     int           partition_seed     = parameter -> partition_seed;
     bool          g_stream_from_host = parameter -> g_stream_from_host;
+    bool          instrument         = parameter -> instrumented;
+    bool          debug              = parameter -> debug;
+    bool          size_check         = parameter -> size_check;
     size_t       *org_size           = new size_t  [num_gpus];
     // Allocate host-side arrays
     Value        *h_sigmas           = new Value   [graph->nodes];
@@ -204,9 +132,7 @@ void runBC(GRGraph* output, BC_Parameter *parameter)
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
 
-    BcEnactor* enactor = new BcEnactor(num_gpus, gpu_idx);  // BC enactor map
-    BcProblem* problem = new BcProblem;  // Allocate problem on GPU
-
+    Problem* problem = new Problem(false);  // Allocate problem on GPU
     util::GRError(
         problem->Init(
             g_stream_from_host,
@@ -221,6 +147,9 @@ void runBC(GRGraph* output, BC_Parameter *parameter)
             partition_factor,
             partition_seed),
         "BC Problem Initialization Failed", __FILE__, __LINE__);
+    
+    Enactor* enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);  // BC enactor map
     util::GRError(
         enactor->Init(context, problem, max_grid_size),
         "BC Enactor init failed", __FILE__, __LINE__);
@@ -385,7 +314,7 @@ void dispatchBC(
                 {
                     printf(" source: %lld\n", (long long) parameter->src[0]);
                 }
-                RunTests_instrumented<int, float, int>(grapho, parameter);
+                runBC<int, int, float>(grapho, parameter);
 
                 csr.row_offsets    = NULL;
                 csr.column_indices = NULL;

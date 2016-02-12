@@ -47,11 +47,11 @@ texture<VisitedMask, cudaTextureType1D, cudaReadModeElementType> BitmaskTex<Visi
  * @brief CTA tile-processing abstraction for the filter operator.
  *
  * @tparam KernelPolicy Kernel policy type for filter.
- * @tparam ProblemData Problem data type for filter.
+ * @tparam Problem Problem data type for filter.
  * @tparam Functor Functor type for the specific problem type.
  *
  */
-template <typename KernelPolicy, typename ProblemData, typename Functor>
+template <typename KernelPolicy, typename Problem, typename Functor>
 struct Cta
 {
     //---------------------------------------------------------------------
@@ -64,8 +64,8 @@ struct Cta
     typedef typename KernelPolicy::RakingDetails    RakingDetails;
     typedef typename KernelPolicy::SmemStorage      SmemStorage;
 
-    typedef typename ProblemData::DataSlice         DataSlice;
-    typedef typename ProblemData::Value             Value;
+    typedef typename Problem::DataSlice             DataSlice;
+    typedef typename Problem::Value                 Value;
 
     /**
      * Members
@@ -73,9 +73,9 @@ struct Cta
 
     // Input and output device pointers
     VertexId                *d_in;                      // Incoming frontier
-    VertexId                *d_pred_in;                 // Incoming predecessor frontier (if any)
+    Value                   *d_value_in;                //
     VertexId                *d_out;                     // Outgoing frontier
-    DataSlice               *problem;                   // Problem data
+    DataSlice               *d_data_slice;              // Problem data
     unsigned char           *d_visited_mask;            // Mask for detecting visited status
 
     // Work progress
@@ -218,24 +218,24 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                if (ProblemData::ENABLE_IDEMPOTENCE && cta->iteration != -1) {
+                if (Problem::ENABLE_IDEMPOTENCE && cta->iteration != -1) {
                     if (tile->element_id[LOAD][VEC] >= 0) {
                         VertexId row_id = (tile->element_id[LOAD][VEC]&KernelPolicy::ELEMENT_ID_MASK);///cta->num_gpus;
 
                         VertexId label;
-                        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
+                        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
                                                     label,
-                                                    cta->problem->labels + row_id);
+                                                    cta->d_data_slice ->labels + row_id);
                         if (label != -1) {
                             // Seen it
                             tile->element_id[LOAD][VEC] = -1;
                         } else {
-                            if (ProblemData::MARK_PREDECESSORS) {
-                                if (Functor::CondFilter(row_id, cta->problem))
-                                Functor::ApplyFilter(row_id, cta->problem, tile->pred_id[LOAD][VEC]);
+                            if (Problem::MARK_PREDECESSORS) {
+                                if (Functor::CondFilter(row_id, cta->d_data_slice))
+                                Functor::ApplyFilter(row_id, cta->d_data_slice, tile->pred_id[LOAD][VEC]);
                             } else {
-                                if (Functor::CondFilter(row_id, cta->problem))
-                                Functor::ApplyFilter(row_id, cta->problem, cta->iteration);
+                                if (Functor::CondFilter(row_id, cta->d_data_slice))
+                                Functor::ApplyFilter(row_id, cta->d_data_slice, cta->iteration);
                             }
                         }
                     }
@@ -244,9 +244,9 @@ struct Cta
                         // Row index on our GPU (for multi-gpu, element ids are striped across GPUs)
                         VertexId row_id = (tile->element_id[LOAD][VEC]);// / cta->num_gpus;
                         SizeT node_id = threadIdx.x * LOADS_PER_TILE*LOAD_VEC_SIZE + LOAD*LOAD_VEC_SIZE+VEC;
-                        if (Functor::CondFilter(row_id, cta->problem, cta->iteration, node_id)) {
+                        if (Functor::CondFilter(row_id, cta->d_data_slice, cta->iteration, node_id)) {
                             // ApplyFilter(row_id)
-                            Functor::ApplyFilter(row_id, cta->problem, cta->iteration, node_id);
+                            Functor::ApplyFilter(row_id, cta->d_data_slice, cta->iteration, node_id);
                         }
                         else tile->element_id[LOAD][VEC] = -1;
                     }
@@ -427,9 +427,9 @@ struct Cta
         //int                     num_gpus,
         SmemStorage             &smem_storage,
         VertexId                *d_in,
-        VertexId                *d_pred_in,
+        Value                   *d_value_in,
         VertexId                *d_out,
-        DataSlice               *problem,
+        DataSlice               *d_data_slice,
         unsigned char           *d_visited_mask,
         util::CtaWorkProgress   &work_progress,
         SizeT                   max_out_frontier):
@@ -443,9 +443,9 @@ struct Cta
                 0),
             smem_storage(smem_storage),
             d_in(d_in),
-            d_pred_in(d_pred_in),
+            d_value_in(d_value_in),
             d_out(d_out),
-            problem(problem),
+            d_data_slice(d_data_slice),
             d_visited_mask(d_visited_mask),
             work_progress(work_progress),
             max_out_frontier(max_out_frontier),
@@ -481,7 +481,7 @@ struct Cta
             KernelPolicy::LOG_LOADS_PER_TILE,
             KernelPolicy::LOG_LOAD_VEC_SIZE,
             KernelPolicy::THREADS,
-            ProblemData::QUEUE_READ_MODIFIER,
+            Problem::QUEUE_READ_MODIFIER,
             false>::LoadValid(
                 tile.element_id,
                 d_in,
@@ -489,25 +489,25 @@ struct Cta
                 guarded_elements,
                 (VertexId) -1);
         
-        if (ProblemData::ENABLE_IDEMPOTENCE && ProblemData::MARK_PREDECESSORS && d_pred_in != NULL) {
+        /*if (Problem::ENABLE_IDEMPOTENCE && Problem::MARK_PREDECESSORS && d_value_in != NULL) {
             util::io::LoadTile<
             KernelPolicy::LOG_LOADS_PER_TILE,
             KernelPolicy::LOG_LOAD_VEC_SIZE,
             KernelPolicy::THREADS,
-            ProblemData::QUEUE_READ_MODIFIER,
+            Problem::QUEUE_READ_MODIFIER,
             false>::LoadValid(
                 tile.pred_id,
-                d_pred_in,
+                d_value_in,
                 cta_offset,
                 guarded_elements);
-        }
+        }*/
 
-        if (ProblemData::ENABLE_IDEMPOTENCE && bitmask_cull && d_visited_mask != NULL) {
+        if (Problem::ENABLE_IDEMPOTENCE && bitmask_cull && d_visited_mask != NULL) {
             tile.BitmaskCull(this);
         }
         tile.VertexCull(this);          // using vertex visitation status (update discovered vertices)
         
-        if (ProblemData::ENABLE_IDEMPOTENCE && iteration != -1) {
+        if (Problem::ENABLE_IDEMPOTENCE && iteration != -1) {
             tile.HistoryCull(this);
             tile.WarpCull(this);
         }
@@ -542,7 +542,7 @@ struct Cta
                 KernelPolicy::LOG_LOADS_PER_TILE,
                 KernelPolicy::LOG_LOAD_VEC_SIZE,
                 KernelPolicy::THREADS,
-                ProblemData::QUEUE_WRITE_MODIFIER>::Scatter(
+                Problem::QUEUE_WRITE_MODIFIER>::Scatter(
                     d_out,
                     tile.element_id,
                     tile.flags,

@@ -44,7 +44,7 @@ struct Sweep
         //int                                     &num_gpus,
         int                                     &label,
         typename KernelPolicy::VertexId         *&d_in_queue,
-        typename KernelPolicy::VertexId         *&d_pred_out,
+        typename KernelPolicy::Value            *&d_value_out,
         typename KernelPolicy::VertexId         *&d_out_queue,
         typename KernelPolicy::SizeT            *&d_row_offsets,
         typename KernelPolicy::VertexId         *&d_column_indices,
@@ -81,7 +81,7 @@ struct Sweep
                 label,
                 smem_storage,
                 d_in_queue,
-                d_pred_out,
+                d_value_out,
                 d_out_queue,
                 d_row_offsets,
                 d_column_indices,
@@ -132,6 +132,7 @@ struct Dispatch
 {
     typedef typename KernelPolicy::VertexId VertexId;
     typedef typename KernelPolicy::SizeT    SizeT;
+    typedef typename KernelPolicy::Value    Value;
     typedef typename ProblemData::DataSlice DataSlice;
 
     static __device__ __forceinline__ void Kernel(
@@ -140,7 +141,7 @@ struct Dispatch
         int                         &label,
         SizeT                       &num_elements,
         VertexId                    *&d_in_queue,
-        VertexId                    *&d_pred_out,
+        Value                       *&d_value_out,
         VertexId                    *&d_out_queue,
         SizeT                       *&d_row_offsets,
         VertexId                    *&d_column_indices,
@@ -174,6 +175,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 {
     typedef typename KernelPolicy::VertexId VertexId;
     typedef typename KernelPolicy::SizeT    SizeT;
+    typedef typename KernelPolicy::Value    Value;
     typedef typename ProblemData::DataSlice DataSlice;
 
     static __device__ __forceinline__ void Kernel(
@@ -182,7 +184,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         int                         &label,
         SizeT                       &num_elements,
         VertexId                    *&d_in_queue,
-        VertexId                    *&d_pred_out,
+        Value                       *&d_value_out,
         VertexId                    *&d_out_queue,
         SizeT                       *&d_row_offsets,
         VertexId                    *&d_column_indices,
@@ -204,9 +206,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
 
         // If instrument flag is set, track kernel stats
-        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
-            kernel_stats.MarkStart();
-        }
+        //if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+        //    kernel_stats.MarkStart();
+        //}
 
         // Reset work_progress
         //if (queue_reset)
@@ -258,7 +260,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 queue_index,
                 label,
                 d_in_queue,
-                d_pred_out,
+                d_value_out,
                 d_out_queue,
                 d_row_offsets, 
                 d_column_indices,
@@ -275,10 +277,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 d_value_to_reduce,
                 d_reduce_frontier);
 
-        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
-            kernel_stats.MarkStop();
-            kernel_stats.Flush();
-        }
+        //if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+        //    kernel_stats.MarkStop();
+        //    kernel_stats.Flush();
+        //}
     }
 
 };
@@ -313,7 +315,7 @@ void Kernel(
         int                                     label,
         typename KernelPolicy::SizeT            num_elements,
         typename KernelPolicy::VertexId         *d_in_queue,
-        typename KernelPolicy::VertexId         *d_pred_out,
+        typename KernelPolicy::Value            *d_value_out,
         typename KernelPolicy::VertexId         *d_out_queue,
         typename KernelPolicy::SizeT            *d_row_offsets,
         typename KernelPolicy::VertexId         *d_column_indices,
@@ -336,7 +338,7 @@ void Kernel(
             label,
             num_elements,
             d_in_queue,
-            d_pred_out,
+            d_value_out,
             d_out_queue,
             d_row_offsets,
             d_column_indices,

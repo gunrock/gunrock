@@ -28,10 +28,10 @@ namespace filter {
  * @brief Structure for invoking CTA processing tile over all elements.
  *
  * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
- * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Problem Problem data type for partitioned edge mapping.
  * @tparam Functor Functor type for the specific problem type.
  */
-template <typename KernelPolicy, typename ProblemData, typename Functor>
+template <typename KernelPolicy, typename Problem, typename Functor>
 struct SweepPass
 {
     static __device__ __forceinline__ void Invoke(
@@ -39,9 +39,9 @@ struct SweepPass
         typename KernelPolicy::VertexId         &queue_index,
         //int                                     &num_gpus,
         typename KernelPolicy::VertexId         *&d_in,
-        typename KernelPolicy::VertexId         *&d_pred_in,
+        typename KernelPolicy::Value            *&d_value_in,
         typename KernelPolicy::VertexId         *&d_out,
-        typename ProblemData::DataSlice         *&problem,
+        typename Problem::DataSlice             *&d_data_slice,
         unsigned char                           *&d_visited_mask,
         typename KernelPolicy::SmemStorage      &smem_storage,
         util::CtaWorkProgress                   &work_progress,
@@ -49,7 +49,7 @@ struct SweepPass
         typename KernelPolicy::SizeT            &max_out_frontier)
         //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *&t_bitmask)
     {
-        typedef Cta<KernelPolicy, ProblemData, Functor>     Cta;
+        typedef Cta<KernelPolicy, Problem, Functor>         Cta;
         typedef typename KernelPolicy::SizeT                SizeT;
 
         // Determine our threadblock's work range
@@ -70,9 +70,9 @@ struct SweepPass
             //num_gpus,
             smem_storage,
             d_in,
-            d_pred_in,
+            d_value_in,
             d_out,
-            problem,
+            d_data_slice,
             d_visited_mask,
             work_progress,
             max_out_frontier);
@@ -102,20 +102,21 @@ struct SweepPass
  * Not valid for this arch (default)
  *
  * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
- * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Problem Problem data type for partitioned edge mapping.
  * @tparam Functor Functor type for the specific problem type.
  * @tparam VALID.
  */
 template <
     typename    KernelPolicy,
-    typename    ProblemData,
+    typename    Problem,
     typename    Functor,
     bool        VALID = (__GR_CUDA_ARCH__ >= KernelPolicy::CUDA_ARCH)>
 struct Dispatch
 {
     typedef typename KernelPolicy::VertexId VertexId;
-    typedef typename KernelPolicy::SizeT SizeT;
-    typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename KernelPolicy::SizeT    SizeT;
+    typedef typename KernelPolicy::Value    Value;
+    typedef typename Problem::DataSlice     DataSlice;
 
     static __device__ __forceinline__ void  Kernel2(
             VertexId &iteration,
@@ -124,9 +125,9 @@ struct Dispatch
             //int &num_gpus,
             SizeT &num_elements,
             //volatile int *&d_done,
-            VertexId *&d_in_queue,
-            VertexId *&d_out_queue,
-            DataSlice *&problem,
+            VertexId  *&d_in_queue,
+            VertexId  *&d_out_queue,
+            DataSlice *&d_data_slice,
             util::CtaWorkProgress &work_progress,
             SizeT &max_in_queue,
             SizeT &max_out_queue,
@@ -143,9 +144,9 @@ struct Dispatch
         SizeT                       &num_elements,
         //volatile int                *&d_done,
         VertexId                    *&d_in,
-        VertexId                    *&d_pred_in,
+        Value                       *&d_value_in,
         VertexId                    *&d_out,
-        DataSlice                   *&problem,
+        DataSlice                   *&d_data_slice,
         unsigned char               *&d_visited_mask,
         util::CtaWorkProgress       &work_progress,
         SizeT                       &max_in_frontier,
@@ -162,15 +163,16 @@ struct Dispatch
  * @brief Kernel dispatch code for different architectures.
  *
  * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
- * @tparam ProblemData Problem data type for partitioned edge mapping.
+ * @tparam Problem Problem data type for partitioned edge mapping.
  * @tparam Functor Functor type for the specific problem type.
  */
-template <typename KernelPolicy, typename ProblemData, typename Functor>
-struct Dispatch<KernelPolicy, ProblemData, Functor, true>
+template <typename KernelPolicy, typename Problem, typename Functor>
+struct Dispatch<KernelPolicy, Problem, Functor, true>
 {
     typedef typename KernelPolicy::VertexId VertexId;
-    typedef typename KernelPolicy::SizeT SizeT;
-    typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename KernelPolicy::SizeT    SizeT;
+    typedef typename KernelPolicy::Value    Value;
+    typedef typename Problem::DataSlice     DataSlice;
 
     static __device__ __forceinline__ void Kernel(
         VertexId                    &iteration,
@@ -180,9 +182,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         SizeT                       &num_elements,
         //volatile int                *&d_done,
         VertexId                    *&d_in,
-        VertexId                    *&d_pred_in,
+        Value                       *&d_value_in,
         VertexId                    *&d_out,
-        DataSlice                   *&problem,
+        DataSlice                   *&d_data_slice,
         unsigned char               *&d_visited_mask,
         util::CtaWorkProgress       &work_progress,
         SizeT                       &max_in_frontier,
@@ -194,9 +196,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         // Shared storage for the kernel
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
 
-        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
-            kernel_stats.MarkStart();
-        }
+        //if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+        //    kernel_stats.MarkStart();
+        //}
     
         // workprogress reset
         //if (queue_reset)
@@ -245,14 +247,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         // Barrier to protect work decomposition
         __syncthreads();
 
-        SweepPass<KernelPolicy, ProblemData, Functor>::Invoke(
+        SweepPass<KernelPolicy, Problem, Functor>::Invoke(
                 iteration,
                 queue_index,
                 //num_gpus,
                 d_in,
-                d_pred_in,
+                d_value_in,
                 d_out,
-                problem,
+                d_data_slice,
                 d_visited_mask,
                 smem_storage,
                 work_progress,
@@ -260,10 +262,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 max_out_frontier);
 		//t_bitmask);
 
-        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
-            kernel_stats.MarkStop();
-            kernel_stats.Flush();
-        }
+        //if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+        //    kernel_stats.MarkStop();
+        //    kernel_stats.Flush();
+        //}
     }
 
     static __device__ __forceinline__ void  Kernel2(
@@ -275,7 +277,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             //volatile int *&d_done,
             VertexId *&d_in_queue,
             VertexId *&d_out_queue,
-            DataSlice *&problem,
+            DataSlice *&d_data_slice,
             util::CtaWorkProgress &work_progress,
             SizeT &max_in_frontier,
             SizeT &max_out_frontier,
@@ -340,7 +342,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         //if (my_idx == 0)
         //    printf("num elements:%d\n", num_elements);
 
-        Functor::ApplyFilter(d_in_queue[my_idx], problem, iteration);
+        Functor::ApplyFilter(d_in_queue[my_idx], d_data_slice, iteration);
         d_out_queue[my_idx] = d_in_queue[my_idx];
 
         /*if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
@@ -354,7 +356,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @brief Filter kernel entry point.
  *
  * @tparam KernelPolicy Kernel policy type for filter.
- * @tparam ProblemData Problem data type for filter.
+ * @tparam Problem Problem data type for filter.
  * @tparam Functor Functor type for the specific problem type.
  *
  * @param[in] iteration     Current graph traversal iteration
@@ -374,7 +376,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @param[in] kernel_stats  Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT is set)
  * @param[in] filtering_flag Boolean value indicates whether to filter out elements in the frontier (if not don't use scan+scatter, just apply computation to each element)
  */
-template <typename KernelPolicy, typename ProblemData, typename Functor>
+template <typename KernelPolicy, typename Problem, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
 __global__
 void Kernel(
@@ -383,9 +385,9 @@ void Kernel(
     typename KernelPolicy::VertexId         queue_index,                
     typename KernelPolicy::SizeT            num_elements,             
     typename KernelPolicy::VertexId         *d_in_queue,            
-    typename KernelPolicy::VertexId         *d_in_predecessor_queue,
+    typename KernelPolicy::Value            *d_in_value_queue,
     typename KernelPolicy::VertexId         *d_out_queue,          
-    typename ProblemData::DataSlice         *problem,
+    typename Problem::DataSlice             *d_data_slice,
     unsigned char                           *d_visited_mask,
     util::CtaWorkProgress                   work_progress,        
     typename KernelPolicy::SizeT            max_in_queue,        
@@ -394,7 +396,7 @@ void Kernel(
     bool                                    filtering_flag = true)
 {
     if (filtering_flag) {
-        Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
+        Dispatch<KernelPolicy, Problem, Functor>::Kernel(
                 iteration,
                 queue_reset,
                 queue_index,
@@ -402,16 +404,16 @@ void Kernel(
                 num_elements,
                 //d_done,
                 d_in_queue,
-                d_in_predecessor_queue,
+                d_in_value_queue,
                 d_out_queue,
-                problem,
+                d_data_slice,
                 d_visited_mask,
                 work_progress,
                 max_in_queue,
                 max_out_queue,
                 kernel_stats);
     } else {
-        Dispatch<KernelPolicy, ProblemData, Functor>::Kernel2(
+        Dispatch<KernelPolicy, Problem, Functor>::Kernel2(
                 iteration,
                 queue_reset,
                 queue_index,
@@ -420,7 +422,7 @@ void Kernel(
                 //d_done,
                 d_in_queue,
                 d_out_queue,
-                problem,
+                d_data_slice,
                 work_progress,
                 max_in_queue,
                 max_out_queue,
@@ -428,20 +430,20 @@ void Kernel(
     }
 }
 
-template <typename KernelPolicy, typename ProblemData, typename Functor>
+template <typename KernelPolicy, typename Problem, typename Functor>
 void LaunchKernel(
-    dim3                                    grid_size,
-    dim3                                    block_size,
+    unsigned int                            grid_size,
+    unsigned int                            block_size,
     size_t                                  shared_size,
     cudaStream_t                            stream,
-    typename KernelPolicy::VertexId         iteration,
+    long long                               iteration,
     bool                                    queue_reset,
-    typename KernelPolicy::VertexId         queue_index,                
+    unsigned int                            queue_index,                
     typename KernelPolicy::SizeT            num_elements,             
-    typename KernelPolicy::VertexId         *d_in_queue,            
-    typename KernelPolicy::VertexId         *d_in_predecessor_queue,
+    typename KernelPolicy::VertexId         *d_in_queue,       
+    typename KernelPolicy::Value            *d_in_value_queue,
     typename KernelPolicy::VertexId         *d_out_queue,          
-    typename ProblemData::DataSlice         *problem,
+    typename Problem::DataSlice             *d_data_slice,
     unsigned char                           *d_visited_mask,
     util::CtaWorkProgress                   work_progress,        
     typename KernelPolicy::SizeT            max_in_queue,        
@@ -452,16 +454,16 @@ void LaunchKernel(
     if (queue_reset)
         work_progress.template Reset_<typename KernelPolicy::SizeT>(0, stream);
 
-    Kernel<KernelPolicy, ProblemData, Functor>
+    Kernel<KernelPolicy, Problem, Functor>
         <<<grid_size, block_size, shared_size, stream>>>(
         iteration,
         queue_reset,
         queue_index,
         num_elements,
         d_in_queue,
-        d_in_predecessor_queue,
+        d_in_value_queue,
         d_out_queue,
-        problem,
+        d_data_slice,
         d_visited_mask,
         work_progress,
         max_in_queue,

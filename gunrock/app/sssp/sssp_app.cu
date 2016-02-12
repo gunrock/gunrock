@@ -52,11 +52,11 @@ public:
 
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK,
+    typename Value,
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK,
     bool MARK_PREDECESSORS >
 void runSSSP(GRGraph* output, SSSP_Parameter *parameter);
 
@@ -75,95 +75,17 @@ void runSSSP(GRGraph* output, SSSP_Parameter *parameter);
  */
 template <
     typename    VertexId,
-    typename    Value,
     typename    SizeT,
-    bool        INSTRUMENT,
-    bool        DEBUG,
-    bool        SIZE_CHECK >
+    typename    Value>
+    //bool        INSTRUMENT,
+    //bool        DEBUG,
+    //bool        SIZE_CHECK >
 void markPredecessorsSSSP(GRGraph* output, SSSP_Parameter *parameter)
 {
     if (parameter->mark_predecessors)
-        runSSSP<VertexId, Value, SizeT, INSTRUMENT,
-                DEBUG, SIZE_CHECK,  true>(output, parameter);
+        runSSSP<VertexId, SizeT, Value, true>(output, parameter);
     else
-        runSSSP<VertexId, Value, SizeT, INSTRUMENT,
-                DEBUG, SIZE_CHECK, false>(output, parameter);
-}
-
-/**
- * @brief Run test
- *
- * @tparam VertexId   Vertex identifier type
- * @tparam Value      Attribute type
- * @tparam SizeT      Graph size type
- * @tparam INSTRUMENT Keep kernels statics
- * @tparam DEBUG      Keep debug statics
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT,
-    bool          INSTRUMENT,
-    bool          DEBUG >
-void sizeCheckSSSP(GRGraph* output, SSSP_Parameter *parameter)
-{
-    if (parameter->size_check)
-        markPredecessorsSSSP<VertexId, Value, SizeT, INSTRUMENT,
-                             DEBUG,  true>(output, parameter);
-    else
-        markPredecessorsSSSP<VertexId, Value, SizeT, INSTRUMENT,
-                             DEBUG, false>(output, parameter);
-}
-
-/**
- * @brief Run test
- *
- * @tparam VertexId   Vertex identifier type
- * @tparam Value      Attribute type
- * @tparam SizeT      Graph size type
- * @tparam INSTRUMENT Keep kernels statics
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT,
-    bool        INSTRUMENT >
-void debugSSSP(GRGraph* output, SSSP_Parameter *parameter)
-{
-    if (parameter->debug)
-        sizeCheckSSSP<VertexId, Value, SizeT, INSTRUMENT,
-                      true>(output, parameter);
-    else
-        sizeCheckSSSP<VertexId, Value, SizeT, INSTRUMENT,
-                      false>(output, parameter);
-}
-
-/**
- * @brief Run test
- *
- * @tparam VertexId Vertex identifier type
- * @tparam Value    Attribute type
- * @tparam SizeT    Graph size type
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT >
-void instrumentedSSSP(GRGraph* output, SSSP_Parameter *parameter)
-{
-    if (parameter->instrumented)
-        debugSSSP<VertexId, Value, SizeT,  true>(output, parameter);
-    else
-        debugSSSP<VertexId, Value, SizeT, false>(output, parameter);
+        runSSSP<VertexId, SizeT, Value, false>(output, parameter);
 }
 
 /**
@@ -182,26 +104,27 @@ void instrumentedSSSP(GRGraph* output, SSSP_Parameter *parameter)
  */
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK,
+    typename Value,
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK,
     bool MARK_PREDECESSORS >
 void runSSSP(GRGraph* output, SSSP_Parameter *parameter)
 {
     typedef SSSPProblem < VertexId,
             SizeT,
             Value,
-            MARK_PREDECESSORS > SsspProblem;
+            MARK_PREDECESSORS > Problem;
 
-    typedef SSSPEnactor < SsspProblem,
-            INSTRUMENT,
-            DEBUG,
-            SIZE_CHECK > SsspEnactor;
+    typedef SSSPEnactor < Problem>
+            //INSTRUMENT,
+            //DEBUG,
+            //SIZE_CHECK >
+            Enactor;
 
-    Csr<VertexId, Value, SizeT>
-    *graph = (Csr<VertexId, Value, SizeT>*)parameter->graph;
+    Csr<VertexId, SizeT, Value>
+        *graph = (Csr<VertexId, SizeT, Value>*)parameter->graph;
     bool          quiet              = parameter -> g_quiet;
     VertexId      src                = (VertexId)parameter -> src[0];
     int           max_grid_size      = parameter -> max_grid_size;
@@ -217,6 +140,9 @@ void runSSSP(GRGraph* output, SSSP_Parameter *parameter)
     bool          g_stream_from_host = parameter -> g_stream_from_host;
     int           delta_factor       = parameter -> delta_factor;
     int           traversal_mode     = parameter -> traversal_mode;
+    bool          instrument         = parameter -> instrumented;
+    bool          debug              = parameter -> debug;
+    bool          size_check         = parameter -> size_check;
     size_t       *org_size           = new size_t[num_gpus];
     // Allocate host-side distance arrays
     Value    *h_distances = new Value[graph->nodes];
@@ -229,9 +155,7 @@ void runSSSP(GRGraph* output, SSSP_Parameter *parameter)
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
 
-    SsspEnactor* enactor = new SsspEnactor(num_gpus, gpu_idx);  // enactor map
-    SsspProblem* problem = new SsspProblem;  // Allocate problem on GPU
-
+    Problem* problem = new Problem;  // Allocate problem on GPU
     util::GRError(
         problem->Init(
             g_stream_from_host,
@@ -248,6 +172,8 @@ void runSSSP(GRGraph* output, SSSP_Parameter *parameter)
             partition_seed),
         "Problem SSSP Initialization Failed", __FILE__, __LINE__);
 
+    Enactor* enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
     util::GRError(
         enactor->Init (context, problem, max_grid_size, traversal_mode),
         "SSSP Enactor init failed", __FILE__, __LINE__);
@@ -367,7 +293,7 @@ void dispatchSSSP(
                     printf(" source: %lld\n", (long long) parameter->src[0]);
                 }
 
-                instrumentedSSSP<int, int, int>(grapho, parameter);
+                markPredecessorsSSSP<int, int, int>(grapho, parameter);
 
                 // reset for free memory
                 csr.row_offsets    = NULL;
