@@ -41,7 +41,7 @@ namespace gunrock {
  * @tparam Value Associated value type.
  * @tparam SizeT Graph size type.
  */
-template<typename VertexId, typename Value, typename SizeT>
+template<typename VertexId, typename SizeT, typename Value>
 struct Csr
 {
     SizeT nodes;            // Number of nodes in the graph

@@ -100,12 +100,13 @@ void Usage()
  * @param[in] graph Reference to the CSR graph.
  * @param[in] edge_mask Pointer to the MST edge mask.
  */
-template<typename VertexId, typename Value, typename SizeT>
+template<typename VertexId, typename SizeT, typename Value>
 void DisplaySolution(
-    const Csr<VertexId, Value, SizeT> &graph, int *edge_mask)
+    const Csr<VertexId, SizeT, Value> &graph, 
+    int *edge_mask)
 {
-    int count = 0;
-    int print_limit = graph.nodes;
+    SizeT count = 0;
+    SizeT print_limit = graph.nodes;
     if (print_limit > 10)
     {
         print_limit = 10;
@@ -113,22 +114,23 @@ void DisplaySolution(
 
     // find source vertex ids for display results
     VertexId *source = new VertexId[graph.edges];
-    for (int i = 0; i < graph.nodes; ++i)
+    for (SizeT i = 0; i < graph.nodes; ++i)
     {
-        for (int j = graph.row_offsets[i]; j < graph.row_offsets[i + 1]; ++j)
+        for (SizeT j = graph.row_offsets[i]; j < graph.row_offsets[i + 1]; ++j)
         {
             source[j] = i;
         }
     }
 
     // print source-destination pairs of minimum spanning tree edges
-    printf("GPU Minimum Spanning Tree [First %d edges]\n", print_limit);
+    printf("GPU Minimum Spanning Tree [First %lld edges]\n", 
+        (long long)print_limit);
     printf("src dst\n");
-    for (int i = 0; i < graph.edges; ++i)
+    for (SizeT i = 0; i < graph.edges; ++i)
     {
         if (edge_mask[i] == 1 && count <= print_limit)
         {
-            printf("%d %d\n", source[i], graph.column_indices[i]);
+            printf("%lld %lld\n", (long long)source[i], (long long)graph.column_indices[i]);
             ++count;
         }
     }
@@ -154,10 +156,10 @@ void DisplaySolution(
  *
  *  \return long long int which indicates the total weight of the graph.
  */
-template<typename VertexId, typename Value, typename SizeT>
-Value SimpleReferenceMST(
+template <typename VertexId, typename SizeT, typename Value>
+Value ReferenceMST(
     const Value *edge_values,
-    const Csr<VertexId, Value, SizeT> &graph,
+    const Csr<VertexId, SizeT, Value> &graph,
     bool quiet_mode = false)
 {
     if (!quiet_mode) { printf("\nMST CPU REFERENCE TEST\n"); }
@@ -172,9 +174,9 @@ Value SimpleReferenceMST(
 
     E *edge_pairs = new E[graph.edges];
     int idx = 0;
-    for (int i = 0; i < graph.nodes; ++i)
+    for (SizeT i = 0; i < graph.nodes; ++i)
     {
-        for (int j = graph.row_offsets[i]; j < graph.row_offsets[i + 1]; ++j)
+        for (SizeT j = graph.row_offsets[i]; j < graph.row_offsets[i + 1]; ++j)
         {
             edge_pairs[idx++] = std::make_pair(i, graph.column_indices[j]);
         }
@@ -244,80 +246,106 @@ Value SimpleReferenceMST(
 template <
     typename VertexId,
     typename SizeT,
-    typename Value,
-    bool     DEBUG,
-    bool     SIZE_CHECK >
-void RunTest(Info<VertexId, Value, SizeT> *info)
+    typename Value>
+    //bool     DEBUG,
+    //bool     SIZE_CHECK >
+void RunTest(Info<VertexId, SizeT, Value> *info)
 {
     // define the problem data structure for graph primitive
     typedef MSTProblem<VertexId,
             SizeT,
             Value,
             true,    // MARK_PREDECESSORS
-            false,   // ENABLE_IDEMPOTENCE
-            true >   // USE_DOUBLE_BUFFER
+            false>   // ENABLE_IDEMPOTENCE
+            //true >   // USE_DOUBLE_BUFFER
             Problem;
+    typedef MSTEnactor <Problem>
+            Enactor;
 
-    Csr<VertexId, Value, SizeT>* graph =
-        (Csr<VertexId, Value, SizeT>*)info->csr_ptr;
-    int num_gpus            = info->info["num_gpus"].get_int();
-    int max_grid_size       = info->info["max_grid_size"].get_int();
-    int iterations          = 1; //force to 1 info->info["num_iteration"].get_int();
-    bool quiet_mode         = info->info["quiet_mode"].get_bool();
-    bool quick_mode         = info->info["quick_mode"].get_bool();
-    bool stream_from_host   = info->info["stream_from_host"].get_bool();
-    double max_queue_sizing = info->info["max_queue_sizing"].get_real();
+    Csr<VertexId, SizeT, Value>* graph = info->csr_ptr;
+    int     num_gpus                = info->info["num_gpus"         ].get_int ();
+    int     max_grid_size           = info->info["max_grid_size"    ].get_int ();
+    int     iterations              = 1; //force to 1 info->info["num_iteration"].get_int();
+    bool    quiet_mode              = info->info["quiet_mode"       ].get_bool ();
+    bool    quick_mode              = info->info["quick_mode"       ].get_bool ();
+    bool    instrument              = info->info["instrument"       ].get_bool (); 
+    bool    debug                   = info->info["debug_mode"       ].get_bool (); 
+    bool    size_check              = info->info["size_check"       ].get_bool (); 
+    bool    stream_from_host        = info->info["stream_from_host" ].get_bool ();
+    double  max_queue_sizing        = info->info["max_queue_sizing" ].get_real ();
+    double  max_queue_sizing1       = info->info["max_queue_sizing1"].get_real ();
+    double  max_in_sizing           = info->info["max_in_sizing"    ].get_real (); 
+    std::string partition_method    = info->info["partition_method" ].get_str  (); 
+    double   partition_factor       = info->info["partition_factor" ].get_real (); 
+    int      partition_seed         = info->info["partition_seed"   ].get_int  ();
+    CpuTimer cpu_timer; 
+
+    cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) 
         gpu_idx[i] = device_list[i].get_int();
 
     // TODO: remove after merge mgpu-cq
-    ContextPtr* context = (ContextPtr*)info->context;
+    ContextPtr   *context = (ContextPtr*  )info->context;
     cudaStream_t *streams = (cudaStream_t*)info->streams;
-
-    // allocate MST enactor map
-    MSTEnactor < Problem,
-               false,        // INSTRUMENT
-               DEBUG,        // DEBUG
-               SIZE_CHECK >  // SIZE_CHECK
-               enactor(gpu_idx);
-
-    // allocate problem on GPU create a pointer of the MSTProblem type
-    Problem * problem = new Problem;
 
     // host results spaces
     VertexId * edge_mask = new VertexId[graph->edges];
 
     if (!quiet_mode) { printf("\nMINIMUM SPANNING TREE TEST\n"); fflush(stdout);}
 
+    // allocate problem on GPU create a pointer of the MSTProblem type
+    Problem * problem = new Problem(true);
     // copy data from CPU to GPU initialize data members in DataSlice
-    util::GRError(problem->Init(stream_from_host, *graph, num_gpus, gpu_idx, streams),
-                  "Problem MST Initialization Failed", __FILE__, __LINE__);
+    util::GRError(problem->Init(
+        stream_from_host, 
+        graph,
+        NULL,
+        num_gpus, 
+        gpu_idx,
+        partition_method,
+        streams,
+        max_queue_sizing,
+        max_in_sizing,
+        partition_factor,
+        partition_seed),
+        "Problem MST Initialization Failed", __FILE__, __LINE__);
+
+    // allocate MST enactor map
+    Enactor *enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);
+    util::GRError(enactor -> Init(
+        context, problem, max_grid_size));
+    cpu_timer.Stop();
+    info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
     // perform calculations
-    GpuTimer gpu_timer;  // record the kernel running time
+    //GpuTimer gpu_timer;  // record the kernel running time
     double elapsed_gpu = 0.0f;  // device elapsed running time
 
     for (int iter = 0; iter < iterations; ++iter)
     {
         // reset values in DataSlice
         util::GRError(problem->Reset(
-                          enactor.GetFrontierType(), max_queue_sizing),
-                      "MST Problem Data Reset Failed", __FILE__, __LINE__);
+            enactor -> GetFrontierType(),
+            max_queue_sizing,
+            max_queue_sizing1),
+            "MST Problem Data Reset Failed", __FILE__, __LINE__);
 
-        gpu_timer.Start();
+        cpu_timer.Start();
 
         // launch MST enactor
-        util::GRError(enactor.template Enact<Problem>(
-                          *context, problem, max_grid_size),
-                      "MST Problem Enact Failed", __FILE__, __LINE__);
+        util::GRError(enactor ->Enact(),
+            "MST Problem Enact Failed", __FILE__, __LINE__);
 
-        gpu_timer.Stop();
-        elapsed_gpu += gpu_timer.ElapsedMillis();
+        cpu_timer.Stop();
+        elapsed_gpu += cpu_timer.ElapsedMillis();
     }
 
     elapsed_gpu /= iterations;
+    cpu_timer.Start();
+
     if (!quiet_mode)
     {
         printf("GPU - Computation Complete in %lf msec.\n", elapsed_gpu);
@@ -330,8 +358,8 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
     if (!quick_mode)  // run CPU reference test
     {
         // calculate GPU final number of selected edges
-        int num_selected_gpu = 0;
-        for (int iter = 0; iter < graph->edges; ++iter)
+        SizeT num_selected_gpu = 0;
+        for (SizeT iter = 0; iter < graph->edges; ++iter)
         {
             num_selected_gpu += edge_mask[iter];
         }
@@ -339,14 +367,14 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
 
         // calculate GPU total selected MST weights for validation
         Value total_weight_gpu = 0;
-        for (int iter = 0; iter < graph->edges; ++iter)
+        for (SizeT iter = 0; iter < graph->edges; ++iter)
         {
             total_weight_gpu += edge_mask[iter] * graph->edge_values[iter];
         }
 
         // correctness validation
-        Value total_weight_cpu = SimpleReferenceMST(
-                                     graph->edge_values, *graph, quiet_mode);
+        Value total_weight_cpu = ReferenceMST(
+            graph->edge_values, *graph, quiet_mode);
         if (total_weight_cpu == total_weight_gpu)
         {
             // print the edge pairs in the minimum spanning tree
@@ -358,52 +386,20 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
             if (!quiet_mode)
             {
                 printf("INCORRECT.\n");
-                std::cout << "CPU Weight = " << total_weight_cpu << std::endl;
-                std::cout << "GPU Weight = " << total_weight_gpu << std::endl;
+                printf("CPU Weight = %lld\n", (long long)total_weight_cpu);
+                printf("GPU Weight = %lld\n", (long long)total_weight_gpu);
             }
         }
     }
 
-
-    info->ComputeCommonStats(enactor.enactor_stats.GetPointer(), elapsed_gpu);
-
-    if (!quiet_mode)
-    {
-        info->DisplayStats(false);   // display collected statistics
-    }
-
-    info->CollectInfo();
+    info->ComputeCommonStats(
+        enactor -> enactor_stats.GetPointer(), elapsed_gpu, (VertexId*) NULL);
 
     // clean up if necessary
     if (problem)   delete    problem;
     if (edge_mask) delete [] edge_mask;
-}
-
-/**
- * @brief Test entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam DEBUG
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename VertexId,
-    typename Value,
-    typename SizeT,
-    bool     DEBUG >
-void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["size_check"].get_bool())
-    {
-        RunTest <VertexId, Value, SizeT, DEBUG,  true>(info);
-    }
-    else
-    {
-        RunTest <VertexId, Value, SizeT, DEBUG, false>(info);
-    }
+    cpu_timer.Stop();
+    info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
 }
 
 /**
@@ -415,33 +411,8 @@ void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
  *
  * @param[in] info Pointer to info contains parameters and statistics.
  */
-template <
-    typename VertexId,
-    typename Value,
-    typename SizeT >
-void RunTests_debug(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["debug_mode"].get_bool())
-    {
-        RunTests_size_check <VertexId, Value, SizeT,  true>(info);
-    }
-    else
-    {
-        RunTests_size_check <VertexId, Value, SizeT, false>(info);
-    }
-}
-
-/**
- * @brief Test entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <typename VertexId, typename Value, typename SizeT>
-void RunTest_connectivity_check(Info<VertexId, Value, SizeT> *info)
+template <typename VertexId, typename SizeT, typename Value>
+void RunTest_connectivity_check(Info<VertexId, SizeT, Value> *info)
 {
     // test graph connectivity because MST only supports fully-connected graph
     struct GRTypes data_t;          // data type structure
@@ -449,10 +420,10 @@ void RunTest_connectivity_check(Info<VertexId, Value, SizeT> *info)
     data_t.SIZET_TYPE = SIZET_INT;  // graph size type
     data_t.VALUE_TYPE = VALUE_INT;  // attributes type
 
-    struct GRSetup config = InitSetup(1, NULL);  // gunrock configurations
-    int num_gpus            = info->info["num_gpus"].get_int();
+    struct GRSetup config           = InitSetup(1, NULL);  // gunrock configurations
+    int num_gpus                    = info->info["num_gpus"].get_int();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
-    int* gpu_idx = new int[num_gpus];
+    int *gpu_idx                    = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) 
         gpu_idx[i] = device_list[i].get_int();
     delete config.device_list;
@@ -461,8 +432,8 @@ void RunTest_connectivity_check(Info<VertexId, Value, SizeT> *info)
     struct GRGraph *grapho = (GRGraph*)malloc(sizeof(GRGraph));
     struct GRGraph *graphi = (GRGraph*)malloc(sizeof(GRGraph));
 
-    graphi->num_nodes = info->csr_ptr->nodes;
-    graphi->num_edges = info->csr_ptr->edges;
+    graphi->num_nodes   = info->csr_ptr->nodes;
+    graphi->num_edges   = info->csr_ptr->edges;
     graphi->row_offsets = (void*)&info->csr_ptr->row_offsets[0];
     graphi->col_indices = (void*)&info->csr_ptr->column_indices[0];
 
@@ -472,7 +443,7 @@ void RunTest_connectivity_check(Info<VertexId, Value, SizeT> *info)
     int* num_cc = (int*)grapho->aggregation;
     if (*num_cc == 1)  // perform minimum spanning tree test
     {
-        RunTests_debug<VertexId, Value, SizeT>(info);
+        RunTest<VertexId, SizeT, Value>(info);
     }
     else  // more than one connected components in the graph
     {
@@ -487,6 +458,71 @@ void RunTest_connectivity_check(Info<VertexId, Value, SizeT> *info)
 ///////////////////////////////////////////////////////////////////////////////
 // Main function
 ///////////////////////////////////////////////////////////////////////////////
+template <
+    typename VertexId,  // use int as the vertex identifier
+    typename SizeT   ,  // use int as the graph size type
+    typename Value   >  // use int as the value type
+int main_(CommandLineArgs *args)
+{
+    CpuTimer cpu_timer, cpu_timer2;
+    cpu_timer.Start();
+    Csr <VertexId, SizeT, Value> csr(false);  // graph we process on
+    Info<VertexId, SizeT, Value> *info = new Info<VertexId, SizeT, Value>;
+
+    // graph construction or generation related parameters
+    info->info["undirected"] = true;  // always convert to undirected
+    info->info["edge_value"] = true;  // require per edge weight values
+
+    cpu_timer2.Start();
+    info->Init("MST", *args, csr);
+    cpu_timer2.Stop();
+    info->info["load_time"] = cpu_timer2.ElapsedMillis();
+
+    RunTest_connectivity_check<VertexId, SizeT, Value>(info);  // run test
+    cpu_timer.Stop();
+    info->info["total_time"] = cpu_timer.ElapsedMillis();
+
+    if (!(info->info["quiet_mode"].get_bool()))
+    {
+        info->DisplayStats();  // display collected statistics
+    }
+
+    info->CollectInfo();  // collected all the info and put into JSON mObject
+    return 0;
+}
+
+template <
+    typename VertexId, // the vertex identifier type, usually int or long long
+    typename SizeT   > // the size tyep, usually int or long long
+int main_Value(CommandLineArgs *args)
+{
+    // Value = VertexId for MST
+    return main_<VertexId, SizeT, VertexId>(args);
+    //if (args -> CheckCmdLineFlag("64bit-Value"))
+    //    return main_<VertexId, SizeT, long long>(args);
+    //else
+    //    return main_<VertexId, SizeT, int      >(args);
+}
+
+template <
+    typename VertexId>
+int main_SizeT(CommandLineArgs *args)
+{
+    // SizeT = Value, as internal datatypes are not clearly seperated
+    return main_Value<VertexId, VertexId>(args);
+    //if (args -> CheckCmdLineFlag("64bit-SizeT"))
+    //    return main_Value<VertexId, long long>(args);
+    //else
+    //    return main_Value<VertexId, int      >(args);
+}
+
+int main_VertexId(CommandLineArgs *args)
+{
+    //if (args -> CheckCmdLineFlag("64bit-VertexId"))
+    //    return main_SizeT<long long>(args);
+    //else 
+        return main_SizeT<int      >(args);
+}
 
 int main(int argc, char** argv)
 {
@@ -498,21 +534,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    typedef int VertexId;  // use int as the vertex identifier
-    typedef int Value;     // use int as the value type
-    typedef int SizeT;     // use int as the graph size type
-
-    Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
-    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
-
-    // graph construction or generation related parameters
-    info->info["undirected"] = true;  // always convert to undirected
-    info->info["edge_value"] = true;  // require per edge weight values
-
-    info->Init("MST", args, csr);
-    RunTest_connectivity_check<VertexId, Value, SizeT>(info);  // run test
-
-    return 0;
+    return main_VertexId(&args);
 }
 
 // Leave this at the end of the file

@@ -186,9 +186,9 @@ struct MarkFunctor
   VertexId s_id, VertexId d_id, DataSlice *problem,
   VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    // mark minimum spanning tree output edges
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      1, problem->mst_output + problem->temp_index[s_id]);
+        // mark minimum spanning tree output edges
+        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+            (SizeT)1, problem->mst_output + problem->temp_index[s_id]);
   }
 };
 
@@ -251,7 +251,7 @@ struct CyRmFunctor
 
     // remove some edges in the MST output result
     util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      0, problem->mst_output + problem->temp_index[s_id]);
+        (SizeT)0, problem->mst_output + problem->temp_index[s_id]);
   }
 };
 

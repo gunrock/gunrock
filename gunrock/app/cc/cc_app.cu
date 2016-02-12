@@ -38,89 +38,12 @@ public:
 
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK >
+    typename Value>
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK >
 void runCC(GRGraph* output, CC_Parameter *parameter);
-
-/**
- * @brief Run test
- *
- * @tparam VertexId   Vertex identifier type
- * @tparam Value      Attribute type
- * @tparam SizeT      Graph size type
- * @tparam INSTRUMENT Keep kernels statics
- * @tparam DEBUG      Keep debug statics
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT,
-    bool          INSTRUMENT,
-    bool          DEBUG >
-void sizeCheckCC(GRGraph* output, CC_Parameter *parameter)
-{
-    if (parameter->size_check)
-        runCC<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-              true > (output, parameter);
-
-    else
-        runCC<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-              false> (output, parameter);
-}
-
-/**
- * @brief Run test
- *
- * @tparam VertexId   Vertex identifier type
- * @tparam Value      Attribute type
- * @tparam SizeT      Graph size type
- * @tparam INSTRUMENT Keep kernels statics
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT,
-    bool        INSTRUMENT >
-void debugCC(GRGraph* output, CC_Parameter *parameter)
-{
-    if (parameter->debug)
-        sizeCheckCC<VertexId, Value, SizeT, INSTRUMENT,
-                    true > (output, parameter);
-    else
-        sizeCheckCC<VertexId, Value, SizeT, INSTRUMENT,
-                    false> (output, parameter);
-}
-
-/**
- * @brief Run test
- *
- * @tparam VertexId Vertex identifier type
- * @tparam Value    Attribute type
- * @tparam SizeT    Graph size type
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT >
-void instrumentedCC(GRGraph* output, CC_Parameter *parameter)
-{
-    if (parameter->instrumented)
-        debugCC<VertexId, Value, SizeT,  true>(output, parameter);
-    else
-        debugCC<VertexId, Value, SizeT, false>(output, parameter);
-}
 
 /**
  * @brief Run test
@@ -137,25 +60,25 @@ void instrumentedCC(GRGraph* output, CC_Parameter *parameter)
  */
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK >
+    typename Value>
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK >
 void runCC(GRGraph* output, CC_Parameter *parameter)
 {
     typedef CCProblem < VertexId,
             SizeT,
-            Value,
-            false > CcProblem; // use double buffer
+            Value> Problem; // use double buffer
 
-    typedef CCEnactor < CcProblem,
-            INSTRUMENT,
-            DEBUG,
-            SIZE_CHECK > CcEnactor;
+    typedef CCEnactor < Problem>
+            //INSTRUMENT,
+            //DEBUG,
+            //SIZE_CHECK > 
+            Enactor;
 
-    Csr<VertexId, Value, SizeT> *graph =
-        (Csr<VertexId, Value, SizeT>*)parameter->graph;
+    Csr<VertexId, SizeT, Value> *graph =
+        (Csr<VertexId, SizeT, Value>*)parameter->graph;
     bool          quiet              = parameter -> g_quiet;
     int           max_grid_size      = parameter -> max_grid_size;
     int           num_gpus           = parameter -> num_gpus;
@@ -168,6 +91,9 @@ void runCC(GRGraph* output, CC_Parameter *parameter)
     float         partition_factor   = parameter -> partition_factor;
     int           partition_seed     = parameter -> partition_seed;
     bool          g_stream_from_host = parameter -> g_stream_from_host;
+    bool          instrument         = parameter -> instrumented;
+    bool          debug              = parameter -> debug;
+    bool          size_check         = parameter -> size_check;
     size_t       *org_size           = new size_t  [num_gpus];
     // Allocate host-side label array
     VertexId    *h_component_ids     = new VertexId[graph->nodes];
@@ -179,9 +105,7 @@ void runCC(GRGraph* output, CC_Parameter *parameter)
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
 
-    CcEnactor* enactor = new CcEnactor(num_gpus, gpu_idx);  // CC enactor map
-    CcProblem* problem = new CcProblem;  // Allocate problem on GPU
-
+    Problem* problem = new Problem(false);  // Allocate problem on GPU
     util::GRError(
         problem->Init(
             g_stream_from_host,
@@ -196,6 +120,9 @@ void runCC(GRGraph* output, CC_Parameter *parameter)
             partition_factor,
             partition_seed),
         "CC Problem Initialization Failed", __FILE__, __LINE__);
+
+    Enactor* enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);  // CC enactor map
     util::GRError(
         enactor->Init(context, problem, max_grid_size),
         "CC Enactor Init failed", __FILE__, __LINE__);
@@ -281,7 +208,7 @@ void dispatch_cc(
                 csr.column_indices = (int*)graphi->col_indices;
                 parameter->graph = &csr;
 
-                instrumentedCC<int, int, int>(grapho, parameter);
+                runCC<int, int, int>(grapho, parameter);
 
                 // reset for free memory
                 csr.row_offsets    = NULL;

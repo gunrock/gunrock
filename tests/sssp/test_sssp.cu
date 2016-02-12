@@ -154,11 +154,11 @@ void DisplaySolution (VertexId *source_path, SizeT num_nodes)
  */
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
+    typename Value,
     bool     MARK_PREDECESSORS >
-void SimpleReferenceSssp(
-    const Csr<VertexId, Value, SizeT> &graph,
+void ReferenceSssp(
+    const Csr<VertexId, SizeT, Value> &graph,
     Value                             *node_values,
     VertexId                          *node_preds,
     VertexId                          src,
@@ -178,9 +178,9 @@ void SimpleReferenceSssp(
     Edge   *edges = ( Edge*)malloc(sizeof( Edge) * graph.edges);
     Value *weight = (Value*)malloc(sizeof(Value) * graph.edges);
 
-    for (int i = 0; i < graph.nodes; ++i)
+    for (SizeT i = 0; i < graph.nodes; ++i)
     {
-        for (int j = graph.row_offsets[i]; j < graph.row_offsets[i + 1]; ++j)
+        for (SizeT j = graph.row_offsets[i]; j < graph.row_offsets[i + 1]; ++j)
         {
             edges[j] = Edge(i, graph.column_indices[j]);
             weight[j] = graph.edge_values[j];
@@ -205,16 +205,16 @@ void SimpleReferenceSssp(
     if (MARK_PREDECESSORS)
     {
         dijkstra_shortest_paths(g, s,
-                                predecessor_map(boost::make_iterator_property_map(
-                                        p.begin(), get(boost::vertex_index, g))).distance_map(
-                                    boost::make_iterator_property_map(
-                                        d.begin(), get(boost::vertex_index, g))));
+            predecessor_map(boost::make_iterator_property_map(
+                p.begin(), get(boost::vertex_index, g))).distance_map(
+                    boost::make_iterator_property_map(
+                        d.begin(), get(boost::vertex_index, g))));
     }
     else
     {
         dijkstra_shortest_paths(g, s,
-                                distance_map(boost::make_iterator_property_map(
-                                        d.begin(), get(boost::vertex_index, g))));
+            distance_map(boost::make_iterator_property_map(
+                d.begin(), get(boost::vertex_index, g))));
     }
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
@@ -252,13 +252,13 @@ void SimpleReferenceSssp(
             RowFirstTupleCompare< Coo<VertexId, VertexId> >);
     }
 
-    for (int i = 0; i < graph.nodes; ++i)
+    for (SizeT i = 0; i < graph.nodes; ++i)
     {
         node_values[i] = sort_dist[i].col;
     }
     if (MARK_PREDECESSORS)
     {
-        for (int i = 0; i < graph.nodes; ++i)
+        for (SizeT i = 0; i < graph.nodes; ++i)
         {
             node_preds[i] = sort_pred[i].col;
         }
@@ -281,42 +281,47 @@ void SimpleReferenceSssp(
  */
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK,
+    typename Value,
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK,
     bool MARK_PREDECESSORS >
-void RunTests(Info<VertexId, Value, SizeT> *info)
+void RunTests(Info<VertexId, SizeT, Value> *info)
 {
     typedef SSSPProblem < VertexId,
             SizeT,
             Value,
             MARK_PREDECESSORS > Problem;
 
-    typedef SSSPEnactor < Problem,
+    typedef SSSPEnactor < Problem/*,
             INSTRUMENT,
             DEBUG,
-            SIZE_CHECK > Enactor;
+            SIZE_CHECK*/ > Enactor;
 
     // parse configurations from mObject info
-    Csr<VertexId, Value, SizeT> *graph = info->csr_ptr;
-    VertexId src                 = info->info["source_vertex"].get_int64();
-    int max_grid_size            = info->info["max_grid_size"].get_int();
-    int num_gpus                 = info->info["num_gpus"].get_int();
-    double max_queue_sizing      = info->info["max_queue_sizing"].get_real();
-    double max_queue_sizing1     = info->info["max_queue_sizing1"].get_real();
-    double max_in_sizing         = info->info["max_in_sizing"].get_real();
-    std::string partition_method = info->info["partition_method"].get_str();
-    double partition_factor      = info->info["partition_factor"].get_real();
-    int partition_seed           = info->info["partition_seed"].get_int();
-    bool quiet_mode              = info->info["quiet_mode"].get_bool();
-    bool quick_mode              = info->info["quick_mode"].get_bool();
-    bool stream_from_host        = info->info["stream_from_host"].get_bool();
-    int traversal_mode           = info->info["traversal_mode"].get_int();
-    int iterations               = 1; //force to 1 info->info["num_iteration"].get_int();
-    int delta_factor             = info->info["delta_factor"].get_int();
+    Csr<VertexId, SizeT, Value> *graph = info->csr_ptr;
+    VertexId    src                 = info->info["source_vertex"    ].get_int64();
+    int         max_grid_size       = info->info["max_grid_size"    ].get_int  ();
+    int         num_gpus            = info->info["num_gpus"         ].get_int  ();
+    double      max_queue_sizing    = info->info["max_queue_sizing" ].get_real ();
+    double      max_queue_sizing1   = info->info["max_queue_sizing1"].get_real ();
+    double      max_in_sizing       = info->info["max_in_sizing"    ].get_real ();
+    std::string partition_method    = info->info["partition_method" ].get_str  ();
+    double      partition_factor    = info->info["partition_factor" ].get_real ();
+    int         partition_seed      = info->info["partition_seed"   ].get_int  ();
+    bool        quiet_mode          = info->info["quiet_mode"       ].get_bool ();
+    bool        quick_mode          = info->info["quick_mode"       ].get_bool ();
+    bool        stream_from_host    = info->info["stream_from_host" ].get_bool ();
+    int         traversal_mode      = info->info["traversal_mode"   ].get_int  ();
+    bool        instrument          = info->info["instrument"       ].get_bool ();
+    bool        debug               = info->info["debug_mode"       ].get_bool ();
+    bool        size_check          = info->info["size_check"       ].get_bool ();
+    int         iterations          = 1; //force to 1 info->info["num_iteration"].get_int();
+    int         delta_factor        = info->info["delta_factor"     ].get_int  ();
+    CpuTimer    cpu_timer;
 
+    cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
@@ -341,34 +346,37 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
 
-    // Allocate SSSP enactor map
-    Enactor* enactor = new Enactor(num_gpus, gpu_idx);
-
     // Allocate problem on GPU
     Problem *problem = new Problem;
     util::GRError(problem->Init(
-                      stream_from_host,
-                      graph,
-                      NULL,
-                      num_gpus,
-                      gpu_idx,
-                      partition_method,
-                      streams,
-                      delta_factor,
-                      max_queue_sizing,
-                      max_in_sizing,
-                      partition_factor,
-                      partition_seed),
-                  "SSSP Problem Init failed", __FILE__, __LINE__);
+        stream_from_host,
+        graph,
+        NULL,
+        num_gpus,
+        gpu_idx,
+        partition_method,
+        streams,
+        delta_factor,
+        max_queue_sizing,
+        max_in_sizing,
+        partition_factor,
+        partition_seed),
+        "SSSP Problem Init failed", __FILE__, __LINE__);
+
+    // Allocate SSSP enactor map
+    Enactor* enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);
     util::GRError(enactor->Init(
-                      context, problem, max_grid_size, traversal_mode),
-                  "SSSP Enactor Init failed", __FILE__, __LINE__);
+        context, problem, max_grid_size, traversal_mode),
+        "SSSP Enactor Init failed", __FILE__, __LINE__);
+    cpu_timer.Stop();
+    info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
     // compute reference CPU SSSP solution for source-distance
-    if (reference_check_label != NULL)
+    if (!quick_mode)
     {
         if (!quiet_mode) { printf("Computing reference value ...\n"); }
-        SimpleReferenceSssp<VertexId, Value, SizeT, MARK_PREDECESSORS>(
+        ReferenceSssp<VertexId, SizeT, Value, MARK_PREDECESSORS>(
             *graph,
             reference_check_label,
             reference_check_pred,
@@ -377,18 +385,17 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         if (!quiet_mode) { printf("\n"); }
     }
 
-    double elapsed = 0.0f;
-
     // perform SSSP
-    CpuTimer cpu_timer;
+    double elapsed = 0.0f;
 
     for (int iter = 0; iter < iterations; ++iter)
     {
         util::GRError(problem->Reset(
-                          src, enactor->GetFrontierType(), max_queue_sizing, max_queue_sizing1),
-                      "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
+            src, enactor->GetFrontierType(), 
+            max_queue_sizing, max_queue_sizing1),
+            "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
         util::GRError(enactor->Reset(),
-                      "SSSP Enactor Reset failed", __FILE__, __LINE__);
+            "SSSP Enactor Reset failed", __FILE__, __LINE__);
 
         if (!quiet_mode)
         {
@@ -406,6 +413,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     }
     elapsed /= iterations;
 
+    cpu_timer.Start();
     // Copy out results
     util::GRError(problem->Extract(h_labels, h_preds),
                   "SSSP Problem Data Extraction Failed", __FILE__, __LINE__);
@@ -427,7 +435,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         DisplaySolution(h_labels, graph->nodes);
     }
     // Verify the result
-    if (reference_check_label != NULL)
+    if (!quick_mode)
     {
         if (!quiet_mode) { printf("Label Validity: "); }
         int error_num = CompareResults(
@@ -446,13 +454,6 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
 
     info->ComputeTraversalStats(  // compute running statistics
         enactor->enactor_stats.GetPointer(), elapsed, h_labels);
-
-    if (!quiet_mode)
-    {
-        info->DisplayStats();  // display collected statistics
-    }
-
-    info->CollectInfo();  // collected all the info and put into JSON mObject
 
     if (!quiet_mode)
     {
@@ -514,6 +515,8 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     if (h_labels        ) {delete[] h_labels        ; h_labels         = NULL;}
     if (reference_preds ) {delete[] reference_preds ; reference_preds  = NULL;}
     if (h_preds         ) {delete[] h_preds         ; h_preds          = NULL;}
+    cpu_timer.Stop();
+    info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
 }
 
 /**
@@ -530,111 +533,92 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
  */
 template <
     typename    VertexId,
-    typename    Value,
     typename    SizeT,
-    bool        INSTRUMENT,
-    bool        DEBUG,
-    bool        SIZE_CHECK >
-void RunTests_mark_predecessors(Info<VertexId, Value, SizeT> *info)
+    typename    Value>
+    //bool        INSTRUMENT,
+    //bool        DEBUG,
+    //bool        SIZE_CHECK >
+void RunTests_mark_predecessors(Info<VertexId, SizeT, Value> *info)
 {
     if (info->info["mark_predecessors"].get_bool())
     {
-        RunTests<VertexId, Value, SizeT, INSTRUMENT,
-                 DEBUG, SIZE_CHECK, true>(info);
+        RunTests<VertexId, SizeT, Value, /*INSTRUMENT,
+                 DEBUG, SIZE_CHECK,*/ true>(info);
     }
     else
     {
-        RunTests<VertexId, Value, SizeT, INSTRUMENT,
-                 DEBUG, SIZE_CHECK, false>(info);
-    }
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- *
- * @param[in] info Pointer to mObject info.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT,
-    bool          INSTRUMENT,
-    bool          DEBUG >
-void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["size_check"].get_bool())
-    {
-        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
-                                   DEBUG,  true>(info);
-    }
-    else
-    {
-        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
-                                   DEBUG, false>(info);
-    }
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT,
-    bool        INSTRUMENT >
-void RunTests_debug(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["debug_mode"].get_bool())
-    {
-        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,  true>(info);
-    }
-    else
-    {
-        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT, false>(info);
-    }
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT >
-void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["instrument"].get_bool())
-    {
-        RunTests_debug<VertexId, Value, SizeT, true>(info);
-    }
-    else
-    {
-        RunTests_debug<VertexId, Value, SizeT, false>(info);
+        RunTests<VertexId, SizeT, Value, /*INSTRUMENT,
+                 DEBUG, SIZE_CHECK,*/ false>(info);
     }
 }
 
 /******************************************************************************
 * Main
 ******************************************************************************/
+
+template <
+    typename VertexId,  // Use int as the vertex identifier
+    typename SizeT,     // Use int as the graph size type
+    typename Value>     // Use int as the value type
+int main_(CommandLineArgs *args)
+{
+    CpuTimer cpu_timer, cpu_timer2;
+    cpu_timer.Start();
+    Csr <VertexId, SizeT, Value> csr(false);  // graph we process on
+    Info<VertexId, SizeT, Value> *info = new Info<VertexId, SizeT, Value>;
+
+    // graph construction or generation related parameters
+    info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
+    info->info["edge_value"] = true;  // require per edge weight values
+
+    cpu_timer2.Start();
+    info->Init("SSSP", *args, csr);  // initialize Info structure
+    cpu_timer2.Stop();
+    info->info["load_time"] = cpu_timer2.ElapsedMillis();
+
+    RunTests_mark_predecessors<VertexId, SizeT, Value>(info);  // run test
+    cpu_timer.Stop();
+    info->info["total_time"] = cpu_timer.ElapsedMillis();
+
+    if (!(info->info["quiet_mode"].get_bool()))
+    {
+        info->DisplayStats();  // display collected statistics
+    }
+
+    info->CollectInfo();  // collected all the info and put into JSON mObject
+    return 0;
+}
+
+template <
+    typename VertexId, // the vertex identifier type, usually int or long long
+    typename SizeT   > // the size tyep, usually int or long long
+int main_Value(CommandLineArgs *args)
+{
+// Disabled becaus atomicMin(long long*, long long) is not available
+//    if (args -> CheckCmdLineFlag("64bit-Value"))
+//        return main_<VertexId, SizeT, long long>(args);
+//    else 
+        return main_<VertexId, SizeT, int      >(args);
+}
+
+template <
+    typename VertexId>
+int main_SizeT(CommandLineArgs *args)
+{
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_Value<VertexId, long long>(args);
+    else
+        return main_Value<VertexId, int      >(args);
+}
+
+int main_VertexId(CommandLineArgs *args)
+{
+    // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
+    //if (args -> CheckCmdLineFlag("64bit-VertexId"))
+    //    return main_SizeT<long long>(args);
+    //else 
+        return main_SizeT<int      >(args);
+}
 
 int main(int argc, char** argv)
 {
@@ -646,23 +630,8 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    typedef int VertexId;  // Use int as the vertex identifier
-    typedef int Value;     // Use int as the value type
-    typedef int SizeT;     // Use int as the graph size type
-
-    Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
-    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
-
-    // graph construction or generation related parameters
-    info->info["undirected"] = args.CheckCmdLineFlag("undirected");
-    info->info["edge_value"] = true;  // require per edge weight values
-
-    info->Init("SSSP", args, csr);  // initialize Info structure
-    RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test
-
-    return 0;
+    return main_VertexId(&args);
 }
-
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++
