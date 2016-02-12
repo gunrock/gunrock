@@ -18,7 +18,7 @@
 #include <sys/utsname.h>        /* for Cpuinfo */
 #include <cuda.h>               /* for Gpuinfo */
 #include <cuda_runtime_api.h>   /* for Gpuinfo */
-#include <unistd.h>             /* for Userinfo */
+#include <pwd.h>                /* for Userinfo */
 
 
 namespace gunrock {
@@ -106,7 +106,14 @@ public:
     json_spirit::mObject getUserinfo() const
     {
         json_spirit::mObject info;
-        info["login"] = getlogin();
+        const char * usernotfound = "Not Found";
+        if (getpwuid(getuid()))
+        {
+            info["login"] = getpwuid(getuid())->pw_name;
+        } else
+        {
+            info["login"] = usernotfound;
+        }
         return info;
     }
 };
