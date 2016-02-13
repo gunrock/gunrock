@@ -30,8 +30,46 @@ namespace gunrock {
 namespace global_indicator {
 namespace tc {
 
+using namespace gunrock::app;
 using namespace mgpu;
 using namespace cub;
+
+template<
+typename VertexId,
+typename SizeT,
+typename Value,
+typename ProblemData>
+struct TCFunctor
+{
+    typedef typename ProblemData::DataSlice DataSlice;
+    
+    static __device__ __forceinline__ bool CondEdge(
+    VertexId s_id, VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+    {
+        return (problem->d_degrees[s_id] > problem->d_degrees[d_id]
+                || (problem->d_degrees[s_id] == problem->d_degrees[d_id] && s_id < d_id));
+    }
+
+    static __device__ __forceinline__ void ApplyEdge(
+    VertexId s_id, VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+    {
+        return;
+    }
+
+    static __device__ __forceinline__ bool CondFilter(
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
+    {
+            return (node!=-1);
+    }
+
+    static __device__ __forceinline__ void ApplyFilter(
+    VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
+    {
+        return;
+    }
+};
 
 /**
  * @brief TC enactor class.
@@ -138,11 +176,81 @@ class TCEnactor :
         return retval;
       }
 
-      // TODO: Add TC algorithm here.
-      // 1) Do advance/filter to get rid of neighbors with a smaller #ofdegree.
-      // 2) Do intersection using generated edge lists from the previous step.
-      // 3) DeviceReduce the output to collect the triangle count.
+      attributes->queue_index = 0;
+      attributes->selector = 0;
+      attributes->queue_length = graph_slice->nodes;
+      attributes->queue_reset = true; 
 
+      // TODO: Add TC algorithm here.
+      
+      // Prepare src node_ids for edge list
+      // TODO: move this to problem. need to send CudaContext to problem too.
+      IntervalExpand(
+            graph_slice->edges,
+            data_slice->d_degrees.GetPointer(util::DEVICE),
+            queue->keys[attributes->selector].GetPointer(util::DEVICE),
+            graph_slice->nodes,
+            data_slice->d_src_node_ids.GetPointer(util::DEVICE),
+            context[0]);
+
+      // 1) Do advance/filter to get rid of neighbors with a smaller #ofdegree.
+      gunrock::oprtr::advance::LaunchKernel
+      <AdvanceKernelPolicy, TCProblem, TCFunctor>(
+      statistics[0],
+      attributes[0],
+      d_data_slice,
+      (VertexId*)NULL,
+      (bool*)NULL,
+      (bool*)NULL,
+      d_scanned_edges,
+      queue->keys[attributes->selector].GetPointer(util::DEVICE),
+      queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+      (VertexId*)NULL,
+      (VertexId*)NULL,
+      graph_slice->row_offsets.GetPointer(util::DEVICE),
+      graph_slice->column_indices.GetPointer(util::DEVICE),
+      (SizeT*)NULL,
+      (VertexId*)NULL,
+      graph_slice->nodes,
+      graph_slice->edges,
+      work_progress,
+      context[0],
+      stream,
+      gunrock::oprtr::advance::V2E);
+
+      attributes->queue_reset = false;
+      attributes->queue_index++;
+      attributes->selector ^= 1;
+
+      //Filter to get edge_list (done)
+      //declare edge_list in problem (done)
+      //modify intersection operator
+      //cubPartition the coarse_count is on device, need to change
+      gunrock::oprtr::filter::Kernel<FilterKernelPolicy, TCProblem, TCFunctor>
+      <<<statistics->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
+      statistics->iteration,
+      attributes->queue_reset,
+      attributes->queue_index,
+      attributes->queue_length,
+      queue->keys[attributes->selector].GetPointer(util::DEVICE),
+      NULL,
+      data_slice->d_edge_list.GetPointer(util::DEVICE),
+      d_data_slice,
+      NULL,
+      work_progress,
+      graph_slice->edges,
+      graph_slice->edges,
+      statistics->filter_kernel_stats);
+
+      //GetQueueLength of the new edge_list
+      if (statistics->retval = work_progress->GetQueueLength(++attributes->queue_index, attributes->queue_length, false, stream, true)) return;
+
+      // 2) Do intersection using generated edge lists from the previous step.
+      //gunrock::oprtr::intersection::LaunchKernel
+      //<IntersectionKernelPolicy, TCProblem, TCFunctor>(
+      //);
+
+      // 3) DeviceReduce the output to collect the triangle count.
 
       // end of the TC recursive loop
 

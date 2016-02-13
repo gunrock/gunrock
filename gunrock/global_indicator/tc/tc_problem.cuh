@@ -51,8 +51,8 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
         // device storage arrays
 	util::Array1D<SizeT, VertexId> d_src_node_ids;  // Used for ...
 	util::Array1D<SizeT, VertexId> d_dst_node_ids;  // Used for ...
-	util::Array1D<SizeT, VertexId> d_src_node_ids_partitioned;  // Used for ...
-	util::Array1D<SizeT, VertexId> d_dst_node_ids_partitioned;  // Used for ...
+    util::Array1D<SizeT, VertexId> d_edge_list;
+    util::Array1D<SizeT, SizeT> d_degrees; // Used for store node degree
 	util::Array1D<SizeT, bool> d_flags;         /** < Used for candidate set boolean matrix */
 
 	/*
@@ -62,8 +62,8 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
         {
 	    d_src_node_ids	.SetName("d_src_node_ids");
 	    d_dst_node_ids	.SetName("d_dst_node_ids");
-	    d_src_node_ids_partitioned	.SetName("d_src_node_ids_partitioned");
-	    d_dst_node_ids_partitioned	.SetName("d_dst_node_ids_partitioned");
+	    d_edge_list	    .SetName("d_edge_list");
+        d_degrees. SetName("d_degrees");
 	    d_flags		    .SetName("d_flags");
 	}
 	 /*
@@ -74,8 +74,8 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
             if (util::SetDevice(this->gpu_idx)) return;
             d_src_node_ids.Release();
             d_dst_node_ids.Release();
-            d_src_node_ids_partitioned.Release();
-            d_dst_node_ids_partitioned.Release();
+            d_edge_list.Release();
+            d_degrees.Release();
             d_flags.Release();
 	}
         
@@ -231,8 +231,8 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
         // create SoA on device
 		if(retval = data_slices[gpu]->d_src_node_ids.Allocate(edges, util::DEVICE))  return retval; 
 		if(retval = data_slices[gpu]->d_dst_node_ids.Allocate(edges, util::DEVICE))   return retval;
-		if(retval = data_slices[gpu]->d_src_node_ids_partitioned.Allocate(edges, util::DEVICE))   return retval;
-		if(retval = data_slices[gpu]->d_dst_node_ids_partitioned.Allocate(edges, util::DEVICE))   return retval;
+		if(retval = data_slices[gpu]->d_edge_list.Allocate(edges, util::DEVICE))   return retval;
+		if(retval = data_slices[gpu]->d_degrees.Allocate(nodes, util::DEVICE))   return retval;
 		if(retval = data_slices[gpu]->d_flags.Allocate(edges, util::DEVICE))  return retval;
 
         }
@@ -276,16 +276,16 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
         if (data_slices[gpu]->d_dst_node_ids.GetPointer(util::DEVICE) == NULL) 
             if (retval = data_slices[gpu]->d_dst_node_ids.Allocate(edges, util::DEVICE)) 
                 return retval;
-        if (data_slices[gpu]->d_src_node_ids_partitioned.GetPointer(util::DEVICE) == NULL) 
-            if (retval = data_slices[gpu]->d_src_node_ids_partitioned.Allocate(edges, util::DEVICE)) 
+        if (data_slices[gpu]->d_edge_list.GetPointer(util::DEVICE) == NULL) 
+            if (retval = data_slices[gpu]->d_edge_list.Allocate(edges, util::DEVICE)) 
                 return retval;
-        if (data_slices[gpu]->d_dst_node_ids_partitioned.GetPointer(util::DEVICE) == NULL) 
-            if (retval = data_slices[gpu]->d_dst_node_ids_partitioned.Allocate(edges, util::DEVICE)) 
+        if (data_slices[gpu]->d_degrees.GetPointer(util::DEVICE) == NULL) 
+            if (retval = data_slices[gpu]->d_degrees.Allocate(nodes, util::DEVICE)) 
                 return retval;
         if (data_slices[gpu]->d_flags.GetPointer(util::DEVICE) == NULL) 
             if (retval = data_slices[gpu]->d_flags.Allocate(edges, util::DEVICE)) 
                 return retval;
-            // TODO: code to for other allocations here
+            // TODO: code to for other allocations here 
 
             if (retval = util::GRError(
                     cudaMemcpy(d_data_slices[gpu],
@@ -297,8 +297,13 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
             }
 
            // TODO: fill in the initial input_queue for problem
-	   util::MemsetIdxKernel<<<128, 128>>>(
-            data_slices[0]->frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes);
+        util::MemsetIdxKernel<<<128, 128>>>(
+                data_slices[0]->frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes);
+
+        util::MemsetMadVectorKernel<<<128, 128>>>(
+                data_slices[0]->d_degrees,
+                this->graph_slices[0]->row_offsets.GetPointer(util::DEVICE),
+                this->graph_slices[0]->row_offsets.GetPointer(util::DEVICE)+1, -1, nodes);
 
         return retval;
     }

@@ -70,21 +70,14 @@ struct Dispatch
     typedef typename KernelPolicy::Value    Value;
     typedef typename ProblemData::DataSlice DataSlice;
 
-    static __device__ __forceinline__ SizeT GetNeighborListLength(
-                            SizeT       *&d_row_offsets,
-                            VertexId    &d_vertex_id,
-                            SizeT       &max_vertex,
-                            SizeT       &max_edge)
-    {
-    }
-
     // Get neighbor list sizes, scan to get both
     // fine_counts (for two per-thread methods) and
     // coarse_counts (for balanced-path per-block method)
     static __device__ void Inspect(
-                            SizeT       *&d_row_offsets,
                             VertexId    *&d_src_node_ids,
                             VertexId    *&d_dst_node_ids,
+                            VertexId    *&d_edge_list,
+                            SizeT       *&d_degrees,
                             SizeT       *&d_flags,
                             SizeT       &input_length,
                             SizeT       &num_vertex,
@@ -97,6 +90,8 @@ struct Dispatch
                             VertexId    *&d_column_indices,
                             VertexId    *&d_src_node_ids,
                             VertexId    *&d_dst_node_ids,
+                            VertexId    *&d_edge_list,
+                            SizeT       *&d_degrees,
                             DataSlice   *&problem,
                             SizeT       *&d_output_counts,
                             SizeT       &input_length,
@@ -111,6 +106,8 @@ struct Dispatch
                             VertexId    *&d_column_indices,
                             VertexId    *&d_src_node_ids,
                             VertexId    *&d_dst_node_ids,
+                            VertexId    *&d_edge_list,
+                            SizeT       *&d_degrees,
                             DataSlice   *&problem,
                             SizeT       &input_length,
                             SizeT       &nv_per_block,
@@ -136,27 +133,14 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
     typedef typename KernelPolicy::Value            Value;
     typedef typename ProblemData::DataSlice         DataSlice;
 
-    static __device__ __forceinline__ SizeT GetNeighborListLength(
-                            SizeT       *&d_row_offsets,
-                            VertexId    &d_vertex_id,
-                            SizeT       &max_vertex,
-                            SizeT       &max_edge)
-    {
-        SizeT first = d_vertex_id >= max_vertex ? max_edge
-                                                : d_row_offsets[d_vertex_id];
-        SizeT second = (d_vertex_id + 1) >= max_vertex
-                        ? max_edge : d_row_offsets[d_vertex_id+1];
-
-        return (second > first) ? second - first : 0;
-    }
-
     // Get neighbor list sizes, scan to get both
     // fine_counts (for two per-thread methods) and
     // coarse_counts (for balanced-path per-block method)
     static __device__ __forceinline__ void Inspect(
-                            SizeT       *&d_row_offsets,
                             VertexId    *&d_src_node_ids,
                             VertexId    *&d_dst_node_ids,
+                            VertexId    *&d_edge_list,
+                            SizeT       *&d_degrees,
                             SizeT       *&d_flags,
                             SizeT       &input_length,
                             SizeT       &num_vertex,
@@ -165,12 +149,13 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         // Compute d_src_nl_sizes and d_dst_nl_sizes;
         VertexId idx = threadIdx.x + blockIdx.x * blockDim.x;
         if (idx >= input_length) return;
-        SizeT src_nl_size = GetNeighborListLength(d_row_offsets, 
-                                                  d_src_node_ids[idx], 
-                                                  num_vertex, num_edge);
-        SizeT dst_nl_size = GetNeighborListLength(d_row_offsets, 
-                                                  d_dst_node_ids[idx], 
-                                                  num_vertex, num_edge);
+        VertexId edge_id = d_edge_list[idx];
+        VertexId src_node = d_src_node_ids[edge_id];
+        VertexId dst_node = d_dst_node_ids[edge_id];
+        // TODO: check -1 vertex id. for now let's just assume
+        // that sane users won't input -1.
+        SizeT src_nl_size = d_degrees[src_node];
+        SizeT dst_nl_size = d_degrees[dst_node];
         d_flags[idx] = (src_nl_size > KernelPolicy::NL_THRESDHOLD
                      && dst_nl_size > KernelPolicy::NL_THRESHOLD) ? 1 : 0;
     }
@@ -180,6 +165,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             VertexId    *&d_column_indices,
                             VertexId    *&d_src_node_ids,
                             VertexId    *&d_dst_node_ids,
+                            VertexId    *&d_edge_list,
+                            SizeT       *&d_degrees,
                             DataSlice   *&problem,
                             SizeT       *&d_output_counts,
                             SizeT       &input_length,
@@ -199,10 +186,13 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         for (VertexId idx = start; idx < end; idx += KernelPolicy::THREADS) {
             // get nls start and end index for two ids
-            SizeT src_it = d_row_offsets[d_src_node_ids[idx]];
-            SizeT src_end = d_row_offsets[d_src_node_ids[idx]+1];
-            SizeT dst_it = d_row_offsets[d_dst_node_ids[idx]];
-            SizeT dst_end = d_row_offsets[d_dst_node_ids[idx]+1];
+            VertexId eid = d_edge_list[idx];
+            VertexId sid = d_src_node_ids[eid];
+            VertexId did = d_dst_node_ids[eid];
+            SizeT src_it = d_row_offsets[sid];
+            SizeT src_end = d_row_offsets[sid+1];
+            SizeT dst_it = d_row_offsets[did];
+            SizeT dst_end = d_row_offsets[did+1];
             VertexId src_edge = d_column_indices[src_it];
             VertexId dst_edge = d_column_indices[dst_it];
             while (src_it < src_end && dst_it < dst_end) {
@@ -225,6 +215,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             VertexId    *&d_column_indices,
                             VertexId    *&d_src_node_ids,
                             VertexId    *&d_dst_node_ids,
+                            VertexId    *&d_edge_list,
+                            SizeT       *&d_degrees,
                             DataSlice   *&problem,
                             SizeT       *&d_output_counts,
                             SizeT       &input_length,
@@ -270,10 +262,13 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             //
             // partition:
             // get acount and bcount
-            SizeT a_rowoffset = d_row_offsets[d_src_node_ids[i]];
-            SizeT b_rowoffset = d_row_offsets[d_dst_node_ids[i]];
-            SizeT acount  = d_row_offsets[d_src_node_ids[i]+1] - a_rowoffset;
-            SizeT bcount  = d_row_offsets[d_dst_node_ids[i]+1] - b_rowoffset;
+            VertexId edge_id = d_edge_list[i];
+            VertexId src_node = d_src_node_ids[edge_id];
+            VertexId dst_node = d_dst_node_ids[edge_id];
+            SizeT a_rowoffset = d_row_offsets[src_node];
+            SizeT b_rowoffset = d_row_offsets[dst_node];
+            SizeT acount  = d_degrees[src_node];
+            SizeT bcount  = d_degrees[dst_node];
             VertexId *a_list = &d_column_indices[a_rowoffset];
             VertexId *b_list = &d_column_indices[b_rowoffset];
             int numPartitions = KernelPolicy::THREADS;
@@ -327,11 +322,12 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @tparam ProblemData Problem data type for intersection.
  * @tparam Functor Functor type for the specific problem type.
  *
- * @param[in] d_row_offset      Device pointer of SizeT to the row offsets queue
  * @param[in] d_src_node_ids    Device pointer of VertexId to the incoming frontier
  *                              queue (source node ids)
  * @param[in] d_dst_node_ids    Device pointer of VertexId to the incoming frontier 
  *                              queue (destination node ids)
+ * @param[in] d_edge_list       Device pointer of SizeT to the edge list index
+ * @param[in] d_degrees         Device pointer of SizeT to the degree array
  * @param[out] d_flags          Device pointer of SizeT to the partition flag queue
  * @param[in] input_queue_len   Length of the incoming frontier queues(d_src_node_ids 
  *                              and d_dst_node_ids should have the same length)
@@ -344,18 +340,20 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
     __global__
 void Inspect(
-        typename KernelPolicy::SizeT            *d_row_offsets,
         typename KernelPolicy::VertexId         *d_src_node_ids,
         typename KernelPolicy::VertexId         *d_dst_node_ids,
+        typename KernelPolicy::VertexId         *d_edge_list,
+        typename KernelPolicy::SizeT            *d_degrees,
         typename KernelPolicy::SizeT            *d_flags,
         typename KernelPolicy::SizeT            input_queue_len,
         typename KernelPolicy::SizeT            max_vertices,
         typename KernelPolicy::SizeT            max_edges)
 {
     Dispatch<KernelPolicy, ProblemData, Functor>::Inspect(
-            d_row_offsets,
             d_src_node_ids,
             d_dst_node_ids,
+            d_edge_list,
+            d_degrees,
             d_flags,
             input_queue_len,
             max_vertices,
@@ -373,6 +371,8 @@ void Inspect(
  * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
  * @param[in] d_src_node_ids    Device pointer of VertexId to the incoming frontier queue (source node ids)
  * @param[in] d_dst_node_ids    Device pointer of VertexId to the incoming frontier queue (destination node ids)
+ * @param[in] d_edge_list       Device pointer of VertexId to the edge list IDs
+ * @param[in] d_degrees         Device pointer of SizeT to degree array
  * @param[in] problem           Device pointer to the problem object
  * @param[out] d_output_counts  Device pointer to the output counts array
  * @param[in] input_length      Length of the incoming frontier queues (d_src_node_ids and d_dst_node_ids should have the same length)
@@ -389,6 +389,8 @@ void Inspect(
             typename KernelPolicy::VertexId     *d_column_indices,
             typename KernelPolicy::VertexId     *d_src_node_ids,
             typename KernelPolicy::VertexId     *d_dst_node_ids,
+            typename KernelPolicy::VertexId     *d_edge_list,
+            typename KernelPolicy::SizeT        *d_degrees,
             typename ProblemData::DataSlice     *problem,
             typename KernelPolicy::SizeT        *d_output_counts,
             typename KernelPolicy::SizeT        input_length,
@@ -401,6 +403,8 @@ void Inspect(
             d_column_indices,
             d_src_node_ids,
             d_dst_node_ids,
+            d_edge_list,
+            d_degrees,
             problem,
             d_output_counts,
             input_length,
@@ -438,6 +442,8 @@ void Inspect(
             typename KernelPolicy::VertexId     *d_column_indices,
             typename KernelPolicy::VertexId     *d_src_node_ids,
             typename KernelPolicy::VertexId     *d_dst_node_ids,
+            typename KernelPolicy::VertexId     *&d_edge_list,
+            typename KernelPolicy::SizeT        *&d_degrees,
             typename ProblemData::DataSlice     *problem,
             typename KernelPolicy::SizeT        *d_output_counts,
             typename KernelPolicy::SizeT        input_length,
@@ -450,6 +456,8 @@ void Inspect(
             d_column_indices,
             d_src_node_ids,
             d_dst_node_ids,
+            d_edge_list,
+            d_degrees,
             problem,
             d_output_counts,
             input_length,
@@ -469,8 +477,9 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         typename KernelPolicy::VertexId         *d_column_indices,
         typename KernelPolicy::VertexId         *d_src_node_ids,
         typename KernelPolicy::VertexId         *d_dst_node_ids,
-        typename KernelPolicy::VertexId         *d_src_node_ids_partitioned,
-        typename KernelPolicy::VertexId         *d_dst_node_ids_partitioned,
+        typename KernelPolicy::VertexId         *d_degrees,
+        typename KernelPolicy::VertexId         *d_edge_list,
+        typename KernelPolicy::VertexId         *d_edge_list_partitioned,
         typename KernelPolicy::SizeT            *d_flags,
         typename KernelPolicy::SizeT            *d_output_counts,
         typename KernelPolicy::SizeT            input_length,
@@ -491,9 +500,10 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
     
     Inspect<KernelPolicy, ProblemData, Functor>
     <<<block_num, KernelPolicy::THREADS>>>(
-            d_row_offsets,
             d_src_node_ids,
             d_dst_node_ids,
+            d_edge_list,
+            d_degrees,
             d_flags,
             input_length,
             max_vertex,
@@ -501,35 +511,36 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
 
     // Partition d_src_node_ids and d_dst_node_ids. Compute coarse_counts and
     // fine_counts.
+    
     void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
-    SizeT coarse_counts = 0;
+    SizeT *d_coarse_count;
+    SizeT coarse_counts[1] = {0};
+    util::GRError(cudaMalloc(
+                    (void**)&d_coarse_count[0],
+                    sizeof(SizeT)),
+                    "Coarse count cudaMalloc failed.", __FILE__, __LINE__);
+    
     cub::DevicePartition::Flagged(d_temp_storage,
                                   temp_storage_bytes,
-                                  d_src_node_ids,
+                                  d_edge_list,
                                   d_flags, 
-                                  d_src_node_ids_partitioned, 
-                                  coarse_counts, 
+                                  d_edge_list_partitioned, 
+                                  d_coarse_count, 
                                   input_length);
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
 
-    cub::DevicePartition::Flagged(d_temp_storage, 
-                                  temp_storage_bytes, 
-                                  d_src_node_ids,
+    cub::DevicePartition::Flagged(d_temp_storage,
+                                  temp_storage_bytes,
+                                  d_edge_list,
                                   d_flags, 
-                                  d_src_node_ids_partitioned, 
-                                  coarse_counts, 
+                                  d_edge_list_partitioned, 
+                                  d_coarse_count, 
                                   input_length);
+    util::GRError(cudaMemcpy(d_coarse_count, coarse_counts, sizeof(SizeT), cudaMemcpyHostToDevice),
+                    "Coarse count cudaMemcpy failed.", __FILE__, __LINE__);
 
-    cub::DevicePartition::Flagged(d_temp_storage, 
-                                  temp_storage_bytes, 
-                                  d_src_node_ids,
-                                  d_flags, 
-                                  d_src_node_ids_partitioned, 
-                                  coarse_counts, 
-                                  input_length);
-
-    SizeT fine_counts = input_length - coarse_counts;
+    SizeT fine_counts = input_length - coarse_counts[0];
 
     if (coarse_counts > 0) {
         SizeT pairs_per_block = (coarse_counts + KernelPolicy::BLOCKS - 1)
@@ -539,8 +550,10 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         <<<KernelPolicy::BLOCKS, KernelPolicy::THREADS>>>(
             d_row_offsets,
             d_column_indices,
-            d_src_node_ids_partitioned,
-            d_dst_node_ids_partitioned,
+            d_src_node_ids,
+            d_dst_node_ids,
+            d_edge_list_partitioned,
+            d_degrees,
             data_slice,
             d_output_counts,
             coarse_counts,
@@ -557,8 +570,10 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
     <<<KernelPolicy::BLOCKS, KernelPolicy::THREADS>>>(
             d_row_offsets,
             d_column_indices,
-            &d_src_node_ids_partitioned[coarse_counts],
-            &d_dst_node_ids_partitioned[coarse_counts],
+            d_src_node_ids,
+            d_dst_node_ids,
+            &d_edge_list_partitioned[coarse_counts[0]],
+            d_degrees,
             data_slice,
             d_output_counts,
             fine_counts,
