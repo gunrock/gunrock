@@ -52,6 +52,7 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
 	util::Array1D<SizeT, VertexId> d_src_node_ids;  // Used for ...
 	util::Array1D<SizeT, VertexId> d_dst_node_ids;  // Used for ...
     util::Array1D<SizeT, VertexId> d_edge_list;
+    util::Array1D<SizeT, VertexId> d_edge_list_partitioned;
     util::Array1D<SizeT, SizeT> d_degrees; // Used for store node degree
 	util::Array1D<SizeT, bool> d_flags;         /** < Used for candidate set boolean matrix */
 
@@ -63,6 +64,7 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
 	    d_src_node_ids	.SetName("d_src_node_ids");
 	    d_dst_node_ids	.SetName("d_dst_node_ids");
 	    d_edge_list	    .SetName("d_edge_list");
+	    d_edge_list_partitioned	    .SetName("d_edge_list_partitioned");
         d_degrees. SetName("d_degrees");
 	    d_flags		    .SetName("d_flags");
 	}
@@ -75,6 +77,7 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
             d_src_node_ids.Release();
             d_dst_node_ids.Release();
             d_edge_list.Release();
+            d_edge_list_partitioned.Release();
             d_degrees.Release();
             d_flags.Release();
 	}
@@ -232,6 +235,7 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
 		if(retval = data_slices[gpu]->d_src_node_ids.Allocate(edges, util::DEVICE))  return retval; 
 		if(retval = data_slices[gpu]->d_dst_node_ids.Allocate(edges, util::DEVICE))   return retval;
 		if(retval = data_slices[gpu]->d_edge_list.Allocate(edges, util::DEVICE))   return retval;
+		if(retval = data_slices[gpu]->d_edge_list_partitioned.Allocate(edges, util::DEVICE))   return retval;
 		if(retval = data_slices[gpu]->d_degrees.Allocate(nodes, util::DEVICE))   return retval;
 		if(retval = data_slices[gpu]->d_flags.Allocate(edges, util::DEVICE))  return retval;
 
@@ -278,6 +282,9 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
                 return retval;
         if (data_slices[gpu]->d_edge_list.GetPointer(util::DEVICE) == NULL) 
             if (retval = data_slices[gpu]->d_edge_list.Allocate(edges, util::DEVICE)) 
+                return retval;
+        if (data_slices[gpu]->d_edge_list_partitioned.GetPointer(util::DEVICE) == NULL) 
+            if (retval = data_slices[gpu]->d_edge_list_partitioned.Allocate(edges, util::DEVICE)) 
                 return retval;
         if (data_slices[gpu]->d_degrees.GetPointer(util::DEVICE) == NULL) 
             if (retval = data_slices[gpu]->d_degrees.Allocate(nodes, util::DEVICE)) 

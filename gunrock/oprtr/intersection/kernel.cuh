@@ -207,7 +207,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         if (threadIdx.x == 0)
         {
             d_output_counts[blockIdx.x] += aggregate;
-        } 
+        }
     }
 
     static __device__ void IntersectTwoLargeNL(
@@ -468,7 +468,7 @@ void Inspect(
 
 // Kernel Entry point for performing batch intersection computation
 template <typename KernelPolicy, typename ProblemData, typename Functor>
-    void LaunchKernel(
+    typename KernelPolicy::SizeT LaunchKernel(
         gunrock::app::EnactorStats              &enactor_stats,
         gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                                 &frontier_attribute,
@@ -537,7 +537,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                                   d_edge_list_partitioned, 
                                   d_coarse_count, 
                                   input_length);
-    util::GRError(cudaMemcpy(d_coarse_count, coarse_counts, sizeof(SizeT), cudaMemcpyHostToDevice),
+    util::GRError(cudaMemcpy(coarse_counts, d_coarse_count, sizeof(SizeT), cudaMemcpyDeviceToHost),
                     "Coarse count cudaMemcpy failed.", __FILE__, __LINE__);
 
     SizeT fine_counts = input_length - coarse_counts[0];
@@ -580,6 +580,26 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             stride,
             max_vertex,
             max_edge);
+
+    cub::DeviceReduce::Sum(d_temp_storage,
+                                  temp_storage_bytes,
+                                  d_output_counts,
+                                  &d_output_counts[KernelPolicy::BLOCKS],
+                                  KernelPolicy::BLOCKS);
+    cudaMalloc(&d_temp_storage, temp_storage_bytes);
+
+    cub::DeviceReduce::Sum(d_temp_storage,
+                                  temp_storage_bytes,
+                                  d_output_counts,
+                                  &d_output_counts[KernelPolicy::BLOCKS],
+                                  KernelPolicy::BLOCKS);
+
+    util::GRError(cudaMemcpy( coarse_counts,
+    &d_output_counts[KernelPolicy::BLOCKS], sizeof(SizeT),
+    cudaMemcpyDeviceToHost),"Coarse count cudaMemcpy failed.", __FILE__,
+    __LINE__);
+
+    return coarse_counts[0];
 }
 
 }  // intersection

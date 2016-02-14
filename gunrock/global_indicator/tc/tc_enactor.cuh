@@ -224,8 +224,8 @@ class TCEnactor :
 
       //Filter to get edge_list (done)
       //declare edge_list in problem (done)
-      //modify intersection operator
-      //cubPartition the coarse_count is on device, need to change
+      //modify intersection operator (done)
+      //cubPartition the coarse_count is on device, need to change (done)
       gunrock::oprtr::filter::Kernel<FilterKernelPolicy, TCProblem, TCFunctor>
       <<<statistics->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
       statistics->iteration,
@@ -243,16 +243,38 @@ class TCEnactor :
       statistics->filter_kernel_stats);
 
       //GetQueueLength of the new edge_list
-      if (statistics->retval = work_progress->GetQueueLength(++attributes->queue_index, attributes->queue_length, false, stream, true)) return;
+      if (retval = work_progress->GetQueueLength(++attributes->queue_index, attributes->queue_length, false, stream, true)) return retval;
 
       // 2) Do intersection using generated edge lists from the previous step.
       //gunrock::oprtr::intersection::LaunchKernel
       //<IntersectionKernelPolicy, TCProblem, TCFunctor>(
       //);
+      // Reuse d_scanned_edges
+      SizeT *d_output_counts = d_scanned_edges;
 
-      // 3) DeviceReduce the output to collect the triangle count.
+      // Should make tc_count a member var to TCProblem
+      SizeT tc_count = gunrock::oprtr::intersection::LaunchKernel
+      <IntersectionKernelPolicy, TCProblem, TCFunctor>(
+      statistics[0],
+      attributes[0],
+      d_data_slice,
+      graph_slice->row_offsets.GetPointer(util::DEVICE),
+      graph_slice->column_indices.GetPointer(util::DEVICE),
+      data_slice->d_src_node_ids.GetPointer(util::DEVICE),
+      data_slice->d_dst_node_ids.GetPointer(util::DEVICE),
+      data_slice->d_degrees.GetPointer(util::DEVICE),
+      data_slice->d_edge_list.GetPointer(util::DEVICE),
+      data_slice->d_edge_list_partitioned.GetPointer(util::DEVICE),
+      data_slice->d_flags.GetPointer(util::DEVICE),
+      d_output_counts,
+      attributes->queue_length,
+      graph_slice->nodes,
+      graph_slice->edges,
+      work_progress,
+      context[0],
+      stream);
 
-      // end of the TC recursive loop
+      // end of the TC
 
       if (d_scanned_edges) cudaFree(d_scanned_edges);
       if (retval) break;
