@@ -29,9 +29,9 @@ namespace gunrock {
 namespace oprtr {
 namespace intersection {
 
-template<typename Value, typename VertexId, typename SizeT, bool RangeCheck, typename Comp>
-__device__ int SerialSetIntersection(const Value* aData,
-                                     const Value* bData,
+template<typename VertexId, typename SizeT, typename Comp>
+__device__ int SerialSetIntersection(VertexId* aData,
+                                     VertexId* bData,
                                      VertexId aBegin,
                                      VertexId aEnd,
                                      VertexId bBegin,
@@ -44,13 +44,11 @@ __device__ int SerialSetIntersection(const Value* aData,
 
                                      #pragma unroll
                                      for (int i = 0; i < vt; ++i) {
-                                       bool test = RangeCheck ?
-                                       ((aBegin + bBegin < end) && (aBegin < aEnd) && (bBegin < bEnd)) :
-                                       (i < MinIterations || (aBegin + bBegin < end));
+                                       bool test = (aBegin + bBegin < end) && (aBegin < aEnd) && (bBegin < bEnd);
 
                                        if (test) {
-                                        Value aKey = aData[aBegin];
-                                        Value bKey = bData[bBegin];
+                                        VertexId aKey = aData[aBegin];
+                                        VertexId bKey = bData[bBegin];
 
                                         bool pA = comp(aKey, bKey);
                                         bool pB = comp(bKey, aKey);

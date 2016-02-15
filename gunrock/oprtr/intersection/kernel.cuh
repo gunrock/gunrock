@@ -156,8 +156,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         // that sane users won't input -1.
         SizeT src_nl_size = d_degrees[src_node];
         SizeT dst_nl_size = d_degrees[dst_node];
-        d_flags[idx] = (src_nl_size > KernelPolicy::NL_THRESDHOLD
-                     && dst_nl_size > KernelPolicy::NL_THRESHOLD) ? 1 : 0;
+        d_flags[idx] = (src_nl_size > KernelPolicy::NL_SIZE_THRESHOLD
+                     && dst_nl_size > KernelPolicy::NL_SIZE_THRESHOLD) ? 1 : 0;
     }
 
     static __device__ void IntersectTwoSmallNL(
@@ -294,8 +294,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             VertexId bBegin = 0;
             VertexId aEnd = smem_storage.s_partition_idx[gid];
             VertexId bEnd = nv - smem_storage.s_partition_idx[gid];
-            SizeT result = SerialSetIntersection(a_list[a_rowoffset+diag],
-                                  b_list[b_rowoffset+diag],
+            SizeT result = SerialSetIntersection(&a_list[a_rowoffset+diag],
+                                  &b_list[b_rowoffset+diag],
                                   aBegin,
                                   aEnd,
                                   bBegin,
@@ -543,8 +543,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
     SizeT fine_counts = input_length - coarse_counts[0];
 
     if (coarse_counts > 0) {
-        SizeT pairs_per_block = (coarse_counts + KernelPolicy::BLOCKS - 1)
-                                >> KernelPolicy::LOG_BLOCKS;
+        SizeT pairs_per_block = (coarse_counts[0] + KernelPolicy::BLOCKS - 1) >> KernelPolicy::LOG_BLOCKS;
         // Use IntersectTwoLargeNL
         IntersectTwoLargeNL<KernelPolicy, ProblemData, Functor>
         <<<KernelPolicy::BLOCKS, KernelPolicy::THREADS>>>(
@@ -556,7 +555,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             d_degrees,
             data_slice,
             d_output_counts,
-            coarse_counts,
+            coarse_counts[0],
             pairs_per_block,
             max_vertex,
             max_edge);

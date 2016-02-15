@@ -50,17 +50,20 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
     struct DataSlice : DataSliceBase<SizeT, VertexId, Value>{
         // device storage arrays
 	util::Array1D<SizeT, VertexId> d_src_node_ids;  // Used for ...
+
+    util::Array1D<SizeT, VertexId> labels; // does not used in MST
 	util::Array1D<SizeT, VertexId> d_dst_node_ids;  // Used for ...
     util::Array1D<SizeT, VertexId> d_edge_list;
     util::Array1D<SizeT, VertexId> d_edge_list_partitioned;
     util::Array1D<SizeT, SizeT> d_degrees; // Used for store node degree
-	util::Array1D<SizeT, bool> d_flags;         /** < Used for candidate set boolean matrix */
+	util::Array1D<SizeT, SizeT> d_flags;         /** < Used for candidate set boolean matrix */
 
 	/*
          * @brief Default constructor
          */
         DataSlice()
         {
+	    labels		.SetName("labels");
 	    d_src_node_ids	.SetName("d_src_node_ids");
 	    d_dst_node_ids	.SetName("d_dst_node_ids");
 	    d_edge_list	    .SetName("d_edge_list");
@@ -79,6 +82,7 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
             d_edge_list.Release();
             d_edge_list_partitioned.Release();
             d_degrees.Release();
+            labels.Release();
             d_flags.Release();
 	}
         
@@ -238,6 +242,7 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
 		if(retval = data_slices[gpu]->d_edge_list_partitioned.Allocate(edges, util::DEVICE))   return retval;
 		if(retval = data_slices[gpu]->d_degrees.Allocate(nodes, util::DEVICE))   return retval;
 		if(retval = data_slices[gpu]->d_flags.Allocate(edges, util::DEVICE))  return retval;
+		if(retval = data_slices[gpu]->labels.Allocate(nodes, util::DEVICE))  return retval;
 
         }
             // add multi-GPU allocation code
@@ -292,6 +297,9 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
         if (data_slices[gpu]->d_flags.GetPointer(util::DEVICE) == NULL) 
             if (retval = data_slices[gpu]->d_flags.Allocate(edges, util::DEVICE)) 
                 return retval;
+if (data_slices[gpu]->labels.GetPointer(util::DEVICE) == NULL) 
+            if (retval = data_slices[gpu]->labels.Allocate(nodes, util::DEVICE)) 
+                return retval;
             // TODO: code to for other allocations here 
 
             if (retval = util::GRError(
@@ -308,7 +316,7 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
                 data_slices[0]->frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes);
 
         util::MemsetMadVectorKernel<<<128, 128>>>(
-                data_slices[0]->d_degrees,
+                data_slices[0]->d_degrees.GetPointer(util::DEVICE),
                 this->graph_slices[0]->row_offsets.GetPointer(util::DEVICE),
                 this->graph_slices[0]->row_offsets.GetPointer(util::DEVICE)+1, -1, nodes);
 
@@ -319,7 +327,7 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
 };
 
 }  // namespace tc
-}  // namespace app
+}  // namespace global_indicator
 }  // namespace gunrock
 
 // Leave this at the end of the file

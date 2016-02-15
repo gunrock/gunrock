@@ -22,6 +22,7 @@
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/global_indicator/tc/tc_problem.cuh>
+#include <gunrock/global_indicator/tc/tc_functor.cuh>
 
 #include <moderngpu.cuh>
 #include <cub/cub.cuh>
@@ -33,43 +34,6 @@ namespace tc {
 using namespace gunrock::app;
 using namespace mgpu;
 using namespace cub;
-
-template<
-typename VertexId,
-typename SizeT,
-typename Value,
-typename ProblemData>
-struct TCFunctor
-{
-    typedef typename ProblemData::DataSlice DataSlice;
-    
-    static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
-    {
-        return (problem->d_degrees[s_id] > problem->d_degrees[d_id]
-                || (problem->d_degrees[s_id] == problem->d_degrees[d_id] && s_id < d_id));
-    }
-
-    static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
-    {
-        return;
-    }
-
-    static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
-    {
-            return (node!=-1);
-    }
-
-    static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
-    {
-        return;
-    }
-};
 
 /**
  * @brief TC enactor class.
@@ -142,6 +106,8 @@ class TCEnactor :
     typedef typename TCProblem::SizeT    SizeT;
     typedef typename TCProblem::Value    Value;
 
+    typedef TCFunctor <VertexId, SizeT, Value, TCProblem> TCFunctor;
+
     cudaError_t retval = cudaSuccess;
     SizeT *d_scanned_edges = NULL;  // Used for LB
 
@@ -157,7 +123,6 @@ class TCEnactor :
     do
     {
       // initialization
-      if (retval = Setup(problem)) break;
       if (retval = EnactorBase<
         typename _Problem::SizeT, _DEBUG, _SIZE_CHECK>::Setup(
           problem,
@@ -213,7 +178,7 @@ class TCEnactor :
       (VertexId*)NULL,
       graph_slice->nodes,
       graph_slice->edges,
-      work_progress,
+      work_progress[0],
       context[0],
       stream,
       gunrock::oprtr::advance::V2E);
@@ -237,7 +202,7 @@ class TCEnactor :
       data_slice->d_edge_list.GetPointer(util::DEVICE),
       d_data_slice,
       NULL,
-      work_progress,
+      work_progress[0],
       graph_slice->edges,
       graph_slice->edges,
       statistics->filter_kernel_stats);
@@ -270,7 +235,7 @@ class TCEnactor :
       attributes->queue_length,
       graph_slice->nodes,
       graph_slice->edges,
-      work_progress,
+      work_progress[0],
       context[0],
       stream);
 
