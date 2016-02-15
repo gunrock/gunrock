@@ -5,14 +5,16 @@ set(gunrock_VERSION_MINOR 3)
 set(gunrock_VERSION_PATCH 0)
 add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MINOR}.${gunrock_VERSION_PATCH}")
 
+set(gunrock_REQUIRED_CUDA_VERSION 6.5)
 set(gunrock_REQUIRED_BOOST_VERSION 1.53)
 set(gunrock_REQUIRED_METIS_VERSION 5.0)
+
 
 cmake_minimum_required(VERSION 2.8)
 
 option(CMAKE_VERBOSE_MAKEFILE ON)
 
-find_package(CUDA REQUIRED)
+find_package(CUDA ${gunrock_REQUIRED_CUDA_VERSION} REQUIRED)
 
 if(CUDA_64_BIT_DEVICE_CODE)
   set(gunrock_arch_suffix x86_64)
@@ -31,21 +33,54 @@ else()
   message(WARNING "Boost was requested but support was not found, run /dep/install_boost.sh for installation.")
 endif ()
 
-find_package(OpenMP)
-if(OPENMP_FOUND)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  # also see how to do overrides:
+  # https://gist.github.com/robertmaynard/11297565
+
+  # updated for CUDA 7, which uses libc++ rather than libstdc++
+  # older settings: check the git history
+  set(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} 	 /opt/local/lib /opt/local/lib/libomp)
+  set(CMAKE_INCLUDE_PATH ${CMAKE_INCLUDE_PATH} 	 /opt/local/include /opt/local/include/libomp)
+  # message(WARNING "Clang detected - CMake Root: ${CMAKE_FIND_ROOT_PATH}")
+
+  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+
+    #added for Boost and OpenMP on OS X
+    FIND_PATH(OPENMP_INCLUDE omp.h PATHS ${CMAKE_INCLUDE_PATH})
+    FIND_LIBRARY(OPENMP_LIB NAMES libgomp.dylib libomp.dylib libiomp5.dylib PATHS ${CMAKE_LIBRARY_PATH})
+    if (OPENMP_INCLUDE OR OPENMP_LIB)
+
+      link_directories("/opt/local/lib" "/opt/local/lib/libomp")
+      include_directories("/opt/local/include" "/opt/local/include/libomp")
+
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    else()
+      message(WARNING "OpenMP (libomp) was requested but support was not found")
+    endif(OPENMP_INCLUDE OR OPENMP_LIB)
+
+  endif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+
 else()
-  message(WARNING "OpenMP was requested but support was not found")
-endif()
+
+  find_package(OpenMP)
+  if(OPENMP_FOUND)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+  else()
+    message(WARNING "OpenMP was requested but support was not found")
+  endif()
+endif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 FIND_LIBRARY(METIS_LIB NAMES metis)
 find_package(Metis ${gunrock_REQUIRED_METIS_VERSION} REQUIRED)
 SET(METIS_FOUND FALSE)
 IF (METIS_LIB)
-  SET(METIS_FOUND TRUE)
+  set(METIS_FOUND TRUE)
+  add_definitions( -DMETIS_FOUND=TRUE )
   message(STATUS "Found Metis")
 ELSE (METIS_LIB)
+  add_definitions( -DMETIS_FOUND=FALSE )
   message(WARNING "Metis was requested but support was not found, run /dep/install_metis.sh for installation.")
 ENDIF (METIS_LIB)
 
@@ -183,23 +218,6 @@ endif (CUDA_VERBOSE_PTXAS)
 # c++11 is required
 set(CUDA_NVCC_FLAGS -std=c++11)
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  # also see how to do overrides:
-  # https://gist.github.com/robertmaynard/11297565
-
-  # updated for CUDA 7, which uses libc++ rather than libstdc++
-  # older settings: check the git history
-  set(CUDA_PROPAGATE_HOST_FLAGS OFF)
-  set(CMAKE_CXX_FLAGS -std=c++11)
-
-  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    #added for Boost and OpenMP on OS X
-    link_directories("/opt/local/lib" "/opt/local/lib/libomp")
-    include_directories("/opt/local/include" "/opt/local/include/libomp")
-  endif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-
-endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-
 if(GUNROCK_BUILD_LIB)
   if(GUNROCK_BUILD_SHARED_LIBS)
     set(LIB_TYPE SHARED)
@@ -304,3 +322,4 @@ set_tests_properties(SHARED_LIB_TEST_PAGERANK
 #    data/simple_example/bips98_606.mtx --src=largestdegree)
 #set_tests_properties(TestBFS
 #    PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
