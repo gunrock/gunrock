@@ -114,6 +114,7 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
 
     Csr<VertexId, Value, SizeT>* graph =
         (Csr<VertexId, Value, SizeT>*)info->csr_ptr;
+
     int num_gpus            = info->info["num_gpus"].get_int();
     int max_grid_size       = info->info["max_grid_size"].get_int();
     int iterations          = 1; //force to 1 info->info["num_iteration"].get_int();

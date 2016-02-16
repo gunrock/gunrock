@@ -514,10 +514,10 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
     
     void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
-    SizeT *d_coarse_count;
+    SizeT *d_coarse_count = NULL;
     SizeT coarse_counts[1] = {0};
     util::GRError(cudaMalloc(
-                    (void**)&d_coarse_count[0],
+                    &d_coarse_count,
                     sizeof(SizeT)),
                     "Coarse count cudaMalloc failed.", __FILE__, __LINE__);
     

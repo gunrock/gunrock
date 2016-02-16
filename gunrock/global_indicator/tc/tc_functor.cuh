@@ -20,8 +20,9 @@ struct TCFunctor
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        return (problem->d_degrees[s_id] > problem->d_degrees[d_id]
+        bool res =  (problem->d_degrees[s_id] > problem->d_degrees[d_id]
                 || (problem->d_degrees[s_id] == problem->d_degrees[d_id] && s_id < d_id));
+        return res;
     }
 
     static __device__ __forceinline__ void ApplyEdge(

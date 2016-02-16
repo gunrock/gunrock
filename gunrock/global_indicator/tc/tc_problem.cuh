@@ -31,7 +31,7 @@ template<typename VertexId,
 	 typename SizeT, 
 	 typename Value>
 struct TCProblem : ProblemBase<VertexId, SizeT, Value,
-	false,
+	true,   // need to mark predecessor
 	false,
 	false,
 	false,	// _ENABLE_BACKWARD
@@ -52,7 +52,6 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
 	util::Array1D<SizeT, VertexId> d_src_node_ids;  // Used for ...
 
     util::Array1D<SizeT, VertexId> labels; // does not used in MST
-	util::Array1D<SizeT, VertexId> d_dst_node_ids;  // Used for ...
     util::Array1D<SizeT, VertexId> d_edge_list;
     util::Array1D<SizeT, VertexId> d_edge_list_partitioned;
     util::Array1D<SizeT, SizeT> d_degrees; // Used for store node degree
@@ -65,7 +64,6 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
         {
 	    labels		.SetName("labels");
 	    d_src_node_ids	.SetName("d_src_node_ids");
-	    d_dst_node_ids	.SetName("d_dst_node_ids");
 	    d_edge_list	    .SetName("d_edge_list");
 	    d_edge_list_partitioned	    .SetName("d_edge_list_partitioned");
         d_degrees. SetName("d_degrees");
@@ -78,7 +76,6 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
         {
             if (util::SetDevice(this->gpu_idx)) return;
             d_src_node_ids.Release();
-            d_dst_node_ids.Release();
             d_edge_list.Release();
             d_edge_list_partitioned.Release();
             d_degrees.Release();
@@ -181,7 +178,7 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
 
         ProblemBase<
 	VertexId, SizeT, Value,
-		false,
+		true,
 		false,
 		false,
 		false, // _ENABLE_BACKWARD
@@ -237,7 +234,6 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
 
         // create SoA on device
 		if(retval = data_slices[gpu]->d_src_node_ids.Allocate(edges, util::DEVICE))  return retval; 
-		if(retval = data_slices[gpu]->d_dst_node_ids.Allocate(edges, util::DEVICE))   return retval;
 		if(retval = data_slices[gpu]->d_edge_list.Allocate(edges, util::DEVICE))   return retval;
 		if(retval = data_slices[gpu]->d_edge_list_partitioned.Allocate(edges, util::DEVICE))   return retval;
 		if(retval = data_slices[gpu]->d_degrees.Allocate(nodes, util::DEVICE))   return retval;
@@ -281,9 +277,6 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
             // allocate output labels if necessary
         if (data_slices[gpu]->d_src_node_ids.GetPointer(util::DEVICE) == NULL) 
             if (retval = data_slices[gpu]->d_src_node_ids.Allocate(edges, util::DEVICE)) 
-                return retval;
-        if (data_slices[gpu]->d_dst_node_ids.GetPointer(util::DEVICE) == NULL) 
-            if (retval = data_slices[gpu]->d_dst_node_ids.Allocate(edges, util::DEVICE)) 
                 return retval;
         if (data_slices[gpu]->d_edge_list.GetPointer(util::DEVICE) == NULL) 
             if (retval = data_slices[gpu]->d_edge_list.Allocate(edges, util::DEVICE)) 

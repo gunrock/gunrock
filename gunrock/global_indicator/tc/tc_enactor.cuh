@@ -152,7 +152,7 @@ class TCEnactor :
       // TODO: move this to problem. need to send CudaContext to problem too.
       IntervalExpand(
             graph_slice->edges,
-            data_slice->d_degrees.GetPointer(util::DEVICE),
+            graph_slice->row_offsets.GetPointer(util::DEVICE),
             queue->keys[attributes->selector].GetPointer(util::DEVICE),
             graph_slice->nodes,
             data_slice->d_src_node_ids.GetPointer(util::DEVICE),
@@ -183,8 +183,9 @@ class TCEnactor :
       stream,
       gunrock::oprtr::advance::V2E);
 
-      attributes->queue_reset = false;
-      attributes->queue_index++;
+
+      
+      if (retval = work_progress->GetQueueLength(++attributes->queue_index, attributes->queue_length, false, stream, true)) return retval;
       attributes->selector ^= 1;
 
       //Filter to get edge_list (done)
@@ -226,7 +227,7 @@ class TCEnactor :
       graph_slice->row_offsets.GetPointer(util::DEVICE),
       graph_slice->column_indices.GetPointer(util::DEVICE),
       data_slice->d_src_node_ids.GetPointer(util::DEVICE),
-      data_slice->d_dst_node_ids.GetPointer(util::DEVICE),
+      graph_slice->column_indices.GetPointer(util::DEVICE),
       data_slice->d_degrees.GetPointer(util::DEVICE),
       data_slice->d_edge_list.GetPointer(util::DEVICE),
       data_slice->d_edge_list_partitioned.GetPointer(util::DEVICE),
@@ -238,6 +239,10 @@ class TCEnactor :
       work_progress[0],
       context[0],
       stream);
+
+      tc_count /= 3;
+
+      printf("tc count:%d\n", tc_count);
 
       // end of the TC
 
