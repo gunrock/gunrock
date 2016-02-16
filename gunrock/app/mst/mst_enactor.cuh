@@ -200,7 +200,7 @@ public:
             bool debug_info = 0;   // used for debug purpose
             //int tmp_select  = 0; // used for debug purpose
             //int tmp_length  = 0; // used for debug purpose
-            SizeT *num_selected = new SizeT; // used in cub select
+            unsigned int *num_selected = new unsigned int; // used in cub select
 
             //////////////////////////////////////////////////////////////////////////
             // recursive Loop for minimum spanning tree implementation

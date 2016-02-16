@@ -755,9 +755,10 @@ template <
     typename SizeT   > // the size tyep, usually int or long long
 int main_Value(CommandLineArgs *args)
 {
-    if (args -> CheckCmdLineFlag("64bit-Value"))
-        return main_<VertexId, SizeT, double>(args);
-    else 
+// disabled to reduce compile time
+//    if (args -> CheckCmdLineFlag("64bit-Value"))
+//        return main_<VertexId, SizeT, double>(args);
+//    else 
         return main_<VertexId, SizeT, float >(args);
 }
 
@@ -765,14 +766,16 @@ template <
     typename VertexId>
 int main_SizeT(CommandLineArgs *args)
 {
-    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-        return main_Value<VertexId, long long>(args);
-    else
+// disabled to reduce compile time
+//    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+//        return main_Value<VertexId, long long>(args);
+//    else
         return main_Value<VertexId, int      >(args);
 }
 
 int main_VertexId(CommandLineArgs *args)
 {
+// disabled, because of filter smem size issue
     //if (args -> CheckCmdLineFlag("64bit-VertexId"))
     //    return main_SizeT<long long>(args);
     //else 

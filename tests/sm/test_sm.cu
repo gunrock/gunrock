@@ -366,9 +366,10 @@ template <
     typename SizeT   > // the size tyep, usually int or long long
 int main_Value(CommandLineArgs *args, int graph_args)
 {
-    if (args -> CheckCmdLineFlag("64bit-Value"))
-        return main_<VertexId, SizeT, long long>(args, graph_args);
-    else
+// disabled to reduce compile time
+//    if (args -> CheckCmdLineFlag("64bit-Value"))
+//        return main_<VertexId, SizeT, long long>(args, graph_args);
+//    else
         return main_<VertexId, SizeT, int      >(args, graph_args);
 }
 

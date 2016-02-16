@@ -518,6 +518,7 @@ int main_SizeT(CommandLineArgs *args)
 
 int main_VertexId(CommandLineArgs *args)
 {
+    // disabled because of filter smem oversize issue
     //if (args -> CheckCmdLineFlag("64bit-VertexId"))
     //    return main_SizeT<long long>(args);
     //else 
