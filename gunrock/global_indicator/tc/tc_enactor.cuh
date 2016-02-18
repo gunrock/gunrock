@@ -211,6 +211,9 @@ class TCEnactor :
       //GetQueueLength of the new edge_list
       if (retval = work_progress->GetQueueLength(++attributes->queue_index, attributes->queue_length, false, stream, true)) return retval;
 
+      //util::DisplayDeviceResults(data_slice->d_edge_list.GetPointer(util::DEVICE), attributes->queue_length);
+
+      printf("queue length:%d\n", attributes->queue_length);
       // 2) Do intersection using generated edge lists from the previous step.
       //gunrock::oprtr::intersection::LaunchKernel
       //<IntersectionKernelPolicy, TCProblem, TCFunctor>(
@@ -240,7 +243,7 @@ class TCEnactor :
       context[0],
       stream);
 
-      tc_count /= 3;
+      tc_count /= 1;
 
       printf("tc count:%d\n", tc_count);
 
@@ -265,7 +268,7 @@ class TCEnactor :
    * \return cudaError_t object which indicates the success of
    * all CUDA function calls.
    */
-  template <typename TCProblem>
+  template <typename TCProblem, int NL_SIZE>
   cudaError_t Enact(
     ContextPtr  context,
     TCProblem* problem,
@@ -322,7 +325,7 @@ class TCEnactor :
         8,                  // MIN_CTA_OCCUPANCY
         10,                 // LOG_THREADS
         8,                  // LOG_BLOCKS
-        7>                  // NL_SIZE_THRESHOLD
+        NL_SIZE>                  // NL_SIZE_THRESHOLD
         IntersectionKernelPolicy;
 
       return EnactTC<AdvanceKernelPolicy, FilterKernelPolicy, IntersectionKernelPolicy,

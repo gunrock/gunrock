@@ -36,20 +36,21 @@ __device__ int SerialSetIntersection(VertexId* aData,
                                      VertexId aEnd,
                                      VertexId bBegin,
                                      VertexId bEnd,
-                                     VertexId end,
-                                     SizeT vt,
+                                     VertexId vt,
+                                     SizeT end,
                                      Comp comp) {
-                                     const int MinIterations = vt/2;
-                                     int result = 0;
-
+                                     int result = 0; 
+ 
                                      #pragma unroll
                                      for (int i = 0; i < vt; ++i) {
-                                       bool test = (aBegin + bBegin < end) && (aBegin < aEnd) && (bBegin < bEnd);
+                                       bool test = (aBegin + bBegin < end) && (aBegin <= aEnd) && (bBegin <= bEnd);
 
                                        if (test) {
-                                        VertexId aKey = aData[aBegin];
-                                        VertexId bKey = bData[bBegin];
-
+                                        //if (blockIdx.x < 13 && threadIdx.x < 10) {
+                                        //    printf("%d %d abegin:%d, bbegin:%d, aend:%d, bend:%d, akey %d bkey %d\n",blockIdx.x, threadIdx.x, aBegin, bBegin, aEnd, bEnd, aData[aBegin], bData[bBegin]);
+                                       // }
+                                       VertexId aKey = aData[aBegin];
+                                        VertexId bKey = bData[bBegin]; 
                                         bool pA = comp(aKey, bKey);
                                         bool pB = comp(bKey, aKey);
 
@@ -57,7 +58,7 @@ __device__ int SerialSetIntersection(VertexId* aData,
                                         if (!pB) ++bBegin;
                                         if (pA == pB) ++result;
                                        }
-                                     }
+                                     } 
                                      return result;
                                     }
 

@@ -84,7 +84,7 @@ struct KernelPolicy
         THREADS                         = 1 << LOG_THREADS,
         LOG_BLOCKS                      = _LOG_BLOCKS,
         BLOCKS                          = 1 << LOG_BLOCKS,
-        NL_SIZE_THRESHOLD               = _NL_SIZE_THRESHOLD,
+        NL_SIZE_THRESHOLD               = 1 << _NL_SIZE_THRESHOLD,
     };
     
     /**
