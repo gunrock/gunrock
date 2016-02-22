@@ -101,6 +101,125 @@ __device__ __forceinline__ int FastMul(int a, int b)
 #endif  
 }
 
+// Ensure no un-specialized types will be compiled
+extern __device__ __host__ void Error_UnsupportedType();
+ 
+template <typename T>
+__device__ __host__ __forceinline__ T MaxValue()
+{
+    Error_UnsupportedType();
+    return 0;
+}
+
+template <>
+__device__ __host__ __forceinline__ int MaxValue<int>()
+{
+    return INT_MAX;
+}
+
+template <>
+__device__ __host__ __forceinline__ long long MaxValue<long long>()
+{
+    return LLONG_MAX;
+}
+
+template <typename T>
+__device__ __host__ __forceinline__ T MinValue()
+{
+    Error_UnsupportedType();
+    return 0;
+}
+
+template <>
+__device__ __host__ __forceinline__ int MinValue<int>()
+{
+    return INT_MIN;
+}
+
+template <>
+__device__ __host__ __forceinline__ long long MinValue<long long>()
+{
+    return LLONG_MIN;
+}
+
+/*template <typename T, size_t SIZE>
+__device__ __host__ __forceinline__ T AllZeros_N()
+{
+    Error_UnsupportedSize();
+    return 0;
+}
+
+template <typename T>
+__device__ __host__ __forceinline__ T AllZeros_N<T, 4>()
+{
+    return (T)0x00000000;
+}
+
+template <typename T>
+__device__ __host__ __forceinline__ T AllZeros_N<T, 8>()
+{
+    return (T)0x0000000000000000;
+}*/
+
+template <typename T>
+__device__ __host__ __forceinline__ T AllZeros()
+{
+    //return AllZeros_N<T, sizeof(T)>();
+    Error_UnsupportedType();
+    return 0;
+}
+
+template <>
+__device__ __host__ __forceinline__ int AllZeros<int>()
+{
+    return (int)0x00000000;
+}
+
+template <>
+__device__ __host__ __forceinline__ long long AllZeros<long long>()
+{
+    return (long long)0x0000000000000000LL;
+}
+
+
+/*template <typename T, size_t SIZE>
+__device__ __host__ __forceinline__ T AllOnes_N()
+{
+    Error_UnsupportedSize();
+    return 0;
+}
+
+template <typename T>
+__device__ __host__ __forceinline__ T AllOnes_N<T, 4>()
+{
+    return (T)0xFFFFFFFF;
+}
+
+template <typename T>
+__device__ __host__ __forceinline__ T AllOnes_N<T, 8>()
+{
+    return (T)0xFFFFFFFFFFFFFFFF;
+}*/
+
+template <typename T>
+__device__ __host__ __forceinline__ T AllOnes()
+{
+    //return AllOnes_N<T, sizeof(T)>();
+    Error_UnsupportedType();
+    return 0;
+}
+
+template <>
+__device__ __host__ __forceinline__ int AllOnes<int>()
+{
+    return (int)0xFFFFFFFF;
+}
+
+template <>
+__device__ __host__ __forceinline__ long long AllOnes<long long>()
+{
+    return (long long)0xFFFFFFFFFFFFFFFFLL;
+}
 
 /**
  * Wrapper for performing atomic operations on integers of type size_t 

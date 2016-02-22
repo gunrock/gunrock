@@ -12,8 +12,6 @@
  * @brief Kernel configuration policy for Forward Edge Expansion Kernel
  */
 
-
-
 #pragma once
 
 #include <gunrock/util/basic_utils.h>
@@ -62,22 +60,105 @@ enum TYPE {
  * @brief opeartion to use for mgpu primitives
  */
 enum REDUCE_OP {
-    NONE,
-    PLUS,
-    MINUS,
-    MULTIPLIES,
-    MODULUS,
-    BIT_OR,
-    BIT_AND,
-    BIT_XOR,
-    MAXIMUM,
-    MINIMUM
+    NONE       ,
+    PLUS       ,
+    MINUS      ,
+    MULTIPLIES ,
+    MODULUS    ,
+    BIT_OR     ,
+    BIT_AND    ,
+    BIT_XOR    ,
+    MAXIMUM    ,
+    MINIMUM    
 };
 
 enum REDUCE_TYPE {
     EMPTY,
     VERTEX,
     EDGE
+};
+
+template <typename T, REDUCE_OP R_OP>
+struct Identity
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        extern __device__ __host__ void Error_UnsupportedOperation();
+        Error_UnsupportedOperation();
+        return 0;
+    }
+};
+
+template <typename T>
+struct Identity<T, NONE>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return 0;
+    }
+};
+
+template <typename T>
+struct Identity<T, PLUS>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return 0;
+    }
+};
+
+template <typename T>
+struct Identity<T, MULTIPLIES>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return 1;
+    }
+};
+
+template <typename T>
+struct Identity<T, BIT_OR>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return util::AllZeros<T>();
+    }
+};
+
+template <typename T>
+struct Identity<T, BIT_AND>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return util::AllOnes <T>();
+    }
+};
+
+template <typename T>
+struct Identity<T, BIT_XOR>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return util::AllZeros<T>();
+    }
+};
+
+template <typename T>
+struct Identity<T, MAXIMUM>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return util::MinValue<T>();
+    }
+};
+
+template <typename T>
+struct Identity<T, MINIMUM>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return util::MaxValue<T>();
+    }
 };
 
 /**

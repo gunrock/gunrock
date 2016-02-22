@@ -236,35 +236,38 @@ public:
 
 
     // Deallocates and resets the progress counters
-    cudaError_t HostReset()
+    cudaError_t Release()
     {
         cudaError_t retval = cudaSuccess;
 
-        do {
-            if (gpu != GR_INVALID_DEVICE) {
+        if (gpu != GR_INVALID_DEVICE) 
+        {
 
-                // Save current gpu
-                int current_gpu;
-                if (retval = util::GRError(cudaGetDevice(&current_gpu),
-                    "CtaWorkProgress cudaGetDevice failed: ", __FILE__, __LINE__)) break;
+            // Save current gpu
+            int current_gpu;
+            if (retval = util::GRError(cudaGetDevice(&current_gpu),
+                "CtaWorkProgress cudaGetDevice failed: ", __FILE__, __LINE__))
+                return retval;
 
-                // Deallocate
-                if (retval = util::GRError(cudaSetDevice(gpu),
-                    "CtaWorkProgress cudaSetDevice failed: ", __FILE__, __LINE__)) break;
-                if (retval = util::GRError(cudaFree(d_counters),
-                    "CtaWorkProgress cudaFree d_counters failed: ", __FILE__, __LINE__)) break;
+            // Deallocate
+            if (retval = util::GRError(cudaSetDevice(gpu),
+                "CtaWorkProgress cudaSetDevice failed: ", __FILE__, __LINE__))
+                return retval;
 
-                d_counters = NULL;
-                gpu = GR_INVALID_DEVICE;
+            if (retval = util::GRError(cudaFree(d_counters),
+                "CtaWorkProgress cudaFree d_counters failed: ", __FILE__, __LINE__))
+                return retval;
 
-                // Restore current gpu
-                if (retval = util::GRError(cudaSetDevice(current_gpu),
-                    "CtaWorkProgress cudaSetDevice failed: ", __FILE__, __LINE__)) break;
-            }
+            d_counters = NULL;
+            gpu = GR_INVALID_DEVICE;
 
-            progress_selector = 0;
+            // Restore current gpu
+            if (retval = util::GRError(cudaSetDevice(current_gpu),
+                "CtaWorkProgress cudaSetDevice failed: ", __FILE__, __LINE__))
+                return retval;
+        }
 
-        } while (0);
+        progress_selector = 0;
 
         return retval;
     }
@@ -275,14 +278,14 @@ public:
      */
     virtual ~CtaWorkProgressLifetime()
     {
-        HostReset();
+        Release();
     }
 
 
     // Sets up the progress counters for the next kernel launch (lazily
     // allocating and initializing them if necessary)
     template <typename SizeT>
-    cudaError_t Setup()
+    cudaError_t Init()
     {
         cudaError_t retval = cudaSuccess;
         do {

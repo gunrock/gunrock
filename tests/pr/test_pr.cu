@@ -491,7 +491,7 @@ template <
     //bool DEBUG,
     //bool SIZE_CHECK,
     bool NORMALIZED>
-void RunTests(Info<VertexId, SizeT, Value> *info)
+cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 {
     typedef PRProblem <VertexId,
             SizeT,
@@ -523,13 +523,14 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     bool        instrument          = info->info["instrument"       ].get_bool ();
     bool        debug               = info->info["debug_mode"       ].get_bool ();
     bool        size_check          = info->info["size_check"       ].get_bool ();
-    int         iterations          = 1; //force to 1 info->info["num_iteration"].get_int();
+    int         iterations          = info->info["num_iteration"    ].get_int  ();
     int         traversal_mode      = info->info["traversal_mode"   ].get_int  ();
     std::string ref_filename        = info->info["ref_filename"     ].get_str  ();
     Value       delta               = info->info["delta"            ].get_real ();
     Value       error               = info->info["error"            ].get_real ();
     bool        scaled              = info->info["scaled"           ].get_bool ();
     CpuTimer    cpu_timer;
+    cudaError_t retval              = cudaSuccess;
 
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
@@ -551,12 +552,12 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     for (int gpu = 0; gpu < num_gpus; gpu++)
     {
         size_t dummy;
-        cudaSetDevice(gpu_idx[gpu]);
-        cudaMemGetInfo(&(org_size[gpu]), &dummy);
+        if (retval = cudaSetDevice(gpu_idx[gpu])) return retval;
+        if (retval = cudaMemGetInfo(&(org_size[gpu]), &dummy)) return retval;
     }
 
     Problem *problem = new Problem(scaled);  // allocate problem on GPU
-    util::GRError(problem->Init(
+    if (retval = util::GRError(problem->Init(
         stream_from_host,
         graph,
         NULL,
@@ -568,50 +569,70 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         max_in_sizing,
         partition_factor,
         partition_seed),
-        "PR Problem Init failed", __FILE__, __LINE__);
+        "PR Problem Init failed", __FILE__, __LINE__))
+        return retval;
 
     Enactor *enactor = new Enactor(
         num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
-    util::GRError(enactor->Init(
+    if (retval = util::GRError(enactor->Init(
         context, problem, traversal_mode, max_grid_size),
-        "PR Enactor Init failed", __FILE__, __LINE__);
+        "PR Enactor Init failed", __FILE__, __LINE__))
+        return retval;
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
-    double elapsed = 0.0f;
-
     // perform PageRank
+    double total_elapsed = 0.0;
+    double single_elapsed = 0.0;
+    double max_elapsed    = 0.0;
+    double min_elapsed    = 1e10;
+    json_spirit::mArray process_times;
 
     for (int iter = 0; iter < iterations; ++iter)
     {
-        util::GRError(problem->Reset(
+        if (retval = util::GRError(problem->Reset(
             src, delta, error, max_iteration,
             enactor->GetFrontierType(), max_queue_sizing,
             max_queue_sizing1, traversal_mode == 1 ? true : false),
-            "PR Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(enactor->Reset(),
-            "PR Enactor Reset Reset failed", __FILE__, __LINE__);
+            "PR Problem Data Reset Failed", __FILE__, __LINE__))
+            return retval;
+        if (retval = util::GRError(enactor->Reset(),
+            "PR Enactor Reset Reset failed", __FILE__, __LINE__))
+            return retval;
 
         if (!quiet_mode)
         {
             printf("__________________________\n"); fflush(stdout);
         }
         cpu_timer.Start();
-        util::GRError(enactor->Enact(traversal_mode),
-                      "PR Problem Enact Failed", __FILE__, __LINE__);
+        if (retval = util::GRError(enactor->Enact(traversal_mode),
+            "PR Problem Enact Failed", __FILE__, __LINE__))
+            return retval;
         cpu_timer.Stop();
+
+        single_elapsed = cpu_timer.ElapsedMillis();
+        total_elapsed += single_elapsed;
+        process_times.push_back(single_elapsed);
+        if (single_elapsed > max_elapsed) max_elapsed = single_elapsed;
+        if (single_elapsed < min_elapsed) min_elapsed = single_elapsed;
         if (!quiet_mode)
-        {
-            printf("--------------------------\n"); fflush(stdout);
-        }
-        elapsed += cpu_timer.ElapsedMillis();
-    }
-    elapsed /= iterations;
+        {   
+            printf("--------------------------\n"
+                "iteration %d elapsed: %lf ms\n", 
+                iter, single_elapsed);
+            fflush(stdout);
+        }   
+    }   
+    total_elapsed /= iterations;
+    info -> info["process_times"] = process_times;
+    info -> info["min_process_time"] = min_elapsed;
+    info -> info["max_process_time"] = max_elapsed;
 
     cpu_timer.Start();
     // copy out results
-    util::GRError(problem->Extract(h_rank, h_node_id),
-        "PR Problem Data Extraction Failed", __FILE__, __LINE__);
+    if (retval = util::GRError(problem->Extract(h_rank, h_node_id),
+        "PR Problem Data Extraction Failed", __FILE__, __LINE__))
+        return retval;
 
     if (!quiet_mode)
     {
@@ -776,7 +797,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     info->ComputeCommonStats(  // compute running statistics
-        enactor->enactor_stats.GetPointer(), elapsed, (VertexId*)NULL, true);
+        enactor->enactor_stats.GetPointer(), total_elapsed, (VertexId*)NULL, true);
 
     if (!quiet_mode)
     {
@@ -821,8 +842,20 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
 
     // Clean up
     if (org_size   ) { delete   org_size   ; org_size    = NULL; }
-    if (problem    ) { delete   problem    ; problem     = NULL; }
-    if (enactor    ) { delete   enactor    ; enactor     = NULL; }
+    if (enactor         )
+    {
+        if (retval = util::GRError(enactor -> Release(),
+            "BFS Enactor Release failed", __FILE__, __LINE__))
+            return retval;
+        delete   enactor         ; enactor          = NULL;
+    }
+    if (problem         )
+    {
+        if (retval = util::GRError(problem -> Release(),
+            "BFS Problem Release failed", __FILE__, __LINE__))
+            return retval;
+        delete   problem         ; problem          = NULL;
+    }
     if (ref_rank   ) { delete[] ref_rank   ; ref_rank    = NULL; }
     if (ref_node_id) { delete[] ref_node_id; ref_node_id = NULL; }
     cpu_timer.Stop();
@@ -876,6 +909,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         }
         delete[] h_rank     ; h_rank      = NULL; 
     }
+    return retval;
 }
 
 /**
@@ -897,12 +931,12 @@ template <
     //bool INSTRUMENT,
     //bool DEBUG,
     //bool SIZE_CHECK >
-void RunTests_normalized(Info<VertexId, SizeT, Value> *info)
+cudaError_t RunTests_normalized(Info<VertexId, SizeT, Value> *info)
 {
     if (info->info["normalized"].get_bool())
-        RunTests<VertexId, SizeT, Value, true>(info);
+        return RunTests<VertexId, SizeT, Value, true>(info);
     else
-        RunTests<VertexId, SizeT, Value, false>(info);
+        return RunTests<VertexId, SizeT, Value, false>(info);
 }
 
 /******************************************************************************
@@ -915,6 +949,7 @@ template<
     typename Value>
 int main_(CommandLineArgs *args)
 {
+    cudaError_t retval = cudaSuccess;
     CpuTimer cpu_timer, cpu_timer2;
 
     cpu_timer.Start();
@@ -935,7 +970,7 @@ int main_(CommandLineArgs *args)
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
-    RunTests_normalized<VertexId, SizeT, Value>(info);  // run test
+    retval = RunTests_normalized<VertexId, SizeT, Value>(info);  // run test
 
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
@@ -947,7 +982,7 @@ int main_(CommandLineArgs *args)
 
     info->CollectInfo();  // collected all the info and put into JSON mObject
 
-    return 0;
+    return retval;
 }
 
 template <

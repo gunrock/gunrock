@@ -178,9 +178,9 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     // define the problem data structure for graph primitive
     typedef SMProblem<VertexId,
             SizeT,
-            Value,
-            true,    // MARK_PREDECESSORS
-            false>   // ENABLE_IDEMPOTENCE
+            Value>
+            //true,    // MARK_PREDECESSORS
+            //false>   // ENABLE_IDEMPOTENCE
             //true >   // USE_DOUBLE_BUFFER
             Problem;
     typedef SMEnactor <Problem>

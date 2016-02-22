@@ -254,9 +254,9 @@ void RunTest(Info<VertexId, SizeT, Value> *info)
     // define the problem data structure for graph primitive
     typedef MSTProblem<VertexId,
             SizeT,
-            Value,
-            true,    // MARK_PREDECESSORS
-            false>   // ENABLE_IDEMPOTENCE
+            Value>
+            //true,    // MARK_PREDECESSORS
+            //false>   // ENABLE_IDEMPOTENCE
             //true >   // USE_DOUBLE_BUFFER
             Problem;
     typedef MSTEnactor <Problem>

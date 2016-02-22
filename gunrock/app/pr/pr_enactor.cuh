@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <thread>
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
 #include <gunrock/util/sort_utils.cuh>
@@ -504,7 +505,8 @@ static void FullQueue_Core(
     //if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index, frontier_attribute->queue_length, false, stream)) return;
     frontier_attribute->queue_reset = true;
     enactor_stats -> nodes_queued[0] += frontier_attribute -> queue_length;
-    gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, RemoveZeroFunctor>(
+    gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, RemoveZeroFunctor,
+        gunrock::oprtr::advance::V2V>(
         enactor_stats[0],
         frontier_attribute[0],
         d_data_slice,
@@ -525,7 +527,7 @@ static void FullQueue_Core(
         work_progress[0],
         context[0],
         stream,
-        gunrock::oprtr::advance::V2V,
+        //gunrock::oprtr::advance::V2V,
         false,
         false,
         false);
@@ -634,7 +636,8 @@ static cudaError_t Compute_OutputLength(
         partitioned_scanned_edges, over_sized, 
         -1, -1, -1, false)) return retval;
     retval = gunrock::oprtr::advance::ComputeOutputLength
-        <AdvanceKernelPolicy, Problem, RemoveZeroFunctor>(
+        <AdvanceKernelPolicy, Problem, RemoveZeroFunctor,
+        gunrock::oprtr::advance::V2V>(
         frontier_attribute,
         d_offsets,
         d_indices,
@@ -646,7 +649,7 @@ static cudaError_t Compute_OutputLength(
         max_out,
         context,
         stream,
-        ADVANCE_TYPE,
+        //ADVANCE_TYPE,
         express,
         in_inv,
         out_inv);
@@ -983,7 +986,9 @@ struct PRIteration : public IterationBase <
             //if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_forward::Kernel failed", __FILE__, __LINE__))) break;
             //cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
 
-            //printf("Filter end.\n");fflush(stdout);
+            if (enactor -> debug)
+                util::cpu_mt::PrintMessage("Filter end.",
+                    thread_num, enactor_stats -> iteration, peer_);
             //enactor_stats->iteration++;
             frontier_attribute->queue_index++;
 
@@ -1044,9 +1049,27 @@ struct PRIteration : public IterationBase <
 
         //if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index, edge_map_queue_len)) return;
         frontier_attribute->queue_length = data_slice->edge_map_queue_len;
-        //if (enactor_stats->iteration == 0) util::cpu_mt::PrintGPUArray("keys", frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), frontier_attribute->queue_length, thread_num, enactor_stats->iteration, peer_, stream);
+        //if (enactor_stats->iteration == 0) 
+        /*util::cpu_mt::PrintGPUArray("keys", 
+            frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), 
+            frontier_attribute->queue_length, 
+            thread_num, enactor_stats->iteration, peer_, stream);
         //if (enactor_stats->iteration == 0) util::cpu_mt::PrintGPUArray<SizeT, SizeT>("degrees", data_slice->degrees.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
         //util::cpu_mt::PrintGPUArray<SizeT, Value>("ranks", data_slice->rank_curr.GetPointer(util::DEVICE), graph_slice->nodes, thread_num, enactor_stats->iteration, peer_, stream);
+        util::cpu_mt::PrintGPUArray("row_offsets",
+            graph_slice -> row_offsets.GetPointer(util::DEVICE),
+            graph_slice -> nodes + 1,
+            thread_num, enactor_stats -> iteration, peer_, stream);
+
+        util::cpu_mt::PrintGPUArray("column_indices",
+            graph_slice -> column_indices.GetPointer(util::DEVICE),
+            graph_slice -> edges,
+            thread_num, enactor_stats -> iteration, peer_, stream);
+        
+        util::cpu_mt::PrintGPUArray("scanned_edges",
+            scanned_edges -> GetPointer(util::DEVICE),
+            frontier_attribute -> queue_length,
+            thread_num, enactor_stats -> iteration, peer_, stream);*/
 
         if (enactor -> debug)
             util::cpu_mt::PrintMessage("Advance Prfunctor start.",
@@ -1054,7 +1077,8 @@ struct PRIteration : public IterationBase <
 
         // Edge Map
         frontier_attribute->queue_reset = true;
-        gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, PrFunctor>(
+        gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, PrFunctor,
+            gunrock::oprtr::advance::V2V>(
             //d_done,
             enactor_stats[0],
             frontier_attribute[0],
@@ -1076,7 +1100,7 @@ struct PRIteration : public IterationBase <
             work_progress[0],
             context[0],
             stream,
-            gunrock::oprtr::advance::V2V,
+            //gunrock::oprtr::advance::V2V,
             false,
             false,
             false);
@@ -1104,7 +1128,8 @@ struct PRIteration : public IterationBase <
                     thread_num, enactor_stats -> iteration, peer_);
             frontier_attribute -> queue_reset = true;
             // Edge Map
-            gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, PrMarkerFunctor>(
+            gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, PrMarkerFunctor,
+                gunrock::oprtr::advance::V2V>(
                 //d_done,
                 enactor_stats[0],
                 frontier_attribute[0],
@@ -1126,7 +1151,7 @@ struct PRIteration : public IterationBase <
                 work_progress[0],
                 context[0],
                 stream,
-                gunrock::oprtr::advance::V2V,
+                //gunrock::oprtr::advance::V2V,
                 false,
                 false,
                 true);
@@ -1193,7 +1218,8 @@ struct PRIteration : public IterationBase <
                 partitioned_scanned_edges, 
                 over_sized, -1, -1, -1, false)) return retval;
             retval = gunrock::oprtr::advance::ComputeOutputLength
-                <AdvanceKernelPolicy, Problem, PrFunctor>(
+                <AdvanceKernelPolicy, Problem, PrFunctor, 
+                gunrock::oprtr::advance::V2V>(
                 frontier_attribute,
                 d_offsets,
                 d_indices,
@@ -1205,10 +1231,14 @@ struct PRIteration : public IterationBase <
                 max_out,
                 context,
                 stream,
-                ADVANCE_TYPE,
+                //ADVANCE_TYPE,
                 express,
                 in_inv,
                 out_inv);
+            //util::cpu_mt::PrintGPUArray("scanned_edges0",
+            //    partitioned_scanned_edges->GetPointer(util::DEVICE),
+            //    frontier_attribute->queue_length,
+            //    -1, -1, -1, stream);
         }
         //printf("Compute_OutputLength end.\n");fflush(stdout);
         return retval;
@@ -1405,7 +1435,7 @@ struct PRIteration : public IterationBase <
                     data_slice[0]->keys_out[peer_].GetPointer(util::DEVICE));
             }
             data_slice[0]->keys_outs.Move(util::HOST, util::DEVICE, -1, 0, stream);
-            data_slice[0]->out_length[0] = temp_length;
+            //data_slice[0]->out_length[0] = temp_length;
 
             //util::cpu_mt::PrintCPUArray("out_length", &data_slice[0]->out_length[0], num_gpus, thread_num, enactor_stats->iteration);
             //for (peer_ = 0; peer_<num_gpus; peer_++)
@@ -1467,22 +1497,35 @@ static CUT_THREADPROC PRThread(
     FrontierAttribute<SizeT>
                  *frontier_attribute = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
     EnactorStats *enactor_stats      = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
+    int          *markers            = new int [num_gpus];
 
-    do {
-        // printf("PRThread entered\n");fflush(stdout);
-        if (enactor_stats[0].retval = util::SetDevice(gpu_idx)) break;
-        int *markers = new int [num_gpus];
-        thread_data->stats = 1;
-        while (thread_data->stats !=2) sleep(0);
-        thread_data->stats = 3;
+    // printf("PRThread entered\n");fflush(stdout);
+    if (enactor_stats[0].retval = util::SetDevice(gpu_idx))
+    {
+        thread_data -> status = ThreadSlice::Status::Ended;
+        CUT_THREADEND;
+    }        
+    
+    thread_data->status = ThreadSlice::Status::Ideal;
+    while (thread_data -> status != ThreadSlice::Status::ToKill)
+    {    
+        while (thread_data -> status == ThreadSlice::Status::Wait ||
+               thread_data -> status == ThreadSlice::Status::Ideal)
+        {    
+            //sleep(0);
+            std::this_thread::yield();
+        }        
+        if (thread_data -> status == ThreadSlice::Status::ToKill)
+            break;
+        //thread_data->status = ThreadSlice::Status::Running;
 
-        for (int peer_=0; peer_<num_gpus; peer_++)
+        for (int peer=0; peer<num_gpus; peer++)
         {
-            frontier_attribute[peer_].queue_length  = peer_==0?data_slice->local_nodes : 0;
-            frontier_attribute[peer_].queue_index   = 0;        // Work queue index
-            frontier_attribute[peer_].selector      = 0;
-            frontier_attribute[peer_].queue_reset   = true;
-            enactor_stats     [peer_].iteration     = 0;
+            frontier_attribute[peer].queue_length  = peer==0?data_slice->local_nodes : 0;
+            frontier_attribute[peer].queue_index   = 0;        // Work queue index
+            frontier_attribute[peer].selector      = 0;
+            frontier_attribute[peer].queue_reset   = true;
+            enactor_stats     [peer].iteration     = 0;
         }
         //gunrock::app::Iteration_Loop
         //    <0, 0, PrEnactor, PrFunctor, R0DIteration<AdvanceKernelPolicy, FilterKernelPolicy, PrEnactor> > (thread_data);
@@ -1610,10 +1653,11 @@ static CUT_THREADPROC PRThread(
             }
         }
 
-    } while(0);
+        thread_data -> status = ThreadSlice::Status::Ideal;
+    }
 
     // printf("PR_Thread finished\n");fflush(stdout);
-    thread_data->stats = 4;
+    thread_data -> status = ThreadSlice::Status::Ideal;
     CUT_THREADEND;
 }
 
@@ -1636,7 +1680,7 @@ class PREnactor :
     // Members
     ThreadSlice *thread_slices;
     CUTThread   *thread_Ids   ;
-    util::cpu_mt::CPUBarrier *cpu_barrier;
+    //util::cpu_mt::CPUBarrier *cpu_barrier;
 
     // Methods
 public:
@@ -1668,8 +1712,8 @@ public:
             instrument, debug, size_check),
         thread_slices (NULL),
         thread_Ids    (NULL),
-        problem       (NULL),
-        cpu_barrier   (NULL)
+        problem       (NULL)
+        //cpu_barrier   (NULL)
     {
     }
 
@@ -1678,16 +1722,29 @@ public:
      */
     virtual ~PREnactor()
     {
-        cutWaitForThreads(thread_Ids, this->num_gpus);
-        delete[] thread_Ids   ; thread_Ids    = NULL;
-        delete[] thread_slices; thread_slices = NULL;
-        problem = NULL;
-        if (cpu_barrier!=NULL)
+        Release();
+    }
+
+    cudaError_t Release()
+    {
+        cudaError_t retval = cudaSuccess;
+        if (thread_slices != NULL)
         {
-            util::cpu_mt::DestoryBarrier(&cpu_barrier[0]);
-            util::cpu_mt::DestoryBarrier(&cpu_barrier[1]);
-            delete[] cpu_barrier;cpu_barrier=NULL;
+            for (int gpu = 0; gpu < this->num_gpus; gpu++)
+                thread_slices[gpu].status = ThreadSlice::Status::ToKill;
+            cutWaitForThreads(thread_Ids, this->num_gpus);
+            delete[] thread_Ids   ; thread_Ids    = NULL;
+            delete[] thread_slices; thread_slices = NULL;
         }
+        if (retval = BaseEnactor::Release()) return retval;
+        problem = NULL;
+        //if (cpu_barrier!=NULL)
+        //{
+        //    util::cpu_mt::DestoryBarrier(&cpu_barrier[0]);
+        //    util::cpu_mt::DestoryBarrier(&cpu_barrier[1]);
+        //    delete[] cpu_barrier;cpu_barrier=NULL;
+        //}
+        return retval;
     }
     
     /** @} */
@@ -1719,9 +1776,9 @@ public:
         int         max_grid_size = 512)
     {
         cudaError_t retval = cudaSuccess;
-        cpu_barrier = new util::cpu_mt::CPUBarrier[2];
-        cpu_barrier[0]=util::cpu_mt::CreateBarrier(this->num_gpus);
-        cpu_barrier[1]=util::cpu_mt::CreateBarrier(this->num_gpus);
+        //cpu_barrier = new util::cpu_mt::CPUBarrier[2];
+        //cpu_barrier[0]=util::cpu_mt::CreateBarrier(this->num_gpus);
+        //cpu_barrier[1]=util::cpu_mt::CreateBarrier(this->num_gpus);
         // Lazy initialization
         if (retval = BaseEnactor::Init(
             //problem,
@@ -1740,18 +1797,26 @@ public:
 
         for (int gpu=0;gpu<this->num_gpus;gpu++)
         {
-            thread_slices[gpu].cpu_barrier  = cpu_barrier;
+            //thread_slices[gpu].cpu_barrier  = cpu_barrier;
             thread_slices[gpu].thread_num   = gpu;
             thread_slices[gpu].problem      = (void*)problem;
             thread_slices[gpu].enactor      = (void*)this;
             thread_slices[gpu].context      =&(context[gpu*this->num_gpus]);
-            thread_slices[gpu].stats        = -1;
+            thread_slices[gpu].status       = ThreadSlice::Status::Inited;
             thread_slices[gpu].thread_Id = cutStartThread(
                 (CUT_THREADROUTINE)&(PRThread<
                     AdvanceKernelPolity, FilterKernelPolicy,
                     PREnactor<Problem> >),
                     (void*)&(thread_slices[gpu]));
             thread_Ids[gpu] = thread_slices[gpu].thread_Id;
+        }
+
+        for (int gpu=0; gpu < this->num_gpus; gpu++)
+        {
+            while (thread_slices[gpu].status != ThreadSlice::Status::Ideal)
+            {
+                std::this_thread::yield();
+            }
         }
         return retval;
     }
@@ -1763,7 +1828,14 @@ public:
      */
     cudaError_t Reset()
     {
-        return BaseEnactor::Reset();
+       cudaError_t retval = cudaSuccess;
+        if (retval =  BaseEnactor::Reset())
+            return retval;
+        for (int gpu=0; gpu < this->num_gpus; gpu++)
+        {
+            thread_slices[gpu].status = ThreadSlice::Status::Wait;
+        }
+        return retval;
     }
 
 
@@ -1774,26 +1846,25 @@ public:
     {
         cudaError_t              retval         = cudaSuccess;
 
-        do {
-            for (int gpu=0; gpu< this->num_gpus; gpu++)
+        for (int gpu=0; gpu< this->num_gpus; gpu++)
+        {
+            thread_slices[gpu].status = ThreadSlice::Status::Running;
+        }
+        for (int gpu=0; gpu< this->num_gpus; gpu++)
+        {
+            while (thread_slices[gpu].status != ThreadSlice::Status::Ideal)
             {
-                while (thread_slices[gpu].stats!=1) sleep(0);
-                thread_slices[gpu].stats=2;
+                std::this_thread::yield();
             }
-            for (int gpu=0; gpu< this->num_gpus; gpu++)
-            {
-                while (thread_slices[gpu].stats!=4) sleep(0);
-            }
+        }
 
-            for (int gpu=0;gpu< this->num_gpus;gpu++)
-            {
-                if (this->enactor_stats[gpu].retval!=cudaSuccess)
-                {
-                    retval=this->enactor_stats[gpu].retval;
-                    break;
-                }
-            }
-        } while (0);
+        for (int gpu=0; gpu<this->num_gpus * this -> num_gpus;gpu++)
+        if (this->enactor_stats[gpu].retval!=cudaSuccess)
+        {
+            retval=this->enactor_stats[gpu].retval;
+            return retval;
+        }
+
         if (this -> debug) printf("\nGPU PR Done.\n");
         return retval;
     }
@@ -1864,15 +1935,12 @@ public:
             if (min_sm_version == -1 || this->cuda_props[gpu].device_sm_version < min_sm_version)
                 min_sm_version = this->cuda_props[gpu].device_sm_version;
 
-        if (min_sm_version >= 300) {
-            if (traversal_mode == 1)
-            {
-                return EnactPR<FWDAdvanceKernelPolicy, FilterKernelPolicy>();
-            }
-            else
-            {
+        if (min_sm_version >= 300) 
+        {
+//            if (traversal_mode == 1)
+//                return EnactPR<FWDAdvanceKernelPolicy, FilterKernelPolicy>();
+//            else
                 return EnactPR< LBAdvanceKernelPolicy, FilterKernelPolicy>();
-            }
         }
 
         //to reduce compile time, get rid of other architecture for now
@@ -1909,10 +1977,11 @@ public:
 
         if (min_sm_version >= 300)
         {
-            if (traversal_mode == 1)
-                return InitPR<FWDAdvanceKernelPolicy, FilterKernelPolicy>(
-                    context, problem, /*max_iteration,*/ max_grid_size);
-            else return InitPR<LBAdvanceKernelPolicy, FilterKernelPolicy>(
+//            if (traversal_mode == 1)
+//                return InitPR<FWDAdvanceKernelPolicy, FilterKernelPolicy>(
+//                    context, problem, /*max_iteration,*/ max_grid_size);
+//            else 
+                return InitPR<LBAdvanceKernelPolicy, FilterKernelPolicy>(
                     context, problem, /*max_iteration,*/ max_grid_size);
         }
 

@@ -30,20 +30,20 @@ namespace sm {
  */
 template<typename VertexId, 
 	 typename SizeT, 
-	 typename Value,
-	 bool _MARK_PREDECESSORS,
-	 bool _ENABLE_IDEMPOTENCE>
+	 typename Value>
+	 //bool _MARK_PREDECESSORS,
+	 //bool _ENABLE_IDEMPOTENCE>
 	 //bool _USE_DOUBLE_BUFFER>
 struct SMProblem : ProblemBase<VertexId, SizeT, Value,
-	_MARK_PREDECESSORS,
-	_ENABLE_IDEMPOTENCE>
+	true, //_MARK_PREDECESSORS,
+	false>//_ENABLE_IDEMPOTENCE>
 	//_USE_DOUBLE_BUFFER,
 	//false, // _ENABLE_BACKWARD
 	//false, // _KEEP_ORDER
 	//false>  // _KEEP_NODE_NUM
 {
-    static const bool MARK_PREDECESSORS  =  _MARK_PREDECESSORS;
-    static const bool ENABLE_IDEMPOTENCE = _ENABLE_IDEMPOTENCE;
+    static const bool MARK_PREDECESSORS  = true;
+    static const bool ENABLE_IDEMPOTENCE = false;
     static const int  MAX_NUM_VERTEX_ASSOCIATES = 0;  
     static const int  MAX_NUM_VALUE__ASSOCIATES = 0;
     typedef ProblemBase  <VertexId, SizeT, Value, 

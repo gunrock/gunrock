@@ -671,6 +671,7 @@ struct Csr
         SizeT displayed_node_num = (nodes > limit) ? limit : nodes;
         printf("%s : #nodes = ", name); util::PrintValue(nodes);
         printf(", #edges = "); util::PrintValue(edges);
+        printf("\n");
 
         for (SizeT i = 0; i < displayed_node_num; i++)
         {

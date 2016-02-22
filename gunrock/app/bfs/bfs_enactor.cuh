@@ -14,7 +14,7 @@
 
 #pragma once
 
-//#include <thread>
+#include <thread>
 #include <gunrock/util/multithreading.cuh>
 #include <gunrock/util/multithread_utils.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
@@ -544,15 +544,24 @@ static CUT_THREADPROC BFSThread(
                  *frontier_attribute = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
     EnactorStats *enactor_stats      = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
 
-    do {
-        if (enactor_stats[0].retval = util::SetDevice(gpu_idx)) break;
-        thread_data->stats = 1;
-        while (thread_data->stats != 2) 
+    if (enactor_stats[0].retval = util::SetDevice(gpu_idx))
+    {
+        thread_data -> status = ThreadSlice::Status::Ended;
+        CUT_THREADEND;
+    }
+    
+    thread_data->status = ThreadSlice::Status::Ideal;
+    while (thread_data -> status != ThreadSlice::Status::ToKill)
+    {
+        while (thread_data -> status == ThreadSlice::Status::Wait ||
+               thread_data -> status == ThreadSlice::Status::Ideal) 
         {
-            sleep(0);
-            //std::this_thread::yield();
+            //sleep(0);
+            std::this_thread::yield();
         }
-        thread_data->stats=3;
+        if (thread_data -> status == ThreadSlice::Status::ToKill)
+            break;
+        //thread_data->status = ThreadSlice::Status::Running;
 
         for (int peer=0;peer<num_gpus;peer++)
         {
@@ -569,9 +578,10 @@ static CUT_THREADPROC BFSThread(
             Problem::MARK_PREDECESSORS ? 2 : 1, 0>
             (thread_data);
         // printf("BFS_Thread finished\n");fflush(stdout);
-    } while(0);
+        thread_data -> status = ThreadSlice::Status::Ideal;
+    }
 
-    thread_data->stats = 4;
+    thread_data->status = ThreadSlice::Status::Ended;
     CUT_THREADEND;
 }
 
@@ -625,10 +635,23 @@ public:
      */
     virtual ~BFSEnactor()
     {
-        cutWaitForThreads(thread_Ids, this->num_gpus);
-        delete[] thread_Ids   ; thread_Ids    = NULL;
-        delete[] thread_slices; thread_slices = NULL;
+        Release();
+    }
+
+    cudaError_t Release()
+    {
+        cudaError_t retval = cudaSuccess;
+        if (thread_slices != NULL)
+        {
+            for (int gpu = 0; gpu < this->num_gpus; gpu++)
+                thread_slices[gpu].status = ThreadSlice::Status::ToKill;
+            cutWaitForThreads(thread_Ids, this->num_gpus);
+            delete[] thread_Ids   ; thread_Ids    = NULL;
+            delete[] thread_slices; thread_slices = NULL;
+        }
+        if (retval = BaseEnactor::Release()) return retval;
         problem = NULL;
+        return retval;
     }
 
     /**
@@ -696,7 +719,7 @@ public:
             thread_slices[gpu].problem       = (void*)problem;
             thread_slices[gpu].enactor       = (void*)this;
             thread_slices[gpu].context       = &(context[gpu*this->num_gpus]);
-            thread_slices[gpu].stats         = -1;
+            thread_slices[gpu].status        = ThreadSlice::Status::Inited;
             thread_slices[gpu].thread_Id = cutStartThread(
                 (CUT_THREADROUTINE)&(BFSThread<
                     AdvanceKernelPolicy,FilterKernelPolicy,
@@ -705,7 +728,14 @@ public:
             thread_Ids[gpu] = thread_slices[gpu].thread_Id;
         }
 
-       return retval;
+        for (int gpu=0; gpu < this->num_gpus; gpu++)
+        {
+            while (thread_slices[gpu].status != ThreadSlice::Status::Ideal)
+            {
+                std::this_thread::yield();
+            }
+        }
+        return retval;
     }
 
     /**
@@ -715,7 +745,19 @@ public:
      */
     cudaError_t Reset()
     {
-        return BaseEnactor::Reset();
+        cudaError_t retval = cudaSuccess;
+        if (retval =  BaseEnactor::Reset())
+            return retval;
+        for (int gpu=0; gpu < this->num_gpus; gpu++)
+        {
+            //if (retval = util::SetDevice(this -> gpu_idx[gpu]))
+            //    return retval;
+            //if (retval = util::GRError(cudaDeviceSynchronize(),
+            //    "cudaDeviceSynchronize failed", __FILE__, __LINE__))
+            //    return retval;
+            thread_slices[gpu].status = ThreadSlice::Status::Wait;
+        }
+        return retval;
     }
 
     /** @} */
@@ -739,40 +781,33 @@ public:
         clock_t      start_time = clock();
         cudaError_t  retval     = cudaSuccess;
 
-        do {
-            for (int gpu=0;gpu<this->num_gpus;gpu++)
-            {
-                if ((this->num_gpus ==1) || (gpu==this->problem->partition_tables[0][src]))
-                     thread_slices[gpu].init_size=1;
-                else thread_slices[gpu].init_size=0;
-                this->frontier_attribute[gpu*this->num_gpus].queue_length = thread_slices[gpu].init_size;
-            }
+        for (int gpu=0;gpu<this->num_gpus;gpu++)
+        {
+            if ((this->num_gpus ==1) || (gpu==this->problem->partition_tables[0][src]))
+                 thread_slices[gpu].init_size=1;
+            else thread_slices[gpu].init_size=0;
+            this->frontier_attribute[gpu*this->num_gpus].queue_length 
+                = thread_slices[gpu].init_size;
+        }
 
-            for (int gpu=0; gpu< this->num_gpus; gpu++)
+        for (int gpu=0; gpu< this->num_gpus; gpu++)
+        {
+            thread_slices[gpu].status = ThreadSlice::Status::Running;
+        }
+        for (int gpu=0; gpu< this->num_gpus; gpu++)
+        {
+            while (thread_slices[gpu].status != ThreadSlice::Status::Ideal)
             {
-                while (thread_slices[gpu].stats!=1) 
-                {
-                    sleep(0);
-                    //std::this_thread::yield();
-                }
-                thread_slices[gpu].stats=2;
+                std::this_thread::yield();
             }
-            for (int gpu=0; gpu< this->num_gpus; gpu++)
-            {
-                while (thread_slices[gpu].stats!=4) 
-                {
-                    sleep(0);
-                    //std::this_thread::yield();
-                }
-            }
+        }
 
-            for (int gpu=0;gpu<this->num_gpus;gpu++)
-            if (this->enactor_stats[gpu].retval!=cudaSuccess) 
-            {
-                retval=this->enactor_stats[gpu].retval;
-                break;
-            }
-        } while(0);
+        for (int gpu=0; gpu<this->num_gpus * this -> num_gpus;gpu++)
+        if (this->enactor_stats[gpu].retval!=cudaSuccess) 
+        {
+            retval=this->enactor_stats[gpu].retval;
+            return retval;
+        }
 
         if (this -> debug) printf("\nGPU BFS Done.\n");
         return retval;
@@ -892,17 +927,17 @@ public:
         {
             if (Problem::ENABLE_IDEMPOTENCE)
             {
-                if (traversal_mode == 0)
+//                if (traversal_mode == 0)
                     return EnactBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
-                else
-                    return EnactBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
+//                else
+//                    return EnactBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
             }
             else
             {
-                if (traversal_mode == 0)
+//                if (traversal_mode == 0)
                     return EnactBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(src);
-                else
-                    return EnactBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(src);
+//                else
+//                    return EnactBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(src);
             }
         }
 
@@ -945,21 +980,21 @@ public:
         {
             if (Problem::ENABLE_IDEMPOTENCE)
             {
-                if (traversal_mode == 0)
+//                if (traversal_mode == 0)
                     return InitBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
                             context, problem, max_grid_size);
-                else
-                    return InitBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
-                            context, problem, max_grid_size);
+//                else
+//                    return InitBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
+//                            context, problem, max_grid_size);
             }
             else
             {
-                if (traversal_mode == 0)
+//                if (traversal_mode == 0)
                     return InitBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(
                             context, problem, max_grid_size);
-                else
-                    return InitBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(
-                            context, problem, max_grid_size);
+//                else
+//                    return InitBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(
+//                            context, problem, max_grid_size);
             }
         }
 

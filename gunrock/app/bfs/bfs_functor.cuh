@@ -32,9 +32,10 @@ namespace bfs {
  *
  */
 template <
-    typename VertexId, typename SizeT, typename Value, typename ProblemData >
+    typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId>
 struct BFSFunctor {
-    typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Forward Edge Mapping condition function. Check if the destination node
@@ -49,10 +50,17 @@ struct BFSFunctor {
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
     static __device__ __forceinline__ bool CondEdge(
-        VertexId s_id, VertexId d_id, DataSlice *problem,
-        VertexId e_id = 0, VertexId e_id_in = 0) 
+        VertexId s_id, 
+        VertexId d_id, 
+        DataSlice *d_data_slice,
+        SizeT    edge_id   ,
+        VertexId input_item,
+        LabelT   label     ,
+        SizeT    input_pos ,
+        SizeT   &output_pos) 
     {
-        if (ProblemData::ENABLE_IDEMPOTENCE) {
+        if (Problem::ENABLE_IDEMPOTENCE) 
+        {
             //if (util::to_track(problem -> gpu_idx, d_id))
             //    && !util::pred_to_track(problem -> gpu_idx, d_id))
                 //|| util::pred_to_track(problem -> gpu_idx, e_id_in))
@@ -63,16 +71,16 @@ struct BFSFunctor {
         } else {
             // Check if the destination node has been claimed as someone's child
             VertexId new_label, old_label;
-            if (ProblemData::MARK_PREDECESSORS) {
-                util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    new_label, problem->labels + s_id);
-            } else new_label = s_id;
-            new_label = new_label + 1;
-            old_label = atomicMin(problem->labels + d_id, new_label);
+            //if (Problem::MARK_PREDECESSORS) {
+            //    util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+            //        new_label, d_data_slice -> labels + s_id);
+            //} else new_label = label;
+            new_label = label + 1;
+            old_label = atomicMin(d_data_slice -> labels + d_id, new_label);
             bool result = new_label < old_label;
-            if (result && TO_TRACK && util::to_track(problem -> gpu_idx, d_id))
-                 printf("%d\t %d\t CondEdge\t labels[%d] (%d) -> %d = labels[%d] + 1\n", 
-                    problem -> gpu_idx, new_label-1, d_id, old_label, new_label, s_id);
+            //if (result && TO_TRACK && util::to_track(d_data_slice -> gpu_idx, d_id))
+            //     printf("%d\t %d\t CondEdge\t labels[%d] (%d) -> %d = labels[%d] + 1\n", 
+            //        d_data_slice -> gpu_idx, new_label-1, d_id, old_label, new_label, s_id);
             return result;
         }
     }
@@ -90,17 +98,28 @@ struct BFSFunctor {
      *
      */
     static __device__ __forceinline__ void ApplyEdge(
-        VertexId s_id, VertexId d_id, DataSlice *problem,
-        VertexId e_id = 0, VertexId e_id_in = 0) 
+        VertexId s_id, 
+        VertexId d_id, 
+        DataSlice *d_data_slice,
+        SizeT    edge_id   ,
+        VertexId input_item,
+        LabelT   label     ,
+        SizeT    input_pos ,
+        SizeT   &output_pos) 
+        //VertexId s_id, VertexId d_id, DataSlice *problem,
+        //VertexId e_id = 0, VertexId e_id_in = 0) 
     {
-        if (ProblemData::ENABLE_IDEMPOTENCE) {
+        if (Problem::ENABLE_IDEMPOTENCE) 
+        {
             // do nothing here
         } else {
             //set preds[d_id] to be s_id
-            if (ProblemData::MARK_PREDECESSORS) {
+            if (Problem::MARK_PREDECESSORS) 
+            {
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    problem->original_vertex.GetPointer(util::DEVICE) == NULL ? s_id : problem->original_vertex[s_id], 
-                    problem->preds + d_id);
+                    d_data_slice -> original_vertex.GetPointer(util::DEVICE) == NULL ? 
+                        s_id : d_data_slice -> original_vertex[s_id], 
+                    d_data_slice -> preds + d_id);
             }
         }
     }

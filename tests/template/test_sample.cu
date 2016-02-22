@@ -160,9 +160,9 @@ template <
     //bool SIZE_CHECK >
 void RunTest(Info<VertexId, SizeT, Value> *info)
 {
-    typedef SampleProblem < VertexId, SizeT, Value,
-            true,   // MARK_PREDECESSORS
-            false>  // ENABLE_IDEMPOTENCE
+    typedef SampleProblem < VertexId, SizeT, Value>
+            //true,   // MARK_PREDECESSORS
+            //false>  // ENABLE_IDEMPOTENCE
             //false > 
             Problem;
     typedef SampleEnactor <Problem>

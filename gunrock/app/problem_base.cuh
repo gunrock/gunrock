@@ -137,25 +137,34 @@ struct GraphSlice
      */
     virtual ~GraphSlice()
     {
+        Release();
+    }
+
+    cudaError_t Release()
+    {
+        cudaError_t retval = cudaSuccess;
+
         // Set device (use slice index)
-        util::SetDevice(index);
+        if (retval = util::SetDevice(index)) return retval;
 
         // Release allocated host / device memory
-        row_offsets        .Release();
-        column_indices     .Release();
-        out_degrees        .Release();
-        column_offsets     .Release();
-        row_indices        .Release();
-        in_degrees         .Release();
-        partition_table    .Release();
-        convertion_table   .Release();
-        original_vertex    .Release();
-        in_counter         .Release();
-        out_offset         .Release();
-        out_counter        .Release();
-        backward_offset    .Release();
-        backward_partition .Release();
-        backward_convertion.Release();
+        if (retval = row_offsets        .Release()) return retval;
+        if (retval = column_indices     .Release()) return retval;
+        if (retval = out_degrees        .Release()) return retval;
+        if (retval = column_offsets     .Release()) return retval;
+        if (retval = row_indices        .Release()) return retval;
+        if (retval = in_degrees         .Release()) return retval;
+        if (retval = partition_table    .Release()) return retval;
+        if (retval = convertion_table   .Release()) return retval;
+        if (retval = original_vertex    .Release()) return retval;
+        if (retval = in_counter         .Release()) return retval;
+        if (retval = out_offset         .Release()) return retval;
+        if (retval = out_counter        .Release()) return retval;
+        if (retval = backward_offset    .Release()) return retval;
+        if (retval = backward_partition .Release()) return retval;
+        if (retval = backward_convertion.Release()) return retval;
+
+        return retval;
     } // end ~GraphSlice()
 
     /**
@@ -212,89 +221,83 @@ struct GraphSlice
             this->row_indices    .SetPointer(inverstgraph->column_indices   , edges  );
         }
 
-        do
+        // Set device using slice index
+        if (retval = util::SetDevice(index)) return retval;
+
+        // Allocate and initialize row_offsets
+        if (retval = this->row_offsets   .Allocate(nodes + 1 , util::DEVICE)) return retval;
+        if (retval = this->row_offsets   .Move    (util::HOST, util::DEVICE)) return retval;
+
+        // Allocate and initialize column_indices
+        if (retval = this->column_indices.Allocate(edges     , util::DEVICE)) return retval;
+        if (retval = this->column_indices.Move    (util::HOST, util::DEVICE)) return retval;
+
+        // Allocate out degrees for each node
+        if (retval = this->out_degrees   .Allocate(nodes     , util::DEVICE)) return retval;
+        // count number of out-going degrees for each node
+        util::MemsetMadVectorKernel <<< 128, 128>>>(
+            this->out_degrees.GetPointer(util::DEVICE),
+            this->row_offsets.GetPointer(util::DEVICE),
+            this->row_offsets.GetPointer(util::DEVICE) + 1,
+            (SizeT)-1, nodes);
+
+
+        if (inverstgraph != NULL)
         {
-            // Set device using slice index
-            if (retval = util::GRError(cudaSetDevice(index),
-                                       "GpuSlice cudaSetDevice failed", __FILE__, __LINE__)) break;
+            // Allocate and initialize column_offsets
+            if (retval = this->column_offsets.Allocate(nodes + 1 , util::DEVICE)) return retval;
+            if (retval = this->column_offsets.Move    (util::HOST, util::DEVICE)) return retval;
 
-            // Allocate and initialize row_offsets
-            if (retval = this->row_offsets.Allocate(nodes + 1      , util::DEVICE)) break;
-            if (retval = this->row_offsets.Move    (util::HOST   , util::DEVICE)) break;
+            // Allocate and initialize row_indices
+            if (retval = this->row_indices   .Allocate(edges     , util::DEVICE)) return retval;
+            if (retval = this->row_indices   .Move    (util::HOST, util::DEVICE)) return retval;
 
-            // Allocate and initialize column_indices
-            if (retval = this->column_indices.Allocate(edges     , util::DEVICE)) break;
-            if (retval = this->column_indices.Move    (util::HOST, util::DEVICE)) break;
-
-            // Allocate out degrees for each node
-            if (retval = this->out_degrees.Allocate(nodes        , util::DEVICE)) break;
-            // count number of out-going degrees for each node
+            if (retval = this->in_degrees    .Allocate(nodes     , util::DEVICE)) return retval;
+            // count number of in-going degrees for each node
             util::MemsetMadVectorKernel <<< 128, 128>>>(
-                this->out_degrees.GetPointer(util::DEVICE),
-                this->row_offsets.GetPointer(util::DEVICE),
-                this->row_offsets.GetPointer(util::DEVICE) + 1,
+                this->in_degrees    .GetPointer(util::DEVICE),
+                this->column_offsets.GetPointer(util::DEVICE),
+                this->column_offsets.GetPointer(util::DEVICE) + 1,
                 (SizeT)-1, nodes);
-
-
-            if (inverstgraph != NULL)
-            {
-                // Allocate and initialize column_offsets
-                if (retval = this->column_offsets.Allocate(nodes + 1      , util::DEVICE)) break;
-                if (retval = this->column_offsets.Move    (util::HOST   , util::DEVICE)) break;
-
-                // Allocate and initialize row_indices
-                if (retval = this->row_indices.Allocate(edges     , util::DEVICE)) break;
-                if (retval = this->row_indices.Move    (util::HOST, util::DEVICE)) break;
-
-
-                if (retval = this->in_degrees .Allocate(nodes,  util::DEVICE)) break;
-                // count number of in-going degrees for each node
-                util::MemsetMadVectorKernel <<< 128, 128>>>(
-                    this->in_degrees    .GetPointer(util::DEVICE),
-                    this->column_offsets.GetPointer(util::DEVICE),
-                    this->column_offsets.GetPointer(util::DEVICE) + 1,
-                    (SizeT)-1, nodes);
-            }
-
-            // For multi-GPU cases
-            if (num_gpus > 1)
-            {
-                // Allocate and initialize convertion_table
-                if (retval = this->partition_table.Allocate (nodes     , util::DEVICE)) break;
-                if (partition_table  != NULL)
-                    if (retval = this->partition_table.Move (util::HOST, util::DEVICE)) break;
-
-                // Allocate and initialize convertion_table
-                if (retval = this->convertion_table.Allocate(nodes     , util::DEVICE)) break;
-                if (convertion_table != NULL)
-                    if (retval = this->convertion_table.Move(util::HOST, util::DEVICE)) break;
-
-                // Allocate and initialize original_vertex
-                if (retval = this->original_vertex .Allocate(nodes     , util::DEVICE)) break;
-                if (original_vertex  != NULL)
-                    if (retval = this->original_vertex .Move(util::HOST, util::DEVICE)) break;
-
-                // If need backward information proration
-                if (backward_offsets != NULL)
-                {
-                    // Allocate and initialize backward_offset
-                    this->backward_offset    .SetPointer(backward_offsets     , nodes + 1);
-                    if (retval = this->backward_offset    .Allocate(nodes + 1, util::DEVICE)) break;
-                    if (retval = this->backward_offset    .Move(util::HOST, util::DEVICE)) break;
-
-                    // Allocate and initialize backward_partition
-                    this->backward_partition .SetPointer(backward_partition   , backward_offsets[nodes]);
-                    if (retval = this->backward_partition .Allocate(backward_offsets[nodes], util::DEVICE)) break;
-                    if (retval = this->backward_partition .Move(util::HOST, util::DEVICE)) break;
-
-                    // Allocate and initialize backward_convertion
-                    this->backward_convertion.SetPointer(backward_convertion  , backward_offsets[nodes]);
-                    if (retval = this->backward_convertion.Allocate(backward_offsets[nodes], util::DEVICE)) break;
-                    if (retval = this->backward_convertion.Move(util::HOST, util::DEVICE)) break;
-                }
-            } // end if num_gpu>1
         }
-        while (0);
+
+        // For multi-GPU cases
+        if (num_gpus > 1)
+        {
+            // Allocate and initialize convertion_table
+            if (retval = this->partition_table.Allocate (nodes     , util::DEVICE)) return retval;
+            if (partition_table  != NULL)
+                if (retval = this->partition_table.Move (util::HOST, util::DEVICE)) return retval;
+
+            // Allocate and initialize convertion_table
+            if (retval = this->convertion_table.Allocate(nodes     , util::DEVICE)) return retval;
+            if (convertion_table != NULL)
+                if (retval = this->convertion_table.Move(util::HOST, util::DEVICE)) return retval;
+
+            // Allocate and initialize original_vertex
+            if (retval = this->original_vertex .Allocate(nodes     , util::DEVICE)) return retval;
+            if (original_vertex  != NULL)
+                if (retval = this->original_vertex .Move(util::HOST, util::DEVICE)) return retval;
+
+            // If need backward information proration
+            if (backward_offsets != NULL)
+            {
+                // Allocate and initialize backward_offset
+                this->backward_offset    .SetPointer(backward_offsets     , nodes + 1);
+                if (retval = this->backward_offset    .Allocate(nodes + 1, util::DEVICE)) return retval;
+                if (retval = this->backward_offset    .Move(util::HOST, util::DEVICE)) return retval;
+
+                // Allocate and initialize backward_partition
+                this->backward_partition .SetPointer(backward_partition   , backward_offsets[nodes]);
+                if (retval = this->backward_partition .Allocate(backward_offsets[nodes], util::DEVICE)) return retval;
+                if (retval = this->backward_partition .Move(util::HOST, util::DEVICE)) return retval;
+
+                // Allocate and initialize backward_convertion
+                this->backward_convertion.SetPointer(backward_convertion  , backward_offsets[nodes]);
+                if (retval = this->backward_convertion.Allocate(backward_offsets[nodes], util::DEVICE)) return retval;
+                if (retval = this->backward_convertion.Move(util::HOST, util::DEVICE)) return retval;
+            }
+        } // end if num_gpu>1
 
         return retval;
     } // end of Init(...)
@@ -470,10 +473,16 @@ struct DataSliceBase
     /**
      * @brief DataSliceBase default destructor to release host / device memory
      */
-    ~DataSliceBase()
+    virtual ~DataSliceBase()
     {
+        Release();
+    }
+
+    cudaError_t Release()
+    {
+        cudaError_t retval = cudaSuccess;
         // Set device by index
-        if (util::SetDevice(gpu_idx)) return;
+        if (retval = util::SetDevice(gpu_idx)) return retval;
 
         // Release VertexId type incoming associate values and related pointers
         if (vertex_associate_in[0] != NULL)
@@ -482,15 +491,15 @@ struct DataSliceBase
             {
                 for (int i = 0; i < MAX_NUM_VERTEX_ASSOCIATES; i++)
                 {
-                    vertex_associate_in[0][gpu][i].Release();
-                    vertex_associate_in[1][gpu][i].Release();
+                    if (retval = vertex_associate_in[0][gpu][i].Release()) return retval;
+                    if (retval = vertex_associate_in[1][gpu][i].Release()) return retval;
                 }
                 delete[] vertex_associate_in[0][gpu];
                 delete[] vertex_associate_in[1][gpu];
                 vertex_associate_in [0][gpu] = NULL;
                 vertex_associate_in [1][gpu] = NULL;
-                vertex_associate_ins[0][gpu].Release();
-                vertex_associate_ins[1][gpu].Release();
+                if (retval = vertex_associate_ins[0][gpu].Release()) return retval;
+                if (retval = vertex_associate_ins[1][gpu].Release()) return retval;
             }
             delete[] vertex_associate_in [0];
             delete[] vertex_associate_in [1];
@@ -509,15 +518,15 @@ struct DataSliceBase
             {
                 for (int i = 0; i < MAX_NUM_VALUE__ASSOCIATES; i++)
                 {
-                    value__associate_in[0][gpu][i].Release();
-                    value__associate_in[1][gpu][i].Release();
+                    if (retval = value__associate_in[0][gpu][i].Release()) return retval;
+                    if (retval = value__associate_in[1][gpu][i].Release()) return retval;
                 }
                 delete[] value__associate_in[0][gpu];
                 delete[] value__associate_in[1][gpu];
                 value__associate_in [0][gpu] = NULL;
                 value__associate_in [1][gpu] = NULL;
-                value__associate_ins[0][gpu].Release();
-                value__associate_ins[1][gpu].Release();
+                if (retval = value__associate_ins[0][gpu].Release()) return retval;
+                if (retval = value__associate_ins[1][gpu].Release()) return retval;
             }
             delete[] value__associate_in [0];
             delete[] value__associate_in [1];
@@ -534,8 +543,8 @@ struct DataSliceBase
         {
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
-                keys_in[0][gpu].Release();
-                keys_in[1][gpu].Release();
+                if (retval = keys_in[0][gpu].Release()) return retval;
+                if (retval = keys_in[1][gpu].Release()) return retval;
             }
             delete[] keys_in[0];
             delete[] keys_in[1];
@@ -548,12 +557,12 @@ struct DataSliceBase
         {
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
-                keys_out   [gpu].Release();
-                keys_marker[gpu].Release();
+                if (retval = keys_out   [gpu].Release()) return retval;
+                if (retval = keys_marker[gpu].Release()) return retval;
             }
             delete[] keys_out   ; keys_out    = NULL;
             delete[] keys_marker; keys_marker = NULL;
-            keys_markers.Release();
+            if (retval = keys_markers.Release()) return retval;
         }
 
         // Release VertexId type outgoing associate values and pointers
@@ -562,16 +571,16 @@ struct DataSliceBase
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
                 for (int i = 0; i < MAX_NUM_VERTEX_ASSOCIATES; i++)
-                    vertex_associate_out[gpu][i].Release();
+                    if (retval = vertex_associate_out[gpu][i].Release()) return retval;
                 delete[] vertex_associate_out[gpu];
                 vertex_associate_out [gpu] = NULL;
-                vertex_associate_outs[gpu].Release();
+                if (retval = vertex_associate_outs[gpu].Release()) return retval;
             }
             delete[] vertex_associate_out;
             delete[] vertex_associate_outs;
             vertex_associate_out = NULL;
             vertex_associate_outs = NULL;
-            vertex_associate_outss.Release();
+            if (retval = vertex_associate_outss.Release()) return retval;
         }
 
         // Release Value type outgoing associate values and pointers
@@ -580,37 +589,39 @@ struct DataSliceBase
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
                 for (int i = 0; i < MAX_NUM_VALUE__ASSOCIATES; i++)
-                    value__associate_out[gpu][i].Release();
+                    if (retval = value__associate_out[gpu][i].Release()) return retval;
                 delete[] value__associate_out[gpu];
                 value__associate_out [gpu] = NULL;
-                value__associate_outs[gpu].Release();
+                if (retval = value__associate_outs[gpu].Release()) return retval;
             }
             delete[] value__associate_out ;
             delete[] value__associate_outs;
             value__associate_out = NULL;
             value__associate_outs = NULL;
-            value__associate_outss.Release();
+            if (retval = value__associate_outss.Release()) return retval;
         }
 
         // Release events and markers
         for (int i = 0; i < 4; i++)
         {
+            if (events[i].GetPointer() != NULL)
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
                 for (int stage = 0; stage < num_stages; stage++)
-                    cudaEventDestroy(events[i][gpu][stage]);
+                    if (retval = util::GRError(cudaEventDestroy(events[i][gpu][stage]),
+                        "cudaEventDestroy failed", __FILE__, __LINE__)) return retval;
                 delete[] events    [i][gpu]; events    [i][gpu] = NULL;
                 delete[] events_set[i][gpu]; events_set[i][gpu] = NULL;
             }
-            events    [i].Release();
-            events_set[i].Release();
+            if (retval = events    [i].Release()) return retval;
+            if (retval = events_set[i].Release()) return retval;
         }
 
         // Release expand_incoming_arrays
         if (expand_incoming_array != NULL)
         {
             for (int gpu = 0; gpu < num_gpus; gpu++)
-                expand_incoming_array[gpu].Release();
+                if (retval = expand_incoming_array[gpu].Release()) return retval;
             delete[] expand_incoming_array;
             expand_incoming_array = NULL;
         }
@@ -622,8 +633,8 @@ struct DataSliceBase
             {
                 for (int i = 0; i < 2; ++i)
                 {
-                    frontier_queues[gpu].keys  [i].Release();
-                    frontier_queues[gpu].values[i].Release();
+                    if (retval = frontier_queues[gpu].keys  [i].Release()) return retval;
+                    if (retval = frontier_queues[gpu].values[i].Release()) return retval;
                 }
             }
             delete[] frontier_queues; frontier_queues = NULL;
@@ -633,35 +644,36 @@ struct DataSliceBase
         if (scanned_edges != NULL)
         {
             for (int gpu = 0; gpu <= num_gpus; gpu++)
-                scanned_edges          [gpu].Release();
+                if (retval = scanned_edges          [gpu].Release()) return retval;
             delete[] scanned_edges;
             scanned_edges           = NULL;
         }
 
         //Release all other arrays
-        keys_outs     .Release();
-        in_length  [0].Release();
-        in_length  [1].Release();
-        wait_marker   .Release();
-        out_length    .Release();
-        vertex_associate_orgs.Release();
-        value__associate_orgs.Release();
-        streams       .Release();
-        stages        .Release();
-        to_show       .Release();
-        make_out_array.Release();
-        preds         .Release();
-        temp_preds    .Release();
-        labels        .Release();
+        if (retval = keys_outs     .Release()) return retval;
+        if (retval = in_length  [0].Release()) return retval;
+        if (retval = in_length  [1].Release()) return retval;
+        if (retval = wait_marker   .Release()) return retval;
+        if (retval = out_length    .Release()) return retval;
+        if (retval = vertex_associate_orgs.Release()) return retval;
+        if (retval = value__associate_orgs.Release()) return retval;
+        if (retval = streams       .Release()) return retval;
+        if (retval = stages        .Release()) return retval;
+        if (retval = to_show       .Release()) return retval;
+        if (retval = make_out_array.Release()) return retval;
+        if (retval = preds         .Release()) return retval;
+        if (retval = temp_preds    .Release()) return retval;
+        if (retval = labels        .Release()) return retval;
 
-        org_checkpoint.Release();
-        org_d_out     .Release();
-        org_offset1   .Release();
-        org_offset2   .Release();
-        org_queue_idx .Release();
-        org_block_idx .Release();
-        org_thread_idx.Release();
-    } // end ~DataSliceBase()
+        if (retval = org_checkpoint.Release()) return retval;
+        if (retval = org_d_out     .Release()) return retval;
+        if (retval = org_offset1   .Release()) return retval;
+        if (retval = org_offset2   .Release()) return retval;
+        if (retval = org_queue_idx .Release()) return retval;
+        if (retval = org_block_idx .Release()) return retval;
+        if (retval = org_thread_idx.Release()) return retval;
+        return retval;
+    } // end Release()
 
     /**
      * @brief Initiate DataSliceBase
@@ -923,6 +935,17 @@ struct DataSliceBase
         //    (long long)graph_slice -> nodes, (long long)graph_slice -> edges);
 
         cudaError_t retval = cudaSuccess;
+        if (retval = util::SetDevice(gpu_idx)) return retval;
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+            wait_marker[gpu] = 0;
+        for (int i=0; i<4; i++)
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        for (int stage=0; stage < num_stages; stage++)
+            events_set[i][gpu][stage] = false;
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        for (int i=0; i<2; i++)
+            in_length[i][gpu] = 0;
+
         SizeT max_queue_length = 0;
 
         for (int peer = 0; peer < num_gpus; peer++)
@@ -1047,6 +1070,7 @@ struct DataSliceBase
             if (retval = org_thread_idx.Allocate(max_queue_length, util::DEVICE))
                 return retval;
         }
+
         return retval;
     } // end Reset(...)
 
@@ -1299,17 +1323,32 @@ struct ProblemBase
      */
     virtual ~ProblemBase()
     {
+        Release();
+    }
+
+    cudaError_t Release()
+    {
+        cudaError_t retval = cudaSuccess;
         // Cleanup graph slices on the heap
-        for (int i = 0; i < num_gpus; ++i)
+        if (graph_slices != NULL)
         {
-            delete graph_slices[i]; graph_slices[i] = NULL;
+            for (int i = 0; i < num_gpus; ++i)
+            {
+                if (retval = graph_slices[i]->Release()) return retval;
+                delete graph_slices[i]; graph_slices[i] = NULL;
+            }
+            delete[] graph_slices; graph_slices = NULL;
         }
-        if (num_gpus > 1)
+        if (partitioner != NULL)
         {
+            if (retval = partitioner -> Release()) return retval;
             delete partitioner; partitioner = NULL;
         }
-        delete[] graph_slices; graph_slices = NULL;
-        delete[] gpu_idx;      gpu_idx      = NULL;
+        if (gpu_idx != NULL)
+        {
+            delete[] gpu_idx;      gpu_idx      = NULL;
+        }
+        return retval;
     }  // end ~ProblemBase()
 
     /**
@@ -1389,154 +1428,132 @@ struct ProblemBase
         this->num_gpus          = num_gpus;
         this->gpu_idx           = new int [num_gpus];
 
-        do
+        if (num_gpus == 1 && gpu_idx == NULL)
         {
-            if (num_gpus == 1 && gpu_idx == NULL)
+            if (retval = util::GRError(cudaGetDevice(&(this->gpu_idx[0])),
+                "ProblemBase cudaGetDevice failed", __FILE__, __LINE__)) return retval;
+        }
+        else
+        {
+            for (int gpu = 0; gpu < num_gpus; gpu++)
+                this->gpu_idx[gpu] = gpu_idx[gpu];
+        }
+
+        graph_slices = new GraphSlice<VertexId, SizeT, Value>*[num_gpus];
+
+        if (num_gpus > 1)
+        {
+            util::CpuTimer cpu_timer;
+
+            //printf("partition_method = %s\n", partition_method.c_str());
+
+            if      (partition_method == "random")
             {
-                if (retval = util::GRError(cudaGetDevice(&(this->gpu_idx[0])),
-                    "ProblemBase cudaGetDevice failed", __FILE__, __LINE__)) break;
+                partitioner = new rp::RandomPartitioner     <VertexId, SizeT, Value
+                    /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
+                    (*graph, num_gpus, NULL, enable_backward, keep_order, keep_node_num);
+            }
+            else if (partition_method == "metis")
+            {
+                partitioner = new metisp::MetisPartitioner  <VertexId, SizeT, Value
+                    /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
+                    (*graph, num_gpus, NULL, enable_backward, keep_order, keep_node_num);
+            }
+            else if (partition_method == "static")
+            {
+                partitioner = new sp::StaticPartitioner     <VertexId, SizeT, Value
+                    /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
+                    (*graph, num_gpus, NULL, enable_backward, keep_order, keep_node_num);
+            }
+            else if (partition_method == "cluster")
+            {
+               partitioner = new cp::ClusterPartitioner     <VertexId, SizeT, Value
+                    /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
+                    (*graph, num_gpus, NULL, enable_backward, keep_order, keep_node_num);
+            }
+            else if (partition_method == "biasrandom")
+            {
+                partitioner = new brp::BiasRandomPartitioner<VertexId, SizeT, Value
+                    /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
+                    (*graph, num_gpus, NULL, enable_backward, keep_order, keep_node_num);
             }
             else
             {
-                for (int gpu = 0; gpu < num_gpus; gpu++)
-                    this->gpu_idx[gpu] = gpu_idx[gpu];
+                util::GRError("partition_method invalid", __FILE__, __LINE__);
             }
+            cpu_timer.Start();
+            retval = partitioner->Partition(
+                sub_graphs,
+                partition_tables,
+                convertion_tables,
+                original_vertexes,
+                in_counter,
+                out_offsets,
+                out_counter,
+                backward_offsets,
+                backward_partitions,
+                backward_convertions,
+                partition_factor,
+                partition_seed);
+            cpu_timer.Stop();
 
-            graph_slices = new GraphSlice<VertexId, SizeT, Value>*[num_gpus];
+            printf("partition end. (%f ms)\n", cpu_timer.ElapsedMillis());
 
+            /*graph->DisplayGraph("org_graph",graph->nodes);
+            util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);
+            util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion0",convertion_tables[0],graph->nodes);
+            //util::cpu_mt::PrintCPUArray<SizeT,Value>("edge_value",graph->edge_values,graph->edges);
+            for (int gpu=0;gpu<num_gpus;gpu++)
+            {
+                sub_graphs[gpu].DisplayGraph("sub_graph",sub_graphs[gpu].nodes);
+                printf("%d\n",gpu);
+                util::cpu_mt::PrintCPUArray<SizeT,int     >("partition"           , partition_tables    [gpu+1], sub_graphs[gpu].nodes);
+                util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion"          , convertion_tables   [gpu+1], sub_graphs[gpu].nodes);
+                //util::cpu_mt::PrintCPUArray<SizeT,SizeT   >("backward_offsets"    , backward_offsets    [gpu], sub_graphs[gpu].nodes);
+                //util::cpu_mt::PrintCPUArray<SizeT,int     >("backward_partitions" , backward_partitions [gpu], backward_offsets[gpu][sub_graphs[gpu].nodes]);
+                //util::cpu_mt::PrintCPUArray<SizeT,VertexId>("backward_convertions", backward_convertions[gpu], backward_offsets[gpu][sub_graphs[gpu].nodes]);
+            }*/
+            //for (int gpu=0;gpu<num_gpus;gpu++)
+            //{
+            //    cross_counter[gpu][num_gpus]=0;
+            //    for (int peer=0;peer<num_gpus;peer++)
+            //    {
+            //        cross_counter[gpu][peer]=out_offsets[gpu][peer+1]-out_offsets[gpu][peer];
+            //    }
+            //    cross_counter[gpu][num_gpus]=in_offsets[gpu][num_gpus];
+            //}
+            /*for (int gpu=0;gpu<num_gpus;gpu++)
+            for (int peer=0;peer<=num_gpus;peer++)
+            {
+                in_offsets[gpu][peer]*=2;
+                out_offsets[gpu][peer]*=2;
+            }*/
+            if (retval) return retval;
+        } else {
+            sub_graphs = graph;
+        }
+
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            graph_slices[gpu] = new GraphSlice<VertexId, SizeT, Value>(this->gpu_idx[gpu]);
             if (num_gpus > 1)
             {
-                util::CpuTimer cpu_timer;
-
-                //printf("partition_method = %s\n", partition_method.c_str());
-
-                if      (partition_method == "random")
+                if (enable_backward)
                 {
-                    partitioner = new rp::RandomPartitioner     <VertexId, SizeT, Value
-                        /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
-                        (*graph, num_gpus);
-                }
-                else if (partition_method == "metis")
-                {
-                    partitioner = new metisp::MetisPartitioner  <VertexId, SizeT, Value
-                        /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
-                        (*graph, num_gpus);
-                }
-                else if (partition_method == "static")
-                {
-                    partitioner = new sp::StaticPartitioner     <VertexId, SizeT, Value
-                        /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
-                        (*graph, num_gpus);
-                }
-                else if (partition_method == "cluster")
-                {
-                   partitioner = new cp::ClusterPartitioner     <VertexId, SizeT, Value
-                        /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
-                        (*graph, num_gpus);
-                }
-                else if (partition_method == "biasrandom")
-                {
-                    partitioner = new brp::BiasRandomPartitioner<VertexId, SizeT, Value
-                        /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
-                        (*graph, num_gpus);
-                }
-                else
-                {
-                    util::GRError("partition_method invalid", __FILE__, __LINE__);
-                }
-                cpu_timer.Start();
-                retval = partitioner->Partition(
-                    sub_graphs,
-                    partition_tables,
-                    convertion_tables,
-                    original_vertexes,
-                    in_counter,
-                    out_offsets,
-                    out_counter,
-                    backward_offsets,
-                    backward_partitions,
-                    backward_convertions,
-                    partition_factor,
-                    partition_seed);
-                cpu_timer.Stop();
-
-                printf("partition end. (%f ms)\n", cpu_timer.ElapsedMillis());
-
-                /*graph->DisplayGraph("org_graph",graph->nodes);
-                util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);
-                util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion0",convertion_tables[0],graph->nodes);
-                //util::cpu_mt::PrintCPUArray<SizeT,Value>("edge_value",graph->edge_values,graph->edges);
-                for (int gpu=0;gpu<num_gpus;gpu++)
-                {
-                    sub_graphs[gpu].DisplayGraph("sub_graph",sub_graphs[gpu].nodes);
-                    printf("%d\n",gpu);
-                    util::cpu_mt::PrintCPUArray<SizeT,int     >("partition"           , partition_tables    [gpu+1], sub_graphs[gpu].nodes);
-                    util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion"          , convertion_tables   [gpu+1], sub_graphs[gpu].nodes);
-                    //util::cpu_mt::PrintCPUArray<SizeT,SizeT   >("backward_offsets"    , backward_offsets    [gpu], sub_graphs[gpu].nodes);
-                    //util::cpu_mt::PrintCPUArray<SizeT,int     >("backward_partitions" , backward_partitions [gpu], backward_offsets[gpu][sub_graphs[gpu].nodes]);
-                    //util::cpu_mt::PrintCPUArray<SizeT,VertexId>("backward_convertions", backward_convertions[gpu], backward_offsets[gpu][sub_graphs[gpu].nodes]);
-                }*/
-                //for (int gpu=0;gpu<num_gpus;gpu++)
-                //{
-                //    cross_counter[gpu][num_gpus]=0;
-                //    for (int peer=0;peer<num_gpus;peer++)
-                //    {
-                //        cross_counter[gpu][peer]=out_offsets[gpu][peer+1]-out_offsets[gpu][peer];
-                //    }
-                //    cross_counter[gpu][num_gpus]=in_offsets[gpu][num_gpus];
-                //}
-                /*for (int gpu=0;gpu<num_gpus;gpu++)
-                for (int peer=0;peer<=num_gpus;peer++)
-                {
-                    in_offsets[gpu][peer]*=2;
-                    out_offsets[gpu][peer]*=2;
-                }*/
-                if (retval) break;
-            }
-            else
-            {
-                sub_graphs = graph;
-            }
-
-            for (int gpu = 0; gpu < num_gpus; gpu++)
-            {
-                graph_slices[gpu] = new GraphSlice<VertexId, SizeT, Value>(this->gpu_idx[gpu]);
-                if (num_gpus > 1)
-                {
-                    if (enable_backward)
-                    {
-                        retval = graph_slices[gpu]->Init(
-                            stream_from_host,
-                            num_gpus,
-                            &(sub_graphs     [gpu]),
-                            NULL,
-                            partition_tables    [gpu + 1],
-                            convertion_tables   [gpu + 1],
-                            original_vertexes   [gpu],
-                            in_counter          [gpu],
-                            out_offsets         [gpu],
-                            out_counter         [gpu],
-                            backward_offsets    [gpu],
-                            backward_partitions [gpu],
-                            backward_convertions[gpu]);
-                    }
-                    else
-                    {
-                        retval = graph_slices[gpu]->Init(
-                            stream_from_host,
-                            num_gpus,
-                            &(sub_graphs[gpu]),
-                            NULL,
-                            partition_tables [gpu + 1],
-                            convertion_tables[gpu + 1],
-                            original_vertexes[gpu],
-                            in_counter       [gpu],
-                            out_offsets      [gpu],
-                            out_counter      [gpu],
-                            NULL,
-                            NULL,
-                            NULL);
-                    }
+                    retval = graph_slices[gpu]->Init(
+                        stream_from_host,
+                        num_gpus,
+                        &(sub_graphs     [gpu]),
+                        NULL,
+                        partition_tables    [gpu + 1],
+                        convertion_tables   [gpu + 1],
+                        original_vertexes   [gpu],
+                        in_counter          [gpu],
+                        out_offsets         [gpu],
+                        out_counter         [gpu],
+                        backward_offsets    [gpu],
+                        backward_partitions [gpu],
+                        backward_convertions[gpu]);
                 }
                 else
                 {
@@ -1544,22 +1561,37 @@ struct ProblemBase
                         stream_from_host,
                         num_gpus,
                         &(sub_graphs[gpu]),
-                        inverse_graph,
                         NULL,
-                        NULL,
-                        NULL,
-                        NULL,
-                        NULL,
-                        NULL,
+                        partition_tables [gpu + 1],
+                        convertion_tables[gpu + 1],
+                        original_vertexes[gpu],
+                        in_counter       [gpu],
+                        out_offsets      [gpu],
+                        out_counter      [gpu],
                         NULL,
                         NULL,
                         NULL);
                 }
-                if (retval) break;
-            }  // end for (gpu)
-
-        }
-        while (0);
+            }
+            else
+            {
+                retval = graph_slices[gpu]->Init(
+                    stream_from_host,
+                    num_gpus,
+                    &(sub_graphs[gpu]),
+                    inverse_graph,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL);
+            }
+            if (retval) return retval;
+        }  // end for (gpu)
 
         return retval;
     } // end Init(...)

@@ -83,14 +83,22 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
         /*
          * @brief Default destructor
          */
-        ~DataSlice()
+        virtual ~DataSlice()
         {
-            if (util::SetDevice(this->gpu_idx)) return;
-            distances     .Release();
-            weights       .Release();
-            visit_lookup  .Release();
-            delta         .Release();
-            sssp_marker   .Release();
+            Release();
+        }
+        
+        cudaError_t Release()
+        {
+            cudaError_t retval = cudaSuccess;
+            if (retval = util::SetDevice(this->gpu_idx)) return retval;
+            if (retval = BaseDataSlice::Release()) return retval;
+            if (retval = distances     .Release()) return retval;
+            if (retval = weights       .Release()) return retval;
+            if (retval = visit_lookup  .Release()) return retval;
+            if (retval = delta         .Release()) return retval;
+            if (retval = sssp_marker   .Release()) return retval;
+            return retval;
         }
 
         bool HasNegativeValue(Value* vals, size_t len)
@@ -225,13 +233,17 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             SizeT new_frontier_elements[2] = {0,0};
             if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
+            for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+                this -> wait_marker[gpu] = 0;  
+            for (int i=0; i<4; i++) 
+            for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+            for (int stage=0; stage < this -> num_stages; stage++)
+                this -> events_set[i][gpu][stage] = false;
+            for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+            for (int i=0; i<2; i++) 
+                this -> in_length[i][gpu] = 0;  
             for (int peer=0; peer<this->num_gpus; peer++)
-                this->out_length[peer] = 1;
-
-            if (this->num_gpus>1)
-            {
-                // util::cpu_mt::PrintCPUArray<int, SizeT>("in_counter", graph_slice->in_counter.GetPointer(util::HOST), this->num_gpus+1, this->gpu_idx);
-            }
+                this -> out_length[peer] = 1;
 
             for (int peer=0;peer<(this->num_gpus > 1 ? this->num_gpus+1 : 1);peer++)
             for (int i=0; i < 2; i++)
@@ -336,15 +348,23 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
     /**
      * @brief SSSPProblem default destructor
      */
-    ~SSSPProblem()
+    virtual ~SSSPProblem()
     {
-        if (data_slices==NULL) return;
+        Release();
+    }
+
+    cudaError_t Release()
+    {
+        cudaError_t retval = cudaSuccess;
+        if (data_slices==NULL) return retval;
         for (int i = 0; i < this->num_gpus; ++i)
         {
-            util::SetDevice(this->gpu_idx[i]);
-            data_slices[i].Release();
+            if (retval = util::SetDevice(this->gpu_idx[i])) return retval;
+            if (retval = data_slices[i].Release()) return retval;
         }
         delete[] data_slices;data_slices=NULL;
+        if (retval = BaseProblem::Release()) return retval;
+        return retval;
     }
 
     /**
@@ -364,57 +384,57 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
     {
         cudaError_t retval = cudaSuccess;
 
-        do {
-            if (this->num_gpus == 1) {
+        if (this->num_gpus == 1) 
+        {
 
-                // Set device
-                if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
+            // Set device
+            if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
 
-                data_slices[0]->distances.SetPointer(h_distances);
-                if (retval = data_slices[0]->distances.Move(util::DEVICE,util::HOST)) return retval;
+            data_slices[0]->distances.SetPointer(h_distances);
+            if (retval = data_slices[0]->distances.Move(util::DEVICE,util::HOST)) return retval;
 
+            if (MARK_PATHS) 
+            {
+                data_slices[0]->preds.SetPointer(h_preds);
+                if (retval = data_slices[0]->preds.Move(util::DEVICE,util::HOST)) return retval;
+            }
+
+        } else {
+            Value    **th_distances=new Value*[this->num_gpus];
+            VertexId **th_preds =new VertexId*[this->num_gpus];
+            for (int gpu=0;gpu<this->num_gpus;gpu++)
+            {
+                if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
+                if (retval = data_slices[gpu]->distances.Move(util::DEVICE,util::HOST)) return retval;
+                th_distances[gpu]=data_slices[gpu]->distances.GetPointer(util::HOST);
                 if (MARK_PATHS) {
-                    data_slices[0]->preds.SetPointer(h_preds);
-                    if (retval = data_slices[0]->preds.Move(util::DEVICE,util::HOST)) return retval;
+                    if (retval = data_slices[gpu]->preds.Move(util::DEVICE,util::HOST)) return retval;
+                    th_preds[gpu]=data_slices[gpu]->preds.GetPointer(util::HOST);
                 }
+            } //end for(gpu)
 
-            } else {
-                Value    **th_distances=new Value*[this->num_gpus];
-                VertexId **th_preds =new VertexId*[this->num_gpus];
-                for (int gpu=0;gpu<this->num_gpus;gpu++)
-                {
-                    if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-                    if (retval = data_slices[gpu]->distances.Move(util::DEVICE,util::HOST)) return retval;
-                    th_distances[gpu]=data_slices[gpu]->distances.GetPointer(util::HOST);
-                    if (MARK_PATHS) {
-                        if (retval = data_slices[gpu]->preds.Move(util::DEVICE,util::HOST)) return retval;
-                        th_preds[gpu]=data_slices[gpu]->preds.GetPointer(util::HOST);
-                    }
-                } //end for(gpu)
+            for (VertexId node=0;node<this->nodes;node++)
+            if (this-> partition_tables[0][node]>=0 && this-> partition_tables[0][node]<this->num_gpus &&
+                this->convertion_tables[0][node]>=0 && this->convertion_tables[0][node]<data_slices[this->partition_tables[0][node]]->distances.GetSize())
+                h_distances[node]=th_distances[this->partition_tables[0][node]][this->convertion_tables[0][node]];
+            else {
+                printf("OutOfBound: node = %d, partition = %d, convertion = %d\n",
+                       node, this->partition_tables[0][node], this->convertion_tables[0][node]);
+                       //data_slices[this->partition_tables[0][node]]->distance.GetSize());
+                fflush(stdout);
+            }
 
+           if (MARK_PATHS)
                 for (VertexId node=0;node<this->nodes;node++)
-                if (this-> partition_tables[0][node]>=0 && this-> partition_tables[0][node]<this->num_gpus &&
-                    this->convertion_tables[0][node]>=0 && this->convertion_tables[0][node]<data_slices[this->partition_tables[0][node]]->distances.GetSize())
-                    h_distances[node]=th_distances[this->partition_tables[0][node]][this->convertion_tables[0][node]];
-                else {
-                    printf("OutOfBound: node = %d, partition = %d, convertion = %d\n",
-                           node, this->partition_tables[0][node], this->convertion_tables[0][node]);
-                           //data_slices[this->partition_tables[0][node]]->distance.GetSize());
-                    fflush(stdout);
-                }
-
-               if (MARK_PATHS)
-                    for (VertexId node=0;node<this->nodes;node++)
-                        h_preds[node]=th_preds[this->partition_tables[0][node]][this->convertion_tables[0][node]];
-                for (int gpu=0;gpu<this->num_gpus;gpu++)
-                {
-                    if (retval = data_slices[gpu]->distances.Release(util::HOST)) return retval;
-                    if (retval = data_slices[gpu]->preds.Release(util::HOST)) return retval;
-                }
-                delete[] th_distances;th_distances=NULL;
-                delete[] th_preds ;th_preds =NULL;
-            } //end if (data_slices.size() ==1)
-        } while(0);
+                    h_preds[node]=th_preds[this->partition_tables[0][node]][this->convertion_tables[0][node]];
+            for (int gpu=0;gpu<this->num_gpus;gpu++)
+            {
+                if (retval = data_slices[gpu]->distances.Release(util::HOST)) return retval;
+                if (retval = data_slices[gpu]->preds.Release(util::HOST)) return retval;
+            }
+            delete[] th_distances;th_distances=NULL;
+            delete[] th_preds ;th_preds =NULL;
+        } //end if (data_slices.size() ==1)
 
         return retval;
     }
@@ -453,7 +473,8 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             float         partition_factor  = -1.0,
             int           partition_seed    = -1)
     {
-        BaseProblem::Init(
+        cudaError_t retval = cudaSuccess;
+        if (retval = BaseProblem::Init(
             stream_from_host,
             graph,
             inversegraph,
@@ -462,37 +483,36 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             partition_method,
             queue_sizing,
             partition_factor,
-            partition_seed);
+            partition_seed))
+            return retval;
 
         // No data in DataSlice needs to be copied from host
 
-        cudaError_t retval = cudaSuccess;
         data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
-        do {
-            for (int gpu=0;gpu<this->num_gpus;gpu++)
-            {
-                data_slices[gpu].SetName("data_slices[]");
-                if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-                if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST)) return retval;
-                DataSlice* _data_slice = data_slices[gpu].GetPointer(util::HOST);
-                _data_slice->streams.SetPointer(&streams[gpu*num_gpus*2], num_gpus*2);
+        for (int gpu=0;gpu<this->num_gpus;gpu++)
+        {
+            data_slices[gpu].SetName("data_slices[]");
+            if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
+            if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST)) return retval;
+            DataSlice* _data_slice = data_slices[gpu].GetPointer(util::HOST);
+            _data_slice->streams.SetPointer(&streams[gpu*num_gpus*2], num_gpus*2);
 
-                _data_slice->Init(
-                    this->num_gpus,
-                    this->gpu_idx[gpu],
-                    //this->num_gpus > 1? (MARK_PATHS ? 1 : 0) : 0,
-                    //this->num_gpus > 1? 1 : 0,
-                    this->use_double_buffer,
-                    &(this->sub_graphs[gpu]),
-                    this->num_gpus > 1? this->graph_slices[gpu]->in_counter.GetPointer(util::HOST) : NULL,
-                    this->num_gpus > 1? this->graph_slices[gpu]->out_counter.GetPointer(util::HOST): NULL,
-                    this->num_gpus > 1? this->graph_slices[gpu]->original_vertex.GetPointer(util::HOST) : NULL,
-                    delta_factor,
-                    queue_sizing,
-                    in_sizing);
-            } // end for (gpu)
-        } while (0);
+            if (retval = _data_slice->Init(
+                this->num_gpus,
+                this->gpu_idx[gpu],
+                //this->num_gpus > 1? (MARK_PATHS ? 1 : 0) : 0,
+                //this->num_gpus > 1? 1 : 0,
+                this->use_double_buffer,
+                &(this->sub_graphs[gpu]),
+                this->num_gpus > 1? this->graph_slices[gpu]->in_counter.GetPointer(util::HOST) : NULL,
+                this->num_gpus > 1? this->graph_slices[gpu]->out_counter.GetPointer(util::HOST): NULL,
+                this->num_gpus > 1? this->graph_slices[gpu]->original_vertex.GetPointer(util::HOST) : NULL,
+                delta_factor,
+                queue_sizing,
+                in_sizing))
+                return retval;
+        } // end for (gpu)
 
         return retval;
     }

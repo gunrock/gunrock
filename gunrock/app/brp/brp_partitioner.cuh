@@ -61,27 +61,36 @@ namespace brp {
 template <
     typename VertexId,
     typename SizeT,
-    typename Value,
-    bool     ENABLE_BACKWARD = false,
-    bool     KEEP_ORDER      = false,
-    bool     KEEP_NODE_NUM   = false>
-struct BiasRandomPartitioner : PartitionerBase<VertexId,SizeT,Value,
-    ENABLE_BACKWARD, KEEP_ORDER, KEEP_NODE_NUM>
+    typename Value>
+    //bool     ENABLE_BACKWARD = false,
+    //bool     KEEP_ORDER      = false,
+    //bool     KEEP_NODE_NUM   = false>
+struct BiasRandomPartitioner : PartitionerBase<VertexId,SizeT,Value/*,
+    ENABLE_BACKWARD, KEEP_ORDER, KEEP_NODE_NUM*/>
 {
+    typedef PartitionerBase<VertexId, SizeT, Value> BasePartitioner;
     typedef Csr<VertexId,SizeT,Value> GraphT;
 
     // Members
     float *weitage;
 
     // Methods
-    BiasRandomPartitioner()
+    /*BiasRandomPartitioner()
     {
         weitage=NULL;
-    }
+    }*/
 
-    BiasRandomPartitioner(const GraphT &graph,
-                      int   num_gpus,
-                      float *weitage = NULL)
+    BiasRandomPartitioner(
+        const  GraphT &graph,
+        int    num_gpus,
+        float *weitage = NULL,
+        bool   _enable_backward = false,
+        bool   _keep_order      = false,
+        bool   _keep_node_num   = false) :
+        BasePartitioner(
+            _enable_backward,
+            _keep_order,
+            _keep_node_num)
     {
         Init2(graph,num_gpus,weitage);
     }

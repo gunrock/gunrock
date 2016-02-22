@@ -79,12 +79,20 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         /*
          * @brief Default destructor
          */
-        ~DataSlice()
+        virtual ~DataSlice()
         {
-            if (util::SetDevice(this->gpu_idx)) return;
-            visited_mask  .Release();
-            temp_marker   .Release();
-            original_vertex.Release();
+            Release();
+        }
+        
+        cudaError_t Release()
+        {
+            cudaError_t retval = cudaSuccess;
+            if (retval = util::SetDevice(this->gpu_idx)) return retval;
+            if (retval = BaseDataSlice::Release())  return retval;
+            if (retval = visited_mask   .Release()) return retval;
+            if (retval = temp_marker    .Release()) return retval;
+            if (retval = original_vertex.Release()) return retval;
+            return retval;
         }
 
         /**
@@ -178,15 +186,18 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             SizeT max_queue_length = 0;
             if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
+            if (retval = util::SetDevice( this -> gpu_idx)) return retval;
+            for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+                this -> wait_marker[gpu] = 0; 
+            for (int i=0; i<4; i++) 
+            for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+            for (int stage=0; stage < this -> num_stages; stage++)
+                this -> events_set[i][gpu][stage] = false;
+            for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+            for (int i=0; i<2; i++) 
+                this -> in_length[i][gpu] = 0; 
             for (int peer=0; peer<this->num_gpus; peer++)
-                this->out_length[peer] = 1;
-
-            if (this->num_gpus>1)
-            {
-                // util::cpu_mt::PrintCPUArray<int, SizeT>("in_counter", 
-                // graph_slice->in_counter.GetPointer(util::HOST), 
-                // this->num_gpus+1, this->gpu_idx);
-            }
+                this -> out_length[peer] = 1;
 
             for (int peer=0;peer<(this->num_gpus > 1 ? this->num_gpus+1 : 1);peer++)
             for (int i=0; i < 2; i++)
@@ -330,23 +341,31 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         MARK_PREDECESSORS && ENABLE_IDEMPOTENCE, // use_double_buffer
         false,                                   // enable_backward
         false,                                   // keep_order
-        false)                                   // keep_node_num
+        false),                                   // keep_node_num
+        data_slices(NULL)
     {
-        data_slices = NULL;
     }
 
     /**
      * @brief BFSProblem default destructor
      */
-    ~BFSProblem()
+    virtual ~BFSProblem()
     {
-        if (data_slices==NULL) return;
+        Release();
+    }
+
+    cudaError_t Release()
+    {
+        cudaError_t retval = cudaSuccess;
+        if (data_slices==NULL) return retval;
         for (int i = 0; i < this->num_gpus; ++i)
         {
-            util::SetDevice(this->gpu_idx[i]);
-            data_slices[i].Release();
+            if (retval = util::SetDevice(this->gpu_idx[i])) return retval;
+            if (retval = data_slices[i].Release()) return retval;
         }
         delete[] data_slices;data_slices=NULL;
+        if (retval = BaseProblem::Release()) return retval;
+        return retval;
     }
 
     /**
@@ -456,7 +475,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         float       partition_factor = -1.0f,
         int         partition_seed   = -1)
     {
-        BaseProblem::Init(
+        cudaError_t retval = cudaSuccess;
+        if (retval = BaseProblem::Init(
             stream_from_host,
             graph,
             inversegraph,
@@ -465,11 +485,11 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             partition_method,
             queue_sizing,
             partition_factor,
-            partition_seed);
+            partition_seed))
+            return retval;
 
         // No data in DataSlice needs to be copied from host
 
-        cudaError_t retval = cudaSuccess;
         data_slices = new util::Array1D<SizeT,DataSlice>[this->num_gpus];
 
         for (int gpu = 0; gpu < this -> num_gpus; gpu++)

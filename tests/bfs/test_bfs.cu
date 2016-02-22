@@ -275,7 +275,7 @@ template <
     //bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS,
     bool        ENABLE_IDEMPOTENCE >
-void RunTests(Info<VertexId, SizeT, Value> *info)
+cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 {
     typedef BFSProblem < VertexId,
             SizeT,
@@ -309,8 +309,9 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     bool     instrument            = info->info["instrument"        ].get_bool ();
     bool     debug                 = info->info["debug_mode"        ].get_bool ();
     bool     size_check            = info->info["size_check"        ].get_bool ();
-    int      iterations            = 1; //disable since doesn't support mgpu stop condition. info->info["num_iteration"].get_int();
+    int      iterations            = info->info["num_iteration"     ].get_int  ();
     CpuTimer cpu_timer;
+    cudaError_t retval             = cudaSuccess;
 
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
@@ -342,12 +343,13 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     for (int gpu = 0; gpu < num_gpus; gpu++)
     {
         size_t dummy;
-        cudaSetDevice(gpu_idx[gpu]);
-        cudaMemGetInfo(&(org_size[gpu]), &dummy);
+        if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
+        if (retval = util::GRError( cudaMemGetInfo(&(org_size[gpu]), &dummy),
+            "cudaMemGetInfo failed", __FILE__, __LINE__)) return retval;
     }
 
     Problem* problem = new Problem;  // allocate problem on GPU
-    util::GRError(problem->Init(
+    if (retval = util::GRError(problem->Init(
         stream_from_host,
         graph,
         NULL,
@@ -359,13 +361,14 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         max_in_sizing,
         partition_factor,
         partition_seed),
-        "BFS Problem Init failed", __FILE__, __LINE__);
+        "BFS Problem Init failed", __FILE__, __LINE__)) return retval;
 
     Enactor* enactor = new Enactor(
         num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
-    util::GRError(enactor->Init(
+    if (retval = util::GRError(enactor->Init(
         context, problem, max_grid_size, traversal_mode),
-        "BFS Enactor Init failed", __FILE__, __LINE__);
+        "BFS Enactor Init failed", __FILE__, __LINE__)) 
+        return retval;
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
@@ -390,17 +393,23 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     // perform BFS
-    double elapsed = 0.0f;
+    double total_elapsed = 0.0;
+    double single_elapsed = 0.0;
+    double max_elapsed    = 0.0;
+    double min_elapsed    = 1e10;
+    json_spirit::mArray process_times;
 
     for (int iter = 0; iter < iterations; ++iter)
     {
-        util::GRError(problem->Reset(
+        if (retval = util::GRError(problem->Reset(
             src, enactor->GetFrontierType(),
             max_queue_sizing, max_queue_sizing1),
-            "BFS Problem Data Reset Failed", __FILE__, __LINE__);
+            "BFS Problem Reset failed", __FILE__, __LINE__))
+            return retval;
 
-        util::GRError(enactor->Reset(),
-            "BFS Enactor Reset failed", __FILE__, __LINE__);
+        if (retval = util::GRError(enactor->Reset(),
+            "BFS Enactor Reset failed", __FILE__, __LINE__))
+            return retval;
 
         if (!quiet_mode)
         {
@@ -408,24 +417,31 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         }
 
         cpu_timer.Start();
-        util::GRError(enactor->Enact(src, traversal_mode),
-                      "BFS Problem Enact Failed", __FILE__, __LINE__);
+        if (retval = util::GRError(enactor->Enact(src, traversal_mode),
+            "BFS Enact failed", __FILE__, __LINE__)) return retval;
         cpu_timer.Stop();
-
+        single_elapsed = cpu_timer.ElapsedMillis();
+        total_elapsed += single_elapsed;
+        process_times.push_back(single_elapsed);
+        if (single_elapsed > max_elapsed) max_elapsed = single_elapsed;
+        if (single_elapsed < min_elapsed) min_elapsed = single_elapsed;
         if (!quiet_mode)
         {
-            printf("--------------------------\n"); fflush(stdout);
+            printf("--------------------------\n"
+                "iteration %d elapsed: %lf ms\n", 
+                iter, single_elapsed);
+            fflush(stdout);
         }
-
-        elapsed += cpu_timer.ElapsedMillis();
     }
-
-    elapsed /= iterations;
+    total_elapsed /= iterations;
+    info -> info["process_times"] = process_times;
+    info -> info["min_process_time"] = min_elapsed;
+    info -> info["max_process_time"] = max_elapsed;
 
     cpu_timer.Start();
     // copy out results
-    util::GRError(problem->Extract(h_labels, h_preds),
-                  "BFS Problem Data Extraction Failed", __FILE__, __LINE__);
+    if (retval = util::GRError(problem->Extract(h_labels, h_preds),
+        "BFS Problem Extraction failed", __FILE__, __LINE__)) return retval;
 
     // verify the result
     if ((!quick_mode) && (!quiet_mode))
@@ -532,7 +548,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     info->ComputeTraversalStats(  // compute running statistics
-        enactor->enactor_stats.GetPointer(), elapsed, h_labels);
+        enactor->enactor_stats.GetPointer(), total_elapsed, h_labels);
 
 
     if (!quiet_mode)
@@ -609,8 +625,20 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
 
     // Clean up
     if (org_size        ) {delete[] org_size        ; org_size         = NULL;}
-    if (enactor         ) {delete   enactor         ; enactor          = NULL;}
-    if (problem         ) {delete   problem         ; problem          = NULL;}
+    if (enactor         ) 
+    {
+        if (retval = util::GRError(enactor -> Release(),
+            "BFS Enactor Release failed", __FILE__, __LINE__))
+            return retval;
+        delete   enactor         ; enactor          = NULL;
+    }
+    if (problem         ) 
+    {
+        if (retval = util::GRError(problem -> Release(),
+            "BFS Problem Release failed", __FILE__, __LINE__))
+            return retval;
+        delete   problem         ; problem          = NULL;
+    }
     if (reference_labels) {delete[] reference_labels; reference_labels = NULL;}
     if (reference_preds ) {delete[] reference_preds ; reference_preds  = NULL;}
     if (h_labels        ) {delete[] h_labels        ; h_labels         = NULL;}
@@ -642,6 +670,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         }
         delete[] h_preds         ; h_preds          = NULL;
     }
+    return retval;
 }
 
 /**
@@ -665,13 +694,13 @@ template <
     //bool        DEBUG,
     //bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS >
-void RunTests_enable_idempotence(Info<VertexId, SizeT, Value> *info)
+cudaError_t RunTests_enable_idempotence(Info<VertexId, SizeT, Value> *info)
 {
-    if (info->info["idempotent"].get_bool())
-        RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
-                 MARK_PREDECESSORS, true > (info);
-    else
-        RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
+//    if (info->info["idempotent"].get_bool())
+//        return RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
+//                 MARK_PREDECESSORS, true > (info);
+//    else
+        return RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
                  MARK_PREDECESSORS, false> (info);
 }
 
@@ -694,13 +723,13 @@ template <
     //bool        INSTRUMENT,
     //bool        DEBUG,
     //bool        SIZE_CHECK >
-void RunTests_mark_predecessors(Info<VertexId, SizeT, Value> *info)
+cudaError_t RunTests_mark_predecessors(Info<VertexId, SizeT, Value> *info)
 {
-    if (info->info["mark_predecessors"].get_bool())
-        RunTests_enable_idempotence<VertexId, SizeT, Value, /*INSTRUMENT,
-                                    DEBUG, SIZE_CHECK,*/  true> (info);
-    else
-        RunTests_enable_idempotence<VertexId, SizeT, Value,/* INSTRUMENT,
+//    if (info->info["mark_predecessors"].get_bool())
+//        RunTests_enable_idempotence<VertexId, SizeT, Value, /*INSTRUMENT,
+//                                    DEBUG, SIZE_CHECK,*/  true> (info);
+//    else
+        return RunTests_enable_idempotence<VertexId, SizeT, Value,/* INSTRUMENT,
                                     DEBUG, SIZE_CHECK,*/ false> (info);
 }
 
@@ -731,7 +760,7 @@ int main_(CommandLineArgs *args)
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
-    RunTests_mark_predecessors<VertexId, SizeT, Value>(info);  // run test
+    cudaError_t retval = RunTests_mark_predecessors<VertexId, SizeT, Value>(info);  // run test
 
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
@@ -742,7 +771,7 @@ int main_(CommandLineArgs *args)
     }
 
     info->CollectInfo();  // collected all the info and put into JSON mObject
-    return 0;
+    return retval;
 }
 
 template <

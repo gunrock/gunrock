@@ -81,6 +81,8 @@ public:
         info["elapsed"]            = 0.0f;   // elapsed device running time
         info["preprocess_time"]    = 0.0f;   // elapsed preprocessing time
         info["postprocess_time"]   = 0.0f;   // postprocessing time
+        info["min_process_time"]   = 0.0f;   // min. elapsed time
+        info["max_process_time"]   = 0.0f;   // max. elapsed time 
         info["total_time"]         = 0.0f;   // total run time of the program
         info["load_time"]          = 0.0f;   // data loading time
         info["write_time"]         = 0.0f;   // output writing time
@@ -130,7 +132,7 @@ public:
         info["beta"]               = 6.0f;   // default beta for DOBFS
         info["top_nodes"]          = 0;      // default number of nodes for top-k primitive
         info["normalized"]         = false;  // default normalized for PageRank
-	info["multi_graphs"]       = false;  // default only one input graph
+        info["multi_graphs"]       = false;  // default only one input graph
         info["node_value"]         = false;  // default don't load labels
         info["label"]              = "";     // label file name used in test
         // info["gpuinfo"]
@@ -1034,9 +1036,12 @@ public:
         double  postprocess_time = info["postprocess_time"].get_real();
         double  write_time       = info["write_time"      ].get_real();
         double  total_time       = info["total_time"      ].get_real();
+        double  min_process_time = info["min_process_time"].get_real();
+        double  max_process_time = info["max_process_time"].get_real();
 
-        printf("\n [%s] finished.", info["algorithm"].get_str().c_str());
-        printf("\n elapsed: %.4f ms\n iterations: %lld", elapsed, (long long)search_depth);
+        printf("\n [%s] finished.\n", info["algorithm"].get_str().c_str());
+        printf(" avg. elapsed: %.4f ms\n", elapsed);
+        printf(" iterations: %lld\n", (long long)search_depth);
 
         if (verbose)
         {
@@ -1046,41 +1051,46 @@ public:
             }
             else
             {
+                if (min_process_time > 0)
+                    printf(" min. elapsed: %.4f ms\n", min_process_time);
+                if (max_process_time > 0)
+                    printf(" max. elapsed: %.4f ms\n", max_process_time);
+                
                 if (m_teps > 0.01)
                 {
-                    printf("\n rate: %.4f MiEdges/s", m_teps);
+                    printf(" rate: %.4f MiEdges/s\n", m_teps);
                 }
                 if (avg_duty > 0.01)
                 {
-                    printf("\n average CTA duty: %.2f%%", avg_duty);
+                    printf(" average CTA duty: %.2f%%\n", avg_duty);
                 }
                 if (nodes_visited != 0 && edges_visited != 0)
                 {
-                    printf("\n src: %lld\n nodes_visited: %lld\n edges_visited: %lld",
+                    printf(" src: %lld\n nodes_visited: %lld\n edges_visited: %lld\n",
                         source, (long long)nodes_visited, (long long)edges_visited);
                 }
                 if (nodes_queued > 0)
                 {
-                    printf("\n nodes queued: %lld", (long long)nodes_queued);
+                    printf(" nodes queued: %lld\n", (long long)nodes_queued);
                 }
                 if (edges_queued > 0)
                 {
-                    printf("\n edges queued: %lld", (long long)edges_queued);
+                    printf(" edges queued: %lld\n", (long long)edges_queued);
                 }
                 if (nodes_redundance > 0.01)
                 {
-                    printf("\n nodes redundance: %.2f%%", nodes_redundance);
+                    printf(" nodes redundance: %.2f%%\n", nodes_redundance);
                 }
                 if (edges_redundance > 0.01)
                 {
-                    printf("\n edges redundance: %.2f%%", edges_redundance);
+                    printf(" edges redundance: %.2f%%\n", edges_redundance);
                 }
-                printf("\n load time: %.4f ms", load_time);
-                printf("\n preprocess time: %.4f ms", preprocess_time);
-                printf("\n postprocess time: %.4f ms", postprocess_time);
+                printf(" load time: %.4f ms\n", load_time);
+                printf(" preprocess time: %.4f ms\n", preprocess_time);
+                printf(" postprocess time: %.4f ms\n", postprocess_time);
                 if (info["output_filename"].get_str() != "")
-                    printf("\n write time: %.4f ms", write_time);
-                printf("\n total time: %.4f ms", total_time);
+                    printf(" write time: %.4f ms\n", write_time);
+                printf(" total time: %.4f ms\n", total_time);
            }
         }
         printf("\n");
