@@ -263,6 +263,12 @@ add_test(NAME TEST_MST COMMAND minimum_spanning_tree market
   ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx)
 set_tests_properties(TEST_MST PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
+if(DEFINED DEVICES)
+  set(DEVICES "--device=${DEVICES}")
+else(DEFINED DEVICES)
+  set(DEVICES "")
+endif(DEFINED DEVICES)
+
 option(ALLTEST "ALLTEST" OFF)
 if(ALLTEST)
   execute_process(COMMAND make
@@ -279,35 +285,35 @@ if(ALLTEST)
               ${gunrock_INCLUDE_DIRS}/dataset/large/delaunay_n13/delaunay_n13.mtx)
 
     add_test(NAME TEST_BFS_${MTX} COMMAND breadth_first_search market
-      ${MTX} --undirected --src=0)
+      ${MTX} ${DEVICES} --undirected --src=0)
     set_tests_properties(TEST_BFS_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
     add_test(NAME TEST_BC_${MTX} COMMAND betweenness_centrality market
-      ${MTX} --undirected --src=0)
+      ${MTX} ${DEVICES} --undirected --src=0)
     set_tests_properties(TEST_BC_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
     add_test(NAME TEST_CC_${MTX} COMMAND connected_component market
-      ${MTX})
+      ${MTX} ${DEVICES})
     set_tests_properties(TEST_CC_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
     add_test(NAME TEST_SSSP_${MTX} COMMAND single_source_shortest_path market
-      ${MTX} --undirected --src=0)
+      ${MTX} ${DEVICES} --undirected --src=0)
     set_tests_properties(TEST_SSSP_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
     add_test(NAME TEST_PAGERANK_${MTX} COMMAND pagerank market
-      ${MTX} --undirected)
+      ${MTX} ${DEVICES} --undirected)
     set_tests_properties(TEST_PAGERANK_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
     add_test(NAME TEST_DOBFS_${MTX} COMMAND direction_optimizing_bfs market
-      ${MTX} --undirected --src=0)
+      ${MTX} ${DEVICES} --undirected --src=0)
     set_tests_properties(TEST_DOBFS_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
     add_test(NAME TEST_TOPK_${MTX} COMMAND degree_centrality market
-      ${MTX} --undirected)
+      ${MTX} ${DEVICES} --undirected)
     set_tests_properties(TEST_TOPK_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
     add_test(NAME TEST_MST_${MTX} COMMAND minimum_spanning_tree market
-      ${MTX})
+      ${MTX} ${DEVICES})
     set_tests_properties(TEST_MST_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
   ENDFOREACH(MTX)
 endif(ALLTEST)
