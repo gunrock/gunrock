@@ -65,20 +65,20 @@ directly using [Github](https://github.com/gunrock/gunrock/issues).
 Operating System Support and Requirements
 =========================================
 
-This release (0.3) has only been tested on Linux Mint 15 (64-bit) and Ubuntu
-12.04 with CUDA 5.5, 6.0, 6.5, and 7.0 installed. We expect Gunrock to build
+This release (0.3) has been tested on Linux Mint 15 (64-bit), Ubuntu
+12.04, 14.04 and 15.10 with CUDA 7.5 installed. We expect Gunrock to build
 and run correctly on other 64-bit and 32-bit Linux distributions, Mac OS,
 and Windows.
 
 Requirements
 ------------
 
-CUDA version 5.5 (or greater) and compute capability 3.0 (or greater) is
+CUDA version 7.5 (or greater) and compute capability 3.0 (or greater) is
 required.
 
 Several graph primitives' CPU validation code uses Boost Graph Library.
 We are also using Boost Spirit, filesystem, and timer in our utility code.
-A boost version > 1.53.0 is required.
+A boost version > 1.56.0 is required (1.58.0 is recommended).
 
 CUDA
 ====
