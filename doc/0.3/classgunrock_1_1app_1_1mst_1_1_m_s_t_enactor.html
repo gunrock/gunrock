@@ -148,7 +148,7 @@ virtual&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="c
 <tr class="separator:a97db7c3c307444df5a47df93eee46fd3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a89f005e1469866987d099728fea75797"><td class="memTemplParams" colspan="2">template&lt;typename AdvanceKernelPolicy , typename FilterKernelPolicy , typename MSTProblem &gt; </td></tr>
 <tr class="memitem:a89f005e1469866987d099728fea75797"><td class="memTemplItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classgunrock_1_1app_1_1mst_1_1_m_s_t_enactor.html#a89f005e1469866987d099728fea75797">EnactMST</a> (ContextPtr context, MSTProblem *problem, int max_grid_size=0)</td></tr>
-<tr class="memdesc:a89f005e1469866987d099728fea75797"><td class="mdescLeft">&#160;</td><td class="mdescRight">Obtain statistics about the last MST search enacted.  <a href="#a89f005e1469866987d099728fea75797">More...</a><br /></td></tr>
+<tr class="memdesc:a89f005e1469866987d099728fea75797"><td class="mdescLeft">&#160;</td><td class="mdescRight">Enacts a MST computing on the specified graph.  <a href="#a89f005e1469866987d099728fea75797">More...</a><br /></td></tr>
 <tr class="separator:a89f005e1469866987d099728fea75797"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af312d6fd2e5863cebb508e453c5a2ee0"><td class="memTemplParams" colspan="2">template&lt;typename MSTProblem &gt; </td></tr>
 <tr class="memitem:af312d6fd2e5863cebb508e453c5a2ee0"><td class="memTemplItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classgunrock_1_1app_1_1mst_1_1_m_s_t_enactor.html#af312d6fd2e5863cebb508e453c5a2ee0">Enact</a> (ContextPtr context, MSTProblem *problem, int max_grid_size=0)</td></tr>
@@ -278,16 +278,9 @@ template&lt;typename AdvanceKernelPolicy , typename FilterKernelPolicy , typenam
 </table>
 </div><div class="memdoc">
 
-<p>Obtain statistics about the last MST search enacted. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[out]</td><td class="paramname">total_queued</td><td>Total queued elements in MST kernel. </td></tr>
-    <tr><td class="paramdir">[out]</td><td class="paramname">search_depth</td><td>Search depth of MST algorithm. </td></tr>
-    <tr><td class="paramdir">[out]</td><td class="paramname">avg_duty</td><td>Average kernel running duty (kernel run time / kernel lifetime). Enacts a MST computing on the specified graph.</td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="tparams"><dt>Template Parameters</dt><dd>
+<p>Enacts a MST computing on the specified graph. </p>
+<p>@ brief Obtain statistics about the last MST search enacted.</p>
+<p>@ param[out] total_queued Total queued elements in MST kernel. @ param[out] search_depth Search depth of MST algorithm. @ param[out] avg_duty Average kernel running duty (kernel run time / kernel lifetime). spaces between @ and name are to eliminate doxygen warnings </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
     <tr><td class="paramname">Advance</td><td>Kernel policy for forward advance kernel. </td></tr>
     <tr><td class="paramname">Filter</td><td>Kernel policy for filter kernel. </td></tr>
@@ -394,7 +387,7 @@ template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following file:<ul>
-<li>/home/huan/projects/gunrock/maingrepo/gunrock/gunrock/app/mst/<a class="el" href="mst__enactor_8cuh.html">mst_enactor.cuh</a></li>
+<li>/home/muhammad/gunrock/gunrock/app/mst/<a class="el" href="mst__enactor_8cuh.html">mst_enactor.cuh</a></li>
 </ul>
 </div><!-- contents -->
 <!-- HTML footer for doxygen 1.8.8-->
@@ -405,7 +398,7 @@ template&lt;typename _Problem , bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK&
 </div>
 </div>
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat Dec 12 2015 00:50:08 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Wed Feb 24 2016 10:47:48 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.11
 </small></address>
