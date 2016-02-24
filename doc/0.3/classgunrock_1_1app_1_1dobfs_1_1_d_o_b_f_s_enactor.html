@@ -147,7 +147,7 @@ virtual&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="c
 <tr class="separator:aa05317cf19458fba26b98dadf14a68aa"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa043ad683594f6ad1bd5e577527a779c"><td class="memTemplParams" colspan="2">template&lt;typename AdvanceKernelPolicy , typename BackwardAdvanceKernelPolicy , typename FilterKernelPolicy , typename BackwardFilterKernelPolicy , typename DOBFSProblem &gt; </td></tr>
 <tr class="memitem:aa043ad683594f6ad1bd5e577527a779c"><td class="memTemplItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classgunrock_1_1app_1_1dobfs_1_1_d_o_b_f_s_enactor.html#aa043ad683594f6ad1bd5e577527a779c">EnactDOBFS</a> (ContextPtr context, <a class="el" href="structgunrock_1_1app_1_1dobfs_1_1_d_o_b_f_s_problem.html">DOBFSProblem</a> *problem, typename DOBFSProblem::VertexId src, int max_grid_size=0)</td></tr>
-<tr class="memdesc:aa043ad683594f6ad1bd5e577527a779c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Obtain statistics about the last BFS search enacted.  <a href="#aa043ad683594f6ad1bd5e577527a779c">More...</a><br /></td></tr>
+<tr class="memdesc:aa043ad683594f6ad1bd5e577527a779c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Enacts a direction optimal breadth-first search computing on the specified graph. (now only reverse bfs for testing purpose)  <a href="#aa043ad683594f6ad1bd5e577527a779c">More...</a><br /></td></tr>
 <tr class="separator:aa043ad683594f6ad1bd5e577527a779c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ga03d6aa2856ac8af483554127d68d2c83"><td class="memTemplParams" colspan="2">template&lt;typename DOBFSProblem &gt; </td></tr>
 <tr class="memitem:ga03d6aa2856ac8af483554127d68d2c83"><td class="memTemplItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga03d6aa2856ac8af483554127d68d2c83">Enact</a> (ContextPtr context, <a class="el" href="structgunrock_1_1app_1_1dobfs_1_1_d_o_b_f_s_problem.html">DOBFSProblem</a> *problem, typename DOBFSProblem::VertexId src, int max_grid_size=0)</td></tr>
@@ -275,16 +275,9 @@ template&lt;typename AdvanceKernelPolicy , typename BackwardAdvanceKernelPolicy 
 </table>
 </div><div class="memdoc">
 
-<p>Obtain statistics about the last BFS search enacted. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[out]</td><td class="paramname">total_queued</td><td>Total queued elements in BFS kernel running. </td></tr>
-    <tr><td class="paramdir">[out]</td><td class="paramname">search_depth</td><td>Search depth of BFS algorithm. </td></tr>
-    <tr><td class="paramdir">[out]</td><td class="paramname">avg_duty</td><td>Average kernel running duty (kernel run time/kernel lifetime). Enacts a direction optimal breadth-first search computing on the specified graph. (now only reverse bfs for testing purpose)</td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="tparams"><dt>Template Parameters</dt><dd>
+<p>Enacts a direction optimal breadth-first search computing on the specified graph. (now only reverse bfs for testing purpose) </p>
+<p>@ brief Obtain statistics about the last BFS search enacted.</p>
+<p>@ param[out] total_queued Total queued elements in BFS kernel running. @ param[out] search_depth Search depth of BFS algorithm. @ param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime). spaces between @ and name are to eliminate doxygen warnings </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
     <tr><td class="paramname">AdvanceKernelPolicy</td><td>Kernel policy for advance operator. </td></tr>
     <tr><td class="paramname">BackwardAdvanceKernelPolicy</td><td>Kernel policy for backward advance operator. </td></tr>
@@ -307,7 +300,7 @@ template&lt;typename AdvanceKernelPolicy , typename BackwardAdvanceKernelPolicy 
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following file:<ul>
-<li>/home/huan/projects/gunrock/maingrepo/gunrock/gunrock/app/dobfs/<a class="el" href="dobfs__enactor_8cuh.html">dobfs_enactor.cuh</a></li>
+<li>/home/muhammad/gunrock/gunrock/app/dobfs/<a class="el" href="dobfs__enactor_8cuh.html">dobfs_enactor.cuh</a></li>
 </ul>
 </div><!-- contents -->
 <!-- HTML footer for doxygen 1.8.8-->
@@ -318,7 +311,7 @@ template&lt;typename AdvanceKernelPolicy , typename BackwardAdvanceKernelPolicy 
 </div>
 </div>
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat Dec 12 2015 00:50:07 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Wed Feb 24 2016 10:47:47 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.11
 </small></address>

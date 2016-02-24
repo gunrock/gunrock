@@ -133,7 +133,7 @@ virtual&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="g
 <tr class="separator:ga3ee05b6cc6a0ff1f24c9897845a7fafa"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:gaec4ca9988184d279dc4876a1a8eda671"><td class="memTemplParams" colspan="2">template&lt;typename AdvanceKernelPolity , typename FilterKernelPolicy &gt; </td></tr>
 <tr class="memitem:gaec4ca9988184d279dc4876a1a8eda671"><td class="memTemplItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="group___public_interface.html#gaec4ca9988184d279dc4876a1a8eda671">gunrock::app::bc::BCEnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::InitBC</a> (ContextPtr *context, Problem *problem, int max_grid_size=512, bool size_check=true)</td></tr>
-<tr class="memdesc:gaec4ca9988184d279dc4876a1a8eda671"><td class="mdescLeft">&#160;</td><td class="mdescRight">Obtain statistics about the last primitive enacted.  <a href="#gaec4ca9988184d279dc4876a1a8eda671">More...</a><br /></td></tr>
+<tr class="memdesc:gaec4ca9988184d279dc4876a1a8eda671"><td class="mdescLeft">&#160;</td><td class="mdescRight">Initialize the problem.  <a href="#gaec4ca9988184d279dc4876a1a8eda671">More...</a><br /></td></tr>
 <tr class="separator:gaec4ca9988184d279dc4876a1a8eda671"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ga94d77c3b580281c4d62f83a6dddafe0a"><td class="memItemLeft" align="right" valign="top">cudaError_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___public_interface.html#ga94d77c3b580281c4d62f83a6dddafe0a">gunrock::app::bc::BCEnactor&lt; _Problem, _INSTRUMENT, _DEBUG, _SIZE_CHECK &gt;::Reset</a> ()</td></tr>
 <tr class="memdesc:ga94d77c3b580281c4d62f83a6dddafe0a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset enactor.  <a href="#ga94d77c3b580281c4d62f83a6dddafe0a">More...</a><br /></td></tr>
@@ -449,15 +449,9 @@ template&lt;typename AdvanceKernelPolity , typename FilterKernelPolicy &gt; </di
 </table>
 </div><div class="memdoc">
 
-<p>Obtain statistics about the last primitive enacted. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[out]</td><td class="paramname">total_queued</td><td>Total queued elements in kernel running. </td></tr>
-    <tr><td class="paramdir">[out]</td><td class="paramname">avg_duty</td><td>Average kernel duty (kernel time/kernel lifetime). Initialize the problem.</td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="tparams"><dt>Template Parameters</dt><dd>
+<p>Initialize the problem. </p>
+<p>@ brief Obtain statistics about the last primitive enacted.</p>
+<p>@ param[out] total_queued Total queued elements in kernel running. @ param[out] avg_duty Average kernel duty (kernel time/kernel lifetime). spaces between @ and name are to eliminate doxygen warnings </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
     <tr><td class="paramname">AdvanceKernelPolicy</td><td>Kernel policy for advance operator. </td></tr>
     <tr><td class="paramname">FilterKernelPolicy</td><td>Kernel policy for filter operator.</td></tr>
@@ -1767,7 +1761,8 @@ template&lt;typename _VertexId , typename _SizeT , typename _Value , bool _MARK_
   <table class="params">
     <tr><td class="paramdir">[in]</td><td class="paramname">src</td><td>Source node for one BFS computing pass. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">frontier_type</td><td>The frontier type (i.e., edge/vertex/mixed) </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">queue_sizing</td><td>Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).</td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">queue_sizing</td><td>Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">queue_sizing1</td><td>Size scaling factor for work queue allocation</td></tr>
   </table>
   </dd>
 </dl>
@@ -2918,7 +2913,8 @@ template&lt;typename VertexId , typename SizeT , typename Value , bool _MARK_PAT
   <table class="params">
     <tr><td class="paramdir">[in]</td><td class="paramname">src</td><td>Source node to start. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">frontier_type</td><td>The frontier type (i.e., edge/vertex/mixed). </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">queue_sizing</td><td>Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).</td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">queue_sizing</td><td>Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">queue_sizing1</td><td></td></tr>
   </table>
   </dd>
 </dl>
@@ -4396,7 +4392,7 @@ template&lt;typename SizeT &gt; </div>
 </div>
 </div>
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat Dec 12 2015 00:50:07 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Wed Feb 24 2016 10:47:47 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.11
 </small></address>
