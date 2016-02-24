@@ -38,10 +38,10 @@ FIND_PACKAGE(Metis ${gunrock_REQUIRED_METIS_VERSION} REQUIRED)
 SET(METIS_FOUND FALSE)
 if (METIS_LIB)
   set(METIS_FOUND TRUE)
-  add_definitions( -DMETIS_FOUND=TRUE )
+  add_definitions( -DMETIS_FOUND=true )
   message(STATUS "Found Metis")
 else (METIS_LIB)
-  add_definitions( -DMETIS_FOUND=FALSE )
+  add_definitions( -DMETIS_FOUND=false )
   message(WARNING "Metis was requested but support was not found,
   run `sudo apt-get install metis` or `/dep/install_metis.sh` for installation.")
 endif (METIS_LIB)
@@ -325,4 +325,3 @@ set_tests_properties(SHARED_LIB_TEST_PAGERANK
 #    data/simple_example/bips98_606.mtx --src=largestdegree)
 #set_tests_properties(TestBFS
 #    PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
-
