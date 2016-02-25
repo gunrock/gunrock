@@ -51,7 +51,7 @@ struct Sweep
         typename KernelPolicy::VertexId         *&d_inverse_column_indices,
         typename ProblemData::DataSlice         *&problem,
         typename KernelPolicy::SmemStorage      &smem_storage,
-        util::CtaWorkProgress                   &work_progress,
+        util::CtaWorkProgress<typename KernelPolicy::SizeT> &work_progress,
         util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition,
         typename KernelPolicy::SizeT            &max_out_frontier,
         gunrock::oprtr::advance::TYPE           &ADVANCE_TYPE,
@@ -147,7 +147,7 @@ struct Dispatch
         VertexId                    *&d_column_indices,
         VertexId                    *&d_inverse_column_indices,
         DataSlice                   *&problem,
-        util::CtaWorkProgress       &work_progress,
+        util::CtaWorkProgress<SizeT> &work_progress,
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
         util::KernelRuntimeStats    &kernel_stats,
@@ -190,7 +190,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         VertexId                    *&d_column_indices,
         VertexId                    *&d_inverse_column_indices,
         DataSlice                   *&problem,
-        util::CtaWorkProgress       &work_progress,
+        util::CtaWorkProgress<SizeT> &work_progress,
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
         util::KernelRuntimeStats    &kernel_stats,
@@ -226,11 +226,11 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             // Obtain problem size
             if (queue_reset)
             {
-                work_progress.StoreQueueLength<SizeT>(num_elements, queue_index);
+                work_progress.StoreQueueLength(num_elements, queue_index);
             }
             else
             {
-                num_elements = work_progress.template LoadQueueLength<SizeT>(queue_index);
+                num_elements = work_progress.LoadQueueLength(queue_index);
 
                 // Check if we previously overflowed
                 if (num_elements >= max_in_frontier) {
@@ -321,7 +321,7 @@ void Kernel(
         typename KernelPolicy::VertexId         *d_column_indices,
         typename KernelPolicy::VertexId         *d_inverse_column_indices,
         typename ProblemData::DataSlice         *problem,
-        util::CtaWorkProgress                   work_progress,
+        util::CtaWorkProgress<typename KernelPolicy::SizeT> work_progress,
         typename KernelPolicy::SizeT            max_in_frontier,
         typename KernelPolicy::SizeT            max_out_frontier,
         util::KernelRuntimeStats                kernel_stats,

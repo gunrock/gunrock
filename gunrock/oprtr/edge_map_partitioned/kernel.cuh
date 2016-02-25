@@ -106,7 +106,7 @@ struct Dispatch
         SizeT      &partition_size,
         SizeT      &max_vertices,
         SizeT      &max_edges,
-        util::CtaWorkProgress &work_progress,
+        util::CtaWorkProgress<SizeT> &work_progress,
         util::KernelRuntimeStats &kernel_stats,
         //gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
         bool       &input_inverse_graph,
@@ -135,7 +135,7 @@ struct Dispatch
         SizeT      &partition_size,
         SizeT      &max_vertices,
         SizeT      &max_edges,
-        util::CtaWorkProgress &work_progress,
+        util::CtaWorkProgress<SizeT> &work_progress,
         util::KernelRuntimeStats &kernel_stats,
         //gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
         bool       &input_inverse_graph,
@@ -348,7 +348,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         SizeT                    &partition_size,
         SizeT                    &max_vertices,
         SizeT                    &max_edges,
-        util::CtaWorkProgress    &work_progress,
+        util::CtaWorkProgress<SizeT> &work_progress,
         util::KernelRuntimeStats &kernel_stats,
         bool                     &input_inverse_graph,
         bool                     &output_inverse_graph,
@@ -361,18 +361,18 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             // obtain problem size
             if (queue_reset)
             {
-                work_progress.StoreQueueLength<SizeT>(input_queue_len, queue_index);
+                work_progress.StoreQueueLength(input_queue_len, queue_index);
             }
             else
             {
-                input_queue_len = work_progress.template LoadQueueLength<SizeT>(queue_index);
+                input_queue_len = work_progress.LoadQueueLength(queue_index);
             }
 
             work_progress.Enqueue(output_queue_len[0], queue_index+1);
 
             // Reset our next outgoing queue counter to zero
-            work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
-            work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
+            work_progress.StoreQueueLength(0, queue_index + 2);
+            work_progress.PrepResetSteal(queue_index + 1);
         }
 
         // Barrier to protect work decomposition
@@ -381,24 +381,6 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
         //int tid = threadIdx.x;
         //int bid = blockIdx.x;
-
-        //int my_thread_start, my_thread_end;
-
-        SizeT block_output_start = blockIdx.x * partition_size;
-        SizeT block_output_end   = ((blockIdx.x + 1) * partition_size < output_queue_len[0]) ? 
-            (blockIdx.x + 1) * partition_size : output_queue_len[0];
-        if (block_output_start >= output_queue_len[0])
-            return;
-        SizeT block_output_size  = block_output_end - block_output_start;
-        SizeT block_output_processed = 0;
-
-        //SizeT block_input_start = partition_starts[blockIdx.x];
-        SizeT block_input_end   = (partition_starts[blockIdx.x + 1] > input_queue_len) ? 
-            partition_starts[blockIdx.x + 1] : input_queue_len;
-        SizeT block_input       = partition_starts[blockIdx.x];
-
-        // smem_storage.s_edges[NT]
-        // smem_storage.s_vertices[NT]
         // unsigned int* s_edges = (unsigned int*) &smem_storage.s_edges[0];
         // SizeT    *s_output_offset = smem_storage.output_offset;
         // unsigned int* s_vertices = (unsigned int*) &smem_storage.s_vertices[0];
@@ -406,24 +388,76 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         // unsigned int* s_edge_ids = (unsigned int*) &smem_storage.s_edge_ids[0];
         // VertexId *s_input_queue   = smem_storage.input_queue;
 
+        SizeT block_output_start = blockIdx.x * partition_size;
+        if (block_output_start >= output_queue_len[0])
+            return;
+        SizeT block_output_end   = min(
+            (blockIdx.x + 1) * partition_size, output_queue_len[0]);
+        SizeT block_output_size  = block_output_end - block_output_start;
+        SizeT block_output_processed = 0;
+
+        //SizeT block_input_start = partition_starts[blockIdx.x];
+        SizeT block_input_end    = (blockIdx.x == gridDim.x - 1) ? 
+            input_queue_len : min(
+            partition_starts[blockIdx.x + 1] , input_queue_len);
+
         //int out_offset = blockIdx.x * partition_size;
-        SizeT block_output_offset = (block_input > 0) ? 
-            d_scanned_edges[block_input-1] : 0;
-        SizeT inblock_output_offset = block_output_start - block_output_offset;
-        VertexId input_item = 0;
+        volatile SizeT iter_input_start  = partition_starts[blockIdx.x];
+        volatile SizeT iter_input_size   = 0;
+        //SizeT iter_output_start = (iter_input_start > 0)?
+        //    d_scanned_edges[iter_input_start -1] : 0;
+        //SizeT iter_output_start_offset = 0;
+        volatile SizeT iter_output_size  = 0;
+        //SizeT iter_output_offset = block_output_start - iter_output_start;
+        volatile VertexId input_item = 0;
+        volatile SizeT block_first_v_skip_count = (iter_input_start > 0 && 
+            block_output_start != d_scanned_edges[iter_input_start]) ? 
+            block_output_start - d_scanned_edges[iter_input_start -1] : 0;
+        if (threadIdx.x ==0 ) //<2 || threadIdx.x > blockDim.x -3)
+        {
+            printf("( %4d , %4d ) : block_input = [ %4d , %4d ), block_output = [ %4d , %4d ), skip_count = %lld\n",
+                blockIdx.x, threadIdx.x,
+                iter_input_start, block_input_end,
+                block_output_start, block_output_end,
+                (long long)block_first_v_skip_count);
+            if (iter_input_start > 0)
+                printf("( %4d , %4d ) : d_scanned_edges = %lld, %lld\n",
+                    blockIdx.x, threadIdx.x,
+                    (long long) d_scanned_edges[iter_input_start -1],
+                    (long long) d_scanned_edges[iter_input_start]);
+        }
 
         while (block_output_processed < block_output_size && 
-            block_input < block_input_end)
+            iter_input_start < block_input_end)
         {
-            block_output_offset = block_input > 0 ? d_scanned_edges[block_input - 1] : 0;
-
-            __syncthreads();
-            
-            if (block_input + threadIdx.x < block_input_end)
+            //iter_output_start = (iter_input_start > 0) ? 
+            //    d_scanned_edges[iter_input_start - 1] : 0;
+            iter_input_size  = min(
+                KernelPolicy::THREADS, block_input_end - iter_input_start);
+            volatile SizeT iter_input_end = iter_input_start + iter_input_size;
+            volatile SizeT iter_output_end = iter_input_end < input_queue_len ?
+                d_scanned_edges[iter_input_end] : output_queue_len[0];
+            iter_output_size = min(
+                //smem_storage.output_offset[iter_input_size-1] - block_output_processed, 
+                iter_output_end - block_output_start,
+                block_output_size);
+            iter_output_size -= block_output_processed;
+    
+            if (threadIdx.x ==0 ) //<2 || threadIdx.x > blockDim.x -3)
             {
-                input_item = d_queue[block_input + threadIdx.x];
+                printf("( %4d , %4d ) :  iter_input = [ %4d , %4d ), iter_output = [ %4d , %4d )\n",
+                    blockIdx.x, threadIdx.x,
+                    iter_input_start, iter_input_start + iter_input_size,
+                    block_output_start + block_output_processed,
+                    block_output_start + block_output_processed + iter_output_size);
+            }
+
+            volatile VertexId thread_input = iter_input_start + threadIdx.x;
+            if (thread_input <= block_input_end && thread_input < input_queue_len)
+            {
+                input_item = d_queue[thread_input];
                 smem_storage.output_offset[threadIdx.x] = 
-                    d_scanned_edges[block_input + threadIdx.x] - inblock_output_offset;
+                    d_scanned_edges [thread_input] - block_output_start;
                 smem_storage.input_queue  [threadIdx.x] = input_item;
                 if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || 
                     ADVANCE_TYPE == gunrock::oprtr::advance::V2E)
@@ -439,67 +473,80 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                         smem_storage.vertices[threadIdx.x] = d_column_indices        [input_item];
                 }
             } else {
-                smem_storage.output_offset[threadIdx.x] = max_edges;
-                smem_storage.vertices     [threadIdx.x] = max_vertices;
-                smem_storage.input_queue  [threadIdx.x] = max_vertices;
+                smem_storage.output_offset[threadIdx.x] = util::MaxValue<SizeT>(); //max_edges;
+                smem_storage.vertices     [threadIdx.x] = util::MaxValue<VertexId>();//max_vertices;
+                smem_storage.input_queue  [threadIdx.x] = util::MaxValue<VertexId>();//max_vertices;
             }
-
-            SizeT block_last_input = (block_input + KernelPolicy::THREADS >= block_input_end) ? 
-                block_input_end - block_input - 1 : KernelPolicy::THREADS - 1;
-
             __syncthreads();
 
-            SizeT block_last_output = min(
-                smem_storage.output_offset[block_last_input] - inblock_output_offset, 
-                block_output_size - block_output_processed);
-            SizeT    v_index    = BinarySearch<KernelPolicy::THREADS>(
-                inblock_output_offset + threadIdx.x, smem_storage.output_offset);
-            VertexId v          = smem_storage.vertices   [v_index];
-            VertexId input_item = smem_storage.input_queue[v_index];
-            SizeT last_output_offset_v = (v_index < block_input_end) ? 
-                smem_storage.output_offset[v_index] : max_edges;
-            SizeT internal_output_offset = (v_index > 0) ? 
-                smem_storage.output_offset[v_index-1] : 0;
-            SizeT row_offset_v = (output_inverse_graph)? 
-                d_inverse_row_offsets[v] : d_row_offsets[v];
-
-            for (SizeT thread_output_offset = inblock_output_offset + threadIdx.x; 
-                thread_output_offset < inblock_output_offset + block_last_output; 
-                thread_output_offset += KernelPolicy::THREADS)
+            volatile SizeT    v_index    = BinarySearch<KernelPolicy::THREADS>(
+                threadIdx.x + block_output_processed, smem_storage.output_offset);
+            volatile VertexId v          = smem_storage.vertices   [v_index];
+            volatile VertexId input_item = smem_storage.input_queue[v_index];
+            volatile SizeT next_v_output_start_offset = (v_index < iter_input_size) ? 
+                smem_storage.output_offset[v_index] : util::MaxValue<SizeT>();
+            volatile SizeT v_output_start_offset = (v_index > 0) ? 
+                smem_storage.output_offset[v_index-1] : block_output_processed;
+            volatile SizeT row_offset_v = 0;
+            if (threadIdx.x < iter_output_size)
             {
-                if (thread_output_offset >= last_output_offset_v)
+                //printf("( %4d , %4d ) : v_index = %4d , v = %5d , input_item = %5d , "
+                //    "v_output_start_offset = %4d , next_v_output_start_offset = %4d \n",
+                //    blockIdx.x, threadIdx.x, v_index, v, input_item,
+                //    v_output_start_offset, next_v_output_start_offset);
+                row_offset_v = (output_inverse_graph)? 
+                    d_inverse_row_offsets[v] : d_row_offsets[v];
+            }
+
+            for (volatile SizeT i = threadIdx.x; i < iter_output_size; i += KernelPolicy::THREADS)
+            {
+                volatile SizeT thread_output_offset = i + block_output_processed;
+                if (thread_output_offset >= next_v_output_start_offset)
                 {
                     v_index    = BinarySearch<KernelPolicy::THREADS>(
                         thread_output_offset, smem_storage.output_offset);
                     v          = smem_storage.vertices   [v_index];
                     input_item = smem_storage.input_queue[v_index];
-                    last_output_offset_v = (v_index < KernelPolicy::THREADS) ? 
-                        smem_storage.output_offset[v_index] : max_edges;
-                    internal_output_offset = v_index > 0 ? 
-                        smem_storage.output_offset[v_index-1] : 0;
+                    next_v_output_start_offset = (v_index < KernelPolicy::THREADS) ? 
+                        smem_storage.output_offset[v_index] : util::MaxValue<SizeT>();
+                    v_output_start_offset = v_index > 0 ? 
+                        smem_storage.output_offset[v_index-1] : block_output_processed;
+                    //if (v < 0 || v > 45292)
+                    //printf("( %4d , %4d ) : v_index = %4d , v = %5d , input_item = %5d , "
+                    //    "v_output_start_offset = %4d , next_v_output_start_offset = %4d \n",
+                    //    blockIdx.x, threadIdx.x, v_index, v, input_item,
+                    //    v_output_start_offset, next_v_output_start_offset);
                     row_offset_v = (output_inverse_graph)? 
                         d_inverse_row_offsets[v] : 
                         d_row_offsets        [v];
                 }
 
-                VertexId neighbor_pos = thread_output_offset - internal_output_offset;
-                SizeT edge_id = row_offset_v + neighbor_pos;
-                VertexId u = (output_inverse_graph)?
+                volatile VertexId neighbor_pos = thread_output_offset - v_output_start_offset;
+                if (v_index == 0 && block_first_v_skip_count != 0) 
+                {
+                    //printf("( %4d , %4d ) : v = %d, skip_count = %d\n",
+                    //    blockIdx.x, threadIdx.x, v, block_first_v_skip_count);
+                    neighbor_pos += block_first_v_skip_count;
+                }
+                volatile SizeT edge_id = row_offset_v + neighbor_pos;
+                volatile VertexId u = (output_inverse_graph)?
                     d_inverse_column_indices[edge_id] : 
                     d_column_indices        [edge_id];
 
                 ProcessNeighbor(
                     v, u, d_data_slice, edge_id, 
-                    block_input + v_index, input_item,
-                    block_output_start + block_output_processed + (thread_output_offset - block_output_offset),
+                    iter_input_start + v_index, input_item,
+                    block_output_start + thread_output_offset,
                     label, d_out,
                     d_value_to_reduce, d_reduce_frontier);
 
             } // for
-
-            block_output_processed += block_last_output;
-            block_input += KernelPolicy::THREADS;
-            inblock_output_offset = 0;
+            block_output_processed += iter_output_size;
+            iter_input_start += KernelPolicy::THREADS;
+            block_first_v_skip_count = 0;
+            //inblock_output_offset = 0;
+            
+            __syncthreads();
         }
     }
 
@@ -519,7 +566,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         SizeT                   * d_output_queue_length,
         SizeT                    &max_vertices,
         SizeT                    &max_edges,
-        util::CtaWorkProgress    &work_progress,
+        util::CtaWorkProgress<SizeT> &work_progress,
         util::KernelRuntimeStats &kernel_stats,
         bool                     &input_inverse_graph,
         bool                     &output_inverse_graph,
@@ -532,18 +579,18 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             // obtain problem size
             if (queue_reset)
             {
-                work_progress.StoreQueueLength<SizeT>(input_queue_length, queue_index);
+                work_progress.StoreQueueLength(input_queue_length, queue_index);
             }
             else
             {
-                input_queue_length = work_progress.template LoadQueueLength<SizeT>(queue_index);
+                input_queue_length = work_progress.LoadQueueLength(queue_index);
             }
 
             work_progress.Enqueue(d_output_queue_length[0], queue_index+1);
 
             // Reset our next outgoing queue counter to zero
-            work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
-            work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
+            work_progress.StoreQueueLength(0, queue_index + 2);
+            work_progress.PrepResetSteal(queue_index + 1);
         }
 
         // Barrier to protect work decomposition
@@ -708,7 +755,7 @@ void RelaxPartitionedEdges2(
     typename KernelPolicy::SizeT             partition_size,
     typename KernelPolicy::SizeT             max_vertices,
     typename KernelPolicy::SizeT             max_edges,
-    util::CtaWorkProgress                    work_progress,
+    util::CtaWorkProgress<typename KernelPolicy::SizeT> work_progress,
     util::KernelRuntimeStats                 kernel_stats,
     //gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
     bool                                     input_inverse_graph = false,
@@ -799,7 +846,7 @@ void RelaxLightEdges(
     typename KernelPolicy::SizeT     *d_output_queue_len,
     typename KernelPolicy::SizeT      max_vertices,
     typename KernelPolicy::SizeT      max_edges,
-    util::CtaWorkProgress             work_progress,
+    util::CtaWorkProgress<typename KernelPolicy::SizeT> work_progress,
     util::KernelRuntimeStats          kernel_stats,
     //gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
     bool                              input_inverse_graph = false,

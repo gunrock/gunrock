@@ -108,7 +108,7 @@ struct Cta
 
     // Work progress
     VertexId                queue_index;                // Current frontier queue counter index
-    util::CtaWorkProgress   &work_progress;             // Atomic queueing counters
+    util::CtaWorkProgress<SizeT>   &work_progress;             // Atomic queueing counters
     SizeT                   max_out_frontier;           // Maximum size (in elements) of outgoing frontier
     int                     label;                      // Current label of the frontier
     gunrock::oprtr::advance::TYPE           advance_type;
@@ -755,7 +755,7 @@ struct Cta
         VertexId                    *d_column_indices,
         VertexId                    *d_inverse_column_indices,
         DataSlice                   *problem,
-        util::CtaWorkProgress       &work_progress,
+        util::CtaWorkProgress<SizeT>       &work_progress,
         SizeT                       max_out_frontier,
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
         bool                        inverse_graph,
@@ -859,7 +859,7 @@ struct Cta
             if (enqueue_offset + enqueue_amt > max_out_frontier) 
             {
                 smem_storage.state.overflowed = true;
-                work_progress.SetOverflow<SizeT>();
+                work_progress.SetOverflow();
             }
         }
 

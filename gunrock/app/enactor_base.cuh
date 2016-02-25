@@ -74,7 +74,7 @@ public:
     util::Array1D<SizeT, util::CudaProperties>          cuda_props        ;
 
     // Queue size counters and accompanying functionality
-    util::Array1D<SizeT, util::CtaWorkProgressLifetime> work_progress     ;
+    util::Array1D<SizeT, util::CtaWorkProgressLifetime<SizeT> > work_progress     ;
     util::Array1D<SizeT, EnactorStats>                  enactor_stats     ;
     util::Array1D<SizeT, FrontierAttribute<SizeT> >     frontier_attribute;
 
@@ -195,7 +195,7 @@ protected:
             // it in our kernel code)
             for (int peer=0;peer<num_gpus;peer++)
             {
-                if (retval = work_progress     [gpu*num_gpus + peer].template Init<SizeT>())
+                if (retval = work_progress     [gpu*num_gpus + peer].Init())
                     return retval;
                 if (retval = frontier_attribute[gpu*num_gpus + peer].Init())
                     return retval;
@@ -228,7 +228,7 @@ protected:
                     .Reset())
                     return retval;
                 if (retval = work_progress     [gpu * num_gpus + peer]
-                    .template Reset_<SizeT>())
+                    .Reset_())
                     return retval;
                 if (retval = frontier_attribute[gpu * num_gpus + peer]
                     .Reset())

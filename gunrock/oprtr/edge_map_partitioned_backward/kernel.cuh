@@ -94,7 +94,7 @@ struct Dispatch
                                 SizeT &partition_size,
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
-                                util::CtaWorkProgress &work_progress,
+                                util::CtaWorkProgress<SizeT> &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
                                 bool &inverse_graph)
@@ -118,7 +118,7 @@ struct Dispatch
                                 SizeT *output_queue_len,
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
-                                util::CtaWorkProgress &work_progress,
+                                util::CtaWorkProgress<SizeT> &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
                                 bool &inverse_graph)
@@ -192,7 +192,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 SizeT &partition_size,
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
-                                util::CtaWorkProgress &work_progress,
+                                util::CtaWorkProgress<SizeT> &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
                                 bool &inverse_graph)
@@ -216,11 +216,11 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             // obtain problem size
             if (queue_reset)
             {
-                work_progress.StoreQueueLength<SizeT>(input_queue_len, queue_index);
+                work_progress.StoreQueueLength(input_queue_len, queue_index);
             }
             else
             {
-                input_queue_len = work_progress.template LoadQueueLength<SizeT>(queue_index);
+                input_queue_len = work_progress.LoadQueueLength(queue_index);
                 
                 // Signal to host that we're done
                 //if (input_queue_len == 0) {
@@ -231,8 +231,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             work_progress.Enqueue(output_queue_len[0], queue_index+1);
 
             // Reset our next outgoing queue counter to zero
-            work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
-            work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
+            work_progress.StoreQueueLength(0, queue_index + 2);
+            work_progress.PrepResetSteal(queue_index + 1);
         }
 
         // Barrier to protect work decomposition
@@ -395,7 +395,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 SizeT *output_queue_len,
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
-                                util::CtaWorkProgress &work_progress,
+                                util::CtaWorkProgress<SizeT> &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
                                 bool inverse_graph)
@@ -419,11 +419,11 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             // obtain problem size
             if (queue_reset)
             {
-                work_progress.StoreQueueLength<SizeT>(input_queue_len, queue_index);
+                work_progress.StoreQueueLength(input_queue_len, queue_index);
             }
             else
             {
-                input_queue_len = work_progress.template LoadQueueLength<SizeT>(queue_index);
+                input_queue_len = work_progress.LoadQueueLength(queue_index);
                 
                 // Signal to host that we're done
                 //if (input_queue_len == 0) {
@@ -434,8 +434,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             work_progress.Enqueue(output_queue_len[0], queue_index+1);
 
             // Reset our next outgoing queue counter to zero
-            work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
-            work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
+            work_progress.StoreQueueLength(0, queue_index + 2);
+            work_progress.PrepResetSteal(queue_index + 1);
         }
 
         // Barrier to protect work decomposition
@@ -585,7 +585,7 @@ void RelaxPartitionedEdges(
         typename KernelPolicy::SizeT            partition_size,
         typename KernelPolicy::SizeT            max_vertices,
         typename KernelPolicy::SizeT            max_edges,
-        util::CtaWorkProgress                   work_progress,
+        util::CtaWorkProgress<typename KernelPolicy::SizeT>            work_progress,
         util::KernelRuntimeStats                kernel_stats,
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
         bool                                    inverse_graph = false)
@@ -664,7 +664,7 @@ void RelaxLightEdges(
         typename KernelPolicy::SizeT    *output_queue_len,
         typename KernelPolicy::SizeT    max_vertices,
         typename KernelPolicy::SizeT    max_edges,
-        util::CtaWorkProgress           work_progress,
+        util::CtaWorkProgress<typename KernelPolicy::SizeT>    work_progress,
         util::KernelRuntimeStats        kernel_stats,
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
         bool                            inverse_graph = false)

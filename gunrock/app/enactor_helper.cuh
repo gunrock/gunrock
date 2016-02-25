@@ -308,7 +308,7 @@ void ShowDebugInfo(
                  *data_slice,
     GraphSlice<typename Problem::VertexId, typename Problem::SizeT, typename Problem::Value>
                  *graph_slice,
-    util::CtaWorkProgressLifetime
+    util::CtaWorkProgressLifetime<typename Problem::SizeT>
                  *work_progress,
     std::string   check_name = "",
     cudaStream_t  stream = 0)

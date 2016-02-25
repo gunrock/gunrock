@@ -78,6 +78,9 @@ struct BFSFunctor {
             new_label = label + 1;
             old_label = atomicMin(d_data_slice -> labels + d_id, new_label);
             bool result = new_label < old_label;
+            atomicAdd(d_data_slice -> input_counter + input_pos, 1);
+            atomicAdd(d_data_slice -> output_counter + output_pos, 1);
+            atomicAdd(d_data_slice -> edge_marker + edge_id, 1);
             //if (result && TO_TRACK && util::to_track(d_data_slice -> gpu_idx, d_id))
             //     printf("%d\t %d\t CondEdge\t labels[%d] (%d) -> %d = labels[%d] + 1\n", 
             //        d_data_slice -> gpu_idx, new_label-1, d_id, old_label, new_label, s_id);
@@ -116,7 +119,7 @@ struct BFSFunctor {
             //set preds[d_id] to be s_id
             if (Problem::MARK_PREDECESSORS) 
             {
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+                util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                     d_data_slice -> original_vertex.GetPointer(util::DEVICE) == NULL ? 
                         s_id : d_data_slice -> original_vertex[s_id], 
                     d_data_slice -> preds + d_id);
@@ -135,11 +138,11 @@ struct BFSFunctor {
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) 
+        VertexId node, DataSlice *d_data_slice, Value v = 0, SizeT nid = 0) 
     {
-        if (TO_TRACK && util::to_track(problem -> gpu_idx, node))
+        if (TO_TRACK && util::to_track(d_data_slice -> gpu_idx, node))
                 printf("%d\t %d\t CondFilter (%d, %d)\t [%d] past\n", 
-                    problem -> gpu_idx, v, blockIdx.x, threadIdx.x, node);
+                    d_data_slice -> gpu_idx, v, blockIdx.x, threadIdx.x, node);
         return node != -1;
     }
 
@@ -153,14 +156,14 @@ struct BFSFunctor {
      *
      */
     static __device__ __forceinline__ void ApplyFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) 
+        VertexId node, DataSlice *d_data_slice, Value v = 0, SizeT nid = 0) 
     {
-        if (ProblemData::ENABLE_IDEMPOTENCE) {
-            if (TO_TRACK && util::to_track(problem -> gpu_idx, node))
+        if (Problem::ENABLE_IDEMPOTENCE) {
+            if (TO_TRACK && util::to_track(d_data_slice -> gpu_idx, node))
                 printf("%d\t %d\t ApplyFilter (%d, %d)\t labels[%d] -> %d\n",
-                problem -> gpu_idx, v, blockIdx.x, threadIdx.x, node, v);
+                d_data_slice -> gpu_idx, v, blockIdx.x, threadIdx.x, node, v);
             util::io::ModifiedStore<util::io::st::cg>::St(
-                (VertexId)v, problem->labels + node);
+                (VertexId)v, d_data_slice->labels + node);
         } else {
             // Doing nothing here
         }

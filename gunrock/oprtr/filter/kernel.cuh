@@ -34,23 +34,26 @@ namespace filter {
 template <typename KernelPolicy, typename Problem, typename Functor>
 struct SweepPass
 {
+    typedef Cta<KernelPolicy, Problem, Functor>         Cta;
+    typedef typename KernelPolicy::SizeT                SizeT;
+    typedef typename KernelPolicy::VertexId             VertexId;
+    typedef typename KernelPolicy::Value                Value;
+
     static __device__ __forceinline__ void Invoke(
-        typename KernelPolicy::VertexId         &iteration,
-        typename KernelPolicy::VertexId         &queue_index,
+        VertexId         &iteration,
+        VertexId         &queue_index,
         //int                                     &num_gpus,
-        typename KernelPolicy::VertexId         *&d_in,
-        typename KernelPolicy::Value            *&d_value_in,
-        typename KernelPolicy::VertexId         *&d_out,
-        typename Problem::DataSlice             *&d_data_slice,
-        unsigned char                           *&d_visited_mask,
-        typename KernelPolicy::SmemStorage      &smem_storage,
-        util::CtaWorkProgress                   &work_progress,
-        util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition,
-        typename KernelPolicy::SizeT            &max_out_frontier)
+        VertexId         *&d_in,
+        Value            *&d_value_in,
+        VertexId         *&d_out,
+        typename Problem::DataSlice        *&d_data_slice,
+        unsigned char                      *&d_visited_mask,
+        typename KernelPolicy::SmemStorage  &smem_storage,
+        util::CtaWorkProgress    <SizeT>    &work_progress,
+        util::CtaWorkDistribution<SizeT>    &work_decomposition,
+        SizeT            &max_out_frontier)
         //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *&t_bitmask)
     {
-        typedef Cta<KernelPolicy, Problem, Functor>         Cta;
-        typedef typename KernelPolicy::SizeT                SizeT;
 
         // Determine our threadblock's work range
         util::CtaWorkLimits<SizeT> work_limits;
@@ -128,7 +131,7 @@ struct Dispatch
             VertexId  *&d_in_queue,
             VertexId  *&d_out_queue,
             DataSlice *&d_data_slice,
-            util::CtaWorkProgress &work_progress,
+            util::CtaWorkProgress<SizeT> &work_progress,
             SizeT &max_in_queue,
             SizeT &max_out_queue,
             util::KernelRuntimeStats &kernel_stats)
@@ -148,7 +151,7 @@ struct Dispatch
         VertexId                    *&d_out,
         DataSlice                   *&d_data_slice,
         unsigned char               *&d_visited_mask,
-        util::CtaWorkProgress       &work_progress,
+        util::CtaWorkProgress<SizeT> &work_progress,
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
         util::KernelRuntimeStats    &kernel_stats)
@@ -186,7 +189,7 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
         VertexId                    *&d_out,
         DataSlice                   *&d_data_slice,
         unsigned char               *&d_visited_mask,
-        util::CtaWorkProgress       &work_progress,
+        util::CtaWorkProgress<SizeT> &work_progress,
         SizeT                       &max_in_frontier,
         SizeT                       &max_out_frontier,
         util::KernelRuntimeStats    &kernel_stats)
@@ -215,11 +218,11 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
             // Obtain problem size
             if (queue_reset)
             {
-                work_progress.template StoreQueueLength<SizeT>(num_elements, queue_index);
+                work_progress.StoreQueueLength(num_elements, queue_index);
             }
             else
             {
-                num_elements = work_progress.template LoadQueueLength<SizeT>(queue_index);
+                num_elements = work_progress.LoadQueueLength(queue_index);
 
                 // Check if we previously overflowed
                 if (num_elements >= max_in_frontier) {
@@ -240,7 +243,7 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
                     num_elements, gridDim.x);
 
             // Reset our next outgoing queue counter to zero
-            work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
+            work_progress.StoreQueueLength(0, queue_index + 2);
 
         }
 
@@ -278,7 +281,7 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
             VertexId *&d_in_queue,
             VertexId *&d_out_queue,
             DataSlice *&d_data_slice,
-            util::CtaWorkProgress &work_progress,
+            util::CtaWorkProgress<SizeT> &work_progress,
             SizeT &max_in_frontier,
             SizeT &max_out_frontier,
             util::KernelRuntimeStats &kernel_stats)
@@ -389,7 +392,7 @@ void Kernel(
     typename KernelPolicy::VertexId         *d_out_queue,          
     typename Problem::DataSlice             *d_data_slice,
     unsigned char                           *d_visited_mask,
-    util::CtaWorkProgress                   work_progress,        
+    util::CtaWorkProgress<typename KernelPolicy::SizeT> work_progress,        
     typename KernelPolicy::SizeT            max_in_queue,        
     typename KernelPolicy::SizeT            max_out_queue,      
     util::KernelRuntimeStats                kernel_stats,
@@ -445,14 +448,14 @@ void LaunchKernel(
     typename KernelPolicy::VertexId         *d_out_queue,          
     typename Problem::DataSlice             *d_data_slice,
     unsigned char                           *d_visited_mask,
-    util::CtaWorkProgress                   work_progress,        
+    util::CtaWorkProgress<typename KernelPolicy::SizeT> work_progress,        
     typename KernelPolicy::SizeT            max_in_queue,        
     typename KernelPolicy::SizeT            max_out_queue,      
     util::KernelRuntimeStats                kernel_stats,
     bool                                    filtering_flag = true)
 {
     if (queue_reset)
-        work_progress.template Reset_<typename KernelPolicy::SizeT>(0, stream);
+        work_progress.Reset_(0, stream);
 
     Kernel<KernelPolicy, Problem, Functor>
         <<<grid_size, block_size, shared_size, stream>>>(

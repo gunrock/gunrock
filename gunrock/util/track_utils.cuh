@@ -699,6 +699,28 @@ __global__ void Verify_Value(
     }
 }
 
+template <typename SizeT, typename Value>
+__global__ void Verify_Value(
+    const int gpu_num,
+    const int check_num,
+    const SizeT num_elements,
+    const long long iteration,
+    const Value* values,
+    const Value value)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+
+    while (x < num_elements)
+    {
+        if (values[x] != value)
+            printf("%d\t %lld\t Verify_Value\t %d\t values[%d] (%d) != %lld\n",
+                gpu_num, iteration, check_num, x, values[x], (long long)value); 
+        x += STRIDE;
+    }
+}
+
+
 template <typename VertexId, typename SizeT, typename Value>
 __global__ void Verify_Value_(
     const int gpu_num,
@@ -720,6 +742,66 @@ __global__ void Verify_Value_(
             if (values[key] != value)
                 printf("%d\t %lld\t Verify_Value\t %d\t values[%d] (%d) != %lld\n",
                     gpu_num, iteration, check_num, key, values[key], (long long)value); 
+        }
+        x += STRIDE;
+    }
+}
+
+template <typename VertexId, typename SizeT>
+__global__ void Verify_Row_Length(
+    const int gpu_num,
+    const int check_num,
+    const SizeT num_elements,
+    const long long iteration,
+    const VertexId* keys,
+    const SizeT* row_offsets,
+    const SizeT* values)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+
+    while (x < num_elements)
+    {
+        VertexId key = keys[x];
+        if (key != -1)
+        {
+            if (values[x] != row_offsets[key+1] - row_offsets[key])
+                printf("%d\t %lld\t Verify_Row_Length\t %d\t keys[%d] (%d)\t values[%d] (%d) != %lld\n",
+                    gpu_num, iteration, check_num, x, key, x, values[x], 
+                    (long long)(row_offsets[key+1] - row_offsets[key])); 
+        }
+        x += STRIDE;
+    }
+}
+
+template <typename VertexId, typename SizeT, typename MarkerT>
+__global__ void Verify_Edges(
+    const int gpu_num,
+    const int check_num,
+    const SizeT num_elements,
+    const long long iteration,
+    const VertexId* keys,
+    const SizeT* row_offsets,
+    const MarkerT* markers,
+    const MarkerT  value)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+
+    while (x < num_elements)
+    {
+        VertexId key = keys[x];
+        if (key != -1)
+        {
+            for (SizeT edge_id = row_offsets[key]; edge_id < row_offsets[key+1]; edge_id ++)
+                if (markers[edge_id] != value)
+                    printf("%d\t %lld\t Verify_Edges\t %d\t edge[%lld] (key_pos = %lld, key = %lld,"
+                        " neighbor_pos = %lld)\t marker (%lld) != %lld\n",
+                        gpu_num, iteration, check_num, (long long)edge_id, (long long)x, 
+                        (long long)key, 
+                        (long long)(edge_id - row_offsets[key]),
+                        (long long)markers[edge_id], 
+                        (long long)value); 
         }
         x += STRIDE;
     }

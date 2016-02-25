@@ -72,7 +72,7 @@ void Iteration_Loop(
                  *s_frontier_attribute = &(enactor     -> frontier_attribute [0         ]);
     EnactorStats *enactor_stats        = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
     EnactorStats *s_enactor_stats      = &(enactor     -> enactor_stats      [0         ]);
-    util::CtaWorkProgressLifetime
+    util::CtaWorkProgressLifetime<SizeT>
                  *work_progress        = &(enactor     -> work_progress      [thread_num * num_gpus]);
     ContextPtr   *context              =   thread_data -> context;
     int          *stages               =   data_slice  -> stages .GetPointer(util::HOST);
@@ -90,7 +90,7 @@ void Iteration_Loop(
     FrontierAttribute<SizeT>
                  *frontier_attribute_  =   NULL;
     EnactorStats *enactor_stats_       =   NULL;
-    util::CtaWorkProgressLifetime
+    util::CtaWorkProgressLifetime<SizeT>
                  *work_progress_       =   NULL;
     util::Array1D<SizeT, SizeT>
                  *scanned_edges_       =   NULL;
@@ -742,7 +742,7 @@ public:
         DataSlice                     *data_slice,
         DataSlice                     *d_data_slice,
         GraphSliceT                   *graph_slice,
-        util::CtaWorkProgressLifetime *work_progress,
+        util::CtaWorkProgressLifetime<SizeT> *work_progress,
         ContextPtr                     context,
         cudaStream_t                   stream)
     {
@@ -775,7 +775,7 @@ public:
         DataSlice                     *data_slice,
         DataSlice                     *d_data_slice,
         GraphSliceT                   *graph_slice,
-        util::CtaWorkProgressLifetime *work_progress,
+        util::CtaWorkProgressLifetime<SizeT> *work_progress,
         ContextPtr                     context,
         cudaStream_t                   stream)
     {
@@ -808,7 +808,7 @@ public:
         DataSlice                     *data_slice,
         DataSlice                     *d_data_slice,
         GraphSliceT                   *graph_slice,
-        util::CtaWorkProgressLifetime *work_progress,
+        util::CtaWorkProgressLifetime<SizeT> *work_progress,
         ContextPtr                     context,
         cudaStream_t                   stream)
     {
@@ -841,7 +841,7 @@ public:
         DataSlice                     *data_slice,
         DataSlice                     *d_data_slice,
         GraphSliceT                   *graph_slice,
-        util::CtaWorkProgressLifetime *work_progress,
+        util::CtaWorkProgressLifetime<SizeT> *work_progress,
         ContextPtr                     context,
         cudaStream_t                   stream)
     {
@@ -1004,7 +1004,7 @@ public:
         util::Array1D<SizeT, DataSlice>
                                       *data_slice_,
         GraphSliceT                   *graph_slice,
-        util::CtaWorkProgressLifetime *work_progress,
+        util::CtaWorkProgressLifetime<SizeT> *work_progress,
         ContextPtr                     context,
         cudaStream_t                   stream)
     {

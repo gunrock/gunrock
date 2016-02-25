@@ -159,7 +159,7 @@ struct BFSIteration : public IterationBase <
         DataSlice                     *data_slice,
         DataSlice                     *d_data_slice,
         GraphSlice                    *graph_slice,
-        util::CtaWorkProgressLifetime *work_progress,
+        util::CtaWorkProgressLifetime<SizeT> *work_progress,
         ContextPtr                     context,
         cudaStream_t                   stream)
     {
@@ -189,8 +189,19 @@ struct BFSIteration : public IterationBase <
         }
         frontier_attribute->queue_reset = true;
         enactor_stats     ->nodes_queued[0] += frontier_attribute->queue_length;
+        util::MemsetKernel<<<256, 256, 0, stream>>>(
+            data_slice -> output_counter.GetPointer(util::DEVICE),
+            0, frontier_attribute -> output_length[0]);
+        util::MemsetKernel<<<256, 256, 0, stream>>>(
+            data_slice -> input_counter.GetPointer(util::DEVICE),
+            0, frontier_attribute -> queue_length);
+        util::MemsetKernel<<<256, 256, 0, stream>>>(
+            data_slice -> edge_marker.GetPointer(util::DEVICE),
+            0, graph_slice -> edges);
+
         // Edge Map
-        gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem, Functor>(
+        gunrock::oprtr::advance::LaunchKernel
+            <AdvanceKernelPolicy, Problem, Functor, gunrock::oprtr::advance::V2V>(
             enactor_stats[0],
             frontier_attribute[0],
             d_data_slice,
@@ -211,11 +222,32 @@ struct BFSIteration : public IterationBase <
             work_progress[0],
             context[0],
             stream,
-            gunrock::oprtr::advance::V2V,
+            //gunrock::oprtr::advance::V2V,
             false,
             false,
             false);
 
+        util::Verify_Value<<<256, 256, 0, stream>>>(
+            thread_num, 0, frontier_attribute -> output_length[0],
+            enactor_stats -> iteration,
+            data_slice -> output_counter.GetPointer(util::DEVICE),
+            1);
+
+        util::Verify_Row_Length<<<256, 256, 0, stream>>>(
+            thread_num, 0, frontier_attribute -> queue_length,
+            enactor_stats -> iteration,
+            frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+            graph_slice -> row_offsets.GetPointer(util::DEVICE),
+            data_slice -> input_counter.GetPointer(util::DEVICE));
+
+        util::Verify_Edges<<<256, 256, 0, stream>>>(
+            thread_num, 0, frontier_attribute -> queue_length,
+            enactor_stats -> iteration,
+            frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+            graph_slice -> row_offsets.GetPointer(util::DEVICE),
+            data_slice -> edge_marker.GetPointer(util::DEVICE),
+            1);
+            
         // Only need to reset queue for once
         if (enactor -> debug) 
             util::cpu_mt::PrintMessage("Advance end", 
@@ -224,7 +256,7 @@ struct BFSIteration : public IterationBase <
         frontier_attribute -> queue_index++;
         frontier_attribute -> selector ^= 1;
         enactor_stats      -> AccumulateEdges(
-            work_progress  -> GetQueueLengthPointer<unsigned int,SizeT>(
+            work_progress  -> template GetQueueLengthPointer<unsigned int>(
                 frontier_attribute -> queue_index), stream);
 
         if (enactor -> debug) 
@@ -233,7 +265,7 @@ struct BFSIteration : public IterationBase <
         if (TO_TRACK)
         {
             util::Check_Value<<<1,1,0,stream>>>(
-                work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
+                work_progress -> template GetQueueLengthPointer<unsigned int>(
                     frontier_attribute->queue_index),
                 data_slice->gpu_idx, 3, enactor_stats -> iteration);
             //util::Check_Exist_<<<256, 256, 0, stream>>>(
@@ -287,11 +319,11 @@ struct BFSIteration : public IterationBase <
         if (TO_TRACK)
         {
             util::Check_Value<<<1,1,0,stream>>>(
-                work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
+                work_progress -> template GetQueueLengthPointer<unsigned int>(
                     frontier_attribute->queue_index),
                 data_slice->gpu_idx, 4, enactor_stats -> iteration);
             util::Check_Exist_<<<256, 256, 0, stream>>>(
-                work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
+                work_progress -> template GetQueueLengthPointer<unsigned int>(
                     frontier_attribute->queue_index),
                 data_slice->gpu_idx, 4, enactor_stats -> iteration,
                 frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
@@ -404,7 +436,7 @@ struct BFSIteration : public IterationBase <
                 partitioned_scanned_edges, over_sized, -1, -1, -1, false))
                 return retval;
             retval = gunrock::oprtr::advance::ComputeOutputLength
-                <AdvanceKernelPolicy, Problem, Functor>(
+                <AdvanceKernelPolicy, Problem, Functor, gunrock::oprtr::advance::V2V>(
                 frontier_attribute,
                 d_offsets,
                 d_indices,
@@ -416,7 +448,7 @@ struct BFSIteration : public IterationBase <
                 max_out,
                 context,
                 stream,
-                ADVANCE_TYPE,
+                //ADVANCE_TYPE,
                 express,
                 in_inv,
                 out_inv);
@@ -876,7 +908,8 @@ public:
         32,                                 // WARP_GATHER_THRESHOLD
         128 * 4,                            // CTA_GATHER_THRESHOLD
         7,                                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::advance::LB_LIGHT>
+        //gunrock::oprtr::advance::LB_LIGHT>
+        gunrock::oprtr::advance::LB>
     LBAdvanceKernelPolicy_IDEM;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
@@ -893,7 +926,8 @@ public:
         32,                                 // WARP_GATHER_THRESHOLD
         128 * 4,                            // CTA_GATHER_THRESHOLD
         7,                                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::advance::LB_LIGHT>
+        //gunrock::oprtr::advance::LB_LIGHT>
+        gunrock::oprtr::advance::LB>
     LBAdvanceKernelPolicy;
 
     /**

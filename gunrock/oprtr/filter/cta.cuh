@@ -81,7 +81,7 @@ struct Cta
     // Work progress
     VertexId                iteration;                  // Current graph traversal iteration
     VertexId                queue_index;                // Current frontier queue counter index
-    util::CtaWorkProgress   &work_progress;             // Atomic workstealing and queueing counters
+    util::CtaWorkProgress<SizeT> &work_progress;             // Atomic workstealing and queueing counters
     SizeT                   max_out_frontier;           // Maximum size (in elements) of outgoing frontier
     //int                     num_gpus;                   // Number of GPUs
 
@@ -431,7 +431,7 @@ struct Cta
         VertexId                *d_out,
         DataSlice               *d_data_slice,
         unsigned char           *d_visited_mask,
-        util::CtaWorkProgress   &work_progress,
+        util::CtaWorkProgress<SizeT> &work_progress,
         SizeT                   max_out_frontier):
         //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *t_bitmask):
             iteration(iteration),
@@ -525,13 +525,13 @@ struct Cta
         SizeT new_queue_offset = util::scan::CooperativeTileScan<KernelPolicy::LOAD_VEC_SIZE>::ScanTileWithEnqueue(
             raking_details,
             tile.ranks,
-            work_progress.GetQueueCounter<SizeT>(queue_index + 1),
+            work_progress.GetQueueCounter(queue_index + 1),
             scan_op);
         
         // Check updated queue offset for overflow due to redundant expansion
         if (new_queue_offset >= max_out_frontier) {
             //printf(" new_queue_offset >= max_out_frontier, new_queue_offset = %d, max_out_frontier = %d\n", new_queue_offset, max_out_frontier);
-            work_progress.SetOverflow<SizeT>();
+            work_progress.SetOverflow();
             util::ThreadExit();
         }
 
