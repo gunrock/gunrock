@@ -400,6 +400,8 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         SizeT block_input_end    = (blockIdx.x == gridDim.x - 1) ? 
             input_queue_len : min(
             partition_starts[blockIdx.x + 1] , input_queue_len);
+        if (block_input_end < input_queue_len && block_output_end > (block_input_end > 0 ? d_scanned_edges[block_input_end-1] : 0))
+            block_input_end ++;
 
         //int out_offset = blockIdx.x * partition_size;
         volatile SizeT iter_input_start  = partition_starts[blockIdx.x];
@@ -410,12 +412,14 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         volatile SizeT iter_output_size  = 0;
         //SizeT iter_output_offset = block_output_start - iter_output_start;
         volatile VertexId input_item = 0;
-        volatile SizeT block_first_v_skip_count = (iter_input_start > 0 && 
-            block_output_start != d_scanned_edges[iter_input_start]) ? 
-            block_output_start - d_scanned_edges[iter_input_start -1] : 0;
+        volatile SizeT block_first_v_skip_count = 
+            (block_output_start != d_scanned_edges[iter_input_start]) ? 
+                block_output_start - 
+                    (iter_input_start > 0 ? d_scanned_edges[iter_input_start -1] : 0) 
+                : 0;
         if (threadIdx.x ==0 ) //<2 || threadIdx.x > blockDim.x -3)
         {
-            printf("( %4d , %4d ) : block_input = [ %4d , %4d ), block_output = [ %4d , %4d ), skip_count = %lld\n",
+            printf("( %4d , %4d ) : block_input = [ %7d , %7d ), block_output = [ %7d , %7d ), skip_count = %lld\n",
                 blockIdx.x, threadIdx.x,
                 iter_input_start, block_input_end,
                 block_output_start, block_output_end,
@@ -433,7 +437,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             //iter_output_start = (iter_input_start > 0) ? 
             //    d_scanned_edges[iter_input_start - 1] : 0;
             iter_input_size  = min(
-                KernelPolicy::THREADS, block_input_end - iter_input_start);
+                KernelPolicy::THREADS-1, block_input_end - iter_input_start);
             volatile SizeT iter_input_end = iter_input_start + iter_input_size;
             volatile SizeT iter_output_end = iter_input_end < input_queue_len ?
                 d_scanned_edges[iter_input_end] : output_queue_len[0];
@@ -445,7 +449,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
     
             if (threadIdx.x ==0 ) //<2 || threadIdx.x > blockDim.x -3)
             {
-                printf("( %4d , %4d ) :  iter_input = [ %4d , %4d ), iter_output = [ %4d , %4d )\n",
+                printf("( %4d , %4d ) :  iter_input = [ %7d , %7d ),  iter_output = [ %7d , %7d )\n",
                     blockIdx.x, threadIdx.x,
                     iter_input_start, iter_input_start + iter_input_size,
                     block_output_start + block_output_processed,
@@ -479,8 +483,9 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             }
             __syncthreads();
 
+            volatile SizeT thread_output_offset = threadIdx.x + block_output_processed;
             volatile SizeT    v_index    = BinarySearch<KernelPolicy::THREADS>(
-                threadIdx.x + block_output_processed, smem_storage.output_offset);
+                thread_output_offset, smem_storage.output_offset);
             volatile VertexId v          = smem_storage.vertices   [v_index];
             volatile VertexId input_item = smem_storage.input_queue[v_index];
             volatile SizeT next_v_output_start_offset = (v_index < iter_input_size) ? 
@@ -500,7 +505,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
 
             for (volatile SizeT i = threadIdx.x; i < iter_output_size; i += KernelPolicy::THREADS)
             {
-                volatile SizeT thread_output_offset = i + block_output_processed;
+                thread_output_offset = i + block_output_processed;
                 if (thread_output_offset >= next_v_output_start_offset)
                 {
                     v_index    = BinarySearch<KernelPolicy::THREADS>(
@@ -532,7 +537,19 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                 volatile VertexId u = (output_inverse_graph)?
                     d_inverse_column_indices[edge_id] : 
                     d_column_indices        [edge_id];
-
+                //if (v_index == 0 || v_index == blockDim.x-1)
+                //{
+                //    printf("( %4d , %4d ) : v_index = %4d, v = %5d, row_offset_v = %6d, %6d, "
+                //        "v_output_start_offset = %5d, next_v_output_start_offset = %5d, "
+                //        "thread_output_offset = %5d, output_offsets = %d, %d ... %d, %d\n",
+                //        blockIdx.x, threadIdx.x, v_index, v, row_offset_v, d_row_offsets[v+1],
+                //        v_output_start_offset, next_v_output_start_offset,
+                //        thread_output_offset,
+                //        smem_storage.output_offset[0], 
+                //        smem_storage.output_offset[1],
+                //        smem_storage.output_offset[blockDim.x -2], 
+                //        smem_storage.output_offset[blockDim.x-1]);
+                //}
                 ProcessNeighbor(
                     v, u, d_data_slice, edge_id, 
                     iter_input_start + v_index, input_item,
@@ -542,7 +559,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
 
             } // for
             block_output_processed += iter_output_size;
-            iter_input_start += KernelPolicy::THREADS;
+            iter_input_start += iter_input_size;
             block_first_v_skip_count = 0;
             //inblock_output_offset = 0;
             

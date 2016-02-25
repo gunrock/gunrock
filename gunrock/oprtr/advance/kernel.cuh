@@ -493,6 +493,9 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
                 parameter -> frontier_attribute -> queue_length,
                 parameter -> enactor_stats -> node_locks_out.GetPointer(util::DEVICE),
                 parameter -> context[0]);
+            util::cpu_mt::PrintGPUArray("node_locks_out",
+                parameter -> enactor_stats -> node_locks_out.GetPointer(util::DEVICE),
+                num_blocks + 1, -1, -1, -1, parameter -> stream);
             gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges2
                 <LBPOLICY, 
                 typename Parameter::Problem, 

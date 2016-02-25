@@ -779,6 +779,7 @@ __global__ void Verify_Edges(
     const int gpu_num,
     const int check_num,
     const SizeT num_elements,
+    const SizeT num_nodes,
     const long long iteration,
     const VertexId* keys,
     const SizeT* row_offsets,
@@ -791,7 +792,7 @@ __global__ void Verify_Edges(
     while (x < num_elements)
     {
         VertexId key = keys[x];
-        if (key != -1)
+        if (key > 0 && key < num_nodes)
         {
             for (SizeT edge_id = row_offsets[key]; edge_id < row_offsets[key+1]; edge_id ++)
                 if (markers[edge_id] != value)

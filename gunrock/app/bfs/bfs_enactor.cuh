@@ -226,6 +226,10 @@ struct BFSIteration : public IterationBase <
             false,
             false,
             false);
+        // Only need to reset queue for once
+        if (enactor -> debug) 
+            util::cpu_mt::PrintMessage("Advance end", 
+                thread_num, enactor_stats->iteration, peer_);
 
         util::Verify_Value<<<256, 256, 0, stream>>>(
             thread_num, 0, frontier_attribute -> output_length[0],
@@ -241,17 +245,13 @@ struct BFSIteration : public IterationBase <
             data_slice -> input_counter.GetPointer(util::DEVICE));
 
         util::Verify_Edges<<<256, 256, 0, stream>>>(
-            thread_num, 0, frontier_attribute -> queue_length,
+            thread_num, 0, frontier_attribute -> queue_length, graph_slice -> nodes,
             enactor_stats -> iteration,
             frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
             graph_slice -> row_offsets.GetPointer(util::DEVICE),
             data_slice -> edge_marker.GetPointer(util::DEVICE),
             1);
             
-        // Only need to reset queue for once
-        if (enactor -> debug) 
-            util::cpu_mt::PrintMessage("Advance end", 
-                thread_num, enactor_stats->iteration, peer_);
         frontier_attribute -> queue_reset = false;
         frontier_attribute -> queue_index++;
         frontier_attribute -> selector ^= 1;
