@@ -98,7 +98,7 @@ void Usage()
         "[--traversal-mode=<0|1>]  Set traversal strategy, 0 for Load-Balanced\n"
         "                          1 for Dynamic-Cooperative (Default: dynamic\n"
         "                          determine based on average degree).\n"
-        "[--partition_method=<random|biasrandom|clustered|metis>]\n"
+        "[--partition-method=<random|biasrandom|clustered|metis>]\n"
         "                          Choose partitioner (Default use random).\n"
         "[--delta_factor=<factor>] Delta factor for delta-stepping SSSP.\n"
         "[--quiet]                 No output (unless --json is specified).\n"
@@ -391,7 +391,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     for (int iter = 0; iter < iterations; ++iter)
     {
         util::GRError(problem->Reset(
-            src, enactor->GetFrontierType(), 
+            src, enactor->GetFrontierType(),
             max_queue_sizing, max_queue_sizing1),
             "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
         util::GRError(enactor->Reset(),
@@ -597,7 +597,7 @@ int main_Value(CommandLineArgs *args)
 // Disabled becaus atomicMin(long long*, long long) is not available
 //    if (args -> CheckCmdLineFlag("64bit-Value"))
 //        return main_<VertexId, SizeT, long long>(args);
-//    else 
+//    else
         return main_<VertexId, SizeT, int      >(args);
 }
 
@@ -617,7 +617,7 @@ int main_VertexId(CommandLineArgs *args)
     // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
     //if (args -> CheckCmdLineFlag("64bit-VertexId"))
     //    return main_SizeT<long long>(args);
-    //else 
+    //else
         return main_SizeT<int      >(args);
 }
 

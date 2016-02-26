@@ -106,7 +106,7 @@ void Usage()
         "                          (graph-edges * <factor>). (Default: 1.0)\n"
         "[--v]                     Print verbose per iteration debug info.\n"
         "[--iteration-num=<num>]   Number of runs to perform the test.\n"
-        "[--partition_method=<random|biasrandom|clustered|metis>]\n"
+        "[--partition-method=<random|biasrandom|clustered|metis>]\n"
         "                          Choose partitioner (Default use random).\n"
         "[--quiet]                 No output (unless --json is specified).\n"
         "[--json]                  Output JSON-format statistics to STDOUT.\n"
@@ -284,7 +284,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     typedef CCEnactor < Problem>
             //INSTRUMENT,
             //DEBUG,
-            //SIZE_CHECK > 
+            //SIZE_CHECK >
             Enactor;
 
     // parse configurations from mObject info
@@ -301,8 +301,8 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     bool    quick_mode             = info->info["quick_mode"        ].get_bool ();
     bool    stream_from_host       = info->info["stream_from_host"  ].get_bool ();
     int     traversal_mode         = info->info["traversal_mode"    ].get_int  ();
-    bool    instrument             = info->info["instrument"        ].get_bool (); 
-    bool    debug                  = info->info["debug_mode"        ].get_bool (); 
+    bool    instrument             = info->info["instrument"        ].get_bool ();
+    bool    debug                  = info->info["debug_mode"        ].get_bool ();
     bool    size_check             = info->info["size_check"        ].get_bool ();
     int     iterations             = 1; //set to 1 for now. info->info["num_iteration"].get_int();
     CpuTimer cpu_timer;
@@ -593,7 +593,7 @@ int main_VertexId(CommandLineArgs *args)
     // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
     //if (args -> CheckCmdLineFlag("64bit-VertexId"))
     //    return main_SizeT<long long>(args);
-    //else 
+    //else
         return main_SizeT<int      >(args);
 }
 
