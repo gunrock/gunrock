@@ -101,6 +101,7 @@ struct KernelPolicy
         // Scratch elements
         struct {
             SizeT                       output_offset[SCRATCH_ELEMENTS];
+            //SizeT                       row_offset   [SCRATCH_ELEMENTS];
             VertexId                    vertices     [SCRATCH_ELEMENTS];
             VertexId                    input_queue  [SCRATCH_ELEMENTS];
         };

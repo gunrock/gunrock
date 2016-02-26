@@ -91,11 +91,11 @@ cudaError_t ComputeOutputLength(
         return cudaSuccess;
     }
 
-    SizeT num_block = (frontier_attribute->queue_length 
+    SizeT num_block = (frontier_attribute->queue_length
         + KernelPolicy::LOAD_BALANCED::THREADS - 1)
         /KernelPolicy::LOAD_BALANCED::THREADS;
     //if (num_block > 256) num_block = 256;
-    if (KernelPolicy::ADVANCE_MODE == LB_BACKWARD || 
+    if (KernelPolicy::ADVANCE_MODE == LB_BACKWARD ||
         KernelPolicy::ADVANCE_MODE == TWC_BACKWARD)
     {
         gunrock::oprtr::edge_map_partitioned_backward::GetEdgeCounts
@@ -161,8 +161,8 @@ cudaError_t ComputeOutputLength(
 }
 
 template <
-    typename    _KernelPolicy, 
-    typename    _Problem, 
+    typename    _KernelPolicy,
+    typename    _Problem,
     typename    _Functor,
     TYPE        _ADVANCE_TYPE,
     REDUCE_OP   _R_OP        ,
@@ -176,7 +176,8 @@ struct KernelParameter
     static const REDUCE_OP   R_OP         = _R_OP;
     static const REDUCE_TYPE R_TYPE       = _R_TYPE;
 
-    gunrock::app::EnactorStats              *enactor_stats;
+    gunrock::app::EnactorStats<typename KernelPolicy::SizeT>       
+                                            *enactor_stats;
     gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                             *frontier_attribute;
     typename Problem::DataSlice             *d_data_slice;
@@ -194,7 +195,8 @@ struct KernelParameter
     typename KernelPolicy::VertexId         *d_row_indices;
     typename KernelPolicy::SizeT             max_in;
     typename KernelPolicy::SizeT             max_out;
-    util::CtaWorkProgress<typename KernelPolicy::SizeT> *work_progress;
+    util::CtaWorkProgress<typename KernelPolicy::SizeT> 
+                                            *work_progress;
     CudaContext                             *context;
     cudaStream_t                             stream;
     //TYPE                                     ADVANCE_TYPE,
@@ -212,8 +214,8 @@ template <typename Parameter>
 cudaError_t ComputeOutputLength(Parameter* parameter)
 {
     return ComputeOutputLength<
-        typename Parameter::KernelPolicy, 
-        typename Parameter::Problem, 
+        typename Parameter::KernelPolicy,
+        typename Parameter::Problem,
         typename Parameter::Functor,
         Parameter::ADVANCE_TYPE,
         Parameter::R_TYPE,
@@ -241,14 +243,14 @@ struct LaunchKernel_
     {
         extern void UnSupportedAdvanceMode();
         UnSupportedAdvanceMode();
-        return util::GRError(cudaErrorInvalidDeviceFunction, 
+        return util::GRError(cudaErrorInvalidDeviceFunction,
             "UnSupportedAdvanceMode", __FILE__, __LINE__);
     }
 };
 
 template <typename Parameter>
 struct LaunchKernel_<Parameter, gunrock::oprtr::advance::TWC_FORWARD>
-{        
+{
     typedef typename Parameter::Problem::SizeT         SizeT;
     typedef typename Parameter::Problem::VertexId      VertexId;
     typedef typename Parameter::Problem::Value         Value;
@@ -258,11 +260,11 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::TWC_FORWARD>
         cudaError_t retval = cudaSuccess;
          // Load Thread Warp CTA Forward Kernel
         gunrock::oprtr::edge_map_forward::Kernel
-            <typename Parameter::KernelPolicy::THREAD_WARP_CTA_FORWARD, 
-            Parameter::Problem, 
+            <typename Parameter::KernelPolicy::THREAD_WARP_CTA_FORWARD,
+            Parameter::Problem,
             Parameter::Functor>
-            <<< parameter -> enactor_stats -> advance_grid_size, 
-            Parameter::KernelPolicy::THREAD_WARP_CTA_FORWARD::THREADS, 
+            <<< parameter -> enactor_stats -> advance_grid_size,
+            Parameter::KernelPolicy::THREAD_WARP_CTA_FORWARD::THREADS,
             0, parameter -> stream>>>(
             parameter -> frontier_attribute -> queue_reset,
             (VertexId) parameter -> frontier_attribute -> queue_index, // TODO: match this type
@@ -324,7 +326,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::TWC_FORWARD>
 
 template <typename Parameter>
 struct LaunchKernel_<Parameter, gunrock::oprtr::advance::TWC_BACKWARD>
-{        
+{
     typedef typename Parameter::Problem::SizeT         SizeT;
     typedef typename Parameter::Problem::VertexId      VertexId;
     typedef typename Parameter::Problem::Value         Value;
@@ -335,9 +337,9 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::TWC_BACKWARD>
         // Load Thread Warp CTA Backward Kernel
         // Edge Map
         gunrock::oprtr::edge_map_backward::Kernel
-            <typename Parameter::KernelPolicy::THREAD_WARP_CTA_BACKWARD, 
+            <typename Parameter::KernelPolicy::THREAD_WARP_CTA_BACKWARD,
             Parameter::Problem, Parameter::Functor>
-            <<< parameter -> enactor_stats -> advance_grid_size, 
+            <<< parameter -> enactor_stats -> advance_grid_size,
             Parameter::KernelPolicy::THREAD_WARP_CTA_BACKWARD::THREADS,
             0, parameter -> stream>>>(
             parameter -> frontier_attribute -> queue_reset,
@@ -345,11 +347,11 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::TWC_BACKWARD>
             parameter -> frontier_attribute -> queue_length,
             parameter -> d_in_key_queue,              // d_in_queue
             parameter -> d_backward_index_queue,            // d_in_index_queue
-            parameter -> frontier_attribute -> selector == 1 ? 
-                parameter -> d_backward_frontier_map_in  : 
+            parameter -> frontier_attribute -> selector == 1 ?
+                parameter -> d_backward_frontier_map_in  :
                 parameter -> d_backward_frontier_map_out,
-            parameter -> frontier_attribute -> selector == 1 ? 
-                parameter -> d_backward_frontier_map_out : 
+            parameter -> frontier_attribute -> selector == 1 ?
+                parameter -> d_backward_frontier_map_out :
                 parameter -> d_backward_frontier_map_in ,
             parameter -> d_column_offsets,
             parameter -> d_row_indices,
@@ -360,10 +362,10 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::TWC_BACKWARD>
         return retval;
    }
 };
- 
+
 template <typename Parameter>
 struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_BACKWARD>
-{        
+{
     typedef typename Parameter::Problem::SizeT         SizeT;
     typedef typename Parameter::Problem::VertexId      VertexId;
     typedef typename Parameter::Problem::Value         Value;
@@ -373,8 +375,8 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_BACKWARD>
     {
         cudaError_t retval = cudaSuccess;
          // Load Thread Warp CTA Backward Kernel
-        SizeT num_block = (parameter -> frontier_attribute -> queue_length + 
-            LBPOLICY::THREADS - 1) / 
+        SizeT num_block = (parameter -> frontier_attribute -> queue_length +
+            LBPOLICY::THREADS - 1) /
             LBPOLICY::THREADS;
         if (parameter -> get_output_length)
         {
@@ -394,11 +396,11 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_BACKWARD>
             (VertexId*)NULL,
             parameter -> d_partitioned_scanned_edges,  // TODO: +1?
             parameter -> d_in_key_queue,
-            (parameter -> frontier_attribute -> selector == 1) ? 
+            (parameter -> frontier_attribute -> selector == 1) ?
                 parameter -> d_backward_frontier_map_in  :
                 parameter -> d_backward_frontier_map_out,
-            (parameter -> frontier_attribute -> selector == 1) ? 
-                parameter -> d_backward_frontier_map_out : 
+            (parameter -> frontier_attribute -> selector == 1) ?
+                parameter -> d_backward_frontier_map_out :
                 parameter -> d_backward_frontier_map_in ,
             parameter -> d_data_slice,
             parameter -> frontier_attribute -> queue_length,
@@ -415,7 +417,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_BACKWARD>
 
 template <typename Parameter>
 struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
-{        
+{
     typedef typename Parameter::Problem::SizeT         SizeT;
     typedef typename Parameter::Problem::VertexId      VertexId;
     typedef typename Parameter::Problem::Value         Value;
@@ -425,7 +427,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
     {
         cudaError_t retval = cudaSuccess;
         // load edge-expand-partitioned kernel
-        SizeT num_block = (parameter -> frontier_attribute -> queue_length + 
+        SizeT num_block = (parameter -> frontier_attribute -> queue_length +
             LBPOLICY::THREADS - 1) / LBPOLICY::THREADS;
         if (parameter -> get_output_length)
         {
@@ -437,15 +439,16 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
         }
         //printf("output_length = %lld\n", (long long)frontier_attribute.output_length[0]);
         if (/*!parameter -> get_output_length || (parameter -> get_output_length &&*/
-            parameter -> frontier_attribute -> output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD)//)
+            //parameter -> frontier_attribute -> output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD)//)
+            parameter -> frontier_attribute -> output_length[0] < 64 * 2 * LBPOLICY::THREADS)
         {
             //printf("using RelaxLightEdges\n");
             gunrock::oprtr::edge_map_partitioned::RelaxLightEdges
-                <LBPOLICY, 
-                typename Parameter::Problem, 
-                typename Parameter::Functor, 
-                Parameter::ADVANCE_TYPE, 
-                Parameter::R_TYPE, 
+                <LBPOLICY,
+                typename Parameter::Problem,
+                typename Parameter::Functor,
+                Parameter::ADVANCE_TYPE,
+                Parameter::R_TYPE,
                 Parameter::R_OP>
                 <<< num_block, LBPOLICY::THREADS, 0, parameter -> stream>>>(
                 parameter -> frontier_attribute -> queue_reset,
@@ -475,33 +478,35 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
         }
         else //if (/*get_output_length &&*/ parameter -> frontier_attribute -> output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
         {
-            int num_blocks = 2; // LBPOLICY::BLOCKS
-            unsigned int split_val = (parameter -> frontier_attribute -> output_length[0] + 
+            int num_blocks = parameter -> frontier_attribute -> output_length[0] / 2 / LBPOLICY::THREADS; // LBPOLICY::BLOCKS
+            if (num_blocks > LBPOLICY::BLOCKS)
+                num_blocks = LBPOLICY::BLOCKS;
+            SizeT split_val = (parameter -> frontier_attribute -> output_length[0] +
                 num_blocks - 1) / num_blocks;
-            printf("using RelaxLightEdges2, input_length = %lld, ouput_length = %lld, split_val = %lld\n",
-                (long long)parameter -> frontier_attribute -> queue_length,
-                (long long)parameter -> frontier_attribute -> output_length[0],
-                (long long)split_val);
-            util::MemsetIdxKernel<unsigned int, int> <<<1, 256, 0, parameter -> stream>>>(
+            //printf("using RelaxLightEdges2, input_length = %lld, ouput_length = %lld, split_val = %lld\n",
+            //    (long long)parameter -> frontier_attribute -> queue_length,
+            //    (long long)parameter -> frontier_attribute -> output_length[0],
+            //    (long long)split_val);
+            util::MemsetIdxKernel<<<1, 256, 0, parameter -> stream>>>(
                 parameter -> enactor_stats -> node_locks.GetPointer(util::DEVICE),
-                num_blocks + 1, 
+                num_blocks,
                 split_val);
             SortedSearch<MgpuBoundsLower>(
                 parameter -> enactor_stats -> node_locks.GetPointer(util::DEVICE),
-                num_blocks + 1,
+                num_blocks,
                 parameter -> d_partitioned_scanned_edges,
                 parameter -> frontier_attribute -> queue_length,
                 parameter -> enactor_stats -> node_locks_out.GetPointer(util::DEVICE),
                 parameter -> context[0]);
-            util::cpu_mt::PrintGPUArray("node_locks_out",
-                parameter -> enactor_stats -> node_locks_out.GetPointer(util::DEVICE),
-                num_blocks + 1, -1, -1, -1, parameter -> stream);
+            //util::cpu_mt::PrintGPUArray("node_locks_out",
+            //    parameter -> enactor_stats -> node_locks_out.GetPointer(util::DEVICE),
+            //    num_blocks + 1, -1, -1, -1, parameter -> stream);
             gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges2
-                <LBPOLICY, 
-                typename Parameter::Problem, 
-                typename Parameter::Functor, 
-                Parameter::ADVANCE_TYPE, 
-                Parameter::R_TYPE, 
+                <LBPOLICY,
+                typename Parameter::Problem,
+                typename Parameter::Functor,
+                Parameter::ADVANCE_TYPE,
+                Parameter::R_TYPE,
                 Parameter::R_OP>
                 <<< num_blocks, LBPOLICY::THREADS, 0, parameter -> stream>>>(
                 parameter -> frontier_attribute -> queue_reset,
@@ -567,7 +572,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
 
 template <typename Parameter>
 struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_LIGHT>
-{        
+{
     typedef typename Parameter::Problem::SizeT         SizeT;
     typedef typename Parameter::Problem::VertexId      VertexId;
     typedef typename Parameter::Problem::Value         Value;
@@ -587,10 +592,10 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_LIGHT>
         }
 
         gunrock::oprtr::edge_map_partitioned::RelaxLightEdges
-            <LBPOLICY, 
-            typename Parameter::Problem, 
-            typename Parameter::Functor, 
-            Parameter::ADVANCE_TYPE, 
+            <LBPOLICY,
+            typename Parameter::Problem,
+            typename Parameter::Functor,
+            Parameter::ADVANCE_TYPE,
             Parameter::R_TYPE,
             Parameter::R_OP>
             <<< num_block, LBPOLICY::THREADS, 0, parameter -> stream>>>(
@@ -663,7 +668,8 @@ template <typename KernelPolicy, typename Problem, typename Functor,
     REDUCE_OP   R_OP         = gunrock::oprtr::advance::NONE,
     REDUCE_TYPE R_TYPE       = gunrock::oprtr::advance::EMPTY>
 cudaError_t LaunchKernel(
-    gunrock::app::EnactorStats              &enactor_stats,
+    gunrock::app::EnactorStats<typename KernelPolicy::SizeT>              
+                                            &enactor_stats,
     gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                             &frontier_attribute,
     typename Problem::DataSlice             *d_data_slice,

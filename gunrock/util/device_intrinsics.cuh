@@ -221,6 +221,27 @@ __device__ __host__ __forceinline__ long long AllOnes<long long>()
     return (long long)0xFFFFFFFFFFFFFFFFLL;
 }
 
+template <typename T>
+__device__ __host__ __forceinline__ T InvalidValue()
+{
+    //return AllOnes_N<T, sizeof(T)>();
+    Error_UnsupportedType();
+    return 0;
+}
+
+template <>
+__device__ __host__ __forceinline__ int InvalidValue<int>()
+{
+    return (int)-1;
+}
+
+template <>
+__device__ __host__ __forceinline__ long long InvalidValue<long long>()
+{
+    return (long long)-1;
+}
+
+
 /**
  * Wrapper for performing atomic operations on integers of type size_t 
  */
