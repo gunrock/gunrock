@@ -475,13 +475,15 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
         }
         else //if (/*get_output_length &&*/ parameter -> frontier_attribute -> output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
         {
-            int num_blocks = 2; // LBPOLICY::BLOCKS
+            int num_blocks = parameter -> frontier_attribute -> output_length[0] / 2 / LBPOLICY::THREADS; // LBPOLICY::BLOCKS
+            if (num_blocks > LBPOLICY::BLOCKS)
+                num_blocks = LBPOLICY::BLOCKS;
             unsigned int split_val = (parameter -> frontier_attribute -> output_length[0] + 
                 num_blocks - 1) / num_blocks;
-            printf("using RelaxLightEdges2, input_length = %lld, ouput_length = %lld, split_val = %lld\n",
-                (long long)parameter -> frontier_attribute -> queue_length,
-                (long long)parameter -> frontier_attribute -> output_length[0],
-                (long long)split_val);
+            //printf("using RelaxLightEdges2, input_length = %lld, ouput_length = %lld, split_val = %lld\n",
+            //    (long long)parameter -> frontier_attribute -> queue_length,
+            //    (long long)parameter -> frontier_attribute -> output_length[0],
+            //    (long long)split_val);
             util::MemsetIdxKernel<unsigned int, int> <<<1, 256, 0, parameter -> stream>>>(
                 parameter -> enactor_stats -> node_locks.GetPointer(util::DEVICE),
                 num_blocks + 1, 
@@ -493,9 +495,9 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
                 parameter -> frontier_attribute -> queue_length,
                 parameter -> enactor_stats -> node_locks_out.GetPointer(util::DEVICE),
                 parameter -> context[0]);
-            util::cpu_mt::PrintGPUArray("node_locks_out",
-                parameter -> enactor_stats -> node_locks_out.GetPointer(util::DEVICE),
-                num_blocks + 1, -1, -1, -1, parameter -> stream);
+            //util::cpu_mt::PrintGPUArray("node_locks_out",
+            //    parameter -> enactor_stats -> node_locks_out.GetPointer(util::DEVICE),
+            //    num_blocks + 1, -1, -1, -1, parameter -> stream);
             gunrock::oprtr::edge_map_partitioned::RelaxPartitionedEdges2
                 <LBPOLICY, 
                 typename Parameter::Problem, 

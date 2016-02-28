@@ -38,7 +38,7 @@ namespace edge_map_partitioned {
 template <int NT, typename KeyType, typename ArrayType>
 __device__ int BinarySearch(KeyType i, ArrayType *queue)
 {
-    int mid = (NT/2 - 1);
+    int mid = ((NT >> 1) - 1);
 
     if (NT > 512)
         mid = queue[mid] > i ? mid - 256 : mid + 256;
@@ -54,8 +54,7 @@ __device__ int BinarySearch(KeyType i, ArrayType *queue)
     mid = queue[mid] > i ? mid - 4 : mid + 4;
     mid = queue[mid] > i ? mid - 2 : mid + 2;
     mid = queue[mid] > i ? mid - 1 : mid + 1;
-
-    mid = queue[mid] <= i ? mid + 1 : mid;
+    mid = queue[mid] > i ? mid     : mid + 1;
 
     return mid;
 }

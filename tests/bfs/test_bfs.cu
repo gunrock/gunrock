@@ -696,10 +696,10 @@ template <
     bool        MARK_PREDECESSORS >
 cudaError_t RunTests_enable_idempotence(Info<VertexId, SizeT, Value> *info)
 {
-//    if (info->info["idempotent"].get_bool())
-//        return RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
-//                 MARK_PREDECESSORS, true > (info);
-//    else
+    if (info->info["idempotent"].get_bool())
+        return RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
+                 MARK_PREDECESSORS, true > (info);
+    else
         return RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
                  MARK_PREDECESSORS, false> (info);
 }

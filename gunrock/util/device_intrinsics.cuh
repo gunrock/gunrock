@@ -27,14 +27,14 @@ __device__ static double atomicAdd(double *addr, double val)
                __double_as_longlong(assumed),
                __double_as_longlong(val + assumed)));
     } while( assumed!=old );
-    return old; 
+    return old;
 }
 
 __device__ static long long atomicCAS(long long *addr, long long comp, long long val)
 {
     return (long long)atomicCAS(
-        (unsigned long long*)addr, 
-        (unsigned long long )comp, 
+        (unsigned long long*)addr,
+        (unsigned long long )comp,
         (unsigned long long ) val);
 }
 
@@ -62,7 +62,7 @@ namespace util {
  */
 __device__ __forceinline__ void ThreadExit() {
     asm("exit;");
-}   
+}
 
 
 /**
@@ -98,12 +98,12 @@ __device__ __forceinline__ int FastMul(int a, int b)
     return a * b;
 #else
     return __mul24(a, b);
-#endif  
+#endif
 }
 
 // Ensure no un-specialized types will be compiled
 extern __device__ __host__ void Error_UnsupportedType();
- 
+
 template <typename T>
 __device__ __host__ __forceinline__ T MaxValue()
 {
@@ -221,8 +221,28 @@ __device__ __host__ __forceinline__ long long AllOnes<long long>()
     return (long long)0xFFFFFFFFFFFFFFFFLL;
 }
 
+template <typename T>
+__device__ __host__ __forceinline__ T InvalidValue()
+{
+    //return AllOnes_N<T, sizeof(T)>();
+    Error_UnsupportedType();
+    return 0;
+}
+
+template <>
+__device__ __host__ __forceinline__ int InvalidValue<int>()
+{
+    return (int)-1;
+}
+
+template <>
+__device__ __host__ __forceinline__ long long InvalidValue<long long>()
+{
+    return (long long)-1;
+}
+
 /**
- * Wrapper for performing atomic operations on integers of type size_t 
+ * Wrapper for performing atomic operations on integers of type size_t
  */
 template <typename T, int SizeT = sizeof(T)>
 struct AtomicInt;
@@ -248,4 +268,3 @@ struct AtomicInt<T, 8>
 
 } // namespace util
 } // namespace gunrock
-

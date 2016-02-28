@@ -93,7 +93,7 @@ struct EnactorStats
         //int max_grid_size,
         //int advance_occupancy,
         //int filter_occupancy,
-        int node_lock_size = 256)
+        int node_lock_size = 1024)
    {
         cudaError_t retval = cudaSuccess;
         if (retval = advance_kernel_stats
@@ -101,9 +101,9 @@ struct EnactorStats
         if (retval = filter_kernel_stats
               .Setup(filter_grid_size )) return retval;
         if (retval = node_locks    
-              .Allocate(node_lock_size, util::DEVICE)) return retval;
+              .Allocate(node_lock_size + 1, util::DEVICE)) return retval;
         if (retval = node_locks_out
-              .Allocate(node_lock_size, util::DEVICE)) return retval;
+              .Allocate(node_lock_size + 1, util::DEVICE)) return retval;
         if (retval = nodes_queued  
               .Allocate(1, util::DEVICE | util::HOST)) return retval;
         if (retval = edges_queued  

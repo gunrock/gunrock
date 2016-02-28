@@ -162,7 +162,7 @@ protected:
      * @param[in] max_grid_size Maximum CUDA block numbers in on grid
      * @param[in] advance_occupancy CTA Occupancy for Advance operator
      * @param[in] filter_occupancy CTA Occupancy for Filter operator
-     * @param[in] node_lock_size The size of an auxiliary array used in enactor, 256 by default.
+     * @param[in] node_lock_size The size of an auxiliary array used in enactor, 1024 by default.
      *
      * \return cudaError_t object indicates the success of all CUDA calls.
      */
@@ -172,7 +172,7 @@ protected:
         int max_grid_size,
         int advance_occupancy,
         int filter_occupancy,
-        int node_lock_size = 256)
+        int node_lock_size = 1024)
     {
         cudaError_t retval = cudaSuccess;
         if (retval = work_progress     .Init(
@@ -257,7 +257,7 @@ protected:
         int max_grid_size,
         int advance_occupancy,
         int filter_occupancy,
-        int node_lock_size = 256)
+        int node_lock_size = 1024)
     {
         cudaError_t retval = cudaSuccess;
 

@@ -65,9 +65,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, unsigned char > visited_mask  ;
         util::Array1D<SizeT, unsigned int  > temp_marker   ;
         util::Array1D<SizeT, VertexId      > original_vertex;
-        util::Array1D<SizeT, SizeT         > input_counter;
-        util::Array1D<SizeT, SizeT         > output_counter;
-        util::Array1D<SizeT, int           > edge_marker;
+        //util::Array1D<SizeT, SizeT         > input_counter;
+        //util::Array1D<SizeT, SizeT         > output_counter;
+        //util::Array1D<SizeT, int           > edge_marker;
 
         /*
          * @brief Default constructor
@@ -77,9 +77,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             visited_mask    .SetName("visited_mask"    );
             temp_marker     .SetName("temp_marker"     );
             original_vertex .SetName("original_vertex" );
-            input_counter   .SetName("input_counter"   );
-            output_counter  .SetName("output_counter"  );
-            edge_marker     .SetName("edge_marker"     );
+            //input_counter   .SetName("input_counter"   );
+            //output_counter  .SetName("output_counter"  );
+            //edge_marker     .SetName("edge_marker"     );
         }
 
         /*
@@ -98,9 +98,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = visited_mask   .Release()) return retval;
             if (retval = temp_marker    .Release()) return retval;
             if (retval = original_vertex.Release()) return retval;
-            if (retval = input_counter  .Release()) return retval;
-            if (retval = output_counter .Release()) return retval;
-            if (retval = edge_marker    .Release()) return retval;
+            //if (retval = input_counter  .Release()) return retval;
+            //if (retval = output_counter .Release()) return retval;
+            //if (retval = edge_marker    .Release()) return retval;
             return retval;
         }
 
@@ -147,9 +147,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
 
             // Create SoA on device
             if (retval = this->labels        .Allocate(graph->nodes, util::DEVICE)) return retval;
-            if (retval = this->input_counter .Allocate(graph->nodes, util::DEVICE)) return retval;
-            if (retval = this->output_counter.Allocate(graph->edges, util::DEVICE)) return retval;
-            if (retval = this->edge_marker   .Allocate(graph->edges, util::DEVICE)) return retval;
+            //if (retval = this->input_counter .Allocate(graph->nodes, util::DEVICE)) return retval;
+            //if (retval = this->output_counter.Allocate(graph->edges, util::DEVICE)) return retval;
+            //if (retval = this->edge_marker   .Allocate(graph->edges, util::DEVICE)) return retval;
 
             if (MARK_PREDECESSORS)
             {

@@ -55,7 +55,7 @@ template <
     // Behavioral control parameters
     //bool _INSTRUMENT,
     // Tunable parameters
-    int _MIN_CTA_OCCUPANCY,                                             
+    int _MIN_CTA_OCCUPANCY,
     int _LOG_THREADS,
     int _LOG_BLOCKS,
     int _LIGHT_EDGE_THRESHOLD>
@@ -82,7 +82,7 @@ struct KernelPolicy
         BLOCKS                          = 1 << LOG_BLOCKS,
         LIGHT_EDGE_THRESHOLD            = _LIGHT_EDGE_THRESHOLD,
     };
-    
+
     /**
      * @brief Shared memory storage type for the CTA
      */
@@ -93,7 +93,7 @@ struct KernelPolicy
             MAX_SCRATCH_BYTES_PER_CTA       = (GR_SMEM_BYTES(CUDA_ARCH) / _MIN_CTA_OCCUPANCY)
                                                 - 128,                                          // Fudge-factor to guarantee occupancy
 
-            SCRATCH_ELEMENT_SIZE            = sizeof(SizeT) + sizeof(VertexId) * 2,
+            SCRATCH_ELEMENT_SIZE            = sizeof(SizeT) * 2 + sizeof(VertexId) * 2,
 
             SCRATCH_ELEMENTS                 = (THREADS > MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE) ? MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE : THREADS,
         };
@@ -101,6 +101,7 @@ struct KernelPolicy
         // Scratch elements
         struct {
             SizeT                       output_offset[SCRATCH_ELEMENTS];
+            SizeT                       row_offset   [SCRATCH_ELEMENTS];
             VertexId                    vertices     [SCRATCH_ELEMENTS];
             VertexId                    input_queue  [SCRATCH_ELEMENTS];
         };

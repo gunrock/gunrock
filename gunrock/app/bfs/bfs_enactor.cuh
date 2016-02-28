@@ -163,7 +163,7 @@ struct BFSIteration : public IterationBase <
         ContextPtr                     context,
         cudaStream_t                   stream)
     {
-        if (enactor -> debug) 
+        if (enactor -> debug)
             util::cpu_mt::PrintMessage("Advance begin",
                 thread_num, enactor_stats->iteration, peer_);
         if (TO_TRACK)
@@ -179,7 +179,7 @@ struct BFSIteration : public IterationBase <
             util::Check_Exist<<<256, 256, 0, stream>>>(
                 frontier_attribute -> queue_length,
                 data_slice->gpu_idx, 2, enactor_stats -> iteration,
-                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));       
+                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
             //util::Verify_Value<<<256, 256, 0, stream>>>(
             //    data_slice -> gpu_idx, 2, frontier_attribute -> queue_length,
             //    enactor_stats -> iteration,
@@ -189,15 +189,15 @@ struct BFSIteration : public IterationBase <
         }
         frontier_attribute->queue_reset = true;
         enactor_stats     ->nodes_queued[0] += frontier_attribute->queue_length;
-        util::MemsetKernel<<<256, 256, 0, stream>>>(
-            data_slice -> output_counter.GetPointer(util::DEVICE),
-            0, frontier_attribute -> output_length[0]);
-        util::MemsetKernel<<<256, 256, 0, stream>>>(
-            data_slice -> input_counter.GetPointer(util::DEVICE),
-            0, frontier_attribute -> queue_length);
-        util::MemsetKernel<<<256, 256, 0, stream>>>(
-            data_slice -> edge_marker.GetPointer(util::DEVICE),
-            0, graph_slice -> edges);
+        //util::MemsetKernel<<<256, 256, 0, stream>>>(
+        //    data_slice -> output_counter.GetPointer(util::DEVICE),
+        //    0, frontier_attribute -> output_length[0]);
+        //util::MemsetKernel<<<256, 256, 0, stream>>>(
+        //    data_slice -> input_counter.GetPointer(util::DEVICE),
+        //    0, frontier_attribute -> queue_length);
+        //util::MemsetKernel<<<256, 256, 0, stream>>>(
+        //    data_slice -> edge_marker.GetPointer(util::DEVICE),
+        //    0, graph_slice -> edges);
 
         // Edge Map
         gunrock::oprtr::advance::LaunchKernel
@@ -227,31 +227,31 @@ struct BFSIteration : public IterationBase <
             false,
             false);
         // Only need to reset queue for once
-        if (enactor -> debug) 
-            util::cpu_mt::PrintMessage("Advance end", 
+        if (enactor -> debug)
+            util::cpu_mt::PrintMessage("Advance end",
                 thread_num, enactor_stats->iteration, peer_);
 
-        util::Verify_Value<<<256, 256, 0, stream>>>(
-            thread_num, 0, frontier_attribute -> output_length[0],
-            enactor_stats -> iteration,
-            data_slice -> output_counter.GetPointer(util::DEVICE),
-            1);
+        //util::Verify_Value<<<256, 256, 0, stream>>>(
+        //    thread_num, 0, frontier_attribute -> output_length[0],
+        //    enactor_stats -> iteration,
+        //    data_slice -> output_counter.GetPointer(util::DEVICE),
+        //    1);
 
-        util::Verify_Row_Length<<<256, 256, 0, stream>>>(
-            thread_num, 0, frontier_attribute -> queue_length,
-            enactor_stats -> iteration,
-            frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
-            graph_slice -> row_offsets.GetPointer(util::DEVICE),
-            data_slice -> input_counter.GetPointer(util::DEVICE));
+        //util::Verify_Row_Length<<<256, 256, 0, stream>>>(
+        //    thread_num, 0, frontier_attribute -> queue_length,
+        //    enactor_stats -> iteration,
+        //    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+        //    graph_slice -> row_offsets.GetPointer(util::DEVICE),
+        //    data_slice -> input_counter.GetPointer(util::DEVICE));
 
-        util::Verify_Edges<<<256, 256, 0, stream>>>(
-            thread_num, 0, frontier_attribute -> queue_length, graph_slice -> nodes,
-            enactor_stats -> iteration,
-            frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
-            graph_slice -> row_offsets.GetPointer(util::DEVICE),
-            data_slice -> edge_marker.GetPointer(util::DEVICE),
-            1);
-            
+        //util::Verify_Edges<<<256, 256, 0, stream>>>(
+        //    thread_num, 0, frontier_attribute -> queue_length, graph_slice -> nodes,
+        //    enactor_stats -> iteration,
+        //    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+        //    graph_slice -> row_offsets.GetPointer(util::DEVICE),
+        //    data_slice -> edge_marker.GetPointer(util::DEVICE),
+        //    1);
+
         frontier_attribute -> queue_reset = false;
         frontier_attribute -> queue_index++;
         frontier_attribute -> selector ^= 1;
@@ -259,8 +259,8 @@ struct BFSIteration : public IterationBase <
             work_progress  -> template GetQueueLengthPointer<unsigned int>(
                 frontier_attribute -> queue_index), stream);
 
-        if (enactor -> debug) 
-            util::cpu_mt::PrintMessage("Filter begin", 
+        if (enactor -> debug)
+            util::cpu_mt::PrintMessage("Filter begin",
                 thread_num, enactor_stats->iteration, peer_);
         if (TO_TRACK)
         {
@@ -274,7 +274,7 @@ struct BFSIteration : public IterationBase <
             //    data_slice->gpu_idx, 3, enactor_stats -> iteration,
             //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
             //util::Verify_Value_<<<256, 256, 0, stream>>>(
-            //    data_slice -> gpu_idx, 3, 
+            //    data_slice -> gpu_idx, 3,
             //    work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
             //        frontier_attribute -> queue_index),
             //    enactor_stats -> iteration,
@@ -291,9 +291,9 @@ struct BFSIteration : public IterationBase <
         // Filter
         gunrock::oprtr::filter::LaunchKernel
             <FilterKernelPolicy, Problem, Functor>(
-            enactor_stats->filter_grid_size, 
-            FilterKernelPolicy::THREADS, 
-            (size_t)0, 
+            enactor_stats->filter_grid_size,
+            FilterKernelPolicy::THREADS,
+            (size_t)0,
             stream,
             enactor_stats->iteration+1,
             frontier_attribute->queue_reset,
@@ -308,10 +308,10 @@ struct BFSIteration : public IterationBase <
             frontier_queue->keys  [frontier_attribute->selector  ].GetSize(),
             frontier_queue->keys  [frontier_attribute->selector^1].GetSize(),
             enactor_stats->filter_kernel_stats);
-        if (enactor -> debug && (enactor_stats->retval = 
+        if (enactor -> debug && (enactor_stats->retval =
             util::GRError("filter_forward::Kernel failed", __FILE__, __LINE__))) return;
-        if (enactor -> debug) 
-            util::cpu_mt::PrintMessage("Filter end.", 
+        if (enactor -> debug)
+            util::cpu_mt::PrintMessage("Filter end.",
                 thread_num, enactor_stats->iteration);
         frontier_attribute->queue_index++;
         frontier_attribute->selector ^= 1;
@@ -328,7 +328,7 @@ struct BFSIteration : public IterationBase <
                 data_slice->gpu_idx, 4, enactor_stats -> iteration,
                 frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
             //util::Verify_Value_<<<256, 256, 0, stream>>>(
-            //    data_slice -> gpu_idx, 4, 
+            //    data_slice -> gpu_idx, 4,
             //    work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
             //        frontier_attribute -> queue_index),
             //    enactor_stats -> iteration,
@@ -371,7 +371,7 @@ struct BFSIteration : public IterationBase <
     {
         bool over_sized = false;
         Check_Size</*Enactor::SIZE_CHECK,*/ SizeT, VertexId>(
-            enactor -> size_check, 
+            enactor -> size_check,
             "queue1", num_elements, keys_out, over_sized, -1, -1, -1);
         Expand_Incoming_BFS
             <VertexId, SizeT, Value, NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
@@ -492,25 +492,25 @@ struct BFSIteration : public IterationBase <
 
         if (enactor_stats->retval =
             Check_Size</*true,*/ SizeT, VertexId > (
-                true, "queue3", request_length, 
-                &frontier_queue->keys  [selector^1], 
+                true, "queue3", request_length,
+                &frontier_queue->keys  [selector^1],
                 over_sized, thread_num, iteration, peer_, false)) return;
         if (enactor_stats->retval =
             Check_Size</*true,*/ SizeT, VertexId > (
-                true, "queue3", graph_slice->nodes+2, 
-                &frontier_queue->keys  [selector  ], 
+                true, "queue3", graph_slice->nodes+2,
+                &frontier_queue->keys  [selector  ],
                 over_sized, thread_num, iteration, peer_, true )) return;
         if (enactor -> problem -> use_double_buffer)
         {
             if (enactor_stats->retval =
                 Check_Size</*true,*/ SizeT, Value> (
-                    true, "queue3", request_length, 
-                    &frontier_queue->values[selector^1], 
+                    true, "queue3", request_length,
+                    &frontier_queue->values[selector^1],
                     over_sized, thread_num, iteration, peer_, false)) return;
             if (enactor_stats->retval =
                 Check_Size</*true,*/ SizeT, Value> (
-                    true, "queue3", graph_slice->nodes+2, 
-                    &frontier_queue->values[selector  ], 
+                    true, "queue3", graph_slice->nodes+2,
+                    &frontier_queue->values[selector  ],
                     over_sized, thread_num, iteration, peer_, true )) return;
         }
     }
@@ -560,9 +560,9 @@ static CUT_THREADPROC BFSThread(
     typedef typename Enactor::VertexId   VertexId  ;
     typedef typename Enactor::Value      Value     ;
     typedef typename Problem::DataSlice  DataSlice ;
-    typedef GraphSlice<SizeT, VertexId, Value>    
+    typedef GraphSlice<SizeT, VertexId, Value>
                                          GraphSlice;
-    typedef BFSFunctor<VertexId, SizeT, Value, Problem> 
+    typedef BFSFunctor<VertexId, SizeT, Value, Problem>
                                          Functor   ;
 
     ThreadSlice  *thread_data        =  (ThreadSlice*) thread_data_;
@@ -581,12 +581,12 @@ static CUT_THREADPROC BFSThread(
         thread_data -> status = ThreadSlice::Status::Ended;
         CUT_THREADEND;
     }
-    
+
     thread_data->status = ThreadSlice::Status::Ideal;
     while (thread_data -> status != ThreadSlice::Status::ToKill)
     {
         while (thread_data -> status == ThreadSlice::Status::Wait ||
-               thread_data -> status == ThreadSlice::Status::Ideal) 
+               thread_data -> status == ThreadSlice::Status::Ideal)
         {
             //sleep(0);
             std::this_thread::yield();
@@ -605,7 +605,7 @@ static CUT_THREADPROC BFSThread(
         }
 
         gunrock::app::Iteration_Loop
-            <Enactor, Functor, 
+            <Enactor, Functor,
             BFSIteration<AdvanceKernelPolicy, FilterKernelPolicy, Enactor>,
             Problem::MARK_PREDECESSORS ? 2 : 1, 0>
             (thread_data);
@@ -648,13 +648,13 @@ public:
      * @brief BFSEnactor constructor
      */
     BFSEnactor(
-        int   num_gpus   = 1, 
+        int   num_gpus   = 1,
         int  *gpu_idx    = NULL,
         bool  instrument = false,
         bool  debug      = false,
         bool  size_check = true) :
         BaseEnactor(
-            VERTEX_FRONTIERS, num_gpus, gpu_idx, 
+            VERTEX_FRONTIERS, num_gpus, gpu_idx,
             instrument, debug, size_check),
         thread_slices (NULL),
         thread_Ids    (NULL),
@@ -722,7 +722,7 @@ public:
             //problem,
             max_grid_size,
             AdvanceKernelPolicy::CTA_OCCUPANCY,
-            FilterKernelPolicy::CTA_OCCUPANCY)) 
+            FilterKernelPolicy::CTA_OCCUPANCY))
             return retval;
 
         this->problem = problem;
@@ -818,7 +818,7 @@ public:
             if ((this->num_gpus ==1) || (gpu==this->problem->partition_tables[0][src]))
                  thread_slices[gpu].init_size=1;
             else thread_slices[gpu].init_size=0;
-            this->frontier_attribute[gpu*this->num_gpus].queue_length 
+            this->frontier_attribute[gpu*this->num_gpus].queue_length
                 = thread_slices[gpu].init_size;
         }
 
@@ -835,7 +835,7 @@ public:
         }
 
         for (int gpu=0; gpu<this->num_gpus * this -> num_gpus;gpu++)
-        if (this->enactor_stats[gpu].retval!=cudaSuccess) 
+        if (this->enactor_stats[gpu].retval!=cudaSuccess)
         {
             retval=this->enactor_stats[gpu].retval;
             return retval;
@@ -900,7 +900,7 @@ public:
         //INSTRUMENT,                         // INSTRUMENT
         8,                                  // MIN_CTA_OCCUPANCY
         10,                                 // LOG_THREADS
-        8,                                  // LOG_BLOCKS
+        9,                                  // LOG_BLOCKS
         32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
         1,                                  // LOG_LOAD_VEC_SIZE
         0,                                  // LOG_LOADS_PER_TILE
@@ -918,7 +918,7 @@ public:
         //INSTRUMENT,                         // INSTRUMENT
         1,                                  // MIN_CTA_OCCUPANCY
         10,                                 // LOG_THREADS
-        8,                                  // LOG_BLOCKS
+        9,                                  // LOG_BLOCKS
         32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
         1,                                  // LOG_LOAD_VEC_SIZE
         0,                                  // LOG_LOADS_PER_TILE
