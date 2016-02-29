@@ -25,6 +25,7 @@
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel_policy.cuh>
+#include <gunrock/oprtr/simplified_filter/kernel.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/bfs/bfs_problem.cuh>
@@ -204,13 +205,14 @@ struct BFSIteration : public IterationBase <
             <AdvanceKernelPolicy, Problem, Functor, gunrock::oprtr::advance::V2V>(
             enactor_stats[0],
             frontier_attribute[0],
+            enactor_stats -> iteration,
             d_data_slice,
             (VertexId*)NULL,
             (bool*    )NULL,
             (bool*    )NULL,
             scanned_edges ->GetPointer(util::DEVICE),
             frontier_queue->keys  [frontier_attribute->selector  ].GetPointer(util::DEVICE),
-            frontier_queue->keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE),
+            /*(VertexId*)NULL, */frontier_queue->keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE),
             (Value*   )NULL,
             frontier_queue->values[frontier_attribute->selector^1].GetPointer(util::DEVICE),
             graph_slice->row_offsets   .GetPointer(util::DEVICE),
@@ -289,7 +291,7 @@ struct BFSIteration : public IterationBase <
         }
 
         // Filter
-        gunrock::oprtr::filter::LaunchKernel
+        /*gunrock::oprtr::filter::LaunchKernel
             <FilterKernelPolicy, Problem, Functor>(
             enactor_stats->filter_grid_size,
             FilterKernelPolicy::THREADS,
@@ -307,7 +309,32 @@ struct BFSIteration : public IterationBase <
             work_progress[0],
             frontier_queue->keys  [frontier_attribute->selector  ].GetSize(),
             frontier_queue->keys  [frontier_attribute->selector^1].GetSize(),
-            enactor_stats->filter_kernel_stats);
+            enactor_stats->filter_kernel_stats);*/
+        gunrock::oprtr::simplified_filter::LaunchKernel
+            <FilterKernelPolicy, Problem, Functor> (
+            enactor_stats[0],
+            frontier_attribute[0],
+            enactor_stats -> iteration + 1,
+            d_data_slice,
+            data_slice -> vertex_markers[enactor_stats -> iteration % 2].GetPointer(util::DEVICE),
+            data_slice->visited_mask.GetPointer(util::DEVICE),
+            frontier_queue->keys  [frontier_attribute -> selector  ].GetPointer(util::DEVICE),
+            frontier_queue->keys  [frontier_attribute -> selector^1].GetPointer(util::DEVICE),
+            frontier_queue->values[frontier_attribute -> selector  ].GetPointer(util::DEVICE),
+            (Value*)NULL,
+            frontier_attribute -> output_length[0],
+            graph_slice -> nodes,
+            work_progress[0],
+            context[0],
+            stream,
+            frontier_queue -> keys  [frontier_attribute -> selector  ].GetSize(),
+            frontier_queue -> keys  [frontier_attribute -> selector^1].GetSize(),
+            enactor_stats -> filter_kernel_stats,
+            true, // filtering_flag
+            false); // skip_marking
+
+        util::MemsetKernel<<<256, 256, 0, stream>>>(
+            data_slice -> vertex_markers[(enactor_stats -> iteration +1)%2].GetPointer(util::DEVICE), (SizeT)0, graph_slice -> nodes + 1);
         if (enactor -> debug && (enactor_stats->retval =
             util::GRError("filter_forward::Kernel failed", __FILE__, __LINE__))) return;
         if (enactor -> debug)
@@ -857,7 +884,8 @@ public:
         0,                                  // LOG_LOADS_PER_TILE
         5,                                  // LOG_RAKING_THREADS
         5,                                  // END_BITMASK_CULL
-        8>                                  // LOG_SCHEDULE_GRANULARITY
+        8,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::filter::SIMPLIFIED>
     FilterKernelPolicy;
 
     typedef gunrock::oprtr::advance::KernelPolicy<

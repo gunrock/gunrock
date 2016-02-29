@@ -79,7 +79,8 @@ struct Cta
     unsigned char           *d_visited_mask;            // Mask for detecting visited status
 
     // Work progress
-    VertexId                iteration;                  // Current graph traversal iteration
+    //VertexId                iteration;                  // Current graph traversal iteration
+    typename Functor::LabelT label;
     VertexId                queue_index;                // Current frontier queue counter index
     util::CtaWorkProgress<SizeT> &work_progress;             // Atomic workstealing and queueing counters
     SizeT                   max_out_frontier;           // Maximum size (in elements) of outgoing frontier
@@ -87,7 +88,7 @@ struct Cta
 
     // Operational details for raking_scan_grid
     RakingDetails           raking_details;
-    
+
     // Shared memory for the CTA
     SmemStorage             &smem_storage;
 
@@ -218,7 +219,7 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                if (Problem::ENABLE_IDEMPOTENCE && cta->iteration != -1) {
+                if (Problem::ENABLE_IDEMPOTENCE && cta->label != -1) {
                     if (tile->element_id[LOAD][VEC] >= 0) {
                         VertexId row_id = (tile->element_id[LOAD][VEC]&KernelPolicy::ELEMENT_ID_MASK);///cta->num_gpus;
 
@@ -231,11 +232,35 @@ struct Cta
                             tile->element_id[LOAD][VEC] = -1;
                         } else {
                             if (Problem::MARK_PREDECESSORS) {
-                                if (Functor::CondFilter(row_id, cta->d_data_slice))
-                                Functor::ApplyFilter(row_id, cta->d_data_slice, tile->pred_id[LOAD][VEC]);
+                                if (Functor::CondFilter(
+                                    tile->pred_id[LOAD][VEC],
+                                    row_id, cta->d_data_slice,
+                                    util::InvalidValue<SizeT>(),
+                                    cta->label,
+                                    util::InvalidValue<SizeT>(),
+                                    util::InvalidValue<SizeT>()))
+                                Functor::ApplyFilter(
+                                    tile->pred_id[LOAD][VEC],
+                                    row_id, cta->d_data_slice,
+                                    util::InvalidValue<SizeT>(),
+                                    cta->label,
+                                    util::InvalidValue<SizeT>(),
+                                    util::InvalidValue<SizeT>());
                             } else {
-                                if (Functor::CondFilter(row_id, cta->d_data_slice))
-                                Functor::ApplyFilter(row_id, cta->d_data_slice, cta->iteration);
+                                if (Functor::CondFilter(
+                                    util::InvalidValue<VertexId>(),
+                                    row_id, cta->d_data_slice,
+                                    util::InvalidValue<SizeT>(),
+                                    cta->label,
+                                    util::InvalidValue<SizeT>(),
+                                    util::InvalidValue<SizeT>()))
+                                Functor::ApplyFilter(
+                                    util::InvalidValue<VertexId>(),
+                                    row_id, cta->d_data_slice,
+                                    util::InvalidValue<SizeT>(),
+                                    cta->label,
+                                    util::InvalidValue<SizeT>(),
+                                    util::InvalidValue<SizeT>());
                             }
                         }
                     }
@@ -244,9 +269,22 @@ struct Cta
                         // Row index on our GPU (for multi-gpu, element ids are striped across GPUs)
                         VertexId row_id = (tile->element_id[LOAD][VEC]);// / cta->num_gpus;
                         SizeT node_id = threadIdx.x * LOADS_PER_TILE*LOAD_VEC_SIZE + LOAD*LOAD_VEC_SIZE+VEC;
-                        if (Functor::CondFilter(row_id, cta->d_data_slice, cta->iteration, node_id)) {
+                        if (Functor::CondFilter(
+                            util::InvalidValue<VertexId>(),
+                            row_id, cta->d_data_slice,
+                            node_id,
+                            cta->label,
+                            util::InvalidValue<SizeT>(),
+                            util::InvalidValue<SizeT>()))
+                        {
                             // ApplyFilter(row_id)
-                            Functor::ApplyFilter(row_id, cta->d_data_slice, cta->iteration, node_id);
+                            Functor::ApplyFilter(
+                            util::InvalidValue<VertexId>(),
+                            row_id, cta->d_data_slice,
+                            node_id,
+                            cta->label,
+                            util::InvalidValue<SizeT>(),
+                            util::InvalidValue<SizeT>());
                         }
                         else tile->element_id[LOAD][VEC] = -1;
                     }
@@ -365,10 +403,10 @@ struct Cta
 
             // VertexCull
             static __device__ __forceinline__ void VertexCull(Cta *cta, Tile *tile) {}
-            
+
             // HistoryCull
             static __device__ __forceinline__ void HistoryCull(Cta *cta, Tile *tile) {}
-            
+
             // WarpCull
             static __device__ __forceinline__ void WarpCull(Cta *cta, Tile *tile) {}
 
@@ -422,7 +460,7 @@ struct Cta
      * @brief CTA type default constructor
      */
     __device__ __forceinline__ Cta(
-        VertexId                iteration,
+        typename Functor::LabelT  label,
         VertexId                queue_index,
         //int                     num_gpus,
         SmemStorage             &smem_storage,
@@ -434,7 +472,8 @@ struct Cta
         util::CtaWorkProgress<SizeT> &work_progress,
         SizeT                   max_out_frontier):
         //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *t_bitmask):
-            iteration(iteration),
+            //iteration(iteration),
+            label(label),
             queue_index(queue_index),
             //num_gpus(num_gpus),
             raking_details(
@@ -455,7 +494,7 @@ struct Cta
                     true :
                     (KernelPolicy::END_BITMASK_CULL == 0) ?
                     false :
-                    (iteration < KernelPolicy::END_BITMASK_CULL))
+                    (/*iteration*/ label < KernelPolicy::END_BITMASK_CULL))
     {
         // Initialize history duplicate-filter
         for (int offset = threadIdx.x; offset < SmemStorage::HISTORY_HASH_ELEMENTS; offset += KernelPolicy::THREADS) {
@@ -488,7 +527,7 @@ struct Cta
                 cta_offset,
                 guarded_elements,
                 (VertexId) -1);
-        
+
         /*if (Problem::ENABLE_IDEMPOTENCE && Problem::MARK_PREDECESSORS && d_value_in != NULL) {
             util::io::LoadTile<
             KernelPolicy::LOG_LOADS_PER_TILE,
@@ -506,8 +545,8 @@ struct Cta
             tile.BitmaskCull(this);
         }
         tile.VertexCull(this);          // using vertex visitation status (update discovered vertices)
-        
-        if (Problem::ENABLE_IDEMPOTENCE && iteration != -1) {
+
+        if (Problem::ENABLE_IDEMPOTENCE && /*iteration*/ label != -1) {
             tile.HistoryCull(this);
             tile.WarpCull(this);
         }
@@ -527,7 +566,7 @@ struct Cta
             tile.ranks,
             work_progress.GetQueueCounter(queue_index + 1),
             scan_op);
-        
+
         // Check updated queue offset for overflow due to redundant expansion
         if (new_queue_offset >= max_out_frontier) {
             //printf(" new_queue_offset >= max_out_frontier, new_queue_offset = %d, max_out_frontier = %d\n", new_queue_offset, max_out_frontier);

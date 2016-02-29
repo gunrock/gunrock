@@ -17,6 +17,7 @@
 #include <gunrock/util/cta_work_distribution.cuh>
 #include <gunrock/util/cta_work_progress.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
+#include <gunrock/util/device_intrinsics.cuh>
 
 #include <gunrock/oprtr/filter/cta.cuh>
 
@@ -40,7 +41,8 @@ struct SweepPass
     typedef typename KernelPolicy::Value                Value;
 
     static __device__ __forceinline__ void Invoke(
-        VertexId         &iteration,
+        //VertexId         &iteration,
+        typename Functor::LabelT &label,
         VertexId         &queue_index,
         //int                                     &num_gpus,
         VertexId         *&d_in,
@@ -68,7 +70,8 @@ struct SweepPass
 
         // CTA processing abstraction
         Cta cta(
-            iteration,
+            //iteration,
+            label,
             queue_index,
             //num_gpus,
             smem_storage,
@@ -120,9 +123,11 @@ struct Dispatch
     typedef typename KernelPolicy::SizeT    SizeT;
     typedef typename KernelPolicy::Value    Value;
     typedef typename Problem::DataSlice     DataSlice;
+    typedef typename Functor::LabelT        LabelT;
 
     static __device__ __forceinline__ void  Kernel2(
-            VertexId &iteration,
+            //VertexId &iteration,
+            LabelT label,
             bool &queue_reset,
             VertexId &queue_index,
             //int &num_gpus,
@@ -140,7 +145,8 @@ struct Dispatch
     }
 
     static __device__ __forceinline__ void Kernel(
-        VertexId                    &iteration,
+        //VertexId                    &iteration,
+        LabelT                      &label,
         bool                        &queue_reset,
         VertexId                    &queue_index,
         //int                         &num_gpus,
@@ -176,9 +182,11 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
     typedef typename KernelPolicy::SizeT    SizeT;
     typedef typename KernelPolicy::Value    Value;
     typedef typename Problem::DataSlice     DataSlice;
+    typedef typename Functor::LabelT        LabelT;
 
     static __device__ __forceinline__ void Kernel(
-        VertexId                    &iteration,
+        //VertexId                    &iteration,
+        LabelT                      &label,
         bool                        &queue_reset,
         VertexId                    &queue_index,
         //int                         &num_gpus,
@@ -202,7 +210,7 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
         //if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
         //    kernel_stats.MarkStart();
         //}
-    
+
         // workprogress reset
         //if (queue_reset)
         //{
@@ -237,21 +245,21 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
                 //    if (d_done) d_done[0] = num_elements;
                 //}
             }
-            
+
             // Initialize work decomposition in smem
             smem_storage.state.work_decomposition.template Init<KernelPolicy::LOG_SCHEDULE_GRANULARITY>(
                     num_elements, gridDim.x);
 
             // Reset our next outgoing queue counter to zero
             work_progress.StoreQueueLength(0, queue_index + 2);
-
         }
 
         // Barrier to protect work decomposition
         __syncthreads();
 
         SweepPass<KernelPolicy, Problem, Functor>::Invoke(
-                iteration,
+                //iteration,
+                label,
                 queue_index,
                 //num_gpus,
                 d_in,
@@ -272,7 +280,8 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
     }
 
     static __device__ __forceinline__ void  Kernel2(
-            VertexId &iteration,
+            //VertexId &iteration,
+            LabelT &label,
             bool &queue_reset,
             VertexId &queue_index,
             //int &num_gpus,
@@ -292,7 +301,7 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
         if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
             kernel_stats.MarkStart();
         }
-    
+
         // workprogress reset
         if (queue_reset)
         {
@@ -345,8 +354,15 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
         //if (my_idx == 0)
         //    printf("num elements:%d\n", num_elements);
 
-        Functor::ApplyFilter(d_in_queue[my_idx], d_data_slice, iteration);
-        d_out_queue[my_idx] = d_in_queue[my_idx];
+        SizeT output_pos = my_idx;
+        Functor::ApplyFilter(
+            util::InvalidValue<VertexId>(),
+            d_in_queue[my_idx],
+            d_data_slice, /*iteration*/
+            util::InvalidValue<SizeT>(),
+            label,
+            my_idx, output_pos);
+        d_out_queue[output_pos] = d_in_queue[my_idx];
 
         /*if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
             kernel_stats.MarkStop();
@@ -383,24 +399,26 @@ template <typename KernelPolicy, typename Problem, typename Functor>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
 __global__
 void Kernel(
-    typename KernelPolicy::VertexId         iteration,
+    //typename KernelPolicy::VertexId         iteration,
+    typename Functor::LabelT                label,
     bool                                    queue_reset,
-    typename KernelPolicy::VertexId         queue_index,                
-    typename KernelPolicy::SizeT            num_elements,             
-    typename KernelPolicy::VertexId         *d_in_queue,            
+    typename KernelPolicy::VertexId         queue_index,
+    typename KernelPolicy::SizeT            num_elements,
+    typename KernelPolicy::VertexId         *d_in_queue,
     typename KernelPolicy::Value            *d_in_value_queue,
-    typename KernelPolicy::VertexId         *d_out_queue,          
+    typename KernelPolicy::VertexId         *d_out_queue,
     typename Problem::DataSlice             *d_data_slice,
     unsigned char                           *d_visited_mask,
-    util::CtaWorkProgress<typename KernelPolicy::SizeT> work_progress,        
-    typename KernelPolicy::SizeT            max_in_queue,        
-    typename KernelPolicy::SizeT            max_out_queue,      
+    util::CtaWorkProgress<typename KernelPolicy::SizeT> work_progress,
+    typename KernelPolicy::SizeT            max_in_queue,
+    typename KernelPolicy::SizeT            max_out_queue,
     util::KernelRuntimeStats                kernel_stats,
     bool                                    filtering_flag = true)
 {
     if (filtering_flag) {
         Dispatch<KernelPolicy, Problem, Functor>::Kernel(
-                iteration,
+                //iteration,
+                label,
                 queue_reset,
                 queue_index,
                 //num_gpus,
@@ -417,7 +435,8 @@ void Kernel(
                 kernel_stats);
     } else {
         Dispatch<KernelPolicy, Problem, Functor>::Kernel2(
-                iteration,
+                //iteration,
+                label,
                 queue_reset,
                 queue_index,
                 //num_gpus,
@@ -439,18 +458,19 @@ void LaunchKernel(
     unsigned int                            block_size,
     size_t                                  shared_size,
     cudaStream_t                            stream,
-    long long                               iteration,
+    //long long                               iteration,
+    typename Functor::LabelT                label,
     bool                                    queue_reset,
-    unsigned int                            queue_index,                
-    typename KernelPolicy::SizeT            num_elements,             
-    typename KernelPolicy::VertexId         *d_in_queue,       
+    unsigned int                            queue_index,
+    typename KernelPolicy::SizeT            num_elements,
+    typename KernelPolicy::VertexId         *d_in_queue,
     typename KernelPolicy::Value            *d_in_value_queue,
-    typename KernelPolicy::VertexId         *d_out_queue,          
+    typename KernelPolicy::VertexId         *d_out_queue,
     typename Problem::DataSlice             *d_data_slice,
     unsigned char                           *d_visited_mask,
-    util::CtaWorkProgress<typename KernelPolicy::SizeT> work_progress,        
-    typename KernelPolicy::SizeT            max_in_queue,        
-    typename KernelPolicy::SizeT            max_out_queue,      
+    util::CtaWorkProgress<typename KernelPolicy::SizeT> work_progress,
+    typename KernelPolicy::SizeT            max_in_queue,
+    typename KernelPolicy::SizeT            max_out_queue,
     util::KernelRuntimeStats                kernel_stats,
     bool                                    filtering_flag = true)
 {
@@ -459,7 +479,8 @@ void LaunchKernel(
 
     Kernel<KernelPolicy, Problem, Functor>
         <<<grid_size, block_size, shared_size, stream>>>(
-        iteration,
+        //iteration,
+        label,
         queue_reset,
         queue_index,
         num_elements,

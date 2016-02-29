@@ -43,7 +43,7 @@ enum MODE {
     TWC_BACKWARD,
     LB_BACKWARD,
     LB,
-    LB_LIGHT,
+    LB_LIGHT
 };
 
 /**
@@ -69,7 +69,7 @@ enum REDUCE_OP {
     BIT_AND    ,
     BIT_XOR    ,
     MAXIMUM    ,
-    MINIMUM    
+    MINIMUM
 };
 
 enum REDUCE_TYPE {
@@ -196,15 +196,15 @@ template <
     // Behavioral control parameters
     //bool _INSTRUMENT,
     // Tunable parameters
-    int _MIN_CTA_OCCUPANCY,                                             
-    int _LOG_THREADS,                                                   
+    int _MIN_CTA_OCCUPANCY,
+    int _LOG_THREADS,
     int _LOG_BLOCKS,
     int _LIGHT_EDGE_THRESHOLD,
-    int _LOG_LOAD_VEC_SIZE,                                             
-    int _LOG_LOADS_PER_TILE,                                            
-    int _LOG_RAKING_THREADS,                                            
-    int _WARP_GATHER_THRESHOLD,                                          
-    int _CTA_GATHER_THRESHOLD,                                           
+    int _LOG_LOAD_VEC_SIZE,
+    int _LOG_LOADS_PER_TILE,
+    int _LOG_RAKING_THREADS,
+    int _WARP_GATHER_THRESHOLD,
+    int _CTA_GATHER_THRESHOLD,
     int _LOG_SCHEDULE_GRANULARITY,
     // Advance Mode and Type parameters
     MODE _ADVANCE_MODE>

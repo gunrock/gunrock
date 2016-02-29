@@ -26,7 +26,10 @@ namespace gunrock {
 namespace oprtr {
 namespace filter {
 
-
+enum MODE {
+    CULL,
+    SIMPLIFIED
+};
 
 /**
  * @brief Kernel configuration policy for filter kernels.
@@ -53,23 +56,24 @@ namespace filter {
  * @tparam _LOG_SCHEDULE_GRANULARITY    The scheduling granularity of incoming frontier tiles (for even-share work distribution only) (log)
  */
 template <
-    typename _ProblemData,                              
+    typename _ProblemData,
 
     // Machine parameters
-    int _CUDA_ARCH,                                     
+    int _CUDA_ARCH,
     //bool _INSTRUMENT,
     // Behavioral control parameters
-    int _SATURATION_QUIT,                                
+    int _SATURATION_QUIT,
     bool _DEQUEUE_PROBLEM_SIZE,
 
     // Tunable parameters
     int _MIN_CTA_OCCUPANCY,
-    int _LOG_THREADS,                                   
-    int _LOG_LOAD_VEC_SIZE,                             
-    int _LOG_LOADS_PER_TILE,                            
-    int _LOG_RAKING_THREADS,                            
+    int _LOG_THREADS,
+    int _LOG_LOAD_VEC_SIZE,
+    int _LOG_LOADS_PER_TILE,
+    int _LOG_RAKING_THREADS,
     int _END_BITMASK_CULL,
-    int _LOG_SCHEDULE_GRANULARITY>                      
+    int _LOG_SCHEDULE_GRANULARITY,
+    MODE _FILTER_MODE = CULL>
 
 struct KernelPolicy
 {
@@ -81,6 +85,8 @@ struct KernelPolicy
     typedef typename ProblemData::VertexId  VertexId;
     typedef typename ProblemData::SizeT     SizeT;
     typedef typename ProblemData::Value     Value;
+
+    static const MODE FILTER_MODE = _FILTER_MODE;
 
     enum {
         CUDA_ARCH                       = _CUDA_ARCH,
