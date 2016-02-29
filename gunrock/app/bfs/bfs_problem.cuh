@@ -155,8 +155,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             //if (retval = this->input_counter .Allocate(graph->nodes, util::DEVICE)) return retval;
             //if (retval = this->output_counter.Allocate(graph->edges, util::DEVICE)) return retval;
             //if (retval = this->edge_marker   .Allocate(graph->edges, util::DEVICE)) return retval;
-            if (retval = vertex_markers[0].Allocate(graph->nodes + 2, util::DEVICE)) return retval;
-            if (retval = vertex_markers[1].Allocate(graph->nodes + 2, util::DEVICE)) return retval;
+            //if (retval = vertex_markers[0].Allocate(graph->nodes + 2, util::DEVICE)) return retval;
+            //if (retval = vertex_markers[1].Allocate(graph->nodes + 2, util::DEVICE)) return retval;
             if (MARK_PREDECESSORS)
             {
                 if (retval = this->preds     .Allocate(graph->nodes,util::DEVICE)) return retval;
@@ -318,12 +318,12 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 graph_slice -> original_vertex.GetPointer(util::DEVICE),
                 graph_slice -> original_vertex.GetSize(),
                 util::DEVICE);
-            util::MemsetKernel<<<256, 256>>>(
-                vertex_markers[0].GetPointer(util::DEVICE),
-                (SizeT)0, nodes + 1);
-            util::MemsetKernel<<<256, 256>>>(
-                vertex_markers[1].GetPointer(util::DEVICE),
-                (SizeT)0, nodes + 1);
+            //util::MemsetKernel<<<256, 256>>>(
+            //    vertex_markers[0].GetPointer(util::DEVICE),
+            //    (SizeT)0, nodes + 1);
+            //util::MemsetKernel<<<256, 256>>>(
+            //    vertex_markers[1].GetPointer(util::DEVICE),
+            //    (SizeT)0, nodes + 1);
 
             if (TO_TRACK)
             {

@@ -333,8 +333,8 @@ struct BFSIteration : public IterationBase <
             true, // filtering_flag
             false); // skip_marking
 
-        util::MemsetKernel<<<256, 256, 0, stream>>>(
-            data_slice -> vertex_markers[(enactor_stats -> iteration +1)%2].GetPointer(util::DEVICE), (SizeT)0, graph_slice -> nodes + 1);
+        //util::MemsetKernel<<<256, 256, 0, stream>>>(
+        //    data_slice -> vertex_markers[(enactor_stats -> iteration +1)%2].GetPointer(util::DEVICE), (SizeT)0, graph_slice -> nodes + 1);
         if (enactor -> debug && (enactor_stats->retval =
             util::GRError("filter_forward::Kernel failed", __FILE__, __LINE__))) return;
         if (enactor -> debug)
@@ -601,7 +601,7 @@ static CUT_THREADPROC BFSThread(
     DataSlice    *data_slice         =   problem     -> data_slices        [thread_num].GetPointer(util::HOST);
     FrontierAttribute<SizeT>
                  *frontier_attribute = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
-    EnactorStats<SizeT> 
+    EnactorStats<SizeT>
                  *enactor_stats      = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
 
     if (enactor_stats[0].retval = util::SetDevice(gpu_idx))
@@ -886,7 +886,7 @@ public:
         5,                                  // LOG_RAKING_THREADS
         5,                                  // END_BITMASK_CULL
         8,                                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::filter::SIMPLIFIED>
+        gunrock::oprtr::filter::CULL>
     FilterKernelPolicy;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
