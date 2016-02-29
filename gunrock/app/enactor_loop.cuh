@@ -70,8 +70,10 @@ void Iteration_Loop(
                  *frontier_attribute   = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
     FrontierAttribute<SizeT>
                  *s_frontier_attribute = &(enactor     -> frontier_attribute [0         ]);
-    EnactorStats *enactor_stats        = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
-    EnactorStats *s_enactor_stats      = &(enactor     -> enactor_stats      [0         ]);
+    EnactorStats<SizeT> 
+                 *enactor_stats        = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
+    EnactorStats<SizeT> 
+                 *s_enactor_stats      = &(enactor     -> enactor_stats      [0         ]);
     util::CtaWorkProgressLifetime<SizeT>
                  *work_progress        = &(enactor     -> work_progress      [thread_num * num_gpus]);
     ContextPtr   *context              =   thread_data -> context;
@@ -89,7 +91,8 @@ void Iteration_Loop(
     Frontier     *frontier_queue_      =   NULL;
     FrontierAttribute<SizeT>
                  *frontier_attribute_  =   NULL;
-    EnactorStats *enactor_stats_       =   NULL;
+    EnactorStats<SizeT> 
+                 *enactor_stats_       =   NULL;
     util::CtaWorkProgressLifetime<SizeT>
                  *work_progress_       =   NULL;
     util::Array1D<SizeT, SizeT>
@@ -738,7 +741,7 @@ public:
         Frontier                      *frontier_queue,
         util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
-        EnactorStats                  *enactor_stats,
+        EnactorStats<SizeT>           *enactor_stats,
         DataSlice                     *data_slice,
         DataSlice                     *d_data_slice,
         GraphSliceT                   *graph_slice,
@@ -771,7 +774,7 @@ public:
         Frontier                      *frontier_queue,
         util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
-        EnactorStats                  *enactor_stats,
+        EnactorStats<SizeT>           *enactor_stats,
         DataSlice                     *data_slice,
         DataSlice                     *d_data_slice,
         GraphSliceT                   *graph_slice,
@@ -804,7 +807,7 @@ public:
         Frontier                      *frontier_queue,
         util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
-        EnactorStats                  *enactor_stats,
+        EnactorStats<SizeT>           *enactor_stats,
         DataSlice                     *data_slice,
         DataSlice                     *d_data_slice,
         GraphSliceT                   *graph_slice,
@@ -837,7 +840,7 @@ public:
         Frontier                      *frontier_queue,
         util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
-        EnactorStats                  *enactor_stats,
+        EnactorStats<SizeT>           *enactor_stats,
         DataSlice                     *data_slice,
         DataSlice                     *d_data_slice,
         GraphSliceT                   *graph_slice,
@@ -856,7 +859,7 @@ public:
      * @param[in] num_gpus Number of GPUs used.
      */
     static bool Stop_Condition(
-        EnactorStats                  *enactor_stats,
+        EnactorStats<SizeT>           *enactor_stats,
         FrontierAttribute<SizeT>      *frontier_attribute,
         util::Array1D<SizeT, DataSlice>
                                       *data_slice,
@@ -936,7 +939,7 @@ public:
         SizeT                          request_length,
         Frontier                      *frontier_queue,
         FrontierAttribute<SizeT>      *frontier_attribute,
-        EnactorStats                  *enactor_stats,
+        EnactorStats<SizeT>           *enactor_stats,
         GraphSliceT                   *graph_slice)
     {
         bool over_sized = false;
@@ -1000,7 +1003,7 @@ public:
         Frontier                      *frontier_queue,
         util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
-        EnactorStats                  *enactor_stats,
+        EnactorStats<SizeT>           *enactor_stats,
         util::Array1D<SizeT, DataSlice>
                                       *data_slice_,
         GraphSliceT                   *graph_slice,

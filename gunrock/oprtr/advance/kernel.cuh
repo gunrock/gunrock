@@ -176,7 +176,8 @@ struct KernelParameter
     static const REDUCE_OP   R_OP         = _R_OP;
     static const REDUCE_TYPE R_TYPE       = _R_TYPE;
 
-    gunrock::app::EnactorStats              *enactor_stats;
+    gunrock::app::EnactorStats<typename KernelPolicy::SizeT>       
+                                            *enactor_stats;
     gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                             *frontier_attribute;
     typename Problem::DataSlice             *d_data_slice;
@@ -438,7 +439,8 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
         }
         //printf("output_length = %lld\n", (long long)frontier_attribute.output_length[0]);
         if (/*!parameter -> get_output_length || (parameter -> get_output_length &&*/
-            parameter -> frontier_attribute -> output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD)//)
+            //parameter -> frontier_attribute -> output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD)//)
+            parameter -> frontier_attribute -> output_length[0] < 64 * 2 * LBPOLICY::THREADS)
         {
             //printf("using RelaxLightEdges\n");
             gunrock::oprtr::edge_map_partitioned::RelaxLightEdges
@@ -479,19 +481,19 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
             int num_blocks = parameter -> frontier_attribute -> output_length[0] / 2 / LBPOLICY::THREADS; // LBPOLICY::BLOCKS
             if (num_blocks > LBPOLICY::BLOCKS)
                 num_blocks = LBPOLICY::BLOCKS;
-            unsigned int split_val = (parameter -> frontier_attribute -> output_length[0] +
+            SizeT split_val = (parameter -> frontier_attribute -> output_length[0] +
                 num_blocks - 1) / num_blocks;
             //printf("using RelaxLightEdges2, input_length = %lld, ouput_length = %lld, split_val = %lld\n",
             //    (long long)parameter -> frontier_attribute -> queue_length,
             //    (long long)parameter -> frontier_attribute -> output_length[0],
             //    (long long)split_val);
-            util::MemsetIdxKernel<unsigned int, int> <<<1, 256, 0, parameter -> stream>>>(
+            util::MemsetIdxKernel<<<1, 256, 0, parameter -> stream>>>(
                 parameter -> enactor_stats -> node_locks.GetPointer(util::DEVICE),
-                num_blocks + 1,
+                num_blocks,
                 split_val);
             SortedSearch<MgpuBoundsLower>(
                 parameter -> enactor_stats -> node_locks.GetPointer(util::DEVICE),
-                num_blocks + 1,
+                num_blocks,
                 parameter -> d_partitioned_scanned_edges,
                 parameter -> frontier_attribute -> queue_length,
                 parameter -> enactor_stats -> node_locks_out.GetPointer(util::DEVICE),
@@ -666,7 +668,8 @@ template <typename KernelPolicy, typename Problem, typename Functor,
     REDUCE_OP   R_OP         = gunrock::oprtr::advance::NONE,
     REDUCE_TYPE R_TYPE       = gunrock::oprtr::advance::EMPTY>
 cudaError_t LaunchKernel(
-    gunrock::app::EnactorStats              &enactor_stats,
+    gunrock::app::EnactorStats<typename KernelPolicy::SizeT>              
+                                            &enactor_stats,
     gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                             &frontier_attribute,
     typename Functor::LabelT                 label,

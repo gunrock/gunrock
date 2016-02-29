@@ -156,7 +156,7 @@ struct BFSIteration : public IterationBase <
         Frontier                      *frontier_queue,
         util::Array1D<SizeT, SizeT>   *scanned_edges,
         FrontierAttribute<SizeT>      *frontier_attribute,
-        EnactorStats                  *enactor_stats,
+        EnactorStats<SizeT>           *enactor_stats,
         DataSlice                     *data_slice,
         DataSlice                     *d_data_slice,
         GraphSlice                    *graph_slice,
@@ -501,7 +501,7 @@ struct BFSIteration : public IterationBase <
         SizeT                          request_length,
         Frontier                      *frontier_queue,
         FrontierAttribute<SizeT>      *frontier_attribute,
-        EnactorStats                  *enactor_stats,
+        EnactorStats<SizeT>           *enactor_stats,
         GraphSlice                    *graph_slice)
     {
         bool over_sized = false;
@@ -601,7 +601,8 @@ static CUT_THREADPROC BFSThread(
     DataSlice    *data_slice         =   problem     -> data_slices        [thread_num].GetPointer(util::HOST);
     FrontierAttribute<SizeT>
                  *frontier_attribute = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
-    EnactorStats *enactor_stats      = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
+    EnactorStats<SizeT> 
+                 *enactor_stats      = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
 
     if (enactor_stats[0].retval = util::SetDevice(gpu_idx))
     {

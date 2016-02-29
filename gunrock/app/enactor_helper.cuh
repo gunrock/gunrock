@@ -33,7 +33,7 @@ namespace app {
  * @param[in] num_gpus Number of GPUs used for testing.
  */
 template <typename SizeT, typename DataSlice>
-bool All_Done(EnactorStats                    *enactor_stats,
+bool All_Done(EnactorStats<SizeT>             *enactor_stats,
               FrontierAttribute<SizeT>        *frontier_attribute,
               util::Array1D<SizeT, DataSlice> *data_slice,
               int                              num_gpus)
@@ -174,7 +174,7 @@ void PushNeighbor(
     int                peer,
     typename Enactor::SizeT   
                        queue_length,
-    EnactorStats      *enactor_stats,
+    EnactorStats<typename Enactor::SizeT>  *enactor_stats,
     DataSlice         *data_slice_l,
     DataSlice         *data_slice_p,
     GraphSliceT       *graph_slice_l,
@@ -303,7 +303,8 @@ void ShowDebugInfo(
     int           peer_,
     FrontierAttribute<typename Problem::SizeT>
                  *frontier_attribute,
-    EnactorStats *enactor_stats,
+    EnactorStats<typename Problem::SizeT> 
+                 *enactor_stats,
     typename Problem::DataSlice
                  *data_slice,
     GraphSlice<typename Problem::VertexId, typename Problem::SizeT, typename Problem::Value>

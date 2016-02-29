@@ -28,19 +28,20 @@ namespace app {
 /**
  * @brief Structure for auxiliary variables used in enactor.
  */
+template <typename SizeT>
 struct EnactorStats
 {
     long long                        iteration           ;
     unsigned long long               total_lifetimes     ;
     unsigned long long               total_runtimes      ;
-    util::Array1D<int, long long>    edges_queued        ;
-    util::Array1D<int, long long>    nodes_queued        ;
+    util::Array1D<int, SizeT>        edges_queued        ;
+    util::Array1D<int, SizeT>        nodes_queued        ;
     unsigned int                     advance_grid_size   ;
     unsigned int                     filter_grid_size    ;
     util::KernelRuntimeStatsLifetime advance_kernel_stats;
     util::KernelRuntimeStatsLifetime filter_kernel_stats ;
-    util::Array1D<int, unsigned int> node_locks          ;
-    util::Array1D<int, unsigned int> node_locks_out      ;
+    util::Array1D<int, SizeT>        node_locks          ;
+    util::Array1D<int, SizeT>        node_locks_out      ;
     cudaError_t                      retval              ;
     clock_t                          start_time          ;
 

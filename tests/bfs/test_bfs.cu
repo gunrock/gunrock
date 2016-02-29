@@ -135,7 +135,7 @@ void DisplaySolution(
 
     if (num_nodes > 40) { num_nodes = 40; }
 
-    printf("\nFirst %lld labels of the GPU result:\n", 
+    printf("\nFirst %lld labels of the GPU result:\n",
         (long long)num_nodes);
 
     printf("[");
@@ -367,7 +367,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
     if (retval = util::GRError(enactor->Init(
         context, problem, max_grid_size, traversal_mode),
-        "BFS Enactor Init failed", __FILE__, __LINE__)) 
+        "BFS Enactor Init failed", __FILE__, __LINE__))
         return retval;
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
@@ -381,10 +381,10 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         }
         ReferenceBFS<VertexId, SizeT, Value,
             MARK_PREDECESSORS, ENABLE_IDEMPOTENCE>(
-            graph, 
+            graph,
             reference_check_label,
-            reference_check_preds, 
-            src, 
+            reference_check_preds,
+            src,
             quiet_mode);
         if (!quiet_mode)
         {
@@ -428,7 +428,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         if (!quiet_mode)
         {
             printf("--------------------------\n"
-                "iteration %d elapsed: %lf ms\n", 
+                "iteration %d elapsed: %lf ms\n",
                 iter, single_elapsed);
             fflush(stdout);
         }
@@ -462,8 +462,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             num_errors = 0;
             for (VertexId v=0; v<graph->nodes; v++)
             {
-                if (h_labels[v] == 
-                    (ENABLE_IDEMPOTENCE ? -1 : util::MaxValue<VertexId>() - 1)) 
+                if (h_labels[v] ==
+                    (ENABLE_IDEMPOTENCE ? -1 : util::MaxValue<VertexId>() - 1))
                     continue; // unvisited vertex
                 if (v == src && h_preds[v] == -1) continue; // source vertex
                 VertexId pred = h_preds[v];
@@ -477,12 +477,12 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 if (h_labels[v] != h_labels[pred] + 1)
                 {
                     //if (num_errors == 0)
-                        printf("INCORRECT: label[%d] (%d) != label[%d] (%d) + 1\n", 
+                        printf("INCORRECT: label[%d] (%d) != label[%d] (%d) + 1\n",
                             v, h_labels[v], pred, h_labels[pred]);
                     num_errors ++;
                     continue;
                 }
-                
+
                 bool v_found = false;
                 for (SizeT t = graph->row_offsets[pred]; t < graph->row_offsets[pred+1]; t++)
                 if (v == graph->column_indices[t])
@@ -524,7 +524,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                     v_[gpu][problem->original_vertexes[gpu][v]] = v;
             }
         }
-        util::Track_Results(graph, num_gpus, (VertexId)1, h_labels, reference_check_label, 
+        util::Track_Results(graph, num_gpus, (VertexId)1, h_labels, reference_check_label,
             num_gpus > 1 ? problem->partition_tables[0] : NULL, v_);
         char file_name[512];
         sprintf(file_name, "./eval/error_dump/error_%lld_%d.txt", (long long)time(NULL), gpu_idx[0]);
@@ -625,14 +625,14 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
     // Clean up
     if (org_size        ) {delete[] org_size        ; org_size         = NULL;}
-    if (enactor         ) 
+    if (enactor         )
     {
         if (retval = util::GRError(enactor -> Release(),
             "BFS Enactor Release failed", __FILE__, __LINE__))
             return retval;
         delete   enactor         ; enactor          = NULL;
     }
-    if (problem         ) 
+    if (problem         )
     {
         if (retval = util::GRError(problem -> Release(),
             "BFS Problem Release failed", __FILE__, __LINE__))
@@ -645,7 +645,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
 
-    if (h_preds         ) 
+    if (h_preds         )
     {
         if (info->info["output_filename"].get_str() != "")
         {
@@ -662,7 +662,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 else if (h_preds[v] != -2) // valid pred
                     fout<< v+1 << "," << h_preds[v]+1 << std::endl;
             }
-            
+
             fout.close();
             delete[] fout_buf; fout_buf = NULL;
             cpu_timer.Stop();
@@ -780,20 +780,20 @@ template <
 int main_Value(CommandLineArgs *args)
 {
 // disabled to reduce compile time
-//    if (args -> CheckCmdLineFlag("64bit-Value"))
-//        return main_<VertexId, SizeT, long long>(args);
-//    else 
+    if (args -> CheckCmdLineFlag("64bit-Value"))
+        return main_<VertexId, SizeT, long long>(args);
+    else
         return main_<VertexId, SizeT, int      >(args);
 }
 
 template <
-    typename VertexId> 
+    typename VertexId>
 int main_SizeT(CommandLineArgs *args)
 {
 // disabled to reduce compile time
-//    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-//        return main_Value<VertexId, long long>(args);
-//    else
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_Value<VertexId, long long>(args);
+    else
         return main_Value<VertexId, int      >(args);
 }
 
@@ -802,7 +802,7 @@ int main_VertexId(CommandLineArgs *args)
 // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
 //    if (args -> CheckCmdLineFlag("64bit-VertexId"))
 //        return main_SizeT<long long>(args);
-//    else 
+//    else
         return main_SizeT<int      >(args);
 }
 

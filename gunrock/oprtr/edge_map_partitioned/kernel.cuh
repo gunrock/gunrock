@@ -81,10 +81,10 @@ struct Dispatch
     }
 
     static __device__ __forceinline__ void MarkPartitionSizes(
-        unsigned int *&d_needles,
-        unsigned int &split_val,
-        SizeT &num_elements,
-        SizeT &output_queue_len)
+        SizeT *&d_needles,
+        SizeT  &split_val,
+        SizeT  &num_elements,
+        SizeT  &output_queue_len)
     {
     }
 
@@ -97,8 +97,8 @@ struct Dispatch
         VertexId  *&d_column_indices,
         VertexId  *&d_inverse_column_indices,
         SizeT     *&d_scanned_edges,
-        unsigned int *&partition_starts,
-        unsigned int &num_partitions,
+        SizeT     *&partition_starts,
+        SizeT      &num_partitions,
         VertexId  *&d_queue,
         VertexId  *&d_out,
         DataSlice *&d_data_slice,
@@ -243,8 +243,8 @@ struct Dispatch<KernelPolicy, Problem, Functor,
     }
 
     static __device__ __forceinline__ void MarkPartitionSizes(
-        unsigned int *&d_needles,
-        unsigned int  &split_val,
+        SizeT        *&d_needles,
+        SizeT         &split_val,
         SizeT         &num_elements,
         SizeT         &output_queue_length)
     {
@@ -264,8 +264,8 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         VertexId                *&d_column_indices,
         VertexId                *&d_inverse_column_indices,
         SizeT                   *&d_scanned_edges,
-        unsigned int            *&partition_starts,
-        unsigned int             &num_partitions,
+        SizeT                   *&partition_starts,
+        SizeT                    &num_partitions,
         VertexId                *&d_queue,
         VertexId                *&d_out,
         DataSlice               *&d_data_slice,
@@ -295,7 +295,8 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         SizeT block_input_end    = (blockIdx.x == gridDim.x - 1) ?
             input_queue_len : min(
             partition_starts[blockIdx.x + 1] , input_queue_len);
-        if (block_input_end < input_queue_len && block_output_end > (block_input_end > 0 ? d_scanned_edges[block_input_end-1] : 0))
+        if (block_input_end < input_queue_len && 
+            block_output_end > (block_input_end > 0 ? d_scanned_edges[block_input_end-1] : 0))
             block_input_end ++;
 
         SizeT iter_input_start  = partition_starts[blockIdx.x];
@@ -315,7 +316,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             iter_input_start < block_input_end)
         {
             SizeT iter_input_size  = min(
-                KernelPolicy::THREADS-1, block_input_end - iter_input_start);
+                (SizeT)KernelPolicy::THREADS-1, block_input_end - iter_input_start);
             SizeT iter_input_end = iter_input_start + iter_input_size;
             SizeT iter_output_end = iter_input_end < input_queue_len ?
                 d_scanned_edges[iter_input_end] : output_queue_len[0];
@@ -353,6 +354,10 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                             row_offsets[d_column_indices[input_item]];
                     }
                 }
+                //smem_storage.row_offset [threadIdx.x] = (output_inverse_graph)?
+                //        d_inverse_row_offsets[smem_storage.vertices[threadIdx.x]] :
+                //        d_row_offsets        [smem_storage.vertices[threadIdx.x]];
+
             } else {
                 smem_storage.output_offset[threadIdx.x] = util::MaxValue<SizeT>(); //max_edges;
                 smem_storage.vertices     [threadIdx.x] = util::MaxValue<VertexId>();//max_vertices;
@@ -569,8 +574,8 @@ void RelaxPartitionedEdges2(
     typename KernelPolicy::VertexId         *d_column_indices,
     typename KernelPolicy::VertexId         *d_inverse_column_indices,
     typename KernelPolicy::SizeT            *d_scanned_edges,
-    unsigned int                            *partition_starts,
-    unsigned int                             num_partitions,
+    typename KernelPolicy::SizeT            *partition_starts,
+    typename KernelPolicy::SizeT             num_partitions,
     typename KernelPolicy::VertexId         *d_queue,
     typename KernelPolicy::VertexId         *d_out,
     typename Problem     ::DataSlice        *d_data_slice,
@@ -786,8 +791,8 @@ template <
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
     __global__
 void MarkPartitionSizes(
-    unsigned int                 *d_needles,
-    unsigned int                  split_val,
+    typename KernelPolicy::SizeT *d_needles,
+    typename KernelPolicy::SizeT  split_val,
     typename KernelPolicy::SizeT  num_elements,
     typename KernelPolicy::SizeT  output_queue_len)
 {

@@ -75,7 +75,7 @@ public:
 
     // Queue size counters and accompanying functionality
     util::Array1D<SizeT, util::CtaWorkProgressLifetime<SizeT> > work_progress     ;
-    util::Array1D<SizeT, EnactorStats>                  enactor_stats     ;
+    util::Array1D<SizeT, EnactorStats<SizeT> >                  enactor_stats     ;
     util::Array1D<SizeT, FrontierAttribute<SizeT> >     frontier_attribute;
 
     FrontierType GetFrontierType() {return frontier_type;}
@@ -199,7 +199,7 @@ protected:
                     return retval;
                 if (retval = frontier_attribute[gpu*num_gpus + peer].Init())
                     return retval;
-                EnactorStats *enactor_stats_ = enactor_stats + gpu*num_gpus + peer;
+                EnactorStats<SizeT> *enactor_stats_ = enactor_stats + gpu*num_gpus + peer;
                 //initialize runtime stats
                 enactor_stats_ -> advance_grid_size = MaxGridSize(
                     gpu, advance_occupancy, max_grid_size);

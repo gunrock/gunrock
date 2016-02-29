@@ -177,7 +177,7 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
         LabelT      label,
         SizeT       input_pos,
         SizeT       output_pos,
-        SizeT      *d_output_queue)
+        VertexId   *d_output_queue)
     {
         do
         {
@@ -305,7 +305,8 @@ struct KernelParameter
     //typedef Problem::Value    Value;
     //typedef Functor::LabelT   LabelT;
 
-    gunrock::app::EnactorStats         *enactor_stats;
+    gunrock::app::EnactorStats<typename KernelPolicy::SizeT>         
+                                       *enactor_stats;
     gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                        *frontier_attribute;
     typename Functor::LabelT            label;
@@ -480,7 +481,8 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::filter::SIMPLIFIED>
 
 template <typename KernelPolicy, typename Problem, typename Functor>
 cudaError_t LaunchKernel(
-    gunrock::app::EnactorStats         &enactor_stats,
+    gunrock::app::EnactorStats<typename KernelPolicy::SizeT>         
+                                       &enactor_stats,
     gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                        &frontier_attribute,
     typename Functor::LabelT            label,
