@@ -12,10 +12,22 @@
  * @brief linkage to metis partitioner
  */
 
+/* Temporary fix for using Makefiles
+ * in tests/primitive_name/
+ */
+#ifndef METIS_FOUND
+  #define METIS_FOUND false
+#endif
+/* METIS_FOUND default false */
+
 #pragma once
 
-#include <metis.h>
+#ifdef METIS_FOUND
+  #include <metis.h>
+#endif
+
 #include <gunrock/app/partitioner_base.cuh>
+#include <gunrock/util/error_utils.cuh>
 
 namespace gunrock {
 namespace app {
@@ -28,7 +40,7 @@ template <
     bool     ENABLE_BACKWARD = false,
     bool     KEEP_ORDER      = false,
     bool     KEEP_NODE_NUM   = false>
-struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value, 
+struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value,
     ENABLE_BACKWARD, KEEP_ORDER, KEEP_NODE_NUM>
 {
     typedef Csr<VertexId,SizeT,Value> GraphT;
@@ -61,7 +73,7 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value,
         else {
             float sum=0;
             for (int gpu=0;gpu<num_gpus;gpu++) sum+=weitage[gpu];
-            for (int gpu=0;gpu<num_gpus;gpu++) this->weitage[gpu]=weitage[gpu]/sum; 
+            for (int gpu=0;gpu<num_gpus;gpu++) this->weitage[gpu]=weitage[gpu]/sum;
         }
         for (int gpu=0;gpu<num_gpus;gpu++) this->weitage[gpu+1]+=this->weitage[gpu];
     }
@@ -105,7 +117,9 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value,
         for (idx_t edge = 0; edge < edges; edge++)
             tcolumn_indices[edge] = this->graph->column_indices[edge];
 
-        //int Status = 
+      if(METIS_FOUND)
+      {
+        //int Status =
                 METIS_PartGraphKway(
                     &nodes,                      // nvtxs  : the number of vertices in the graph
                     &ncons,                      // ncon   : the number of balancing constraints
@@ -120,7 +134,7 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value,
                     NULL,                        // options: the options
                     &objval,                     // objval : the returned edge-cut or the total communication volume
                     tpartition_table);           // part   : the returned partition vector of the graph
-        
+
         for (SizeT i=0;i<nodes;i++) this->partition_tables[0][i]=tpartition_table[i];
         delete[] tpartition_table; tpartition_table = NULL;
         delete[] trow_offsets    ; trow_offsets     = NULL;
@@ -138,6 +152,12 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value,
         backward_offsets     = this->backward_offsets;
         backward_partitions  = this->backward_partitions;
         backward_convertions = this->backward_convertions;
+
+      } else
+      {
+        const char * str = "Metis was not found during installation, therefore metis partitioner cannot be used [default=false].";
+        retval = util::GRError(cudaErrorUnknown, str, __FILE__, 19);
+      } // METIS_FOUND
         return retval;
     }
 };
