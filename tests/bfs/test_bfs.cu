@@ -144,7 +144,7 @@ void DisplaySolution(
         PrintValue(i);
         printf(":");
         PrintValue(labels[i]);
-        if (MARK_PREDECESSORS && !ENABLE_IDEMPOTENCE)
+        if (MARK_PREDECESSORS) //&& !ENABLE_IDEMPOTENCE)
         {
             printf(",");
             PrintValue(preds[i]);
@@ -189,10 +189,10 @@ void ReferenceBFS(
     // Initialize labels
     for (VertexId i = 0; i < graph->nodes; ++i)
     {
-        source_path[i] = ENABLE_IDEMPOTENCE ? -1 : util::MaxValue<VertexId>() - 1;
+        source_path[i] = /*ENABLE_IDEMPOTENCE ? -1 :*/ util::MaxValue<VertexId>();
         if (MARK_PREDECESSORS)
         {
-            predecessor[i] = -1;
+            predecessor[i] = util::InvalidValue<VertexId>();
         }
     }
     source_path[src] = 0;
@@ -220,7 +220,7 @@ void ReferenceBFS(
         {
             //Lookup neighbor and enqueue if undiscovered
             VertexId neighbor = graph->column_indices[edge];
-            if (source_path[neighbor] > neighbor_dist || source_path[neighbor] == -1)
+            if (source_path[neighbor] > neighbor_dist) //|| source_path[neighbor] == -1)
             {
                 source_path[neighbor] = neighbor_dist;
                 if (MARK_PREDECESSORS)
@@ -238,7 +238,7 @@ void ReferenceBFS(
 
     if (MARK_PREDECESSORS)
     {
-        predecessor[src] = -1;
+        predecessor[src] = util::InvalidValue<VertexId>();
     }
 
     cpu_timer.Stop();
@@ -463,9 +463,9 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             for (VertexId v=0; v<graph->nodes; v++)
             {
                 if (h_labels[v] ==
-                    (ENABLE_IDEMPOTENCE ? -1 : util::MaxValue<VertexId>() - 1))
+                    /*(ENABLE_IDEMPOTENCE ? -1 :*/ util::MaxValue<VertexId>())
                     continue; // unvisited vertex
-                if (v == src && h_preds[v] == -1) continue; // source vertex
+                if (v == src && h_preds[v] == util::InvalidValue<VertexId>()) continue; // source vertex
                 VertexId pred = h_preds[v];
                 if (pred >= graph->nodes || pred < 0)
                 {
@@ -725,10 +725,10 @@ template <
     //bool        SIZE_CHECK >
 cudaError_t RunTests_mark_predecessors(Info<VertexId, SizeT, Value> *info)
 {
-//    if (info->info["mark_predecessors"].get_bool())
-//        RunTests_enable_idempotence<VertexId, SizeT, Value, /*INSTRUMENT,
-//                                    DEBUG, SIZE_CHECK,*/  true> (info);
-//    else
+    if (info->info["mark_predecessors"].get_bool())
+        return RunTests_enable_idempotence<VertexId, SizeT, Value, /*INSTRUMENT,
+                                    DEBUG, SIZE_CHECK,*/  true> (info);
+    else
         return RunTests_enable_idempotence<VertexId, SizeT, Value,/* INSTRUMENT,
                                     DEBUG, SIZE_CHECK,*/ false> (info);
 }
@@ -779,11 +779,12 @@ template <
     typename SizeT   > // the size tyep, usually int or long long
 int main_Value(CommandLineArgs *args)
 {
-// disabled to reduce compile time
-    if (args -> CheckCmdLineFlag("64bit-Value"))
-        return main_<VertexId, SizeT, long long>(args);
-    else
-        return main_<VertexId, SizeT, int      >(args);
+    // Value = VertexId for bfs
+    return main_<VertexId, SizeT, VertexId>(args);
+//    if (args -> CheckCmdLineFlag("64bit-Value"))
+//        return main_<VertexId, SizeT, long long>(args);
+//    else
+//        return main_<VertexId, SizeT, int      >(args);
 }
 
 template <
