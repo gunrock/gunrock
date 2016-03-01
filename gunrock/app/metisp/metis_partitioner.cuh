@@ -12,6 +12,14 @@
  * @brief linkage to metis partitioner
  */
 
+/* Temporary fix for using Makefiles
+ * in tests/primitive_name/
+ */
+#ifndef METIS_FOUND
+  #define METIS_FOUND false
+#endif
+/* METIS_FOUND default false */
+
 #pragma once
 
 #ifdef METIS_FOUND
@@ -147,8 +155,8 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value,
 
       } else
       {
-        const char * str = "Metis was not found during installation, therefore metis partitioner cannot be used.";
-        retval = util::GRError(cudaErrorUnknown, str, __FILE__, __LINE__);
+        const char * str = "Metis was not found during installation, therefore metis partitioner cannot be used [default=false].";
+        retval = util::GRError(cudaErrorUnknown, str, __FILE__, 19);
       } // METIS_FOUND
         return retval;
     }
