@@ -88,15 +88,15 @@ __global__ void Expand_Incoming_BFS (
         key = keys_in[x];
         t   = s_vertex_associate_in[0][x];
 
-        if (atomicCAS(s_vertex_associate_org[0]+key, (VertexId)-1, t)!= -1)
-        {
+        //if (atomicCAS(s_vertex_associate_org[0]+key, (VertexId)-1, t)!= -1)
+        //{
            if (atomicMin(s_vertex_associate_org[0]+key, t)<=t)
            {
                keys_out[x]=-1;
                x+=STRIDE;
                continue;
            }
-        }
+        //}
         keys_out[x]=key;
         if (util::to_track(gpu_idx, key))
             printf("%d\t %s\t labels[%d] -> %d\n",

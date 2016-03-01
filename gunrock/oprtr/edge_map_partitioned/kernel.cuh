@@ -267,7 +267,8 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         SizeT                   *&partition_starts,
         SizeT                    &num_partitions,
         VertexId                *&d_queue,
-        VertexId                *&d_out,
+        VertexId                *&d_keys_out,
+        Value                   *&d_values_out,
         DataSlice               *&d_data_slice,
         SizeT                    &input_queue_len,
         SizeT                   * output_queue_len,
@@ -295,7 +296,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         SizeT block_input_end    = (blockIdx.x == gridDim.x - 1) ?
             input_queue_len : min(
             partition_starts[blockIdx.x + 1] , input_queue_len);
-        if (block_input_end < input_queue_len && 
+        if (block_input_end < input_queue_len &&
             block_output_end > (block_input_end > 0 ? d_scanned_edges[block_input_end-1] : 0))
             block_input_end ++;
 
@@ -380,11 +381,11 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                 {
                     v_index    = BinarySearch<KernelPolicy::THREADS>(
                         thread_output_offset, smem_storage.output_offset);
-                    v          = smem_storage.vertices   [v_index];
+                    input_item = smem_storage.input_queue[v_index];
                     if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V ||
                         ADVANCE_TYPE == gunrock::oprtr::advance::V2E)
-                        input_item = v;
-                    else input_item = smem_storage.input_queue[v_index];
+                        v = input_item;
+                    else v = smem_storage.vertices[v_index];
                     row_offset_v = smem_storage.row_offset[v_index];
                     next_v_output_start_offset = smem_storage.output_offset[v_index];
                     if (v_index > 0)
@@ -403,7 +404,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     v, u, d_data_slice, edge_id,
                     iter_input_start + v_index, input_item,
                     block_output_start + thread_output_offset,
-                    label, d_out,
+                    label, d_keys_out, d_values_out,
                     d_value_to_reduce, d_reduce_frontier);
 
             } // for
@@ -425,7 +426,8 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         VertexId                *&d_inverse_column_indices,
         SizeT                   *&d_scanned_edges,
         VertexId                *&d_queue,
-        VertexId                *&d_out,
+        VertexId                *&d_keys_out,
+        Value                   *&d_values_out,
         DataSlice               *&d_data_slice,
         SizeT                    &input_queue_length,
         SizeT                   * d_output_queue_length,
@@ -520,7 +522,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                 v, u, d_data_slice, edge_id,
                 block_input_start + v_index, input_item,
                 block_output_start + thread_output,
-                label, d_out,
+                label, d_keys_out, d_values_out,
                 d_value_to_reduce, d_reduce_frontier);
 
         } // end of for thread_output
@@ -577,7 +579,8 @@ void RelaxPartitionedEdges2(
     typename KernelPolicy::SizeT            *partition_starts,
     typename KernelPolicy::SizeT             num_partitions,
     typename KernelPolicy::VertexId         *d_queue,
-    typename KernelPolicy::VertexId         *d_out,
+    typename KernelPolicy::VertexId         *d_keys_out,
+    typename KernelPolicy::Value            *d_values_out,
     typename Problem     ::DataSlice        *d_data_slice,
     typename KernelPolicy::SizeT             input_queue_len,
     typename KernelPolicy::SizeT            *d_output_queue_len,
@@ -607,7 +610,8 @@ void RelaxPartitionedEdges2(
         partition_starts,
         num_partitions,
         d_queue,
-        d_out,
+        d_keys_out,
+        d_values_out,
         d_data_slice,
         input_queue_len,
         d_output_queue_len,
@@ -669,7 +673,8 @@ void RelaxLightEdges(
     typename KernelPolicy::VertexId  *d_inverse_column_indices,
     typename KernelPolicy::SizeT     *d_scanned_edges,
     typename KernelPolicy::VertexId  *d_queue,
-    typename KernelPolicy::VertexId  *d_out,
+    typename KernelPolicy::VertexId  *d_keys_out,
+    typename KernelPolicy::Value     *d_values_out,
     typename Problem     ::DataSlice *d_data_slice,
     typename KernelPolicy::SizeT      input_queue_len,
     typename KernelPolicy::SizeT     *d_output_queue_len,
@@ -696,7 +701,8 @@ void RelaxLightEdges(
         d_inverse_column_indices,
         d_scanned_edges,
         d_queue,
-        d_out,
+        d_keys_out,
+        d_values_out,
         d_data_slice,
         input_queue_len,
         d_output_queue_len,

@@ -157,7 +157,7 @@ struct KernelPolicy
             // General pool for prefix sum
             union {
                 SizeT                               raking_elements[RakingGrid::TOTAL_RAKING_ELEMENTS];
-                volatile VertexId                   vid_hashtable[WARPS][WARP_HASH_ELEMENTS];
+                /*volatile*/ VertexId                   vid_hashtable[WARPS][WARP_HASH_ELEMENTS];
             };
 
         } state;
@@ -173,7 +173,7 @@ struct KernelPolicy
         };
 
         // Fill the remainder of smem with a history-based hash-cache of seen vertex-ids
-        volatile VertexId                      history[HISTORY_HASH_ELEMENTS];
+        /*volatile*/ VertexId                      history[HISTORY_HASH_ELEMENTS];
 
     };
 

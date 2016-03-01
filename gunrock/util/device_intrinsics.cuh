@@ -241,6 +241,12 @@ __device__ __host__ __forceinline__ long long InvalidValue<long long>()
     return (long long)-1;
 }
 
+template <typename T>
+__device__ __host__ __forceinline__ bool isValid(T val)
+{
+    return val >= 0;//(val != InvalidValue<T>());
+}
+
 /**
  * Wrapper for performing atomic operations on integers of type size_t
  */

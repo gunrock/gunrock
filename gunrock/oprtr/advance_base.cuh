@@ -43,7 +43,8 @@ static __device__ __forceinline__ void ProcessNeighbor(
     typename Problem::VertexId   input_item,
     typename Problem::SizeT      output_pos,
     typename Functor::LabelT     label,
-    typename Problem::VertexId  *d_out,
+    typename Problem::VertexId  *d_keys_out,
+    typename Problem::Value     *d_values_out,
     typename Problem::Value     *d_value_to_reduce,
     typename Problem::Value     *d_reduce_frontier)
 {
@@ -54,59 +55,53 @@ static __device__ __forceinline__ void ProcessNeighbor(
         Functor::ApplyEdge(
             v, u, d_data_slice, edge_id, input_item,
             label, input_pos, output_pos);
-        if (d_out != NULL)
-        {
-            if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V)
-            {
-                util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-                        u,
-                        d_out + output_pos);
-            } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
-                     ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E)
-            {
-                util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-                        (typename Problem::VertexId)edge_id, // TODO: potential overflow if edge_id is large
-                        d_out + output_pos);
-            }
-        }
-        //printf("%d,%dCe\t", threadIdx.x, i);
+
         if (d_value_to_reduce != NULL)
         {
+            typename Problem::Value reduce_value;
             if (R_TYPE == gunrock::oprtr::advance::VERTEX)
             {
-                util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-                        d_value_to_reduce[u],
-                        d_reduce_frontier + output_pos);
+                reduce_value = d_value_to_reduce[u];
             } else if (R_TYPE == gunrock::oprtr::advance::EDGE)
             {
-                util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-                        d_value_to_reduce[edge_id],
-                        d_reduce_frontier + output_pos);
+                reduce_value = d_value_to_reduce[edge_id];
+            } else if (R_TYPE != gunrock::oprtr::advance::EMPTY)
+            {
+                // use user-specified function to generate value to reduce
             }
-        } else if (R_TYPE != gunrock::oprtr::advance::EMPTY)
-        {
-            // use user-specified function to generate value to reduce
+            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                reduce_value, d_reduce_frontier + output_pos);
         }
-        //printf("%d,%dCf\t", threadIdx.x, i);
 
-    } // end of if cond_success
-    else {
-        //printf("%d,%dCg\t", threadIdx.x, i);
-        if (d_out != NULL)
+        if (d_keys_out != NULL)
+        {
+            if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E ||
+                ADVANCE_TYPE == gunrock::oprtr::advance::E2E)
+            {
+                u = (typename Problem::VertexId) edge_id;
+            }
+            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                u,
+                d_keys_out + output_pos);
+        }
+
+        if (Problem::ENABLE_IDEMPOTENCE && Problem::MARK_PREDECESSORS && d_values_out != NULL)
         {
             util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-                    util::InvalidValue<typename Problem::VertexId>(),
-                    d_out + output_pos);
+                (typename Problem::Value)v, d_values_out + output_pos);
         }
-        //printf("%d,%dCh\t", threadIdx.x, i);
+
+    } else {
+        if (d_keys_out != NULL)
+            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                util::InvalidValue<typename Problem::VertexId>(),
+                d_keys_out + output_pos);
+
         if (d_value_to_reduce != NULL)
-        {
             util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                 gunrock::oprtr::advance::Identity<typename Problem::Value, R_OP>()(),
                 d_reduce_frontier + output_pos);
-        }
-       //printf("%d,%dCi\t", threadIdx.x, i);
-    } // end of else cond_success
+    }
 }
 
 template <typename VertexId, typename SizeT>
@@ -149,4 +144,3 @@ __device__ __forceinline__ void PrepareQueue(
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-

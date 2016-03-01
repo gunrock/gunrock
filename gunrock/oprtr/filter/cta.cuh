@@ -66,6 +66,7 @@ struct Cta
 
     typedef typename Problem::DataSlice             DataSlice;
     typedef typename Problem::Value                 Value;
+    typedef typename Functor::LabelT                LabelT;
 
     /**
      * Members
@@ -154,7 +155,7 @@ struct Cta
             static __device__ __forceinline__ void InitFlags(Tile *tile)
             {
                 // Initially valid if vertex-id is valid
-                tile->flags[LOAD][VEC] = (tile->element_id[LOAD][VEC] == -1) ? 0 : 1;
+                tile->flags[LOAD][VEC] = (tile->element_id[LOAD][VEC] == util::InvalidValue<VertexId>()) ? 0 : 1;
                 tile->ranks[LOAD][VEC] = tile->flags[LOAD][VEC];
 
                 // Next
@@ -169,7 +170,8 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                if (tile->element_id[LOAD][VEC] >= 0) {
+                if (tile->element_id[LOAD][VEC] >= 0)
+                {
                     // Location of mask byte to read
                     SizeT mask_byte_offset = (tile->element_id[LOAD][VEC] & KernelPolicy::ELEMENT_ID_MASK) >> 3;
 
@@ -181,9 +183,10 @@ struct Cta
                         BitmaskTex<unsigned char>::ref,//cta->t_bitmask[0],
                         mask_byte_offset);
 
-                    if (mask_bit & tex_mask_byte) {
+                    if (mask_bit & tex_mask_byte)
+                    {
                         // Seen it
-                        tile->element_id[LOAD][VEC] = -1;
+                        tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
                     } else {
                         unsigned char mask_byte;
                         //util::io::ModifiedLoad<util::io::ld::cg>::Ld(
@@ -194,7 +197,7 @@ struct Cta
 
                         if (mask_bit & mask_byte) {
                             // Seen it
-                            tile->element_id[LOAD][VEC] = -1;
+                            tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
                         } else {
                             // Update with best effort
                             mask_byte |= mask_bit;
@@ -219,17 +222,25 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                if (Problem::ENABLE_IDEMPOTENCE && cta->label != -1) {
-                    if (tile->element_id[LOAD][VEC] >= 0) {
-                        VertexId row_id = (tile->element_id[LOAD][VEC]&KernelPolicy::ELEMENT_ID_MASK);///cta->num_gpus;
+                //VertexId row_id = tile->element_id[LOAD][VEC];
+                //SizeT node_id = util::InvalidValue<SizeT>();
+                //if (!util::isValid(row_id)) return;
+                if (Problem::ENABLE_IDEMPOTENCE)// && util::isValid(cta->label))
+                {
+                    if (tile -> element_id[LOAD][VEC] >= 0)//util::isValid(row_id))//tile->element_id[LOAD][VEC]))
+                    {
+                        VertexId row_id = (tile->element_id[LOAD][VEC] & KernelPolicy::ELEMENT_ID_MASK);///cta->num_gpus;
+                        //row_id = row_id & KernelPolicy::ELEMENT_ID_MASK;
 
-                        VertexId label;
+                        LabelT label;
                         util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
-                                                    label,
-                                                    cta->d_data_slice ->labels + row_id);
-                        if (label != -1) {
+                            label,
+                            cta->d_data_slice ->labels + row_id);
+                        if (label != util::MaxValue<LabelT>())
+                        {
                             // Seen it
-                            tile->element_id[LOAD][VEC] = -1;
+                            tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
+                            //row_id = util::InvalidValue<VertexId>();
                         } else {
                             if (Problem::MARK_PREDECESSORS) {
                                 if (Functor::CondFilter(
@@ -239,39 +250,47 @@ struct Cta
                                     cta->label,
                                     util::InvalidValue<SizeT>(),
                                     util::InvalidValue<SizeT>()))
-                                Functor::ApplyFilter(
-                                    tile->pred_id[LOAD][VEC],
-                                    row_id, cta->d_data_slice,
-                                    util::InvalidValue<SizeT>(),
-                                    cta->label,
-                                    util::InvalidValue<SizeT>(),
-                                    util::InvalidValue<SizeT>());
+                                {
+                                    Functor::ApplyFilter(
+                                        tile->pred_id[LOAD][VEC],
+                                        row_id, cta->d_data_slice,
+                                        util::InvalidValue<SizeT>(),
+                                        cta->label,
+                                        util::InvalidValue<SizeT>(),
+                                        util::InvalidValue<SizeT>());
+                                } //else tile -> element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
                             } else {
                                 if (Functor::CondFilter(
                                     util::InvalidValue<VertexId>(),
-                                    row_id, cta->d_data_slice,
+                                    row_id,
+                                    cta->d_data_slice,
                                     util::InvalidValue<SizeT>(),
                                     cta->label,
                                     util::InvalidValue<SizeT>(),
                                     util::InvalidValue<SizeT>()))
-                                Functor::ApplyFilter(
-                                    util::InvalidValue<VertexId>(),
-                                    row_id, cta->d_data_slice,
-                                    util::InvalidValue<SizeT>(),
-                                    cta->label,
-                                    util::InvalidValue<SizeT>(),
-                                    util::InvalidValue<SizeT>());
+                                {
+                                    Functor::ApplyFilter(
+                                        util::InvalidValue<VertexId>(),
+                                        row_id,
+                                        cta->d_data_slice,
+                                        util::InvalidValue<SizeT>(),
+                                        cta->label,
+                                        util::InvalidValue<SizeT>(),
+                                        util::InvalidValue<SizeT>());
+                                } //else tile -> element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
                             }
                         }
                     }
                 } else {
-                    if (tile->element_id[LOAD][VEC] >= 0) {
+                    if (util::isValid(tile->element_id[LOAD][VEC]))
+                    {
                         // Row index on our GPU (for multi-gpu, element ids are striped across GPUs)
-                        VertexId row_id = (tile->element_id[LOAD][VEC]);// / cta->num_gpus;
+                        //VertexId row_id = (tile->element_id[LOAD][VEC]);// / cta->num_gpus;
                         SizeT node_id = threadIdx.x * LOADS_PER_TILE*LOAD_VEC_SIZE + LOAD*LOAD_VEC_SIZE+VEC;
                         if (Functor::CondFilter(
                             util::InvalidValue<VertexId>(),
-                            row_id, cta->d_data_slice,
+                            tile->element_id[LOAD][VEC],//row_id,
+                            cta->d_data_slice,
                             node_id,
                             cta->label,
                             util::InvalidValue<SizeT>(),
@@ -280,16 +299,37 @@ struct Cta
                             // ApplyFilter(row_id)
                             Functor::ApplyFilter(
                             util::InvalidValue<VertexId>(),
-                            row_id, cta->d_data_slice,
+                            tile->element_id[LOAD][VEC],//row_id,
+                            cta->d_data_slice,
                             node_id,
                             cta->label,
                             util::InvalidValue<SizeT>(),
                             util::InvalidValue<SizeT>());
                         }
-                        else tile->element_id[LOAD][VEC] = -1;
+                        else tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
                     }
                 }
 
+                /*if (util::isValid(row_id))
+                {
+                    if (Functor::CondFilter(
+                        tile->pred_id[LOAD][VEC],
+                        row_id, cta->d_data_slice,
+                        node_id,
+                        cta->label,
+                        util::InvalidValue<SizeT>(),
+                        util::InvalidValue<SizeT>()))
+                    Functor::ApplyFilter(
+                        tile->pred_id[LOAD][VEC],
+                        row_id, cta->d_data_slice,
+                        node_id,
+                        cta->label,
+                        util::InvalidValue<SizeT>(),
+                        util::InvalidValue<SizeT>());
+                    else tile -> element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
+                } else {
+                    tile -> element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
+                }*/
                 // Next
                 Iterate<LOAD, VEC + 1>::VertexCull(cta, tile);
             }
@@ -302,13 +342,15 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                if (tile->element_id[LOAD][VEC] >= 0) {
-                    int hash = ((unsigned int)tile->element_id[LOAD][VEC]) % SmemStorage::HISTORY_HASH_ELEMENTS;
+                if (util::isValid(tile->element_id[LOAD][VEC]))
+                {
+                    int hash = (tile->element_id[LOAD][VEC]) % SmemStorage::HISTORY_HASH_ELEMENTS;
                     VertexId retrieved = cta->smem_storage.history[hash];
 
-                    if (retrieved == tile->element_id[LOAD][VEC]) {
+                    if (retrieved == tile->element_id[LOAD][VEC])
+                    {
                         // Seen it
-                        tile->element_id[LOAD][VEC] = -1;
+                        tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
                     } else {
                         // Update it
                         cta->smem_storage.history[hash] = tile->element_id[LOAD][VEC];
@@ -327,18 +369,19 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                if (tile->element_id[LOAD][VEC] >= 0) {
+                if (util::isValid(tile->element_id[LOAD][VEC])) {
                     int warp_id = threadIdx.x >> 5;
                     int hash    = tile->element_id[LOAD][VEC] & (SmemStorage::WARP_HASH_ELEMENTS - 1);
 
                     cta->smem_storage.state.vid_hashtable[warp_id][hash] = tile->element_id[LOAD][VEC];
                     VertexId retrieved = cta->smem_storage.state.vid_hashtable[warp_id][hash];
 
-                    if (retrieved == tile->element_id[LOAD][VEC]) {
+                    if (retrieved == tile->element_id[LOAD][VEC])
+                    {
                         cta->smem_storage.state.vid_hashtable[warp_id][hash] = threadIdx.x;
                         VertexId tid = cta->smem_storage.state.vid_hashtable[warp_id][hash];
                         if (tid != threadIdx.x) {
-                            tile->element_id[LOAD][VEC] = -1;
+                            tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
                         }
                     }
                 }
@@ -498,7 +541,7 @@ struct Cta
     {
         // Initialize history duplicate-filter
         for (int offset = threadIdx.x; offset < SmemStorage::HISTORY_HASH_ELEMENTS; offset += KernelPolicy::THREADS) {
-            smem_storage.history[offset] = -1;
+            smem_storage.history[offset] = util::InvalidValue<VertexId>();
         }
     }
 
@@ -526,9 +569,9 @@ struct Cta
                 d_in,
                 cta_offset,
                 guarded_elements,
-                (VertexId) -1);
+                util::InvalidValue<VertexId>());
 
-        /*if (Problem::ENABLE_IDEMPOTENCE && Problem::MARK_PREDECESSORS && d_value_in != NULL) {
+        if (Problem::ENABLE_IDEMPOTENCE && Problem::MARK_PREDECESSORS && d_value_in != NULL) {
             util::io::LoadTile<
             KernelPolicy::LOG_LOADS_PER_TILE,
             KernelPolicy::LOG_LOAD_VEC_SIZE,
@@ -539,14 +582,15 @@ struct Cta
                 d_value_in,
                 cta_offset,
                 guarded_elements);
-        }*/
+        }
 
         if (Problem::ENABLE_IDEMPOTENCE && bitmask_cull && d_visited_mask != NULL) {
             tile.BitmaskCull(this);
         }
         tile.VertexCull(this);          // using vertex visitation status (update discovered vertices)
 
-        if (Problem::ENABLE_IDEMPOTENCE && /*iteration*/ label != -1) {
+        if (Problem::ENABLE_IDEMPOTENCE) //&& /*iteration != -1*/ util::isValid(label))
+        {
             tile.HistoryCull(this);
             tile.WarpCull(this);
         }

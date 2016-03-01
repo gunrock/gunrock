@@ -103,10 +103,10 @@ struct BFSFunctor {
      *
      */
     static __device__ __forceinline__ void ApplyEdge(
-        VertexId s_id,
+        volatile VertexId s_id,
         VertexId d_id,
         DataSlice *d_data_slice,
-        SizeT    edge_id   ,
+        volatile SizeT    edge_id   ,
         VertexId input_item,
         LabelT   label     ,
         SizeT    input_pos ,
@@ -121,9 +121,10 @@ struct BFSFunctor {
             //set preds[d_id] to be s_id
             if (Problem::MARK_PREDECESSORS)
             {
+                if (d_data_slice -> original_vertex.GetPointer(util::DEVICE) != NULL)
+                    s_id = d_data_slice -> original_vertex[s_id];
                 util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-                    d_data_slice -> original_vertex.GetPointer(util::DEVICE) == NULL ?
-                        s_id : d_data_slice -> original_vertex[s_id],
+                    s_id,
                     d_data_slice -> preds + d_id);
             }
         }
@@ -182,6 +183,13 @@ struct BFSFunctor {
                 d_data_slice -> gpu_idx, label, blockIdx.x, threadIdx.x, node, label);
             util::io::ModifiedStore<util::io::st::cg>::St(
                 label, d_data_slice->labels + node);
+            if (Problem::MARK_PREDECESSORS)
+            {
+                if (d_data_slice -> original_vertex.GetPointer(util::DEVICE) != NULL)
+                    v = d_data_slice -> original_vertex[v];
+                util::io::ModifiedStore<util::io::st::cg>::St(
+                v, d_data_slice -> preds + node);
+            }
         } else {
             // Doing nothing here
         }

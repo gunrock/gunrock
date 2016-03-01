@@ -92,8 +92,8 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
     {
         //if (Functor::CondFilter(s_id, d_id, d_data_slice,
         //    node_id, label, input_pos, output_pos))
-        if (d_id == -1) return false;
-        if (Problem::ENABLE_IDEMPOTENCE && d_data_slice->labels[d_id] != -1)
+        if (!util::isValid(d_id)) return false;
+        if (Problem::ENABLE_IDEMPOTENCE && d_data_slice->labels[d_id] != util::MaxValue<LabelT>())
             return false;
 
         //d_markers[output_pos] = (SizeT)1;
@@ -148,7 +148,7 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
                 //    output_count[target_pos]++;
                 //}
                 //output_count++;
-                d_markers[v] = 1;
+                d_markers[v] = (SizeT)1;
             }
             //if (__any(output_count[threadIdx.x] > 32))
             //if (output_count > 1500 - blockDim.x)
@@ -181,14 +181,14 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
     {
         do
         {
-            if (Problem::ENABLE_IDEMPOTENCE && d_data_slice->labels[d_id] != -1)
-            { d_id = -1; break;}
+            if (Problem::ENABLE_IDEMPOTENCE && d_data_slice->labels[d_id] != util::MaxValue<LabelT>())
+            { d_id = util::InvalidValue<VertexId>(); break;}
             if (Functor::CondFilter(s_id, d_id, d_data_slice,
                 node_id, label, input_pos, output_pos))
             {
                 Functor::ApplyFilter(s_id, d_id, d_data_slice,
                     node_id, label, input_pos, output_pos);
-            } else d_id = -1;
+            } else d_id = util::InvalidValue<VertexId>();
         } while (0);
         if (d_output_queue != NULL) d_output_queue[output_pos] = d_id;
     }
@@ -305,7 +305,7 @@ struct KernelParameter
     //typedef Problem::Value    Value;
     //typedef Functor::LabelT   LabelT;
 
-    gunrock::app::EnactorStats<typename KernelPolicy::SizeT>         
+    gunrock::app::EnactorStats<typename KernelPolicy::SizeT>
                                        *enactor_stats;
     gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                        *frontier_attribute;
@@ -481,7 +481,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::filter::SIMPLIFIED>
 
 template <typename KernelPolicy, typename Problem, typename Functor>
 cudaError_t LaunchKernel(
-    gunrock::app::EnactorStats<typename KernelPolicy::SizeT>         
+    gunrock::app::EnactorStats<typename KernelPolicy::SizeT>
                                        &enactor_stats,
     gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                        &frontier_attribute,

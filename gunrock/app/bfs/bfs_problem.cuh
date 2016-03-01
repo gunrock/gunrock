@@ -303,7 +303,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = this->labels.Allocate(nodes, util::DEVICE))
                     return retval;
             util::MemsetKernel<<<128, 128>>>(this->labels.GetPointer(util::DEVICE),
-                ENABLE_IDEMPOTENCE ? (VertexId)-1 : (util::MaxValue<VertexId>()-1), nodes);
+                /*ENABLE_IDEMPOTENCE ? (VertexId)-1 :*/ (util::MaxValue<VertexId>()), nodes);
 
             // Allocate preds if necessary
             if (MARK_PREDECESSORS)// && !_ENABLE_IDEMPOTENCE)
@@ -312,7 +312,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                     if (retval = this->preds.Allocate(nodes, util::DEVICE))
                         return retval;
                 util::MemsetKernel<<<128,128>>>(
-                    this->preds.GetPointer(util::DEVICE), (VertexId)-2, nodes);
+                    this->preds.GetPointer(util::DEVICE), util::InvalidValue<VertexId>()/*(VertexId)-2*/, nodes);
             }
             original_vertex.SetPointer(
                 graph_slice -> original_vertex.GetPointer(util::DEVICE),
@@ -609,7 +609,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__))
             return retval;
 
-       if (MARK_PREDECESSORS && !ENABLE_IDEMPOTENCE)
+       if (MARK_PREDECESSORS)// && !ENABLE_IDEMPOTENCE)
         {
             VertexId src_pred = -1;
             if (retval = util::GRError(cudaMemcpy(

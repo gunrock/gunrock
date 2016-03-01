@@ -176,7 +176,7 @@ struct KernelParameter
     static const REDUCE_OP   R_OP         = _R_OP;
     static const REDUCE_TYPE R_TYPE       = _R_TYPE;
 
-    gunrock::app::EnactorStats<typename KernelPolicy::SizeT>       
+    gunrock::app::EnactorStats<typename KernelPolicy::SizeT>
                                             *enactor_stats;
     gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                             *frontier_attribute;
@@ -461,6 +461,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
                 parameter -> d_partitioned_scanned_edges, // TODO: +1?
                 parameter -> d_in_key_queue,
                 parameter -> d_out_key_queue,
+                parameter -> d_out_value_queue,
                 parameter -> d_data_slice,
                 parameter -> frontier_attribute -> queue_length,
                 parameter -> frontier_attribute -> output_length.GetPointer(util::DEVICE),
@@ -521,6 +522,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
                 num_blocks,
                 parameter -> d_in_key_queue,
                 parameter -> d_out_key_queue,
+                parameter -> d_out_value_queue,
                 parameter -> d_data_slice,
                 parameter -> frontier_attribute -> queue_length,
                 parameter -> frontier_attribute -> output_length.GetPointer(util::DEVICE),
@@ -609,6 +611,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_LIGHT>
             parameter -> d_partitioned_scanned_edges, // TODO: +1?
             parameter -> d_in_key_queue,
             parameter -> d_out_key_queue,
+            parameter -> d_out_value_queue,
             parameter -> d_data_slice,
             parameter -> frontier_attribute -> queue_length,
             parameter -> frontier_attribute -> output_length.GetPointer(util::DEVICE),
@@ -668,7 +671,7 @@ template <typename KernelPolicy, typename Problem, typename Functor,
     REDUCE_OP   R_OP         = gunrock::oprtr::advance::NONE,
     REDUCE_TYPE R_TYPE       = gunrock::oprtr::advance::EMPTY>
 cudaError_t LaunchKernel(
-    gunrock::app::EnactorStats<typename KernelPolicy::SizeT>              
+    gunrock::app::EnactorStats<typename KernelPolicy::SizeT>
                                             &enactor_stats,
     gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                             &frontier_attribute,
