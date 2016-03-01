@@ -5,113 +5,51 @@ set(gunrock_VERSION_MINOR 3)
 set(gunrock_VERSION_PATCH 0)
 add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MINOR}.${gunrock_VERSION_PATCH}")
 
-set(gunrock_REQUIRED_CUDA_VERSION 7.5)
-set(gunrock_REQUIRED_BOOST_VERSION 1.56)
-set(gunrock_REQUIRED_METIS_VERSION 5.0)
-
 cmake_minimum_required(VERSION 2.8)
+
+# begin /* Suppress "deprecated auto_ptr" warnings caused by moderngpu */
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-deprecated-declarations")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
+add_definitions ("-Wno-deprecated-declarations")
+# end /* Suppress "deprecated auto_ptr" warnings caused by moderngpu */
 
 option(CMAKE_VERBOSE_MAKEFILE ON)
 
+# begin /* Find and set CUDA arch */
+set(gunrock_REQUIRED_CUDA_VERSION 7.5)
 FIND_PACKAGE(CUDA ${gunrock_REQUIRED_CUDA_VERSION} REQUIRED)
-
 if(CUDA_64_BIT_DEVICE_CODE)
   set(gunrock_arch_suffix x86_64)
 else()
   set(gunrock_arch_suffix i386)
 endif()
+# end /* Find and set CUDA arch */
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-
-FIND_PACKAGE(Boost ${gunrock_REQUIRED_BOOST_VERSION}
-  REQUIRED system filesystem timer chrono)
-if (Boost_FOUND)
-  include_directories(${Boost_INCLUDE_DIRS})
-  link_directories(${Boost_LIBRARY_DIRS})
-else()
-  message(WARNING "Boost was requested but support was not found, run
-  `sudo apt-get install libboost1.58-all-dev` `/dep/install_boost.sh` for installation.")
-endif ()
-
-FIND_LIBRARY(METIS_LIB NAMES metis)
-FIND_PACKAGE(Metis ${gunrock_REQUIRED_METIS_VERSION} REQUIRED)
-SET(METIS_FOUND FALSE)
-if (METIS_LIB)
-  set(METIS_FOUND TRUE)
-  add_definitions( -DMETIS_FOUND=true )
-  message(STATUS "Found Metis")
-else (METIS_LIB)
-  add_definitions( -DMETIS_FOUND=false )
-  message(WARNING "Metis was requested but support was not found,
-  run `sudo apt-get install metis` or `/dep/install_metis.sh` for installation.")
-endif (METIS_LIB)
-
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  # also see how to do overrides:
-  # https://gist.github.com/robertmaynard/11297565
-
-  # updated for CUDA 7, which uses libc++ rather than libstdc++
-  # older settings: check the git history
-  set(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} 	 /opt/local/lib /opt/local/lib/libomp)
-  set(CMAKE_INCLUDE_PATH ${CMAKE_INCLUDE_PATH} 	 /opt/local/include /opt/local/include/libomp)
-
-  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-
-    #added for OpenMP on OS X using Macports
-    FIND_PATH(OPENMP_INCLUDE omp.h PATHS ${CMAKE_INCLUDE_PATH})
-    FIND_LIBRARY(OPENMP_LIB NAMES libgomp.dylib libomp.dylib libiomp5.dylib PATHS ${CMAKE_LIBRARY_PATH})
-    if (OPENMP_INCLUDE OR OPENMP_LIB)
-
-      link_directories("/opt/local/lib" "/opt/local/lib/libomp")
-      include_directories("/opt/local/include" "/opt/local/include/libomp")
-
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-      message(STATUS "Found OpenMP (-libomp)")
-    else()
-      message(WARNING "OpenMP (-libomp) was requested but support was not found")
-    endif(OPENMP_INCLUDE OR OPENMP_LIB)
-
-  endif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-
-else()
-
-  #added for OpenMP on Linux
-  FIND_PACKAGE(OpenMP)
-  if(OPENMP_FOUND)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    message(STATUS "Found OpenMP")
-  else()
-    message(WARNING "OpenMP was requested but support was not found")
-  endif()
-endif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+# begin /* Include Boost, OpenMP & Metis */
+include(${CMAKE_SOURCE_DIR}/cmake/FindBoostHeaders.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/FindBoost.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/FindOpenMP.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/FindMetis.cmake)
+# end /* Include Boost, OpenMP & Metis */
 
 # begin /* How can I pass git SHA1 to compiler as definition using cmake? */
 # http://stackoverflow.com/questions/1435953/how-can-i-pass-git-sha1-to-compiler-as-definition-using-cmake/4318642#4318642
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 include(GetGitRevisionDescription)
 get_git_head_revision(GIT_REFSPEC GIT_SHA1)
 # end /* How can I pass git SHA1 to compiler as definition using cmake? */
 
+# begin /* Include gunrock directories ./ */
 set(gunrock_INCLUDE_DIRS
   ${CMAKE_SOURCE_DIR})
 include_directories(${gunrock_INCLUDE_DIRS})
+# end /* Include gunrock directories ./ */
 
-set(mgpu_INCLUDE_DIRS
-  ${CMAKE_SOURCE_DIR}/externals/moderngpu/include
-  CACHE PATH
-  "Directory to the Modern GPU include files")
-
-set(mgpu_SOURCE_DIRS
-  ${CMAKE_SOURCE_DIR}/externals/moderngpu/src
-  CACHE PATH
-  "Directory to the Modern GPU source files")
-
-set(cub_INCLUDE_DIRS
-  ${CMAKE_SOURCE_DIR}/externals/cub
-  CACHE PATH
-  "Directory to the CUB include files")
+# begin /* Include moderngpu & cub */
+include(${CMAKE_SOURCE_DIR}/cmake/FindModernGPU.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/FindCUB.cmake)
+# end /* Include moderngpu & cub */
 
 ## Set the directory where the binaries will be stored
 set(EXECUTABLE_OUTPUT_PATH
@@ -125,6 +63,7 @@ set(LIBRARY_OUTPUT_PATH
   CACHE PATH
   "Directory where all the libraries will be stored")
 
+# begin /* SET GENCODE_SM */
 set(GENCODE_SM10
   -gencode=arch=compute_10,code=sm_10 -gencode=arch=compute_10,code=compute_10)
 set(GENCODE_SM13
@@ -139,9 +78,10 @@ set(GENCODE_SM37
   -gencode=arch=compute_37,code=sm_37 -gencode=arch=compute_37,code=compute_37)
 set(GENCODE_SM50
   -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_50,code=compute_50)
-
 #set(GENCODE -gencode=arch=compute_10,code=compute_10) # at least generate PTX
+# end /* SET GENCODE_SM */
 
+# begin /* Configure GUNROCK build options */
 option(GUNROCK_BUILD_LIB
   "On to build library"
   ON)
@@ -217,6 +157,7 @@ endif(GUNROCK_GENCODE_SM50)
 if (CUDA_VERBOSE_PTXAS)
   set(VERBOSE_PTXAS --ptxas-options=-v)
 endif (CUDA_VERBOSE_PTXAS)
+# end /* Configure GUNROCK build options */
 
 # c++11 is required
 set(CUDA_NVCC_FLAGS -std=c++11)
@@ -240,6 +181,7 @@ if(GUNROCK_BUILD_LIB)
   add_subdirectory(gunrock)
 endif(GUNROCK_BUILD_LIB)
 
+# begin /* Add premitives' subdirectories */
 if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(shared_lib_tests)
   #add_subdirectory(simple_example)
@@ -258,6 +200,7 @@ if(GUNROCK_BUILD_APPLICATIONS)
   #add_subdirectory(tests/vis)
   #add_subdirectory(tests/mis)
 endif(GUNROCK_BUILD_APPLICATIONS)
+# end /* Add premitives' subdirectories */
 
 enable_testing()
 
