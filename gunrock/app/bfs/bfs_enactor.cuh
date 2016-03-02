@@ -610,11 +610,11 @@ static CUT_THREADPROC BFSThread(
         CUT_THREADEND;
     }
 
-    thread_data->status = ThreadSlice::Status::Ideal;
+    thread_data->status = ThreadSlice::Status::Idle;
     while (thread_data -> status != ThreadSlice::Status::ToKill)
     {
         while (thread_data -> status == ThreadSlice::Status::Wait ||
-               thread_data -> status == ThreadSlice::Status::Ideal)
+               thread_data -> status == ThreadSlice::Status::Idle)
         {
             //sleep(0);
             std::this_thread::yield();
@@ -638,7 +638,7 @@ static CUT_THREADPROC BFSThread(
             Problem::MARK_PREDECESSORS ? 2 : 1, 0>
             (thread_data);
         // printf("BFS_Thread finished\n");fflush(stdout);
-        thread_data -> status = ThreadSlice::Status::Ideal;
+        thread_data -> status = ThreadSlice::Status::Idle;
     }
 
     thread_data->status = ThreadSlice::Status::Ended;
@@ -790,7 +790,7 @@ public:
 
         for (int gpu=0; gpu < this->num_gpus; gpu++)
         {
-            while (thread_slices[gpu].status != ThreadSlice::Status::Ideal)
+            while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
             {
                 std::this_thread::yield();
             }
@@ -856,7 +856,7 @@ public:
         }
         for (int gpu=0; gpu< this->num_gpus; gpu++)
         {
-            while (thread_slices[gpu].status != ThreadSlice::Status::Ideal)
+            while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
             {
                 std::this_thread::yield();
             }
@@ -990,17 +990,17 @@ public:
         {
             if (Problem::ENABLE_IDEMPOTENCE)
             {
-//                if (traversal_mode == 0)
+                if (traversal_mode == 0)
                     return EnactBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
-//                else
-//                    return EnactBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
+                else
+                    return EnactBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
             }
             else
             {
-//                if (traversal_mode == 0)
+                if (traversal_mode == 0)
                     return EnactBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(src);
-//                else
-//                    return EnactBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(src);
+                else
+                    return EnactBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(src);
             }
         }
 
@@ -1043,21 +1043,21 @@ public:
         {
             if (Problem::ENABLE_IDEMPOTENCE)
             {
-//                if (traversal_mode == 0)
+                if (traversal_mode == 0)
                     return InitBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
                             context, problem, max_grid_size);
-//                else
-//                    return InitBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
-//                            context, problem, max_grid_size);
+                else
+                    return InitBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
+                            context, problem, max_grid_size);
             }
             else
             {
-//                if (traversal_mode == 0)
+                if (traversal_mode == 0)
                     return InitBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(
                             context, problem, max_grid_size);
-//                else
-//                    return InitBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(
-//                            context, problem, max_grid_size);
+                else
+                    return InitBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(
+                            context, problem, max_grid_size);
             }
         }
 

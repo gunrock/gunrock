@@ -32,7 +32,7 @@ namespace pr {
  */
 template <
     typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId>
-struct PRMarkerFunctor 
+struct PRMarkerFunctor
 {
     typedef typename Problem::DataSlice DataSlice;
     typedef _LabelT LabelT;
@@ -50,14 +50,14 @@ struct PRMarkerFunctor
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
     static __device__ __forceinline__ bool CondEdge(
-        VertexId   s_id, 
-        VertexId   d_id, 
+        VertexId   s_id,
+        VertexId   d_id,
         DataSlice *d_data_slice,
-        SizeT      edge_id, 
+        SizeT      edge_id,
         VertexId   input_item,
         LabelT     label,
         SizeT      input_pos,
-        SizeT     &output_pos) 
+        SizeT     &output_pos)
     {
         //return (problem->degrees[d_id] > 0 && problem->degrees[s_id] > 0);
         return true;
@@ -76,22 +76,40 @@ struct PRMarkerFunctor
      *
      */
     static __device__ __forceinline__ void ApplyEdge(
-        VertexId   s_id, 
-        VertexId   d_id, 
+        VertexId   s_id,
+        VertexId   d_id,
         DataSlice *d_data_slice,
-        SizeT      edge_id, 
+        SizeT      edge_id,
         VertexId   input_item,
         LabelT     label,
         SizeT      input_pos,
-        SizeT     &output_pos) 
+        SizeT     &output_pos)
         //VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
-        //VertexId e_id = 0, VertexId e_id_in = 0) 
+        //VertexId e_id = 0, VertexId e_id_in = 0)
     {
         //atomicAdd(problem->rank_next + d_id, problem->rank_curr[s_id]/problem->degrees[s_id]);
         d_data_slice -> markers[d_id] = 1;
         //if (util::to_track(d_id))
         //    printf("%d\t marker[%lld] -> 1\n", problem->gpu_idx, (long long)d_id);
     }
+};
+
+template <typename T>
+struct Make4Vector
+{
+    typedef int4 V4;
+};
+
+template <>
+struct Make4Vector<float>
+{
+    typedef float4 V4;
+};
+
+template <>
+struct Make4Vector<double>
+{
+    typedef double4 V4;
 };
 
 /**
@@ -104,11 +122,11 @@ struct PRMarkerFunctor
  *
  */
 template <
-    typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId >
-struct PRFunctor 
+    typename VertexId, typename SizeT, typename Value, typename Problem> //typename _LabelT = VertexId >
+struct PRFunctor
 {
     typedef typename Problem::DataSlice DataSlice;
-    typedef _LabelT LabelT;
+    typedef typename Make4Vector<Value>::V4 LabelT;
 
     /**
      * @brief Forward Edge Mapping condition function. Check if the
@@ -124,16 +142,16 @@ struct PRFunctor
      *         include the destination node in the next frontier.
      */
     static __device__ __forceinline__ bool CondEdge(
-        VertexId   s_id, 
-        VertexId   d_id, 
+        VertexId   s_id,
+        VertexId   d_id,
         DataSlice *d_data_slice,
-        SizeT      edge_id, 
+        SizeT      edge_id,
         VertexId   input_item,
         LabelT     label,
         SizeT      input_pos,
-        SizeT     &output_pos) 
+        SizeT     &output_pos)
         //VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
-        //VertexId e_id = 0, VertexId e_id_in = 0) 
+        //VertexId e_id = 0, VertexId e_id_in = 0)
     {
         //return (problem->degrees[d_id] > 0 && problem->degrees[s_id] > 0);
         return true;
@@ -152,16 +170,16 @@ struct PRFunctor
      *
      */
     static __device__ __forceinline__ void ApplyEdge(
-        VertexId   s_id, 
-        VertexId   d_id, 
+        VertexId   s_id,
+        VertexId   d_id,
         DataSlice *d_data_slice,
-        SizeT      edge_id, 
+        SizeT      edge_id,
         VertexId   input_item,
         LabelT     label,
         SizeT      input_pos,
-        SizeT     &output_pos) 
+        SizeT     &output_pos)
         //VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
-        //VertexId e_id = 0, VertexId e_id_in = 0) 
+        //VertexId e_id = 0, VertexId e_id_in = 0)
     {
         Value add_value = d_data_slice -> rank_curr[s_id] / d_data_slice->degrees[s_id];
         if (isfinite(add_value))
@@ -169,7 +187,7 @@ struct PRFunctor
             Value old_value = atomicAdd(d_data_slice->rank_next + d_id, add_value);
             //printf("%d\t (%d, %d) rank_next[%d] += rank_curr[%d] (=%.8le) / %lld, old_value = %.8le\n",
             //    d_data_slice -> gpu_idx, blockIdx.x, threadIdx.x,
-            //    d_id, s_id, d_data_slice -> rank_curr[s_id], 
+            //    d_id, s_id, d_data_slice -> rank_curr[s_id],
             //    (long long) d_data_slice -> degrees[s_id], old_value);
             //if (to_track(d_id))
             //{
@@ -191,7 +209,14 @@ struct PRFunctor
      *         include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondFilter(
-        VertexId node, DataSlice *d_data_slice, Value v = 0, SizeT nid = 0) 
+        VertexId   v,
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+        //VertexId node, DataSlice *d_data_slice, Value v = 0, SizeT nid = 0)
     {
         Value    old_value = d_data_slice -> rank_curr[node];
         Value    new_value = d_data_slice -> delta * d_data_slice -> rank_next[node];
@@ -212,7 +237,14 @@ struct PRFunctor
      *
      */
     static __device__ __forceinline__ void ApplyFilter(
-        VertexId node, DataSlice *d_data_slice, Value v = 0, SizeT nid = 0) 
+        VertexId   v,
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+        //VertexId node, DataSlice *d_data_slice, Value v = 0, SizeT nid = 0)
     {
         // Doing nothing here
     }
@@ -229,7 +261,7 @@ struct PRFunctor
  */
 template <
     typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId >
-struct RemoveZeroDegreeNodeFunctor 
+struct RemoveZeroDegreeNodeFunctor
 {
     typedef typename Problem::DataSlice DataSlice;
     typedef _LabelT  LabelT;
@@ -246,16 +278,16 @@ struct RemoveZeroDegreeNodeFunctor
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
     static __device__ __forceinline__ bool CondEdge(
-        VertexId   s_id, 
-        VertexId   d_id, 
+        VertexId   s_id,
+        VertexId   d_id,
         DataSlice *d_data_slice,
-        SizeT      edge_id, 
+        SizeT      edge_id,
         VertexId   input_item,
         LabelT     label,
         SizeT      input_pos,
-        SizeT     &output_pos) 
+        SizeT     &output_pos)
         //VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
-        //VertexId e_id = 0, VertexId e_id_in = 0) 
+        //VertexId e_id = 0, VertexId e_id_in = 0)
     {
         return (d_data_slice->degrees[d_id] == 0);
     }
@@ -273,16 +305,16 @@ struct RemoveZeroDegreeNodeFunctor
      *
      */
     static __device__ __forceinline__ void ApplyEdge(
-        VertexId   s_id, 
-        VertexId   d_id, 
+        VertexId   s_id,
+        VertexId   d_id,
         DataSlice *d_data_slice,
-        SizeT      edge_id, 
+        SizeT      edge_id,
         VertexId   input_item,
         LabelT     label,
         SizeT      input_pos,
-        SizeT     &output_pos) 
+        SizeT     &output_pos)
         //VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
-        //VertexId e_id = 0, VertexId e_id_in = 0) 
+        //VertexId e_id = 0, VertexId e_id_in = 0)
     {
         atomicAdd(d_data_slice -> degrees_pong + s_id, -1);
     }
@@ -297,7 +329,14 @@ struct RemoveZeroDegreeNodeFunctor
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondFilter(
-        VertexId node, DataSlice *d_data_slice, Value v = 0) 
+        VertexId   v,
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+        //VertexId node, DataSlice *d_data_slice, Value v = 0)
     {
         //SizeT degree = problem->degrees[node];
         //if (degree == 0)
@@ -316,7 +355,14 @@ struct RemoveZeroDegreeNodeFunctor
      *
      */
     static __device__ __forceinline__ void ApplyFilter(
-        VertexId node, DataSlice *d_data_slice, Value v = 0, SizeT nid = 0) 
+        VertexId   v,
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+        //VertexId node, DataSlice *d_data_slice, Value v = 0, SizeT nid = 0)
     {
         // Doing nothing here
     }

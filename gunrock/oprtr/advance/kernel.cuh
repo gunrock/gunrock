@@ -261,30 +261,35 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::TWC_FORWARD>
          // Load Thread Warp CTA Forward Kernel
         gunrock::oprtr::edge_map_forward::Kernel
             <typename Parameter::KernelPolicy::THREAD_WARP_CTA_FORWARD,
-            Parameter::Problem,
-            Parameter::Functor>
+            typename Parameter::Problem,
+            typename Parameter::Functor,
+            Parameter::ADVANCE_TYPE,
+            Parameter::R_TYPE,
+            Parameter::R_OP>
             <<< parameter -> enactor_stats -> advance_grid_size,
             Parameter::KernelPolicy::THREAD_WARP_CTA_FORWARD::THREADS,
-            0, parameter -> stream>>>(
+            0,
+            parameter -> stream>>>(
             parameter -> frontier_attribute -> queue_reset,
             (VertexId) parameter -> frontier_attribute -> queue_index, // TODO: match this type
             parameter -> label,//(int) parameter -> enactor_stats -> iteration,        // TODO: match this type
-            parameter -> frontier_attribute -> queue_length,
-            parameter -> d_in_key_queue,              // d_in_queue
-            parameter -> d_out_value_queue,          // d_pred_out_queue
-            parameter -> d_out_key_queue,            // d_out_queue
             parameter -> d_row_offsets,
+            parameter -> d_column_offsets,
             parameter -> d_column_indices,
             parameter -> d_row_indices,
+            parameter -> d_in_key_queue,              // d_in_queue
+            parameter -> d_out_key_queue,            // d_out_queue
+            parameter -> d_out_value_queue,          // d_pred_out_queue
             parameter -> d_data_slice,
-            parameter -> work_progress[0],
+            parameter -> frontier_attribute -> queue_length,
             parameter -> max_in,                   // max_in_queue
             parameter -> max_out,                 // max_out_queue
+            parameter -> work_progress[0],
             parameter -> enactor_stats -> advance_kernel_stats,
-            Parameter::ADVANCE_TYPE,
+            //Parameter::ADVANCE_TYPE,
             parameter -> input_inverse_graph,
-            Parameter::R_TYPE,
-            Parameter::R_OP,
+            //Parameter::R_TYPE,
+            //Parameter::R_OP,
             parameter -> d_value_to_reduce,
             parameter -> d_reduce_frontier);
 

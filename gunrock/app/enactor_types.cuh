@@ -101,13 +101,13 @@ struct EnactorStats
               .Setup(advance_grid_size)) return retval;
         if (retval = filter_kernel_stats
               .Setup(filter_grid_size )) return retval;
-        if (retval = node_locks    
+        if (retval = node_locks
               .Allocate(node_lock_size + 1, util::DEVICE)) return retval;
         if (retval = node_locks_out
               .Allocate(node_lock_size + 1, util::DEVICE)) return retval;
-        if (retval = nodes_queued  
+        if (retval = nodes_queued
               .Allocate(1, util::DEVICE | util::HOST)) return retval;
-        if (retval = edges_queued  
+        if (retval = edges_queued
               .Allocate(1, util::DEVICE | util::HOST)) return retval;
         return retval;
     }
@@ -219,7 +219,7 @@ public:
         Start,
         Wait,
         Running,
-        Ideal,
+        Idle,
         ToKill,
         Ended
     };

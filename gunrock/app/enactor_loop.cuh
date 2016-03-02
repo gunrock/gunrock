@@ -70,9 +70,9 @@ void Iteration_Loop(
                  *frontier_attribute   = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
     FrontierAttribute<SizeT>
                  *s_frontier_attribute = &(enactor     -> frontier_attribute [0         ]);
-    EnactorStats<SizeT> 
+    EnactorStats<SizeT>
                  *enactor_stats        = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
-    EnactorStats<SizeT> 
+    EnactorStats<SizeT>
                  *s_enactor_stats      = &(enactor     -> enactor_stats      [0         ]);
     util::CtaWorkProgressLifetime<SizeT>
                  *work_progress        = &(enactor     -> work_progress      [thread_num * num_gpus]);
@@ -91,7 +91,7 @@ void Iteration_Loop(
     Frontier     *frontier_queue_      =   NULL;
     FrontierAttribute<SizeT>
                  *frontier_attribute_  =   NULL;
-    EnactorStats<SizeT> 
+    EnactorStats<SizeT>
                  *enactor_stats_       =   NULL;
     util::CtaWorkProgressLifetime<SizeT>
                  *work_progress_       =   NULL;
@@ -184,8 +184,8 @@ void Iteration_Loop(
                             stages[peer__]=2;
                         }
                         break;
-                    } else if ((iteration==0 || data_slice->out_length[peer_]==0) 
-                        && peer__>num_gpus) 
+                    } else if ((iteration==0 || data_slice->out_length[peer_]==0)
+                        && peer__>num_gpus)
                     {
                         Set_Record(data_slice, iteration, peer_, 0, streams[peer__]);
                         stages[peer__]=3;
@@ -198,7 +198,7 @@ void Iteration_Loop(
                         {   to_show[peer__]=false;stages[peer__]--;break;}
 
                         s_data_slice[peer]->events_set[iteration_][gpu_][0]=false;
-                        frontier_attribute_->queue_length = 
+                        frontier_attribute_->queue_length =
                             data_slice->in_length[iteration%2][peer_];
                         data_slice->in_length[iteration%2][peer_]=0;
                         if (frontier_attribute_->queue_length ==0)
@@ -292,16 +292,20 @@ void Iteration_Loop(
                         //printf("moving output_length\n");
                         frontier_attribute_ -> output_length.Move(
                             util::DEVICE, util::HOST,1,0,streams[peer_]);
-                    }
+                    //}
 
-                    if (enactor -> size_check)
-                    {
+                    //if (enactor -> size_check)
+                    //{
                         Set_Record(data_slice, iteration, peer_, stages[peer_], streams[peer_]);
                     }
                     break;
 
                 case 2: //SubQueue Core
-                    if (enactor -> size_check)
+                    if (enactor -> size_check ||
+                        (Iteration::AdvanceKernelPolicy::ADVANCE_MODE
+                            != oprtr::advance::TWC_FORWARD &&
+                         Iteration::AdvanceKernelPolicy::ADVANCE_MODE
+                            != oprtr::advance::TWC_BACKWARD))
                     {
                         if (enactor_stats_ -> retval = Check_Record (
                             data_slice, iteration, peer_,
@@ -316,6 +320,7 @@ void Iteration_Loop(
                         }*/
                         //printf("iteration = %lld, request_size = %d\n",
                         //    enactor_stats_ -> iteration, frontier_attribute_->output_length[0]);
+                        if (enactor -> size_check)
                         Iteration::Check_Queue_Size(
                             enactor,
                             thread_num,
@@ -485,7 +490,7 @@ void Iteration_Loop(
 
                 offset = frontier_attribute[0].queue_length;
                 for (peer_ = 1; peer_ < num_gpus; peer_++)
-                if (frontier_attribute[peer_].queue_length !=0) 
+                if (frontier_attribute[peer_].queue_length !=0)
                 {
                     util::MemsetCopyVectorKernel<<<256,256, 0, streams[0]>>>(
                         data_slice->frontier_queues[0    ]
@@ -517,7 +522,7 @@ void Iteration_Loop(
                 peer_               = 0;
                 frontier_queue_     = &(data_slice->frontier_queues
                     [(enactor -> size_check || num_gpus==1) ? 0 : num_gpus]);
-                scanned_edges_      = &(data_slice->scanned_edges  
+                scanned_edges_      = &(data_slice->scanned_edges
                     [(enactor -> size_check || num_gpus==1) ? 0 : num_gpus]);
                 frontier_attribute_ = &(frontier_attribute[peer_]);
                 enactor_stats_      = &(enactor_stats[peer_]);
@@ -705,9 +710,9 @@ public:
     typedef typename Enactor::VertexId   VertexId  ;
     typedef typename Enactor::Problem    Problem   ;
     typedef typename Problem::DataSlice  DataSlice ;
-    typedef GraphSlice<VertexId, SizeT, Value> 
+    typedef GraphSlice<VertexId, SizeT, Value>
                                          GraphSliceT;
-    typedef util::DoubleBuffer<VertexId, SizeT, Value> 
+    typedef util::DoubleBuffer<VertexId, SizeT, Value>
                                          Frontier;
     //static const bool INSTRUMENT = Enactor::INSTRUMENT;
     //static const bool DEBUG      = Enactor::DEBUG;
@@ -954,21 +959,21 @@ public:
 
         if (enactor_stats->retval =
             Check_Size</*true,*/ SizeT, VertexId > (
-                true, "queue3", request_length, &frontier_queue->keys  [selector^1], 
+                true, "queue3", request_length, &frontier_queue->keys  [selector^1],
                 over_sized, thread_num, iteration, peer_, false)) return;
         if (enactor_stats->retval =
             Check_Size</*true,*/ SizeT, VertexId > (
-                true, "queue3", request_length, &frontier_queue->keys  [selector  ], 
+                true, "queue3", request_length, &frontier_queue->keys  [selector  ],
                 over_sized, thread_num, iteration, peer_, true )) return;
         if (enactor -> problem -> use_double_buffer)
         {
             if (enactor_stats->retval =
                 Check_Size</*true,*/ SizeT, Value> (
-                    true, "queue3", request_length, &frontier_queue->values[selector^1], 
+                    true, "queue3", request_length, &frontier_queue->values[selector^1],
                     over_sized, thread_num, iteration, peer_, false)) return;
             if (enactor_stats->retval =
                 Check_Size</*true,*/ SizeT, Value> (
-                    true, "queue3", request_length, &frontier_queue->values[selector  ], 
+                    true, "queue3", request_length, &frontier_queue->values[selector  ],
                     over_sized, thread_num, iteration, peer_, true )) return;
         }
     }
@@ -1035,16 +1040,16 @@ public:
         {
             if (enactor_stats->retval =
                 Check_Size<SizeT, SizeT> (
-                    enactor -> size_check, "keys_marker", 
-                    num_elements, &data_slice->keys_marker[peer_], 
-                    over_sized, thread_num, enactor_stats->iteration, peer_)) 
+                    enactor -> size_check, "keys_marker",
+                    num_elements, &data_slice->keys_marker[peer_],
+                    over_sized, thread_num, enactor_stats->iteration, peer_))
                 break;
-            if (over_sized) 
-                data_slice->keys_markers[peer_] = 
+            if (over_sized)
+                data_slice->keys_markers[peer_] =
                     data_slice->keys_marker[peer_].GetPointer(util::DEVICE);
         }
         if (enactor_stats->retval) return;
-        if (over_sized) 
+        if (over_sized)
             data_slice->keys_markers.Move(util::HOST, util::DEVICE, num_gpus, 0, stream);
 
         for (t=0; t<2; t++)
@@ -1118,14 +1123,14 @@ public:
                             data_slice->out_length[peer_] + t_out_length[peer_],
                             &data_slice->vertex_associate_out[peer_][i],
                             over_sized, thread_num, enactor_stats->iteration, peer_),
-                            data_slice->out_length[peer_]==0? false: true) 
+                            data_slice->out_length[peer_]==0? false: true)
                         break;
-                    if (over_sized) 
-                        data_slice->vertex_associate_outs[peer_][i] = 
+                    if (over_sized)
+                        data_slice->vertex_associate_outs[peer_][i] =
                             data_slice->vertex_associate_out[peer_][i].GetPointer(util::DEVICE);
                 }
                 if (enactor_stats->retval) break;
-                if (over_sized) 
+                if (over_sized)
                     data_slice->vertex_associate_outs[peer_].Move(
                         util::HOST, util::DEVICE, NUM_VERTEX_ASSOCIATES, 0, stream);
 
@@ -1139,17 +1144,17 @@ public:
                             &data_slice->value__associate_out[peer_][i],
                             over_sized, thread_num, enactor_stats->iteration, peer_,
                             data_slice->out_length[peer_]==0? false: true)) break;
-                    if (over_sized) 
-                        data_slice->value__associate_outs[peer_][i] = 
+                    if (over_sized)
+                        data_slice->value__associate_outs[peer_][i] =
                             data_slice->value__associate_out[peer_][i].GetPointer(util::DEVICE);
                 }
                 if (enactor_stats->retval) break;
-                if (over_sized) 
+                if (over_sized)
                     data_slice->value__associate_outs[peer_].Move(
                         util::HOST, util::DEVICE, NUM_VALUE__ASSOCIATES, 0, stream);
             }
             if (enactor_stats->retval) break;
-            if (keys_over_sized) 
+            if (keys_over_sized)
                 data_slice->keys_outs.Move(util::HOST, util::DEVICE, num_gpus, 0, stream);
 
             offset = 0;
@@ -1190,7 +1195,7 @@ public:
             data_slice->make_out_array.Move(util::HOST, util::DEVICE, offset, 0, stream);
 
             if (BACKWARD && t==1)
-                Make_Out_Backward<VertexId, SizeT, Value, 
+                Make_Out_Backward<VertexId, SizeT, Value,
                     NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
                     <<<grid_size, block_size, sizeof(char)*offset, stream>>> (
                     num_elements,
@@ -1202,7 +1207,7 @@ public:
                     offset,
                     data_slice    -> make_out_array      .GetPointer(util::DEVICE));
             else if (FORWARD && t==0)
-                Make_Out<VertexId, SizeT, Value, 
+                Make_Out<VertexId, SizeT, Value,
                     NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
                     <<<grid_size, block_size, sizeof(char)*offset, stream>>> (
                     num_elements,

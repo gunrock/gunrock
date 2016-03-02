@@ -399,7 +399,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     for (int iter = 0; iter < iterations; ++iter)
     {
         if (retval = util::GRError(problem->Reset(
-            src, enactor->GetFrontierType(), 
+            src, enactor->GetFrontierType(),
             max_queue_sizing, max_queue_sizing1),
             "SSSP Problem Data Reset Failed", __FILE__, __LINE__))
             return retval;
@@ -425,7 +425,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         {
             printf("--------------------------\n"
                 "iteration %d elapsed: %lf ms\n",
-                iter, single_elapsed); 
+                iter, single_elapsed);
             fflush(stdout);
         }
     }
@@ -531,20 +531,20 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
     // Clean up
     if (org_size        ) {delete[] org_size        ; org_size         = NULL;}
-    if (enactor         )   
-    {   
+    if (enactor         )
+    {
         if (retval = util::GRError(enactor -> Release(),
             "BFS Enactor Release failed", __FILE__, __LINE__))
             return retval;
         delete   enactor         ; enactor          = NULL;
-    }   
-    if (problem         )   
-    {   
+    }
+    if (problem         )
+    {
         if (retval = util::GRError(problem -> Release(),
             "BFS Problem Release failed", __FILE__, __LINE__))
             return retval;
         delete   problem         ; problem          = NULL;
-    } 
+    }
     if (reference_labels) {delete[] reference_labels; reference_labels = NULL;}
     if (h_labels        ) {delete[] h_labels        ; h_labels         = NULL;}
     if (reference_preds ) {delete[] reference_preds ; reference_preds  = NULL;}
@@ -628,7 +628,7 @@ int main_Value(CommandLineArgs *args)
 // Disabled becaus atomicMin(long long*, long long) is not available
 //    if (args -> CheckCmdLineFlag("64bit-Value"))
 //        return main_<VertexId, SizeT, long long>(args);
-//    else 
+//    else
         return main_<VertexId, SizeT, int      >(args);
 }
 
@@ -637,9 +637,9 @@ template <
 int main_SizeT(CommandLineArgs *args)
 {
 // disabled to reduce compile time
-//    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-//        return main_Value<VertexId, long long>(args);
-//    else
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_Value<VertexId, long long>(args);
+    else
         return main_Value<VertexId, int      >(args);
 }
 
@@ -648,7 +648,7 @@ int main_VertexId(CommandLineArgs *args)
     // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
     //if (args -> CheckCmdLineFlag("64bit-VertexId"))
     //    return main_SizeT<long long>(args);
-    //else 
+    //else
         return main_SizeT<int      >(args);
 }
 

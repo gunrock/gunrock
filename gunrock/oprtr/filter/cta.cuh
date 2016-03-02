@@ -182,29 +182,31 @@ struct Cta
                     unsigned char tex_mask_byte = tex1Dfetch(
                         BitmaskTex<unsigned char>::ref,//cta->t_bitmask[0],
                         mask_byte_offset);
+                    //unsigned char tex_mask_byte = cta->d_visited_mask[mask_byte_offset];
 
                     if (mask_bit & tex_mask_byte)
                     {
                         // Seen it
                         tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
                     } else {
-                        unsigned char mask_byte;
+                        //unsigned char mask_byte = tex_mask_byte;
                         //util::io::ModifiedLoad<util::io::ld::cg>::Ld(
                         //    mask_byte, cta->d_visited_mask + mask_byte_offset);
-                        mask_byte = cta->d_visited_mask[mask_byte_offset];
+                        //mask_byte = cta->d_visited_mask[mask_byte_offset];
 
-                        mask_byte |= tex_mask_byte;
+                        //mask_byte |= tex_mask_byte;
 
-                        if (mask_bit & mask_byte) {
+                        //if (mask_bit & mask_byte) {
                             // Seen it
-                            tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
-                        } else {
+                        //    tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
+                        //} else {
                             // Update with best effort
-                            mask_byte |= mask_bit;
+                            //mask_byte |= mask_bit;
+                            tex_mask_byte |= mask_bit;
                             util::io::ModifiedStore<util::io::st::cg>::St(
-                                mask_byte,
+                                tex_mask_byte, //mask_byte,
                                 cta->d_visited_mask + mask_byte_offset);
-                        }
+                        //}
                     }
                 }
 
@@ -212,31 +214,31 @@ struct Cta
                 Iterate<LOAD, VEC + 1>::BitmaskCull(cta, tile);
             }
 
-            /**
-             * @brief Set vertex id to -1 if we want to cull this vertex from the outgoing frontier.
-             * @param[in] cta
-             * @param[in] tile
-             *
-             */
-            static __device__ __forceinline__ void VertexCull(
-                Cta *cta,
-                Tile *tile)
+            template <typename DummyT, bool ENABLE_IDEMPOTENCE>
+            struct VertexC
             {
-                //VertexId row_id = tile->element_id[LOAD][VEC];
-                //SizeT node_id = util::InvalidValue<SizeT>();
-                //if (!util::isValid(row_id)) return;
-                if (Problem::ENABLE_IDEMPOTENCE)// && util::isValid(cta->label))
+                static __device__ __forceinline__ void Cull(
+                    Cta* cta, Tile *tile)
+                {}
+            };
+
+            template <typename DummyT>
+            struct VertexC<DummyT, true>
+            {
+                static __device__ __forceinline__ void Cull(
+                    Cta* cta, Tile *tile)
                 {
                     if (tile -> element_id[LOAD][VEC] >= 0)//util::isValid(row_id))//tile->element_id[LOAD][VEC]))
                     {
                         VertexId row_id = (tile->element_id[LOAD][VEC] & KernelPolicy::ELEMENT_ID_MASK);///cta->num_gpus;
                         //row_id = row_id & KernelPolicy::ELEMENT_ID_MASK;
 
-                        LabelT label;
-                        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
-                            label,
-                            cta->d_data_slice ->labels + row_id);
-                        if (label != util::MaxValue<LabelT>())
+                        //LabelT label;
+                        //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                        //    label,
+                        //    cta->d_data_slice ->labels + row_id);
+                        //if (label != util::MaxValue<LabelT>())
+                        if (cta -> d_data_slice -> labels[row_id] != util::MaxValue<LabelT>())
                         {
                             // Seen it
                             tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
@@ -281,7 +283,15 @@ struct Cta
                             }
                         }
                     }
-                } else {
+                }
+            };
+
+            template <typename DummyT>
+            struct VertexC<DummyT, false>
+            {
+                static __device__ __forceinline__ void Cull(
+                    Cta* cta, Tile *tile)
+                {
                     if (util::isValid(tile->element_id[LOAD][VEC]))
                     {
                         // Row index on our GPU (for multi-gpu, element ids are striped across GPUs)
@@ -309,27 +319,20 @@ struct Cta
                         else tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
                     }
                 }
+            };
 
-                /*if (util::isValid(row_id))
-                {
-                    if (Functor::CondFilter(
-                        tile->pred_id[LOAD][VEC],
-                        row_id, cta->d_data_slice,
-                        node_id,
-                        cta->label,
-                        util::InvalidValue<SizeT>(),
-                        util::InvalidValue<SizeT>()))
-                    Functor::ApplyFilter(
-                        tile->pred_id[LOAD][VEC],
-                        row_id, cta->d_data_slice,
-                        node_id,
-                        cta->label,
-                        util::InvalidValue<SizeT>(),
-                        util::InvalidValue<SizeT>());
-                    else tile -> element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
-                } else {
-                    tile -> element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
-                }*/
+            /**
+             * @brief Set vertex id to -1 if we want to cull this vertex from the outgoing frontier.
+             * @param[in] cta
+             * @param[in] tile
+             *
+             */
+            static __device__ __forceinline__ void VertexCull(
+                Cta *cta,
+                Tile *tile)
+            {
+                VertexC<SizeT, Problem::ENABLE_IDEMPOTENCE>::Cull(cta, tile);
+
                 // Next
                 Iterate<LOAD, VEC + 1>::VertexCull(cta, tile);
             }
@@ -499,6 +502,35 @@ struct Cta
     // Methods
     //---------------------------------------------------------------------
 
+    template <typename LabelT, bool ENABLE_IDEMPOTENCE>
+    struct BitMask_Cull
+    {
+        static __device__ __forceinline__ bool Eval(LabelT label)
+        {return false;}
+    };
+
+    template <typename LabelT>
+    struct BitMask_Cull<LabelT, true>
+    {
+        static __device__ __forceinline__ bool Eval(LabelT label)
+        {
+            if (KernelPolicy::END_BITMASK_CULL < 0)
+                return true;
+            else if (KernelPolicy::END_BITMASK_CULL == 0)
+                return false;
+            else return (label < KernelPolicy::END_BITMASK_CULL);
+        }
+    };
+
+    template <typename LabelT>
+    struct BitMask_Cull<LabelT, false>
+    {
+        static __device__ __forceinline__ bool Eval(LabelT label)
+        {
+            return false;
+        }
+    };
+
     /**
      * @brief CTA type default constructor
      */
@@ -530,21 +562,82 @@ struct Cta
             d_data_slice(d_data_slice),
             d_visited_mask(d_visited_mask),
             work_progress(work_progress),
-            max_out_frontier(max_out_frontier),
+            max_out_frontier(max_out_frontier)
 	    //t_bitmask(t_bitmask),
-            bitmask_cull(
-                (KernelPolicy::END_BITMASK_CULL < 0) ?
-                    true :
-                    (KernelPolicy::END_BITMASK_CULL == 0) ?
-                    false :
-                    (/*iteration*/ label < KernelPolicy::END_BITMASK_CULL))
+            //bitmask_cull(
+            //    (KernelPolicy::END_BITMASK_CULL < 0) ?
+            //        true :
+            //        ((KernelPolicy::END_BITMASK_CULL == 0) ?
+            //            false :
+            //            (/*iteration*/ (Problem::ENABLE_IDEMPOTENCE) ?
+            //                (label < KernelPolicy::END_BITMASK_CULL) :
+            //                false)))
     {
+        bitmask_cull = BitMask_Cull<typename Functor::LabelT, Problem::ENABLE_IDEMPOTENCE>::Eval(label);
+
         // Initialize history duplicate-filter
         for (int offset = threadIdx.x; offset < SmemStorage::HISTORY_HASH_ELEMENTS; offset += KernelPolicy::THREADS) {
             smem_storage.history[offset] = util::InvalidValue<VertexId>();
         }
     }
 
+
+    template <typename T, typename Cta, bool ENABLE_IDEMPOTENCE>
+    struct PTile
+    {
+        static __device__ __forceinline__ void Process(
+            T &tile,
+            Cta *cta,
+            SizeT cta_offset,
+            const SizeT &guarded_elements = KernelPolicy::TILE_ELEMENTS)
+        {}
+    };
+
+    template <typename TileT, typename Cta>
+    struct PTile<TileT, Cta, true>
+    {
+        static __device__ __forceinline__ void Process(
+            TileT &tile,
+            Cta *cta,
+            SizeT &cta_offset,
+            const SizeT &guarded_elements = KernelPolicy::TILE_ELEMENTS)
+        {
+            if (Problem::MARK_PREDECESSORS && cta -> d_value_in != NULL)
+            {
+                util::io::LoadTile<
+                KernelPolicy::LOG_LOADS_PER_TILE,
+                KernelPolicy::LOG_LOAD_VEC_SIZE,
+                KernelPolicy::THREADS,
+                Problem::QUEUE_READ_MODIFIER,
+                false>::LoadValid(
+                    tile.pred_id,
+                    cta -> d_value_in,
+                    cta_offset,
+                    guarded_elements);
+            }
+
+            if (cta -> bitmask_cull && cta -> d_visited_mask != NULL)
+            {
+                tile.BitmaskCull(cta);
+            }
+            tile.VertexCull(cta);          // using vertex visitation status (update discovered vertices)
+            tile.HistoryCull(cta);
+            tile.WarpCull(cta);
+        }
+    };
+
+    template <typename TileT, typename Cta>
+    struct PTile<TileT, Cta, false>
+    {
+        static __device__ __forceinline__ void Process(
+            TileT &tile,
+            Cta *cta,
+            SizeT &cta_offset,
+            const SizeT &guarded_elements = KernelPolicy::TILE_ELEMENTS)
+        {
+            tile.VertexCull(cta);          // using vertex visitation status (update discovered vertices)
+        }
+    };
 
     /**
      * @brief Process a single, full tile.
@@ -556,7 +649,8 @@ struct Cta
         SizeT cta_offset,
         const SizeT &guarded_elements = KernelPolicy::TILE_ELEMENTS)
     {
-        Tile<KernelPolicy::LOG_LOADS_PER_TILE, KernelPolicy::LOG_LOAD_VEC_SIZE> tile;
+        typedef Tile<KernelPolicy::LOG_LOADS_PER_TILE, KernelPolicy::LOG_LOAD_VEC_SIZE> TileT;
+        TileT tile;
 
         // Load tile
         util::io::LoadTile<
@@ -571,29 +665,8 @@ struct Cta
                 guarded_elements,
                 util::InvalidValue<VertexId>());
 
-        if (Problem::ENABLE_IDEMPOTENCE && Problem::MARK_PREDECESSORS && d_value_in != NULL) {
-            util::io::LoadTile<
-            KernelPolicy::LOG_LOADS_PER_TILE,
-            KernelPolicy::LOG_LOAD_VEC_SIZE,
-            KernelPolicy::THREADS,
-            Problem::QUEUE_READ_MODIFIER,
-            false>::LoadValid(
-                tile.pred_id,
-                d_value_in,
-                cta_offset,
-                guarded_elements);
-        }
-
-        if (Problem::ENABLE_IDEMPOTENCE && bitmask_cull && d_visited_mask != NULL) {
-            tile.BitmaskCull(this);
-        }
-        tile.VertexCull(this);          // using vertex visitation status (update discovered vertices)
-
-        if (Problem::ENABLE_IDEMPOTENCE) //&& /*iteration != -1*/ util::isValid(label))
-        {
-            tile.HistoryCull(this);
-            tile.WarpCull(this);
-        }
+        PTile<TileT, Cta, Problem::ENABLE_IDEMPOTENCE>::Process(
+            tile, this, cta_offset, guarded_elements);
 
         // Init valid flags and ranks
         tile.InitFlags();

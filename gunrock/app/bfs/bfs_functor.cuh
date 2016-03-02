@@ -103,10 +103,10 @@ struct BFSFunctor {
      *
      */
     static __device__ __forceinline__ void ApplyEdge(
-        volatile VertexId s_id,
+        VertexId s_id,
         VertexId d_id,
         DataSlice *d_data_slice,
-        volatile SizeT    edge_id   ,
+        SizeT    edge_id   ,
         VertexId input_item,
         LabelT   label     ,
         SizeT    input_pos ,

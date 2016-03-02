@@ -460,6 +460,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         {
             printf("Predecessor Validity: \n");
             num_errors = 0;
+            #pragma omp parallel for
             for (VertexId v=0; v<graph->nodes; v++)
             {
                 if (h_labels[v] ==
@@ -471,6 +472,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 {
                     //if (num_errors == 0)
                         printf("INCORRECT: pred[%d] : %d out of bound\n", v, pred);
+                    #pragma omp atomic
                     num_errors ++;
                     continue;
                 }
@@ -479,6 +481,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                     //if (num_errors == 0)
                         printf("INCORRECT: label[%d] (%d) != label[%d] (%d) + 1\n",
                             v, h_labels[v], pred, h_labels[pred]);
+                    #pragma omp atomic
                     num_errors ++;
                     continue;
                 }
@@ -495,6 +498,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                     //if (num_errors == 0)
                         printf("INCORRECT: Vertex %d not in Vertex %d's neighbor list\n",
                             v, pred);
+                    #pragma omp atomic
                     num_errors ++;
                     continue;
                 }

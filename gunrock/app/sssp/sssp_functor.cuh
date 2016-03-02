@@ -35,9 +35,10 @@ namespace sssp {
  *
  */
 template <
-    typename VertexId, typename SizeT, typename Value, typename Problem >
+    typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId >
 struct SSSPFunctor {
     typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Forward Edge Mapping condition function. Check if the destination node
@@ -52,15 +53,24 @@ struct SSSPFunctor {
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
     static __device__ __forceinline__ bool CondEdge(
-        VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
-        VertexId e_id = 0, VertexId e_id_in = 0) {
-        Value distance, weight;
+        VertexId s_id,
+        VertexId d_id,
+        DataSlice *d_data_slice,
+        SizeT    edge_id   ,
+        VertexId input_item,
+        LabelT   label     ,
+        SizeT    input_pos ,
+        SizeT   &output_pos)
+        //VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
+        //VertexId e_id = 0, VertexId e_id_in = 0)
+    {
+        Value pred_distance, edge_weight;
 
         util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
-            distance, d_data_slice->distances + s_id);
+            pred_distance, d_data_slice->distances + s_id);
         util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
-            weight, d_data_slice->weights + e_id);
-        Value new_distance = weight + distance;
+            edge_weight, d_data_slice->weights + edge_id);
+        Value new_distance = pred_distance + edge_weight;
 
         // Check if the destination node has been claimed as someone's child
         Value old_distance = atomicMin(d_data_slice->distances + d_id, new_distance);
@@ -82,8 +92,17 @@ struct SSSPFunctor {
      *
      */
     static __device__ __forceinline__ void ApplyEdge(
-        VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
-        VertexId e_id = 0, VertexId e_id_in = 0) {
+        VertexId s_id,
+        VertexId d_id,
+        DataSlice *d_data_slice,
+        SizeT    edge_id   ,
+        VertexId input_item,
+        LabelT   label     ,
+        SizeT    input_pos ,
+        SizeT   &output_pos)
+        //VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
+        //VertexId e_id = 0, VertexId e_id_in = 0)
+    {
         if (Problem::MARK_PATHS)
             util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                 s_id, d_data_slice->preds + d_id);
@@ -100,7 +119,15 @@ struct SSSPFunctor {
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondFilter(
-        VertexId node, DataSlice *d_data_slice, VertexId v = 0, SizeT nid = 0) {
+        VertexId   v,
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+        //VertexId node, DataSlice *d_data_slice, VertexId v = 0, SizeT nid = 0)
+    {
         if (node == -1) return false;
         return (atomicCAS(d_data_slice->sssp_marker + node, 0, 1) == 0);
         //return (node != -1);
@@ -116,7 +143,15 @@ struct SSSPFunctor {
      *
      */
     static __device__ __forceinline__ void ApplyFilter(
-        VertexId node, DataSlice *d_data_slice, VertexId v = 0, SizeT nid = 0) {
+        VertexId   v,
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+        //VertexId node, DataSlice *d_data_slice, VertexId v = 0, SizeT nid = 0)
+    {
         // Doing nothing here
     }
 };

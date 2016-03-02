@@ -434,7 +434,7 @@ void ReferencePageRank_Normalized(
             //{
             //    iteration ++;
             //}
-        }    
+        }
     }
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
@@ -451,7 +451,7 @@ void ReferencePageRank_Normalized(
         pr_list[i].page_rank = rank_current[i];
     }
 
-    std::stable_sort(pr_list, pr_list + nodes, 
+    std::stable_sort(pr_list, pr_list + nodes,
                      PRCompare<RankPair<SizeT, Value> >);
 
     #pragma omp parallel for
@@ -464,10 +464,10 @@ void ReferencePageRank_Normalized(
     free(pr_list     ); pr_list      = NULL;
     free(rank_current); rank_current = NULL;
     free(rank_next   ); rank_next    = NULL;
-    if (!quiet) 
+    if (!quiet)
     {
-        printf("CPU iteration : %lld\n", (long long)iteration); 
-        printf("CPU PageRank finished in %lf msec.\n", elapsed); 
+        printf("CPU iteration : %lld\n", (long long)iteration);
+        printf("CPU PageRank finished in %lf msec.\n", elapsed);
     }
 }
 
@@ -501,7 +501,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     typedef PREnactor <Problem>
             //INSTRUMENT,
             //DEBUG,
-            //SIZE_CHECK > 
+            //SIZE_CHECK >
             Enactor;
 
     // parse configurations from mObject info
@@ -616,13 +616,13 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         if (single_elapsed > max_elapsed) max_elapsed = single_elapsed;
         if (single_elapsed < min_elapsed) min_elapsed = single_elapsed;
         if (!quiet_mode)
-        {   
+        {
             printf("--------------------------\n"
-                "iteration %d elapsed: %lf ms\n", 
+                "iteration %d elapsed: %lf ms\n",
                 iter, single_elapsed);
             fflush(stdout);
-        }   
-    }   
+        }
+    }
     total_elapsed /= iterations;
     info -> info["process_times"] = process_times;
     info -> info["min_process_time"] = min_elapsed;
@@ -684,7 +684,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             if (v < 0 || v >= graph->nodes)
             {
                 if (error_count == 0 && !quiet_mode)
-                    printf("INCORRECT : node_id[%lld] (%lld) is out of bound\n", 
+                    printf("INCORRECT : node_id[%lld] (%lld) is out of bound\n",
                         (long long)i, (long long)v);
                 error_count ++;
                 continue;
@@ -692,7 +692,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             if (v_count[v] > 0)
             {
                 if (error_count == 0 && !quiet_mode)
-                    printf("INCORRECT : node_id[%lld] (%lld) appears more than once\n", 
+                    printf("INCORRECT : node_id[%lld] (%lld) appears more than once\n",
                         (long long)i, (long long)v);
                 error_count ++;
                 continue;
@@ -745,11 +745,11 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         else if (!quiet_mode)
             printf("number of errors : %lld\n", (long long) error_count);
         printf("Reference total rank : %.10lf\n", ref_total_rank);
-        printf("Maximum difference : "); 
+        printf("Maximum difference : ");
         if (max_diff_pos < graph->nodes)
             printf("rank[%lld] %.8le vs. %.8le, ",
-                (long long)ref_node_id[max_diff_pos], 
-                (double)unorder_rank[ref_node_id[max_diff_pos]], 
+                (long long)ref_node_id[max_diff_pos],
+                (double)unorder_rank[ref_node_id[max_diff_pos]],
                 (double)ref_rank[max_diff_pos]);
         printf("%.8le\n", (double)max_diff);
         printf("Maximum relative difference :");
@@ -767,7 +767,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         {
             if (error_count == 0 && !quiet_mode)
                 printf("INCORRECT : rank[%lld] (%.8le), place %lld < rank[%lld] (%.8le), place %lld\n",
-                    (long long)h_node_id[i  ], (double)h_rank[i  ], (long long)i, 
+                    (long long)h_node_id[i  ], (double)h_rank[i  ], (long long)i,
                     (long long)h_node_id[i+1], (double)h_rank[i+1], (long long)i+1);
             error_count ++;
         }
@@ -860,8 +860,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     if (ref_node_id) { delete[] ref_node_id; ref_node_id = NULL; }
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
-    
-    if (h_rank     ) 
+
+    if (h_rank     )
     {
         if (info->info["output_filename"].get_str() !="")
         {
@@ -881,13 +881,13 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             cpu_timer.Stop();
             info->info["write_time"] = cpu_timer.ElapsedMillis();
         }
-        delete[] h_rank     ; h_rank      = NULL; 
+        delete[] h_rank     ; h_rank      = NULL;
     }
     if (h_node_id  ) { delete[] h_node_id  ; h_node_id   = NULL; }
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
-    
-    if (h_rank     ) 
+
+    if (h_rank     )
     {
         if (info->info["output_filename"].get_str() !="")
         {
@@ -907,7 +907,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             cpu_timer.Stop();
             info->info["write_time"] = cpu_timer.ElapsedMillis();
         }
-        delete[] h_rank     ; h_rank      = NULL; 
+        delete[] h_rank     ; h_rank      = NULL;
     }
     return retval;
 }
@@ -991,9 +991,9 @@ template <
 int main_Value(CommandLineArgs *args)
 {
 // disabled to reduce compile time
-//    if (args -> CheckCmdLineFlag("64bit-Value"))
-//        return main_<VertexId, SizeT, double>(args);
-//    else 
+    if (args -> CheckCmdLineFlag("64bit-Value"))
+        return main_<VertexId, SizeT, double>(args);
+    else
         return main_<VertexId, SizeT, float >(args);
 }
 
@@ -1003,9 +1003,9 @@ template <
 int main_SizeT(CommandLineArgs *args)
 {
 // disabled to reduce compile time
-//    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-//        return main_Value<VertexId, long long>(args);
-//    else 
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_Value<VertexId, long long>(args);
+    else
         return main_Value<VertexId, int      >(args);
 }
 
@@ -1014,7 +1014,7 @@ int main_VertexId(CommandLineArgs *args)
     // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
     //if (args -> CheckCmdLineFlag("64bit-VertexId"))
     //    return main_SizeT<long long>(args);
-    //else 
+    //else
         return main_SizeT<int      >(args);
 }
 
@@ -1023,10 +1023,10 @@ int main(int argc, char** argv)
     CommandLineArgs args(argc, argv);
     int graph_args = argc - args.ParsedArgc() - 1;
     if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
-    {   
+    {
         Usage();
         return 1;
-    }   
+    }
 
     return main_VertexId(&args);
 }
