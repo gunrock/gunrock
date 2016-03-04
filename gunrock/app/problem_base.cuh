@@ -378,6 +378,11 @@ struct DataSliceBase
     util::Array1D<SizeT, VertexId    >  *keys_out                ; // Device pointers to outgoing vertices
     util::Array1D<SizeT, SizeT       >  *keys_marker             ; // Markers to separate vertices to peer GPUs
     util::Array1D<SizeT, SizeT*      >   keys_markers            ; // Device pointer to the markers
+
+    util::Array1D<SizeT, SizeT       >  *visit_lookup            ; // Vertex lookup array
+    util::Array1D<SizeT, VertexId    >  *valid_in                ; // Vertex valid in
+    util::Array1D<SizeT, VertexId    >  *valid_out               ; // Vertex valid out
+
     util::Array1D<SizeT, cudaEvent_t*>   events               [4]; // GPU stream events arrays
     util::Array1D<SizeT, bool*       >   events_set           [4]; // Whether the GPU stream events are set
     util::Array1D<SizeT, int         >   wait_marker             ; //
@@ -421,6 +426,9 @@ struct DataSliceBase
         keys_marker              = NULL;
         keys_in              [0] = NULL;
         keys_in              [1] = NULL;
+        visit_lookup             = NULL;
+        valid_in                 = NULL;
+        valid_out                = NULL;
         vertex_associate_in  [0] = NULL;
         vertex_associate_in  [1] = NULL;
         vertex_associate_ins [0] = NULL;
@@ -550,6 +558,36 @@ struct DataSliceBase
             delete[] keys_in[1];
             keys_in[0] = NULL;
             keys_in[1] = NULL;
+        }
+
+        if (visit_lookup != NULL)
+        {
+            for (int gpu = 0; gpu < num_gpus; gpu++)
+            {
+                if (retval = visit_lookup[gpu].Release()) return retval;
+            }
+            delete[] visit_lookup;
+            visit_lookup = NULL;
+        }
+
+        if (valid_in != NULL)
+        {
+            for (int gpu = 0; gpu < num_gpus; gpu++)
+            {
+                if (retval = valid_in[gpu].Release()) return retval;
+            }
+            delete[] valid_in;
+            valid_in = NULL;
+        }
+
+        if (valid_out != NULL)
+        {
+            for (int gpu = 0; gpu < num_gpus; gpu++)
+            {
+                if (retval = valid_out[gpu].Release()) return retval;
+            }
+            delete[] valid_out;
+            valid_out = NULL;
         }
 
         // Release outgoing keys and markers
@@ -763,6 +801,9 @@ struct DataSliceBase
         // Create incoming buffer on device
         keys_in             [0] = new util::Array1D<SizeT, VertexId > [num_gpus];
         keys_in             [1] = new util::Array1D<SizeT, VertexId > [num_gpus];
+        visit_lookup            = new util::Array1D<SizeT, SizeT    > [num_gpus];
+        valid_in                = new util::Array1D<SizeT, VertexId > [num_gpus];
+        valid_out               = new util::Array1D<SizeT, VertexId > [num_gpus];
         vertex_associate_in [0] = new util::Array1D<SizeT, VertexId >*[num_gpus];
         vertex_associate_in [1] = new util::Array1D<SizeT, VertexId >*[num_gpus];
         vertex_associate_ins[0] = new util::Array1D<SizeT, VertexId*> [num_gpus];
@@ -819,8 +860,26 @@ struct DataSliceBase
                 keys_in[t][gpu].SetName("keys_in");
                 if (gpu != 0) 
                     if (retval = keys_in[t][gpu].Allocate(num_in_node, util::DEVICE)) 
-                        return retval;
+                        return retval; 
             }
+        }
+
+        for (int gpu = 0; gpu < num_gpus; ++gpu)
+        { 
+            SizeT num_in_node = num_in_nodes[gpu] * in_sizing;
+            SizeT num_out_node = num_out_nodes[gpu] * in_sizing;
+            visit_lookup[gpu].SetName("visit_lookup");
+            if (gpu != 0) 
+                if (retval = visit_lookup[gpu].Allocate(num_out_node, util::DEVICE)) 
+                    return retval;
+            valid_in[gpu].SetName("valid_in");
+            if (gpu != 0) 
+                if (retval = valid_in[gpu].Allocate(num_in_node, util::DEVICE)) 
+                    return retval;
+            valid_out[gpu].SetName("valid_out");
+            if (gpu != 0) 
+                if (retval = valid_out[gpu].Allocate(num_in_node, util::DEVICE)) 
+                    return retval;
         }
 
         // Allocate outgoing buffer on device
