@@ -886,7 +886,7 @@ public:
         5,                                  // LOG_RAKING_THREADS
         5,                                  // END_BITMASK_CULL
         8,                                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::filter::CULL>
+        gunrock::oprtr::filter::COMPACTED_CULL>
     FilterKernelPolicy;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
@@ -990,17 +990,17 @@ public:
         {
             if (Problem::ENABLE_IDEMPOTENCE)
             {
-                if (traversal_mode == 0)
+//                if (traversal_mode == 0)
                     return EnactBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
-                else
-                    return EnactBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
+//                else
+//                    return EnactBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
             }
             else
             {
-                if (traversal_mode == 0)
+//                if (traversal_mode == 0)
                     return EnactBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(src);
-                else
-                    return EnactBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(src);
+//                else
+//                    return EnactBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(src);
             }
         }
 
@@ -1043,21 +1043,21 @@ public:
         {
             if (Problem::ENABLE_IDEMPOTENCE)
             {
-                if (traversal_mode == 0)
+//                if (traversal_mode == 0)
                     return InitBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
                             context, problem, max_grid_size);
-                else
-                    return InitBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
-                            context, problem, max_grid_size);
+//                else
+//                    return InitBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
+//                            context, problem, max_grid_size);
             }
             else
             {
-                if (traversal_mode == 0)
+//                if (traversal_mode == 0)
                     return InitBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(
                             context, problem, max_grid_size);
-                else
-                    return InitBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(
-                            context, problem, max_grid_size);
+//                else
+//                    return InitBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(
+//                            context, problem, max_grid_size);
             }
         }
 

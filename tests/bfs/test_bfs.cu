@@ -700,12 +700,12 @@ template <
     bool        MARK_PREDECESSORS >
 cudaError_t RunTests_enable_idempotence(Info<VertexId, SizeT, Value> *info)
 {
-    if (info->info["idempotent"].get_bool())
+//    if (info->info["idempotent"].get_bool())
         return RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
                  MARK_PREDECESSORS, true > (info);
-    else
-        return RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
-                 MARK_PREDECESSORS, false> (info);
+//    else
+//        return RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
+//                 MARK_PREDECESSORS, false> (info);
 }
 
 /**
@@ -729,10 +729,10 @@ template <
     //bool        SIZE_CHECK >
 cudaError_t RunTests_mark_predecessors(Info<VertexId, SizeT, Value> *info)
 {
-    if (info->info["mark_predecessors"].get_bool())
-        return RunTests_enable_idempotence<VertexId, SizeT, Value, /*INSTRUMENT,
-                                    DEBUG, SIZE_CHECK,*/  true> (info);
-    else
+//    if (info->info["mark_predecessors"].get_bool())
+//        return RunTests_enable_idempotence<VertexId, SizeT, Value, /*INSTRUMENT,
+//                                    DEBUG, SIZE_CHECK,*/  true> (info);
+//    else
         return RunTests_enable_idempotence<VertexId, SizeT, Value,/* INSTRUMENT,
                                     DEBUG, SIZE_CHECK,*/ false> (info);
 }
@@ -796,9 +796,9 @@ template <
 int main_SizeT(CommandLineArgs *args)
 {
 // disabled to reduce compile time
-    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-        return main_Value<VertexId, long long>(args);
-    else
+//    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+//        return main_Value<VertexId, long long>(args);
+//    else
         return main_Value<VertexId, int      >(args);
 }
 

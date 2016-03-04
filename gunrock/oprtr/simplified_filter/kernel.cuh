@@ -21,6 +21,7 @@
 #include <gunrock/oprtr/filter/kernel.cuh>
 #include <gunrock/oprtr/simplified_filter/cta.cuh>
 #include <gunrock/oprtr/simplified_filter/kernel_policy.cuh>
+#include <gunrock/oprtr/compacted_cull_filter/kernel.cuh>
 #include <gunrock/util/multithread_utils.cuh>
 #include <moderngpu.cuh>
 
@@ -395,6 +396,63 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::filter::CULL>
             parameter -> max_out_queue,
             parameter -> kernel_stats[0],
             parameter -> filtering_flag);
+        return retval;
+    }
+};
+
+template <typename Parameter>
+struct LaunchKernel_<Parameter, gunrock::oprtr::filter::COMPACTED_CULL>
+{
+    typedef typename Parameter::Problem::SizeT         SizeT;
+    typedef typename Parameter::Problem::VertexId      VertexId;
+    typedef typename Parameter::Problem::Value         Value   ;
+
+    static cudaError_t Launch(Parameter *parameter)
+    {
+        /*printf("Using original filter, grid_size = %d, block_size = %d, "
+            "label = %d, queue_reset = %s, queue_index = %d, "
+            "num_elements = %d, in_key = %p, in_value = %p, out_key = %p, "
+            "data_slice = %p, visited_mask = %p, max_in_queue = %d, "
+            "max_out_queue = %d, flag = %s\n",
+            parameter -> enactor_stats -> filter_grid_size,
+            Parameter::KernelPolicy::THREADS,
+            parameter -> label,
+            parameter -> frontier_attribute -> queue_reset ? "true" : "false",
+            parameter -> frontier_attribute -> queue_index,
+            parameter -> num_elements,
+            parameter -> d_in_key_queue,
+            parameter -> d_in_value_queue,
+            parameter -> d_out_key_queue,
+            parameter -> d_data_slice,
+            parameter -> d_visited_mask,
+            parameter -> max_in_queue,
+            parameter -> max_out_queue,
+            parameter -> filtering_flag ? "true" : "false");*/
+        cudaError_t retval = cudaSuccess;
+        typedef typename gunrock::oprtr::compacted_cull_filter::KernelPolicy<
+            typename Parameter::Problem> CCFPolicy;
+        gunrock::oprtr::compacted_cull_filter::LaunchKernel<
+            CCFPolicy,//typename Parameter::KernelPolicy,
+            typename Parameter::Problem,
+            typename Parameter::Functor>
+            <<<parameter -> enactor_stats -> filter_grid_size,
+            CCFPolicy::THREADS,
+            (size_t)0,
+            parameter -> stream>>> (
+            parameter -> label,
+            parameter -> frontier_attribute -> queue_reset,
+            (VertexId)parameter -> frontier_attribute -> queue_index,
+            parameter -> num_elements,
+            parameter -> d_in_key_queue,
+            parameter -> d_in_value_queue,
+            parameter -> d_out_key_queue,
+            parameter -> d_data_slice,
+            parameter -> d_visited_mask,
+            parameter -> work_progress[0],
+            parameter -> max_in_queue,
+            parameter -> max_out_queue,
+            parameter -> kernel_stats[0]);
+            //parameter -> filtering_flag);
         return retval;
     }
 };

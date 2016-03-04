@@ -28,7 +28,8 @@ namespace filter {
 
 enum MODE {
     CULL,
-    SIMPLIFIED
+    SIMPLIFIED,
+    COMPACTED_CULL
 };
 
 /**
