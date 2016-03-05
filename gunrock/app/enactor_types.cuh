@@ -25,6 +25,23 @@ using namespace mgpu;
 namespace gunrock {
 namespace app {
 
+/*
+ * @brief Accumulate number function.
+ *
+ * @tparam SizeT1
+ * @tparam SizeT2
+ *
+ * @param[in] num
+ * @param[in] sum
+ */
+template <typename SizeT1, typename SizeT2>
+__global__ void Accumulate_Num (
+    SizeT1 *num,
+    SizeT2 *sum)
+{
+    sum[0]+=num[0];
+}
+
 /**
  * @brief Structure for auxiliary variables used in enactor.
  */

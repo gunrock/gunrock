@@ -30,7 +30,7 @@
 
 namespace gunrock {
 namespace oprtr {
-namespace filter {
+namespace cull_filter {
 
 /**
 * Templated texture reference for visited mask

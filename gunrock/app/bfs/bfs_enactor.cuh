@@ -292,7 +292,7 @@ struct BFSIteration : public IterationBase <
         }
 
         // Filter
-        gunrock::oprtr::filter::LaunchKernel
+        /*gunrock::oprtr::filter::LaunchKernel
             <FilterKernelPolicy, Problem, Functor>(
             enactor_stats->filter_grid_size,
             FilterKernelPolicy::THREADS,
@@ -310,12 +310,13 @@ struct BFSIteration : public IterationBase <
             work_progress[0],
             frontier_queue->keys  [frontier_attribute->selector  ].GetSize(),
             frontier_queue->keys  [frontier_attribute->selector^1].GetSize(),
-            enactor_stats->filter_kernel_stats);
-        /*gunrock::oprtr::simplified_filter::LaunchKernel
+            enactor_stats->filter_kernel_stats);*/
+        gunrock::oprtr::filter::LaunchKernel
             <FilterKernelPolicy, Problem, Functor> (
             enactor_stats[0],
             frontier_attribute[0],
-            enactor_stats -> iteration + 1,
+            (VertexId)enactor_stats -> iteration + 1,
+            data_slice,
             d_data_slice,
             data_slice -> vertex_markers[enactor_stats -> iteration % 2].GetPointer(util::DEVICE),
             data_slice->visited_mask.GetPointer(util::DEVICE),
@@ -332,10 +333,11 @@ struct BFSIteration : public IterationBase <
             frontier_queue -> keys  [frontier_attribute -> selector^1].GetSize(),
             enactor_stats -> filter_kernel_stats,
             true, // filtering_flag
-            false); // skip_marking*/
+            false); // skip_marking
 
-        //util::MemsetKernel<<<256, 256, 0, stream>>>(
-        //    data_slice -> vertex_markers[(enactor_stats -> iteration +1)%2].GetPointer(util::DEVICE), (SizeT)0, graph_slice -> nodes + 1);
+        //if (FilterKernelPolicy::FILTER_MODE == gunrock::oprtr::filter::SIMPLIFIED)
+        //    util::MemsetKernel<<<256, 256, 0, stream>>>(
+        //        data_slice -> vertex_markers[(enactor_stats -> iteration +1)%2].GetPointer(util::DEVICE), (SizeT)0, graph_slice -> nodes + 1);
         if (enactor -> debug && (enactor_stats->retval =
             util::GRError("filter_forward::Kernel failed", __FILE__, __LINE__))) return;
         if (enactor -> debug)
@@ -668,6 +670,7 @@ public:
     typedef typename Problem::VertexId VertexId;
     typedef typename Problem::Value    Value   ;
     typedef EnactorBase<SizeT>         BaseEnactor;
+    typedef BFSEnactor<Problem>        Enactor;
     //static const bool INSTRUMENT = _INSTRUMENT;
     //static const bool DEBUG      = _DEBUG;
     //static const bool SIZE_CHECK = _SIZE_CHECK;
@@ -764,10 +767,10 @@ public:
             if (Problem::ENABLE_IDEMPOTENCE) {
                 SizeT bytes = (problem->graph_slices[gpu]->nodes + 8 - 1) / 8;
                 cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
-                gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
+                gunrock::oprtr::cull_filter::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
                 if (retval = util::GRError(cudaBindTexture(
                     0,
-                    gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref,
+                    gunrock::oprtr::cull_filter::BitmaskTex<unsigned char>::ref,
                     problem->data_slices[gpu]->visited_mask.GetPointer(util::DEVICE),
                     bytes),
                     "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
@@ -886,7 +889,7 @@ public:
 
     typedef gunrock::oprtr::filter::KernelPolicy<
         Problem,                            // Problem data type
-        350,                                // CUDA_ARCH
+        300,                                // CUDA_ARCH
         //INSTRUMENT,                         // INSTRUMENT
         0,                                  // SATURATION QUIT
         true,                               // DEQUEUE_PROBLEM_SIZE
@@ -897,7 +900,7 @@ public:
         5,                                  // LOG_RAKING_THREADS
         5,                                  // END_BITMASK_CULL
         8,                                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::filter::SIMPLIFIED>
+        gunrock::oprtr::filter::CULL>
     FilterKernelPolicy;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
@@ -970,6 +973,62 @@ public:
         gunrock::oprtr::advance::LB>
     LBAdvanceKernelPolicy;
 
+    template<
+        typename AdvanceKernelPolicy,
+        typename FilterKernelPolicy,
+        typename AdvanceKernelPolicy_IDEM,
+        typename FilterKernelPolicy_IDEM,
+        bool ENABLE_IDEMPOTENCE>
+    struct IDEM_SWICTH{};
+
+    template<
+        typename AdvanceKernelPolicy,
+        typename FilterKernelPolicy ,
+        typename AdvanceKernelPolicy_IDEM,
+        typename FilterKernelPolicy_IDEM>
+    struct IDEM_SWICTH<
+        AdvanceKernelPolicy, FilterKernelPolicy,
+        AdvanceKernelPolicy_IDEM, FilterKernelPolicy_IDEM, true>
+    {
+        static cudaError_t Enact(Enactor &enactor, VertexId src)
+        {
+            return enactor.EnactBFS<AdvanceKernelPolicy_IDEM, FilterKernelPolicy_IDEM>(src);
+        }
+
+        static cudaError_t Init(
+            Enactor &enactor,
+            ContextPtr  *context,
+            Problem     *problem,
+            int         max_grid_size  = 0)
+        {
+            return enactor.InitBFS<AdvanceKernelPolicy_IDEM, FilterKernelPolicy_IDEM>(context, problem, max_grid_size);
+        }
+    };
+
+    template<
+        typename AdvanceKernelPolicy,
+        typename FilterKernelPolicy ,
+        typename AdvanceKernelPolicy_IDEM,
+        typename FilterKernelPolicy_IDEM>
+    struct IDEM_SWICTH<
+        AdvanceKernelPolicy, FilterKernelPolicy,
+        AdvanceKernelPolicy_IDEM, FilterKernelPolicy_IDEM, false>
+    {
+        static cudaError_t Enact(Enactor &enactor, VertexId src)
+        {
+            return enactor.EnactBFS<AdvanceKernelPolicy, FilterKernelPolicy>(src);
+        }
+
+        static cudaError_t Init(
+            Enactor &enactor,
+            ContextPtr  *context,
+            Problem     *problem,
+            int         max_grid_size  = 0)
+        {
+            return enactor.InitBFS<AdvanceKernelPolicy, FilterKernelPolicy>(context, problem, max_grid_size);
+        }
+    };
+
     /**
      * \addtogroup PublicInterface
      * @{
@@ -999,7 +1058,17 @@ public:
 
         if (min_sm_version >= 300)
         {
-            if (Problem::ENABLE_IDEMPOTENCE)
+            //if (traversal_mode == 0)
+                return IDEM_SWICTH<
+                    LBAdvanceKernelPolicy, FilterKernelPolicy,
+                    LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy,
+                    Problem::ENABLE_IDEMPOTENCE>::Enact(*this, src);
+            //else return IDEM_SWITCH<
+            //        ForwardAdvanceKernelPolicy, FilterKernelPolicy,
+            //        ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy,
+            //        Problem::ENABLE_IDEMPOTENCE>::Enact(*this, src);
+
+            /*if (Problem::ENABLE_IDEMPOTENCE)
             {
 //                if (traversal_mode == 0)
                     return EnactBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
@@ -1012,7 +1081,7 @@ public:
                     return EnactBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(src);
 //                else
 //                    return EnactBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(src);
-            }
+            }*/
         }
 
         //to reduce compile time, get rid of other architecture for now
@@ -1052,7 +1121,17 @@ public:
 
         if (min_sm_version >= 300)
         {
-            if (Problem::ENABLE_IDEMPOTENCE)
+            //if (traversal_mode == 0)
+                return IDEM_SWICTH<
+                    LBAdvanceKernelPolicy, FilterKernelPolicy,
+                    LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy,
+                    Problem::ENABLE_IDEMPOTENCE>::Init(*this, context, problem, max_grid_size);
+            //else return IDEM_SWITCH<
+            //        ForwardAdvanceKernelPolicy, FilterKernelPolicy,
+            //        ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy,
+            //        Problem::ENABLE_IDEMPOTENCE>::Init(*this, context, problem, max_grid_size);
+
+            /*if (Problem::ENABLE_IDEMPOTENCE)
             {
 //                if (traversal_mode == 0)
                     return InitBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
@@ -1069,7 +1148,7 @@ public:
 //                else
 //                    return InitBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(
 //                            context, problem, max_grid_size);
-            }
+            }*/
         }
 
         //to reduce compile time, get rid of other architecture for now

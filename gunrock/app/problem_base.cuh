@@ -463,13 +463,13 @@ struct DataSliceBase
         preds                  .SetName("preds"                  );
         temp_preds             .SetName("temp_preds"             );
         labels                 .SetName("labels"                 );
-        org_checkpoint         .SetName("org_checkpoint"         );  
-        org_d_out              .SetName("org_d_out"              );  
-        org_offset1            .SetName("org_offset1"            );  
-        org_offset2            .SetName("org_offset2"            );  
-        org_queue_idx          .SetName("org_queue_idx"          );  
-        org_block_idx          .SetName("org_block_idx"          );  
-        org_thread_idx         .SetName("org_thread_idx"         );  
+        org_checkpoint         .SetName("org_checkpoint"         );
+        org_d_out              .SetName("org_d_out"              );
+        org_offset1            .SetName("org_offset1"            );
+        org_offset2            .SetName("org_offset2"            );
+        org_queue_idx          .SetName("org_queue_idx"          );
+        org_block_idx          .SetName("org_block_idx"          );
+        org_thread_idx         .SetName("org_thread_idx"         );
 
         for (int i = 0; i < 4; i++)
         {
@@ -785,7 +785,7 @@ struct DataSliceBase
                 {
                     if (retval = util::GRError(
                         cudaEventCreate(&(events[i][gpu][stage])),
-                       "cudaEventCreate failed.", __FILE__, __LINE__)) 
+                       "cudaEventCreate failed.", __FILE__, __LINE__))
                         return retval;
                     events_set[i][gpu][stage] = false;
                 }
@@ -797,13 +797,14 @@ struct DataSliceBase
                 in_length[i][gpu] = 0;
         }
 
+        visit_lookup            = new util::Array1D<SizeT, SizeT    > [num_gpus];
+        valid_in                = new util::Array1D<SizeT, VertexId > [num_gpus];
+        valid_out               = new util::Array1D<SizeT, VertexId > [num_gpus];
+
         if (num_gpus == 1) return retval;
         // Create incoming buffer on device
         keys_in             [0] = new util::Array1D<SizeT, VertexId > [num_gpus];
         keys_in             [1] = new util::Array1D<SizeT, VertexId > [num_gpus];
-        visit_lookup            = new util::Array1D<SizeT, SizeT    > [num_gpus];
-        valid_in                = new util::Array1D<SizeT, VertexId > [num_gpus];
-        valid_out               = new util::Array1D<SizeT, VertexId > [num_gpus];
         vertex_associate_in [0] = new util::Array1D<SizeT, VertexId >*[num_gpus];
         vertex_associate_in [1] = new util::Array1D<SizeT, VertexId >*[num_gpus];
         vertex_associate_ins[0] = new util::Array1D<SizeT, VertexId*> [num_gpus];
@@ -817,25 +818,25 @@ struct DataSliceBase
             for (int t = 0; t < 2; t++)
             {
                 SizeT num_in_node = num_in_nodes[gpu] * in_sizing;
-                vertex_associate_in [t][gpu] = 
+                vertex_associate_in [t][gpu] =
                     new util::Array1D<SizeT, VertexId>[MAX_NUM_VERTEX_ASSOCIATES];
                 for (int i = 0; i < MAX_NUM_VERTEX_ASSOCIATES; i++)
                 {
                     vertex_associate_in [t][gpu][i].SetName("vertex_associate_in[]");
-                    if (gpu == 0) continue; 
+                    if (gpu == 0) continue;
                     if (retval = vertex_associate_in[t][gpu][i]
-                        .Allocate(num_in_node, util::DEVICE)) 
+                        .Allocate(num_in_node, util::DEVICE))
                         return retval;
                 }
 
-                value__associate_in [t][gpu] = 
+                value__associate_in [t][gpu] =
                     new util::Array1D<SizeT, Value   >[MAX_NUM_VALUE__ASSOCIATES];
                 for (int i = 0; i < MAX_NUM_VALUE__ASSOCIATES; i++)
                 {
                     value__associate_in[t][gpu][i].SetName("value__associate_ins[]");
                     if (gpu == 0) continue;
                     if (retval = value__associate_in[t][gpu][i]
-                        .Allocate(num_in_node, util::DEVICE)) 
+                        .Allocate(num_in_node, util::DEVICE))
                         return retval;
                 }
 
@@ -843,44 +844,44 @@ struct DataSliceBase
                 if (retval = vertex_associate_ins[t][gpu].Allocate(
                     MAX_NUM_VERTEX_ASSOCIATES, util::DEVICE | util::HOST)) return retval;
                 for (int i = 0; i < MAX_NUM_VERTEX_ASSOCIATES; i++)
-                    vertex_associate_ins[t][gpu][i] = 
+                    vertex_associate_ins[t][gpu][i] =
                         vertex_associate_in[t][gpu][i].GetPointer(util::DEVICE);
-                if (retval = vertex_associate_ins[t][gpu].Move(util::HOST, util::DEVICE)) 
+                if (retval = vertex_associate_ins[t][gpu].Move(util::HOST, util::DEVICE))
                     return retval;
 
                 value__associate_ins[t][gpu].SetName("value__associate_ins");
                 if (retval = value__associate_ins[t][gpu].Allocate(
                     MAX_NUM_VALUE__ASSOCIATES, util::DEVICE | util::HOST)) return retval;
                 for (int i = 0; i < MAX_NUM_VALUE__ASSOCIATES; i++)
-                    value__associate_ins[t][gpu][i] = 
+                    value__associate_ins[t][gpu][i] =
                         value__associate_in[t][gpu][i].GetPointer(util::DEVICE);
-                if (retval = value__associate_ins[t][gpu].Move(util::HOST, util::DEVICE)) 
+                if (retval = value__associate_ins[t][gpu].Move(util::HOST, util::DEVICE))
                     return retval;
 
                 keys_in[t][gpu].SetName("keys_in");
-                if (gpu != 0) 
-                    if (retval = keys_in[t][gpu].Allocate(num_in_node, util::DEVICE)) 
-                        return retval; 
+                if (gpu != 0)
+                    if (retval = keys_in[t][gpu].Allocate(num_in_node, util::DEVICE))
+                        return retval;
             }
         }
 
-        for (int gpu = 0; gpu < num_gpus; ++gpu)
-        { 
+        /*for (int gpu = 0; gpu < num_gpus; ++gpu)
+        {
             SizeT num_in_node = num_in_nodes[gpu] * in_sizing;
             SizeT num_out_node = num_out_nodes[gpu] * in_sizing;
             visit_lookup[gpu].SetName("visit_lookup");
-            if (gpu != 0) 
-                if (retval = visit_lookup[gpu].Allocate(num_out_node, util::DEVICE)) 
+            if (gpu != 0)
+                if (retval = visit_lookup[gpu].Allocate(num_out_node, util::DEVICE))
                     return retval;
             valid_in[gpu].SetName("valid_in");
-            if (gpu != 0) 
-                if (retval = valid_in[gpu].Allocate(num_in_node, util::DEVICE)) 
+            if (gpu != 0)
+                if (retval = valid_in[gpu].Allocate(num_in_node, util::DEVICE))
                     return retval;
             valid_out[gpu].SetName("valid_out");
-            if (gpu != 0) 
-                if (retval = valid_out[gpu].Allocate(num_in_node, util::DEVICE)) 
+            if (gpu != 0)
+                if (retval = valid_out[gpu].Allocate(num_in_node, util::DEVICE))
                     return retval;
-        }
+        }*/
 
         // Allocate outgoing buffer on device
         vertex_associate_out  = new util::Array1D<SizeT, VertexId >*[num_gpus];
@@ -918,9 +919,9 @@ struct DataSliceBase
                 vertex_associate_out[gpu][i].SetName("vertex_associate_out[][]");
                 if (gpu != 0)
                     if (retval = vertex_associate_out[gpu][i].Allocate(
-                        num_out_node, util::DEVICE)) 
+                        num_out_node, util::DEVICE))
                         return retval;
-                vertex_associate_outs[gpu][i] = 
+                vertex_associate_outs[gpu][i] =
                     vertex_associate_out[gpu][i].GetPointer(util::DEVICE);
             }
             if (retval = vertex_associate_outs[gpu].Move(util::HOST, util::DEVICE)) return retval;
@@ -937,7 +938,7 @@ struct DataSliceBase
                 if (gpu != 0)
                     if (retval = value__associate_out[gpu][i].Allocate(num_out_node, util::DEVICE))
                         return retval;
-                value__associate_outs[gpu][i] = 
+                value__associate_outs[gpu][i] =
                     value__associate_out[gpu][i].GetPointer(util::DEVICE);
             }
             if (retval = value__associate_outs[gpu].Move(util::HOST, util::DEVICE)) return retval;
@@ -990,7 +991,7 @@ struct DataSliceBase
         bool    skip_scanned_edges = false)
     {
         //printf("DataSliceBase reset, queue_sizing = %lf, %lf, nodes = %lld, edges = %lld\n",
-        //    queue_sizing, queue_sizing1, 
+        //    queue_sizing, queue_sizing1,
         //    (long long)graph_slice -> nodes, (long long)graph_slice -> edges);
 
         cudaError_t retval = cudaSuccess;
@@ -1027,7 +1028,7 @@ struct DataSliceBase
             {
             case VERTEX_FRONTIERS :
                 // O(n) ping-pong global vertex frontiers
-                new_frontier_elements[0] = ((num_gpus > 1) ? 
+                new_frontier_elements[0] = ((num_gpus > 1) ?
                     graph_slice->in_counter[peer] : graph_slice->nodes) * queue_sizing_ + 2;
                 new_frontier_elements[1] = new_frontier_elements[0];
                 break;
@@ -1040,7 +1041,7 @@ struct DataSliceBase
 
             case MIXED_FRONTIERS :
                 // O(n) global vertex frontier, O(m) global edge frontier
-                new_frontier_elements[0] = ((num_gpus > 1) ? 
+                new_frontier_elements[0] = ((num_gpus > 1) ?
                     graph_slice->in_counter[peer] : graph_slice->nodes) * queue_sizing_ + 2;
                 new_frontier_elements[1] = graph_slice->edges * queue_sizing_ + 2;
                 break;
@@ -1051,34 +1052,34 @@ struct DataSliceBase
             {
 
                 // If previously allocated
-                if (frontier_queues[peer].keys[i].GetPointer(util::DEVICE) != NULL && 
+                if (frontier_queues[peer].keys[i].GetPointer(util::DEVICE) != NULL &&
                     frontier_queues[peer].keys[i].GetSize() != 0)
                 {
                     if (retval = frontier_queues[peer].keys[i].EnsureSize(
-                        new_frontier_elements[i])) 
+                        new_frontier_elements[i]))
                         return retval;
                 }
                 else
                 {
                     if (retval = frontier_queues[peer].keys[i].Allocate(
-                        new_frontier_elements[i], util::DEVICE)) 
+                        new_frontier_elements[i], util::DEVICE))
                         return retval;
                 }
 
                 // If use double buffer
                 if (_USE_DOUBLE_BUFFER)
                 {
-                    if (frontier_queues[peer].values[i].GetPointer(util::DEVICE) != NULL && 
+                    if (frontier_queues[peer].values[i].GetPointer(util::DEVICE) != NULL &&
                         frontier_queues[peer].values[i].GetSize() != 0)
                     {
                         if (retval = frontier_queues[peer].values[i].EnsureSize(
-                            new_frontier_elements[i])) 
+                            new_frontier_elements[i]))
                             return retval;
                     }
                     else
                     {
                         if (retval = frontier_queues[peer].values[i].Allocate(
-                            new_frontier_elements[i], util::DEVICE)) 
+                            new_frontier_elements[i], util::DEVICE))
                             return retval;
                     }
                 }
@@ -1094,19 +1095,19 @@ struct DataSliceBase
 
             // Allocate scanned_edges
             SizeT max_elements = new_frontier_elements[0];
-            if (new_frontier_elements[1] > max_elements) 
+            if (new_frontier_elements[1] > max_elements)
                 max_elements = new_frontier_elements[1];
             if (scanned_edges[peer].GetSize() < max_elements)
             {
-                if (scanned_edges[peer].GetPointer(util::DEVICE) != NULL && 
+                if (scanned_edges[peer].GetPointer(util::DEVICE) != NULL &&
                     scanned_edges[peer].GetSize() != 0)
                 {
-                    if (retval = scanned_edges[peer].EnsureSize(max_elements)) 
+                    if (retval = scanned_edges[peer].EnsureSize(max_elements))
                         return retval;
                 }
                 else
                 {
-                    if (retval = scanned_edges[peer].Allocate(max_elements, util::DEVICE)) 
+                    if (retval = scanned_edges[peer].Allocate(max_elements, util::DEVICE))
                         return retval;
                 }
             }

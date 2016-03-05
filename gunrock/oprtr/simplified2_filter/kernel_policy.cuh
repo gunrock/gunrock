@@ -18,7 +18,7 @@
 
 namespace gunrock {
 namespace oprtr {
-namespace simplified_filter {
+namespace simplified2_filter {
 
 template <
     typename _Problem,
@@ -49,7 +49,7 @@ struct KernelPolicy : public gunrock::oprtr::cull_filter::KernelPolicy <
     };
 };
 
-} // namespace simplified_filter
+} // namespace simplified2_filter
 } // namespace oprtr
 } // namespace gunrock
 

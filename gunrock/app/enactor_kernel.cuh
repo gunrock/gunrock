@@ -22,23 +22,6 @@ namespace gunrock {
 namespace app {
 
 /*
- * @brief Accumulate number function.
- *
- * @tparam SizeT1
- * @tparam SizeT2
- *
- * @param[in] num
- * @param[in] sum
- */
-template <typename SizeT1, typename SizeT2>
-__global__ void Accumulate_Num (
-    SizeT1 *num,
-    SizeT2 *sum)
-{
-    sum[0]+=num[0];
-}
-
-/*
  * @brief Copy predecessor function.
  *
  * @tparam VertexId
@@ -323,9 +306,9 @@ __global__ void Make_Out_Backward(
     while (x<num_elements)
     {
         VertexId key    = keys_in [x];
-        if (key < 0) 
+        if (key < 0)
         {
-            x+=STRIDE; 
+            x+=STRIDE;
             continue;
         }
         for (SizeT j = offsets[key]; j < offsets[key+1]; j++)
