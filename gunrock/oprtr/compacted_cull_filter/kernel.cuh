@@ -21,10 +21,13 @@ namespace gunrock {
 namespace oprtr {
 namespace compacted_cull_filter {
 
-template <typename Problem>
+template <typename Problem, int _CUDA_ARCH>
 struct KernelPolicy
 {
+    typedef typename Problem::VertexId VertexId;
+    typedef typename Problem::SizeT    SizeT;
     enum {
+        CUDA_ARCH            = _CUDA_ARCH,
         LOG_THREADS          = 8,
         THREADS              = 1 << LOG_THREADS,
         MAX_BLOCKS           = 1024,
@@ -32,26 +35,58 @@ struct KernelPolicy
         BLOCK_HASH_LENGTH    = 1 << BLOCK_HASH_BITS,
         BLOCK_HASH_MASK      = BLOCK_HASH_LENGTH -1,
         GLOBAL_LOAD_SIZE     = 4,
-        SHARED_LOAD_SIZE     = 8 / sizeof(typename Problem::VertexId),
+        SHARED_LOAD_SIZE     = 8 / sizeof(VertexId),
         WARP_SIZE            = GR_WARP_THREADS(CUDA_ARCH),
         LOG_WARP_SIZE        = 5,
         WARP_SIZE_MASK       = WARP_SIZE -1,
-        WARP_HASH_BITS       = 7,
+        WARP_HASH_BITS       = 6,
         WARP_HASH_LENGTH     = 1 << WARP_HASH_BITS,
         WARP_HASH_MASK       = WARP_HASH_LENGTH -1,
         WARPS                = THREADS / WARP_SIZE,
-        ELEMENT_ID_MASK      = ~(1<<(sizeof(typename Problem::VertexId)*8-2)),
+        ELEMENT_ID_MASK      = ~(1<<(sizeof(VertexId)*8-2)),
+        MAX_CTA_OCCUPANCY    = 16,
+    };
 
+    struct SmemStorage
+    {
+        //typedef cub::BlockScan<int, KernelPolicy::THREADS, cub::BLOCK_SCAN_RAKING /*cub::BLOCK_SCAN_WARP_SCANS*/> BlockScanT;
+        //typedef cub::WarpScan<int> WarpScanT;
+        typedef cub::BlockScan<int, THREADS, cub::BLOCK_SCAN_RAKING_MEMOIZE> BlockScanT;
+        typedef cub::BlockLoad<VertexId*, THREADS, GLOBAL_LOAD_SIZE, cub::BLOCK_LOAD_VECTORIZE> BlockLoadT;
+
+        VertexId vertices  [KernelPolicy::THREADS * KernelPolicy::GLOBAL_LOAD_SIZE];
+        //VertexId block_hash[BLOCK_HASH_LENGTH];
+        //VertexId warp_hash [WARPS][WARP_HASH_LENGTH];
+        //int    temp_space[KernelPolicy::THREADS];
+        union {
+            //typename cub::BlockLoadT ::TempStorage load_space;
+            //typename cub::BlockStoreT::TempStorage store_space;
+            typename BlockScanT::TempStorage scan_space;
+            //typename WarpScanT::TempStorage scan_space[KernelPolicy::WARPS];
+            typename BlockLoadT::TempStorage load_space;
+        } cub_storage;
+
+        int    num_elements;
+        SizeT  block_offset;
+        SizeT start_segment, end_segment, segment_size;
+    };
+
+    enum {
+        THREAD_OCCUPANCY = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
+        SMEM_OCCUPANCY   = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
+        CTA_OCCUPANCY    = GR_MIN(MAX_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
+        VALID            = (CTA_OCCUPANCY > 0),
     };
 };
 
 template <typename KernelPolicy, typename Problem, typename Functor>
-struct ThreadStorage{
+struct ThreadWork{
     typedef typename Problem::VertexId VertexId;
     typedef typename Problem::SizeT    SizeT;
     typedef typename Problem::Value    Value;
     typedef typename Problem::DataSlice DataSlice;
     typedef typename Functor::LabelT    LabelT;
+    typedef typename KernelPolicy::SmemStorage  SmemStorageT;
 
     VertexId vertices[KernelPolicy::GLOBAL_LOAD_SIZE];
     int       num_elements;
@@ -65,12 +100,14 @@ struct ThreadStorage{
     SizeT     input_queue_length;
     SizeT    *d_output_counter;
     unsigned char *d_visited_mask;
-    VertexId *d_labels;
+    VertexId  *d_labels;
     DataSlice *d_data_slice;
     LabelT     label;
+    SmemStorageT &smem;
 
-    __device__ __forceinline__ ThreadStorage(
-        VertexId     **block_warp_hash,
+    __device__ __forceinline__ ThreadWork(
+        //VertexId     **block_warp_hash,
+        SmemStorageT  &_smem,
         VertexId      *_d_keys_in,
         VertexId      *_d_keys_out,
         SizeT          _input_queue_length,
@@ -79,6 +116,7 @@ struct ThreadStorage{
         unsigned char *_d_visited_mask,
         DataSlice     *_d_data_slice,
         LabelT         _label) :
+        smem                (_smem),
         num_elements        (0),
         block_num_elements  (0),
         block_input_start   (_block_input_start),
@@ -92,7 +130,7 @@ struct ThreadStorage{
         d_data_slice        (_d_data_slice),
         label               (_label)
     {
-        warp_hash = block_warp_hash[warp_id];
+        //warp_hash = smem.warp_hash[warp_id];
         d_labels = d_data_slice -> labels.GetPointer(util::DEVICE);
     }
 };
@@ -108,64 +146,53 @@ struct Cta
     typedef typename Problem::Value    Value;
     typedef typename Functor::LabelT   LabelT;
     typedef Cta<KernelPolicy, Problem, Functor> CtaT;
-    typedef ThreadStorage<KernelPolicy, Problem, Functor> ThreadStorageT;
-    //typedef cub::BlockScan<int, KernelPolicy::THREADS, cub::BLOCK_SCAN_RAKING /*cub::BLOCK_SCAN_WARP_SCANS*/> BlockScanT;
-    typedef cub::WarpScan<int> WarpScanT;
+    typedef ThreadWork<KernelPolicy, Problem, Functor> ThreadWorkT;
+    typedef typename KernelPolicy::SmemStorage  SmemStorageT;
+    typedef typename SmemStorageT::BlockScanT   BlockScanT;
+    typedef typename SmemStorageT::BlockLoadT   BlockLoadT;
 
-    VertexId vertices  [KernelPolicy::THREADS * KernelPolicy::GLOBAL_LOAD_SIZE];
-    VertexId block_hash[KernelPolicy::BLOCK_HASH_LENGTH];
-    VertexId warp_hash [KernelPolicy::WARPS][KernelPolicy::WARP_HASH_LENGTH];
-    int    temp_space[KernelPolicy::THREADS];
-    union {
-        //typename cub::BlockLoadT ::TempStorage load_space;
-        //typename cub::BlockStoreT::TempStorage store_space;
-        //typename BlockScanT::TempStorage scan_space;
-        typename WarpScanT::TempStorage scan_space[KernelPolicy::WARPS];
-    } cub_storage;
-
-    int    num_elements;
-    SizeT  block_offset;
-
-    __device__ __forceinline__ Cta()
-    {}
+    SmemStorageT smem;
 
     __device__ __forceinline__ void Init(
-        ThreadStorageT &thread_data)
+        ThreadWorkT &thread_work)
+        //SmemStorageT &smem)
     {
-        for (int i = threadIdx.x;
+        /*for (int i = threadIdx.x;
             i <  KernelPolicy::BLOCK_HASH_LENGTH;
             i += KernelPolicy::THREADS)
-            block_hash[i] = util::InvalidValue<VertexId>();
+            smem.block_hash[i] = util::InvalidValue<VertexId>();
 
-        for (int i = thread_data.lane_id;
+        for (int i = thread_work.lane_id;
             i <  KernelPolicy::WARP_HASH_LENGTH;
             i += KernelPolicy::WARP_SIZE)
-            warp_hash[thread_data.warp_id][i] = util::InvalidValue<VertexId>();
+            smem.warp_hash[thread_work.warp_id][i] = util::InvalidValue<VertexId>();*/
     }
 
     __device__ __forceinline__ void Load_from_Global(
-        ThreadStorageT &thread_data)
+        ThreadWorkT &thread_work)
+        //SmemStorageT &smem)
     {
         //typedef typename util::VectorType<VertexId, KernelPolicy::NUM_ELEMENT_PER_GLOBAL_LOAD>::Type LoadT;
-        SizeT thread_input_pos = thread_data.block_input_start +
-            thread_data.warp_id * KernelPolicy::WARP_SIZE * KernelPolicy::GLOBAL_LOAD_SIZE + thread_data.lane_id;
-        thread_data.num_elements = 0;
-        //if (threadIdx.x == 0) printf("(%4d, %4d) : block_input_start = %d, input_queue_length = %d\n",
-        //    blockIdx.x, threadIdx.x, thread_data.block_input_start, thread_data.input_queue_length);
-        #pragma unroll
-        for (int i=0; i<KernelPolicy::GLOBAL_LOAD_SIZE; i++)
+        if (thread_work.block_input_start + (KernelPolicy::GLOBAL_LOAD_SIZE << KernelPolicy::LOG_THREADS) <= thread_work.input_queue_length)
         {
-            if (thread_input_pos >= thread_data.input_queue_length)
-            {
-                thread_data.vertices[i] = util::InvalidValue<VertexId>();
-            } else {
-                thread_data.vertices[i] = thread_data.d_keys_in[thread_input_pos];
-                thread_data.num_elements ++;
-                //printf("(%4d, %4d) : reading pos = %d, item = %d\n",
-                //    blockIdx.x, threadIdx.x, thread_input_pos, thread_data.vertices[i]);
-            }
+            BlockLoadT(smem.cub_storage.load_space).Load(thread_work.d_keys_in + thread_work.block_input_start, thread_work.vertices);
+            thread_work.num_elements = KernelPolicy::GLOBAL_LOAD_SIZE;
+        } else {
+            SizeT thread_input_pos = thread_work.block_input_start + thread_work.warp_id * (KernelPolicy::GLOBAL_LOAD_SIZE << KernelPolicy::LOG_WARP_SIZE) + thread_work.lane_id;
+            thread_work.num_elements = 0;
 
-            thread_input_pos += KernelPolicy::WARP_SIZE;
+            #pragma unroll
+            for (int i=0; i<KernelPolicy::GLOBAL_LOAD_SIZE; i++)
+            {
+                if (thread_input_pos >= thread_work.input_queue_length)
+                {
+                    thread_work.vertices[i] = util::InvalidValue<VertexId>();
+                } else {
+                    thread_work.vertices[i] = thread_work.d_keys_in[thread_input_pos];
+                    thread_work.num_elements ++;
+                }
+                thread_input_pos += KernelPolicy::WARP_SIZE;
+            }
         }
 
         /*LoadT *keys_in = (LoadT*)(d_keys_in + thread_input_pos);
@@ -180,7 +207,8 @@ struct Cta
     }
 
     __device__ __forceinline__ void Load_from_Shared(
-        ThreadStorageT &thread_data)
+        ThreadWorkT &thread_work)
+        //SmemStorageT &smem)
     {
         /*typedef typename util::VectorType<VertexId, KernelPolicy::NUM_ELEMENT_PER_SHARED_LOAD>::Type LoadT;
         SizeT thread_input_start = threadIdx.x * KernelPolicy::NUM_ELEMENT_PER_SHARED_LOAD;
@@ -195,17 +223,28 @@ struct Cta
 
             } else thread_data.num_elements = KernelPolicy::NUM_ELEMENT_PER_SHARED_LOAD;
         }*/
+        int thread_pos = thread_work.warp_id * (KernelPolicy::GLOBAL_LOAD_SIZE << KernelPolicy::LOG_WARP_SIZE) + thread_work.lane_id;
+        thread_work.num_elements = 0;
+        #pragma unroll
+        for (int i=0; i<KernelPolicy::GLOBAL_LOAD_SIZE; i++)
+        {
+            if (thread_pos < smem.num_elements)
+            {
+                thread_work.vertices[i] = smem.vertices[thread_pos];
+                thread_work.num_elements ++;
+            } else thread_work.vertices[i] = util::InvalidValue<VertexId>();
+            thread_pos += KernelPolicy::WARP_SIZE;
+        }
     }
 
     __device__ __forceinline__ void Store_to_Global(
-        ThreadStorageT &thread_data)
+        ThreadWorkT &thread_work)
+        //SmemStorageT &smem)
     {
         //temp_space[threadIdx.x] = thread_data.num_elements;
-        if (threadIdx.x == 0) num_elements = 0;
+        /*if (threadIdx.x == 0) num_elements = 0;
         __syncthreads();
 
-        //BlockScanT(cub_storage.scan_space).ExclusiveSum(temp_space, temp_space, thread_data.block_num_elements);
-        SizeT thread_offset = 0;
         WarpScanT(cub_storage.scan_space[thread_data.warp_id]).ExclusiveSum(thread_data.num_elements, thread_offset);
         int warp_offset;
         if (thread_data.lane_id == KernelPolicy::WARP_SIZE_MASK)
@@ -213,52 +252,87 @@ struct Cta
             warp_offset = atomicAdd(&num_elements, thread_offset + thread_data.num_elements);
             //num_elements = thread_data.block_num_elements;
         }
-        __syncthreads();
-        if (threadIdx.x == 0)
+        __syncthreads();*/
+        SizeT thread_offset = 0;//, block_size = 0;
+        BlockScanT(smem.cub_storage.scan_space)
+            .ExclusiveSum(thread_work.num_elements, thread_offset);//, block_size);
+        if (threadIdx.x == KernelPolicy::THREADS-1)
         {
-            block_offset = atomicAdd(thread_data.d_output_counter, num_elements);
+            smem.block_offset = atomicAdd(thread_work.d_output_counter, thread_offset + thread_work.num_elements);//block_size);
+            //if (//block_offset > thread_data.input_queue_length ||
+            //    num_elements > KernelPolicy::THREADS * KernelPolicy::GLOBAL_LOAD_SIZE)
+            //    printf("(%4d, %4d) : num_elements = %d, block_offset = %d, input_queue_length = %d\n",
+            //    blockIdx.x, threadIdx.x, num_elements, block_offset, thread_data.input_queue_length);
         }
         __syncthreads();
         //if (thread_data.lane_id == KernelPolicy::WARP_SIZE_MASK)
         //    warp_offset += block_offset;
-        warp_offset = cub::ShuffleIndex(warp_offset, KernelPolicy::WARP_SIZE_MASK);
-        thread_offset += warp_offset + block_offset;
+        //warp_offset = cub::ShuffleIndex(warp_offset, KernelPolicy::WARP_SIZE_MASK);
+        thread_offset += smem.block_offset;
         //__syncthreads();
-        for (int i=0; i<thread_data.num_elements; i++)
-            thread_data.d_keys_out[thread_offset + i] = thread_data.vertices[i];
+        //#pragma unroll
+        for (int i=0; i</*KernelPolicy::GLOBAL_LOAD_SIZE*/thread_work.num_elements; i++)
+        {
+            //if (i == thread_data.num_elements) break;
+            //thread_data.d_keys_out[thread_offset + i] = thread_data.vertices[i];
+            util::io::ModifiedStore<util::io::st::cg>::St(
+                thread_work.vertices[i],
+                thread_work.d_keys_out + (thread_offset + i));
+        }
     }
 
     __device__ __forceinline__ void Store_to_Shared(
-        ThreadStorageT &thread_data)
+        ThreadWorkT &thread_work)
+        //SmemStorageT &smem)
     {
-
+        SizeT thread_offset = 0, block_num_elements;
+        //thread_work.num_elements = 0;
+        //#pragma unroll
+        //for (int i=0; i<thread_work.num_elements;i++)
+        //if (util::isValid(thread_work.vertices[i])) thread_work.num_elements ++;
+        BlockScanT(smem.cub_storage.scan_space)
+            .ExclusiveSum(thread_work.num_elements, thread_offset, block_num_elements);
+        if (threadIdx.x == 0) smem.num_elements = block_num_elements;
+        //thread_work.num_elements = 0;
+        //#pragma unroll
+        for (int i=0; i< thread_work.num_elements; i++)
+        {
+            //if (!util::isValid(thread_work.vertices[i])) continue;
+            smem.vertices[thread_offset + i] = thread_work.vertices[i];
+            //thread_work.num_elements ++;
+        }
+        __syncthreads();
     }
 
     __device__ __forceinline__ void Local_Compact(
-        ThreadStorageT &thread_data)
+        ThreadWorkT &thread_work)
+        //SmemStorageT &smem)
     {
         int temp_size = 0;
-        for (int i=0; i< thread_data.num_elements; i++)
-        if (util::isValid(thread_data.vertices[i]))
+        #pragma unroll
+        for (int i=0; i</*thread_data.num_elements*/KernelPolicy::GLOBAL_LOAD_SIZE; i++)
         {
-            thread_data.vertices[temp_size] = thread_data.vertices[i];
+            if (!util::isValid(thread_work.vertices[i])) continue;
+            //if (temp_size != i)
+                thread_work.vertices[temp_size] = thread_work.vertices[i];
             temp_size ++;
         }
-        thread_data.num_elements = temp_size;
+        thread_work.num_elements = temp_size;
     }
 
     __device__ __forceinline__ void BitMask_Cull(
-        ThreadStorageT &thread_data)
+        ThreadWorkT &thread_work)
+        //SmemStorageT &smem)
     {
         #pragma unroll
-        for (int i=0; i<KernelPolicy::GLOBAL_LOAD_SIZE; i++)
+        for (int i=0; i<KernelPolicy::GLOBAL_LOAD_SIZE/* thread_data.num_elements*/; i++)
         {
-            if (!util::isValid(thread_data.vertices[i])) continue;
+            if (!util::isValid(thread_work.vertices[i])) continue;
             // Location of mask byte to read
-            SizeT mask_byte_offset = (thread_data.vertices[i] & KernelPolicy::ELEMENT_ID_MASK) >> 3;
+            SizeT mask_byte_offset = (thread_work.vertices[i] & KernelPolicy::ELEMENT_ID_MASK) >> 3;
 
             // Bit in mask byte corresponding to current vertex id
-            unsigned char mask_bit = 1 << (thread_data.vertices[i] & 7);
+            unsigned char mask_bit = 1 << (thread_work.vertices[i] & 7);
 
             // Read byte from visited mask in tex
             unsigned char tex_mask_byte = tex1Dfetch(
@@ -269,7 +343,7 @@ struct Cta
             if (mask_bit & tex_mask_byte)
             {
                 // Seen it
-                thread_data.vertices[i] = util::InvalidValue<VertexId>();
+                thread_work.vertices[i] = util::InvalidValue<VertexId>();
             } else {
                 //unsigned char mask_byte = tex_mask_byte;
                 //util::io::ModifiedLoad<util::io::ld::cg>::Ld(
@@ -284,10 +358,13 @@ struct Cta
                 //} else {
                     // Update with best effort
                     //mask_byte |= mask_bit;
+
                     tex_mask_byte |= mask_bit;
                     util::io::ModifiedStore<util::io::st::cg>::St(
                         tex_mask_byte, //mask_byte,
-                        thread_data.d_visited_mask + mask_byte_offset);
+                        thread_work.d_visited_mask + mask_byte_offset);
+                    //thread_work.d_visited_mask[mask_byte_offset] |= mask_bit;
+                    ///thread_data.d_visited_mask [mask_byte_offset] = tex_mask_byte;
                 //}
             }
         }
@@ -297,7 +374,8 @@ struct Cta
     struct VertexC
     {
         static __device__ __forceinline__ void Cull(
-            ThreadStorageT &thread_data)
+            ThreadWorkT &thread_work)
+            //SmemStorageT &smem)
         {}
     };
 
@@ -305,15 +383,16 @@ struct Cta
     struct VertexC<DummyT, true>
     {
         static __device__ __forceinline__ void Cull(
-            ThreadStorageT &thread_data)
+            ThreadWorkT &thread_work)
+            //SmemStorageT &smem)
         {
             #pragma unroll
-            for (int i=0; i<KernelPolicy::GLOBAL_LOAD_SIZE; i++)
+            for (int i=0; i<KernelPolicy::GLOBAL_LOAD_SIZE/*thread_data.num_elements*/; i++)
             {
-                if (!util::isValid(thread_data.vertices[i])) continue;
-                VertexId row_id = thread_data.vertices[i] & KernelPolicy::ELEMENT_ID_MASK;
-                if (thread_data.d_labels[row_id] != util::MaxValue<LabelT>())
-                    thread_data.vertices[i] = util::InvalidValue<VertexId>();
+                if (!util::isValid(thread_work.vertices[i])) continue;
+                VertexId row_id = thread_work.vertices[i] & KernelPolicy::ELEMENT_ID_MASK;
+                if (thread_work.d_labels[row_id] != util::MaxValue<LabelT>())
+                    thread_work.vertices[i] = util::InvalidValue<VertexId>();
             }
         }
     };
@@ -322,53 +401,61 @@ struct Cta
     struct VertexC<DummyT, false>
     {
         static __device__ __forceinline__ void Cull(
-            ThreadStorageT &thread_data)
+            ThreadWorkT &thread_work)
+            //SmemStorageT &smem)
         {}
     };
 
     __device__ __forceinline__ void Vertex_Cull(
-        ThreadStorageT &thread_data)
+        ThreadWorkT &thread_work)
+        //SmemStorageT &smem)
     {
-        VertexC<SizeT, Problem::ENABLE_IDEMPOTENCE>::Cull(thread_data);
+        VertexC<SizeT, Problem::ENABLE_IDEMPOTENCE>::Cull(thread_work);
     }
 
     __device__ __forceinline__ void History_Cull(
-        ThreadStorageT &thread_data)
+        ThreadWorkT &thread_work)
+        //SmemStorageT &smem)
     {
         #pragma unroll
-        for (int i=0; i<KernelPolicy::GLOBAL_LOAD_SIZE; i++)
+        for (int i=0; i<KernelPolicy::GLOBAL_LOAD_SIZE/*thread_data.num_elements*/; i++)
         {
-            if (!util::isValid(thread_data.vertices[i])) continue;
-            int hash = (thread_data.vertices[i]) & KernelPolicy::BLOCK_HASH_MASK;
-            VertexId retrieved = block_hash[hash];
+            if (!util::isValid(thread_work.vertices[i])) continue;
+            int hash = (thread_work.vertices[i]) & KernelPolicy::BLOCK_HASH_MASK;
+            VertexId retrieved = smem.block_hash[hash];
 
-            if (retrieved == thread_data.vertices[i])
+            if (retrieved == thread_work.vertices[i])
                 // Seen it
-                thread_data.vertices[i] = util::InvalidValue<VertexId>();
+                thread_work.vertices[i] = util::InvalidValue<VertexId>();
             else // Update it
-                block_hash[hash] = thread_data.vertices[i];
+                smem.block_hash[hash] = thread_work.vertices[i];
         }
     }
 
     __device__ __forceinline__ void Warp_Cull(
-        ThreadStorageT &thread_data)
+        ThreadWorkT &thread_work)
+        //SmemStorageT &smem)
     {
         #pragma unroll
-        for (int i=0; i<KernelPolicy::GLOBAL_LOAD_SIZE; i++)
+        for (int i=0; i<KernelPolicy::GLOBAL_LOAD_SIZE/* thread_data.num_elements*/; i++)
         {
-            if (!util::isValid(thread_data.vertices[i])) continue;
+            if (!util::isValid(thread_work.vertices[i])) continue;
             //int warp_id = threadIdx.x >> 5;
-            int hash    = thread_data.vertices[i] & (KernelPolicy::WARP_HASH_MASK);
+            int hash    = thread_work.vertices[i] & (KernelPolicy::WARP_HASH_MASK);
 
-            warp_hash[thread_data.warp_id][hash] = thread_data.vertices[i];
-            VertexId retrieved = warp_hash[thread_data.warp_id][hash];
+            smem.warp_hash[thread_work.warp_id][hash] = thread_work.vertices[i];
+            //thread_work.warp_hash[hash] = thread_work.vertices[i];
+            VertexId retrieved = smem.warp_hash[thread_work.warp_id][hash];
+            //VertexId retrieved = thread_work.warp_hash[hash];
 
-            if (retrieved == thread_data.vertices[i])
+            if (retrieved == thread_work.vertices[i])
             {
-                warp_hash[thread_data.warp_id][hash] = threadIdx.x;
-                VertexId tid = warp_hash[thread_data.warp_id][hash];
+                smem.warp_hash[thread_work.warp_id][hash] = threadIdx.x;
+                //thread_work.warp_hash[hash] = threadIdx.x;
+                VertexId tid = smem.warp_hash[thread_work.warp_id][hash];
+                //VertexId tid = thread_work.warp_hash[hash];
                 if (tid != threadIdx.x)
-                    thread_data.vertices[i] = util::InvalidValue<VertexId>();
+                    thread_work.vertices[i] = util::InvalidValue<VertexId>();
             }
         }
     }
@@ -377,7 +464,8 @@ struct Cta
     struct VertexP
     {
         static __device__ __forceinline__ void Process(
-            ThreadStorageT &thread_data)
+            ThreadWorkT &thread_work)
+            //SmemStorageT &smem)
         {}
     };
 
@@ -385,36 +473,38 @@ struct Cta
     struct VertexP<DummyT, true, false>
     {
         static __device__ __forceinline__ void Process(
-            ThreadStorageT &thread_data)
+            ThreadWorkT &thread_work)
+            //SmemStorageT &smem)
         {
-            #pragma unroll
-            for (int i=0; i<KernelPolicy::GLOBAL_LOAD_SIZE; i++)
+            //#pragma unroll
+            for (int i=0; i < /*KernelPolicy::GLOBAL_LOAD_SIZE*/
+                thread_work.num_elements; i++)
             {
-                if (!util::isValid(thread_data.vertices[i])) continue;
-                VertexId row_id = thread_data.vertices[i] & KernelPolicy::ELEMENT_ID_MASK;
+                if (!util::isValid(thread_work.vertices[i])) continue;
+                VertexId row_id = thread_work.vertices[i] & KernelPolicy::ELEMENT_ID_MASK;
 
-                if (thread_data.d_labels[row_id] != util::MaxValue<LabelT>())
+                if (thread_work.d_labels[row_id] != util::MaxValue<LabelT>())
                 {
-                    thread_data.vertices[i] = util::InvalidValue<VertexId>();
+                    thread_work.vertices[i] = util::InvalidValue<VertexId>();
                 } else {
                     if (Functor::CondFilter(
                         util::InvalidValue<VertexId>(),
                         row_id,
-                        thread_data.d_data_slice,
+                        thread_work.d_data_slice,
                         util::InvalidValue<SizeT>(),
-                        thread_data.label,
+                        thread_work.label,
                         util::InvalidValue<SizeT>(),
                         util::InvalidValue<SizeT>()))
                     {
                         Functor::ApplyFilter(
                             util::InvalidValue<VertexId>(),
                             row_id,
-                            thread_data.d_data_slice,
+                            thread_work.d_data_slice,
                             util::InvalidValue<SizeT>(),
-                            thread_data.label,
+                            thread_work.label,
                             util::InvalidValue<SizeT>(),
                             util::InvalidValue<SizeT>());
-                    } else thread_data.vertices[i] = util::InvalidValue<VertexId>();
+                    } else thread_work.vertices[i] = util::InvalidValue<VertexId>();
                 }
             }
         }
@@ -424,45 +514,47 @@ struct Cta
     struct VertexP<DummyT, false, MARK_PREDECESSORS>
     {
         static __device__ __forceinline__ void Process(
-            ThreadStorageT &thread_data)
+            ThreadWorkT &thread_work)
+            //SmemStorageT &smem)
         {
             #pragma unroll
-            for (int i=0; i < KernelPolicy::NUM_ELEMENT_PER_GLOBAL_LOAD; i++)
+            for (int i=0; i < KernelPolicy::GLOBAL_LOAD_SIZE/* thread_data.num_elements*/; i++)
             {
-                if (!util::isValid(thread_data.vertices[i])) continue;
+                if (!util::isValid(thread_work.vertices[i])) continue;
                 if (Functor::CondFilter(
                     util::InvalidValue<VertexId>(),
-                    thread_data.vertices[i],
-                    thread_data.d_data_slice,
+                    thread_work.vertices[i],
+                    thread_work.d_data_slice,
                     util::InvalidValue<SizeT>(),
-                    thread_data.label,
+                    thread_work.label,
                     util::InvalidValue<SizeT>(),
                     util::InvalidValue<SizeT>()))
                 {
                     Functor::ApplyFilter(
                         util::InvalidValue<VertexId>(),
-                        thread_data.vertices[i],
-                        thread_data.d_data_slice,
+                        thread_work.vertices[i],
+                        thread_work.d_data_slice,
                         util::InvalidValue<SizeT>(),
-                        thread_data.label,
+                        thread_work.label,
                         util::InvalidValue<SizeT>(),
                         util::InvalidValue<SizeT>());
-                } else thread_data.vertices[i] = util::InvalidValue<VertexId>();
+                } else thread_work.vertices[i] = util::InvalidValue<VertexId>();
             }
         }
     };
 
     __device__ __forceinline__ void Vertex_Process(
-        ThreadStorageT &thread_data)
+        ThreadWorkT &thread_work)
+        //SmemStorageT &smem)
     {
-        VertexP<SizeT, Problem::ENABLE_IDEMPOTENCE, Problem::MARK_PREDECESSORS>::Process(thread_data);
+        VertexP<SizeT, Problem::ENABLE_IDEMPOTENCE, Problem::MARK_PREDECESSORS>::Process(thread_work);
     }
 
     template <typename DummyT, bool ENABLE_IDEMPOTENCE>
     struct Kernel_{
         static __device__ __forceinline__ void Invoke(
             CtaT            &cta,
-            ThreadStorageT  &thread_data)
+            ThreadWorkT  &thread_work)
         {}
     };
 
@@ -470,17 +562,25 @@ struct Cta
     struct Kernel_<DummyT, true>
     {
         static __device__ __forceinline__ void Invoke(
-            CtaT            &cta,
-            ThreadStorageT  &thread_data)
+            CtaT         &cta,
+            ThreadWorkT  &thread_work)
+            //SmemStorageT &smem)
         {
-            cta. Load_from_Global(thread_data);
-            cta. BitMask_Cull    (thread_data);
-            cta. Vertex_Cull     (thread_data);
-            cta. History_Cull    (thread_data);
-            cta. Warp_Cull       (thread_data);
-            cta. Vertex_Process  (thread_data);
-            cta. Local_Compact   (thread_data);
-            cta. Store_to_Global (thread_data);
+            cta.Load_from_Global(thread_work);
+            //cta.Warp_Cull       (thread_work);
+            //cta.History_Cull    (thread_work);
+            cta.BitMask_Cull    (thread_work);
+            cta.Local_Compact   (thread_work);
+            cta.Store_to_Shared (thread_work);
+            cta.Load_from_Shared(thread_work);
+            if (thread_work.num_elements > 0)
+            {
+                //cta.Vertex_Cull     (thread_work);
+                //cta. Local_Compact   (thread_data);
+                cta.Vertex_Process  (thread_work);
+                cta.Local_Compact   (thread_work);
+            }
+            cta.Store_to_Global (thread_work);
         }
     };
 
@@ -489,20 +589,33 @@ struct Cta
     {
         static __device__ __forceinline__ void Invoke(
             CtaT            &cta,
-            ThreadStorageT  &thread_data)
+            ThreadWorkT  &thread_work)
+            //SmemStorageT &smem)
         {
-            cta. Load_from_Global(thread_data);
-            cta. Vertex_Cull     (thread_data);
-            cta. Vertex_Process  (thread_data);
-            cta. Local_Compact   (thread_data);
-            cta. Store_to_Global (thread_data);
+            cta.Load_from_Global(thread_work);
+            //cta.Vertex_Cull     (thread_work);
+            cta.Vertex_Process  (thread_work);
+            cta.Local_Compact   (thread_work);
+            cta.Store_to_Global (thread_work);
         }
     };
 
     __device__ __forceinline__ void Kernel(
-        ThreadStorageT &thread_data)
+        ThreadWorkT &thread_work)
+        //SmemStorageT &smem)
     {
-        Kernel_<Cta, Problem::ENABLE_IDEMPOTENCE>::Invoke(*this, thread_data);
+        Kernel_<SizeT, Problem::ENABLE_IDEMPOTENCE>::Invoke(*this, thread_work);
+        /*Load_from_Global();
+        if (Problem::ENABLE_IDEMPOTENCE)
+        {
+            BitMask_Cull    ();
+            Vertex_Cull     ();
+            History_Cull    ();
+            Warp_Cull       ();
+        } else Vertex_Cull  ();
+        Vertex_Process  ();
+        Local_Compact   ();
+        Store_to_Global ();*/
     }
 };
 
@@ -510,6 +623,7 @@ template <
     typename KernelPolicy,
     typename Problem,
     typename Functor>
+__launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
 __global__ void LaunchKernel(
     typename Functor::LabelT     label,
     bool                         queue_reset,
@@ -526,6 +640,9 @@ __global__ void LaunchKernel(
     typename Problem::SizeT      max_out_frontier,
     util::KernelRuntimeStats     kernel_stats)
 {
+    typedef typename Problem::SizeT SizeT;
+    __shared__ Cta<KernelPolicy, Problem, Functor> cta;
+
     if (threadIdx.x == 0)
     {
         if (queue_reset)
@@ -540,26 +657,36 @@ __global__ void LaunchKernel(
             //printf("queue_reset = %s, num_elements = %d\n",
             //    queue_reset ? "true" : "false", num_elements);
         }
+
+        cta.smem.segment_size = KernelPolicy::GLOBAL_LOAD_SIZE << KernelPolicy::LOG_THREADS;
+        SizeT num_segments = num_elements / cta.smem.segment_size + 1;
+        cta.smem.start_segment = num_segments * blockIdx.x / gridDim.x;
+        cta.smem.end_segment = num_segments * (blockIdx.x + 1) / gridDim.x;
     }
     __syncthreads();
 
-    __shared__ Cta<KernelPolicy, Problem, Functor> cta;
-    ThreadStorage<KernelPolicy, Problem, Functor> thread_data(
-        (typename Problem::VertexId**)cta.warp_hash,
+    //__shared__ typename KernelPolicy::SmemStorage smem;
+
+
+    ThreadWork<KernelPolicy, Problem, Functor> thread_work(
+        //(typename Problem::VertexId**)cta.smem.warp_hash,
+        cta.smem,
         d_keys_in,
         d_keys_out,
         num_elements,
         work_progress.template GetQueueCounter<typename Problem::VertexId>(queue_index+1),
-        (typename Problem::SizeT)blockIdx.x * KernelPolicy::THREADS * KernelPolicy::GLOBAL_LOAD_SIZE,
+        0, //(typename Problem::SizeT)blockIdx.x * KernelPolicy::THREADS * KernelPolicy::GLOBAL_LOAD_SIZE,
         d_visited_mask,
         d_data_slice,
         label);
 
-    cta.Init  (thread_data);
-    while (thread_data.block_input_start < num_elements)
+    cta.Init(thread_work);
+    //while (thread_work.block_input_start < num_elements)
+    for (SizeT segment = cta.smem.start_segment; segment < cta.smem.end_segment; segment ++)
     {
-        cta.Kernel(thread_data);
-        thread_data.block_input_start += KernelPolicy::THREADS * KernelPolicy::GLOBAL_LOAD_SIZE;
+        thread_work.block_input_start = segment * cta.smem.segment_size;
+        cta.Kernel(thread_work);
+        //thread_work.block_input_start += (typename Problem::SizeT) gridDim.x * (KernelPolicy::GLOBAL_LOAD_SIZE << KernelPolicy::LOG_THREADS);
     }
 }
 

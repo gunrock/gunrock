@@ -348,6 +348,7 @@ struct Cta
                 if (util::isValid(tile->element_id[LOAD][VEC]))
                 {
                     int hash = (tile->element_id[LOAD][VEC]) % SmemStorage::HISTORY_HASH_ELEMENTS;
+                        //(tile -> element_id[LOAD][VEC]) & SmemStorage::HISTORY_HASH_MASK;
                     VertexId retrieved = cta->smem_storage.history[hash];
 
                     if (retrieved == tile->element_id[LOAD][VEC])
@@ -374,7 +375,7 @@ struct Cta
             {
                 if (util::isValid(tile->element_id[LOAD][VEC])) {
                     int warp_id = threadIdx.x >> 5;
-                    int hash    = tile->element_id[LOAD][VEC] & (SmemStorage::WARP_HASH_ELEMENTS - 1);
+                    int hash    = tile->element_id[LOAD][VEC] & SmemStorage::WARP_HASH_MASK;//(SmemStorage::WARP_HASH_ELEMENTS - 1);
 
                     cta->smem_storage.state.vid_hashtable[warp_id][hash] = tile->element_id[LOAD][VEC];
                     VertexId retrieved = cta->smem_storage.state.vid_hashtable[warp_id][hash];
@@ -620,9 +621,9 @@ struct Cta
             {
                 tile.BitmaskCull(cta);
             }
-            tile.VertexCull(cta);          // using vertex visitation status (update discovered vertices)
             tile.HistoryCull(cta);
             tile.WarpCull(cta);
+            tile.VertexCull(cta);          // using vertex visitation status (update discovered vertices)
         }
     };
 
@@ -685,11 +686,11 @@ struct Cta
             scan_op);
 
         // Check updated queue offset for overflow due to redundant expansion
-        if (new_queue_offset >= max_out_frontier) {
+        //if (new_queue_offset >= max_out_frontier) {
             //printf(" new_queue_offset >= max_out_frontier, new_queue_offset = %d, max_out_frontier = %d\n", new_queue_offset, max_out_frontier);
-            work_progress.SetOverflow();
-            util::ThreadExit();
-        }
+        //    work_progress.SetOverflow();
+        //    util::ThreadExit();
+        //}
 
         // Scatter directly (without first contracting in smem scratch), predicated
         // on flags

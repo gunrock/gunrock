@@ -430,7 +430,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::filter::COMPACTED_CULL>
             parameter -> filtering_flag ? "true" : "false");*/
         cudaError_t retval = cudaSuccess;
         typedef typename gunrock::oprtr::compacted_cull_filter::KernelPolicy<
-            typename Parameter::Problem> CCFPolicy;
+            typename Parameter::Problem, 350> CCFPolicy;
         gunrock::oprtr::compacted_cull_filter::LaunchKernel<
             CCFPolicy,//typename Parameter::KernelPolicy,
             typename Parameter::Problem,

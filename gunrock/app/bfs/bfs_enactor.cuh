@@ -26,6 +26,7 @@
 #include <gunrock/oprtr/filter/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel_policy.cuh>
 #include <gunrock/oprtr/simplified_filter/kernel.cuh>
+#include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/bfs/bfs_problem.cuh>
@@ -771,6 +772,16 @@ public:
                     bytes),
                     "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
             }
+
+            cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
+            gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
+            if (retval = util::GRError(cudaBindTexture(
+                0,
+                gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,
+                problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
+                ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
+                "BFSEnactor cudaBindTexture row_offsets_ref failed",
+                __FILE__, __LINE__)) break;
         }
 
         for (int gpu=0;gpu<this->num_gpus;gpu++)
@@ -875,13 +886,13 @@ public:
 
     typedef gunrock::oprtr::filter::KernelPolicy<
         Problem,                            // Problem data type
-        300,                                // CUDA_ARCH
+        350,                                // CUDA_ARCH
         //INSTRUMENT,                         // INSTRUMENT
         0,                                  // SATURATION QUIT
         true,                               // DEQUEUE_PROBLEM_SIZE
         8,                                  // MIN_CTA_OCCUPANCY
         8,                                  // LOG_THREADS
-        1,                                  // LOG_LOAD_VEC_SIZE
+        2,                                  // LOG_LOAD_VEC_SIZE
         0,                                  // LOG_LOADS_PER_TILE
         5,                                  // LOG_RAKING_THREADS
         5,                                  // END_BITMASK_CULL

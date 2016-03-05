@@ -28,6 +28,17 @@ namespace oprtr {
 namespace edge_map_partitioned {
 
 /**
+* Templated texture reference for visited mask
+*/
+template <typename SizeT>
+struct RowOffsetsTex
+{
+   static texture<SizeT, cudaTextureType1D, cudaReadModeElementType> row_offsets;
+};
+template <typename SizeT>
+texture<SizeT, cudaTextureType1D, cudaReadModeElementType> RowOffsetsTex<SizeT>::row_offsets;
+
+/**
  * Arch dispatch
  */
 
@@ -181,9 +192,11 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         //gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
     {
         SizeT first  = /*(d_vertex_id >= max_vertex) ?
-            max_edge :*/ d_row_offsets[d_vertex_id];
+            max_edge :*/ //d_row_offsets[d_vertex_id];
+            tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  d_vertex_id);
         SizeT second = /*(d_vertex_id + 1 >= max_vertex) ?
-            max_edge :*/ d_row_offsets[d_vertex_id+1];
+            max_edge :*/ //d_row_offsets[d_vertex_id+1];
+            tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  d_vertex_id + 1);
 
         //printf(" d_vertex_id = %d, max_vertex = %d, max_edge = %d, first = %d, second = %d\n",
         //       d_vertex_id, max_vertex, max_edge, first, second);
@@ -339,7 +352,8 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                 {
                     //smem_storage.vertices [threadIdx.x] = input_item;
                     if (input_item >= 0)
-                        smem_storage.row_offset[threadIdx.x]= row_offsets[input_item];
+                        smem_storage.row_offset[threadIdx.x]= //row_offsets[input_item];
+                            tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  input_item);
                     else smem_storage.row_offset[threadIdx.x] = util::MaxValue<SizeT>();
                 }
                 else if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V ||
@@ -397,7 +411,10 @@ struct Dispatch<KernelPolicy, Problem, Functor,
 
                 SizeT edge_id = row_offset_v + thread_output_offset + block_first_v_skip_count - v_output_start_offset;
                 VertexId u = column_indices[edge_id];
-
+                //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                //    u, column_indices + edge_id);
+                //u = tex1Dfetch(ColumnIndicesTex<VertexId>::column_indices,
+                //    edge_id);
                 ProcessNeighbor
                     <KernelPolicy, Problem, Functor,
                     ADVANCE_TYPE, R_TYPE, R_OP>(
@@ -516,7 +533,8 @@ struct Dispatch<KernelPolicy, Problem, Functor,
 
             SizeT edge_id = row_offset_v - v_output_start_offset + thread_output;
             VertexId u = column_indices[edge_id];
-
+            //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+            //    u, column_indices + edge_id);
             ProcessNeighbor<KernelPolicy, Problem, Functor,
                 ADVANCE_TYPE, R_TYPE, R_OP>(
                 v, u, d_data_slice, edge_id,
