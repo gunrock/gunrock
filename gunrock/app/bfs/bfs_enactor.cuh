@@ -292,7 +292,7 @@ struct BFSIteration : public IterationBase <
         }
 
         // Filter
-        /*gunrock::oprtr::filter::LaunchKernel
+        gunrock::oprtr::filter::LaunchKernel
             <FilterKernelPolicy, Problem, Functor>(
             enactor_stats->filter_grid_size,
             FilterKernelPolicy::THREADS,
@@ -310,8 +310,8 @@ struct BFSIteration : public IterationBase <
             work_progress[0],
             frontier_queue->keys  [frontier_attribute->selector  ].GetSize(),
             frontier_queue->keys  [frontier_attribute->selector^1].GetSize(),
-            enactor_stats->filter_kernel_stats);*/
-        gunrock::oprtr::simplified_filter::LaunchKernel
+            enactor_stats->filter_kernel_stats);
+        /*gunrock::oprtr::simplified_filter::LaunchKernel
             <FilterKernelPolicy, Problem, Functor> (
             enactor_stats[0],
             frontier_attribute[0],
@@ -332,7 +332,7 @@ struct BFSIteration : public IterationBase <
             frontier_queue -> keys  [frontier_attribute -> selector^1].GetSize(),
             enactor_stats -> filter_kernel_stats,
             true, // filtering_flag
-            false); // skip_marking
+            false); // skip_marking*/
 
         //util::MemsetKernel<<<256, 256, 0, stream>>>(
         //    data_slice -> vertex_markers[(enactor_stats -> iteration +1)%2].GetPointer(util::DEVICE), (SizeT)0, graph_slice -> nodes + 1);
@@ -897,7 +897,7 @@ public:
         5,                                  // LOG_RAKING_THREADS
         5,                                  // END_BITMASK_CULL
         8,                                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::filter::COMPACTED_CULL>
+        gunrock::oprtr::filter::SIMPLIFIED>
     FilterKernelPolicy;
 
     typedef gunrock::oprtr::advance::KernelPolicy<

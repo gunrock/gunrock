@@ -12,7 +12,10 @@
  * @brief Filter Kernel
  */
 
+//TODO: Add d_visit_lookup and d_valid_in d_valid_out into ProblemBase
+
 #pragma once
+#include <cub/cub.cuh>
 
 #include <gunrock/util/cta_work_distribution.cuh>
 #include <gunrock/util/cta_work_progress.cuh>
@@ -20,6 +23,7 @@
 #include <gunrock/util/device_intrinsics.cuh>
 
 #include <gunrock/oprtr/filter/cta.cuh>
+#include <gunrock/oprtr/filter/kernel_policy.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -124,6 +128,55 @@ struct Dispatch
     typedef typename KernelPolicy::Value    Value;
     typedef typename Problem::DataSlice     DataSlice;
     typedef typename Functor::LabelT        LabelT;
+
+    static __device__ __forceinline__ void MarkVisit(
+                VertexId *&vertex_in,
+                SizeT *&visit_lookup,
+                SizeT &input_queue_length,
+                SizeT &node_num)
+    {
+        // Empty
+    }
+
+    static __device__ __forceinline__ void MarkValid(
+                VertexId *&vertex_in,
+                SizeT *&visit_lookup,
+                VertexId *&valid_in,
+                SizeT &input_queue_length,
+                SizeT &node_num)
+    {
+        // Empty
+    }
+
+    static __device__ __forceinline__ void Compact(
+                VertexId *&vertex_in,
+                VertexId *&vertex_out,
+                VertexId *&valid_out,
+                LabelT    label,
+                DataSlice *&data_slice,
+                SizeT &input_queue_length,
+                SizeT &node_num)
+    {
+        // Empty
+    }
+
+    static __device__ __forceinline__ void Filter(
+            VertexId &iteration,
+            bool &queue_reset,
+            VertexId &queue_index,
+            //int &num_gpus,
+            SizeT &num_elements,
+            //volatile int *&d_done,
+            VertexId  *&d_in_queue,
+            VertexId  *&d_out_queue,
+            DataSlice *&d_data_slice,
+            util::CtaWorkProgress<SizeT> &work_progress,
+            SizeT &max_in_queue,
+            SizeT &max_out_queue,
+            util::KernelRuntimeStats &kernel_stats)
+    {
+        //Empty
+    }
 
     static __device__ __forceinline__ void  Kernel2(
             //VertexId &iteration,
@@ -367,6 +420,71 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
             kernel_stats.Flush();
         }*/
     }
+
+
+    static __device__ __forceinline__ void MarkVisit(
+                VertexId *&vertex_in,
+                SizeT *&visit_lookup,
+                SizeT &input_queue_length,
+                SizeT &node_num)
+    {
+        SizeT my_id = threadIdx.x + blockIdx.x * blockDim.x;
+        if (my_id >= input_queue_length)
+            return;
+        VertexId my_vert = vertex_in[my_id];
+        // Wei's suggestion of adding the third condition
+        if (my_vert < 0 || my_vert >= node_num || visit_lookup[my_vert] > 0) return;
+        visit_lookup[my_vert] = my_id;
+    }
+
+    static __device__ __forceinline__ void MarkValid(
+                VertexId *&vertex_in,
+                SizeT *&visit_lookup,
+                VertexId *&valid_in,
+                SizeT &input_queue_length,
+                SizeT &node_num)
+    {
+        int my_id = threadIdx.x + blockIdx.x * blockDim.x;
+        if (my_id >= input_queue_length) return;
+        VertexId my_vert = vertex_in[my_id];
+        if (my_vert >= node_num) { valid_in[my_id] = 0; return; }
+        valid_in[my_id] = (my_id == visit_lookup[my_vert]);
+    }
+
+    static __device__ __forceinline__ void Compact(
+                VertexId *&vertex_in,
+                VertexId *&vertex_out,
+                VertexId *&valid_out,
+                LabelT   label,
+                DataSlice *&data_slice,
+                SizeT &input_queue_length,
+                SizeT &node_num)
+    {
+        int my_id = threadIdx.x + blockIdx.x * blockDim.x;
+        if (my_id >= input_queue_length) return;
+        VertexId my_vert = vertex_in[my_id];
+        if (my_vert >= node_num) return;
+        VertexId my_valid = valid_out[my_id];
+        if (my_valid == valid_out[my_id+1]-1)
+            vertex_out[my_valid] = my_vert;
+        if (Functor::CondFilter(
+            util::InvalidValue<VertexId>(),
+            vertex_in[my_id],
+            data_slice,
+            util::InvalidValue<SizeT>(),
+            label,
+            util::InvalidValue<SizeT>(),
+            util::InvalidValue<SizeT>()))
+            Functor::ApplyFilter(
+            util::InvalidValue<VertexId>(),
+            vertex_in[my_id],
+            data_slice,
+            util::InvalidValue<SizeT>(),
+            label,
+            util::InvalidValue<SizeT>(),
+            util::InvalidValue<SizeT>());
+    }
+
 };
 
 /**
@@ -450,6 +568,62 @@ void Kernel(
     }
 }
 
+template<typename KernelPolicy, typename Problem, typename Functor>
+__launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
+    __global__
+void MarkVisit(
+        typename KernelPolicy::VertexId *vertex_in,
+        typename KernelPolicy::SizeT *visit_lookup,
+        typename KernelPolicy::SizeT input_queue_length,
+        typename KernelPolicy::SizeT node_num)
+{
+    Dispatch<KernelPolicy, Problem, Functor>::MarkVisit(
+    vertex_in,
+    visit_lookup,
+    input_queue_length,
+    node_num);
+}
+
+template<typename KernelPolicy, typename Problem, typename Functor>
+__launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
+    __global__
+void MarkValid(
+        typename KernelPolicy::VertexId *vertex_in, 
+        typename KernelPolicy::SizeT *visit_lookup,
+        typename KernelPolicy::VertexId *valid_in,
+        typename KernelPolicy::SizeT input_queue_length,
+        typename KernelPolicy::SizeT node_num)
+{
+    Dispatch<KernelPolicy, Problem, Functor>::MarkValid(
+    vertex_in,
+    visit_lookup,
+    valid_in,
+    input_queue_length,
+    node_num);
+}
+
+template<typename KernelPolicy, typename Problem, typename Functor>
+__launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
+    __global__
+void Compact(
+        typename KernelPolicy::VertexId *vertex_in,
+        typename KernelPolicy::VertexId *vertex_out, 
+        typename KernelPolicy::VertexId *valid_out,
+        typename Functor::LabelT                label,
+        typename Problem::DataSlice *data_slice,
+        typename KernelPolicy::SizeT input_queue_length,
+        typename KernelPolicy::SizeT node_num)
+{
+    Dispatch<KernelPolicy, Problem, Functor>::Compact(
+    vertex_in,
+    vertex_out,
+    valid_out,
+    label,
+    data_slice,
+    input_queue_length,
+    node_num);
+}
+
 template <typename KernelPolicy, typename Problem, typename Functor>
 void LaunchKernel(
     unsigned int                            grid_size,
@@ -474,24 +648,67 @@ void LaunchKernel(
 {
     if (queue_reset)
         work_progress.Reset_(0, stream);
+    switch (KernelPolicy::FILTER_MODE)
+    {
+        case CULL:
+            {
+                Kernel<KernelPolicy, Problem, Functor>
+                    <<<grid_size, block_size, shared_size, stream>>>(
+                            label,
+                            queue_reset,
+                            queue_index,
+                            num_elements,
+                            d_in_queue,
+                            d_in_value_queue,
+                            d_out_queue,
+                            d_data_slice,
+                            d_visited_mask,
+                            work_progress,
+                            max_in_queue,
+                            max_out_queue,
+                            kernel_stats,
+                            filtering_flag);
+                break;
+            }
+        case SIMPLIFIED:
+            {
 
-    Kernel<KernelPolicy, Problem, Functor>
-        <<<grid_size, block_size, shared_size, stream>>>(
-        //iteration,
-        label,
-        queue_reset,
-        queue_index,
-        num_elements,
-        d_in_queue,
-        d_in_value_queue,
-        d_out_queue,
-        d_data_slice,
-        d_visited_mask,
-        work_progress,
-        max_in_queue,
-        max_out_queue,
-        kernel_stats,
-        filtering_flag);
+                //d_data_slice->valid_in.GetPointer(util::DEVICE)
+                //d_data_slice->valid_out.GetPointer(util::DEVICE)
+                // launch settings
+                int num_block = (num_elements + KernelPolicy::THREADS - 1) / KernelPolicy::THREADS;
+                // MarkVisit
+                MarkVisit<KernelPolicy, Problem, Functor>
+                <<<num_block, KernelPolicy::THREADS>>>
+                (d_in_queue,
+                d_data_slice->visit_lookup[0].GetPointer(util::DEVICE),
+                num_elements, max_in_queue);
+                // MarkValid
+                MarkValid<KernelPolicy, Problem, Functor>
+                <<<num_block, KernelPolicy::THREADS>>>
+                (d_in_queue,
+                d_data_slice->visit_lookup[0].GetPointer(util::DEVICE),
+                d_data_slice->valid_in[0].GetPointer(util::DEVICE),
+                num_elements, max_in_queue);
+                // ExcScan of num_elements+1
+                void *d_temp_storage = NULL;
+                size_t temp_storage_bytes = 0;
+                cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_data_slice->valid_in[0].GetPointer(util::DEVICE), d_data_slice->valid_out[0].GetPointer(util::DEVICE), num_elements+1);
+                cudaMalloc(&d_temp_storage, temp_storage_bytes);
+                cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_data_slice->valid_in[0].GetPointer(util::DEVICE), d_data_slice->valid_out[0].GetPointer(util::DEVICE), num_elements+1);
+                // Compact
+                Compact<KernelPolicy, Problem, Functor>
+                <<<num_block, KernelPolicy::THREADS>>>
+                (d_in_queue, d_out_queue,
+                d_data_slice->valid_out[0].GetPointer(util::DEVICE),
+                label,
+                d_data_slice,
+                num_elements, max_in_queue);
+                break;
+            }
+        default:
+            break;
+    }
 }
 
 
