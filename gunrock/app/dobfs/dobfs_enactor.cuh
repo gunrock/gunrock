@@ -144,10 +144,10 @@ public:
             int bytes = (graph_slice->nodes + 8 - 1) / 8;
             cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
 
-            gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
+            gunrock::oprtr::cull_filter::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
             if (retval = util::GRError(cudaBindTexture(
                 0,
-                gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref,
+                gunrock::oprtr::cull_filter::BitmaskTex<unsigned char>::ref,
                 data_slice->d_visited_mask,
                 bytes),
                 "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__))
@@ -232,10 +232,10 @@ public:
         Problem      *problem            = this -> problem;
         FrontierAttribute<SizeT>
                      *frontier_attribute = &this->frontier_attribute[0];
-        EnactorStats *enactor_stats      = &this->enactor_stats     [0];
+        EnactorStats<SizeT> *enactor_stats      = &this->enactor_stats     [0];
         DataSlice    *data_slice         =  problem->data_slices    [0];
         Frontier     *frontier_queue     = &data_slice->frontier_queues[0];
-        util::CtaWorkProgressLifetime
+        util::CtaWorkProgressLifetime<SizeT>
                      *work_progress      = &this->work_progress     [0];
         cudaStream_t  stream             =  data_slice->streams     [0];
         ContextPtr    context            =  this -> context         [0];
@@ -272,9 +272,10 @@ public:
                 enactor_stats -> nodes_queued[0] += frontier_attribute -> queue_length;
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, BfsFunctor>(
+                    <AdvanceKernelPolicy, Problem, BfsFunctor, gunrock::oprtr::advance::V2V>(
                     enactor_stats[0],
                     frontier_attribute[0],
+                    enactor_stats->iteration+1,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*    )NULL,
@@ -293,7 +294,7 @@ public:
                     work_progress[0],
                     context[0],
                     stream,
-                    gunrock::oprtr::advance::V2V,
+                    //gunrock::oprtr::advance::V2V,
                     false,
                     false,
                     true);
@@ -307,7 +308,7 @@ public:
                 frontier_attribute -> queue_index++;
                 frontier_attribute -> selector ^= 1;
                 enactor_stats      -> AccumulateEdges(
-                    work_progress  -> GetQueueLengthPointer<unsigned int,SizeT>(
+                    work_progress  -> template GetQueueLengthPointer<unsigned int>(
                         frontier_attribute -> queue_index), stream);
 
                 //if (this -> debug) 
@@ -334,23 +335,27 @@ public:
                 // Filter
                 gunrock::oprtr::filter::LaunchKernel
                     <FilterKernelPolicy, Problem, BfsFunctor>(
-                    enactor_stats->filter_grid_size, 
-                    FilterKernelPolicy::THREADS,
-                    (size_t)0, 
-                    stream,
-                    enactor_stats->iteration + 1,
-                    frontier_attribute->queue_reset,
-                    frontier_attribute->queue_index,
-                    frontier_attribute->queue_length,
-                    frontier_queue->keys  [frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_in_queue
-                    frontier_queue->values[frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_pred_in_queue
-                    frontier_queue->keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+                    enactor_stats[0],
+                    frontier_attribute[0],
+                    (VertexId)enactor_stats->iteration+1,
+                    data_slice,
                     d_data_slice,
+                    NULL,//data_slice->vertex_markers[enactor_stats->iteration%2].GetPointer(util::DEVICE),
                     data_slice->d_visited_mask,
+                    frontier_queue->keys  [frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_in_queue
+                    frontier_queue->keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+                    frontier_queue->values[frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_pred_in_queue
+                    (Value*)NULL,
+                    frontier_attribute->output_length[0],
+                    graph_slice->nodes,
                     work_progress[0],
-                    frontier_queue->keys  [frontier_attribute->selector  ].GetSize(),// max_in_queue
-                    frontier_queue->keys  [frontier_attribute->selector^1].GetSize(),// max_out_queue
-                    enactor_stats->filter_kernel_stats);
+                    context[0],
+                    stream,
+                    frontier_queue->keys[frontier_attribute->selector].GetSize(),
+                    frontier_queue->keys[frontier_attribute->selector^1].GetSize(),
+                    enactor_stats->filter_kernel_stats,
+                    true,
+                    false);
 
                 frontier_attribute->queue_index++;
                 frontier_attribute->selector ^= 1;
@@ -407,23 +412,27 @@ public:
                 // Prepare unvisited queue
                 gunrock::oprtr::filter::LaunchKernel
                     <FilterKernelPolicy, Problem, InputFrontierFunctor>(
-                    enactor_stats->filter_grid_size, 
-                    FilterKernelPolicy::THREADS,
-                    (size_t)0, 
-                    stream,
-                    (long long)-1,
-                    frontier_attribute->queue_reset,
-                    frontier_attribute->queue_index,
-                    frontier_attribute->queue_length,
-                    frontier_queue->keys  [frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_in_queue
-                    (Value*)NULL,
-                    frontier_queue->keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+                    enactor_stats[0],
+                    frontier_attribute[0],
+                    (VertexId)enactor_stats->iteration+1,
+                    data_slice,
                     d_data_slice,
-                    (unsigned char*)NULL,
+                    (SizeT*)NULL,//data_slice->vertex_markers[enactor_stats->iteration%2].GetPointer(util::DEVICE),
+                    data_slice->d_visited_mask,
+                    frontier_queue->keys  [frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_in_queue
+                    frontier_queue->keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+                    (VertexId*)NULL,
+                    (Value*)NULL,
+                    frontier_attribute->output_length[0],
+                    graph_slice->nodes,
                     work_progress[0],
-                    frontier_queue->keys  [frontier_attribute->selector  ].GetSize(), // max_in_queue
-                    frontier_queue->keys  [frontier_attribute->selector^1].GetSize(), // max_out_queue
-                    enactor_stats->filter_kernel_stats);
+                    context[0],
+                    stream,
+                    frontier_queue->keys[frontier_attribute->selector].GetSize(),
+                    frontier_queue->keys[frontier_attribute->selector^1].GetSize(),
+                    enactor_stats->filter_kernel_stats,
+                    true,
+                    false);
 
                 //if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "filter_prepare_input_frontier::Kernel failed", __FILE__, __LINE__))) break;
 
@@ -433,23 +442,27 @@ public:
 
                 gunrock::oprtr::filter::LaunchKernel
                     <FilterKernelPolicy, Problem, UnvisitedQueueFunctor>(
-                    enactor_stats->filter_grid_size, 
-                    FilterKernelPolicy::THREADS,
-                    (size_t)0,
-                    stream,
-                    (long long)-1,
-                    frontier_attribute->queue_reset,
-                    frontier_attribute->queue_index,
-                    frontier_attribute->queue_length,
-                    data_slice->d_index_queue, // d_in_queue
-                    (Value*)NULL,
-                    frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+                    enactor_stats[0],
+                    frontier_attribute[0],
+                    (VertexId)enactor_stats->iteration+1,
+                    data_slice,
                     d_data_slice,
-                    (unsigned char*)NULL,
+                    (SizeT*)NULL,//data_slice->vertex_markers[enactor_stats->iteration%2].GetPointer(util::DEVICE),
+                    data_slice->d_visited_mask,
+                    data_slice->d_index_queue,
+                    frontier_queue->keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+                    (VertexId*)NULL,
+                    (Value*)NULL,
+                    frontier_attribute->output_length[0],
+                    graph_slice->nodes,
                     work_progress[0],
-                    frontier_queue->keys[frontier_attribute->selector  ].GetSize(), // max_in_queue
-                    frontier_queue->keys[frontier_attribute->selector^1].GetSize(), // max_out_queue
-                    enactor_stats->filter_kernel_stats);
+                    context[0],
+                    stream,
+                    frontier_queue->keys[frontier_attribute->selector].GetSize(),
+                    frontier_queue->keys[frontier_attribute->selector^1].GetSize(),
+                    enactor_stats->filter_kernel_stats,
+                    true,
+                    false);
 
                 frontier_attribute->queue_index++;
                 frontier_attribute->selector ^= 1;
@@ -484,6 +497,7 @@ public:
                         <BackwardAdvanceKernelPolicy, Problem, RBFSFunctor>(
                         enactor_stats[0],
                         frontier_attribute[0],
+                        enactor_stats->iteration+1,
                         d_data_slice,
                         data_slice->d_index_queue,
                         data_slice->d_frontier_map_in,
@@ -502,7 +516,7 @@ public:
                         work_progress[0],
                         context[0],
                         stream,
-                        gunrock::oprtr::advance::V2V,
+                        //gunrock::oprtr::advance::V2V,
                         false,
                         false,
                         true);
@@ -538,28 +552,32 @@ public:
                     
                     //enactor_stats -> edges_queued[0] += frontier_attribute -> queue_length;
                     enactor_stats      -> AccumulateEdges(
-                        work_progress  -> GetQueueLengthPointer<unsigned int,SizeT>(
+                        work_progress  -> template GetQueueLengthPointer<unsigned int>(
                         frontier_attribute -> queue_index), stream);
-                    // Vertex Map
-                    gunrock::oprtr::filter::LaunchKernel
-                        <FilterKernelPolicy, Problem, RBFSFunctor>(
-                        enactor_stats->filter_grid_size, 
-                        FilterKernelPolicy::THREADS,
-                        (size_t)0,
-                        stream,
-                        (long long)-1,
-                        frontier_attribute->queue_reset,
-                        frontier_attribute->queue_index,
-                        frontier_attribute->queue_length,
-                        frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_in_queue
-                        (Value*)NULL,
-                        frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
-                        d_data_slice,
-                        (unsigned char*)NULL,
-                        work_progress[0],
-                        frontier_queue->keys[frontier_attribute->selector  ].GetSize(),// max_in_queue
-                        frontier_queue->keys[frontier_attribute->selector^1].GetSize(),// max_out_queue
-                        enactor_stats->filter_kernel_stats);
+                    // Vertex Map 
+                gunrock::oprtr::filter::LaunchKernel
+                    <FilterKernelPolicy, Problem, RBFSFunctor>(
+                    enactor_stats[0],
+                    frontier_attribute[0],
+                    (VertexId)enactor_stats->iteration+1,
+                    data_slice,
+                    d_data_slice,
+                    (SizeT*)NULL,//data_slice->vertex_markers[enactor_stats->iteration%2].GetPointer(util::DEVICE),
+                    data_slice->d_visited_mask,
+                    frontier_queue->keys  [frontier_attribute->selector].GetPointer(util::DEVICE), // d_in_queue
+                    frontier_queue->keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+                    (VertexId*)NULL,
+                    (Value*)NULL,
+                    frontier_attribute->output_length[0],
+                    graph_slice->nodes,
+                    work_progress[0],
+                    context[0],
+                    stream,
+                    frontier_queue->keys[frontier_attribute->selector].GetSize(),
+                    frontier_queue->keys[frontier_attribute->selector^1].GetSize(),
+                    enactor_stats->filter_kernel_stats,
+                    true,
+                    false);
 
                     frontier_attribute->queue_index++;
                     frontier_attribute->selector ^= 1;
@@ -631,23 +649,27 @@ public:
 
                 gunrock::oprtr::filter::LaunchKernel
                     <FilterKernelPolicy, Problem, SwitchFunctor>(
-                    enactor_stats->filter_grid_size, 
-                    FilterKernelPolicy::THREADS,
-                    (size_t)0,
-                    stream,
-                    (long long)-1,
-                    frontier_attribute->queue_reset,
-                    frontier_attribute->queue_index,
-                    frontier_attribute->queue_length,
-                    data_slice->d_index_queue,             // d_in_queue
-                    (Value*)NULL,
-                    frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), // d_out_queue
+                    enactor_stats[0],
+                    frontier_attribute[0],
+                    (VertexId)enactor_stats->iteration+1,
+                    data_slice,
                     d_data_slice,
-                    (unsigned char*)NULL,
+                    (SizeT*)NULL,//data_slice->vertex_markers[enactor_stats->iteration%2].GetPointer(util::DEVICE),
+                    data_slice->d_visited_mask,
+                    data_slice->d_index_queue,
+                    frontier_queue->keys  [frontier_attribute->selector].GetPointer(util::DEVICE), // d_out_queue
+                    (VertexId*)NULL,
+                    (Value*)NULL,
+                    frontier_attribute->output_length[0],
+                    graph_slice->nodes,
                     work_progress[0],
-                    frontier_queue->keys[frontier_attribute->selector  ].GetSize(), // max_in_queue
-                    frontier_queue->keys[frontier_attribute->selector^1].GetSize(), // max_out_queue
-                    enactor_stats->filter_kernel_stats);
+                    context[0],
+                    stream,
+                    frontier_queue->keys[frontier_attribute->selector].GetSize(),
+                    frontier_queue->keys[frontier_attribute->selector^1].GetSize(),
+                    enactor_stats->filter_kernel_stats,
+                    true,
+                    false);
 
                 frontier_attribute->queue_index++;
                 if (retval = work_progress -> GetQueueLength(
@@ -724,29 +746,33 @@ public:
                     //if (frontier_attribute -> queue_length == 0) break;
                     //enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
                     enactor_stats      -> AccumulateEdges(
-                        work_progress  -> GetQueueLengthPointer<unsigned int,SizeT>(
+                        work_progress  -> template GetQueueLengthPointer<unsigned int>(
                             frontier_attribute -> queue_index), stream);
 
                     // Vertex Map
-                    gunrock::oprtr::filter::LaunchKernel
-                        <FilterKernelPolicy, Problem, BfsFunctor>(
-                        enactor_stats->filter_grid_size, 
-                        FilterKernelPolicy::THREADS,
-                        (size_t)0, 
-                        stream,
-                        enactor_stats->iteration + 1,
-                        frontier_attribute->queue_reset,
-                        frontier_attribute->queue_index,
-                        frontier_attribute->queue_length,
-                        frontier_queue->keys  [frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_in_queue
-                        frontier_queue->values[frontier_attribute->selector  ].GetPointer(util::DEVICE), // d_pred_in_queue
-                        frontier_queue->keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
-                        d_data_slice,
-                        data_slice->d_visited_mask,
-                        work_progress[0],
-                        frontier_queue->keys  [frontier_attribute->selector  ].GetSize(),// max_in_queue
-                        frontier_queue->keys  [frontier_attribute->selector^1].GetSize(),// max_out_queue
-                        enactor_stats->filter_kernel_stats);
+                gunrock::oprtr::filter::LaunchKernel
+                    <FilterKernelPolicy, Problem, BfsFunctor>(
+                    enactor_stats[0],
+                    frontier_attribute[0],
+                    (VertexId)enactor_stats->iteration+1,
+                    data_slice,
+                    d_data_slice,
+                    (SizeT*)NULL,//data_slice->vertex_markers[enactor_stats->iteration%2].GetPointer(util::DEVICE),
+                    data_slice->d_visited_mask,
+                    frontier_queue->keys  [frontier_attribute->selector].GetPointer(util::DEVICE), // d_in_queue
+                    frontier_queue->keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue 
+                    frontier_queue->values  [frontier_attribute->selector].GetPointer(util::DEVICE), // d_pred_in_queue
+                    (Value*)NULL,
+                    frontier_attribute->output_length[0],
+                    graph_slice->nodes,
+                    work_progress[0],
+                    context[0],
+                    stream,
+                    frontier_queue->keys[frontier_attribute->selector].GetSize(),
+                    frontier_queue->keys[frontier_attribute->selector^1].GetSize(),
+                    enactor_stats->filter_kernel_stats,
+                    true,
+                    false);
 
                     frontier_attribute->queue_index++;
                     frontier_attribute->selector ^= 1;
@@ -805,11 +831,12 @@ public:
         true,                               // DEQUEUE_PROBLEM_SIZE
         8,                                  // MIN_CTA_OCCUPANCY
         8,                                  // LOG_THREADS
-        1,                                  // LOG_LOAD_VEC_SIZE
+        2,                                  // LOG_LOAD_VEC_SIZE
         0,                                  // LOG_LOADS_PER_TILE
         5,                                  // LOG_RAKING_THREADS
         5,                                  // END_BITMASK_CULL
-        8>                                  // LOG_SCHEDULE_GRANULARITY
+        8,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::filter::CULL>
             FilterKernelPolicy;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
@@ -818,7 +845,7 @@ public:
         //INSTRUMENT,                         // INSTRUMENT
         8,                                  // MIN_CTA_OCCUPANCY
         10,                                  // LOG_THREADS
-        8,
+        9,
         32*128,
         1,                                  // LOG_LOAD_VEC_SIZE
         0,                                  // LOG_LOADS_PER_TILE
@@ -826,7 +853,7 @@ public:
         32,                                 // WARP_GATHER_THRESHOLD
         128 * 4,                            // CTA_GATHER_THRESHOLD
         7,                                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::advance::LB_LIGHT>
+        gunrock::oprtr::advance::LB>
             AdvanceKernelPolicy;
 
     typedef gunrock::oprtr::filter::KernelPolicy<

@@ -41,10 +41,11 @@ namespace dobfs {
  * @tparam ProblemData         Problem data type which contains data slice for BFS problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData, typename _LabelT = VertexId>
 struct PrepareInputFrontierMapFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Vertex mapping condition function. Check if the Vertex Id is valid.
@@ -79,10 +80,11 @@ struct PrepareInputFrontierMapFunctor
  * @tparam ProblemData         Problem data type which contains data slice for BFS problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData, typename _LabelT = VertexId>
 struct PrepareUnvisitedQueueFunctor
 {
-    typedef typename ProblemData::DataSlice DataSlice; 
+    typedef typename ProblemData::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Vertex mapping condition function. Check if the Vertex Id is valid (label equals to -1).
@@ -124,11 +126,11 @@ struct PrepareUnvisitedQueueFunctor
  * @tparam ProblemData         Problem data type which contains data slice for BFS problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData, typename _LabelT = VertexId>
 struct ReverseBFSFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
-
+    typedef _LabelT LabelT;
     /**
      * @brief Forward Edge Mapping condition function. Check if the destination node
      * has been claimed as someone else's child.
@@ -212,10 +214,11 @@ struct ReverseBFSFunctor
  * @tparam ProblemData         Problem data type which contains data slice for BFS problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData, typename _LabelT = VertexId>
 struct SwitchToNormalFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice; 
+    typedef _LabelT LabelT;
 
     /**
      * @brief Vertex mapping condition function. Check if the Vertex Id is valid (frontier_map_out is set).

@@ -48,90 +48,16 @@ template<
     bool        VALID = (__GR_CUDA_ARCH__ >= KernelPolicy::CUDA_ARCH)>
 struct Dispatch
 {
-    typedef typename KernelPolicy::VertexId VertexId;
-    typedef typename KernelPolicy::SizeT    SizeT;
-    typedef typename ProblemData::DataSlice DataSlice;
-
-    static __device__ __forceinline__ SizeT GetNeighborListLength(
-                            SizeT    *&d_row_offsets,
-                            VertexId    *&d_column_indices,
-                            VertexId    &d_vertex_id,
-                            SizeT       &max_vertex,
-                            SizeT       &max_edge,
-                            gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
-    {
-    }
-
-    static __device__ __forceinline__ void GetEdgeCounts(
-                                SizeT *&d_row_offsets,
-                                VertexId *&d_column_indices,
-                                VertexId *&d_queue,
-                                SizeT *&d_scanned_edges,
-                                SizeT &num_elements,
-                                SizeT &max_vertex,
-                                SizeT &max_edge,
-                                gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
-    {
-    }
-
-    static __device__ __forceinline__ void RelaxPartitionedEdges(
-                                bool &queue_reset,
-                                VertexId &queue_index,
-                                int &label,
-                                SizeT *&d_row_offsets,
-                                VertexId *&d_column_indices,
-                                VertexId *&d_inverse_column_indices,
-                                SizeT    *&d_scanned_edges,
-                                unsigned int *&partition_starts,
-                                unsigned int &num_partitions,
-                                //volatile int *&d_done,
-                                VertexId *&d_queue,
-                                bool     *&d_bitmap_in,
-                                bool     *&d_bitmap_out,
-                                DataSlice *&problem,
-                                SizeT &input_queue_len,
-                                SizeT *output_queue_len,
-                                SizeT &partition_size,
-                                SizeT &max_vertices,
-                                SizeT &max_edges,
-                                util::CtaWorkProgress<SizeT> &work_progress,
-                                util::KernelRuntimeStats &kernel_stats,
-                                gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
-                                bool &inverse_graph)
-    {
-    }
-
-    static __device__ __forceinline__ void RelaxLightEdges(
-                                bool &queue_reset,
-                                VertexId &queue_index,
-                                int &label,
-                                SizeT *&d_row_offsets,
-                                VertexId *&d_column_indices,
-                                VertexId *&d_inverse_column_indices,
-                                SizeT    *&d_scanned_edges,
-                                //volatile int *&d_done,
-                                VertexId *&d_queue,
-                                bool     *&d_bitmap_in,
-                                bool     *&d_bitmap_out,
-                                DataSlice *&problem,
-                                SizeT &input_queue_len,
-                                SizeT *output_queue_len,
-                                SizeT &max_vertices,
-                                SizeT &max_edges,
-                                util::CtaWorkProgress<SizeT> &work_progress,
-                                util::KernelRuntimeStats &kernel_stats,
-                                gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
-                                bool &inverse_graph)
-    {
-    }
-
 };
+
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 {
     typedef typename KernelPolicy::VertexId         VertexId;
     typedef typename KernelPolicy::SizeT            SizeT;
+    typedef typename KernelPolicy::Value            Value;
     typedef typename ProblemData::DataSlice         DataSlice;
+    typedef typename Functor::LabelT                LabelT;
 
     static __device__ __forceinline__ SizeT GetNeighborListLength(
                             SizeT    *&d_row_offsets,
