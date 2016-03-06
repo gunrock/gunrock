@@ -35,18 +35,18 @@ template <
     gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
     gunrock::oprtr::advance::REDUCE_OP   R_OP>
 static __device__ __forceinline__ void ProcessNeighbor(
-    typename Problem::VertexId   v,
-    typename Problem::VertexId   u,
-    typename Problem::DataSlice *d_data_slice,
-    typename Problem::SizeT      edge_id,
+    typename Problem::VertexId   &v,
+    typename Problem::VertexId   &u,
+    typename Problem::DataSlice *&d_data_slice,
+    typename Problem::SizeT      &edge_id,
     typename Problem::SizeT      input_pos,
-    typename Problem::VertexId   input_item,
+    typename Problem::VertexId   &input_item,
     typename Problem::SizeT      output_pos,
-    typename Functor::LabelT     label,
-    typename Problem::VertexId  *d_keys_out,
-    typename Problem::Value     *d_values_out,
-    typename Problem::Value     *d_value_to_reduce,
-    typename Problem::Value     *d_reduce_frontier)
+    typename Functor::LabelT     &label,
+    typename Problem::VertexId  *&d_keys_out,
+    typename Problem::Value     *&d_values_out,
+    typename Problem::Value     *&d_value_to_reduce,
+    typename Problem::Value     *&d_reduce_frontier)
 {
     if (Functor::CondEdge(
         v, u, d_data_slice, edge_id, input_item,

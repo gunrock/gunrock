@@ -15,11 +15,10 @@
 
 #pragma once
 
-//TODO: use CUB for SOA scan
-
 namespace gunrock {
 namespace oprtr {
-namespace edge_map_partitioned {
+namespace edge_map_partitioned_cull {
+
 
 
 } //namespace edge_map_partitioned

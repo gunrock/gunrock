@@ -18,25 +18,15 @@
 #include <gunrock/util/cta_work_progress.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
 
-#include <gunrock/oprtr/edge_map_partitioned/cta.cuh>
+#include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
+#include <gunrock/oprtr/cull_filter/cta.cuh>
 
-#include <gunrock/oprtr/advance/kernel_policy.cuh>
+#include <gunrock/oprtr/edge_map_partitioned_cull/kernel_policy.cuh>
 #include <gunrock/oprtr/advance_base.cuh>
 
 namespace gunrock {
 namespace oprtr {
-namespace edge_map_partitioned {
-
-/**
-* Templated texture reference for visited mask
-*/
-template <typename SizeT>
-struct RowOffsetsTex
-{
-   static texture<SizeT, cudaTextureType1D, cudaReadModeElementType> row_offsets;
-};
-template <typename SizeT>
-texture<SizeT, cudaTextureType1D, cudaReadModeElementType> RowOffsetsTex<SizeT>::row_offsets;
+namespace edge_map_partitioned_cull {
 
 /**
  * Arch dispatch
@@ -83,6 +73,8 @@ struct Dispatch<KernelPolicy, Problem, Functor,
     typedef typename KernelPolicy::Value            Value;
     typedef typename Problem::DataSlice             DataSlice;
     typedef typename Functor::LabelT                LabelT;
+    typedef typename KernelPolicy::BlockScanT       BlockScanT;
+    //typedef typename KernelPolicy::BlockLoadT       BlockLoadT;
 
     static __device__ __forceinline__ SizeT GetNeighborListLength(
         SizeT     *&d_row_offsets,
@@ -94,10 +86,10 @@ struct Dispatch<KernelPolicy, Problem, Functor,
     {
         SizeT first  = /*(d_vertex_id >= max_vertex) ?
             max_edge :*/ //d_row_offsets[d_vertex_id];
-            tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  d_vertex_id);
+            tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  d_vertex_id);
         SizeT second = /*(d_vertex_id + 1 >= max_vertex) ?
             max_edge :*/ //d_row_offsets[d_vertex_id+1];
-            tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  d_vertex_id + 1);
+            tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  d_vertex_id + 1);
 
         //printf(" d_vertex_id = %d, max_vertex = %d, max_edge = %d, first = %d, second = %d\n",
         //       d_vertex_id, max_vertex, max_edge, first, second);
@@ -196,9 +188,37 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         Value                   *&d_value_to_reduce,
         Value                   *&d_reduce_frontier)
    {
-        PrepareQueue(queue_reset, queue_index, input_queue_len, output_queue_len, work_progress);
-
+        //PrepareQueue(queue_reset, queue_index, input_queue_len, output_queue_len, work_progress);
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
+
+        if (threadIdx.x == 0 && blockIdx.x == 0)
+        {
+            // obtain problem size
+            if (queue_reset)
+            {
+                work_progress.StoreQueueLength(input_queue_len, queue_index);
+            }
+            else
+            {
+                input_queue_len = work_progress.LoadQueueLength(queue_index);
+            }
+
+            //if (!Problem::ENABLE_IDEMPOTENCE)
+            //work_progress.Enqueue(output_queue_len[0], queue_index + 1);
+
+            // Reset our next outgoing queue counter to zero
+            work_progress.StoreQueueLength(0, queue_index + 2);
+        }
+
+        if (threadIdx.x == 0)
+        {
+            smem_storage.d_output_counter = work_progress.template GetQueueCounter<VertexId>(queue_index + 1);
+            //int lane_id = threadIdx.x & KernelPolicy::WARP_SIZE_MASK;
+            //int warp_id = threadIdx.x >> KernelPolicy::LOG_WARP_SIZE;
+            smem_storage.d_labels = d_data_slice -> labels.GetPointer(util::DEVICE);
+            smem_storage.d_visited_mask = d_data_slice -> visited_mask.GetPointer(util::DEVICE);
+        }
+        __syncthreads();
 
         SizeT block_output_start = blockIdx.x * partition_size;
         if (block_output_start >= output_queue_len[0]) return;
@@ -254,7 +274,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     //smem_storage.vertices [threadIdx.x] = input_item;
                     if (input_item >= 0)
                         smem_storage.row_offset[threadIdx.x]= //row_offsets[input_item];
-                            tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  input_item);
+                            tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  input_item);
                     else smem_storage.row_offset[threadIdx.x] = util::MaxValue<SizeT>();
                 }
                 else if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V ||
@@ -288,43 +308,129 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             SizeT next_v_output_start_offset = 0;
             SizeT v_output_start_offset = 0;
             SizeT row_offset_v = 0;
-            for (SizeT thread_output_offset = threadIdx.x + block_output_processed;
-                thread_output_offset < iter_output_end_offset;
-                thread_output_offset += KernelPolicy::THREADS)
+            //for (SizeT thread_output_offset = threadIdx.x + block_output_processed;
+            //    thread_output_offset < iter_output_end_offset;
+            //    thread_output_offset += KernelPolicy::THREADS)
+            for (SizeT small_iter_block_output_offset = block_output_processed;
+                small_iter_block_output_offset < iter_output_end_offset;
+                small_iter_block_output_offset += KernelPolicy::THREADS)
             {
-                if (thread_output_offset >= next_v_output_start_offset)
+                SizeT thread_output_offset = small_iter_block_output_offset + threadIdx.x;
+                SizeT edge_id = 0;
+                VertexId u = 0;
+                bool to_process = true;
+                SizeT output_pos = 0;
+
+                if (thread_output_offset < iter_output_end_offset)
                 {
-                    v_index    = util::BinarySearch<KernelPolicy::THREADS>(
-                        thread_output_offset, smem_storage.output_offset);
-                    input_item = smem_storage.input_queue[v_index];
-                    if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V ||
-                        ADVANCE_TYPE == gunrock::oprtr::advance::V2E)
-                        v = input_item;
-                    else v = smem_storage.vertices[v_index];
-                    row_offset_v = smem_storage.row_offset[v_index];
-                    next_v_output_start_offset = smem_storage.output_offset[v_index];
-                    if (v_index > 0)
+                    if (thread_output_offset >= next_v_output_start_offset)
                     {
-                        block_first_v_skip_count = 0;
-                        v_output_start_offset = smem_storage.output_offset[v_index-1];
-                    } else v_output_start_offset = block_output_processed;
+                        v_index    = util::BinarySearch<KernelPolicy::THREADS>(
+                            thread_output_offset, smem_storage.output_offset);
+                        input_item = smem_storage.input_queue[v_index];
+                        if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V ||
+                            ADVANCE_TYPE == gunrock::oprtr::advance::V2E)
+                            v = input_item;
+                        else v = smem_storage.vertices[v_index];
+                        row_offset_v = smem_storage.row_offset[v_index];
+                        next_v_output_start_offset = smem_storage.output_offset[v_index];
+                        if (v_index > 0)
+                        {
+                            block_first_v_skip_count = 0;
+                            v_output_start_offset = smem_storage.output_offset[v_index-1];
+                        } else v_output_start_offset = block_output_processed;
+                    }
+
+                    edge_id = row_offset_v + thread_output_offset + block_first_v_skip_count - v_output_start_offset;
+                    u = column_indices[edge_id];
+                    //output_pos = block_output_start + thread_output_offset;
+
+                    if (Problem::ENABLE_IDEMPOTENCE)
+                    {
+                        // Location of mask byte to read
+                        SizeT mask_byte_offset = (u & KernelPolicy::ELEMENT_ID_MASK) >> 3;
+
+                        // Bit in mask byte corresponding to current vertex id
+                        unsigned char mask_bit = 1 << (u & 7);
+
+                        // Read byte from visited mask in tex
+                        unsigned char tex_mask_byte = tex1Dfetch(
+                            gunrock::oprtr::cull_filter::BitmaskTex<unsigned char>::ref,//cta->t_bitmask[0],
+                            mask_byte_offset);
+
+                        if (mask_bit & tex_mask_byte)
+                        {
+                            to_process = false;
+                        } else {
+                            tex_mask_byte |= mask_bit;
+                            util::io::ModifiedStore<util::io::st::cg>::St(
+                                tex_mask_byte, //mask_byte,
+                                smem_storage.d_visited_mask + mask_byte_offset);
+
+                            if (smem_storage.d_labels[u] != util::MaxValue<LabelT>())
+                                to_process = false;
+                        }
+                    }
+                } else {
+                    to_process = false;
                 }
 
-                SizeT edge_id = row_offset_v + thread_output_offset + block_first_v_skip_count - v_output_start_offset;
-                VertexId u = column_indices[edge_id];
-                //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
-                //    u, column_indices + edge_id);
-                //u = tex1Dfetch(ColumnIndicesTex<VertexId>::column_indices,
-                //    edge_id);
-                ProcessNeighbor
-                    <KernelPolicy, Problem, Functor,
-                    ADVANCE_TYPE, R_TYPE, R_OP>(
-                    v, u, d_data_slice, edge_id,
-                    iter_input_start + v_index, input_item,
-                    block_output_start + thread_output_offset,
-                    label, d_keys_out, d_values_out,
-                    d_value_to_reduce, d_reduce_frontier);
+                if (to_process)
+                {
+                    //ProcessNeighbor
+                    //    <KernelPolicy, Problem, Functor,
+                    //    ADVANCE_TYPE, R_TYPE, R_OP>(
+                    //    v, u, d_data_slice, edge_id,
+                    //    iter_input_start + v_index, input_item,
+                    //    output_pos,
+                    //    label, d_keys_out, d_values_out,
+                    //    d_value_to_reduce, d_reduce_frontier);
+                    SizeT input_pos = iter_input_start + v_index;
+                    output_pos = util::InvalidValue<SizeT>();
+                    if (Functor::CondEdge(
+                        v, u, d_data_slice, edge_id, input_item, label,
+                        input_pos, output_pos))
+                    {
+                        Functor::ApplyEdge(
+                            v, u, d_data_slice, edge_id, input_item, label,
+                            input_pos, output_pos);
+                        if (Functor::CondFilter(
+                            v, u, d_data_slice, input_item, label,
+                            input_pos, output_pos))
+                        {
+                            Functor::ApplyFilter(
+                                v, u, d_data_slice, input_item, label,
+                                input_pos, output_pos);
+                        } else to_process = false;
+                    } else to_process = false;
+                }
 
+                SizeT thread_offset, block_count;
+                BlockScanT(smem_storage.cub_storage.scan_space).
+                    ExclusiveSum(to_process ? 1 : 0, thread_offset, block_count);
+                if (threadIdx.x == 0 && block_count != 0)
+                {
+                    smem_storage.block_offset = atomicAdd(smem_storage.d_output_counter, block_count);
+                }
+                __syncthreads();
+                if (to_process)
+                {
+                    output_pos = smem_storage.block_offset + thread_offset;
+                    if (d_keys_out != NULL)
+                    {
+                        if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E ||
+                            ADVANCE_TYPE == gunrock::oprtr::advance::E2E)
+                        {
+                            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                                (typename Problem::VertexId) edge_id,
+                                d_keys_out + output_pos);
+                        } else {
+                            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                                u,
+                                d_keys_out + output_pos);
+                        }
+                    }
+                }
             } // for
             block_output_processed += iter_output_size;
             iter_input_start += iter_input_size;

@@ -126,6 +126,34 @@ struct AtomicInt<T, 8>
     }
 };
 
+// From Andrew Davidson's dStepping SSSP GPU implementation
+// binary search on device, only works for arrays shorter
+// than 1024
+
+template <int NT, typename KeyType, typename ArrayType>
+__device__ int BinarySearch(KeyType i, ArrayType *queue)
+{
+    int mid = ((NT >> 1) - 1);
+
+    if (NT > 512)
+        mid = queue[mid] > i ? mid - 256 : mid + 256;
+    if (NT > 256)
+        mid = queue[mid] > i ? mid - 128 : mid + 128;
+    if (NT > 128)
+        mid = queue[mid] > i ? mid - 64 : mid + 64;
+    if (NT > 64)
+        mid = queue[mid] > i ? mid - 32 : mid + 32;
+    if (NT > 32)
+        mid = queue[mid] > i ? mid - 16 : mid + 16;
+    mid = queue[mid] > i ? mid - 8 : mid + 8;
+    mid = queue[mid] > i ? mid - 4 : mid + 4;
+    mid = queue[mid] > i ? mid - 2 : mid + 2;
+    mid = queue[mid] > i ? mid - 1 : mid + 1;
+    mid = queue[mid] > i ? mid     : mid + 1;
+
+    return mid;
+}
+
 } // namespace util
 } // namespace gunrock
 

@@ -221,7 +221,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             else
             {
                 input_queue_len = work_progress.LoadQueueLength(queue_index);
-                
+
                 // Signal to host that we're done
                 //if (input_queue_len == 0) {
                 //    if (d_done) d_done[0] = input_queue_len;
@@ -245,7 +245,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         my_thread_start = bid * partition_size;
         my_thread_end = (bid+1)*partition_size < output_queue_len[0] ? (bid+1)*partition_size : output_queue_len[0];
-        //printf("tid:%d, bid:%d, m_thread_start:%d, m_thread_end:%d\n",tid, bid, my_thread_start, my_thread_end); 
+        //printf("tid:%d, bid:%d, m_thread_start:%d, m_thread_end:%d\n",tid, bid, my_thread_start, my_thread_end);
 
         if (my_thread_start >= output_queue_len[0])
             return;
@@ -294,7 +294,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             __syncthreads();
 
             SizeT e_last = min(s_edges[last] - e_offset, my_work_size - edges_processed);
-            SizeT v_index = gunrock::oprtr::edge_map_partitioned::BinarySearch<KernelPolicy::THREADS>(tid+e_offset, s_edges);
+            SizeT v_index = util::BinarySearch<KernelPolicy::THREADS>(tid+e_offset, s_edges);
             VertexId v = s_vertices[v_index];
             VertexId e_id = s_edge_ids[v_index];
             SizeT end_last = (v_index < my_end_partition ? s_edges[v_index] : max_edges);
@@ -305,7 +305,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             {
                 if (i >= end_last)
                 {
-                    v_index = gunrock::oprtr::edge_map_partitioned::BinarySearch<KernelPolicy::THREADS>(i, s_edges);
+                    v_index = util::BinarySearch<KernelPolicy::THREADS>(i, s_edges);
                     if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
                         v = d_queue[v_index];
                         e_id = 0;
@@ -331,7 +331,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                         u,
-                                        d_out + out_index); 
+                                        d_out + out_index);
                             } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
                                      ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -350,7 +350,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                         u,
-                                        d_out + out_index); 
+                                        d_out + out_index);
                             } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
                                      ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -424,7 +424,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             else
             {
                 input_queue_len = work_progress.LoadQueueLength(queue_index);
-                
+
                 // Signal to host that we're done
                 //if (input_queue_len == 0) {
                 //    if (d_done) d_done[0] = input_queue_len;
@@ -464,7 +464,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         }
         // do not support E2V and E2E for backward BFS now
         /*if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
-            if (inverse_graph) 
+            if (inverse_graph)
                 s_vertices[tid] = (my_id < range ? d_inverse_column_indices[d_queue[my_id]] : max_vertices);
             else
                 s_vertices[tid] = (my_id < range ? d_column_indices[d_queue[my_id]] : max_vertices);
@@ -476,7 +476,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         VertexId v, e, v_id;
 
-        int v_index = gunrock::oprtr::edge_map_partitioned::BinarySearch<KernelPolicy::THREADS>(tid, s_edges);
+        int v_index = util::BinarySearch<KernelPolicy::THREADS>(tid, s_edges);
         v = s_vertices[v_index];
         v_id = s_edge_ids[v_index];
         int end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
@@ -486,7 +486,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         {
             if (i >= end_last)
             {
-                v_index = gunrock::oprtr::edge_map_partitioned::BinarySearch<KernelPolicy::THREADS>(i, s_edges);
+                v_index = util::BinarySearch<KernelPolicy::THREADS>(i, s_edges);
                 v = s_vertices[v_index];
                 v_id = s_edge_ids[v_index];
                 end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
@@ -508,7 +508,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                     if (Functor::CondEdge(label, v, problem))
                         Functor::ApplyEdge(label, v, problem);
                 } else {
-                    if (Functor::CondEdge(u, v, problem)) 
+                    if (Functor::CondEdge(u, v, problem))
                         Functor::ApplyEdge(u, v, problem);
                 }
 

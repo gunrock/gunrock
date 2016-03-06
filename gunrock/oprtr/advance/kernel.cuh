@@ -17,12 +17,13 @@
 #include <gunrock/util/cta_work_progress.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
 
+#include <gunrock/oprtr/advance/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_forward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_backward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_partitioned_backward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
+#include <gunrock/oprtr/edge_map_partitioned_cull/kernel.cuh>
 
-#include <gunrock/oprtr/advance/kernel_policy.cuh>
 #include <gunrock/util/multithread_utils.cuh>
 
 #include <moderngpu.cuh>
@@ -114,7 +115,8 @@ cudaError_t ComputeOutputLength(
     }
     else if (KernelPolicy::ADVANCE_MODE == LB ||
              KernelPolicy::ADVANCE_MODE == LB_LIGHT ||
-             KernelPolicy::ADVANCE_MODE == TWC_FORWARD)
+             KernelPolicy::ADVANCE_MODE == TWC_FORWARD ||
+             KernelPolicy::ADVANCE_MODE == LB_CULL)
     {
         gunrock::oprtr::edge_map_partitioned::GetEdgeCounts
             <typename KernelPolicy::LOAD_BALANCED, Problem, Functor, ADVANCE_TYPE, R_TYPE, R_OP>
@@ -576,6 +578,136 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
                   break;
           }
         }*/
+        return retval;
+    }
+};
+
+template <typename Parameter>
+struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_CULL>
+{
+    typedef typename Parameter::Problem::SizeT         SizeT;
+    typedef typename Parameter::Problem::VertexId      VertexId;
+    typedef typename Parameter::Problem::Value         Value;
+    typedef typename Parameter::KernelPolicy::LOAD_BALANCED_CULL KernelPolicy;
+
+    static cudaError_t Launch(Parameter *parameter)
+    {
+        cudaError_t retval = cudaSuccess;
+        // load edge-expand-partitioned kernel
+        SizeT num_block = (parameter -> frontier_attribute -> queue_length +
+            KernelPolicy::THREADS - 1) / KernelPolicy::THREADS;
+
+        if (parameter -> get_output_length)
+        {
+            if (retval = ComputeOutputLength(parameter))
+                return retval;
+            if (retval = util::GRError(cudaStreamSynchronize(parameter -> stream),
+                "cudaStreamSynchronize failed", __FILE__, __LINE__))
+                return retval;
+        }
+        //printf("output_length = %lld\n", (long long)frontier_attribute.output_length[0]);
+        if (/*!parameter -> get_output_length || (parameter -> get_output_length &&*/
+            //parameter -> frontier_attribute -> output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD)//)
+            parameter -> frontier_attribute -> output_length[0] < 64LL * 2 * KernelPolicy::THREADS)
+        {
+            //printf("using RelaxLightEdges\n");
+            gunrock::oprtr::edge_map_partitioned_cull::RelaxLightEdges
+                <KernelPolicy,
+                typename Parameter::Problem,
+                typename Parameter::Functor,
+                Parameter::ADVANCE_TYPE,
+                Parameter::R_TYPE,
+                Parameter::R_OP>
+                <<< num_block, KernelPolicy::THREADS, 0, parameter -> stream>>>(
+                parameter -> frontier_attribute -> queue_reset,
+                parameter -> frontier_attribute -> queue_index,
+                parameter -> label, //parameter -> enactor_stats -> iteration,
+                parameter -> d_row_offsets,
+                parameter -> d_column_offsets,
+                parameter -> d_column_indices,
+                parameter -> d_row_indices,
+                parameter -> d_partitioned_scanned_edges, // TODO: +1?
+                parameter -> d_in_key_queue,
+                parameter -> d_out_key_queue,
+                parameter -> d_out_value_queue,
+                parameter -> d_data_slice,
+                parameter -> frontier_attribute -> queue_length,
+                parameter -> frontier_attribute -> output_length.GetPointer(util::DEVICE),
+                parameter -> max_in,
+                parameter -> max_out,
+                parameter -> work_progress[0],
+                parameter -> enactor_stats -> advance_kernel_stats,
+                //ADVANCE_TYPE,
+                parameter -> input_inverse_graph,
+                parameter -> output_inverse_graph,
+                //R_TYPE,
+                //R_OP,
+                parameter -> d_value_to_reduce,
+                parameter -> d_reduce_frontier);
+        }
+        else //if (/*get_output_length &&*/ parameter -> frontier_attribute -> output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
+        {
+            int num_blocks = parameter -> frontier_attribute -> output_length[0] / 2 / KernelPolicy::THREADS; // LBPOLICY::BLOCKS
+            if (num_blocks > 120)
+                num_blocks = 120;
+            if (num_blocks < 1) num_blocks = 1;
+            SizeT split_val = (parameter -> frontier_attribute -> output_length[0] +
+                num_blocks - 1) / num_blocks;
+            //printf("using RelaxLightEdges2, input_length = %lld, ouput_length = %lld, split_val = %lld\n",
+            //    (long long)parameter -> frontier_attribute -> queue_length,
+            //    (long long)parameter -> frontier_attribute -> output_length[0],
+            //    (long long)split_val);
+            util::MemsetIdxKernel<<<1, num_blocks, 0, parameter -> stream>>>(
+                parameter -> enactor_stats -> node_locks.GetPointer(util::DEVICE),
+                num_blocks,
+                split_val);
+            SortedSearch<MgpuBoundsLower>(
+                parameter -> enactor_stats -> node_locks.GetPointer(util::DEVICE),
+                num_blocks,
+                parameter -> d_partitioned_scanned_edges,
+                parameter -> frontier_attribute -> queue_length,
+                parameter -> enactor_stats -> node_locks_out.GetPointer(util::DEVICE),
+                parameter -> context[0]);
+            //util::cpu_mt::PrintGPUArray("node_locks_out",
+            //    parameter -> enactor_stats -> node_locks_out.GetPointer(util::DEVICE),
+            //    num_blocks + 1, -1, -1, -1, parameter -> stream);
+            gunrock::oprtr::edge_map_partitioned_cull::RelaxPartitionedEdges2
+                <KernelPolicy,
+                typename Parameter::Problem,
+                typename Parameter::Functor,
+                Parameter::ADVANCE_TYPE,
+                Parameter::R_TYPE,
+                Parameter::R_OP>
+                <<< num_blocks,
+                KernelPolicy::THREADS,
+                0, parameter -> stream>>>(
+                parameter -> frontier_attribute -> queue_reset,
+                parameter -> frontier_attribute -> queue_index,
+                parameter -> label, //parameter -> enactor_stats -> iteration,
+                parameter -> d_row_offsets,
+                parameter -> d_column_offsets,
+                parameter -> d_column_indices,
+                parameter -> d_row_indices,
+                parameter -> d_partitioned_scanned_edges,
+                parameter -> enactor_stats -> node_locks_out.GetPointer(util::DEVICE),
+                num_blocks,
+                parameter -> d_in_key_queue,
+                parameter -> d_out_key_queue,
+                parameter -> d_out_value_queue,
+                parameter -> d_data_slice,
+                parameter -> frontier_attribute -> queue_length,
+                parameter -> frontier_attribute -> output_length.GetPointer(util::DEVICE),
+                split_val,
+                parameter -> max_in,
+                parameter -> max_out,
+                parameter -> work_progress[0],
+                parameter -> enactor_stats -> advance_kernel_stats,
+                parameter -> input_inverse_graph,
+                parameter -> output_inverse_graph,
+                parameter -> d_value_to_reduce,
+                parameter -> d_reduce_frontier);
+            //util::DisplayDeviceResults(d_out_key_queue, output_queue_len);
+        }
         return retval;
     }
 };

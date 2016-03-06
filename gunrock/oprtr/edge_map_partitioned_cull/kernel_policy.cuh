@@ -16,9 +16,11 @@
 
 #pragma once
 
+#include <cub/cub.cuh>
+
 namespace gunrock {
 namespace oprtr {
-namespace edge_map_partitioned {
+namespace edge_map_partitioned_cull {
 
 /**
  * @brief Kernel configuration policy for partitioned edge mapping kernels.
@@ -38,13 +40,13 @@ namespace edge_map_partitioned {
  * @tparam _LOG_THREADS                 Number of threads per CTA (log).
  */
 template <
-    typename _ProblemData,
+    typename _Problem,
     // Machine parameters
     int _CUDA_ARCH,
     // Behavioral control parameters
     //bool _INSTRUMENT,
     // Tunable parameters
-    int _MIN_CTA_OCCUPANCY,
+    int _MAX_CTA_OCCUPANCY,
     int _LOG_THREADS,
     int _LOG_BLOCKS,
     int _LIGHT_EDGE_THRESHOLD>
@@ -55,10 +57,11 @@ struct KernelPolicy
     // Constants and typedefs
     //---------------------------------------------------------------------
 
-    typedef _ProblemData                    ProblemData;
-    typedef typename ProblemData::VertexId  VertexId;
-    typedef typename ProblemData::SizeT     SizeT;
-    typedef typename ProblemData::Value     Value;
+    typedef _Problem                    Problem;
+
+    typedef typename Problem::VertexId  VertexId;
+    typedef typename Problem::SizeT     SizeT;
+    typedef typename Problem::Value     Value;
 
     enum {
 
@@ -70,8 +73,13 @@ struct KernelPolicy
         LOG_BLOCKS                      = _LOG_BLOCKS,
         BLOCKS                          = 1 << LOG_BLOCKS,
         LIGHT_EDGE_THRESHOLD            = _LIGHT_EDGE_THRESHOLD,
+        WARP_SIZE                       = GR_WARP_THREADS(CUDA_ARCH),
+        LOG_WARP_SIZE                   = 5,
+        WARP_SIZE_MASK                  = WARP_SIZE -1,
+        WARPS                           = THREADS / WARP_SIZE,
     };
 
+    typedef cub::BlockScan<SizeT, THREADS, cub::BLOCK_SCAN_RAKING> BlockScanT;
     /**
      * @brief Shared memory storage type for the CTA
      */
@@ -79,7 +87,7 @@ struct KernelPolicy
     {
         enum {
             // Amount of storage we can use for hashing scratch space under target occupancy
-            MAX_SCRATCH_BYTES_PER_CTA       = (GR_SMEM_BYTES(CUDA_ARCH) / _MIN_CTA_OCCUPANCY)
+            MAX_SCRATCH_BYTES_PER_CTA       = (GR_SMEM_BYTES(CUDA_ARCH) / _MAX_CTA_OCCUPANCY)
                                                 - 128,                                          // Fudge-factor to guarantee occupancy
 
             SCRATCH_ELEMENT_SIZE            = sizeof(SizeT) * 2 + sizeof(VertexId) * 2,
@@ -93,15 +101,28 @@ struct KernelPolicy
             SizeT                       row_offset   [SCRATCH_ELEMENTS];
             VertexId                    vertices     [SCRATCH_ELEMENTS];
             VertexId                    input_queue  [SCRATCH_ELEMENTS];
+            SizeT                       block_offset;
+            SizeT                      *d_output_counter;
+            VertexId                   *d_labels;
+            unsigned char              *d_visited_mask;
+            SizeT                       block_output_start;
+            SizeT                       block_output_end;
+            SizeT                       block_output_size;
+            SizeT                       block_input_end;
+            SizeT                       iter_input_start;
+            union {
+                typename BlockScanT::TempStorage scan_space;
+            } cub_storage;
         };
     };
 
     enum {
         THREAD_OCCUPANCY                = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
         SMEM_OCCUPANCY                  = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
-        CTA_OCCUPANCY                   = GR_MIN(_MIN_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
+        CTA_OCCUPANCY                   = GR_MIN(_MAX_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
 
         VALID                           = (CTA_OCCUPANCY > 0),
+        ELEMENT_ID_MASK	                = ~(1<<(sizeof(VertexId)*8-2)),
     };
 };
 

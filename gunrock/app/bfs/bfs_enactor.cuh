@@ -22,11 +22,7 @@
 #include <gunrock/util/device_intrinsics.cuh>
 
 #include <gunrock/oprtr/advance/kernel.cuh>
-#include <gunrock/oprtr/advance/kernel_policy.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
-#include <gunrock/oprtr/filter/kernel_policy.cuh>
-#include <gunrock/oprtr/simplified_filter/kernel.cuh>
-#include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/bfs/bfs_problem.cuh>
@@ -206,7 +202,7 @@ struct BFSIteration : public IterationBase <
             <AdvanceKernelPolicy, Problem, Functor, gunrock::oprtr::advance::V2V>(
             enactor_stats[0],
             frontier_attribute[0],
-            enactor_stats -> iteration,
+            enactor_stats -> iteration + 1,
             d_data_slice,
             (VertexId*)NULL,
             (bool*    )NULL,
@@ -311,7 +307,7 @@ struct BFSIteration : public IterationBase <
             frontier_queue->keys  [frontier_attribute->selector  ].GetSize(),
             frontier_queue->keys  [frontier_attribute->selector^1].GetSize(),
             enactor_stats->filter_kernel_stats);*/
-        gunrock::oprtr::filter::LaunchKernel
+        /*gunrock::oprtr::filter::LaunchKernel
             <FilterKernelPolicy, Problem, Functor> (
             enactor_stats[0],
             frontier_attribute[0],
@@ -344,7 +340,7 @@ struct BFSIteration : public IterationBase <
             util::cpu_mt::PrintMessage("Filter end.",
                 thread_num, enactor_stats->iteration);
         frontier_attribute->queue_index++;
-        frontier_attribute->selector ^= 1;
+        frontier_attribute->selector ^= 1;*/
 
         if (TO_TRACK)
         {
@@ -942,7 +938,7 @@ public:
         300,                                // CUDA_ARCH
         //INSTRUMENT,                         // INSTRUMENT
         8,                                  // MIN_CTA_OCCUPANCY
-        10,                                 // LOG_THREADS
+        9,                                 // LOG_THREADS
         9,                                  // LOG_BLOCKS
         32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
         1,                                  // LOG_LOAD_VEC_SIZE
@@ -952,7 +948,7 @@ public:
         128 * 4,                            // CTA_GATHER_THRESHOLD
         7,                                  // LOG_SCHEDULE_GRANULARITY
         //gunrock::oprtr::advance::LB_LIGHT>
-        gunrock::oprtr::advance::LB>
+        gunrock::oprtr::advance::LB_CULL>
     LBAdvanceKernelPolicy_IDEM;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
