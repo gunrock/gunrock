@@ -38,6 +38,8 @@ struct RowOffsetsTex
 template <typename SizeT>
 texture<SizeT, cudaTextureType1D, cudaReadModeElementType> RowOffsetsTex<SizeT>::row_offsets;
 
+
+
 /**
  * Arch dispatch
  */

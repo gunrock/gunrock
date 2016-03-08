@@ -51,8 +51,10 @@ template <
     int _LOG_BLOCKS,
     int _LIGHT_EDGE_THRESHOLD>
 
-struct KernelPolicy
+class KernelPolicy
 {
+public:
+
     //---------------------------------------------------------------------
     // Constants and typedefs
     //---------------------------------------------------------------------
@@ -77,6 +79,19 @@ struct KernelPolicy
         LOG_WARP_SIZE                   = 5,
         WARP_SIZE_MASK                  = WARP_SIZE -1,
         WARPS                           = THREADS / WARP_SIZE,
+        LOG_OUTPUT_PER_THREAD           = 2,
+        OUTPUT_PER_THREAD               = 1 << LOG_OUTPUT_PER_THREAD,
+        //OUTPUT_PER_THREAD               = 4,
+    };
+
+    enum {
+        // Amount of storage we can use for hashing scratch space under target occupancy
+        //MAX_SCRATCH_BYTES_PER_CTA       = (GR_SMEM_BYTES(CUDA_ARCH) / _MAX_CTA_OCCUPANCY)
+        //                                    - 128,                                          // Fudge-factor to guarantee occupancy
+
+        //SCRATCH_ELEMENT_SIZE            = sizeof(SizeT) * 2 + sizeof(VertexId) * 2,
+
+        SCRATCH_ELEMENTS                = 256,//= (THREADS > MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE) ? MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE : THREADS,
     };
 
     typedef cub::BlockScan<SizeT, THREADS, cub::BLOCK_SCAN_RAKING> BlockScanT;
@@ -85,35 +100,51 @@ struct KernelPolicy
      */
     struct SmemStorage
     {
-        enum {
-            // Amount of storage we can use for hashing scratch space under target occupancy
-            MAX_SCRATCH_BYTES_PER_CTA       = (GR_SMEM_BYTES(CUDA_ARCH) / _MAX_CTA_OCCUPANCY)
-                                                - 128,                                          // Fudge-factor to guarantee occupancy
 
-            SCRATCH_ELEMENT_SIZE            = sizeof(SizeT) * 2 + sizeof(VertexId) * 2,
-
-            SCRATCH_ELEMENTS                 = (THREADS > MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE) ? MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE : THREADS,
-        };
 
         // Scratch elements
-        struct {
+        //struct {
             SizeT                       output_offset[SCRATCH_ELEMENTS];
             SizeT                       row_offset   [SCRATCH_ELEMENTS];
-            VertexId                    vertices     [SCRATCH_ELEMENTS];
+            VertexId                    vertices     [1];//SCRATCH_ELEMENTS];
             VertexId                    input_queue  [SCRATCH_ELEMENTS];
             SizeT                       block_offset;
             SizeT                      *d_output_counter;
             VertexId                   *d_labels;
             unsigned char              *d_visited_mask;
+            SizeT                      *d_column_indices;
             SizeT                       block_output_start;
             SizeT                       block_output_end;
             SizeT                       block_output_size;
+            SizeT                       block_input_start;
             SizeT                       block_input_end;
             SizeT                       iter_input_start;
-            union {
-                typename BlockScanT::TempStorage scan_space;
-            } cub_storage;
-        };
+            SizeT                       iter_input_size;
+            SizeT                       iter_input_end;
+            SizeT                       iter_output_end;
+            SizeT                       iter_output_size;
+            SizeT                       iter_output_end_offset;
+            VertexId                    thread_output_vertices[THREADS * OUTPUT_PER_THREAD];
+            unsigned char               tex_mask_bytes[THREADS * OUTPUT_PER_THREAD];
+            //bool                        warps_cond[WARPS];
+            //bool                        block_cond;
+            SizeT                       block_count;
+            SizeT                       block_first_v_skip_count;
+            //union {
+            //    typename BlockScanT::TempStorage scan_space;
+            //} cub_storage;
+        //};
+
+        __device__ __forceinline__ void Init(
+            typename _Problem::VertexId   &queue_index,
+            typename _Problem::DataSlice *&d_data_slice,
+            typename _Problem::SizeT     *&d_scanned_edges,
+            typename _Problem::SizeT     *&partition_starts,
+            typename _Problem::SizeT      &partition_size,
+            typename _Problem::SizeT      &input_queue_len,
+            typename _Problem::SizeT     *&output_queue_len,
+            util::CtaWorkProgress<typename _Problem::SizeT>
+                                          &work_progress);
     };
 
     enum {

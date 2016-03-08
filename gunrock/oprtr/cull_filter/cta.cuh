@@ -43,6 +43,14 @@ struct BitmaskTex
 template <typename VisitedMask>
 texture<VisitedMask, cudaTextureType1D, cudaReadModeElementType> BitmaskTex<VisitedMask>::ref;
 
+template <typename LabelT>
+struct LabelsTex
+{
+   static texture<LabelT, cudaTextureType1D, cudaReadModeElementType> labels;
+};
+template <typename LabelT>
+texture<LabelT, cudaTextureType1D, cudaReadModeElementType> LabelsTex<LabelT>::labels;
+
 /**
  * @brief CTA tile-processing abstraction for the filter operator.
  *

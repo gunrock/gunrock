@@ -203,6 +203,7 @@ struct BFSIteration : public IterationBase <
             enactor_stats[0],
             frontier_attribute[0],
             enactor_stats -> iteration + 1,
+            data_slice,
             d_data_slice,
             (VertexId*)NULL,
             (bool*    )NULL,
@@ -770,6 +771,15 @@ public:
                     problem->data_slices[gpu]->visited_mask.GetPointer(util::DEVICE),
                     bytes),
                     "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
+
+                cudaChannelFormatDesc   labels_desc = cudaCreateChannelDesc<VertexId>();
+                gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels.channelDesc = labels_desc;
+                if (retval = util::GRError(cudaBindTexture(
+                    0,
+                    gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels,
+                    problem->data_slices[gpu]->labels.GetPointer(util::DEVICE),
+                    problem->graph_slices[gpu]->nodes * sizeof(VertexId)),
+                    "BFSEnactor cudaBindTexture labels_tex_ref failed", __FILE__, __LINE__)) break;
             }
 
             cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
@@ -938,7 +948,7 @@ public:
         300,                                // CUDA_ARCH
         //INSTRUMENT,                         // INSTRUMENT
         8,                                  // MIN_CTA_OCCUPANCY
-        9,                                 // LOG_THREADS
+        10,                                 // LOG_THREADS
         9,                                  // LOG_BLOCKS
         32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
         1,                                  // LOG_LOAD_VEC_SIZE

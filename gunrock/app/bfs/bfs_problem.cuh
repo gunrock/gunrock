@@ -65,9 +65,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, unsigned char > visited_mask  ;
         util::Array1D<SizeT, unsigned int  > temp_marker   ;
         util::Array1D<SizeT, VertexId      > original_vertex;
-        //util::Array1D<SizeT, SizeT         > input_counter;
+        util::Array1D<SizeT, SizeT         > input_counter;
         //util::Array1D<SizeT, SizeT         > output_counter;
-        //util::Array1D<SizeT, int           > edge_marker;
+        util::Array1D<SizeT, int           > edge_marker;
         util::Array1D<SizeT, SizeT         > vertex_markers[2];
 
         /*

@@ -79,13 +79,14 @@ struct BFSFunctor {
             new_label = label + 1;
             old_label = atomicMin(d_data_slice -> labels + d_id, new_label);
             result = new_label < old_label;
-            //atomicAdd(d_data_slice -> input_counter + input_pos, 1);
-            //atomicAdd(d_data_slice -> output_counter + output_pos, 1);
-            //atomicAdd(d_data_slice -> edge_marker + edge_id, 1);
+
             //if (result && TO_TRACK && util::to_track(d_data_slice -> gpu_idx, d_id))
             //     printf("%d\t %d\t CondEdge\t labels[%d] (%d) -> %d = labels[%d] + 1\n",
             //        d_data_slice -> gpu_idx, new_label-1, d_id, old_label, new_label, s_id);
         }
+        //atomicAdd(d_data_slice -> input_counter + input_pos, 1);
+        //atomicAdd(d_data_slice -> output_counter + output_pos, 1);
+        //atomicAdd(d_data_slice -> edge_marker + edge_id, 1);
         //if (result) d_data_slice -> vertex_markers[label&0x1][d_id] = 1;
         return result;
     }
@@ -178,11 +179,12 @@ struct BFSFunctor {
         //VertexId node, DataSlice *d_data_slice, Value v = 0, SizeT nid = 0)
     {
         if (Problem::ENABLE_IDEMPOTENCE) {
-            if (TO_TRACK && util::to_track(d_data_slice -> gpu_idx, node))
-                printf("%d\t %d\t ApplyFilter (%d, %d)\t labels[%d] -> %d\n",
-                d_data_slice -> gpu_idx, label, blockIdx.x, threadIdx.x, node, label);
-            util::io::ModifiedStore<util::io::st::cg>::St(
-                label, d_data_slice->labels + node);
+            //if (TO_TRACK && util::to_track(d_data_slice -> gpu_idx, node))
+            //    printf("(%4d, %4d) : ApplyFilter (%d, %d)\t labels[%d] -> %d\n",
+            //    blockIdx.x, threadIdx.x,
+            //    d_data_slice -> gpu_idx, label,  node, label);
+            //util::io::ModifiedStore<util::io::st::cg>::St(
+            //    label, d_data_slice->labels + node);
             if (Problem::MARK_PREDECESSORS)
             {
                 if (d_data_slice -> original_vertex.GetPointer(util::DEVICE) != NULL)

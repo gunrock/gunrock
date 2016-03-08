@@ -185,6 +185,7 @@ struct KernelParameter
                                             *enactor_stats;
     gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                             *frontier_attribute;
+    typename Problem::DataSlice             *h_data_slice;
     typename Problem::DataSlice             *d_data_slice;
     typename Problem::VertexId              *d_backward_index_queue;
     bool                                    *d_backward_frontier_map_in;
@@ -594,8 +595,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_CULL>
     {
         cudaError_t retval = cudaSuccess;
         // load edge-expand-partitioned kernel
-        SizeT num_block = (parameter -> frontier_attribute -> queue_length +
-            KernelPolicy::THREADS - 1) / KernelPolicy::THREADS;
+
 
         if (parameter -> get_output_length)
         {
@@ -610,7 +610,10 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_CULL>
             //parameter -> frontier_attribute -> output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD)//)
             parameter -> frontier_attribute -> output_length[0] < 64LL * 2 * KernelPolicy::THREADS)
         {
-            //printf("using RelaxLightEdges\n");
+            SizeT num_blocks = (parameter -> frontier_attribute -> queue_length +
+                KernelPolicy::SCRATCH_ELEMENTS - 1) / KernelPolicy::SCRATCH_ELEMENTS;
+            //if (num_blocks > 120 ) num_blocks = 120;
+            //printf("using RelaxLightEdges, num_bolocks = %d, labels = %p\n", num_blocks, parameter->h_data_slice->labels.GetPointer(util::DEVICE));
             gunrock::oprtr::edge_map_partitioned_cull::RelaxLightEdges
                 <KernelPolicy,
                 typename Parameter::Problem,
@@ -618,7 +621,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_CULL>
                 Parameter::ADVANCE_TYPE,
                 Parameter::R_TYPE,
                 Parameter::R_OP>
-                <<< num_block, KernelPolicy::THREADS, 0, parameter -> stream>>>(
+                <<< num_blocks, KernelPolicy::THREADS, 0, parameter -> stream>>>(
                 parameter -> frontier_attribute -> queue_reset,
                 parameter -> frontier_attribute -> queue_index,
                 parameter -> label, //parameter -> enactor_stats -> iteration,
@@ -645,9 +648,9 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_CULL>
                 parameter -> d_value_to_reduce,
                 parameter -> d_reduce_frontier);
         }
-        else //if (/*get_output_length &&*/ parameter -> frontier_attribute -> output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
+        else //if (/*get_output_length &&*/ parameter -> frontier_attribute -> //output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
         {
-            int num_blocks = parameter -> frontier_attribute -> output_length[0] / 2 / KernelPolicy::THREADS; // LBPOLICY::BLOCKS
+            SizeT num_blocks = parameter -> frontier_attribute -> output_length[0] / 2 / KernelPolicy::THREADS; // LBPOLICY::BLOCKS
             if (num_blocks > 120)
                 num_blocks = 120;
             if (num_blocks < 1) num_blocks = 1;
@@ -816,6 +819,7 @@ cudaError_t LaunchKernel(
     gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                             &frontier_attribute,
     typename Functor::LabelT                 label,
+    typename Problem::DataSlice             *h_data_slice,
     typename Problem::DataSlice             *d_data_slice,
     typename Problem::VertexId              *d_backward_index_queue,
     bool                                    *d_backward_frontier_map_in,
@@ -854,6 +858,7 @@ cudaError_t LaunchKernel(
     parameter. enactor_stats                = &enactor_stats;
     parameter. frontier_attribute           = &frontier_attribute;
     parameter. label                        =  label;
+    parameter. h_data_slice                 =  h_data_slice;
     parameter. d_data_slice                 =  d_data_slice;
     parameter. d_backward_index_queue       =  d_backward_index_queue;
     parameter. d_backward_frontier_map_in   =  d_backward_frontier_map_in;
