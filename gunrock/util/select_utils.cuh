@@ -67,13 +67,12 @@ cudaError_t CUBSelect_flagged(
 		num_elements)),
 	    "CUBSelect_flagged cub::DeviceSelect::Flagged failed",
 	    __FILE__, __LINE__)) return retval;
-	
     // allocate temporary storage
     if (util::GRError(
             (retval = cudaMalloc(&d_temp_storage, temp_storage_bytes)),
             "CUBSelect malloc d_temp_storage failed",
             __FILE__, __LINE__)) return retval;
-    
+//printf("temp_storage_bytes Needed: %d, number of flag elements:%d\n", temp_storage_bytes, num_elements);   
     // run selection
     if (util::GRError(
             (retval = cub::DeviceSelect::Flagged(

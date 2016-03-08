@@ -214,8 +214,8 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
     Problem * problem = new Problem;
 
     // host results spaces
-    VertexId *h_froms = new VertexId[1000];
-    VertexId *h_tos = new VertexId[1000];
+    VertexId *h_froms = new VertexId[graph_data->nodes*graph_data->nodes*graph_query->edges/2];
+    VertexId *h_tos = new VertexId[graph_data->nodes*graph_data->nodes*graph_query->edges/2];
 
     if (!quiet_mode) { printf("\nSUBGRAPH MATCHING TEST\n"); fflush(stdout);}
 
@@ -368,7 +368,7 @@ int main(int argc, char** argv)
 
     // graph construction or generation related parameters
     info->info["undirected"] = true;  // always convert to undirected
-    info->info["debug_mode"] = true;  // debug mode
+//    info->info["debug_mode"] = true;  // debug mode
 
     if(graph_args == 5)  info->info["node_value"] = true;  // require per node label values
 

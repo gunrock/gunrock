@@ -21,7 +21,7 @@ namespace sm {
 
 // Loop the first two kernels for a few iterations in order to prune 
 // candidate nodes based on degrees and labels
-// Rember to initialized d_temp_keys before every iteration
+// Rember to initialized froms before every iteration
 /////////////////////////////////////////////////////////////////////
 
 /**
@@ -68,11 +68,11 @@ struct SMInitFunctor {
     ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
     #pragma unroll
 	for(VertexId i=0; i < problem->nodes_query; i++){
-		if ((problem->d_data_labels[node] == problem->d_query_labels[i]) && 
-		    (problem->d_data_degrees[node] >= problem->d_query_degrees[i]))
+		if ((problem->tos_data[node] == problem->froms_data[i]) && 
+		    (problem->d_data_degrees[node] >= problem->tos[i]))
 		{
 			problem->d_c_set[node+i*problem->nodes_data]=1;
-			problem->d_temp_keys[node]=1;
+			problem->froms[node]=1;
 		}
 		else
 			problem->d_c_set[node+i*problem->nodes_data]=0;
@@ -138,7 +138,7 @@ struct UpdateDegreeFunctor
     VertexId s_id,  VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-	if(problem->d_temp_keys[d_id]==0) 
+	if(problem->froms[d_id]==0) 
 	   atomicSub(problem->d_data_degrees+s_id,1);
   }
 }; // UpdateDegreeFunctor
@@ -253,8 +253,7 @@ struct PruneFunctor
     VertexId s_id,  VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-    //if(e_id<problem->edges_data)	printf("e_id:%d s_id:%d->d_id:%d\n",e_id, s_id, d_id);
-
+    #pragma unroll
 	for(VertexId i=0; i<problem->nodes_query; i++)
 	{
 	    if(problem->d_c_set[s_id+i*problem->nodes_data]!=0)
@@ -263,20 +262,17 @@ struct PruneFunctor
 		for(SizeT offset = problem->d_query_row[i]; offset<problem->d_query_row[i+1]; ++offset)
 		{
 		    VertexId j = problem->d_query_col[offset];
-		    if(problem->d_c_set[d_id + j*problem->nodes_data]!=0)
-			problem->d_c_set[s_id + i*problem->nodes_data]+=1;
+		    if(problem->d_c_set[d_id + j*problem->nodes_data])
+			problem->d_data_degrees[s_id + i*problem->nodes_data]+=1;
 		}		
 		__syncthreads();
 
 		// d_c_set[i,s_id] now stores the number of neighbors 
 		// of s_id corresponding to i's neighbors+1
    		// If the prior is less than the latter s_id is not a candidate of i 
-		if(problem->d_c_set[s_id+i*problem->nodes_data]-1 <
+		if(problem->d_data_degrees[s_id+i*problem->nodes_data] <
 		   problem->d_query_row[i+1]-problem->d_query_row[i])
 		    problem->d_c_set[s_id + i*problem->nodes_data]=0;
-		else 
-		    problem->d_c_set[s_id + i*problem->nodes_data]=1;
-			
 	    }
 	}
 
@@ -319,10 +315,8 @@ struct LabelEdgeFunctor
     VertexId s_id, VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {
-   // if(e_id<problem->edges_data)	printf("e_id:%d s_id:%d->d_id:%d\n",e_id, s_id, d_id);
     if(s_id < d_id && e_id<problem->edges_data) 
 	return true;
-    
     else return false;
   }
 
@@ -339,12 +333,13 @@ struct LabelEdgeFunctor
     VertexId s_id,  VertexId d_id, DataSlice *problem,
     VertexId e_id = 0, VertexId e_id_in = 0)
   {    
+    #pragma unroll
 	for(int i=0; i<problem->edges_query; i++){
 	    VertexId source=problem->froms_query[i];
 	    VertexId dest=problem->tos_query[i];
 	    if(	problem->d_c_set[s_id+source*problem->nodes_data]==1 && 
 		problem->d_c_set[d_id+dest*problem->nodes_data]==1)
-		problem->d_temp_keys[e_id]|=(1<<i); // label the candidate edge with the index of its query edge plus 1
+		problem->froms[e_id]|=(1<<i); // label the candidate edge with the index of its query edge plus 1
 	}
   }
 
@@ -412,6 +407,55 @@ struct CollectFunctor
 
 }; // CollectFunctor
 
+
+template<
+  typename VertexId,
+  typename SizeT,
+  typename Value,
+  typename ProblemData>
+struct GroupFunctor
+{
+  typedef typename ProblemData::DataSlice DataSlice;
+  /**
+   * @brief Forward Advance Kernel condition function.
+   *
+   * @param[in] s_id Vertex Id of the edge source node
+   * @param[in] d_id Vertex Id of the edge destination node
+   * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
+   *
+   * \return Whether to load the apply function for the edge and include
+   * the destination node in the next frontier.
+   */
+  static __device__ __forceinline__ bool CondEdge(
+    VertexId s_id, VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+  {
+    if(s_id<d_id && e_id<problem->edges_data && e_id >=0)
+	return true;
+    else return false;
+  }
+
+ /**
+   * @brief Forward Advance Kernel apply function.
+   *
+   * @param[in] s_id Vertex Id of the edge source node
+   * @param[in] d_id Vertex Id of the edge destination node
+   * @param[in] problem Data slice object
+   * @param[in] e_id Output edge index
+   * @param[in] e_id_in Input edge index
+   */
+  static __device__ __forceinline__ void ApplyEdge(
+    VertexId s_id,  VertexId d_id, DataSlice *problem,
+    VertexId e_id = 0, VertexId e_id_in = 0)
+  {
+      problem->froms[e_id] = s_id;
+      problem->tos[e_id] = d_id;
+      problem->d_c_set[e_id] = 1;
+  }
+
+}; // GroupFunctor
 
 }  // namespace sm
 }  // namespace app
