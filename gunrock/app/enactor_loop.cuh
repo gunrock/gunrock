@@ -241,7 +241,8 @@ void Iteration_Loop(
                             &frontier_queue_->keys[selector^1],
                             offset,
                             data_slice ->expand_incoming_array[peer_].GetPointer(util::DEVICE),
-                            data_slice);
+                            data_slice,
+                            enactor_stats_);
                         frontier_attribute_->selector^=1;
                         frontier_attribute_->queue_index++;
                         if (!Iteration::HAS_SUBQ) {

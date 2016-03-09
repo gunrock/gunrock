@@ -61,10 +61,12 @@ __global__ void Expand_Incoming_BFS (
           VertexId*        keys_out,
     const size_t           array_size,
           char*            array,
-          int              gpu_idx)
+          int              gpu_idx,
+          VertexId         label,
+          VertexId         *d_labels)
 {
     extern __shared__ char s_array[];
-    const SizeT STRIDE = gridDim.x * blockDim.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
     size_t offset = 0;
     VertexId** s_vertex_associate_in  = (VertexId**)&(s_array[offset]);
     offset += sizeof(VertexId*) * NUM_VERTEX_ASSOCIATES;
@@ -83,23 +85,24 @@ __global__ void Expand_Incoming_BFS (
     while (x<num_elements)
     {
         key = keys_in[x];
-        t   = s_vertex_associate_in[0][x];
+        //t   = s_vertex_associate_in[0][x];
 
         //if (atomicCAS(s_vertex_associate_org[0]+key, (VertexId)-1, t)!= -1)
         //{
-           if (atomicMin(s_vertex_associate_org[0]+key, t)<=t)
+           if (atomicMin(d_labels+key, label)<=label)
+           //if (s_vertex_associate_org[0][key] <= t)
            {
-               keys_out[x]=-1;
+               keys_out[x]=util::InvalidValue<VertexId>();
                x+=STRIDE;
                continue;
            }
         //}
         keys_out[x]=key;
-        if (util::to_track(gpu_idx, key))
-            printf("%d\t %s\t labels[%d] -> %d\n",
-                gpu_idx, __func__, key, t);
-        if (NUM_VERTEX_ASSOCIATES == 2 && s_vertex_associate_org[0][key] == t)
-            s_vertex_associate_org[1][key]=s_vertex_associate_in[1][x];
+        //if (util::to_track(gpu_idx, key))
+        //    printf("%d\t %s\t labels[%d] -> %d\n",
+        //        gpu_idx, __func__, key, t);
+        if (NUM_VERTEX_ASSOCIATES == 1 && d_labels[key] == t)
+            s_vertex_associate_org[0][key] = s_vertex_associate_in[0][x];
         x+=STRIDE;
     }
 }
@@ -394,7 +397,8 @@ struct BFSIteration : public IterationBase <
         util::Array1D<SizeT, VertexId>* keys_out,
         const size_t    array_size,
         char*           array,
-        DataSlice*      data_slice)
+        DataSlice*      data_slice,
+        EnactorStats<SizeT>           *enactor_stats)
     {
         bool over_sized = false;
         Check_Size</*Enactor::SIZE_CHECK,*/ SizeT, VertexId>(
@@ -408,7 +412,9 @@ struct BFSIteration : public IterationBase <
             keys_out->GetPointer(util::DEVICE),
             array_size,
             array,
-            data_slice -> gpu_idx);
+            data_slice -> gpu_idx,
+            (VertexId)enactor_stats -> iteration,
+            data_slice -> labels.GetPointer(util::DEVICE));
     }
 
     /*
@@ -635,7 +641,7 @@ static CUT_THREADPROC BFSThread(
         gunrock::app::Iteration_Loop
             <Enactor, Functor,
             BFSIteration<AdvanceKernelPolicy, FilterKernelPolicy, Enactor>,
-            Problem::MARK_PREDECESSORS ? 2 : 1, 0>
+            Problem::MARK_PREDECESSORS ? 1 : 0, 0>
             (thread_data);
         // printf("BFS_Thread finished\n");fflush(stdout);
         thread_data -> status = ThreadSlice::Status::Idle;

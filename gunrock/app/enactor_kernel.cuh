@@ -214,7 +214,7 @@ __global__ void Make_Out(
     Value**    s_value__associate_outss= (Value**   )&(s_array[offset]);
     offset+=sizeof(Value*   ) * num_gpus * NUM_VALUE__ASSOCIATES;
     SizeT*     s_offset                = (SizeT*    )&(s_array[offset]);
-    SizeT x= threadIdx.x;
+    volatile SizeT x= threadIdx.x;
 
     while (x<array_size)
     {

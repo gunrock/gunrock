@@ -51,7 +51,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
     static const bool MARK_PREDECESSORS  = _MARK_PREDECESSORS;
     static const bool ENABLE_IDEMPOTENCE = _ENABLE_IDEMPOTENCE;
     static const int  MAX_NUM_VERTEX_ASSOCIATES =
-        (MARK_PREDECESSORS/* && !_ENABLE_IDEMPOTENCE*/) ? 2 : 1;
+        (MARK_PREDECESSORS/* && !_ENABLE_IDEMPOTENCE*/) ? 1 : 0;
     static const int  MAX_NUM_VALUE__ASSOCIATES = 0;
     typedef ProblemBase  <VertexId, SizeT, Value,
         MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem;
@@ -171,9 +171,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
 
             if (num_gpus > 1)
             {
-                this->vertex_associate_orgs[0] = this->labels.GetPointer(util::DEVICE);
+                //this->vertex_associate_orgs[0] = this->labels.GetPointer(util::DEVICE);
                 if (MARK_PREDECESSORS)
-                    this->vertex_associate_orgs[1] = this->preds.GetPointer(util::DEVICE);
+                    this->vertex_associate_orgs[0] = this->preds.GetPointer(util::DEVICE);
                 if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE))
                     return retval;
                 if (retval = temp_marker. Allocate(graph->nodes, util::DEVICE)) return retval;
