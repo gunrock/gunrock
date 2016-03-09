@@ -225,7 +225,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         LabelT                    &label,
         VertexId                 *&d_keys_out)
     {
-        if (threadIdx.x == 0)
+        /*if (threadIdx.x == 0)
             smem_storage.block_count = 0;
         __syncthreads();
         if (thread_output_count != 0)
@@ -233,38 +233,43 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         __syncthreads();
         if (threadIdx.x == 0)
             smem_storage.block_offset = atomicAdd(smem_storage.d_output_counter, smem_storage.block_count);
-        __syncthreads();
+        __syncthreads();*/
+        KernelPolicy::BlockScanT::Scan(thread_output_count, output_pos, smem_storage.scan_space);
 
-        /*KernelPolicy::BlockScanT(smem_storage.cub_storage.scan_space)
-            .ExclusiveSum(thread_output_count, output_pos);
+
+        //KernelPolicy::BlockScanT(smem_storage.cub_storage.scan_space)
+        //    .ExclusiveSum(thread_output_count, output_pos);
         if (threadIdx.x == KernelPolicy::THREADS -1)
         {
             smem_storage.block_offset = atomicAdd(smem_storage.d_output_counter, output_pos + thread_output_count);
         }
-        __syncthreads();*/
+        __syncthreads();
 
         if (thread_output_count != 0)
         {
             output_pos += smem_storage.block_offset;
+            SizeT temp_pos = (threadIdx.x << KernelPolicy::LOG_OUTPUT_PER_THREAD);
             for (int i=0; i<thread_output_count; i++)
             {
                 if (d_keys_out != NULL)
                 {
-                    SizeT temp_pos = (threadIdx.x << KernelPolicy::LOG_OUTPUT_PER_THREAD) + i;
                     VertexId u = smem_storage.thread_output_vertices[temp_pos];
 
                     util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                         u,
                         d_keys_out + output_pos);
 
-                    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-                        label, smem_storage.d_labels + u);
+                    //util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                    //    label, smem_storage.d_labels + u);
+                    smem_storage.d_labels[u] = label;
 
-                    util::io::ModifiedStore<util::io::st::cg>::St(
-                        smem_storage.tex_mask_bytes[temp_pos], //mask_byte,
-                        smem_storage.d_visited_mask + ((u & KernelPolicy::ELEMENT_ID_MASK)>> 3));
+                    //util::io::ModifiedStore<util::io::st::cg>::St(
+                    //    smem_storage.tex_mask_bytes[temp_pos], //mask_byte,
+                    //    smem_storage.d_visited_mask + ((u & KernelPolicy::ELEMENT_ID_MASK)>> 3));
+                    smem_storage.d_visited_mask[(u & KernelPolicy::ELEMENT_ID_MASK)>> 3] = smem_storage.tex_mask_bytes[temp_pos];
                 }
                 output_pos ++;
+                temp_pos ++;
             }
             thread_output_count = 0;
         }

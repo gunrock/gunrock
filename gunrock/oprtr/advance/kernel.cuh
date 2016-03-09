@@ -651,8 +651,8 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_CULL>
         else //if (/*get_output_length &&*/ parameter -> frontier_attribute -> //output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
         {
             SizeT num_blocks = parameter -> frontier_attribute -> output_length[0] / 2 / KernelPolicy::THREADS; // LBPOLICY::BLOCKS
-            if (num_blocks > 120)
-                num_blocks = 120;
+            if (num_blocks > 840)
+                num_blocks = 840;
             if (num_blocks < 1) num_blocks = 1;
             SizeT split_val = (parameter -> frontier_attribute -> output_length[0] +
                 num_blocks - 1) / num_blocks;

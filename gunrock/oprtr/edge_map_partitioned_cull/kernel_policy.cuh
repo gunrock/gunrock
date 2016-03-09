@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cub/cub.cuh>
+#include <gunrock/util/scan/block_scan.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -94,7 +95,8 @@ public:
         SCRATCH_ELEMENTS                = 256,//= (THREADS > MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE) ? MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE : THREADS,
     };
 
-    typedef cub::BlockScan<SizeT, THREADS, cub::BLOCK_SCAN_RAKING> BlockScanT;
+    //typedef cub::BlockScan<SizeT, THREADS, cub::BLOCK_SCAN_RAKING> BlockScanT;
+    typedef util::Block_Scan<SizeT, CUDA_ARCH, LOG_THREADS> BlockScanT;
     /**
      * @brief Shared memory storage type for the CTA
      */
@@ -130,6 +132,7 @@ public:
             //bool                        block_cond;
             SizeT                       block_count;
             SizeT                       block_first_v_skip_count;
+            typename BlockScanT::Temp_Space  scan_space;
             //union {
             //    typename BlockScanT::TempStorage scan_space;
             //} cub_storage;
