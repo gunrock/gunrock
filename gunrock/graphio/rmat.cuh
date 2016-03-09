@@ -173,10 +173,10 @@ inline void VaryParams(
  * @param[in] vmin
  * @param[in] seed
  */
-template <bool WITH_VALUES, typename VertexId, typename Value, typename SizeT>
+template <bool WITH_VALUES, typename VertexId, typename SizeT, typename Value>
 int BuildRmatGraph(
     SizeT nodes, SizeT edges,
-    Csr<VertexId, Value, SizeT> &graph,
+    Csr<VertexId, SizeT, Value> &graph,
     bool undirected,
     double a0 = 0.55,
     double b0 = 0.2,

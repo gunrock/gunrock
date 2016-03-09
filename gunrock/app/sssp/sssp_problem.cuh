@@ -38,20 +38,28 @@ template <
     bool        _MARK_PATHS>
 struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
     true, //MARK_PREDECESSORS
-    false, //ENABLE_IDEMPOTENCE
-    false, //USE_DOUBLE_BUFFER
-    false, //ENABLE_BACKWARD
-    false, //KEEP_ORDER
-    false> //KEEP_NODE_NUM
+    false> //ENABLE_IDEMPOTENCE
+    //false, //USE_DOUBLE_BUFFER
+    //false, //ENABLE_BACKWARD
+    //false, //KEEP_ORDER
+    //false> //KEEP_NODE_NUM
 {
     static const bool MARK_PATHS            = _MARK_PATHS;
+    static const bool MARK_PREDECESSORS     = true;
+    static const bool ENABLE_IDEMPOTENCE    = false;
+    static const int  MAX_NUM_VERTEX_ASSOCIATES = MARK_PATHS ? 1 : 0; 
+    static const int  MAX_NUM_VALUE__ASSOCIATES = 1;
+    typedef ProblemBase   <VertexId, SizeT, Value,
+        MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem;
+    typedef DataSliceBase <VertexId, SizeT, Value,
+        MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
 
     //Helper structures
 
     /**
      * @brief Data slice structure which contains SSSP problem specific data.
      */
-    struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
+    struct DataSlice : BaseDataSlice
     {
         // device storage arrays
         util::Array1D<SizeT, Value       >    distances  ;     /**< Used for source distance */
@@ -63,7 +71,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
         /*
          * @brief Default constructor
          */
-        DataSlice()
+        DataSlice() : BaseDataSlice()
         {
             distances       .SetName("distances"       );
             weights         .SetName("weights"         );
@@ -112,9 +120,10 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
         cudaError_t Init(
             int   num_gpus,
             int   gpu_idx,
-            int   num_vertex_associate,
-            int   num_value__associate,
-            Csr<VertexId, Value, SizeT> *graph,
+            bool  use_double_buffer,
+            //int   num_vertex_associate,
+            //int   num_value__associate,
+            Csr<VertexId, SizeT, Value> *graph,
             SizeT *num_in_nodes,
             SizeT *num_out_nodes,
             VertexId *original_vertex,
@@ -133,11 +142,12 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                         __LINE__);
                 return retval;
             }
-            if (retval = DataSliceBase<SizeT, VertexId, Value>::Init(
+            if (retval = BaseDataSlice::Init(
                 num_gpus,
                 gpu_idx,
-                num_vertex_associate,
-                num_value__associate,
+                use_double_buffer,
+                //num_vertex_associate,
+                //num_value__associate,
                 graph,
                 num_in_nodes,
                 num_out_nodes,
@@ -205,7 +215,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
          */
         cudaError_t Reset(
             FrontierType frontier_type,
-            GraphSlice<SizeT, VertexId, Value>  *graph_slice,
+            GraphSlice<VertexId, SizeT, Value>  *graph_slice,
             double queue_sizing = 2.0,
             double queue_sizing1 = -1.0)
         {
@@ -298,7 +308,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
 
             if (MARK_PATHS) util::MemsetIdxKernel<<<128, 128>>>(this->preds.GetPointer(util::DEVICE), nodes);
             util::MemsetKernel<<<128, 128>>>(this->distances   .GetPointer(util::DEVICE), util::MaxValue<Value>(), nodes);
-            util::MemsetKernel<<<128, 128>>>(this->visit_lookup.GetPointer(util::DEVICE), -1, nodes);
+            util::MemsetKernel<<<128, 128>>>(this->visit_lookup.GetPointer(util::DEVICE), (VertexId)-1, nodes);
             util::MemsetKernel<<<128, 128>>>(sssp_marker.GetPointer(util::DEVICE), (int)0, nodes);
             return retval;
         }
@@ -314,7 +324,11 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
      * @brief SSSPProblem default constructor
      */
 
-    SSSPProblem()
+    SSSPProblem() : BaseProblem(
+        false, // use_double_buffer
+        false, // enable_backward
+        false, // keep_order
+        false) // keep_node_num
     {
         data_slices = NULL;
     }
@@ -425,19 +439,21 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
      */
     cudaError_t Init(
             bool          stream_from_host,       // Only meaningful for single-GPU
-            Csr<VertexId, Value, SizeT> *graph,
-            Csr<VertexId, Value, SizeT> *inversegraph = NULL,
-            int           num_gpus = 1,
-            int*          gpu_idx  = NULL,
-            std::string   partition_method = "random",
-            cudaStream_t* streams = NULL,
-            int           delta_factor = 16,
-            float         queue_sizing = 2.0,
-            float         in_sizing = 1.0,
-            float         partition_factor = -1.0,
-            int           partition_seed   = -1)
+            Csr<VertexId, SizeT, Value> 
+                         *graph,
+            Csr<VertexId, SizeT, Value> 
+                         *inversegraph      = NULL,
+            int           num_gpus          = 1,
+            int          *gpu_idx           = NULL,
+            std::string   partition_method  = "random",
+            cudaStream_t *streams           = NULL,
+            int           delta_factor      = 16,
+            float         queue_sizing      = 2.0,
+            float         in_sizing         = 1.0,
+            float         partition_factor  = -1.0,
+            int           partition_seed    = -1)
     {
-        ProblemBase<VertexId, SizeT, Value, true, false, false, false, false, false>::Init(
+        BaseProblem::Init(
             stream_from_host,
             graph,
             inversegraph,
@@ -465,8 +481,9 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                 _data_slice->Init(
                     this->num_gpus,
                     this->gpu_idx[gpu],
-                    this->num_gpus > 1? (MARK_PATHS ? 1 : 0) : 0,
-                    this->num_gpus > 1? 1 : 0,
+                    //this->num_gpus > 1? (MARK_PATHS ? 1 : 0) : 0,
+                    //this->num_gpus > 1? 1 : 0,
+                    this->use_double_buffer,
                     &(this->sub_graphs[gpu]),
                     this->num_gpus > 1? this->graph_slices[gpu]->in_counter.GetPointer(util::HOST) : NULL,
                     this->num_gpus > 1? this->graph_slices[gpu]->out_counter.GetPointer(util::HOST): NULL,
@@ -503,7 +520,9 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
         for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             // Set device
             if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-            if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, queue_sizing1)) return retval;
+            if (retval = data_slices[gpu] -> Reset(
+                frontier_type, this->graph_slices[gpu], 
+                queue_sizing, queue_sizing1)) return retval;
             if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;
         }
 

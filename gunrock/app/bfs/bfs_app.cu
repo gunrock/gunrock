@@ -50,8 +50,8 @@ public:
     }
 };
 
-template<typename VertexId, typename Value, typename SizeT,
-         bool INSTRUMENT, bool DEBUG, bool SIZE_CHECK,
+template<typename VertexId, typename SizeT, typename Value,
+         //bool INSTRUMENT, bool DEBUG, bool SIZE_CHECK,
          bool MARK_PREDECESSORS, bool ENABLE_IDEMPOTENCE>
 float runBFS(GRGraph* output, BFS_Parameter *parameter);
 
@@ -71,20 +71,20 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter);
  */
 template <
     typename    VertexId,
-    typename    Value,
     typename    SizeT,
-    bool        INSTRUMENT,
-    bool        DEBUG,
-    bool        SIZE_CHECK,
+    typename    Value,
+    //bool        INSTRUMENT,
+    //bool        DEBUG,
+    //bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS >
 float RunTests_enable_idempotence(GRGraph* output, BFS_Parameter *parameter)
 {
     if (parameter->enable_idempotence)
-        return runBFS<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-               SIZE_CHECK, MARK_PREDECESSORS,  true>(output, parameter);
+        return runBFS<VertexId, SizeT, Value,/*INSTRUMENT, DEBUG,
+               SIZE_CHECK,*/ MARK_PREDECESSORS,  true>(output, parameter);
     else
-        return runBFS<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-               SIZE_CHECK, MARK_PREDECESSORS, false>(output, parameter);
+        return runBFS<VertexId, SizeT, Value,/*INSTRUMENT, DEBUG,
+               SIZE_CHECK,*/ MARK_PREDECESSORS, false>(output, parameter);
 }
 
 /**
@@ -102,95 +102,19 @@ float RunTests_enable_idempotence(GRGraph* output, BFS_Parameter *parameter)
  */
 template <
     typename    VertexId,
-    typename    Value,
     typename    SizeT,
-    bool        INSTRUMENT,
-    bool        DEBUG,
-    bool        SIZE_CHECK >
+    typename    Value>
+    //bool        INSTRUMENT,
+    //bool        DEBUG,
+    //bool        SIZE_CHECK >
 float RunTests_mark_predecessors(GRGraph* output, BFS_Parameter *parameter)
 {
     if (parameter->mark_predecessors)
-        return RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-                                    SIZE_CHECK,  true>(output, parameter);
+        return RunTests_enable_idempotence
+            <VertexId, SizeT, Value, true>(output, parameter);
     else
-        return RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-                                    SIZE_CHECK, false>(output, parameter);
-}
-
-/**
- * @brief Run test
- *
- * @tparam VertexId   Vertex identifier type
- * @tparam Value      Attribute type
- * @tparam SizeT      Graph size type
- * @tparam INSTRUMENT Keep kernels statics
- * @tparam DEBUG      Keep debug statics
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT,
-    bool          INSTRUMENT,
-    bool          DEBUG >
-float RunTests_size_check(GRGraph* output, BFS_Parameter *parameter)
-{
-    if (parameter->size_check)
-        return RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
-                                   DEBUG,  true>(output, parameter);
-    else
-        return RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
-                                   DEBUG, false>(output, parameter);
-}
-
-/**
- * @brief Run test
- *
- * @tparam VertexId   Vertex identifier type
- * @tparam Value      Attribute type
- * @tparam SizeT      Graph size type
- * @tparam INSTRUMENT Keep kernels statics
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT,
-    bool        INSTRUMENT >
-float RunTests_debug(GRGraph* output, BFS_Parameter *parameter)
-{
-    if (parameter->debug)
-        return RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,
-                            true>(output, parameter);
-    else
-        return RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,
-                            false>(output, parameter);
-}
-
-/**
- * @brief Run test
- *
- * @tparam VertexId Vertex identifier type
- * @tparam Value    Attribute type
- * @tparam SizeT    Graph size type
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT >
-float RunTests_instrumented(GRGraph* output, BFS_Parameter *parameter)
-{
-    if (parameter->instrumented)
-        return RunTests_debug<VertexId, Value, SizeT,  true>(output, parameter);
-    else
-        return RunTests_debug<VertexId, Value, SizeT, false>(output, parameter);
+        return RunTests_enable_idempotence
+            <VertexId, SizeT, Value, false>(output, parameter);
 }
 
 /**
@@ -210,11 +134,11 @@ float RunTests_instrumented(GRGraph* output, BFS_Parameter *parameter)
  */
 template <
     typename    VertexId,
-    typename    Value,
     typename    SizeT,
-    bool        INSTRUMENT,
-    bool        DEBUG,
-    bool        SIZE_CHECK,
+    typename    Value,
+    //bool        INSTRUMENT,
+    //bool        DEBUG,
+    //bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS,
     bool        ENABLE_IDEMPOTENCE >
 float runBFS(GRGraph* output, BFS_Parameter *parameter)
@@ -223,18 +147,18 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter)
             SizeT,
             Value,
             MARK_PREDECESSORS,
-            ENABLE_IDEMPOTENCE,
-            (MARK_PREDECESSORS && ENABLE_IDEMPOTENCE) >
-            BfsProblem; // does not use double buffer
+            ENABLE_IDEMPOTENCE>
+            //(MARK_PREDECESSORS && ENABLE_IDEMPOTENCE) >
+            Problem; // does not use double buffer
 
-    typedef BFSEnactor < BfsProblem,
-            INSTRUMENT,
-            DEBUG,
-            SIZE_CHECK >
-            BfsEnactor;
+    typedef BFSEnactor < Problem>
+            //INSTRUMENT,
+            //DEBUG,
+            //SIZE_CHECK >
+            Enactor;
 
-    Csr<VertexId, Value, SizeT> *graph =
-        (Csr<VertexId, Value, SizeT>*)parameter->graph;
+    Csr<VertexId, SizeT, Value> *graph =
+        (Csr<VertexId, SizeT, Value>*)parameter->graph;
     bool          quiet                = parameter -> g_quiet;
     int           max_grid_size        = parameter -> max_grid_size;
     int           num_gpus             = parameter -> num_gpus;
@@ -250,6 +174,9 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter)
     int           partition_seed       = parameter -> partition_seed;
     bool          g_stream_from_host   = parameter -> g_stream_from_host;
     int           traversal_mode       = parameter -> traversal_mode;
+    bool          instrument           = parameter -> instrumented;
+    bool          debug                = parameter -> debug;
+    bool          size_check           = parameter -> size_check;
     size_t       *org_size             = new size_t  [num_gpus];
     // Allocate host-side label array
     VertexId     *h_labels             = new VertexId[graph->nodes];
@@ -266,23 +193,24 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter)
         cudaSetDevice(gpu_idx[gpu]);
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
-    BfsEnactor *enactor = new BfsEnactor(num_gpus, gpu_idx);  // BFS enactor map
-    BfsProblem *problem = new BfsProblem;  // Allocate problem on GPU
+    Problem *problem = new Problem;  // Allocate problem on GPU
 
-    util::GRError(
-        problem->Init(g_stream_from_host,
-                      graph,
-                      NULL,
-                      num_gpus,
-                      gpu_idx,
-                      partition_method,
-                      streams,
-                      max_queue_sizing,
-                      max_in_sizing,
-                      partition_factor,
-                      partition_seed),
+    util::GRError( problem->Init(
+        g_stream_from_host,
+        graph,
+        NULL,
+        num_gpus,
+        gpu_idx,
+        partition_method,
+        streams,
+        max_queue_sizing,
+        max_in_sizing,
+        partition_factor,
+        partition_seed),
         "Problem BFS Initialization Failed", __FILE__, __LINE__);
 
+    Enactor *enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);  // BFS enactor map
     util::GRError(
         enactor->Init(context, problem, max_grid_size, traversal_mode),
         "BFS Enactor init failed", __FILE__, __LINE__);
@@ -434,7 +362,7 @@ float dispatch_bfs(
                     printf("\n");
                 }
 
-                elapsed_time = RunTests_instrumented<int, int, int>(grapho, parameter);
+                elapsed_time = RunTests_mark_predecessors<int, int, int>(grapho, parameter);
 
                 // reset for free memory
                 csr.row_offsets    = NULL;

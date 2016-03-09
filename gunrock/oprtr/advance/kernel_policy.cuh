@@ -113,7 +113,7 @@ template <
     // Machine parameters
     int _CUDA_ARCH,
     // Behavioral control parameters
-    bool _INSTRUMENT,
+    //bool _INSTRUMENT,
     // Tunable parameters
     int _MIN_CTA_OCCUPANCY,                                             
     int _LOG_THREADS,                                                   
@@ -140,7 +140,7 @@ struct KernelPolicy {
 typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
     _ProblemData,
     _CUDA_ARCH,
-    _INSTRUMENT,
+    //_INSTRUMENT,
     _MIN_CTA_OCCUPANCY,
     _LOG_THREADS,
     _LOG_LOAD_VEC_SIZE,
@@ -153,7 +153,7 @@ typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
 typedef gunrock::oprtr::edge_map_backward::KernelPolicy<
     _ProblemData,
     _CUDA_ARCH,
-    _INSTRUMENT,
+    //_INSTRUMENT,
     _MIN_CTA_OCCUPANCY,
     _LOG_THREADS,
     _LOG_LOAD_VEC_SIZE,
@@ -166,7 +166,7 @@ typedef gunrock::oprtr::edge_map_backward::KernelPolicy<
 typedef gunrock::oprtr::edge_map_partitioned::KernelPolicy<
     _ProblemData,
     _CUDA_ARCH,
-    _INSTRUMENT,
+    //_INSTRUMENT,
     1,
     _LOG_THREADS,
     _LOG_BLOCKS,

@@ -149,7 +149,7 @@ __global__ void Join(
 
     // x: is the number of matched middle results * edges_query
     VertexId x = blockIdx.x * blockDim.x + threadIdx.x;
-    if(x==0) printf(" size=%d\n", size);
+   // if(x==0) printf(" size=%d\n", size);
    // if(x==0) printf("iter=%d pos[0]=%d, pos[1]=%d, pos[2]=%d, counts[0]=%d counts[1]=%d\n",iter, pos[0], pos[1], pos[2], counts[0], counts[1]);
 //    if(iter==0 && x<pos[iter]) printf("Collected candidate edges: froms[%d]:%d->tos[%d]:%d\n", x, froms[x], x, tos[x]);
 
@@ -284,7 +284,7 @@ __global__ void Collect(
     const SizeT STRIDE = gridDim.x * blockDim.x;
     VertexId x = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if(x==0) printf("iter=%d, counts[0]=%d, counts[1]=%d, edges = %d, counts[0]*edges=%d, pos[iter]=%d\n",iter, counts[0], counts[1], edges, counts[0]*edges, pos[iter]);
+    //if(x==0) printf("iter=%d, counts[0]=%d, counts[1]=%d, edges = %d, counts[0]*edges=%d, pos[iter]=%d\n",iter, counts[0], counts[1], edges, counts[0]*edges, pos[iter]);
 
     while (x < counts[0] * edges)
     {

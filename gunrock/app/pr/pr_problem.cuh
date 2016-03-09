@@ -35,21 +35,27 @@ template <
     bool        NORMALIZED>
 struct PRProblem : ProblemBase<VertexId, SizeT, Value,
     true,  // _MARK_PREDECESSORS
-    false, // _ENABLE_IDEMPOTENCE
-    false, // _USE_DOUBLE_BUFFER
-    false, // _ENABLE_BACKWARD
-    false, // _KEEP_ORDER
-    true> // _KEEP_NODE_NUM
+    false> // _ENABLE_IDEMPOTENCE
+    //false, // _USE_DOUBLE_BUFFER
+    //false, // _ENABLE_BACKWARD
+    //false, // _KEEP_ORDER
+    //true> // _KEEP_NODE_NUM
 {
-    //static const bool MARK_PREDECESSORS     = true;
-    //static const bool ENABLE_IDEMPOTENCE    = false;
+    static const bool MARK_PREDECESSORS     = true;
+    static const bool ENABLE_IDEMPOTENCE    = false;
+    static const int  MAX_NUM_VERTEX_ASSOCIATES = 0;  
+    static const int  MAX_NUM_VALUE__ASSOCIATES = 1;
+    typedef ProblemBase   <VertexId, SizeT, Value,
+        MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem;
+    typedef DataSliceBase <VertexId, SizeT, Value,
+        MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
 
     //Helper structures
 
     /**
      * @brief Data slice structure which contains PR problem specific data.
      */
-    struct DataSlice : DataSliceBase<SizeT, VertexId, Value>
+    struct DataSlice : BaseDataSlice
     {
         // device storage arrays
         util::Array1D<SizeT, Value   > rank_curr;           /**< Used for ping-pong page rank value */
@@ -76,7 +82,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
         /*
          * @brief Default constructor
          */
-        DataSlice()
+        DataSlice() : BaseDataSlice()
         {
             rank_curr   .SetName("rank_curr"   );
             rank_next   .SetName("rank_next"   );
@@ -130,9 +136,10 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
         cudaError_t Init(
             int   num_gpus,
             int   gpu_idx,
-            int   num_vertex_associate,
-            int   num_value__associate,
-            Csr<VertexId, Value, SizeT> *graph,
+            bool  use_double_buffer,
+            //int   num_vertex_associate,
+            //int   num_value__associate,
+            Csr<VertexId, SizeT, Value> *graph,
             SizeT *num_in_nodes,
             SizeT *num_out_nodes,
             float queue_sizing = 2.0,
@@ -152,11 +159,12 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
                 }
             }*/
 
-            if (retval = DataSliceBase<SizeT, VertexId, Value>::Init(
+            if (retval = BaseDataSlice::Init(
                 num_gpus,
                 gpu_idx,
-                num_vertex_associate,
-                num_value__associate,
+                use_double_buffer,
+                //num_vertex_associate,
+                //num_value__associate,
                 graph,
                 num_in_nodes,
                 num_out_nodes,
@@ -217,9 +225,13 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
     /**
      * @brief PRProblem default constructor
      */
-    PRProblem(): 
+    PRProblem(bool _scaled) : BaseProblem(
+        false, // use_double_buffer
+        false, // enable_backward
+        false, // keep_order
+        true ), // keep_node_num 
         data_slices(NULL ),
-        scaled     (false)
+        scaled     (_scaled)
     {}
 
     /**
@@ -282,21 +294,21 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Init(
-            bool          stream_from_host,       // Only meaningful for single-GPU
-            Csr<VertexId, Value, SizeT>
-                         *graph,
-            Csr<VertexId, Value, SizeT>
-                         *inversegraph      = NULL,
-            int           num_gpus         = 1,
-            int          *gpu_idx          = NULL,
-            std::string   partition_method = "random",
-            cudaStream_t *streams          = NULL,
-            float         queue_sizing     = 2.0f,
-            float         in_sizing        = 1.0f,
-            float         partition_factor = -1.0f,
-            int           partition_seed   = -1)
+        bool          stream_from_host,       // Only meaningful for single-GPU
+        Csr<VertexId, SizeT, Value>
+                     *graph,
+        Csr<VertexId, SizeT, Value>
+                     *inversegraph     = NULL,
+        int           num_gpus         = 1,
+        int          *gpu_idx          = NULL,
+        std::string   partition_method = "random",
+        cudaStream_t *streams          = NULL,
+        float         queue_sizing     = 2.0f,
+        float         in_sizing        = 1.0f,
+        float         partition_factor = -1.0f,
+        int           partition_seed   = -1)
     {
-        ProblemBase<VertexId, SizeT, Value, true, false, false, false, false, true> :: Init(
+        BaseProblem :: Init(
             stream_from_host,
             graph,
             inversegraph,
@@ -351,8 +363,9 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = data_slice_->Init(
                     this->num_gpus,
                     this->gpu_idx[gpu],
-                    this->num_gpus>1? 0 : 0,
-                    this->num_gpus>1? 1 : 0,
+                    this->use_double_buffer,
+                    //this->num_gpus>1? 0 : 0,
+                    //this->num_gpus>1? 1 : 0,
                     &(this->sub_graphs[gpu]),
                     this->num_gpus>1? this->graph_slices[gpu]->in_counter .GetPointer(util::HOST) : NULL,
                     this->num_gpus>1? this->graph_slices[gpu]->out_counter.GetPointer(util::HOST) : NULL,

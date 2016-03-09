@@ -13,22 +13,9 @@
 
 #pragma once
 
+#include <gunrock/util/device_intrinsics.cuh>
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/app/pr/pr_problem.cuh>
-
-// atomic addition from Jon Cohen at NVIDIA
-__device__ static double atomicAdd(double *addr, double val)
-{
-    double old=*addr, assumed;
-    do {
-        assumed = old;
-        old = __longlong_as_double(
-        atomicCAS((unsigned long long int*)addr,
-               __double_as_longlong(assumed),
-               __double_as_longlong(val + assumed)));
-    } while( assumed!=old );
-    return old; 
-}
 
 namespace gunrock {
 namespace app {

@@ -118,16 +118,18 @@ void Usage()
  * @param[in] MARK_PREDECESSORS Whether to show predecessor of each node.
  * @param[in] ENABLE_IDEMPOTENCE Whether to enable idempotence mode.
  */
-template<typename VertexId, typename SizeT>
+template <
+    typename VertexId, 
+    typename SizeT,
+    bool MARK_PREDECESSORS,
+    bool ENABLE_IDEMPOTENCE>
 void DisplaySolution(
     VertexId *source_path,
     VertexId *preds,
-    SizeT nodes,
-    bool MARK_PREDECESSORS,
-    bool ENABLE_IDEMPOTENCE)
+    SizeT nodes)
 {
     if (nodes > 40) nodes = 40;
-    printf("\nFirst %d labels of the GPU result.\n", nodes);
+    printf("\nFirst %lld labels of the GPU result.\n", (long long)nodes);
 
     printf("[");
     for (VertexId i = 0; i < nodes; ++i)
@@ -155,37 +157,35 @@ void DisplaySolution(
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
+ * @tparam MARK_PREDECESSORS
+ * @tparam ENABLE_IDEMPOTENCE
  *
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] source_path Host-side vector to store CPU computed labels for each node
+ * @param[in] predecessor Host-side vector to store CPU computed predecessor for each node
  * @param[in] src Source node where BFS starts
- * @param[in] enable_idempotence Whether or not to enable idempotent
  * @param[in] quiet Don't print out anything to stdout
  */
 template <
     typename VertexId,
+    typename SizeT,
     typename Value,
-    typename SizeT >
-void SimpleReferenceBfs(
-    const Csr<VertexId, Value, SizeT>       &graph,
-    VertexId                                *source_path,
-    VertexId                                src,
-    bool                                    enable_idempotence,
-    bool                                    quiet = false)
+    bool MARK_PREDECESSORS,
+    bool ENABLE_IDEMPOTENCE >
+void ReferenceBFS(
+    const Csr<VertexId, SizeT, Value> *graph,
+    VertexId                          *source_path,
+    VertexId                          *predecessor,
+    VertexId                          src,
+    bool                              quiet = false)
 {
-    // Initialize distances
-    if (enable_idempotence)
+    // Initialize labels
+    for (VertexId i = 0; i < graph->nodes; ++i)
     {
-        for (VertexId i = 0; i < graph.nodes; ++i)
+        source_path[i] = ENABLE_IDEMPOTENCE ? -1 : util::MaxValue<VertexId>() - 1;
+        if (MARK_PREDECESSORS)
         {
-            source_path[i] = -1;
-        }
-    }
-    else
-    {
-        for (VertexId i = 0; i < graph.nodes; ++i)
-        {
-            source_path[i] = util::MaxValue<VertexId>() - 1;
+            predecessor[i] = -1;
         }
     }
     source_path[src] = 0;
@@ -200,24 +200,26 @@ void SimpleReferenceBfs(
     cpu_timer.Start();
     while (!frontier.empty())
     {
-
         // Dequeue node from frontier
         VertexId dequeued_node = frontier.front();
         frontier.pop_front();
         VertexId neighbor_dist = source_path[dequeued_node] + 1;
 
         // Locate adjacency list
-        int edges_begin = graph.row_offsets[dequeued_node];
-        int edges_end = graph.row_offsets[dequeued_node + 1];
+        SizeT edges_begin = graph->row_offsets[dequeued_node];
+        SizeT edges_end = graph->row_offsets[dequeued_node + 1];
 
-        for (int edge = edges_begin; edge < edges_end; ++edge)
+        for (SizeT edge = edges_begin; edge < edges_end; ++edge)
         {
             //Lookup neighbor and enqueue if undiscovered
-            VertexId neighbor = graph.column_indices[edge];
-            if (source_path[neighbor] == -1 ||
-                    source_path[neighbor] == util::MaxValue<VertexId>() - 1)
+            VertexId neighbor = graph->column_indices[edge];
+            if (source_path[neighbor] > neighbor_dist || source_path[neighbor] == -1)
             {
                 source_path[neighbor] = neighbor_dist;
+                if (MARK_PREDECESSORS)
+                {
+                    predecessor[neighbor] = dequeued_node;
+                }
                 if (search_depth < neighbor_dist)
                 {
                     search_depth = neighbor_dist;
@@ -227,13 +229,18 @@ void SimpleReferenceBfs(
         }
     }
 
+    if (MARK_PREDECESSORS)
+    {
+        predecessor[src] = -1;
+    }
+
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
     search_depth++;
 
     if (!quiet)
     {
-        printf("CPU BFS finished in %lf msec. Search depth is: %d\n",
+        printf("CPU BFS finished in %lf msec. cpu_search_depth: %d\n",
                elapsed, search_depth);
     }
 }
@@ -254,38 +261,49 @@ void SimpleReferenceBfs(
  */
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK,
+    typename Value,
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK,
     bool MARK_PREDECESSORS,
     bool ENABLE_IDEMPOTENCE >
-void RunTests(Info<VertexId, Value, SizeT> *info)
+void RunTests(Info<VertexId, SizeT, Value> *info)
 {
     typedef DOBFSProblem < VertexId,
             SizeT,
             Value,
             MARK_PREDECESSORS,
-            ENABLE_IDEMPOTENCE,
-            (MARK_PREDECESSORS && ENABLE_IDEMPOTENCE) >
+            ENABLE_IDEMPOTENCE>
+            //(MARK_PREDECESSORS && ENABLE_IDEMPOTENCE) >
             Problem; // does not use double buffer
+    typedef DOBFSEnactor <Problem>
+            Enactor;
 
-    Csr<VertexId, Value, SizeT> *csr = (Csr<VertexId, Value, SizeT>*)info->csr_ptr;
-    Csr<VertexId, Value, SizeT> *csc = (Csr<VertexId, Value, SizeT>*)info->csc_ptr;
-    VertexId src            = info->info["source_vertex"].get_int64();
-    int max_grid_size       = info->info["max_grid_size"].get_int();
-    int num_gpus            = info->info["num_gpus"].get_int();
-    double max_queue_sizing = info->info["max_queue_sizing"].get_real();
-    double max_queue_sizing1 = info->info["max_queue_sizing1"].get_real();
-    bool quiet_mode         = info->info["quiet_mode"].get_bool();
-    bool quick_mode         = info->info["quick_mode"].get_bool();
-    bool undirected         = info->info["undirected"].get_bool();
-    bool stream_from_host   = info->info["stream_from_host"].get_bool();
-    int iterations          = 1; // force to 1 info->info["num_iteration"].get_int();
-    double alpha            = info->info["alpha"].get_real();
-    double beta             = info->info["beta"].get_real();
+    Csr<VertexId, SizeT, Value> *csr = info->csr_ptr;
+    Csr<VertexId, SizeT, Value> *csc = info->csc_ptr;
+    VertexId src                    = info->info["source_vertex"    ].get_int64();
+    int      max_grid_size          = info->info["max_grid_size"    ].get_int  ();
+    int      num_gpus               = info->info["num_gpus"         ].get_int  ();
+    double   max_queue_sizing       = info->info["max_queue_sizing" ].get_real ();
+    double   max_queue_sizing1      = info->info["max_queue_sizing1"].get_real ();
+    double   max_in_sizing          = info->info["max_in_sizing"    ].get_real ();
+    std::string partition_method    = info->info["partition_method" ].get_str  ();
+    double   partition_factor       = info->info["partition_factor" ].get_real ();
+    int      partition_seed         = info->info["partition_seed"   ].get_int  ();
+    bool     quiet_mode             = info->info["quiet_mode"       ].get_bool ();
+    bool     quick_mode             = info->info["quick_mode"       ].get_bool ();
+    bool     undirected             = info->info["undirected"       ].get_bool ();
+    bool     stream_from_host       = info->info["stream_from_host" ].get_bool ();
+    bool     instrument             = info->info["instrument"       ].get_bool (); 
+    bool     debug                  = info->info["debug_mode"       ].get_bool (); 
+    bool     size_check             = info->info["size_check"       ].get_bool (); 
+    int      iterations             = 1; // force to 1 info->info["num_iteration"].get_int();
+    double   alpha                  = info->info["alpha"            ].get_real ();
+    double   beta                   = info->info["beta"             ].get_real ();
+    CpuTimer cpu_timer;
 
+    cpu_timer.Start();
     if (!quiet_mode)
     {
         printf(" alpha = %.4f, beta = %.4f\n", alpha, beta);
@@ -301,99 +319,170 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         size_t dummy;
         cudaSetDevice(gpu_idx[gpu]);
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
-    }   
+    }  
 
-    // TODO: remove after merge mgpu-cq
-    ContextPtr *context = (ContextPtr*)info->context;
-
-    // allocate host-side label array (for both reference and GPU results)
-    VertexId *reference_labels = (VertexId*)malloc(sizeof(VertexId) * csr->nodes);
-    VertexId *h_labels         = (VertexId*)malloc(sizeof(VertexId) * csr->nodes);
-    VertexId *reference_check  = (quick_mode) ? NULL : reference_labels;
-    VertexId *h_preds          = NULL;
-    if (MARK_PREDECESSORS)
+    // TODO: add memory size check and remove this
+    if (max_queue_sizing < 1.0 * csr->edges / csr->nodes)
     {
-        h_preds = (VertexId*)malloc(sizeof(VertexId) * csr->nodes);
+        max_queue_sizing = 1.0 * csr->edges / csr->nodes;
+        max_queue_sizing1 = max_queue_sizing;
     }
 
-    // Allocate BFS enactor map
-    DOBFSEnactor<Problem, INSTRUMENT, DEBUG, SIZE_CHECK> enactor(gpu_idx);
+    // TODO: remove after merge mgpu-cq
+    ContextPtr   *context = (ContextPtr*  )info->context;
+    cudaStream_t *streams = (cudaStream_t*)info->streams;
+
+    // allocate host-side label array (for both reference and GPU results)
+    VertexId *ref_labels       = (quick_mode) ? NULL : new VertexId [csr -> nodes];
+    VertexId *h_labels         = new VertexId[csr -> nodes];
+    VertexId *h_preds          = MARK_PREDECESSORS ? new VertexId[csr -> nodes] : NULL;
+    VertexId *ref_preds        = (!quick_mode && MARK_PREDECESSORS) ? new VertexId[csr -> nodes] : NULL;
 
     // Allocate problem on GPU
-    Problem *problem = new Problem;
-
+    Problem *problem = new Problem((MARK_PREDECESSORS && ENABLE_IDEMPOTENCE));
     util::GRError(problem->Init(
-                      stream_from_host,
-                      undirected,
-                      *csr,
-                      *csc,
-                      num_gpus,
-                      alpha,
-                      beta),
-                  "Problem DOBFS Initialization Failed", __FILE__, __LINE__);
+        stream_from_host,
+        *csr,
+        *csc,
+        undirected,
+        alpha,
+        beta,
+        num_gpus,
+        gpu_idx,
+        partition_method,
+        streams,
+        max_queue_sizing,
+        max_in_sizing,
+        partition_factor,
+        partition_seed),
+        "Problem DOBFS Initialization Failed", __FILE__, __LINE__);
+
+    // Allocate BFS enactor map
+    Enactor *enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);
+    util::GRError(enactor -> Init(
+        context, problem, max_grid_size),
+        "DOBFS Enactor Init failed", __FILE__, __LINE__);
+    cpu_timer.Stop();
+    info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
     // compute reference CPU BFS solution
-    if (reference_check != NULL)
+    if (!quick_mode)
     {
-        if (!quiet_mode) { printf(" computing reference value ...\n"); }
-        SimpleReferenceBfs(
-            *csr,
-            reference_check,
+        if (!quiet_mode)
+        {
+            printf("Computing reference value ...\n");
+        }
+        ReferenceBFS<VertexId, SizeT, Value,
+            MARK_PREDECESSORS, ENABLE_IDEMPOTENCE>(
+            csr,
+            ref_labels,
+            ref_preds,
             src,
-            ENABLE_IDEMPOTENCE,
             quiet_mode);
-        if (!quiet_mode) { printf("\n"); }
+        if (!quiet_mode)
+        {
+            printf("\n");
+        }
     }
 
     double elapsed = 0.0f;
-
     // Perform BFS
-    GpuTimer gpu_timer;
 
     for (int iter = 0; iter < iterations; ++iter)
     {
         util::GRError(problem->Reset(
-                          src, enactor.GetFrontierType(), max_queue_sizing, max_queue_sizing1),
-                      "DOBFS Problem Data Reset Failed", __FILE__, __LINE__);
-        gpu_timer.Start();
-        util::GRError(enactor.template Enact<Problem>(
-                          *context, problem, src, max_grid_size),
-                      "DOBFS Problem Enact Failed", __FILE__, __LINE__);
-        gpu_timer.Stop();
-        elapsed += gpu_timer.ElapsedMillis();
+            src, enactor -> GetFrontierType(), 
+            max_queue_sizing, max_queue_sizing1),
+            "DOBFS Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(enactor -> Reset());
+
+        cpu_timer.Start();
+        util::GRError(enactor -> Enact(src),
+            "DOBFS Problem Enact Failed", __FILE__, __LINE__);
+        cpu_timer.Stop();
+        elapsed += cpu_timer.ElapsedMillis();
     }
     elapsed /= iterations;
 
+    cpu_timer.Start();
     // Copy out results
     util::GRError(problem->Extract(h_labels, h_preds),
-                  "DOBFS Problem Data Extraction Failed", __FILE__, __LINE__);
+        "DOBFS Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // Verify the result
-    if (reference_check != NULL)
+    if (!quick_mode && !quiet_mode)
     {
-        if (!MARK_PREDECESSORS)
-        {
-            if (!quiet_mode) { printf("Validity: "); }
-            CompareResults(
-                h_labels, reference_check, csr->nodes, true, quiet_mode);
-        }
+        printf("Label Validity: ");
+        int num_errors = CompareResults(
+            h_labels, ref_labels,
+            csr ->nodes, true, quiet_mode);
+        if (num_errors > 0)
+        {   
+            printf("%d errors occurred.", num_errors);
+        }   
+        printf("\n");
+
+        if (MARK_PREDECESSORS)
+        {   
+            printf("Predecessor Validity: \n");
+            num_errors = 0;
+            for (VertexId v=0; v< csr->nodes; v++)
+            {   
+                if (h_labels[v] ==  
+                    (ENABLE_IDEMPOTENCE ? -1 : util::MaxValue<VertexId>() - 1)) 
+                    continue; // unvisited vertex
+                if (v == src && h_preds[v] == -1) continue; // source vertex
+                VertexId pred = h_preds[v];
+                if (pred >= csr->nodes || pred < 0)
+                {   
+                    //if (num_errors == 0)
+                        printf("INCORRECT: pred[%d] : %d out of bound\n", v, pred);
+                    num_errors ++; 
+                    continue;
+                }   
+                if (h_labels[v] != h_labels[pred] + 1)
+                {   
+                    //if (num_errors == 0)
+                        printf("INCORRECT: label[%d] (%d) != label[%d] (%d) + 1\n", 
+                            v, h_labels[v], pred, h_labels[pred]);
+                    num_errors ++; 
+                    continue;
+                }   
+    
+                bool v_found = false;
+                for (SizeT t = csr->row_offsets[pred]; t < csr->row_offsets[pred+1]; t++)
+                if (v == csr->column_indices[t])
+                {   
+                    v_found = true;
+                    break;
+                }   
+                if (!v_found)
+                {   
+                    //if (num_errors == 0)
+                        printf("INCORRECT: Vertex %d not in Vertex %d's neighbor list\n",
+                            v, pred);
+                    num_errors ++; 
+                    continue;
+                }   
+            }   
+
+            if (num_errors > 0)
+            {   
+                printf("%d errors occurred.", num_errors);
+            } else printf("CORRECT");
+            printf("\n");
+        }   
     }
 
     if (!quiet_mode)
     {
-        DisplaySolution(h_labels, h_preds, csr->nodes,
-                        MARK_PREDECESSORS, ENABLE_IDEMPOTENCE);
+        DisplaySolution<VertexId, SizeT, MARK_PREDECESSORS, ENABLE_IDEMPOTENCE>
+            (h_labels, h_preds, csr->nodes);
     }
 
     info->ComputeTraversalStats(  // compute running statistics
-        enactor.enactor_stats.GetPointer(), elapsed, h_labels);
-
-    if (!quiet_mode)
-    {
-        info->DisplayStats();  // display collected statistics
-    }
-
-    info->CollectInfo();  // collected all the info and put into JSON mObject
+        enactor -> enactor_stats.GetPointer(), elapsed, h_labels);
 
     if (!quiet_mode)
     {
@@ -468,10 +557,14 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     }
 
     // Clean up
-    if (problem) delete problem;
-    if (reference_labels) free(reference_labels);
-    if (h_labels) free(h_labels);
-    if (h_preds) free(h_preds);
+    if (problem   ) {delete   problem   ; problem    = NULL;}
+    if (enactor   ) {delete   enactor   ; enactor    = NULL;}
+    if (ref_preds ) {delete[] ref_preds ; ref_preds  = NULL;}
+    if (ref_labels) {delete[] ref_labels; ref_labels = NULL;}
+    if (h_labels  ) {delete[] h_labels  ; h_labels   = NULL;}
+    if (h_preds   ) {delete[] h_preds   ; h_preds    = NULL;}
+    cpu_timer.Stop();
+    info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
 
     //cudaDeviceSynchronize();
 }
@@ -491,24 +584,18 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
  */
 template <
     typename    VertexId,
-    typename    Value,
     typename    SizeT,
-    bool        INSTRUMENT,
-    bool        DEBUG,
-    bool        SIZE_CHECK,
+    typename    Value,
+    //bool        INSTRUMENT,
+    //bool        DEBUG,
+    //bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS >
-void RunTests_enable_idempotence(Info<VertexId, Value, SizeT> *info)
+void RunTests_enable_idempotence(Info<VertexId, SizeT, Value> *info)
 {
     if (info->info["idempotent"].get_bool())
-    {
-        RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
-                 MARK_PREDECESSORS, true > (info);
-    }
+        RunTests <VertexId, SizeT, Value, MARK_PREDECESSORS, true > (info);
     else
-    {
-        RunTests <VertexId, Value, SizeT, INSTRUMENT, DEBUG, SIZE_CHECK,
-                 MARK_PREDECESSORS, false> (info);
-    }
+        RunTests <VertexId, SizeT, Value, MARK_PREDECESSORS, false> (info);
 }
 
 /**
@@ -525,115 +612,90 @@ void RunTests_enable_idempotence(Info<VertexId, Value, SizeT> *info)
  */
 template <
     typename    VertexId,
-    typename    Value,
     typename    SizeT,
-    bool        INSTRUMENT,
-    bool        DEBUG,
-    bool        SIZE_CHECK >
-void RunTests_mark_predecessors(Info<VertexId, Value, SizeT> *info)
+    typename    Value>
+    //bool        INSTRUMENT,
+    //bool        DEBUG,
+    //bool        SIZE_CHECK >
+void RunTests_mark_predecessors(Info<VertexId, SizeT, Value> *info)
 {
     if (info->info["mark_predecessors"].get_bool())
-    {
-        RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
-                                    DEBUG, SIZE_CHECK,  true> (info);
-    }
+        RunTests_enable_idempotence<VertexId, SizeT, Value, true> (info);
     else
-    {
-        RunTests_enable_idempotence<VertexId, Value, SizeT, INSTRUMENT,
-                                    DEBUG, SIZE_CHECK, false> (info);
-    }
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT,
-    bool          INSTRUMENT,
-    bool          DEBUG >
-void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["size_check"].get_bool())
-    {
-        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
-                                   DEBUG,  true>(info);
-    }
-    else
-    {
-        RunTests_mark_predecessors<VertexId, Value, SizeT, INSTRUMENT,
-                                   DEBUG, false>(info);
-    }
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT,
-    bool        INSTRUMENT >
-void RunTests_debug(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["debug_mode"].get_bool())
-    {
-        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,  true>(info);
-    }
-    else
-    {
-        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT, false>(info);
-    }
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT >
-void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["instrument"].get_bool())
-    {
-        RunTests_debug<VertexId, Value, SizeT, true>(info);
-    }
-    else
-    {
-        RunTests_debug<VertexId, Value, SizeT, false>(info);
-    }
+        RunTests_enable_idempotence<VertexId, SizeT, Value, false> (info);
 }
 
 /******************************************************************************
 * Main
 ******************************************************************************/
 
-int main( int argc, char** argv)
+template <
+    typename VertexId,  // use int as the vertex identifier
+    typename SizeT   ,  // use int as the graph size type
+    typename Value   >  // use int as the value type
+int main_(CommandLineArgs *args)
 {
+    CpuTimer cpu_timer, cpu_timer2;
+    cpu_timer.Start();
+
+    Csr <VertexId, SizeT, Value> csr(false);  // CSR graph we process on
+    Csr <VertexId, SizeT, Value> csc(false);  // CSC graph we process on
+    Info<VertexId, SizeT, Value> *info = new Info<VertexId, SizeT, Value>;
+
+    // graph construction or generation related parameters
+    info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
+
+    cpu_timer2.Start();
+    info->Init("DOBFS", *args, csr, csc);  // initialize Info structure
+    cpu_timer2.Stop();
+    info->info["load_time"] = cpu_timer2.ElapsedMillis();
+
+    RunTests_mark_predecessors<VertexId, SizeT, Value>(info);  // run test
+
     cudaDeviceReset();
+    cpu_timer.Stop();
+    info->info["total_time"] = cpu_timer.ElapsedMillis();
+
+    if (!(info->info["quiet_mode"].get_bool()))
+    {   
+        info->DisplayStats();  // display collected statistics
+    }   
+
+    info->CollectInfo();  // collected all the info and put into JSON mObject
+    return 0;
+}
+
+template <
+    typename VertexId, // the vertex identifier type, usually int or long long
+    typename SizeT   > // the size tyep, usually int or long long
+int main_Value(CommandLineArgs *args)
+{
+    if (args -> CheckCmdLineFlag("64bit-Value"))
+        return main_<VertexId, SizeT, long long>(args);
+    else
+        return main_<VertexId, SizeT, int      >(args);
+}
+
+template <
+    typename VertexId>
+int main_SizeT(CommandLineArgs *args)
+{
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_Value<VertexId, long long>(args);
+    else
+        return main_Value<VertexId, int      >(args);
+}
+
+int main_VertexId(CommandLineArgs *args)
+{
+//    if (args -> CheckCmdLineFlag("64bit-VertexId"))
+//        return main_SizeT<long long>(args);
+//    else 
+        return main_SizeT<int      >(args);
+}
+
+int main(int argc, char** argv)
+{
     CommandLineArgs args(argc, argv);
     int graph_args = argc - args.ParsedArgc() - 1;
     if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
@@ -642,24 +704,8 @@ int main( int argc, char** argv)
         return 1;
     }
 
-    typedef int VertexId;  // Use int as the vertex identifier
-    typedef int Value;     // Use int as the value type
-    typedef int SizeT;     // Use int as the graph size type
-
-    Csr<VertexId, Value, SizeT> csr(false);  // CSR graph we process on
-    Csr<VertexId, Value, SizeT> csc(false);  // CSC graph we process on
-    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
-
-    // graph construction or generation related parameters
-    info->info["undirected"] = args.CheckCmdLineFlag("undirected");
-
-    info->Init("DOBFS", args, csr, csc);  // initialize Info structure
-    RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test
-
-    cudaDeviceReset();
-    return 0;
+    return main_VertexId(&args);
 }
-
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++

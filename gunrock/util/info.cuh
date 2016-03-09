@@ -26,7 +26,7 @@ namespace util {
  * @tparam SizeT
  */
 // TODO: more robust empty info["value"] check.
-template<typename VertexId, typename Value, typename SizeT>
+template<typename VertexId, typename SizeT, typename Value>
 struct Info
 {
 private:
@@ -55,10 +55,10 @@ private:
 
 public:
     json_spirit::mObject info;  // test parameters and running statistics
-    Csr<VertexId, Value, SizeT> *csr_ptr;  // pointer to CSR input graph
-    Csr<VertexId, Value, SizeT> *csc_ptr;  // pointer to CSC input graph
-    Csr<VertexId, Value, SizeT> *csr_query_ptr; // pointer to CSR input query graph
-    Csr<VertexId, Value, SizeT> *csr_data_ptr; // pointer to CSR input data graph
+    Csr<VertexId, SizeT, Value> *csr_ptr;  // pointer to CSR input graph
+    Csr<VertexId, SizeT, Value> *csc_ptr;  // pointer to CSC input graph
+    Csr<VertexId, SizeT, Value> *csr_query_ptr; // pointer to CSR input query graph
+    Csr<VertexId, SizeT, Value> *csr_data_ptr; // pointer to CSR input data graph
     // TODO: following two already moved into Enactor in branch mgpu-cq
 
     void         *context;  // pointer to context array used by MordernGPU
@@ -385,7 +385,7 @@ public:
     void Init(
         std::string algorithm_name,
         util::CommandLineArgs &args,
-        Csr<VertexId, Value, SizeT> &csr_ref)
+        Csr<VertexId, SizeT, Value> &csr_ref)
     {
         // load or generate input graph
         if (info["edge_value"].get_bool())
@@ -411,8 +411,8 @@ public:
     void Init(
         std::string algorithm_name,
         util::CommandLineArgs &args,
-        Csr<VertexId, Value, SizeT> &csr_ref,
-        Csr<VertexId, Value, SizeT> &csc_ref)
+        Csr<VertexId, SizeT, Value> &csr_ref,
+        Csr<VertexId, SizeT, Value> &csc_ref)
     {
 	// Special initialization for SM problem
         if(algorithm_name == "SM") return Init_SM(args,csr_ref,csc_ref);
@@ -571,7 +571,7 @@ public:
     template<bool EDGE_VALUE, bool INVERSE_GRAPH>
     int LoadGraph(
         util::CommandLineArgs &args,
-        Csr<VertexId, Value, SizeT> &csr_ref)
+        Csr<VertexId, SizeT, Value> &csr_ref)
     {
         std::string graph_type = args.GetCmdLineArgvGraphType();
 
@@ -768,7 +768,7 @@ public:
     template<bool NODE_VALUE>
     int LoadGraph_SM(
         util::CommandLineArgs &args,
-        Csr<VertexId, Value, SizeT> &csr_ref,
+        Csr<VertexId, SizeT, Value> &csr_ref,
         std::string type)
     {
         std::string graph_type = args.GetCmdLineArgvGraphType();
@@ -852,8 +852,8 @@ public:
      */
     void Init_SM(
         util::CommandLineArgs &args,
-        Csr<VertexId, Value, SizeT> &csr_query_ref,
-        Csr<VertexId, Value, SizeT> &csr_data_ref)
+        Csr<VertexId, SizeT, Value> &csr_query_ref,
+        Csr<VertexId, SizeT, Value> &csr_data_ref)
     {
         if(info["node_value"].get_bool()){
             LoadGraph_SM<true>(args,csr_query_ref, "query");
@@ -878,11 +878,11 @@ public:
      * @param[in] labels
      * @param[in] get_traversal_stats
      */
-    template <typename EnactorStats>
+    template <typename EnactorStats, typename T>
     void ComputeCommonStats(
         EnactorStats *enactor_stats,
-        float elapsed,
-        const VertexId *labels = NULL,
+        double elapsed,
+        const T *labels = NULL,
         bool get_traversal_stats = false)
     {
         double total_lifetimes = 0;
@@ -951,7 +951,7 @@ public:
             if (labels != NULL)
             for (VertexId i = 0; i < csr_ptr->nodes; ++i)
             {
-                if (labels[i] < util::MaxValue<VertexId>() && labels[i] != -1)
+                if (labels[i] < util::MaxValue<T>() && labels[i] != -1)
                 {
                     ++nodes_visited;
                     edges_visited +=
@@ -999,11 +999,11 @@ public:
      * @param[in] elapsed
      * @param[in] labels
      */
-    template <typename EnactorStats>
+    template <typename EnactorStats, typename T>
     void ComputeTraversalStats(
         EnactorStats *enactor_stats,
         float elapsed,
-        const VertexId *labels = NULL)
+        const T *labels = NULL)
     {
         ComputeCommonStats(
             enactor_stats,

@@ -62,17 +62,17 @@ struct BFSFunctor {
             return true;
         } else {
             // Check if the destination node has been claimed as someone's child
-            Value new_weight, old_weight;
+            VertexId new_label, old_label;
             if (ProblemData::MARK_PREDECESSORS) {
                 util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                    new_weight, problem->labels + s_id);
-            } else new_weight = s_id;
-            new_weight = new_weight + 1;
-            old_weight = problem -> labels[d_id];
-            bool result = new_weight < atomicMin(problem->labels + d_id, new_weight);
+                    new_label, problem->labels + s_id);
+            } else new_label = s_id;
+            new_label = new_label + 1;
+            old_label = atomicMin(problem->labels + d_id, new_label);
+            bool result = new_label < old_label;
             if (result && TO_TRACK && util::to_track(problem -> gpu_idx, d_id))
                  printf("%d\t %d\t CondEdge\t labels[%d] (%d) -> %d = labels[%d] + 1\n", 
-                    problem -> gpu_idx, new_weight-1, d_id, old_weight, new_weight, s_id);
+                    problem -> gpu_idx, new_label-1, d_id, old_label, new_label, s_id);
             return result;
         }
     }
@@ -134,13 +134,14 @@ struct BFSFunctor {
      *
      */
     static __device__ __forceinline__ void ApplyFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) 
+    {
         if (ProblemData::ENABLE_IDEMPOTENCE) {
             if (TO_TRACK && util::to_track(problem -> gpu_idx, node))
                 printf("%d\t %d\t ApplyFilter (%d, %d)\t labels[%d] -> %d\n",
                 problem -> gpu_idx, v, blockIdx.x, threadIdx.x, node, v);
             util::io::ModifiedStore<util::io::st::cg>::St(
-                v, problem->labels + node);
+                (VertexId)v, problem->labels + node);
         } else {
             // Doing nothing here
         }

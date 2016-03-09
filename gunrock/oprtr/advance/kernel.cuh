@@ -208,8 +208,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         typename KernelPolicy::SizeT            *partitioned_scanned_edges,
         typename KernelPolicy::VertexId         *d_in_key_queue,
         typename KernelPolicy::VertexId         *d_out_key_queue,
-        typename KernelPolicy::VertexId         *d_in_value_queue,
-        typename KernelPolicy::VertexId         *d_out_value_queue,
+        typename KernelPolicy::Value            *d_in_value_queue,
+        typename KernelPolicy::Value            *d_out_value_queue,
         typename KernelPolicy::SizeT            *d_row_offsets,
         typename KernelPolicy::VertexId         *d_column_indices,
         typename KernelPolicy::SizeT            *d_column_offsets,
@@ -244,8 +244,8 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
                 <typename KernelPolicy::THREAD_WARP_CTA_FORWARD, ProblemData, Functor>
                 <<<enactor_stats.advance_grid_size, KernelPolicy::THREAD_WARP_CTA_FORWARD::THREADS, 0, stream>>>(
                 frontier_attribute.queue_reset,
-                frontier_attribute.queue_index,
-                enactor_stats.iteration,
+                (typename KernelPolicy::VertexId) frontier_attribute.queue_index, // TODO: match this type
+                (int)     enactor_stats.iteration,        // TODO: match this type
                 frontier_attribute.queue_length,
                 d_in_key_queue,              // d_in_queue
                 d_out_value_queue,          // d_pred_out_queue

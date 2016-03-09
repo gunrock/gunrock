@@ -57,7 +57,7 @@ template <
 
     // Machine parameters
     int _CUDA_ARCH,                                     
-    bool _INSTRUMENT,
+    //bool _INSTRUMENT,
     // Behavioral control parameters
     int _SATURATION_QUIT,                                
     bool _DEQUEUE_PROBLEM_SIZE,
@@ -80,13 +80,14 @@ struct KernelPolicy
     typedef _ProblemData                    ProblemData;
     typedef typename ProblemData::VertexId  VertexId;
     typedef typename ProblemData::SizeT     SizeT;
+    typedef typename ProblemData::Value     Value;
 
     enum {
         CUDA_ARCH                       = _CUDA_ARCH,
         SATURATION_QUIT                 = _SATURATION_QUIT,
         DEQUEUE_PROBLEM_SIZE            = _DEQUEUE_PROBLEM_SIZE,
 
-        INSTRUMENT                      = _INSTRUMENT,
+        //INSTRUMENT                      = _INSTRUMENT,
 
         LOG_THREADS                     = _LOG_THREADS,
         THREADS                         = 1 << LOG_THREADS,

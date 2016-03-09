@@ -97,15 +97,17 @@ void Usage()
  *
  * @param[in] graph Reference to the CSR graph.
  */
-template<typename VertexId, typename Value, typename SizeT>
-void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph_query,
-                     const Csr<VertexId, Value, SizeT> &graph_data,
-                     VertexId *h_froms,
-                     VertexId *h_tos,
-                     SizeT num_matches)
+template<typename VertexId, typename SizeT, typename Value>
+void DisplaySolution(
+    const Csr<VertexId, SizeT, Value> &graph_query,
+    const Csr<VertexId, SizeT, Value> &graph_data,
+    VertexId *h_froms,
+    VertexId *h_tos,
+    SizeT num_matches)
 {
     // TODO(developer): code to print out results
-    printf("Number of matched subgraphs: %u.\n",num_matches);
+    printf("Number of matched subgraphs: %lld.\n",
+        (long long)num_matches);
 
 }
 
@@ -124,10 +126,10 @@ void DisplaySolution(const Csr<VertexId, Value, SizeT> &graph_query,
  * @param[in] graph_data  Referece to the CSR data graph we process on.
  * @param[in] h_c_set     Reference to the candidate set matrix result.
  */
-template<typename VertexId, typename Value, typename SizeT>
-Value SimpleReferenceSM(
-	const Csr<VertexId, Value, SizeT> &graph_query,
-        const Csr<VertexId, Value, SizeT> &graph_data,
+template<typename VertexId, typename SizeT, typename Value>
+SizeT ReferenceSM(
+	const Csr<VertexId, SizeT, Value> &graph_query,
+    const Csr<VertexId, SizeT, Value> &graph_data,
 	bool quiet_mode = false)
 {
     if (!quiet_mode) { printf("\nSM CPU REFERENCE TEST\n"); }
@@ -168,83 +170,109 @@ Value SimpleReferenceSM(
 template <
     typename VertexId,
     typename SizeT,
-    typename Value,
-    bool     DEBUG,
-    bool     SIZE_CHECK >
-void RunTest(Info<VertexId, Value, SizeT> *info)
+    typename Value>
+    //bool     DEBUG,
+    //bool     SIZE_CHECK >
+void RunTests(Info<VertexId, SizeT, Value> *info)
 {
     // define the problem data structure for graph primitive
     typedef SMProblem<VertexId,
             SizeT,
             Value,
             true,    // MARK_PREDECESSORS
-            false,   // ENABLE_IDEMPOTENCE
-            true >   // USE_DOUBLE_BUFFER
+            false>   // ENABLE_IDEMPOTENCE
+            //true >   // USE_DOUBLE_BUFFER
             Problem;
+    typedef SMEnactor <Problem>
+            Enactor;
 
-    Csr<VertexId, Value, SizeT>* graph_query =
-        (Csr<VertexId, Value, SizeT>*)info->csr_query_ptr;
-    Csr<VertexId, Value, SizeT>* graph_data =
-        (Csr<VertexId, Value, SizeT>*)info->csr_data_ptr;
+    Csr<VertexId, SizeT, Value> *graph_query = info->csr_query_ptr;
+    Csr<VertexId, SizeT, Value> *graph_data  = info->csr_data_ptr;
+    int      max_grid_size         = info->info["max_grid_size"     ].get_int  (); 
+    int      num_gpus              = info->info["num_gpus"          ].get_int  (); 
+    double   max_queue_sizing      = info->info["max_queue_sizing"  ].get_real (); 
+    double   max_queue_sizing1     = info->info["max_queue_sizing1" ].get_real (); 
+    double   max_in_sizing         = info->info["max_in_sizing"     ].get_real (); 
+    std::string partition_method   = info->info["partition_method"  ].get_str  (); 
+    double   partition_factor      = info->info["partition_factor"  ].get_real (); 
+    int      partition_seed        = info->info["partition_seed"    ].get_int  (); 
+    bool     quiet_mode            = info->info["quiet_mode"        ].get_bool (); 
+    bool     quick_mode            = info->info["quick_mode"        ].get_bool (); 
+    bool     stream_from_host      = info->info["stream_from_host"  ].get_bool (); 
+    bool     instrument            = info->info["instrument"        ].get_bool (); 
+    bool     debug                 = info->info["debug_mode"        ].get_bool (); 
+    bool     size_check            = info->info["size_check"        ].get_bool (); 
+    int      iterations            = 1; //disable since doesn't support mgpu stop condition. info->info["num_iteration"].get_int();
+    CpuTimer cpu_timer;
 
-    int num_gpus            = info->info["num_gpus"].get_int();
-    int max_grid_size       = info->info["max_grid_size"].get_int();
-    int iterations          = 1; //force to 1 info->info["num_iteration"].get_int();
-    bool quiet_mode         = info->info["quiet_mode"].get_bool();
-    bool quick_mode         = info->info["quick_mode"].get_bool();
-    bool stream_from_host   = info->info["stream_from_host"].get_bool();
-    double max_queue_sizing = info->info["max_queue_sizing"].get_real();
+    cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) 
         gpu_idx[i] = device_list[i].get_int();
 
     // TODO: remove after merge mgpu-cq
-    ContextPtr* context = (ContextPtr*)info->context;
+    ContextPtr   *context = (ContextPtr*  )info->context;
     cudaStream_t *streams = (cudaStream_t*)info->streams;
-
-    // allocate SM enactor map
-    SMEnactor < Problem,
-               false,        // INSTRUMENT
-               DEBUG,        // DEBUG
-               SIZE_CHECK >  // SIZE_CHECK
-               enactor(gpu_idx);
-
-    // allocate problem on GPU create a pointer of the MSTProblem type
-    Problem * problem = new Problem;
 
     // host results spaces
     VertexId *h_froms = new VertexId[graph_data->nodes*graph_data->nodes*graph_query->edges/2];
     VertexId *h_tos = new VertexId[graph_data->nodes*graph_data->nodes*graph_query->edges/2];
 
-    if (!quiet_mode) { printf("\nSUBGRAPH MATCHING TEST\n"); fflush(stdout);}
+    // allocate problem on GPU create a pointer of the SMProblem type
+    Problem * problem = new Problem(true);
 
     // copy data from CPU to GPU initialize data members in DataSlice
-    util::GRError(problem->Init(stream_from_host, *graph_query, *graph_data, num_gpus, gpu_idx, streams),
-                  "Problem SM Initialization Failed", __FILE__, __LINE__);
+    util::GRError(problem->Init(
+        stream_from_host,
+        graph_query,
+        graph_data,
+        num_gpus,
+        gpu_idx,
+        partition_method,
+        streams,
+        max_queue_sizing,
+        max_in_sizing,
+        partition_factor,
+        partition_seed),
+        "Problem SM Initialization Failed", __FILE__, __LINE__);
+
+    // allocate SM enactor map
+    // allocate primitive enactor map
+    Enactor *enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);
+    util::GRError(enactor->Init(
+        context, problem, max_grid_size),
+        "SMEnactor Init failed", __FILE__, __LINE__);
+    cpu_timer.Stop();
+    info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
+
+    if (!quiet_mode) { printf("\nSUBGRAPH MATCHING TEST\n"); fflush(stdout);}
+
     // perform calculations
-    GpuTimer gpu_timer;  // record the kernel running time
     double elapsed_gpu = 0.0f;  // device elapsed running time
 
     for (int iter = 0; iter < iterations; ++iter)
     {
         // reset values in DataSlice
         util::GRError(problem->Reset(
-                          enactor.GetFrontierType(), max_queue_sizing),
-                      "SM Problem Data Reset Failed", __FILE__, __LINE__);
+            enactor -> GetFrontierType(), 
+            max_queue_sizing, max_queue_sizing1),
+            "SM Problem Data Reset Failed", __FILE__, __LINE__);
+        util::GRError(enactor -> Reset(),
+            "Enactor Reset failed", __FILE__, __LINE__);
 
-        gpu_timer.Start();
-
+        cpu_timer.Start();
         // launch SM enactor
-        util::GRError(enactor.template Enact<Problem>(
-                          *context, problem, max_grid_size),
-                      "SM Problem Enact Failed", __FILE__, __LINE__);
-
-        gpu_timer.Stop();
-        elapsed_gpu += gpu_timer.ElapsedMillis();
+        util::GRError(enactor -> Enact(),
+            "SM Problem Enact Failed", __FILE__, __LINE__);
+        cpu_timer.Stop();
+        elapsed_gpu += cpu_timer.ElapsedMillis();
     }
 
     elapsed_gpu /= iterations;
+    cpu_timer.Start();
+
     if (!quiet_mode)
     {
         printf("GPU - Computation Complete in %lf msec.\n", elapsed_gpu);
@@ -252,134 +280,130 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
 
     // copy results back to CPU from GPU using Extract
     util::GRError(problem->Extract(h_froms, h_tos),
-                  "SM Problem Data Extraction Failed", __FILE__, __LINE__);
+          "SM Problem Data Extraction Failed", __FILE__, __LINE__);
     SizeT num_matches_gpu = problem->data_slices[0]->num_matches;
 
     if (!quick_mode)  // run CPU reference test
     {
         // correctness validation
-	SizeT num_matches_cpu =  SimpleReferenceSM(*graph_query, *graph_data, quiet_mode);
-	if(num_matches_cpu == num_matches_gpu)
-	{
-            if (!quiet_mode) DisplaySolution(*graph_query, *graph_data, h_froms, h_tos, num_matches_cpu);
+	    SizeT num_matches_cpu =  ReferenceSM(
+            *graph_query, *graph_data, quiet_mode);
+	    if(num_matches_cpu == num_matches_gpu)
+	    {
+            if (!quiet_mode) 
+                DisplaySolution(
+                    *graph_query, *graph_data, h_froms, h_tos, num_matches_cpu);
             if (!quiet_mode) { printf("\nCORRECT.\n"); }
-        }
-        else
-        {
+
+        } else {
             if (!quiet_mode)
             {
                 printf("INCORRECT.\n");
-                std::cout << "CPU Number of matched subgraphs = " << num_matches_cpu << std::endl;
-                std::cout << "GPU Number of matched subgraphs = " << num_matches_gpu << std::endl;
+                printf("CPU Number of matched subgraphs = %lld\n",
+                    (long long) num_matches_cpu);
+                printf("GPU Number of matched subgraphs = %lld\n",
+                    (long long) num_matches_gpu);
             }
         }
     }
 
-
-    info->ComputeCommonStats(enactor.enactor_stats.GetPointer(), elapsed_gpu);
-
-    if (!quiet_mode)
-    {
-        info->DisplayStats(false);   // display collected statistics
-    }
-
-    info->CollectInfo();
+    info->ComputeCommonStats(
+        enactor -> enactor_stats.GetPointer(), elapsed_gpu, (VertexId*) NULL);
 
     // clean up if necessary
-    if (problem)   delete    problem;
-    if (h_froms) delete [] h_froms;
-    if (h_tos) delete [] h_tos;
-}
-
-/**
- * @brief Test entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam DEBUG
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename VertexId,
-    typename Value,
-    typename SizeT,
-    bool     DEBUG >
-void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["size_check"].get_bool())
-    {
-        RunTest <VertexId, Value, SizeT, DEBUG,  true>(info);
-    }
-    else
-    {
-        RunTest <VertexId, Value, SizeT, DEBUG, false>(info);
-    }
-}
-
-/**
- * @brief Test entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename VertexId,
-    typename Value,
-    typename SizeT >
-void RunTests_debug(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["debug_mode"].get_bool())
-    {
-        RunTests_size_check <VertexId, Value, SizeT,  true>(info);
-    }
-    else
-    {
-        RunTests_size_check <VertexId, Value, SizeT, false>(info);
-    }
+    if (problem) delete   problem;
+    if (enactor) delete   enactor;
+    if (h_froms) delete[] h_froms;
+    if (h_tos)   delete[] h_tos;
+    cpu_timer.Stop();
+    info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // Main function
 ///////////////////////////////////////////////////////////////////////////////
+template <
+    typename VertexId,  // use int as the vertex identifier
+    typename SizeT   ,  // use int as the graph size type
+    typename Value   >  // use int as the value type
+int main_(CommandLineArgs *args, int graph_args)
+{
+    CpuTimer cpu_timer, cpu_timer2;
+    cpu_timer.Start();
+
+    Csr <VertexId, SizeT, Value> csr_query(false);  // query graph we process on
+    Csr <VertexId, SizeT, Value> csr_data(false);  // data graph we process on
+    Info<VertexId, SizeT, Value> *info = new Info<VertexId, SizeT, Value>;
+
+    // graph construction or generation related parameters
+    info->info["undirected"] = true;  // always convert to undirected
+    info->info["debug_mode"] = false;  // debug mode
+    if (graph_args == 5)  info->info["node_value"] = true;  // require per node label values
+
+    cpu_timer2.Start();
+    info->Init("SM", *args, csr_query, csr_data);
+    cpu_timer2.Stop();
+    info->info["load_time"] = cpu_timer2.ElapsedMillis();
+
+    graphio::RemoveStandaloneNodes<VertexId, SizeT, Value>(
+        &csr_data, args -> CheckCmdLineFlag("quite"));
+
+    RunTests<VertexId, SizeT, Value>(info);  // run test
+
+    cpu_timer.Stop();
+    info->info["total_time"] = cpu_timer.ElapsedMillis();
+
+    if (!(info->info["quiet_mode"].get_bool()))
+    {
+        info->DisplayStats();  // display collected statistics
+    }
+
+    info->CollectInfo();  // collected all the info and put into JSON mObject
+    return 0;
+}
+
+template <
+    typename VertexId, // the vertex identifier type, usually int or long long
+    typename SizeT   > // the size tyep, usually int or long long
+int main_Value(CommandLineArgs *args, int graph_args)
+{
+    if (args -> CheckCmdLineFlag("64bit-Value"))
+        return main_<VertexId, SizeT, long long>(args, graph_args);
+    else
+        return main_<VertexId, SizeT, int      >(args, graph_args);
+}
+
+template <
+    typename VertexId>
+int main_SizeT(CommandLineArgs *args, int graph_args)
+{
+    //disabled, because atomicSub does not support long long
+    //if (args -> CheckCmdLineFlag("64bit-SizeT"))
+    //    return main_Value<VertexId, long long>(args, graph_args);
+    //else
+        return main_Value<VertexId, int      >(args, graph_args);
+}
+
+int main_VertexId(CommandLineArgs *args, int graph_args)
+{
+    // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
+    //if (args -> CheckCmdLineFlag("64bit-VertexId"))
+    //    return main_SizeT<long long>(args, graph_args);
+    //else 
+        return main_SizeT<int      >(args, graph_args);
+}
 
 int main(int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
     int graph_args = argc - args.ParsedArgc() - 1;
-    if (argc < 3 || graph_args < 2 || args.CheckCmdLineFlag("help"))
+    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
     {
         Usage();
         return 1;
     }
 
-    typedef int VertexId;  // use int as the vertex identifier
-    typedef int Value;     // use int as the value type
-    typedef int SizeT;     // use int as the graph size type
-
-    Csr<VertexId, Value, SizeT> csr_query(false);  // query graph we process on
-    Csr<VertexId, Value, SizeT> csr_data(false);  // data graph we process on
-
-    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
-
-    // graph construction or generation related parameters
-    info->info["undirected"] = true;  // always convert to undirected
-//    info->info["debug_mode"] = true;  // debug mode
-
-    if(graph_args == 5)  info->info["node_value"] = true;  // require per node label values
-
-    info->Init("SM", args, csr_query, csr_data);
-
-    graphio::RemoveStandaloneNodes<VertexId, Value, SizeT>(
-        &csr_data, args.CheckCmdLineFlag("quite"));
-
-    RunTests_debug<VertexId, Value, SizeT>(info);  // run test
-
-    return 0;
+    return main_VertexId(&args, graph_args);
 }
 
 // Leave this at the end of the file
