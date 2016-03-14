@@ -69,6 +69,7 @@ cudaError_t ComputeOutputLength(
     typename Problem::VertexId *d_inv_indices,
     typename Problem::VertexId *d_in_key_queue,
     typename Problem::SizeT    *partitioned_scanned_edges,
+    //util::Array1D<typename Problem::SizeT, unsigned char> &cub_scan_space,
     typename Problem::SizeT     max_in,
     typename Problem::SizeT     max_out,
     CudaContext                &context,

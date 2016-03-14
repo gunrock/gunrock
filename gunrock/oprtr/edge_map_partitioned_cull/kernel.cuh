@@ -131,6 +131,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
     typedef typename Problem::DataSlice             DataSlice;
     typedef typename Functor::LabelT                LabelT;
     typedef typename KernelPolicy::BlockScanT       BlockScanT;
+    typedef typename Problem::MaskT                 MaskT;
     //typedef typename KernelPolicy::BlockLoadT       BlockLoadT;
 
     static __device__ __forceinline__ SizeT GetNeighborListLength(
@@ -266,7 +267,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     //util::io::ModifiedStore<util::io::st::cg>::St(
                     //    smem_storage.tex_mask_bytes[temp_pos], //mask_byte,
                     //    smem_storage.d_visited_mask + ((u & KernelPolicy::ELEMENT_ID_MASK)>> 3));
-                    smem_storage.d_visited_mask[(u & KernelPolicy::ELEMENT_ID_MASK)>> 3] = smem_storage.tex_mask_bytes[temp_pos];
+                    smem_storage.d_visited_mask[(u & KernelPolicy::ELEMENT_ID_MASK)>> (2 + sizeof(MaskT))] = smem_storage.tex_mask_bytes[temp_pos];
                 }
                 output_pos ++;
                 temp_pos ++;
@@ -468,7 +469,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             VertexId v          = 0;
             VertexId input_item = 0;
             SizeT next_v_output_start_offset = 0;
-            SizeT v_output_start_offset = 0;
+            //SizeT v_output_start_offset = 0;
             SizeT row_offset_v = 0;
             VertexId v_index = 0;
             for (SizeT thread_output_offset = threadIdx.x + block_output_processed;
@@ -480,7 +481,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                 //VertexId u = 0;
                 bool to_process = false;
                 SizeT output_pos = 0;
-                unsigned char tex_mask_byte;
+                MaskT tex_mask_byte;
 
 
                 if (thread_output_offset < smem_storage.iter_output_end_offset)
@@ -523,14 +524,14 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     {
                         // Location of mask byte to read
                         //SizeT mask_byte_offset = (u & KernelPolicy::ELEMENT_ID_MASK) >> 3;
-                        output_pos = (u & KernelPolicy::ELEMENT_ID_MASK) >> 3;
+                        output_pos = (u & KernelPolicy::ELEMENT_ID_MASK) >> (2 + sizeof(MaskT));
 
                         // Bit in mask byte corresponding to current vertex id
-                        unsigned char mask_bit = 1 << (u & 7);
+                        MaskT mask_bit = 1 << (u & ((1 << (2+sizeof(MaskT)))-1));
 
                         // Read byte from visited mask in tex
                         tex_mask_byte = tex1Dfetch(
-                            gunrock::oprtr::cull_filter::BitmaskTex<unsigned char>::ref,//cta->t_bitmask[0],
+                            gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,//cta->t_bitmask[0],
                             output_pos);//mask_byte_offset);
 
                         if (!(mask_bit & tex_mask_byte))
@@ -765,7 +766,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             {
                 bool to_process = true;
                 SizeT output_pos = 0;
-                unsigned char tex_mask_byte = 0;
+                MaskT tex_mask_byte = 0;
                 if (thread_output < block_output_size)
                 {
                     if (thread_output >= next_v_output_start_offset)
@@ -792,14 +793,16 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     //    d_value_to_reduce, d_reduce_frontier);
                     if (Problem::ENABLE_IDEMPOTENCE)
                     {
-                        output_pos = (u & KernelPolicy::ELEMENT_ID_MASK) >> 3;
+                        //output_pos = (u & KernelPolicy::ELEMENT_ID_MASK) >> 3;
+                        output_pos = (u & KernelPolicy::ELEMENT_ID_MASK) >> (2 + sizeof(MaskT));
 
                         // Bit in mask byte corresponding to current vertex id
-                        unsigned char mask_bit = 1 << (u & 7);
+                        //MaskT mask_bit = 1 << (u & 7);
+                        MaskT mask_bit = 1 << (u & ((1 << (2 + sizeof(MaskT)))-1));
 
                         // Read byte from visited mask in tex
                         tex_mask_byte = tex1Dfetch(
-                            gunrock::oprtr::cull_filter::BitmaskTex<unsigned char>::ref,//cta->t_bitmask[0],
+                            gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,//cta->t_bitmask[0],
                             output_pos);//mask_byte_offset);
 
                         if (!(mask_bit & tex_mask_byte))

@@ -180,7 +180,7 @@ struct Identity<T, MINIMUM>
  * @tparam _ADVANCE_MODE                Enum type which shows the type of advance operator we use: TWC_FORWARD, TWC_BACKWARD, LB)
  */
 template <
-    typename _ProblemData,
+    typename _Problem,
     // Machine parameters
     int _CUDA_ARCH,
     // Behavioral control parameters
@@ -200,15 +200,22 @@ template <
     MODE _ADVANCE_MODE>
 struct KernelPolicy {
 
-    typedef _ProblemData                    ProblemData;
-    typedef typename ProblemData::VertexId  VertexId;
-    typedef typename ProblemData::SizeT     SizeT;
-    typedef typename ProblemData::Value     Value;
+    typedef _Problem                    Problem;
+    typedef typename Problem::VertexId  VertexId;
+    typedef typename Problem::SizeT     SizeT;
+    typedef typename Problem::Value     Value;
 
     static const MODE   ADVANCE_MODE = _ADVANCE_MODE;
 
+    enum
+    {
+        CUDA_ARCH = _CUDA_ARCH,
+        LOG_THREADS = _LOG_THREADS,
+        THREADS = 1 << LOG_THREADS,
+    };
+
     typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
-        _ProblemData,
+        _Problem,
         _CUDA_ARCH,
         //_INSTRUMENT,
         _MAX_CTA_OCCUPANCY,
@@ -222,7 +229,7 @@ struct KernelPolicy {
     THREAD_WARP_CTA_FORWARD;
 
     typedef gunrock::oprtr::edge_map_backward::KernelPolicy<
-        _ProblemData,
+        _Problem,
         _CUDA_ARCH,
         //_INSTRUMENT,
         _MAX_CTA_OCCUPANCY,
@@ -236,7 +243,7 @@ struct KernelPolicy {
     THREAD_WARP_CTA_BACKWARD;
 
     typedef gunrock::oprtr::edge_map_partitioned::KernelPolicy<
-        _ProblemData,
+        _Problem,
         _CUDA_ARCH,
         //_INSTRUMENT,
         1,
@@ -246,7 +253,7 @@ struct KernelPolicy {
     LOAD_BALANCED;
 
     typedef gunrock::oprtr::edge_map_partitioned_backward::KernelPolicy<
-        _ProblemData,
+        _Problem,
         _CUDA_ARCH,
         //_INSTRUMENT,
         1,
@@ -256,7 +263,7 @@ struct KernelPolicy {
     LOAD_BALANCED_BACKWARD;
 
     typedef gunrock::oprtr::edge_map_partitioned_cull::KernelPolicy<
-        _ProblemData,
+        _Problem,
         _CUDA_ARCH,
         //_INSTRUMENT,
         1,

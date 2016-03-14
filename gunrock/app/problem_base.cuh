@@ -359,25 +359,27 @@ struct DataSliceBase
     SizeT  nodes               ; // Number of vertices
     bool   use_double_buffer   ;
 
-    util::Array1D<SizeT, VertexId    > **vertex_associate_in  [2]; // Incoming VertexId type associate values
-    util::Array1D<SizeT, VertexId*   >  *vertex_associate_ins [2]; // Device pointers to incoming VertexId type associate values
-    util::Array1D<SizeT, VertexId    > **vertex_associate_out    ; // Outgoing VertexId type associate values
-    util::Array1D<SizeT, VertexId*   >  *vertex_associate_outs   ; // Device pointers to outgoing VertexId type associate values
-    util::Array1D<SizeT, VertexId**  >   vertex_associate_outss  ; // Device pointers to device points to outgoing VertexId type associate values
+    util::Array1D<SizeT, VertexId    >  *vertex_associate_in  [2]; // Incoming VertexId type associate values
+    //util::Array1D<SizeT, VertexId*   >  *vertex_associate_ins [2]; // Device pointers to incoming VertexId type associate values
+    util::Array1D<SizeT, VertexId    >  *vertex_associate_out    ; // Outgoing VertexId type associate values
+    util::Array1D<SizeT, VertexId*   >   vertex_associate_outs   ; // Device pointers to outgoing VertexId type associate values
+    //util::Array1D<SizeT, VertexId**  >   vertex_associate_outss  ; // Device pointers to device points to outgoing VertexId type associate values
     util::Array1D<SizeT, VertexId*   >   vertex_associate_orgs   ; // Device pointers to original VertexId type associate values
-    util::Array1D<SizeT, Value       > **value__associate_in  [2]; // Incoming Value type associate values
-    util::Array1D<SizeT, Value*      >  *value__associate_ins [2]; // Device pointers to incoming Value type associate values
-    util::Array1D<SizeT, Value       > **value__associate_out    ; // Outgoing Value type associate values
-    util::Array1D<SizeT, Value*      >  *value__associate_outs   ; // Device pointers to outgoing Value type associate values
-    util::Array1D<SizeT, Value**     >   value__associate_outss  ; // Device pointers to device pointers to outgoing Value type associate values
+    util::Array1D<SizeT, Value       >  *value__associate_in  [2]; // Incoming Value type associate values
+    //util::Array1D<SizeT, Value*      >  *value__associate_ins [2]; // Device pointers to incoming Value type associate values
+    util::Array1D<SizeT, Value       >  *value__associate_out    ; // Outgoing Value type associate values
+    util::Array1D<SizeT, Value*      >   value__associate_outs   ; // Device pointers to outgoing Value type associate values
+    //util::Array1D<SizeT, Value**     >   value__associate_outss  ; // Device pointers to device pointers to outgoing Value type associate values
     util::Array1D<SizeT, Value*      >   value__associate_orgs   ; // Device pointers to original Value type associate values
     util::Array1D<SizeT, SizeT       >   out_length              ; // Number of outgoing vertices to peers
     util::Array1D<SizeT, SizeT       >   in_length            [2]; // Number of incoming vertices from peers
+    util::Array1D<SizeT, SizeT       >   in_length_out           ;
+    util::Array1D<SizeT, VertexId    >   in_iteration         [2]; // Incoming iteration numbers
     util::Array1D<SizeT, VertexId    >  *keys_in              [2]; // Incoming vertices
     util::Array1D<SizeT, VertexId*   >   keys_outs               ; // Outgoing vertices
     util::Array1D<SizeT, VertexId    >  *keys_out                ; // Device pointers to outgoing vertices
-    util::Array1D<SizeT, SizeT       >  *keys_marker             ; // Markers to separate vertices to peer GPUs
-    util::Array1D<SizeT, SizeT*      >   keys_markers            ; // Device pointer to the markers
+    //util::Array1D<SizeT, SizeT       >  *keys_marker             ; // Markers to separate vertices to peer GPUs
+    //util::Array1D<SizeT, SizeT*      >   keys_markers            ; // Device pointer to the markers
 
     util::Array1D<SizeT, SizeT       >  *visit_lookup            ; // Vertex lookup array
     util::Array1D<SizeT, VertexId    >  *valid_in                ; // Vertex valid in
@@ -389,15 +391,16 @@ struct DataSliceBase
     util::Array1D<SizeT, cudaStream_t>   streams                 ; // GPU streams
     util::Array1D<SizeT, int         >   stages                  ; // current stages of each streams
     util::Array1D<SizeT, bool        >   to_show                 ; // whether to show debug information for the streams
-    util::Array1D<SizeT, char        >   make_out_array          ; // compressed data structure for make_out kernel
-    util::Array1D<SizeT, char        >  *expand_incoming_array   ; // compressed data structure for expand_incoming kernel
+    //util::Array1D<SizeT, char        >   make_out_array          ; // compressed data structure for make_out kernel
+    //util::Array1D<SizeT, char        >  *expand_incoming_array   ; // compressed data structure for expand_incoming kernel
     util::Array1D<SizeT, VertexId    >   preds                   ; // predecessors of vertices
-    util::Array1D<SizeT, VertexId    >   temp_preds              ; // temporary storages for predecessors
+    //util::Array1D<SizeT, VertexId    >   temp_preds              ; // temporary storages for predecessors
     util::Array1D<SizeT, VertexId    >   labels                  ; // Used for source distance
 
     //Frontier queues. Used to track working frontier.
     util::DoubleBuffer<VertexId, SizeT, Value>  *frontier_queues ; // frontier queues
     util::Array1D<SizeT, SizeT       >  *scanned_edges           ; // length / offsets for offsets of the frontier queues
+    util::Array1D<SizeT, unsigned char> *cub_scan_space;
 
     // arrays used to track data race, containing info about pervious assigment
     util::Array1D<SizeT, int         > org_checkpoint            ; // checkpoint number
@@ -423,7 +426,7 @@ struct DataSliceBase
 
         // Assign NULs to pointers
         keys_out                 = NULL;
-        keys_marker              = NULL;
+        //keys_marker              = NULL;
         keys_in              [0] = NULL;
         keys_in              [1] = NULL;
         visit_lookup             = NULL;
@@ -431,37 +434,43 @@ struct DataSliceBase
         valid_out                = NULL;
         vertex_associate_in  [0] = NULL;
         vertex_associate_in  [1] = NULL;
-        vertex_associate_ins [0] = NULL;
-        vertex_associate_ins [1] = NULL;
+        //vertex_associate_ins [0] = NULL;
+        //vertex_associate_ins [1] = NULL;
         vertex_associate_out     = NULL;
-        vertex_associate_outs    = NULL;
+        //vertex_associate_outs    = NULL;
         value__associate_in  [0] = NULL;
         value__associate_in  [1] = NULL;
-        value__associate_ins [0] = NULL;
-        value__associate_ins [1] = NULL;
+        //value__associate_ins [0] = NULL;
+        //value__associate_ins [1] = NULL;
         value__associate_out     = NULL;
-        value__associate_outs    = NULL;
+        //value__associate_outs    = NULL;
         frontier_queues          = NULL;
         scanned_edges            = NULL;
-        expand_incoming_array    = NULL;
+        //cub_scan_space           = NULL;
+        //expand_incoming_array    = NULL;
 
         // Assign names to arrays
         keys_outs              .SetName("keys_outs"              );
-        vertex_associate_outss .SetName("vertex_associate_outss" );
-        value__associate_outss .SetName("value__associate_outss" );
+        vertex_associate_outs  .SetName("vertex_associate_outs"  );
+        value__associate_outs  .SetName("value__associate_outs"  );
+        //vertex_associate_outss .SetName("vertex_associate_outss" );
+        //value__associate_outss .SetName("value__associate_outss" );
         vertex_associate_orgs  .SetName("vertex_associate_orgs"  );
         value__associate_orgs  .SetName("value__associate_orgs"  );
         out_length             .SetName("out_length"             );
         in_length           [0].SetName("in_length[0]"           );
         in_length           [1].SetName("in_length[1]"           );
+        in_length_out          .SetName("in_length_out"          );
+        in_iteration        [0].SetName("in_iteration[0]"        );
+        in_iteration        [1].SetName("in_iteration[0]"        );
         wait_marker            .SetName("wait_marker"            );
-        keys_markers           .SetName("keys_marker"            );
+        //keys_markers           .SetName("keys_marker"            );
         stages                 .SetName("stages"                 );
         to_show                .SetName("to_show"                );
-        make_out_array         .SetName("make_out_array"         );
+        //make_out_array         .SetName("make_out_array"         );
         streams                .SetName("streams"                );
         preds                  .SetName("preds"                  );
-        temp_preds             .SetName("temp_preds"             );
+        //temp_preds             .SetName("temp_preds"             );
         labels                 .SetName("labels"                 );
         org_checkpoint         .SetName("org_checkpoint"         );
         org_d_out              .SetName("org_d_out"              );
@@ -497,26 +506,26 @@ struct DataSliceBase
         {
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
-                for (int i = 0; i < MAX_NUM_VERTEX_ASSOCIATES; i++)
-                {
-                    if (retval = vertex_associate_in[0][gpu][i].Release()) return retval;
-                    if (retval = vertex_associate_in[1][gpu][i].Release()) return retval;
-                }
-                delete[] vertex_associate_in[0][gpu];
-                delete[] vertex_associate_in[1][gpu];
-                vertex_associate_in [0][gpu] = NULL;
-                vertex_associate_in [1][gpu] = NULL;
-                if (retval = vertex_associate_ins[0][gpu].Release()) return retval;
-                if (retval = vertex_associate_ins[1][gpu].Release()) return retval;
+                //for (int i = 0; i < MAX_NUM_VERTEX_ASSOCIATES; i++)
+                //{
+                //    if (retval = vertex_associate_in[0][gpu][i].Release()) return retval;
+                //    if (retval = vertex_associate_in[1][gpu][i].Release()) return retval;
+                //}
+                //delete[] vertex_associate_in[0][gpu];
+                //delete[] vertex_associate_in[1][gpu];
+                //vertex_associate_in [0][gpu] = NULL;
+                //vertex_associate_in [1][gpu] = NULL;
+                if (retval = vertex_associate_in[0][gpu].Release()) return retval;
+                if (retval = vertex_associate_in[1][gpu].Release()) return retval;
             }
             delete[] vertex_associate_in [0];
             delete[] vertex_associate_in [1];
-            delete[] vertex_associate_ins[0];
-            delete[] vertex_associate_ins[1];
+            //delete[] vertex_associate_ins[0];
+            //delete[] vertex_associate_ins[1];
             vertex_associate_in [0] = NULL;
             vertex_associate_in [1] = NULL;
-            vertex_associate_ins[0] = NULL;
-            vertex_associate_ins[1] = NULL;
+            //vertex_associate_ins[0] = NULL;
+            //vertex_associate_ins[1] = NULL;
         }
 
         // Release Value type incoming associate values and related pointers
@@ -524,26 +533,26 @@ struct DataSliceBase
         {
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
-                for (int i = 0; i < MAX_NUM_VALUE__ASSOCIATES; i++)
-                {
-                    if (retval = value__associate_in[0][gpu][i].Release()) return retval;
-                    if (retval = value__associate_in[1][gpu][i].Release()) return retval;
-                }
-                delete[] value__associate_in[0][gpu];
-                delete[] value__associate_in[1][gpu];
-                value__associate_in [0][gpu] = NULL;
-                value__associate_in [1][gpu] = NULL;
-                if (retval = value__associate_ins[0][gpu].Release()) return retval;
-                if (retval = value__associate_ins[1][gpu].Release()) return retval;
+                //for (int i = 0; i < MAX_NUM_VALUE__ASSOCIATES; i++)
+                //{
+                //    if (retval = value__associate_in[0][gpu][i].Release()) return retval;
+                //    if (retval = value__associate_in[1][gpu][i].Release()) return retval;
+                //}
+                //delete[] value__associate_in[0][gpu];
+                //delete[] value__associate_in[1][gpu];
+                //value__associate_in [0][gpu] = NULL;
+                //value__associate_in [1][gpu] = NULL;
+                if (retval = value__associate_in[0][gpu].Release()) return retval;
+                if (retval = value__associate_in[1][gpu].Release()) return retval;
             }
             delete[] value__associate_in [0];
             delete[] value__associate_in [1];
-            delete[] value__associate_ins[0];
-            delete[] value__associate_ins[1];
+            //delete[] value__associate_ins[0];
+            //delete[] value__associate_ins[1];
             value__associate_in [0] = NULL;
             value__associate_in [1] = NULL;
-            value__associate_ins[0] = NULL;
-            value__associate_ins[1] = NULL;
+            //value__associate_ins[0] = NULL;
+            //value__associate_ins[1] = NULL;
         }
 
         // Release incoming keys and related pointers
@@ -591,34 +600,34 @@ struct DataSliceBase
         }
 
         // Release outgoing keys and markers
-        if (keys_marker != NULL)
-        {
-            for (int gpu = 0; gpu < num_gpus; gpu++)
-            {
-                if (retval = keys_out   [gpu].Release()) return retval;
-                if (retval = keys_marker[gpu].Release()) return retval;
-            }
-            delete[] keys_out   ; keys_out    = NULL;
-            delete[] keys_marker; keys_marker = NULL;
-            if (retval = keys_markers.Release()) return retval;
-        }
+        //if (keys_marker != NULL)
+        //{
+        //    for (int gpu = 0; gpu < num_gpus; gpu++)
+        //    {
+        //        if (retval = keys_out   [gpu].Release()) return retval;
+        //        if (retval = keys_marker[gpu].Release()) return retval;
+        //    }
+        //    delete[] keys_out   ; keys_out    = NULL;
+        //    delete[] keys_marker; keys_marker = NULL;
+        //    if (retval = keys_markers.Release()) return retval;
+        //}
 
         // Release VertexId type outgoing associate values and pointers
         if (vertex_associate_out != NULL)
         {
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
-                for (int i = 0; i < MAX_NUM_VERTEX_ASSOCIATES; i++)
-                    if (retval = vertex_associate_out[gpu][i].Release()) return retval;
-                delete[] vertex_associate_out[gpu];
-                vertex_associate_out [gpu] = NULL;
-                if (retval = vertex_associate_outs[gpu].Release()) return retval;
+                //for (int i = 0; i < MAX_NUM_VERTEX_ASSOCIATES; i++)
+                //    if (retval = vertex_associate_out[gpu][i].Release()) return retval;
+                //delete[] vertex_associate_out[gpu];
+                vertex_associate_outs [gpu] = NULL;
+                if (retval = vertex_associate_out[gpu].Release()) return retval;
             }
             delete[] vertex_associate_out;
-            delete[] vertex_associate_outs;
+            //delete[] vertex_associate_outs;
             vertex_associate_out = NULL;
-            vertex_associate_outs = NULL;
-            if (retval = vertex_associate_outss.Release()) return retval;
+            //vertex_associate_outs = NULL;
+            if (retval = vertex_associate_outs.Release()) return retval;
         }
 
         // Release Value type outgoing associate values and pointers
@@ -626,24 +635,24 @@ struct DataSliceBase
         {
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
-                for (int i = 0; i < MAX_NUM_VALUE__ASSOCIATES; i++)
-                    if (retval = value__associate_out[gpu][i].Release()) return retval;
-                delete[] value__associate_out[gpu];
-                value__associate_out [gpu] = NULL;
-                if (retval = value__associate_outs[gpu].Release()) return retval;
+                //for (int i = 0; i < MAX_NUM_VALUE__ASSOCIATES; i++)
+                //    if (retval = value__associate_out[gpu][i].Release()) return retval;
+                //delete[] value__associate_out[gpu];
+                value__associate_outs [gpu] = NULL;
+                if (retval = value__associate_out[gpu].Release()) return retval;
             }
             delete[] value__associate_out ;
-            delete[] value__associate_outs;
+            //delete[] value__associate_outs;
             value__associate_out = NULL;
-            value__associate_outs = NULL;
-            if (retval = value__associate_outss.Release()) return retval;
+            //value__associate_outs = NULL;
+            if (retval = value__associate_outs.Release()) return retval;
         }
 
         // Release events and markers
         for (int i = 0; i < 4; i++)
         {
             if (events[i].GetPointer() != NULL)
-            for (int gpu = 0; gpu < num_gpus; gpu++)
+            for (int gpu = 0; gpu < num_gpus * 2; gpu++)
             {
                 for (int stage = 0; stage < num_stages; stage++)
                     if (retval = util::GRError(cudaEventDestroy(events[i][gpu][stage]),
@@ -656,13 +665,13 @@ struct DataSliceBase
         }
 
         // Release expand_incoming_arrays
-        if (expand_incoming_array != NULL)
-        {
-            for (int gpu = 0; gpu < num_gpus; gpu++)
-                if (retval = expand_incoming_array[gpu].Release()) return retval;
-            delete[] expand_incoming_array;
-            expand_incoming_array = NULL;
-        }
+        //if (expand_incoming_array != NULL)
+        //{
+        //    for (int gpu = 0; gpu < num_gpus; gpu++)
+        //        if (retval = expand_incoming_array[gpu].Release()) return retval;
+        //    delete[] expand_incoming_array;
+        //    expand_incoming_array = NULL;
+        //}
 
         // Release frontiers
         if (frontier_queues != NULL)
@@ -687,10 +696,21 @@ struct DataSliceBase
             scanned_edges           = NULL;
         }
 
+        /*if (cub_scan_space != NULL)
+        {
+            for (int gpu = 0; gpu <= num_gpus; gpu++)
+                if (retval = cub_scan_space[gpu].Release()) return retval;
+            delete[] cub_scan_space;
+            cub_scan_space = NULL;
+        }*/
+
         //Release all other arrays
         if (retval = keys_outs     .Release()) return retval;
         if (retval = in_length  [0].Release()) return retval;
         if (retval = in_length  [1].Release()) return retval;
+        if (retval = in_length_out .Release()) return retval;
+        if (retval = in_iteration[0].Release()) return retval;
+        if (retval = in_iteration[1].Release()) return retval;
         if (retval = wait_marker   .Release()) return retval;
         if (retval = out_length    .Release()) return retval;
         if (retval = vertex_associate_orgs.Release()) return retval;
@@ -698,9 +718,9 @@ struct DataSliceBase
         if (retval = streams       .Release()) return retval;
         if (retval = stages        .Release()) return retval;
         if (retval = to_show       .Release()) return retval;
-        if (retval = make_out_array.Release()) return retval;
+        //if (retval = make_out_array.Release()) return retval;
         if (retval = preds         .Release()) return retval;
-        if (retval = temp_preds    .Release()) return retval;
+        //if (retval = temp_preds    .Release()) return retval;
         if (retval = labels        .Release()) return retval;
 
         if (retval = org_checkpoint.Release()) return retval;
@@ -736,7 +756,8 @@ struct DataSliceBase
               *graph               ,
         SizeT *num_in_nodes        ,
         SizeT *num_out_nodes       ,
-        float  in_sizing = 1.0     )
+        float  in_sizing = 1.0     ,
+        bool   skip_makeout_selection = false)
     {
         cudaError_t retval         = cudaSuccess;
         // Copy input values
@@ -753,13 +774,18 @@ struct DataSliceBase
         // Allocate frontiers and scanned_edges
         this->frontier_queues      = new util::DoubleBuffer<VertexId, SizeT, Value>[num_gpus + 1];
         this->scanned_edges        = new util::Array1D<SizeT, SizeT>[num_gpus + 1];
+        //this->cub_scan_space       = new util::Array1D<SizeT, unsigned char>[num_gpus + 1];
         for (int i = 0; i < num_gpus + 1; i++)
         {
             this->scanned_edges[i].SetName("scanned_edges[]");
         }
         if (retval = in_length[0].Allocate(num_gpus, util::HOST)) return retval;
         if (retval = in_length[1].Allocate(num_gpus, util::HOST)) return retval;
-        if (retval = out_length  .Allocate(num_gpus, util::HOST | util::DEVICE)) return retval;
+        if (retval = in_length_out.Init(num_gpus, util::HOST | util::DEVICE, true, cudaHostAllocMapped | cudaHostAllocPortable)) return retval;
+        if (retval = in_iteration[0].Allocate(num_gpus, util::HOST)) return retval;
+        if (retval = in_iteration[1].Allocate(num_gpus, util::HOST)) return retval;
+        //if (retval = out_length  .Allocate(num_gpus, util::HOST | util::DEVICE)) return retval;
+        if (retval = out_length .Init(num_gpus, util::HOST | util::DEVICE, true, cudaHostAllocMapped | cudaHostAllocPortable));
         if (retval = vertex_associate_orgs.Allocate(
             MAX_NUM_VERTEX_ASSOCIATES, util::HOST | util::DEVICE)) return retval;
         if (retval = value__associate_orgs.Allocate(
@@ -775,9 +801,9 @@ struct DataSliceBase
         }
         for (int i = 0; i < 4; i++)
         {
-            events    [i].Allocate(num_gpus);
-            events_set[i].Allocate(num_gpus);
-            for (int gpu = 0; gpu < num_gpus; gpu++)
+            events    [i].Allocate(num_gpus * 2);
+            events_set[i].Allocate(num_gpus * 2);
+            for (int gpu = 0; gpu < num_gpus * 2; gpu++)
             {
                 events    [i][gpu] = new cudaEvent_t[num_stages];
                 events_set[i][gpu] = new bool       [num_stages];
@@ -794,7 +820,10 @@ struct DataSliceBase
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
             for (int i = 0; i < 2; i++)
+            {
                 in_length[i][gpu] = 0;
+                in_iteration[i][gpu] = 0;
+            }
         }
 
         visit_lookup            = new util::Array1D<SizeT, SizeT    > [num_gpus];
@@ -805,58 +834,62 @@ struct DataSliceBase
         // Create incoming buffer on device
         keys_in             [0] = new util::Array1D<SizeT, VertexId > [num_gpus];
         keys_in             [1] = new util::Array1D<SizeT, VertexId > [num_gpus];
-        vertex_associate_in [0] = new util::Array1D<SizeT, VertexId >*[num_gpus];
-        vertex_associate_in [1] = new util::Array1D<SizeT, VertexId >*[num_gpus];
-        vertex_associate_ins[0] = new util::Array1D<SizeT, VertexId*> [num_gpus];
-        vertex_associate_ins[1] = new util::Array1D<SizeT, VertexId*> [num_gpus];
-        value__associate_in [0] = new util::Array1D<SizeT, Value    >*[num_gpus];
-        value__associate_in [1] = new util::Array1D<SizeT, Value    >*[num_gpus];
-        value__associate_ins[0] = new util::Array1D<SizeT, Value   *> [num_gpus];
-        value__associate_ins[1] = new util::Array1D<SizeT, Value   *> [num_gpus];
+        vertex_associate_in [0] = new util::Array1D<SizeT, VertexId > [num_gpus];
+        vertex_associate_in [1] = new util::Array1D<SizeT, VertexId > [num_gpus];
+        //vertex_associate_ins[0] = new util::Array1D<SizeT, VertexId*> [num_gpus];
+        //vertex_associate_ins[1] = new util::Array1D<SizeT, VertexId*> [num_gpus];
+        value__associate_in [0] = new util::Array1D<SizeT, Value    > [num_gpus];
+        value__associate_in [1] = new util::Array1D<SizeT, Value    > [num_gpus];
+        //value__associate_ins[0] = new util::Array1D<SizeT, Value   *> [num_gpus];
+        //value__associate_ins[1] = new util::Array1D<SizeT, Value   *> [num_gpus];
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
             for (int t = 0; t < 2; t++)
             {
                 SizeT num_in_node = num_in_nodes[gpu] * in_sizing;
-                vertex_associate_in [t][gpu] =
-                    new util::Array1D<SizeT, VertexId>[MAX_NUM_VERTEX_ASSOCIATES];
-                for (int i = 0; i < MAX_NUM_VERTEX_ASSOCIATES; i++)
-                {
-                    vertex_associate_in [t][gpu][i].SetName("vertex_associate_in[]");
-                    if (gpu == 0) continue;
-                    if (retval = vertex_associate_in[t][gpu][i]
-                        .Allocate(num_in_node, util::DEVICE))
-                        return retval;
-                }
-
-                value__associate_in [t][gpu] =
-                    new util::Array1D<SizeT, Value   >[MAX_NUM_VALUE__ASSOCIATES];
-                for (int i = 0; i < MAX_NUM_VALUE__ASSOCIATES; i++)
-                {
-                    value__associate_in[t][gpu][i].SetName("value__associate_ins[]");
-                    if (gpu == 0) continue;
-                    if (retval = value__associate_in[t][gpu][i]
-                        .Allocate(num_in_node, util::DEVICE))
-                        return retval;
-                }
-
-                vertex_associate_ins[t][gpu].SetName("vertex_associate_ins");
-                if (retval = vertex_associate_ins[t][gpu].Allocate(
-                    MAX_NUM_VERTEX_ASSOCIATES, util::DEVICE | util::HOST)) return retval;
-                for (int i = 0; i < MAX_NUM_VERTEX_ASSOCIATES; i++)
-                    vertex_associate_ins[t][gpu][i] =
-                        vertex_associate_in[t][gpu][i].GetPointer(util::DEVICE);
-                if (retval = vertex_associate_ins[t][gpu].Move(util::HOST, util::DEVICE))
+                //vertex_associate_in [t][gpu] =
+                //    new util::Array1D<SizeT, VertexId>[MAX_NUM_VERTEX_ASSOCIATES];
+                //for (int i = 0; i < MAX_NUM_VERTEX_ASSOCIATES; i++)
+                //{
+                //    vertex_associate_in [t][gpu][i].SetName("vertex_associate_in[]");
+                //    if (gpu == 0) continue;
+                //    if (retval = vertex_associate_in[t][gpu][i]
+                //        .Allocate(num_in_node, util::DEVICE))
+                //        return retval;
+                //}
+                if (retval = vertex_associate_in[t][gpu].Allocate(num_in_node * MAX_NUM_VERTEX_ASSOCIATES, util::DEVICE))
                     return retval;
 
-                value__associate_ins[t][gpu].SetName("value__associate_ins");
-                if (retval = value__associate_ins[t][gpu].Allocate(
-                    MAX_NUM_VALUE__ASSOCIATES, util::DEVICE | util::HOST)) return retval;
-                for (int i = 0; i < MAX_NUM_VALUE__ASSOCIATES; i++)
-                    value__associate_ins[t][gpu][i] =
-                        value__associate_in[t][gpu][i].GetPointer(util::DEVICE);
-                if (retval = value__associate_ins[t][gpu].Move(util::HOST, util::DEVICE))
+                //value__associate_in [t][gpu] =
+                //    new util::Array1D<SizeT, Value   >[MAX_NUM_VALUE__ASSOCIATES];
+                //for (int i = 0; i < MAX_NUM_VALUE__ASSOCIATES; i++)
+                //{
+                //    value__associate_in[t][gpu][i].SetName("value__associate_ins[]");
+                //    if (gpu == 0) continue;
+                //    if (retval = value__associate_in[t][gpu][i]
+                //        .Allocate(num_in_node, util::DEVICE))
+                //        return retval;
+                //}
+                if (retval = value__associate_in[t][gpu].Allocate(num_in_node * MAX_NUM_VALUE__ASSOCIATES, util::DEVICE))
                     return retval;
+
+                //vertex_associate_ins[t][gpu].SetName("vertex_associate_ins");
+                //if (retval = vertex_associate_ins[t][gpu].Allocate(
+                //    MAX_NUM_VERTEX_ASSOCIATES, util::DEVICE | util::HOST)) return retval;
+                //for (int i = 0; i < MAX_NUM_VERTEX_ASSOCIATES; i++)
+                //    vertex_associate_ins[t][gpu][i] =
+                //        vertex_associate_in[t][gpu][i].GetPointer(util::DEVICE);
+                //if (retval = vertex_associate_ins[t][gpu].Move(util::HOST, util::DEVICE))
+                //    return retval;
+
+                //value__associate_ins[t][gpu].SetName("value__associate_ins");
+                //if (retval = value__associate_ins[t][gpu].Allocate(
+                //    MAX_NUM_VALUE__ASSOCIATES, util::DEVICE | util::HOST)) return retval;
+                //for (int i = 0; i < MAX_NUM_VALUE__ASSOCIATES; i++)
+                //    value__associate_ins[t][gpu][i] =
+                //        value__associate_in[t][gpu][i].GetPointer(util::DEVICE);
+                //if (retval = value__associate_ins[t][gpu].Move(util::HOST, util::DEVICE))
+                //    return retval;
 
                 keys_in[t][gpu].SetName("keys_in");
                 if (gpu != 0)
@@ -884,88 +917,130 @@ struct DataSliceBase
         }*/
 
         // Allocate outgoing buffer on device
-        vertex_associate_out  = new util::Array1D<SizeT, VertexId >*[num_gpus];
-        vertex_associate_outs = new util::Array1D<SizeT, VertexId*> [num_gpus];
-        value__associate_out  = new util::Array1D<SizeT, Value    >*[num_gpus];
-        value__associate_outs = new util::Array1D<SizeT, Value*   > [num_gpus];
-        keys_marker           = new util::Array1D<SizeT, SizeT    > [num_gpus];
+        vertex_associate_out  = new util::Array1D<SizeT, VertexId > [num_gpus];
+        //vertex_associate_outs = new util::Array1D<SizeT, VertexId*> [num_gpus];
+        value__associate_out  = new util::Array1D<SizeT, Value    > [num_gpus];
+        //value__associate_outs = new util::Array1D<SizeT, Value*   > [num_gpus];
+        //keys_marker           = new util::Array1D<SizeT, SizeT    > [num_gpus];
         keys_out              = new util::Array1D<SizeT, VertexId > [num_gpus];
-        if (retval = vertex_associate_outss.Allocate(num_gpus, util::HOST | util::DEVICE)) return retval;
-        if (retval = value__associate_outss.Allocate(num_gpus, util::HOST | util::DEVICE)) return retval;
-        if (retval = keys_markers          .Allocate(num_gpus, util::HOST | util::DEVICE)) return retval;
-        if (retval = keys_outs             .Allocate(num_gpus, util::HOST | util::DEVICE)) return retval;
+        //if (retval = vertex_associate_outss.Allocate(num_gpus, util::HOST | util::DEVICE)) return retval;
+        if (retval = vertex_associate_outs. Init(num_gpus, util::HOST | util::DEVICE, true, cudaHostAllocMapped | cudaHostAllocPortable))
+            return retval;
+        //if (retval = value__associate_outss.Allocate(num_gpus, util::HOST | util::DEVICE)) return retval;
+        if (retval = value__associate_outs. Init(num_gpus, util::HOST | util::DEVICE, true, cudaHostAllocMapped | cudaHostAllocPortable))
+            return retval;
+        //if (retval = keys_markers          .Allocate(num_gpus, util::HOST | util::DEVICE)) return retval;
+        //if (retval = keys_outs             .Allocate(num_gpus, util::HOST | util::DEVICE)) return retval;
+        if (retval = keys_outs. Init(num_gpus, util::HOST | util::DEVICE, true, cudaHostAllocMapped | cudaHostAllocPortable))
+            return retval;
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
-            SizeT num_out_node = num_out_nodes[gpu] * in_sizing;
-            keys_marker[gpu].SetName("keys_marker[]");
-            if (retval = keys_marker[gpu].Allocate(
-                num_out_nodes[num_gpus] * in_sizing, util::DEVICE)) return retval;
-            keys_markers[gpu] = keys_marker[gpu].GetPointer(util::DEVICE);
+            //SizeT num_out_node = num_out_nodes[gpu] * in_sizing;
+            SizeT num_out_node = nodes * in_sizing;
+            //keys_marker[gpu].SetName("keys_marker[]");
+            //if (retval = keys_marker[gpu].Allocate(
+            //    num_out_nodes[num_gpus] * in_sizing, util::DEVICE)) return retval;
+            //keys_markers[gpu] = keys_marker[gpu].GetPointer(util::DEVICE);
             keys_out   [gpu].SetName("keys_out[]");
             if (gpu != 0)
             {
-                if (retval = keys_out[gpu].Allocate(num_out_node, util::DEVICE)) return retval;
+                if (retval = keys_out[gpu].Allocate(num_out_node, util::DEVICE))
+                    return retval;
                 keys_outs[gpu] = keys_out[gpu].GetPointer(util::DEVICE);
             }
 
-            vertex_associate_out  [gpu] = new util::Array1D<SizeT, VertexId>
-                [MAX_NUM_VERTEX_ASSOCIATES];
-            vertex_associate_outs [gpu].SetName("vertex_associate_outs[]");
-            if (retval = vertex_associate_outs[gpu].Allocate(
-                MAX_NUM_VERTEX_ASSOCIATES, util::HOST | util::DEVICE)) return retval;
-            vertex_associate_outss[gpu] = vertex_associate_outs[gpu].GetPointer(util::DEVICE);
-            for (int i = 0; i < MAX_NUM_VERTEX_ASSOCIATES; i++)
+            //vertex_associate_out  [gpu] = new util::Array1D<SizeT, VertexId>
+            //    [MAX_NUM_VERTEX_ASSOCIATES];
+            vertex_associate_out [gpu].SetName("vertex_associate_outs[]");
+            //if (retval = vertex_associate_outs[gpu].Allocate(
+            //    MAX_NUM_VERTEX_ASSOCIATES, util::HOST | util::DEVICE)) return retval;
+            //vertex_associate_outss[gpu] = vertex_associate_outs[gpu].GetPointer(util::DEVICE);
+            //for (int i = 0; i < MAX_NUM_VERTEX_ASSOCIATES; i++)
+            //{
+            //    vertex_associate_out[gpu][i].SetName("vertex_associate_out[][]");
+            //    if (gpu != 0)
+            //        if (retval = vertex_associate_out[gpu][i].Allocate(
+            //            num_out_node, util::DEVICE))
+            //            return retval;
+            //    vertex_associate_outs[gpu][i] =
+            //        vertex_associate_out[gpu][i].GetPointer(util::DEVICE);
+            //}
+            //if (retval = vertex_associate_outs[gpu].Move(util::HOST, util::DEVICE)) return retval;
+            if (gpu != 0)
             {
-                vertex_associate_out[gpu][i].SetName("vertex_associate_out[][]");
-                if (gpu != 0)
-                    if (retval = vertex_associate_out[gpu][i].Allocate(
-                        num_out_node, util::DEVICE))
-                        return retval;
-                vertex_associate_outs[gpu][i] =
-                    vertex_associate_out[gpu][i].GetPointer(util::DEVICE);
+                if (retval = vertex_associate_out[gpu].Allocate(num_out_node * MAX_NUM_VERTEX_ASSOCIATES, util::DEVICE))
+                    return retval;
+                vertex_associate_outs[gpu] = vertex_associate_out[gpu].GetPointer(util::DEVICE);
             }
-            if (retval = vertex_associate_outs[gpu].Move(util::HOST, util::DEVICE)) return retval;
 
-            value__associate_out [gpu] = new util::Array1D<SizeT, Value>
-                [MAX_NUM_VALUE__ASSOCIATES];
-            value__associate_outs[gpu].SetName("value__associate_outs[]");
-            if (retval = value__associate_outs[gpu].Allocate(
-                MAX_NUM_VALUE__ASSOCIATES, util::HOST | util::DEVICE)) return retval;
-            value__associate_outss[gpu] = value__associate_outs[gpu].GetPointer(util::DEVICE);
-            for (int i = 0; i < MAX_NUM_VALUE__ASSOCIATES; i++)
+            //value__associate_out [gpu] = new util::Array1D<SizeT, Value>
+            //    [MAX_NUM_VALUE__ASSOCIATES];
+            value__associate_out[gpu].SetName("value__associate_outs[]");
+            //if (retval = value__associate_outs[gpu].Allocate(
+            //    MAX_NUM_VALUE__ASSOCIATES, util::HOST | util::DEVICE)) return retval;
+            //value__associate_outss[gpu] = value__associate_outs[gpu].GetPointer(util::DEVICE);
+            //for (int i = 0; i < MAX_NUM_VALUE__ASSOCIATES; i++)
+            //{
+            //    value__associate_out[gpu][i].SetName("value__associate_out[][]");
+            //    if (gpu != 0)
+            //        if (retval = value__associate_out[gpu][i].Allocate(num_out_node, util::DEVICE))
+            //            return retval;
+            //    value__associate_outs[gpu][i] =
+            //        value__associate_out[gpu][i].GetPointer(util::DEVICE);
+            //}
+            //if (retval = value__associate_outs[gpu].Move(util::HOST, util::DEVICE)) return retval;
+            if (gpu != 0)
             {
-                value__associate_out[gpu][i].SetName("value__associate_out[][]");
-                if (gpu != 0)
-                    if (retval = value__associate_out[gpu][i].Allocate(num_out_node, util::DEVICE))
-                        return retval;
-                value__associate_outs[gpu][i] =
-                    value__associate_out[gpu][i].GetPointer(util::DEVICE);
+                if (retval = value__associate_out[gpu].Allocate(num_out_node * MAX_NUM_VALUE__ASSOCIATES, util::DEVICE))
+                    return retval;
+                vertex_associate_outs[gpu] = vertex_associate_out[gpu].GetPointer(util::DEVICE);
             }
-            if (retval = value__associate_outs[gpu].Move(util::HOST, util::DEVICE)) return retval;
+            if (skip_makeout_selection && gpu == 1) break;
         }
-        if (retval = keys_markers          .Move(util::HOST, util::DEVICE)) return retval;
-        if (retval = vertex_associate_outss.Move(util::HOST, util::DEVICE)) return retval;
-        if (retval = value__associate_outss.Move(util::HOST, util::DEVICE)) return retval;
+        if (skip_makeout_selection)
+        {
+            for (int gpu = 2; gpu < num_gpus; gpu++)
+            {
+                keys_out[gpu].SetPointer(
+                    keys_out[1].GetPointer(util::DEVICE),
+                    keys_out[1].GetSize(), util::DEVICE);
+                keys_outs[gpu] = keys_out[gpu].GetPointer(util::DEVICE);
+
+                vertex_associate_out[gpu].SetPointer(
+                    vertex_associate_out[1].GetPointer(util::DEVICE),
+                    vertex_associate_out[1].GetSize(), util::DEVICE);
+                vertex_associate_outs[gpu] = vertex_associate_out[gpu].GetPointer(util::DEVICE);
+
+                value__associate_out[gpu].SetPointer(
+                    value__associate_out[1].GetPointer(util::DEVICE),
+                    value__associate_out[1].GetSize(), util::DEVICE);
+                value__associate_outs[gpu] = value__associate_out[gpu].GetPointer(util::DEVICE);
+            }
+        }
+        //if (retval = keys_markers          .Move(util::HOST, util::DEVICE)) return retval;
+        if (retval = keys_outs            .Move(util::HOST, util::DEVICE)) return retval;
+        if (retval = vertex_associate_outs.Move(util::HOST, util::DEVICE)) return retval;
+        if (retval = value__associate_outs.Move(util::HOST, util::DEVICE)) return retval;
 
         // Allocate make_out_array and expand_incoming array
-        if (retval = make_out_array.Allocate(
-             sizeof(SizeT*   ) * num_gpus +
-             sizeof(VertexId*) * num_gpus +
-             sizeof(VertexId*) * MAX_NUM_VERTEX_ASSOCIATES +
-             sizeof(Value*   ) * MAX_NUM_VALUE__ASSOCIATES +
-             sizeof(VertexId*) * MAX_NUM_VERTEX_ASSOCIATES * num_gpus +
-             sizeof(Value*   ) * MAX_NUM_VALUE__ASSOCIATES * num_gpus +
-             sizeof(SizeT    ) * num_gpus,
-             util::HOST | util::DEVICE)) return retval;
-        expand_incoming_array = new util::Array1D<SizeT, char>[num_gpus];
-        for (int i = 0; i < num_gpus; i++)
-        {
-            expand_incoming_array[i].SetName("expand_incoming_array[]");
-            if (retval = expand_incoming_array[i].Allocate(
-                 sizeof(Value*   ) * MAX_NUM_VERTEX_ASSOCIATES * 2 +
-                 sizeof(VertexId*) * MAX_NUM_VALUE__ASSOCIATES * 2,
-                 util::HOST | util::DEVICE)) return retval;
-        }
+        //if (retval = make_out_array.Allocate(
+        //     sizeof(SizeT*   ) * num_gpus +
+        //     sizeof(VertexId*) * num_gpus +
+        //     sizeof(VertexId*) * MAX_NUM_VERTEX_ASSOCIATES +
+        //     sizeof(Value*   ) * MAX_NUM_VALUE__ASSOCIATES +
+        //     sizeof(VertexId*) * MAX_NUM_VERTEX_ASSOCIATES * num_gpus +
+        //     sizeof(Value*   ) * MAX_NUM_VALUE__ASSOCIATES * num_gpus +
+        //     sizeof(SizeT    ) * num_gpus,
+        //     util::HOST | util::DEVICE)) return retval;
+        //expand_incoming_array = new util::Array1D<SizeT, char>[num_gpus];
+        //for (int i = 0; i < num_gpus; i++)
+        //{
+        //    expand_incoming_array[i].SetName("expand_incoming_array[]");
+        //    if (retval = expand_incoming_array[i].Allocate(
+        //         sizeof(Value*   ) * MAX_NUM_VERTEX_ASSOCIATES * 2 +
+        //         sizeof(VertexId*) * MAX_NUM_VALUE__ASSOCIATES * 2,
+        //         util::HOST | util::DEVICE)) return retval;
+        //}
 
         return retval;
     } // end Init(..)
@@ -1111,6 +1186,21 @@ struct DataSliceBase
                         return retval;
                 }
             }
+
+            /*SizeT cub_request_size = 0;
+            cub::DeviceScan::ExclusiveSum(NULL, cub_request_size, froniter_queue.keys[0], froniter_queue.keys[0], max_queue_length);
+            if (cub_scan_space[peer].GetSize() < cub_request_size)
+            {
+                if (cub_scan_space[peer].GetPointer(util::DEVICE) != NULL && cub_scan_space[peer].GetSize() != 0)
+                {
+                    if (retval = cub_scan_space[peer].EnsureSize(cub_request_size))
+                        return retval;
+                } else {
+                    if (retval = cub_scan_space[peer].Allocate(cub_request_size, util::DEVICE))
+                        return retval;
+                }
+            }*/
+            return retval;
         }
 
         if (TO_TRACK)
@@ -1312,6 +1402,8 @@ struct ProblemBase
     bool enable_backward;
     bool keep_order;
     bool keep_node_num;
+    bool skip_makeout_selection;
+    bool unified_receive;
 
     /**
      * Load instruction cache-modifier const defines.
@@ -1353,7 +1445,9 @@ struct ProblemBase
         bool _use_double_buffer,
         bool _enable_backward,
         bool _keep_order,
-        bool _keep_node_num) :
+        bool _keep_node_num,
+        bool _skip_makeout_selection = false,
+        bool _unified_receive = false) :
         num_gpus            (0   ),
         gpu_idx             (NULL),
         nodes               (0   ),
@@ -1374,7 +1468,9 @@ struct ProblemBase
         use_double_buffer   (_use_double_buffer),
         enable_backward     (_enable_backward  ),
         keep_order          (_keep_order       ),
-        keep_node_num       (_keep_node_num    )
+        keep_node_num       (_keep_node_num    ),
+        skip_makeout_selection(_skip_makeout_selection),
+        unified_receive     (_unified_receive)
     {
     } // end ProblemBase()
 

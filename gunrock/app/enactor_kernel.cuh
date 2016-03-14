@@ -18,6 +18,8 @@
 #define STR(x) #x
 #define XSTR(x) STR(x)
 
+#include <gunrock/util/scan/block_scan.cuh>
+
 namespace gunrock {
 namespace app {
 
@@ -214,7 +216,7 @@ __global__ void Make_Out(
     Value**    s_value__associate_outss= (Value**   )&(s_array[offset]);
     offset+=sizeof(Value*   ) * num_gpus * NUM_VALUE__ASSOCIATES;
     SizeT*     s_offset                = (SizeT*    )&(s_array[offset]);
-    volatile SizeT x= threadIdx.x;
+    SizeT x= threadIdx.x;
 
     while (x<array_size)
     {
@@ -332,6 +334,129 @@ __global__ void Make_Out_Backward(
             }
         }
         x+=STRIDE;
+    }
+}
+
+template <typename VertexId, typename SizeT, typename Value,
+          SizeT NUM_VERTEX_ASSOCIATES, SizeT NUM_VALUE__ASSOCIATES,
+          int CUDA_ARCH, int LOG_THREADS>
+__global__ void Make_Output_Kernel(
+    SizeT      num_elements,
+    int        num_gpus,
+    SizeT     *d_out_length,
+    VertexId  *d_keys_in,
+    int       *d_partition_table,
+    VertexId  *d_convertion_table,
+    VertexId **d_vertex_associate_orgs,
+    Value    **d_value__associate_orgs,
+    VertexId **d_keys_outs,
+    VertexId **d_vertex_associate_outs,
+    Value    **d_value__associate_outs,
+    bool       skip_convertion = false)
+{
+    typedef util::Block_Scan<SizeT, CUDA_ARCH, LOG_THREADS> BlockScanT;
+    __shared__ typename BlockScanT::Temp_Space scan_space;
+    __shared__ SizeT sum_offset[8];
+
+    SizeT in_pos = (SizeT) blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT) blockDim.x * gridDim.x;
+
+    while (in_pos - threadIdx.x < num_elements)
+    {
+        VertexId key    = util::InvalidValue<VertexId>();
+        int      target = util::InvalidValue<int>();
+        if (in_pos < num_elements)
+        {
+            key = d_keys_in[in_pos];
+            target = d_partition_table[key];
+        }
+        SizeT    out_pos = 0;
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            SizeT out_offset, block_sum;
+            BlockScanT::LogicScan((target == gpu)? 1 : 0, out_offset, scan_space, block_sum);
+            if (target == gpu) out_pos = out_offset;
+            if (threadIdx.x == gpu) sum_offset[gpu] = block_sum;
+            __syncthreads();
+        }
+        if (threadIdx.x < num_gpus)
+            sum_offset[threadIdx.x] = atomicAdd(d_out_length + threadIdx.x, sum_offset[threadIdx.x]);
+        __syncthreads();
+
+        if (in_pos >= num_elements) break;
+        //printf("(%4d, %4d) : in_pos = %d, key = %d, target = %d, out_pos = %d + %d\n",
+        //    blockIdx.x, threadIdx.x, in_pos, key, target, out_pos, sum_offset[target]);
+        out_pos += sum_offset[target];
+        if (skip_convertion)
+        {
+            d_keys_outs[target][out_pos] = key;
+        } else {
+            d_keys_outs[target][out_pos] = d_convertion_table[key];
+        }
+
+        if (target != 0)
+        {
+            /*SizeT temp_out = out_pos * NUM_VERTEX_ASSOCIATES;
+            #pragma unroll
+            for (int i = 0; i < NUM_VERTEX_ASSOCIATES; i++)
+            {
+                d_vertex_associate_outs[target][temp_out]
+                    =d_vertex_associate_orgs[i][key];
+                temp_out ++;
+            }
+            temp_out = out_pos * NUM_VALUE__ASSOCIATES;
+            #pragma unroll
+            for (int i = 0; i < NUM_VALUE__ASSOCIATES; i++)
+            {
+                d_value__associate_outs[target][temp_out]
+                    =d_value__associate_orgs[i][key];
+                temp_out ++;
+            }*/
+        }
+        in_pos += STRIDE;
+    }
+}
+
+template <typename VertexId, typename SizeT, typename Value,
+          SizeT NUM_VERTEX_ASSOCIATES, SizeT NUM_VALUE__ASSOCIATES,
+          int CUDA_ARCH, int LOG_THREADS>
+__global__ void Make_Output_Kernel_SkipSelection(
+    SizeT      num_elements,
+    //int        num_gpus,
+    VertexId  *d_keys_in,
+    VertexId **d_vertex_associate_orgs,
+    Value    **d_value__associate_orgs,
+    VertexId  *d_keys_out,
+    VertexId  *d_vertex_associate_out,
+    VertexId  *d_value__associate_out)
+{
+    SizeT in_pos = (SizeT) blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT) blockDim.x * gridDim.x;
+
+    while (in_pos < num_elements)
+    {
+        VertexId key     = d_keys_in[in_pos];
+        SizeT    out_pos = in_pos;
+
+        //keys_out[0][out_pos] = key;
+        d_keys_out[out_pos] = key;
+        SizeT temp_out = out_pos * NUM_VERTEX_ASSOCIATES;
+        #pragma unroll
+        for (int i = 0; i < NUM_VERTEX_ASSOCIATES; i++)
+        {
+            d_vertex_associate_out[temp_out]
+                =d_vertex_associate_orgs[i][key];
+            temp_out ++;
+        }
+        temp_out = out_pos * NUM_VALUE__ASSOCIATES;
+        #pragma unroll
+        for (int i = 0; i < NUM_VALUE__ASSOCIATES; i++)
+        {
+            d_value__associate_out[temp_out]
+                =d_value__associate_orgs[i][key];
+            temp_out ++;
+        }
+        in_pos += STRIDE;
     }
 }
 

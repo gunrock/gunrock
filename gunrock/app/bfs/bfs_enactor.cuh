@@ -107,6 +107,97 @@ __global__ void Expand_Incoming_BFS (
     }
 }
 
+template <
+    typename KernelPolicy,
+    int      NUM_VERTEX_ASSOCIATES,
+    int      NUM_VALUE__ASSOCIATES>
+__global__ void Expand_Incoming_Kernel(
+                                 int             thread_num,
+          typename KernelPolicy::VertexId        label,
+          typename KernelPolicy::SizeT           num_elements,
+          typename KernelPolicy::VertexId*       d_keys_in,
+          typename KernelPolicy::VertexId*       d_vertex_associate_in,
+    //const Value*    const d_value__associate_out
+          typename KernelPolicy::SizeT*          d_out_length,
+          typename KernelPolicy::VertexId*       d_keys_out,
+          typename KernelPolicy::VertexId**      d_vertex_associate_orgs,
+    //util::Array1D<SizeT, Value*   > value__associate_org,
+          typename KernelPolicy::VertexId*       d_labels,
+          typename KernelPolicy::Problem::MaskT*          d_masks)
+{
+    typedef typename KernelPolicy::VertexId VertexId;
+    typedef typename KernelPolicy::SizeT    SizeT;
+    typedef typename KernelPolicy::Problem::MaskT    MaskT;
+    typedef util::Block_Scan<SizeT, KernelPolicy::CUDA_ARCH, KernelPolicy::LOG_THREADS> BlockScanT;
+
+    __shared__ typename BlockScanT::Temp_Space scan_space;
+    __shared__ SizeT block_offset;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
+    VertexId key = util::InvalidValue<VertexId>();
+    while (x - threadIdx.x < num_elements)
+    {
+        bool to_process = true;
+        SizeT output_pos = util::InvalidValue<SizeT>();
+        SizeT mask_pos = util::InvalidValue<SizeT>();
+        MaskT tex_mask_byte ;
+        //MaskT tex_mask_byte;
+        if (x < num_elements)
+        {
+            key = d_keys_in[x];
+            if (KernelPolicy::Problem::ENABLE_IDEMPOTENCE)
+            {
+                mask_pos = (key & KernelPolicy::LOAD_BALANCED_CULL::ELEMENT_ID_MASK) >> (2+sizeof(MaskT));
+                tex_mask_byte = tex1Dfetch(
+                    gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,
+                    mask_pos);
+                MaskT mask_bit = 1 << (key & ((1 << (2 + sizeof(MaskT)))-1));
+                if (!(mask_bit & tex_mask_byte))
+                {
+                    tex_mask_byte |= mask_bit;
+                } else to_process = false;
+
+                if (to_process)
+                {
+                    if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key) != util::MaxValue<VertexId>())
+                        to_process = false;
+                }
+
+                if (to_process)
+                {
+                    d_labels[key] = label;
+                    d_masks[mask_pos] = tex_mask_byte;
+                }
+            }
+
+            /*if (to_process)
+            {
+                if (tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  key + 1) == tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  key))
+                    to_process = false;
+            }*/
+        } else to_process = false;
+
+        BlockScanT::LogicScan(to_process, output_pos, scan_space);
+        if (threadIdx.x == blockDim.x -1)
+        {
+            block_offset = atomicAdd(d_out_length, output_pos + ((to_process) ? 1 : 0));
+        }
+        __syncthreads();
+
+
+        if (to_process)
+        {
+            //printf("(%4d, %4d) : in_pos = %d, key = %d, out_pos = %d + %d\n",
+            //    blockIdx.x, threadIdx.x, x, key, output_pos, block_offset);
+            output_pos += block_offset;
+            d_keys_out[output_pos] = key;
+            if (NUM_VERTEX_ASSOCIATES != 0 && d_labels[key] == label)
+                d_vertex_associate_orgs[0][key] = d_vertex_associate_in[x];
+        }
+        x += STRIDE;
+    }
+}
+
 /*
  * @brief Iteration structure derived from IterationBase.
  *
@@ -120,7 +211,8 @@ template<
     typename Enactor>
 struct BFSIteration : public IterationBase <
     AdvanceKernelPolicy, FilterKernelPolicy, Enactor,
-    true, false, false, true, Enactor::Problem::MARK_PREDECESSORS>
+    //true, false, false, true, Enactor::Problem::MARK_PREDECESSORS>
+    false, true, false, true, Enactor::Problem::MARK_PREDECESSORS>
 {
     typedef typename Enactor::SizeT      SizeT     ;
     typedef typename Enactor::Value      Value     ;
@@ -149,7 +241,7 @@ struct BFSIteration : public IterationBase <
      * @param[in] context CudaContext for ModernGPU API.
      * @param[in] stream CUDA stream.
      */
-    static void SubQueue_Core(
+    static void FullQueue_Core(
         Enactor                       *enactor,
         int                            thread_num,
         int                            peer_,
@@ -167,6 +259,11 @@ struct BFSIteration : public IterationBase <
         if (enactor -> debug)
             util::cpu_mt::PrintMessage("Advance begin",
                 thread_num, enactor_stats->iteration, peer_);
+        //if (enactor_stats -> retval = util::cpu_mt::PrintGPUArray<SizeT, VertexId>("PreAdvance",
+        //    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+        //    frontier_attribute -> queue_length,
+        //    thread_num, enactor_stats -> iteration, peer_, stream))
+        //    return;
         if (TO_TRACK)
         {
             printf("%d\t %lld\t %d SubQueue_Core queue_length = %lld\n",
@@ -258,13 +355,32 @@ struct BFSIteration : public IterationBase <
         frontier_attribute -> queue_reset = false;
         frontier_attribute -> queue_index++;
         frontier_attribute -> selector ^= 1;
-        enactor_stats      -> AccumulateEdges(
-            work_progress  -> template GetQueueLengthPointer<unsigned int>(
-                frontier_attribute -> queue_index), stream);
-
-        if (enactor -> debug)
-            util::cpu_mt::PrintMessage("Filter begin",
-                thread_num, enactor_stats->iteration, peer_);
+        if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB_CULL)
+        {
+            enactor_stats -> edges_queued[0] += frontier_attribute -> output_length[0];
+        } else {
+            enactor_stats      -> AccumulateEdges(
+                work_progress  -> template GetQueueLengthPointer<unsigned int>(
+                    frontier_attribute -> queue_index), stream);
+        }
+        if (enactor_stats->retval = work_progress -> GetQueueLength(
+            frontier_attribute->queue_index,
+            frontier_attribute->queue_length,
+            false,
+            stream,
+            true)) return;
+        //if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
+        //    "cudaStreamSynchronize failed", __FILE__, __LINE__))
+        //    return;
+        //printf("%d, resulted queue_length = %d\n", thread_num, frontier_attribute ->queue_length);
+        //if (enactor_stats -> retval = util::cpu_mt::PrintGPUArray<SizeT, VertexId>("PostAdvance",
+        //    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+        //    frontier_attribute -> queue_length,
+        //    thread_num, enactor_stats -> iteration, peer_, stream))
+        //    return;
+        //if (enactor -> debug)
+        //    util::cpu_mt::PrintMessage("Filter begin",
+        //        thread_num, enactor_stats->iteration, peer_);
         if (TO_TRACK)
         {
             util::Check_Value<<<1,1,0,stream>>>(
@@ -344,7 +460,14 @@ struct BFSIteration : public IterationBase <
             util::cpu_mt::PrintMessage("Filter end.",
                 thread_num, enactor_stats->iteration);
         frontier_attribute->queue_index++;
-        frontier_attribute->selector ^= 1;*/
+        frontier_attribute->selector ^= 1;
+        if (enactor_stats_->retval = work_progress[peer_].GetQueueLength(
+            frontier_attribute_->queue_index,
+            frontier_attribute_->queue_length,
+            false,
+            streams[peer_],
+            true)) break;
+        */
 
         if (TO_TRACK)
         {
@@ -386,7 +509,7 @@ struct BFSIteration : public IterationBase <
      * @param[in] data_slice
      */
     template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
-    static void Expand_Incoming(
+    static void Expand_Incoming_Old(
         Enactor        *enactor,
         int             grid_size,
         int             block_size,
@@ -415,6 +538,76 @@ struct BFSIteration : public IterationBase <
             data_slice -> gpu_idx,
             (VertexId)enactor_stats -> iteration,
             data_slice -> labels.GetPointer(util::DEVICE));
+    }
+
+    template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
+    static void Expand_Incoming(
+        Enactor        *enactor,
+        cudaStream_t    stream,
+        VertexId        iteration,
+        int             peer_,
+        SizeT           received_length,
+        SizeT           num_elements,
+        util::Array1D<SizeT, SizeT    > &out_length,
+        util::Array1D<SizeT, VertexId > &keys_in,
+        util::Array1D<SizeT, VertexId > &vertex_associate_in,
+        util::Array1D<SizeT, Value    > &value__associate_in,
+        util::Array1D<SizeT, VertexId > &keys_out,
+        util::Array1D<SizeT, VertexId*> &vertex_associate_orgs,
+        util::Array1D<SizeT, Value   *> &value__associate_orgs,
+        DataSlice      *h_data_slice,
+        EnactorStats<SizeT> *enactor_stats)
+    {
+        bool over_sized = false;
+        if (enactor -> problem -> unified_receive)
+        {
+            if (enactor_stats -> retval = Check_Size<SizeT, VertexId>(
+                enactor -> size_check, "incoming_queue",
+                num_elements + received_length,
+                &keys_out, over_sized, h_data_slice -> gpu_idx, iteration, peer_, true))
+                return;
+            received_length += num_elements;
+        } else {
+            //VertexId iteration_ = iteration%2;
+            //printf("Expand_Incoming, num_elements = %d, queue_size = %d, size_check = %s\n",
+            //    num_elements, keys_out.GetSize(), enactor -> size_check ? "true" : "false");
+            //fflush(stdout);
+            //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("ReceivedQueue",
+            //    keys_in.GetPointer(util::DEVICE), num_elements,
+            //    h_data_slice -> gpu_idx, iteration, peer_, stream);
+            if (enactor_stats -> retval = Check_Size<SizeT, VertexId>(
+                enactor -> size_check, "incomping_queue",
+                num_elements,
+                &keys_out, over_sized, h_data_slice -> gpu_idx, iteration, peer_))
+                return;
+            out_length[peer_] =0;
+            out_length.Move(util::HOST, util::DEVICE, 1, peer_, stream);
+        }
+        int num_blocks = num_elements / AdvanceKernelPolicy::THREADS / 2+ 1;
+        if (num_blocks > 120) num_blocks = 120;
+        Expand_Incoming_Kernel
+            <AdvanceKernelPolicy, NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
+            <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
+            (h_data_slice -> gpu_idx,
+            iteration,
+            num_elements,
+            keys_in.GetPointer(util::DEVICE),
+            vertex_associate_in.GetPointer(util::DEVICE),
+            out_length.GetPointer(util::DEVICE) + ((enactor -> problem -> unified_receive) ? 0: peer_),
+            keys_out.GetPointer(util::DEVICE),
+            vertex_associate_orgs.GetPointer(util::DEVICE),
+            h_data_slice -> labels.GetPointer(util::DEVICE),
+            h_data_slice -> visited_mask.GetPointer(util::DEVICE));
+
+        if (!enactor -> problem -> unified_receive)
+            out_length.Move(util::DEVICE, util::HOST, 1, peer_, stream);
+        else out_length.Move(util::DEVICE, util::HOST, 1, 0, stream);
+        //if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
+        //    "cudaStreamSynchronize failed", __FILE__, __LINE__))
+        //    return;
+        //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("ExpandedQueue",
+        //    keys_out.GetPointer(util::DEVICE), out_length[peer_],
+        //    h_data_slice -> gpu_idx, iteration, peer_, stream);
     }
 
     /*
@@ -459,6 +652,7 @@ struct BFSIteration : public IterationBase <
             (AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_FORWARD ||
              AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_BACKWARD))
         {
+            frontier_attribute -> output_length[0] = 0;
             return retval;
 
         } else {
@@ -485,6 +679,8 @@ struct BFSIteration : public IterationBase <
                 express,
                 in_inv,
                 out_inv);
+            frontier_attribute -> output_length.Move(
+                util::DEVICE, util::HOST, 1, 0, stream);
             return retval;
         }
     }
@@ -523,28 +719,45 @@ struct BFSIteration : public IterationBase <
             fflush(stdout);
         }
 
-        if (enactor_stats->retval =
-            Check_Size</*true,*/ SizeT, VertexId > (
-                true, "queue3", request_length,
-                &frontier_queue->keys  [selector^1],
-                over_sized, thread_num, iteration, peer_, false)) return;
-        if (enactor_stats->retval =
-            Check_Size</*true,*/ SizeT, VertexId > (
-                true, "queue3", graph_slice->nodes+2,
-                &frontier_queue->keys  [selector  ],
-                over_sized, thread_num, iteration, peer_, true )) return;
-        if (enactor -> problem -> use_double_buffer)
+        if (AdvanceKernelPolicy::ADVANCE_MODE != gunrock::oprtr::advance::LB_CULL)
         {
             if (enactor_stats->retval =
-                Check_Size</*true,*/ SizeT, Value> (
+                Check_Size</*true,*/ SizeT, VertexId > (
                     true, "queue3", request_length,
-                    &frontier_queue->values[selector^1],
+                    &frontier_queue->keys  [selector^1],
                     over_sized, thread_num, iteration, peer_, false)) return;
             if (enactor_stats->retval =
-                Check_Size</*true,*/ SizeT, Value> (
+                Check_Size</*true,*/ SizeT, VertexId > (
                     true, "queue3", graph_slice->nodes+2,
-                    &frontier_queue->values[selector  ],
+                    &frontier_queue->keys  [selector  ],
                     over_sized, thread_num, iteration, peer_, true )) return;
+            if (enactor -> problem -> use_double_buffer)
+            {
+                if (enactor_stats->retval =
+                    Check_Size</*true,*/ SizeT, Value> (
+                        true, "queue3", request_length,
+                        &frontier_queue->values[selector^1],
+                        over_sized, thread_num, iteration, peer_, false)) return;
+                if (enactor_stats->retval =
+                    Check_Size</*true,*/ SizeT, Value> (
+                        true, "queue3", graph_slice->nodes+2,
+                        &frontier_queue->values[selector  ],
+                        over_sized, thread_num, iteration, peer_, true )) return;
+            }
+        } else {
+            if (enactor_stats->retval =
+                Check_Size</*true,*/ SizeT, VertexId > (
+                    true, "queue3", graph_slice -> nodes * 1.2,
+                    &frontier_queue->keys  [selector^1],
+                    over_sized, thread_num, iteration, peer_, false)) return;
+            if (enactor -> problem -> use_double_buffer)
+            {
+                if (enactor_stats->retval =
+                    Check_Size</*true,*/ SizeT, Value> (
+                        true, "queue3", graph_slice->nodes * 1.2,
+                        &frontier_queue->values[selector^1],
+                        over_sized, thread_num, iteration, peer_, false )) return;
+            }
         }
     }
 
@@ -672,6 +885,7 @@ public:
     typedef typename Problem::SizeT    SizeT   ;
     typedef typename Problem::VertexId VertexId;
     typedef typename Problem::Value    Value   ;
+    typedef typename Problem::MaskT    MaskT   ;
     typedef EnactorBase<SizeT>         BaseEnactor;
     typedef BFSEnactor<Problem>        Enactor;
     //static const bool INSTRUMENT = _INSTRUMENT;
@@ -768,14 +982,14 @@ public:
         {
             if (retval = util::SetDevice(this->gpu_idx[gpu])) break;
             if (Problem::ENABLE_IDEMPOTENCE) {
-                SizeT bytes = (problem->graph_slices[gpu]->nodes + 8 - 1) / 8;
-                cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
-                gunrock::oprtr::cull_filter::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
+                SizeT num_mask_elements = (problem->graph_slices[gpu]->nodes + sizeof(MaskT) - 1) / sizeof(MaskT);
+                cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<MaskT>();
+                gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref.channelDesc = bitmask_desc;
                 if (retval = util::GRError(cudaBindTexture(
                     0,
-                    gunrock::oprtr::cull_filter::BitmaskTex<unsigned char>::ref,
+                    gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,
                     problem->data_slices[gpu]->visited_mask.GetPointer(util::DEVICE),
-                    bytes),
+                    num_mask_elements * sizeof(MaskT)),
                     "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
 
                 cudaChannelFormatDesc   labels_desc = cudaCreateChannelDesc<VertexId>();

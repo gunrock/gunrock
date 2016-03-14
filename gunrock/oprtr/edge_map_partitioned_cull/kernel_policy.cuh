@@ -65,6 +65,7 @@ public:
     typedef typename Problem::VertexId  VertexId;
     typedef typename Problem::SizeT     SizeT;
     typedef typename Problem::Value     Value;
+    typedef typename Problem::MaskT     MaskT;
 
     enum {
 
@@ -113,7 +114,7 @@ public:
             SizeT                       block_offset;
             SizeT                      *d_output_counter;
             VertexId                   *d_labels;
-            unsigned char              *d_visited_mask;
+            MaskT                      *d_visited_mask;
             SizeT                      *d_column_indices;
             SizeT                       block_output_start;
             SizeT                       block_output_end;
@@ -127,7 +128,7 @@ public:
             SizeT                       iter_output_size;
             SizeT                       iter_output_end_offset;
             VertexId                    thread_output_vertices[THREADS * OUTPUT_PER_THREAD];
-            unsigned char               tex_mask_bytes[THREADS * OUTPUT_PER_THREAD];
+            MaskT                       tex_mask_bytes[THREADS * OUTPUT_PER_THREAD];
             //bool                        warps_cond[WARPS];
             //bool                        block_cond;
             SizeT                       block_count;

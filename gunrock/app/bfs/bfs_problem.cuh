@@ -57,18 +57,20 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem;
     typedef DataSliceBase<VertexId, SizeT, Value,
         MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
+    //typedef unsigned char MaskT;
+    typedef unsigned char MaskT;
     /**
      * @brief Data slice structure which contains BFS problem specific data.
      */
     struct DataSlice : BaseDataSlice
     {
-        util::Array1D<SizeT, unsigned char > visited_mask  ;
-        util::Array1D<SizeT, unsigned int  > temp_marker   ;
+        util::Array1D<SizeT, MaskT         > visited_mask  ;
+        //util::Array1D<SizeT, unsigned int  > temp_marker   ;
         util::Array1D<SizeT, VertexId      > original_vertex;
-        util::Array1D<SizeT, SizeT         > input_counter;
+        //util::Array1D<SizeT, SizeT         > input_counter;
         //util::Array1D<SizeT, SizeT         > output_counter;
-        util::Array1D<SizeT, int           > edge_marker;
-        util::Array1D<SizeT, SizeT         > vertex_markers[2];
+        //util::Array1D<SizeT, int           > edge_marker;
+        //util::Array1D<SizeT, SizeT         > vertex_markers[2];
 
         /*
          * @brief Default constructor
@@ -76,13 +78,13 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         DataSlice() : BaseDataSlice()
         {
             visited_mask    .SetName("visited_mask"    );
-            temp_marker     .SetName("temp_marker"     );
+            //temp_marker     .SetName("temp_marker"     );
             original_vertex .SetName("original_vertex" );
             //input_counter   .SetName("input_counter"   );
             //output_counter  .SetName("output_counter"  );
             //edge_marker     .SetName("edge_marker"     );
-            vertex_markers[0].SetName("vertex_markers[0]");
-            vertex_markers[1].SetName("vertex_markers[1]");
+            //vertex_markers[0].SetName("vertex_markers[0]");
+            //vertex_markers[1].SetName("vertex_markers[1]");
         }
 
         /*
@@ -99,13 +101,13 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = util::SetDevice(this->gpu_idx)) return retval;
             if (retval = BaseDataSlice::Release())  return retval;
             if (retval = visited_mask   .Release()) return retval;
-            if (retval = temp_marker    .Release()) return retval;
+            //if (retval = temp_marker    .Release()) return retval;
             if (retval = original_vertex.Release()) return retval;
             //if (retval = input_counter  .Release()) return retval;
             //if (retval = output_counter .Release()) return retval;
             //if (retval = edge_marker    .Release()) return retval;
-            if (retval = vertex_markers[0].Release()) return retval;
-            if (retval = vertex_markers[1].Release()) return retval;
+            //if (retval = vertex_markers[0].Release()) return retval;
+            //if (retval = vertex_markers[1].Release()) return retval;
             return retval;
         }
 
@@ -136,7 +138,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             SizeT *num_out_nodes,
             VertexId *original_vertex,
             float queue_sizing = 2.0,
-            float in_sizing = 1.0)
+            float in_sizing = 1.0,
+            bool  skip_makeout_selection = false)
         {
             cudaError_t retval = cudaSuccess;
             if (retval = BaseDataSlice::Init(
@@ -148,7 +151,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 graph,
                 num_in_nodes,
                 num_out_nodes,
-                in_sizing)) return retval;
+                in_sizing,
+                skip_makeout_selection)) return retval;
 
             // Create SoA on device
             if (retval = this->labels        .Allocate(graph->nodes, util::DEVICE)) return retval;
@@ -160,12 +164,12 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             if (MARK_PREDECESSORS)
             {
                 if (retval = this->preds     .Allocate(graph->nodes,util::DEVICE)) return retval;
-                if (retval = this->temp_preds.Allocate(graph->nodes,util::DEVICE)) return retval;
+                //if (retval = this->temp_preds.Allocate(graph->nodes,util::DEVICE)) return retval;
             }
 
             if (ENABLE_IDEMPOTENCE)
             {
-                if (retval = visited_mask.Allocate((graph->nodes +7)/8, util::DEVICE))
+                if (retval = visited_mask.Allocate((graph->nodes + sizeof(MaskT) -1)/sizeof(MaskT), util::DEVICE))
                     return retval;
             }
 
@@ -176,7 +180,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                     this->vertex_associate_orgs[0] = this->preds.GetPointer(util::DEVICE);
                 if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE))
                     return retval;
-                if (retval = temp_marker. Allocate(graph->nodes, util::DEVICE)) return retval;
+                //if (retval = temp_marker. Allocate(graph->nodes, util::DEVICE)) return retval;
             }
             return retval;
         } // end Init
@@ -208,7 +212,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             for (int gpu = 0; gpu < this -> num_gpus; gpu++)
                 this -> wait_marker[gpu] = 0;
             for (int i=0; i<4; i++)
-            for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+            for (int gpu = 0; gpu < this -> num_gpus * 2; gpu++)
             for (int stage=0; stage < this -> num_stages; stage++)
                 this -> events_set[i][gpu][stage] = false;
             for (int gpu = 0; gpu < this -> num_gpus; gpu++)
@@ -296,6 +300,20 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                     if (retval = this->scanned_edges[peer].Allocate(max_elements, util::DEVICE))
                         return retval;
                 }
+
+                /*SizeT cub_request_size = 0;
+                cub::DeviceScan::ExclusiveSum(NULL, cub_request_size, froniter_queue.keys[0], froniter_queue.keys[0], max_queue_length);
+                if (cub_scan_space[peer].GetSize() < cub_request_size)
+                {
+                    if (cub_scan_space[peer].GetPointer(util::DEVICE) != NULL && cub_scan_space[peer].GetSize() != 0)
+                    {
+                        if (retval = cub_scan_space[peer].EnsureSize(cub_request_size))
+                            return retval;
+                    } else {
+                        if (retval = cub_scan_space[peer].Allocate(cub_request_size, util::DEVICE))
+                            return retval;
+                    }
+                }*/
             }
 
             // Allocate output labels if necessary
@@ -343,10 +361,10 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                     return retval;
             }
             if (ENABLE_IDEMPOTENCE) {
-                SizeT visited_mask_bytes  = ((nodes * sizeof(unsigned char))+7)/8;
-                SizeT visited_mask_elements = visited_mask_bytes * sizeof(unsigned char);
+                //SizeT visited_mask_bytes  = ;
+                SizeT visited_mask_elements = (nodes + sizeof(MaskT) -1 )/sizeof(MaskT);//visited_mask_bytes * sizeof(unsigned char);
                 util::MemsetKernel<<<128, 128>>>(this->visited_mask.GetPointer(util::DEVICE),
-                    (unsigned char)0, visited_mask_elements);
+                    (MaskT)0, visited_mask_elements);
             }
 
             return retval;
@@ -365,7 +383,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         MARK_PREDECESSORS && ENABLE_IDEMPOTENCE, // use_double_buffer
         false,                                   // enable_backward
         false,                                   // keep_order
-        false),                                   // keep_node_num
+        true,                                   // keep_node_num
+        false,                                  // skip_makeout_selection
+        true),                                   // unified_receive
         data_slices(NULL)
     {
     }
@@ -538,7 +558,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 this -> num_gpus > 1? graph_slice -> out_counter    .GetPointer(util::HOST) : NULL,
                 this -> num_gpus > 1? graph_slice -> original_vertex.GetPointer(util::HOST) : NULL,
                 queue_sizing,
-                in_sizing))
+                in_sizing,
+                this -> skip_makeout_selection && this -> keep_node_num))
                 return retval;
         } //end for(gpu)
 
