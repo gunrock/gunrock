@@ -416,7 +416,8 @@ public:
         Csr<VertexId, SizeT, Value> &csr_ref,
         Csr<VertexId, SizeT, Value> &csc_ref)
     {
-	// Special initialization for SM problem
+        typedef Coo<VertexId, Value> EdgeTupleType;
+	    // Special initialization for SM problem
         if(algorithm_name == "SM") return Init_SM(args,csr_ref,csc_ref);
 
          // load or generate input graph
@@ -425,12 +426,12 @@ public:
             if (info["undirected"].get_bool())
             {
                 LoadGraph<true, false>(args, csr_ref);  // with weigh values
-                LoadGraph<true, false>(args, csc_ref);  // same as CSR
+                csc_ref.FromCsr(csr_ref);
             }
             else
             {
                 LoadGraph<true, false>(args, csr_ref);  // load CSR input
-                LoadGraph<true,  true>(args, csc_ref);  // load CSC input
+                csc_ref.template CsrToCsc<EdgeTupleType>(csc_ref, csr_ref);
             }
         }
         else  // does not need weight values
@@ -438,12 +439,12 @@ public:
             if (info["undirected"].get_bool())
             {
                 LoadGraph<false, false>(args, csr_ref);  // without weights
-                LoadGraph<false, false>(args, csc_ref);  // without weights
+                csc_ref.FromCsr(csr_ref);
             }
             else
             {
                 LoadGraph<false, false>(args, csr_ref);  // without weights
-                LoadGraph<false,  true>(args, csc_ref);  // without weights
+                csc_ref.template CsrToCsc<EdgeTupleType>(csc_ref, csr_ref);
             }
         }
         csr_ptr = &csr_ref;  // set CSR pointer

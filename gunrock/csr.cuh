@@ -82,6 +82,75 @@ struct Csr
         this->pinned = pinned;
     }
 
+    void FromCsr(Csr<VertexId, Value, SizeT> &source)
+    {
+        nodes = source.nodes;
+        edges = source.edges;
+        average_degree = source.average_degree;
+        average_edge_value = source.average_edge_value;
+        average_node_value = source.average_node_value;
+        out_nodes = source.out_nodes;
+        if (source.row_offsets == NULL)
+        {
+            row_offsets = NULL;
+        } else {
+            row_offsets = (SizeT*) malloc(sizeof(SizeT) * (source.nodes + 1));
+            memcpy(row_offsets, source.row_offsets, sizeof(SizeT) * (source.nodes + 1));
+        }
+        if (source.column_indices == NULL)
+        {
+            column_indices = NULL;
+        } else {
+            column_indices = (VertexId*) malloc(sizeof(VertexId) * source.edges); 
+            memcpy(column_indices, source.column_indices, sizeof(VertexId) * source.edges);
+        }
+        if (source.edge_values == NULL)
+        {
+            edge_values = NULL;
+        } else {
+            edge_values = (Value*) malloc(sizeof(Value) * source.edges);
+            memcpy(edge_values, source.edge_values, sizeof(Value) * source.edges);
+        }
+        if (source.node_values == NULL)
+        {
+            node_values = NULL;
+        } else {
+            node_values = (Value*) malloc(sizeof(Value) * source.nodes);
+            memcpy(node_values, source.node_values, sizeof(Value) * source.nodes);
+        } 
+    }
+
+    
+    template <typename Tuple>
+    void CsrToCsc(Csr<VertexId, Value, SizeT> &target, 
+            Csr<VertexId, Value, SizeT> &source)
+    {
+        target.nodes = source.nodes;
+        target.edges = source.edges;
+        target.average_degree = source.average_degree;
+        target.average_edge_value = source.average_edge_value;
+        target.average_node_value = source.average_node_value;
+        target.out_nodes = source.out_nodes;
+        {
+            Tuple *coo = (Tuple*)malloc(sizeof(Tuple) * source.edges);
+            int idx = 0;
+            for (int i = 0; i < source.nodes; ++i)
+            {
+                for (int j = source.row_offsets[i]; j < source.row_offsets[i+1]; ++j)
+                {
+                    coo[idx].row = source.column_indices[j];
+                    coo[idx].col = i;
+                    coo[idx++].val = (source.edge_values == NULL) ? 0 : source.edge_values[j];
+                }
+            }
+            if (source.edge_values == NULL)
+                target.template FromCoo<false>(NULL, coo, nodes, edges);
+            else
+                target.template FromCoo<true>(NULL, coo, nodes, edges);
+            free(coo);
+        }
+    }
+
     /**
      * @brief Allocate memory for CSR graph.
      *
