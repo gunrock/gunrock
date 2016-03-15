@@ -142,7 +142,7 @@ void Iteration_Loop(
                     "cudaStreamSynchronize failed", __FILE__, __LINE__))
                 break;
             }
-        }
+        } else data_slice -> in_length_out[0] = received_length;
         for (peer=0; peer<num_gpus; peer++)
         {
             stages [peer         ] = 0   ;
@@ -1404,6 +1404,20 @@ public:
         if (enactor_stats->retval) return;
         if (enactor -> problem -> skip_makeout_selection)
         {
+            if (NUM_VALUE__ASSOCIATES == 0 && NUM_VERTEX_ASSOCIATES == 0)
+            {
+                util::MemsetCopyVectorKernel<<<120, 512, 0, stream>>>(
+                    data_slice -> keys_out[1].GetPointer(util::DEVICE),
+                    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+                    num_elements);
+                for (int peer_=0; peer_<num_gpus; peer_++)
+                    data_slice -> out_length[peer_] = num_elements;
+                if (enactor_stats -> retval = util::GRError(
+                    cudaStreamSynchronize(stream),
+                    "cudaStreamSynchronize failed", __FILE__, __LINE__))
+                    return;
+                return;
+            }
             for (int peer_ = 2; peer_ < num_gpus; peer_++)
             {
                 data_slice -> keys_out[peer_].SetPointer(

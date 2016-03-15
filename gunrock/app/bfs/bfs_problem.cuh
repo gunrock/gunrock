@@ -22,6 +22,11 @@ namespace gunrock {
 namespace app {
 namespace bfs {
 
+enum DIRECTION {
+    FORWARD,
+    BACKWARD,
+};
+
 /**
  * @brief Breadth-First Search Problem structure stores device-side vectors for doing BFS computing on the GPU.
  *
@@ -71,6 +76,10 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         //util::Array1D<SizeT, SizeT         > output_counter;
         //util::Array1D<SizeT, int           > edge_marker;
         //util::Array1D<SizeT, SizeT         > vertex_markers[2];
+        SizeT num_visited_vertices;
+        DIRECTION current_direction, previous_direction;
+        util::Array1D<SizeT, VertexId      > unvisited_vertices[2];
+        util::Array1D<SizeT, SizeT         > split_lengths;
 
         /*
          * @brief Default constructor
@@ -85,6 +94,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             //edge_marker     .SetName("edge_marker"     );
             //vertex_markers[0].SetName("vertex_markers[0]");
             //vertex_markers[1].SetName("vertex_markers[1]");
+            unvisited_vertices[0].SetName("unvisited_vertices[0]");
+            unvisited_vertices[1].SetName("unvisited_vertices[1]");
+            split_lengths.SetName("split_length");
         }
 
         /*
@@ -108,6 +120,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             //if (retval = edge_marker    .Release()) return retval;
             //if (retval = vertex_markers[0].Release()) return retval;
             //if (retval = vertex_markers[1].Release()) return retval;
+            if (retval = unvisited_vertices[0].Release()) return retval;
+            if (retval = unvisited_vertices[1].Release()) return retval;
+            if (retval = split_lengths.Release()) return retval;
             return retval;
         }
 
@@ -161,6 +176,12 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             //if (retval = this->edge_marker   .Allocate(graph->edges, util::DEVICE)) return retval;
             //if (retval = vertex_markers[0].Allocate(graph->nodes + 2, util::DEVICE)) return retval;
             //if (retval = vertex_markers[1].Allocate(graph->nodes + 2, util::DEVICE)) return retval;
+            if (retval = unvisited_vertices[0].Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = unvisited_vertices[1].Allocate(graph->nodes, util::DEVICE)) return
+            retval;
+            if (retval = split_lengths.Init(2, util::HOST | util::DEVICE, true, cudaHostAllocMapped | cudaHostAllocPortable))
+                return retval;
+
             if (MARK_PREDECESSORS)
             {
                 if (retval = this->preds     .Allocate(graph->nodes,util::DEVICE)) return retval;
@@ -206,6 +227,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             SizeT edges = graph_slice->edges;
             SizeT new_frontier_elements[2] = {0,0};
             SizeT max_queue_length = 0;
+            num_visited_vertices = 0;
+            current_direction = FORWARD;
+            previous_direction = FORWARD;
             if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
             if (retval = util::SetDevice( this -> gpu_idx)) return retval;
@@ -384,7 +408,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         false,                                   // enable_backward
         false,                                   // keep_order
         true,                                   // keep_node_num
-        false,                                  // skip_makeout_selection
+        true,                                  // skip_makeout_selection
         true),                                   // unified_receive
         data_slices(NULL)
     {

@@ -13,7 +13,7 @@
  */
 
 #pragma once
-
+#include <limits>
 #include <thread>
 #include <gunrock/util/multithreading.cuh>
 #include <gunrock/util/multithread_utils.cuh>
@@ -170,11 +170,11 @@ __global__ void Expand_Incoming_Kernel(
                 }
             }
 
-            /*if (to_process)
-            {
-                if (tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  key + 1) == tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  key))
-                    to_process = false;
-            }*/
+            //if (to_process)
+            //{
+            //    if (tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  key + 1) == tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  key))
+            //        to_process = false;
+            //}
         } else to_process = false;
 
         BlockScanT::LogicScan(to_process, output_pos, scan_space);
@@ -198,6 +198,183 @@ __global__ void Expand_Incoming_Kernel(
     }
 }
 
+template <typename Problem, typename KernelPolicy>
+__global__ void From_Unvisited_Queue(
+    typename Problem::SizeT     num_nodes,
+    typename Problem::SizeT    *d_out_length,
+    typename Problem::VertexId *d_keys_out,
+    typename Problem::MaskT    *d_visited_mask)
+{
+    typedef typename Problem::VertexId VertexId;
+    typedef typename Problem::SizeT    SizeT;
+    typedef typename Problem::MaskT    MaskT;
+    typedef util::Block_Scan<SizeT, KernelPolicy::CUDA_ARCH, KernelPolicy::LOG_THREADS> BlockScanT;
+
+    __shared__ typename BlockScanT::Temp_Space scan_space;
+    __shared__ SizeT block_offset;
+    SizeT x = (SizeT) blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT) blockDim.x * gridDim.x;
+    VertexId l_keys_out[sizeof(MaskT) * 8];
+    SizeT    l_counter = 0;
+    SizeT    output_pos = 0;
+
+    while ((x - threadIdx.x) * sizeof(MaskT) * 8 < num_nodes)
+    {
+        MaskT mask_byte = 0;
+        bool changed = false;
+        l_counter = 0;
+        if (x * sizeof(MaskT) * 8 < num_nodes)
+        {
+            mask_byte = tex1Dfetch(
+                gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,
+                x);
+            for (int i=0; i<(1 << (2+sizeof(MaskT))); i++)
+            {
+                MaskT mask_bit = 1 << i;
+                VertexId key = 0;
+                bool to_process = true;
+                if (mask_byte & mask_bit)
+                    to_process = false;
+                else {
+                    key = (x << (sizeof(MaskT) + 2)) + i;
+                    if (key >= num_nodes) break;
+                    if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key) != util::MaxValue<VertexId>())
+                    {
+                        to_process = false;
+                        mask_byte |= mask_bit;
+                        changed = true;
+                    }
+                }
+                if (to_process)
+                {
+                    l_keys_out[l_counter] = key;
+                    l_counter ++;
+                }
+            }
+            if (changed)
+                d_visited_mask[x] = mask_byte;
+        }
+
+        BlockScanT::Scan(l_counter, output_pos, scan_space);
+        if (threadIdx.x == blockDim.x -1)
+        {
+            block_offset = atomicAdd(d_out_length, output_pos + l_counter);
+        }
+        __syncthreads();
+        output_pos += block_offset;
+        for (int i=0; i<l_counter; i++)
+        {
+            d_keys_out[output_pos] = l_keys_out[i];
+            output_pos ++;
+        }
+        __syncthreads();
+        x += STRIDE;
+    }
+}
+
+template <typename Problem, typename KernelPolicy>
+__global__ void Inverse_Expand(
+    typename Problem::SizeT     num_unvisited_vertices,
+    typename Problem::VertexId  label,
+    typename Problem::VertexId *d_unvisited_key_in,
+    typename Problem::VertexId *d_inverse_column_indices,
+    typename Problem::SizeT    *d_split_lengths,
+    typename Problem::VertexId *d_unvisited_key_out,
+    typename Problem::VertexId *d_visited_key_out,
+    typename Problem::MaskT    *d_visited_mask,
+    typename Problem::VertexId *d_labels)
+{
+    typedef typename Problem::SizeT    SizeT;
+    typedef typename Problem::VertexId VertexId;
+    typedef typename Problem::MaskT    MaskT;
+    typedef util::Block_Scan<SizeT, KernelPolicy::CUDA_ARCH, KernelPolicy::LOG_THREADS> BlockScanT;
+
+    __shared__ typename BlockScanT::Temp_Space scan_space;
+    __shared__ SizeT block_offset;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
+
+    while (x - threadIdx.x < num_unvisited_vertices)
+    {
+        VertexId key = 0;
+        bool discoverable = false;
+        bool to_process = true;
+        MaskT mask_byte, mask_bit;
+        SizeT mask_pos;
+
+        if (x < num_unvisited_vertices)
+        {
+            key = d_unvisited_key_in[x];
+        } else to_process = false;
+
+        if (to_process)
+        {
+            mask_pos = (key & KernelPolicy::LOAD_BALANCED_CULL::ELEMENT_ID_MASK) >> (2+sizeof(MaskT));
+            mask_byte = tex1Dfetch(
+                gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,
+                mask_pos);
+            mask_bit = 1 << (key & ((1 << (2 + sizeof(MaskT)))-1));
+            if (mask_byte & mask_bit)
+                to_process = false;
+        }
+
+        if (to_process)
+        {
+            if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key) != util::MaxValue<VertexId>())
+            {
+                mask_byte |= mask_bit;
+                d_visited_mask[mask_pos] = mask_byte;
+                to_process = false;
+            }
+        }
+
+        if (to_process)
+        {
+            SizeT edge_start = tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets, key);
+            SizeT edge_end = tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets, key+1);
+            for (SizeT edge_id = edge_start; edge_id < edge_end; edge_id++)
+            {
+                VertexId neighbor = d_inverse_column_indices[edge_id];
+                if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, neighbor) == label-1)
+                {
+                    discoverable = true;
+                    break;
+                }
+            }
+        }
+
+        if (discoverable)
+        {
+            mask_byte |= mask_bit;
+            d_visited_mask[mask_pos] = mask_byte;
+            d_labels[key] = label;
+        }
+
+        SizeT output_pos = 0;
+        BlockScanT::LogicScan(discoverable, output_pos, scan_space);
+        if (threadIdx.x == blockDim.x -1)
+        {
+            block_offset = atomicAdd(d_split_lengths +1, output_pos + ((discoverable) ? 1 : 0));
+        }
+        __syncthreads();
+        output_pos += block_offset;
+        if (discoverable) d_visited_key_out[output_pos] = key;
+        __syncthreads();
+
+        to_process = to_process && (!discoverable);
+        BlockScanT::LogicScan(to_process, output_pos, scan_space);
+        if (threadIdx.x == blockDim.x -1)
+        {
+            block_offset = atomicAdd(d_split_lengths, output_pos + ((to_process) ? 1 : 0));
+        }
+        __syncthreads();
+        output_pos += block_offset;
+        if (to_process) d_unvisited_key_out[output_pos] = key;
+        __syncthreads();
+
+        x += STRIDE;
+    }
+}
 /*
  * @brief Iteration structure derived from IterationBase.
  *
@@ -287,6 +464,21 @@ struct BFSIteration : public IterationBase <
         }
         frontier_attribute->queue_reset = true;
         enactor_stats     ->nodes_queued[0] += frontier_attribute->queue_length;
+        data_slice -> num_visited_vertices += frontier_attribute -> queue_length;
+        SizeT num_unvisited_vertices = graph_slice -> nodes - data_slice -> num_visited_vertices;
+        float rev = data_slice -> num_visited_vertices == 0 ?
+            std::numeric_limits<float>::infinity() :
+            num_unvisited_vertices * 1.0 * graph_slice -> nodes / data_slice -> num_visited_vertices;
+        //printf("%d\t %d\t %d\t queue_length = %d, output_length = %d, visited = %d, rev = %f\n",
+        //    data_slice -> gpu_idx, enactor_stats -> iteration, peer_,
+        //    frontier_attribute -> queue_length,
+        //    frontier_attribute -> output_length[0],
+        //    data_slice -> num_visited_vertices,
+        //    rev);
+
+        if (frontier_attribute -> output_length[0] > rev)
+            data_slice -> current_direction = BACKWARD;
+        else data_slice -> current_direction = FORWARD;
         //util::MemsetKernel<<<256, 256, 0, stream>>>(
         //    data_slice -> output_counter.GetPointer(util::DEVICE),
         //    0, frontier_attribute -> output_length[0]);
@@ -297,78 +489,114 @@ struct BFSIteration : public IterationBase <
         //    data_slice -> edge_marker.GetPointer(util::DEVICE),
         //    0, graph_slice -> edges);
 
-        // Edge Map
-        gunrock::oprtr::advance::LaunchKernel
-            <AdvanceKernelPolicy, Problem, Functor, gunrock::oprtr::advance::V2V>(
-            enactor_stats[0],
-            frontier_attribute[0],
-            enactor_stats -> iteration + 1,
-            data_slice,
-            d_data_slice,
-            (VertexId*)NULL,
-            (bool*    )NULL,
-            (bool*    )NULL,
-            scanned_edges ->GetPointer(util::DEVICE),
-            frontier_queue->keys  [frontier_attribute->selector  ].GetPointer(util::DEVICE),
-            /*(VertexId*)NULL, */frontier_queue->keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE),
-            (Value*   )NULL,
-            frontier_queue->values[frontier_attribute->selector^1].GetPointer(util::DEVICE),
-            graph_slice->row_offsets   .GetPointer(util::DEVICE),
-            graph_slice->column_indices.GetPointer(util::DEVICE),
-            (SizeT*   )NULL,
-            (VertexId*)NULL,
-            graph_slice->nodes,
-            graph_slice->edges,
-            work_progress[0],
-            context[0],
-            stream,
-            //gunrock::oprtr::advance::V2V,
-            false,
-            false,
-            false);
+        if (data_slice -> current_direction == FORWARD)
+        {
+            // Edge Map
+            gunrock::oprtr::advance::LaunchKernel
+                <AdvanceKernelPolicy, Problem, Functor, gunrock::oprtr::advance::V2V>(
+                enactor_stats[0],
+                frontier_attribute[0],
+                enactor_stats -> iteration + 1,
+                data_slice,
+                d_data_slice,
+                (VertexId*)NULL,
+                (bool*    )NULL,
+                (bool*    )NULL,
+                scanned_edges ->GetPointer(util::DEVICE),
+                frontier_queue->keys  [frontier_attribute->selector  ].GetPointer(util::DEVICE),
+                /*(VertexId*)NULL, */frontier_queue->keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE),
+                (Value*   )NULL,
+                frontier_queue->values[frontier_attribute->selector^1].GetPointer(util::DEVICE),
+                graph_slice->row_offsets   .GetPointer(util::DEVICE),
+                graph_slice->column_indices.GetPointer(util::DEVICE),
+                (SizeT*   )NULL,
+                (VertexId*)NULL,
+                graph_slice->nodes,
+                graph_slice->edges,
+                work_progress[0],
+                context[0],
+                stream,
+                //gunrock::oprtr::advance::V2V,
+                false,
+                false,
+                false);
+
+            frontier_attribute -> queue_reset = false;
+            frontier_attribute -> queue_index++;
+            frontier_attribute -> selector ^= 1;
+            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB_CULL)
+            {
+                enactor_stats -> edges_queued[0] += frontier_attribute -> output_length[0];
+            } else {
+                enactor_stats      -> AccumulateEdges(
+                    work_progress  -> template GetQueueLengthPointer<unsigned int>(
+                        frontier_attribute -> queue_index), stream);
+            }
+            if (enactor_stats->retval = work_progress -> GetQueueLength(
+                frontier_attribute->queue_index,
+                frontier_attribute->queue_length,
+                false,
+                stream,
+                true)) return;
+        } else {
+            SizeT num_blocks = 0;
+            if (data_slice -> previous_direction == FORWARD)
+            {
+                data_slice -> split_lengths[0] = 0;
+                data_slice -> split_lengths.Move(util::HOST, util::DEVICE, 1, 0, stream);
+                num_blocks = graph_slice -> nodes / AdvanceKernelPolicy::THREADS + 1;
+                if (num_blocks > 480) num_blocks = 480;
+                From_Unvisited_Queue<Problem, AdvanceKernelPolicy>
+                    <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
+                    (graph_slice -> nodes,
+                    data_slice -> split_lengths.GetPointer(util::DEVICE),
+                    data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE),
+                    data_slice -> visited_mask.GetPointer(util::DEVICE));
+                data_slice -> split_lengths.Move(util::DEVICE, util::HOST, 1, 0, stream);
+                if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
+                    "cudaStreamSynchronize failed", __FILE__, __LINE__))
+                    return;
+                num_unvisited_vertices = data_slice -> split_lengths[0];
+                //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("unvisited0", data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE), num_unvisited_vertices, data_slice -> gpu_idx, enactor_stats -> iteration, -1, stream);
+                data_slice -> num_visited_vertices = graph_slice -> nodes - num_unvisited_vertices;
+            } else {
+                num_unvisited_vertices = data_slice -> split_lengths[0];
+            }
+            //printf("unvisited = %d\n", num_unvisited_vertices);
+            data_slice -> split_lengths[0] = 0;
+            data_slice -> split_lengths[1] = 0;
+            data_slice -> split_lengths.Move(util::HOST, util::DEVICE, 2, 0, stream);
+
+            num_blocks = num_unvisited_vertices / AdvanceKernelPolicy::THREADS + 1;
+            if (num_blocks > 480) num_blocks = 480;
+            Inverse_Expand<Problem, AdvanceKernelPolicy>
+                <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
+                (num_unvisited_vertices,
+                enactor_stats -> iteration + 1,
+                data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE),
+                graph_slice -> column_indices.GetPointer(util::DEVICE), //should be inverse, only works for undirected graph
+                data_slice -> split_lengths.GetPointer(util::DEVICE),
+                data_slice -> unvisited_vertices[frontier_attribute -> selector ^ 1].GetPointer(util::DEVICE),
+                frontier_queue -> keys[frontier_attribute -> selector^1].GetPointer(util::DEVICE),
+                data_slice -> visited_mask.GetPointer(util::DEVICE),
+                data_slice -> labels.GetPointer(util::DEVICE));
+            data_slice -> split_lengths.Move(util::DEVICE, util::HOST, 2, 0, stream);
+            if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
+                "cudaStreamSynchronize failed", __FILE__, __LINE__))
+                return;
+            //printf("discovered = %d, unvisited = %d\n", data_slice -> split_lengths[1], data_slice -> split_lengths[0]);
+            frontier_attribute -> queue_length = data_slice -> split_lengths[1];
+            enactor_stats -> edges_queued[0] += frontier_attribute -> output_length[0];
+            frontier_attribute -> queue_reset = false;
+            frontier_attribute -> queue_index++;
+            frontier_attribute -> selector ^= 1;
+        }
+        data_slice -> previous_direction = data_slice -> current_direction;
         // Only need to reset queue for once
         if (enactor -> debug)
             util::cpu_mt::PrintMessage("Advance end",
                 thread_num, enactor_stats->iteration, peer_);
 
-        //util::Verify_Value<<<256, 256, 0, stream>>>(
-        //    thread_num, 0, frontier_attribute -> output_length[0],
-        //    enactor_stats -> iteration,
-        //    data_slice -> output_counter.GetPointer(util::DEVICE),
-        //    1);
-
-        //util::Verify_Row_Length<<<256, 256, 0, stream>>>(
-        //    thread_num, 0, frontier_attribute -> queue_length,
-        //    enactor_stats -> iteration,
-        //    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
-        //    graph_slice -> row_offsets.GetPointer(util::DEVICE),
-        //    data_slice -> input_counter.GetPointer(util::DEVICE));
-
-        //util::Verify_Edges<<<256, 256, 0, stream>>>(
-        //    thread_num, 0, frontier_attribute -> queue_length, graph_slice -> nodes,
-        //    enactor_stats -> iteration,
-        //    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
-        //    graph_slice -> row_offsets.GetPointer(util::DEVICE),
-        //    data_slice -> edge_marker.GetPointer(util::DEVICE),
-        //    1);
-
-        frontier_attribute -> queue_reset = false;
-        frontier_attribute -> queue_index++;
-        frontier_attribute -> selector ^= 1;
-        if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB_CULL)
-        {
-            enactor_stats -> edges_queued[0] += frontier_attribute -> output_length[0];
-        } else {
-            enactor_stats      -> AccumulateEdges(
-                work_progress  -> template GetQueueLengthPointer<unsigned int>(
-                    frontier_attribute -> queue_index), stream);
-        }
-        if (enactor_stats->retval = work_progress -> GetQueueLength(
-            frontier_attribute->queue_index,
-            frontier_attribute->queue_length,
-            false,
-            stream,
-            true)) return;
         //if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
         //    "cudaStreamSynchronize failed", __FILE__, __LINE__))
         //    return;
@@ -408,25 +636,6 @@ struct BFSIteration : public IterationBase <
         }
 
         // Filter
-        /*gunrock::oprtr::filter::LaunchKernel
-            <FilterKernelPolicy, Problem, Functor>(
-            enactor_stats->filter_grid_size,
-            FilterKernelPolicy::THREADS,
-            (size_t)0,
-            stream,
-            enactor_stats->iteration+1,
-            frontier_attribute->queue_reset,
-            frontier_attribute->queue_index,
-            frontier_attribute->queue_length,
-            frontier_queue->keys  [frontier_attribute->selector  ].GetPointer(util::DEVICE),
-            frontier_queue->values[frontier_attribute->selector  ].GetPointer(util::DEVICE),
-            frontier_queue->keys  [frontier_attribute->selector^1].GetPointer(util::DEVICE),
-            d_data_slice,
-            data_slice->visited_mask.GetPointer(util::DEVICE),
-            work_progress[0],
-            frontier_queue->keys  [frontier_attribute->selector  ].GetSize(),
-            frontier_queue->keys  [frontier_attribute->selector^1].GetSize(),
-            enactor_stats->filter_kernel_stats);*/
         /*gunrock::oprtr::filter::LaunchKernel
             <FilterKernelPolicy, Problem, Functor> (
             enactor_stats[0],
