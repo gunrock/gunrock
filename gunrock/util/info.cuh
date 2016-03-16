@@ -82,7 +82,7 @@ public:
         info["preprocess_time"]    = 0.0f;   // elapsed preprocessing time
         info["postprocess_time"]   = 0.0f;   // postprocessing time
         info["min_process_time"]   = 0.0f;   // min. elapsed time
-        info["max_process_time"]   = 0.0f;   // max. elapsed time 
+        info["max_process_time"]   = 0.0f;   // max. elapsed time
         info["total_time"]         = 0.0f;   // total run time of the program
         info["load_time"]          = 0.0f;   // data loading time
         info["write_time"]         = 0.0f;   // output writing time
@@ -349,7 +349,10 @@ public:
         else  // use single device with index 0
         {
             num_gpus = 1;
-            temp_devices.push_back(0);
+            int gpu_idx;
+            util::GRError(cudaGetDevice(&gpu_idx),
+                "cudaGetDevice failed", __FILE__, __LINE__);
+            temp_devices.push_back(gpu_idx);
         }
 
         cudaStream_t*     streams_ = new cudaStream_t[num_gpus * num_gpus * 2];
@@ -607,7 +610,7 @@ public:
                 return 1;
             }
         }
-        else if (graph_type == "rmat")  // R-MAT graph
+        else if (graph_type == "rmat" || graph_type == "grmat")  // R-MAT graph
         {
             if (!args.CheckCmdLineFlag("quiet"))
             {
@@ -637,6 +640,24 @@ public:
             args.GetCmdLineArgument("rmat_d", rmat_d);
             args.GetCmdLineArgument("rmat_seed", rmat_seed);
 
+            std::vector<int> temp_devices;
+            if (args.CheckCmdLineFlag("device"))  // parse device list
+            {
+                args.GetCmdLineArguments<int>("device", temp_devices);
+                num_gpus = temp_devices.size();
+            }
+            else  // use single device with index 0
+            {
+                num_gpus = 1;
+                int gpu_idx;
+                util::GRError(cudaGetDevice(&gpu_idx),
+                    "cudaGetDevice failed", __FILE__, __LINE__);
+                temp_devices.push_back(gpu_idx);
+            }
+            int *gpu_idx = new int[temp_devices.size()];
+            for (int i=0; i<temp_devices.size(); i++)
+                gpu_idx[i] = temp_devices[i];
+
             // put everything into mObject info
             info["rmat_a"] = rmat_a;
             info["rmat_b"] = rmat_b;
@@ -652,25 +673,49 @@ public:
             cpu_timer.Start();
 
             // generate R-MAT graph
-            if (graphio::rmat::BuildRmatGraph<EDGE_VALUE>(
-                        rmat_nodes,
-                        rmat_edges,
-                        csr_ref,
-                        info["undirected"].get_bool(),
-                        rmat_a,
-                        rmat_b,
-                        rmat_c,
-                        rmat_d,
-                        1,
-                        1,
-                        rmat_seed,
-                        args.CheckCmdLineFlag("quiet")) != 0)
+            if (graph_type == "rmat")
             {
-                return 1;
+                if (graphio::rmat::BuildRmatGraph<EDGE_VALUE>(
+                    rmat_nodes,
+                    rmat_edges,
+                    csr_ref,
+                    info["undirected"].get_bool(),
+                    rmat_a,
+                    rmat_b,
+                    rmat_c,
+                    rmat_d,
+                    1,
+                    1,
+                    rmat_seed,
+                    args.CheckCmdLineFlag("quiet")) != 0)
+                {
+                    return 1;
+                }
+            } else if (graph_type == "grmat")
+            {
+                if (graphio::grmat::BuildRmatGraph<EDGE_VALUE>(
+                    rmat_nodes,
+                    rmat_edges,
+                    csr_ref,
+                    info["undirected"].get_bool(),
+                    rmat_a,
+                    rmat_b,
+                    rmat_c,
+                    rmat_d,
+                    1,
+                    1,
+                    rmat_seed,
+                    args.CheckCmdLineFlag("quiet"),
+                    temp_devices.size(),
+                    gpu_idx) != 0)
+                {
+                    return 1;
+                }
             }
 
             cpu_timer.Stop();
             float elapsed = cpu_timer.ElapsedMillis();
+            delete[] gpu_idx; gpu_idx = NULL;
 
             if (!args.CheckCmdLineFlag("quiet"))
             {
@@ -1056,7 +1101,7 @@ public:
                     printf(" min. elapsed: %.4f ms\n", min_process_time);
                 if (max_process_time > 0)
                     printf(" max. elapsed: %.4f ms\n", max_process_time);
-                
+
                 if (m_teps > 0.01)
                 {
                     printf(" rate: %.4f MiEdges/s\n", m_teps);

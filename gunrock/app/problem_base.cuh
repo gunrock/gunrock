@@ -20,6 +20,7 @@
 // Graph construction utilities
 #include <gunrock/graphio/market.cuh>
 #include <gunrock/graphio/rmat.cuh>
+#include <gunrock/graphio/grmat.cuh>
 #include <gunrock/graphio/rgg.cuh>
 
 // Information stats utilities
@@ -1596,6 +1597,7 @@ struct ProblemBase
         }
 
         graph_slices = new GraphSlice<VertexId, SizeT, Value>*[num_gpus];
+        //graph->DisplayGraph("org_graph",graph->nodes);
 
         if (num_gpus > 1)
         {
