@@ -571,10 +571,14 @@ struct BFSIteration : public IterationBase <
                     data_slice -> current_direction = BACKWARD;
                 else if (vote_counter[BACKWARD] + vote_counter[UNDECIDED] <= vote_counter[FORWARD] && enactor -> problem -> data_slices[0] -> direction_votes[iteration_] == FORWARD)
                     data_slice -> current_direction = FORWARD;
-                std::this_thread::yield();
+                //std::this_thread::yield();
+                sleep(0);
             }*/
             while (enactor ->problem -> data_slices[0] -> direction_votes[iteration_] == UNDECIDED)
-                std::this_thread::yield();
+            {
+                sleep(0);
+                //std::this_thread::yield();
+            }
             data_slice -> current_direction = enactor->problem -> data_slices[0] -> direction_votes[iteration_];
         } else if (enactor_stats -> iteration == 0)
             data_slice -> direction_votes[iteration_] = FORWARD;
@@ -1165,8 +1169,8 @@ static CUT_THREADPROC BFSThread(
         while (thread_data -> status == ThreadSlice::Status::Wait ||
                thread_data -> status == ThreadSlice::Status::Idle)
         {
-            //sleep(0);
-            std::this_thread::yield();
+            sleep(0);
+            //std::this_thread::yield();
         }
         if (thread_data -> status == ThreadSlice::Status::ToKill)
             break;
@@ -1362,7 +1366,8 @@ public:
         {
             while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
             {
-                std::this_thread::yield();
+                sleep(0);
+                //std::this_thread::yield();
             }
         }
         return retval;
@@ -1428,7 +1433,8 @@ public:
         {
             while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
             {
-                std::this_thread::yield();
+                sleep(0);
+                //std::this_thread::yield();
             }
         }
 
