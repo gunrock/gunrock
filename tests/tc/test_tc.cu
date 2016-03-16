@@ -170,7 +170,7 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
         gpu_timer.Start();
 
         // launch MST enactor
-        util::GRError(enactor.template Enact<Problem, 8>(
+        util::GRError(enactor.template Enact<Problem, 30>(
                           *context, problem, max_grid_size),
                       "TC Problem Enact Failed", __FILE__, __LINE__);
 
@@ -262,6 +262,8 @@ int main(int argc, char** argv)
     typedef int VertexId;  // use int as the vertex identifier
     typedef int Value;     // use int as the value type
     typedef int SizeT;     // use int as the graph size type
+    int test = 1 << 31-1;
+    printf("test int:%d\n", test);
 
     Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;

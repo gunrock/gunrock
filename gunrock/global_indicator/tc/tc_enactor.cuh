@@ -221,8 +221,10 @@ class TCEnactor :
       // Reuse d_scanned_edges
       SizeT *d_output_counts = d_scanned_edges;
 
+      util::MemsetKernel<<<256, 1024>>>(d_output_counts, (SizeT)0, attributes->queue_length);
+
       // Should make tc_count a member var to TCProblem
-      SizeT tc_count = gunrock::oprtr::intersection::LaunchKernel
+      long tc_count = gunrock::oprtr::intersection::LaunchKernel
       <IntersectionKernelPolicy, TCProblem, TCFunctor>(
       statistics[0],
       attributes[0],
@@ -243,9 +245,9 @@ class TCEnactor :
       context[0],
       stream);
 
-      tc_count /= 1;
+      tc_count /= 3;
 
-      printf("tc count:%d\n", tc_count);
+      printf("tc count:%ld\n", tc_count);
 
       // end of the TC
 
@@ -322,7 +324,7 @@ class TCEnactor :
         TCProblem,         // Problem data type
         300,                // CUDA_ARCH
         INSTRUMENT,         // INSTRUMENT
-        8,                  // MIN_CTA_OCCUPANCY
+        1,                  // MIN_CTA_OCCUPANCY
         10,                 // LOG_THREADS
         8,                  // LOG_BLOCKS
         NL_SIZE>                  // NL_SIZE_THRESHOLD
