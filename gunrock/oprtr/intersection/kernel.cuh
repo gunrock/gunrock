@@ -90,11 +90,9 @@ struct Dispatch
                             VertexId    *&d_column_indices,
                             VertexId    *&d_src_node_ids,
                             VertexId    *&d_dst_node_ids,
-                            VertexId    *&d_edge_list,
                             SizeT       *&d_degrees,
                             DataSlice   *&problem,
                             SizeT       *&d_output_counts,
-                            SizeT       &start,
                             SizeT       &input_length,
                             SizeT       &stride,
                             SizeT       &num_vertex,
@@ -166,11 +164,9 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             VertexId    *&d_column_indices,
                             VertexId    *&d_src_node_ids,
                             VertexId    *&d_dst_node_ids,
-                            VertexId    *&d_edge_list,
                             SizeT       *&d_degrees,
                             DataSlice   *&problem,
                             SizeT       *&d_output_counts,
-                            SizeT       &start_idx,
                             SizeT       &input_length,
                             SizeT       &stride,
                             SizeT       &num_vertex,
@@ -187,9 +183,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         for (VertexId idx = start; idx < input_length; idx += KernelPolicy::BLOCKS*KernelPolicy::THREADS) {
             SizeT count = 0;
             // get nls start and end index for two ids
-            VertexId eid = d_edge_list[idx];
-            VertexId sid = d_src_node_ids[eid];
-            VertexId did = d_dst_node_ids[eid];
+            VertexId sid = d_src_node_ids[idx];
+            VertexId did = d_dst_node_ids[idx];
             SizeT src_it = d_row_offsets[sid];
             SizeT src_end = d_row_offsets[sid+1];
             SizeT dst_it = d_row_offsets[did];
@@ -205,7 +200,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             //printf("eid:%d, sid:%d, did:%d, src_start:%d, src_end:%d, dst_start:%d, dst_end:%d count:%d\n",
              //           eid,    sid,    did,          src_it,     src_end,      dst_it,     dst_end, count);
             
-            d_output_counts[idx+start_idx] += count;
+            d_output_counts[idx] += count;
         }
         /*SizeT aggregate = BlockReduceT(temp_storage).Sum(count);
         if (threadIdx.x == 0)
@@ -401,11 +396,9 @@ void Inspect(
             typename KernelPolicy::VertexId     *d_column_indices,
             typename KernelPolicy::VertexId     *d_src_node_ids,
             typename KernelPolicy::VertexId     *d_dst_node_ids,
-            typename KernelPolicy::VertexId     *d_edge_list,
             typename KernelPolicy::SizeT        *d_degrees,
             typename ProblemData::DataSlice     *problem,
             typename KernelPolicy::SizeT        *d_output_counts,
-            typename KernelPolicy::SizeT        start,
             typename KernelPolicy::SizeT        input_length,
             typename KernelPolicy::SizeT        stride,
             typename KernelPolicy::SizeT        num_vertex,
@@ -416,11 +409,9 @@ void Inspect(
             d_column_indices,
             d_src_node_ids,
             d_dst_node_ids,
-            d_edge_list,
             d_degrees,
             problem,
             d_output_counts,
-            start,
             input_length,
             stride,
             num_vertex,
@@ -492,9 +483,6 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         typename KernelPolicy::VertexId         *d_src_node_ids,
         typename KernelPolicy::VertexId         *d_dst_node_ids,
         typename KernelPolicy::VertexId         *d_degrees,
-        typename KernelPolicy::VertexId         *d_edge_list,
-        typename KernelPolicy::VertexId         *d_edge_list_partitioned,
-        typename KernelPolicy::SizeT            *d_flags,
         typename KernelPolicy::SizeT            *d_output_counts,
         typename KernelPolicy::SizeT            input_length,
         typename KernelPolicy::SizeT            max_vertex,
@@ -503,142 +491,56 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         CudaContext                             &context,
         cudaStream_t                            stream)
 {
-
     typedef typename KernelPolicy::SizeT        SizeT;
     typedef typename KernelPolicy::VertexId     VertexId;
     typedef typename KernelPolicy::Value        Value;
 
-    // Inspect 
-    size_t block_num = (input_length + KernelPolicy::THREADS - 1)
-                        >> KernelPolicy::LOG_THREADS;
-   
-    Inspect<KernelPolicy, ProblemData, Functor>
-    <<<block_num, KernelPolicy::THREADS>>>(
-            d_src_node_ids,
-            d_dst_node_ids,
-            d_edge_list,
-            d_degrees,
-            d_flags,
-            input_length,
-            max_vertex,
-            max_edge);
-
-    // Partition d_src_node_ids and d_dst_node_ids. Compute coarse_counts and
-    // fine_counts.
-    
     void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
-    SizeT *d_coarse_count = NULL;
-    SizeT coarse_counts[1] = {0};
+    SizeT *d_total_count = NULL;
+    SizeT total_counts[1] = {0};
     util::GRError(cudaMalloc(
-                    &d_coarse_count,
+                    &d_total_count,
                     sizeof(long)),
-                    "Coarse count cudaMalloc failed.", __FILE__, __LINE__);
-    
-    cub::DevicePartition::Flagged(d_temp_storage,
-                                  temp_storage_bytes,
-                                  d_edge_list,
-                                  d_flags, 
-                                  d_edge_list_partitioned, 
-                                  d_coarse_count, 
-                                  input_length);
-    cudaMalloc(&d_temp_storage, temp_storage_bytes);
+                    "Total count cudaMalloc failed.", __FILE__, __LINE__);
 
-    cub::DevicePartition::Flagged(d_temp_storage,
-                                  temp_storage_bytes,
-                                  d_edge_list,
-                                  d_flags, 
-                                  d_edge_list_partitioned, 
-                                  d_coarse_count, 
-                                  input_length);
-    util::GRError(cudaMemcpy(&coarse_counts[0], d_coarse_count, sizeof(SizeT), cudaMemcpyDeviceToHost),
-                    "Coarse count cudaMemcpy failed.", __FILE__, __LINE__);
-
-    SizeT fine_counts = input_length - coarse_counts[0];
-
-    printf("coarse_counts: %d \n", coarse_counts[0]);
-
-    if (coarse_counts[0] > 0) {
-        /*SizeT pairs_per_block = (coarse_counts[0] + KernelPolicy::BLOCKS - 1) >> KernelPolicy::LOG_BLOCKS;
-          printf("pairs_per_block:%d\n", pairs_per_block);
-        // Use IntersectTwoLargeNL
-        IntersectTwoLargeNL<KernelPolicy, ProblemData, Functor>
-        <<<KernelPolicy::BLOCKS, KernelPolicy::THREADS>>>(
-        d_row_offsets,
-        d_column_indices,
-        d_src_node_ids,
-        d_dst_node_ids,
-        &d_edge_list_partitioned[0],
-        d_degrees,
-        data_slice,
-        d_output_counts,
-        coarse_counts[0],
-        pairs_per_block,
-        max_vertex,
-        max_edge);*/
-        size_t stride = (coarse_counts[0] + KernelPolicy::BLOCKS * KernelPolicy::THREADS - 1)
-            >> (KernelPolicy::LOG_THREADS + KernelPolicy::LOG_BLOCKS);
-
-        // Use IntersectTwoSmallNL 
-        IntersectTwoSmallNL<KernelPolicy, ProblemData, Functor>
-            <<<KernelPolicy::BLOCKS, KernelPolicy::THREADS>>>(
-                    d_row_offsets,
-                    d_column_indices,
-                    d_src_node_ids,
-                    d_dst_node_ids,
-                    &d_edge_list_partitioned[0],
-                    d_degrees,
-                    data_slice,
-                    d_output_counts,
-                    (SizeT)0,
-                    coarse_counts[0],
-                    stride,
-                    max_vertex,
-                    max_edge);
-    } 
-
-    size_t stride = (fine_counts + KernelPolicy::BLOCKS * KernelPolicy::THREADS - 1)
+    size_t stride = (input_length + KernelPolicy::BLOCKS * KernelPolicy::THREADS - 1)
                         >> (KernelPolicy::LOG_THREADS + KernelPolicy::LOG_BLOCKS);
     
-    // Use IntersectTwoSmallNL 
     IntersectTwoSmallNL<KernelPolicy, ProblemData, Functor>
     <<<KernelPolicy::BLOCKS, KernelPolicy::THREADS>>>(
             d_row_offsets,
             d_column_indices,
             d_src_node_ids,
             d_dst_node_ids,
-            &d_edge_list_partitioned[coarse_counts[0]],
             d_degrees,
             data_slice,
             d_output_counts,
-            coarse_counts[0],
-            fine_counts,
+            input_length,
             stride,
             max_vertex,
             max_edge);
 
-    //util::DisplayDeviceResults(d_output_counts, input_length);
-
     cub::DeviceReduce::Sum(d_temp_storage,
                                   temp_storage_bytes,
                                   d_output_counts,
-                                  &d_coarse_count[0],
+                                  &d_total_count[0],
                                   input_length);
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
     
     cub::DeviceReduce::Sum(d_temp_storage,
                                   temp_storage_bytes,
                                   d_output_counts,
-                                  &d_coarse_count[0],
+                                  &d_total_count[0],
                                   input_length);
 
-    util::GRError(cudaMemcpy( coarse_counts,
-    &d_coarse_count[0], sizeof(SizeT),
-    cudaMemcpyDeviceToHost),"Coarse count cudaMemcpy failed.", __FILE__,
+    util::GRError(cudaMemcpy( total_counts,
+    &d_total_count[0], sizeof(SizeT),
+    cudaMemcpyDeviceToHost),"Total count cudaMemcpy failed.", __FILE__,
     __LINE__);
 
 
-    return coarse_counts[0];
+    return total_counts[0];
 }
 
 }  // intersection

@@ -115,14 +115,14 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
     Csr<VertexId, Value, SizeT>* graph =
         (Csr<VertexId, Value, SizeT>*)info->csr_ptr;
 
-    for (int i = 0; i < graph->nodes; ++i)
+    /*for (int i = 0; i < graph->nodes; ++i)
     {
         printf("%d: ", graph->row_offsets[i]);
         for (int j = graph->row_offsets[i]; j < graph->row_offsets[i+1]; ++j) {
             printf("%d,", graph->column_indices[j]);
         }
         printf("\n");
-    }
+    }*/
     int num_gpus            = info->info["num_gpus"].get_int();
     int max_grid_size       = info->info["max_grid_size"].get_int();
     int iterations          = 1; //force to 1 info->info["num_iteration"].get_int();

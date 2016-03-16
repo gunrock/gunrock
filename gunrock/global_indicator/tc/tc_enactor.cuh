@@ -149,14 +149,7 @@ class TCEnactor :
       // TODO: Add TC algorithm here.
       
       // Prepare src node_ids for edge list
-      // TODO: move this to problem. need to send CudaContext to problem too.
-      IntervalExpand(
-            graph_slice->edges,
-            graph_slice->row_offsets.GetPointer(util::DEVICE),
-            queue->keys[attributes->selector].GetPointer(util::DEVICE),
-            graph_slice->nodes,
-            data_slice->d_src_node_ids.GetPointer(util::DEVICE),
-            context[0]);
+      // TODO: move this to problem. need to send CudaContext to problem too. 
 
       // 1) Do advance/filter to get rid of neighbors with a smaller #ofdegree.
       gunrock::oprtr::advance::LaunchKernel
@@ -181,9 +174,38 @@ class TCEnactor :
       work_progress[0],
       context[0],
       stream,
-      gunrock::oprtr::advance::V2E);
+      gunrock::oprtr::advance::V2V);
 
+      //SegReduce
+      SegReduceCsr(
+        data_slice->d_src_node_ids.GetPointer(util::DEVICE),
+        graph_slice->row_offsets.GetPointer(util::DEVICE),
+        graph_slice->edges,
+        graph_slice->nodes,
+        false,
+        data_slice->d_edge_list.GetPointer(util::DEVICE),
+        (int)0,
+        mgpu::plus<int>(),
+        context[0]);
 
+      //Scan
+      Scan<mgpu::MgpuScanTypeExc>(
+        data_slice->d_edge_list.GetPointer(util::DEVICE),
+        graph_slice->nodes+1,
+        (int)0,
+        mgpu::plus<int>(),
+        (int*)0,
+        (int*)0,
+        graph_slice->row_offsets.GetPointer(util::DEVICE),
+        context[0]);
+
+      IntervalExpand(
+            graph_slice->edges/2,
+            graph_slice->row_offsets.GetPointer(util::DEVICE),
+            queue->keys[attributes->selector].GetPointer(util::DEVICE),
+            graph_slice->nodes,
+            data_slice->d_src_node_ids.GetPointer(util::DEVICE),
+            context[0]);
       
       if (retval = work_progress->GetQueueLength(++attributes->queue_index, attributes->queue_length, false, stream, true)) return retval;
       attributes->selector ^= 1;
@@ -200,7 +222,7 @@ class TCEnactor :
       attributes->queue_length,
       queue->keys[attributes->selector].GetPointer(util::DEVICE),
       NULL,
-      data_slice->d_edge_list.GetPointer(util::DEVICE),
+      graph_slice->column_indices.GetPointer(util::DEVICE),
       d_data_slice,
       NULL,
       work_progress[0],
@@ -208,12 +230,18 @@ class TCEnactor :
       graph_slice->edges,
       statistics->filter_kernel_stats);
 
+      graph_slice->edges /= 2;
+
       //GetQueueLength of the new edge_list
       if (retval = work_progress->GetQueueLength(++attributes->queue_index, attributes->queue_length, false, stream, true)) return retval;
 
-      //util::DisplayDeviceResults(data_slice->d_edge_list.GetPointer(util::DEVICE), attributes->queue_length);
-
       printf("queue length:%d\n", attributes->queue_length);
+
+
+      util::MemsetMadVectorKernel<<<256, 2014>>>(
+              data_slice->d_degrees.GetPointer(util::DEVICE),
+              graph_slice->row_offsets.GetPointer(util::DEVICE),
+              graph_slice->row_offsets.GetPointer(util::DEVICE)+1, -1, graph_slice->nodes);
       // 2) Do intersection using generated edge lists from the previous step.
       //gunrock::oprtr::intersection::LaunchKernel
       //<IntersectionKernelPolicy, TCProblem, TCFunctor>(
@@ -234,9 +262,6 @@ class TCEnactor :
       data_slice->d_src_node_ids.GetPointer(util::DEVICE),
       graph_slice->column_indices.GetPointer(util::DEVICE),
       data_slice->d_degrees.GetPointer(util::DEVICE),
-      data_slice->d_edge_list.GetPointer(util::DEVICE),
-      data_slice->d_edge_list_partitioned.GetPointer(util::DEVICE),
-      data_slice->d_flags.GetPointer(util::DEVICE),
       d_output_counts,
       attributes->queue_length,
       graph_slice->nodes,
@@ -245,7 +270,7 @@ class TCEnactor :
       context[0],
       stream);
 
-      tc_count /= 3;
+      //tc_count /= 3;
 
       printf("tc count:%ld\n", tc_count);
 
