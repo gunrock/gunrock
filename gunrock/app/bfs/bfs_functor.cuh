@@ -79,11 +79,11 @@ struct BFSFunctor {
             new_label = label + 1;
             old_label = atomicMin(d_data_slice -> labels + d_id, new_label);
             result = new_label < old_label;
-
-            //if (result && TO_TRACK && util::to_track(d_data_slice -> gpu_idx, d_id))
-            //     printf("%d\t %d\t CondEdge\t labels[%d] (%d) -> %d = labels[%d] + 1\n",
-            //        d_data_slice -> gpu_idx, new_label-1, d_id, old_label, new_label, s_id);
         }
+        //if (result && TO_TRACK && util::to_track(d_data_slice -> gpu_idx, d_id))
+        //     printf("%d\t %d\t CondEdge\t labels[%d] (%d) -> %d = labels[%d] + 1\n",
+        //        d_data_slice -> gpu_idx, label-1, d_id, util::MaxValue<VertexId>(), label, s_id);
+
         //atomicAdd(d_data_slice -> input_counter + input_pos, 1);
         //atomicAdd(d_data_slice -> output_counter + output_pos, 1);
         //atomicAdd(d_data_slice -> edge_marker + edge_id, 1);

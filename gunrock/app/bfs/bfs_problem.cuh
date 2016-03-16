@@ -23,8 +23,9 @@ namespace app {
 namespace bfs {
 
 enum DIRECTION {
-    FORWARD,
-    BACKWARD,
+    FORWARD  = 0,
+    BACKWARD = 1,
+    UNDECIDED= 2,
 };
 
 /**
@@ -80,6 +81,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         DIRECTION current_direction, previous_direction;
         util::Array1D<SizeT, VertexId      > unvisited_vertices[2];
         util::Array1D<SizeT, SizeT         > split_lengths;
+        util::Array1D<SizeT, VertexId      > local_vertices;
+        util::Array1D<SizeT, DIRECTION     > direction_votes;
 
         /*
          * @brief Default constructor
@@ -96,7 +99,9 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             //vertex_markers[1].SetName("vertex_markers[1]");
             unvisited_vertices[0].SetName("unvisited_vertices[0]");
             unvisited_vertices[1].SetName("unvisited_vertices[1]");
+            local_vertices.SetName("local_vertices");
             split_lengths.SetName("split_length");
+            direction_votes.SetName("direction_votes");
         }
 
         /*
@@ -123,6 +128,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = unvisited_vertices[0].Release()) return retval;
             if (retval = unvisited_vertices[1].Release()) return retval;
             if (retval = split_lengths.Release()) return retval;
+            if (retval = local_vertices.Release()) return retval;
+            if (retval = direction_votes.Release()) return retval;
             return retval;
         }
 
@@ -149,6 +156,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             //int   num_vertex_associate,
             //int   num_value__associate,
             Csr<VertexId, SizeT, Value> *graph,
+            GraphSlice<VertexId, SizeT, Value> *graph_slice,
             SizeT *num_in_nodes,
             SizeT *num_out_nodes,
             VertexId *original_vertex,
@@ -181,6 +189,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             retval;
             if (retval = split_lengths.Init(2, util::HOST | util::DEVICE, true, cudaHostAllocMapped | cudaHostAllocPortable))
                 return retval;
+            if (retval = direction_votes.Allocate(4, util::HOST));
 
             if (MARK_PREDECESSORS)
             {
@@ -202,6 +211,23 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE))
                     return retval;
                 //if (retval = temp_marker. Allocate(graph->nodes, util::DEVICE)) return retval;
+
+                SizeT local_counter = 0;
+                for (VertexId v=0; v<graph->nodes; v++)
+                if (graph_slice -> partition_table[v] == 0)
+                    local_counter ++;
+                if (retval = local_vertices.Allocate(local_counter, util::HOST | util::DEVICE))
+                    return retval;
+                local_counter = 0;
+                for (VertexId v=0; v<graph->nodes; v++)
+                if (graph_slice -> partition_table[v] == 0)
+                {
+                    local_vertices[local_counter] = v;
+                    local_counter ++;
+                }
+                if (retval = local_vertices.Move(util::HOST, util::DEVICE))
+                    return retval;
+                //util::cpu_mt::PrintCPUArray<SizeT, VertexId>("local_vertices", local_vertices.GetPointer(util::HOST), local_counter, gpu_idx);
             }
             return retval;
         } // end Init
@@ -244,6 +270,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 this -> in_length[i][gpu] = 0;
             for (int peer=0; peer<this->num_gpus; peer++)
                 this -> out_length[peer] = 1;
+            for (int i=0; i<4; i++)
+                direction_votes[i] = UNDECIDED;
 
             for (int peer=0;peer<(this->num_gpus > 1 ? this->num_gpus+1 : 1);peer++)
             for (int i=0; i < 2; i++)
@@ -578,6 +606,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 this -> gpu_idx[gpu],
                 this -> use_double_buffer,
               &(this -> sub_graphs[gpu]),
+                this -> graph_slices[gpu],
                 this -> num_gpus > 1? graph_slice -> in_counter     .GetPointer(util::HOST) : NULL,
                 this -> num_gpus > 1? graph_slice -> out_counter    .GetPointer(util::HOST) : NULL,
                 this -> num_gpus > 1? graph_slice -> original_vertex.GetPointer(util::HOST) : NULL,

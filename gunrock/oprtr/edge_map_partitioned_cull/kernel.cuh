@@ -738,6 +738,12 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                             smem_storage.row_offset[threadIdx.x] = row_offsets[d_column_indices[input_item]];
                         }
                     }
+
+                    //printf("%d\t %d\t (%4d, %4d) : %d, %d ~ %d, %d\n",
+                    //    d_data_slice -> gpu_idx, label, blockIdx.x, threadIdx.x, smem_storage.vertices[threadIdx.x],
+                    //    smem_storage.row_offset[threadIdx.x],
+                    //    d_row_offsets[input_item + 1],
+                    //    smem_storage.output_offset[threadIdx.x]);
                 } // end of if thread_input < input_queue_length
                 else {
                     smem_storage.output_offset[threadIdx.x] = util::MaxValue<SizeT>();//max_edges; // - block_output_start?
@@ -791,6 +797,8 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     //    block_output_start + thread_output,
                     //    label, d_keys_out, d_values_out,
                     //    d_value_to_reduce, d_reduce_frontier);
+                    //printf("%d\t %d\t (%4d, %4d) : %d -> %d\n",
+                    //    d_data_slice -> gpu_idx, label, blockIdx.x, threadIdx.x, v, u);
                     if (Problem::ENABLE_IDEMPOTENCE)
                     {
                         //output_pos = (u & KernelPolicy::ELEMENT_ID_MASK) >> 3;

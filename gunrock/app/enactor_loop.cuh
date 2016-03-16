@@ -1417,23 +1417,24 @@ public:
                     "cudaStreamSynchronize failed", __FILE__, __LINE__))
                     return;
                 return;
-            }
-            for (int peer_ = 2; peer_ < num_gpus; peer_++)
-            {
-                data_slice -> keys_out[peer_].SetPointer(
-                    data_slice -> keys_out[1].GetPointer(util::DEVICE),
-                    data_slice -> keys_out[1].GetSize(), util::DEVICE);
-                data_slice -> keys_outs[peer_] = data_slice -> keys_out[peer_].GetPointer(util::DEVICE);
+            } else {
+                for (int peer_ = 2; peer_ < num_gpus; peer_++)
+                {
+                    data_slice -> keys_out[peer_].SetPointer(
+                        data_slice -> keys_out[1].GetPointer(util::DEVICE),
+                        data_slice -> keys_out[1].GetSize(), util::DEVICE);
+                    data_slice -> keys_outs[peer_] = data_slice -> keys_out[peer_].GetPointer(util::DEVICE);
 
-                data_slice -> vertex_associate_out[peer_].SetPointer(
-                    data_slice -> vertex_associate_out[1].GetPointer(util::DEVICE),
-                    data_slice -> vertex_associate_out[1].GetSize(), util::DEVICE);
-                data_slice -> vertex_associate_outs[peer_] = data_slice -> vertex_associate_out[peer_].GetPointer(util::DEVICE);
+                    data_slice -> vertex_associate_out[peer_].SetPointer(
+                        data_slice -> vertex_associate_out[1].GetPointer(util::DEVICE),
+                        data_slice -> vertex_associate_out[1].GetSize(), util::DEVICE);
+                    data_slice -> vertex_associate_outs[peer_] = data_slice -> vertex_associate_out[peer_].GetPointer(util::DEVICE);
 
-                data_slice -> value__associate_out[peer_].SetPointer(
-                    data_slice -> value__associate_out[1].GetPointer(util::DEVICE),
-                    data_slice -> value__associate_out[1].GetSize(), util::DEVICE);
-                data_slice -> value__associate_outs[peer_] = data_slice -> value__associate_out[peer_].GetPointer(util::DEVICE);
+                    data_slice -> value__associate_out[peer_].SetPointer(
+                        data_slice -> value__associate_out[1].GetPointer(util::DEVICE),
+                        data_slice -> value__associate_out[1].GetSize(), util::DEVICE);
+                    data_slice -> value__associate_outs[peer_] = data_slice -> value__associate_out[peer_].GetPointer(util::DEVICE);
+                }
             }
         }
         //printf("%d Make_Out 1\n", data_slice -> gpu_idx);

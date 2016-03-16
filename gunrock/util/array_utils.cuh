@@ -168,7 +168,7 @@ public:
             if (use_cuda_alloc)
             {
                 retval = util::GRError(
-                    cudaHostRegister(h_pointer, sizeof(Value)*size, flag),
+                    cudaHostRegister((void*)h_pointer, sizeof(Value)*size, flag),
                     name+" cudaHostRegister failed.", __FILE__, __LINE__);
                 if (retval) return retval;
             }
@@ -238,7 +238,7 @@ public:
                 if (use_cuda_alloc)
                 {
                     retval = GRError(
-                        cudaHostUnregister(h_pointer),
+                        cudaHostUnregister((void*)h_pointer),
                         name+" cudaHostUnregister failed",__FILE__,__LINE__);
                     if (retval) return retval;
                 }
@@ -263,7 +263,7 @@ public:
                        name.c_str(), (long long) size);
                 fflush(stdout);
             }
-            retval = GRError(cudaFree(d_pointer),
+            retval = GRError(cudaFree((void*)d_pointer),
                 name + " cudaFree failed", __FILE__, __LINE__);
             if (retval) return retval;
             d_pointer = NULL;
@@ -429,7 +429,7 @@ public:
 
         if (target == HOST && h_pointer!=NULL )
         {
-            if (use_cuda_alloc) util::GRError(cudaHostUnregister(h_pointer),
+            if (use_cuda_alloc) util::GRError(cudaHostUnregister((void*)h_pointer),
                 name + " cudaHostUnregister failed.", __FILE__, __LINE__);
             h_pointer = NULL;
             if (ARRAY_DEBUG) {
