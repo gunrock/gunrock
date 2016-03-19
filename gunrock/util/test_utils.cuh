@@ -341,7 +341,7 @@ inline bool EnoughDeviceMemory(unsigned int mem_needed)
     return (mem_needed <= free_mem);
 }
 
-template <typename T>
+/*template <typename T>
 __device__ __host__ __forceinline__ T MaxValue()
 {
     extern __device__ __host__ void Error_UnsupportedType(); // Ensure no un-specialized types will be compiled
@@ -359,7 +359,7 @@ template <>
 __device__ __host__ __forceinline__ long long MaxValue<long long>()
 {
     return LLONG_MAX;
-}
+}*/
 
 /******************************************************************************
  * Helper routines for list construction and validation

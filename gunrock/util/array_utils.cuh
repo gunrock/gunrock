@@ -15,6 +15,7 @@
 #pragma once
 
 #include <string>
+#include <fstream>
 #include <gunrock/util/basic_utils.h>
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/memset_kernel.cuh>
@@ -100,7 +101,10 @@ public:
 
     virtual ~Array1D()
     {
-        Release();
+    #ifdef __CUDA_ARCH__
+    #else
+        //Release();
+    #endif
     } // ~Array1D()
 
     cudaError_t Init(
@@ -277,7 +281,7 @@ public:
         return retval;
     } // Release(...)
 
-    SizeT GetSize()
+    __host__ __device__ SizeT GetSize() const
     {
         return this->size;
     }
