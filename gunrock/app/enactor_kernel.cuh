@@ -357,6 +357,8 @@ __global__ void Make_Output_Kernel(
     typedef util::Block_Scan<SizeT, CUDA_ARCH, LOG_THREADS> BlockScanT;
     __shared__ typename BlockScanT::Temp_Space scan_space;
     __shared__ SizeT sum_offset[8];
+    //__shared__ SizeT offset[8];
+    //__shared__ SizeT offset_zero;
 
     SizeT in_pos = (SizeT) blockIdx.x * blockDim.x + threadIdx.x;
     const SizeT STRIDE = (SizeT) blockDim.x * gridDim.x;
@@ -370,23 +372,36 @@ __global__ void Make_Output_Kernel(
             key = d_keys_in[in_pos];
             target = d_partition_table[key];
         }
-        SizeT    out_pos = 0;
+        SizeT    out_pos = 0, out_offset = 0;
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
-            SizeT out_offset, block_sum;
-            BlockScanT::LogicScan((target == gpu)? 1 : 0, out_offset, scan_space, block_sum);
+            //SizeT out_offset;
+            //__syncthreads();
+            BlockScanT::LogicScan((target == gpu)? 1 : 0, out_offset, scan_space);
             if (target == gpu) out_pos = out_offset;
-            if (threadIdx.x == gpu) sum_offset[gpu] = block_sum;
+            if (threadIdx.x == blockDim.x-1) 
+            {
+                //sum[gpu] = block_sum;
+                sum_offset[gpu] = out_offset + ((target == gpu) ? 1: 0);
+                //offset[gpu] = atomicAdd(d_out_length + gpu, block_sum);
+                //printf("sum[%d] -> %d\n", gpu, sum[gpu]);
+                //if (gpu == 0) offset_zero = offset[gpu];
+            }
             __syncthreads();
         }
+        //__syncthreads();
         if (threadIdx.x < num_gpus)
+        {
+            //printf("sum[%d] = %d\n", threadIdx.x, sum[threadIdx.x]);
             sum_offset[threadIdx.x] = atomicAdd(d_out_length + threadIdx.x, sum_offset[threadIdx.x]);
+        }
         __syncthreads();
 
         if (in_pos >= num_elements) break;
         //printf("(%4d, %4d) : in_pos = %d, key = %d, target = %d, out_pos = %d + %d\n",
-        //    blockIdx.x, threadIdx.x, in_pos, key, target, out_pos, sum_offset[target]);
-        out_pos += sum_offset[target];
+        //    blockIdx.x, threadIdx.x, in_pos, key, target, out_pos, offset[target]-1);
+        if (key < 0) {in_pos += STRIDE; continue; }
+        out_pos += sum_offset[target]-1;
         if (skip_convertion)
         {
             d_keys_outs[target][out_pos] = key;
@@ -396,22 +411,22 @@ __global__ void Make_Output_Kernel(
 
         if (target != 0)
         {
-            /*SizeT temp_out = out_pos * NUM_VERTEX_ASSOCIATES;
-            #pragma unroll
+            out_offset = out_pos * NUM_VERTEX_ASSOCIATES;
+            //#pragma unroll
             for (int i = 0; i < NUM_VERTEX_ASSOCIATES; i++)
             {
-                d_vertex_associate_outs[target][temp_out]
+                d_vertex_associate_outs[target][out_offset]
                     =d_vertex_associate_orgs[i][key];
-                temp_out ++;
+                out_offset ++;
             }
-            temp_out = out_pos * NUM_VALUE__ASSOCIATES;
-            #pragma unroll
+            out_offset = out_pos * NUM_VALUE__ASSOCIATES;
+            //#pragma unroll
             for (int i = 0; i < NUM_VALUE__ASSOCIATES; i++)
             {
-                d_value__associate_outs[target][temp_out]
+                d_value__associate_outs[target][out_offset]
                     =d_value__associate_orgs[i][key];
-                temp_out ++;
-            }*/
+                out_offset ++;
+            }
         }
         in_pos += STRIDE;
     }

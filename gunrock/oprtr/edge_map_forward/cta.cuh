@@ -464,7 +464,7 @@ struct Cta
                             pred_id,
                             neighbor_id,
                             cta -> d_data_slice,
-                            coop_offset + threadIdx.x,
+                            (SizeT)(coop_offset + threadIdx.x),
                             util::InvalidValue<SizeT>(), // input_pos
                             input_item,
                             cta -> smem_storage.state.coarse_enqueue_offset + coop_rank,

@@ -76,7 +76,7 @@ __device__ __forceinline__ void KernelPolicy
     //int lane_id = threadIdx.x & KernelPolicy::WARP_SIZE_MASK;
     //int warp_id = threadIdx.x >> KernelPolicy::LOG_WARP_SIZE;
     d_labels = d_data_slice -> labels.GetPointer(util::DEVICE);
-    d_visited_mask = d_data_slice -> visited_mask.GetPointer(util::DEVICE);
+    d_visited_mask = (_Problem::ENABLE_IDEMPOTENCE) ? d_data_slice -> visited_mask.GetPointer(util::DEVICE) : NULL;
 
     if (partition_starts != NULL)
     {
@@ -260,14 +260,18 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                         u,
                         d_keys_out + output_pos);
 
-                    //util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-                    //    label, smem_storage.d_labels + u);
-                    smem_storage.d_labels[u] = label;
+                    if (Problem::ENABLE_IDEMPOTENCE)
+                    {
+                        //util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                        //    label, smem_storage.d_labels + u);
+                        smem_storage.d_labels[u] = label;
 
-                    //util::io::ModifiedStore<util::io::st::cg>::St(
-                    //    smem_storage.tex_mask_bytes[temp_pos], //mask_byte,
-                    //    smem_storage.d_visited_mask + ((u & KernelPolicy::ELEMENT_ID_MASK)>> 3));
-                    smem_storage.d_visited_mask[(u & KernelPolicy::ELEMENT_ID_MASK)>> (2 + sizeof(MaskT))] = smem_storage.tex_mask_bytes[temp_pos];
+                        //util::io::ModifiedStore<util::io::st::cg>::St(
+                        //    smem_storage.tex_mask_bytes[temp_pos], //mask_byte,
+                        //    smem_storage.d_visited_mask + ((u & KernelPolicy::ELEMENT_ID_MASK)>> 3));
+                        smem_storage.d_visited_mask[(u & KernelPolicy::ELEMENT_ID_MASK)>> (2 + sizeof(MaskT))] = 
+                            smem_storage.tex_mask_bytes[temp_pos];
+                    }
                 }
                 output_pos ++;
                 temp_pos ++;
@@ -716,12 +720,14 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                 if (thread_input <= block_input_end+1 && thread_input < input_queue_length) // input_queue_length)
                 {
                     input_item = d_queue[thread_input];
+                    //printf("%d input_item = queue[%d] = %d\n",
+                    //    threadIdx.x, thread_input, input_item);
                     smem_storage.input_queue  [threadIdx.x] = input_item;
                     smem_storage.output_offset[threadIdx.x] = d_scanned_edges[thread_input] - block_output_start;
                     if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V ||
                         ADVANCE_TYPE == gunrock::oprtr::advance::V2E)
                     {
-                        smem_storage.vertices[threadIdx.x] = input_item;
+                        //smem_storage.vertices[threadIdx.x] = input_item;
                         if (input_item >= 0)
                             smem_storage.row_offset[threadIdx.x] = //row_offsets[input_item];
                                 tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  input_item);
@@ -747,7 +753,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                 } // end of if thread_input < input_queue_length
                 else {
                     smem_storage.output_offset[threadIdx.x] = util::MaxValue<SizeT>();//max_edges; // - block_output_start?
-                    smem_storage.vertices     [threadIdx.x] = util::MaxValue<VertexId>();//max_vertices;
+                    //smem_storage.vertices     [threadIdx.x] = util::MaxValue<VertexId>();//max_vertices;
                     smem_storage.input_queue  [threadIdx.x] = util::MaxValue<VertexId>();//max_vertices;
                     smem_storage.row_offset   [threadIdx.x] = util::MaxValue<SizeT>();
                 }
@@ -778,8 +784,9 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     if (thread_output >= next_v_output_start_offset)
                     {
                         v_index    = util::BinarySearch<KernelPolicy::SCRATCH_ELEMENTS>(thread_output, smem_storage.output_offset);
-                        v          = smem_storage.vertices   [v_index];
+                        //v          = smem_storage.vertices   [v_index];
                         input_item = smem_storage.input_queue[v_index];
+                        v          = input_item;
                         v_output_start_offset = (v_index > 0) ? smem_storage.output_offset[v_index-1] : 0;
                         next_v_output_start_offset = (v_index < KernelPolicy::SCRATCH_ELEMENTS) ?
                             smem_storage.output_offset[v_index] : util::MaxValue<SizeT>();

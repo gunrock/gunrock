@@ -359,6 +359,7 @@ struct DataSliceBase
     int    num_stages          ; // Number of stages
     SizeT  nodes               ; // Number of vertices
     bool   use_double_buffer   ;
+    typedef unsigned char MaskT;
 
     util::Array1D<SizeT, VertexId    >  *vertex_associate_in  [2]; // Incoming VertexId type associate values
     //util::Array1D<SizeT, VertexId*   >  *vertex_associate_ins [2]; // Device pointers to incoming VertexId type associate values
@@ -382,9 +383,9 @@ struct DataSliceBase
     //util::Array1D<SizeT, SizeT       >  *keys_marker             ; // Markers to separate vertices to peer GPUs
     //util::Array1D<SizeT, SizeT*      >   keys_markers            ; // Device pointer to the markers
 
-    util::Array1D<SizeT, SizeT       >  *visit_lookup            ; // Vertex lookup array
-    util::Array1D<SizeT, VertexId    >  *valid_in                ; // Vertex valid in
-    util::Array1D<SizeT, VertexId    >  *valid_out               ; // Vertex valid out
+    //util::Array1D<SizeT, SizeT       >  *visit_lookup            ; // Vertex lookup array
+    //util::Array1D<SizeT, VertexId    >  *valid_in                ; // Vertex valid in
+    //util::Array1D<SizeT, VertexId    >  *valid_out               ; // Vertex valid out
 
     util::Array1D<SizeT, cudaEvent_t*>   events               [4]; // GPU stream events arrays
     util::Array1D<SizeT, bool*       >   events_set           [4]; // Whether the GPU stream events are set
@@ -402,6 +403,7 @@ struct DataSliceBase
     util::DoubleBuffer<VertexId, SizeT, Value>  *frontier_queues ; // frontier queues
     util::Array1D<SizeT, SizeT       >  *scanned_edges           ; // length / offsets for offsets of the frontier queues
     util::Array1D<SizeT, unsigned char> *cub_scan_space;
+    util::Array1D<SizeT, MaskT        > visited_mask;
 
     // arrays used to track data race, containing info about pervious assigment
     util::Array1D<SizeT, int         > org_checkpoint            ; // checkpoint number
@@ -430,9 +432,9 @@ struct DataSliceBase
         //keys_marker              = NULL;
         keys_in              [0] = NULL;
         keys_in              [1] = NULL;
-        visit_lookup             = NULL;
-        valid_in                 = NULL;
-        valid_out                = NULL;
+        //visit_lookup             = NULL;
+        //valid_in                 = NULL;
+        //valid_out                = NULL;
         vertex_associate_in  [0] = NULL;
         vertex_associate_in  [1] = NULL;
         //vertex_associate_ins [0] = NULL;
@@ -473,6 +475,7 @@ struct DataSliceBase
         preds                  .SetName("preds"                  );
         //temp_preds             .SetName("temp_preds"             );
         labels                 .SetName("labels"                 );
+        visited_mask           .SetName("visited_mask"           );
         org_checkpoint         .SetName("org_checkpoint"         );
         org_d_out              .SetName("org_d_out"              );
         org_offset1            .SetName("org_offset1"            );
@@ -570,7 +573,7 @@ struct DataSliceBase
             keys_in[1] = NULL;
         }
 
-        if (visit_lookup != NULL)
+        /*if (visit_lookup != NULL)
         {
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
@@ -598,7 +601,7 @@ struct DataSliceBase
             }
             delete[] valid_out;
             valid_out = NULL;
-        }
+        }*/
 
         // Release outgoing keys and markers
         //if (keys_marker != NULL)
@@ -723,6 +726,7 @@ struct DataSliceBase
         if (retval = preds         .Release()) return retval;
         //if (retval = temp_preds    .Release()) return retval;
         if (retval = labels        .Release()) return retval;
+        if (retval = visited_mask  .Release()) return retval;
 
         if (retval = org_checkpoint.Release()) return retval;
         if (retval = org_d_out     .Release()) return retval;
@@ -827,9 +831,9 @@ struct DataSliceBase
             }
         }
 
-        visit_lookup            = new util::Array1D<SizeT, SizeT    > [num_gpus];
-        valid_in                = new util::Array1D<SizeT, VertexId > [num_gpus];
-        valid_out               = new util::Array1D<SizeT, VertexId > [num_gpus];
+        //visit_lookup            = new util::Array1D<SizeT, SizeT    > [num_gpus];
+        //valid_in                = new util::Array1D<SizeT, VertexId > [num_gpus];
+        //valid_out               = new util::Array1D<SizeT, VertexId > [num_gpus];
 
         if (num_gpus == 1) return retval;
         // Create incoming buffer on device
@@ -994,7 +998,7 @@ struct DataSliceBase
             {
                 if (retval = value__associate_out[gpu].Allocate(num_out_node * MAX_NUM_VALUE__ASSOCIATES, util::DEVICE))
                     return retval;
-                vertex_associate_outs[gpu] = vertex_associate_out[gpu].GetPointer(util::DEVICE);
+                value__associate_outs[gpu] = value__associate_out[gpu].GetPointer(util::DEVICE);
             }
             if (skip_makeout_selection && gpu == 1) break;
         }
@@ -1075,7 +1079,7 @@ struct DataSliceBase
         for (int gpu = 0; gpu < num_gpus; gpu++)
             wait_marker[gpu] = 0;
         for (int i=0; i<4; i++)
-        for (int gpu = 0; gpu < num_gpus; gpu++)
+        for (int gpu = 0; gpu < num_gpus * 2; gpu++)
         for (int stage=0; stage < num_stages; stage++)
             events_set[i][gpu][stage] = false;
         for (int gpu = 0; gpu < num_gpus; gpu++)
@@ -1657,9 +1661,9 @@ struct ProblemBase
 
             printf("partition end. (%f ms)\n", cpu_timer.ElapsedMillis());
 
-            /*graph->DisplayGraph("org_graph",graph->nodes);
-            util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);
-            util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion0",convertion_tables[0],graph->nodes);
+            //graph->DisplayGraph("org_graph",graph->nodes);
+            //util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);
+            /*util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion0",convertion_tables[0],graph->nodes);
             //util::cpu_mt::PrintCPUArray<SizeT,Value>("edge_value",graph->edge_values,graph->edges);
             for (int gpu=0;gpu<num_gpus;gpu++)
             {

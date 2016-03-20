@@ -75,8 +75,10 @@ struct SSSPFunctor {
         // Check if the destination node has been claimed as someone's child
         Value old_distance = atomicMin(d_data_slice->distances + d_id, new_distance);
         //if (to_track(s_id) || to_track(d_id))
-        //    printf("lable[%d] : %d t-> %d + %d @ %d = %d \t", d_id, old_weight, weight, distance, s_id, new_weight);
-        return (new_distance < old_distance);
+            //printf("lable[%d] : %d -> %d @ %d + %d @ %d = %d \n", d_id, old_distance, edge_weight, edge_id, pred_distance, s_id, new_distance);
+        bool result = (new_distance < old_distance);
+
+        return result;
     }
 
     /**
@@ -103,9 +105,13 @@ struct SSSPFunctor {
         //VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
         //VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        if (Problem::MARK_PATHS)
+        if (Problem::MARK_PATHS)//(Problem::MARK_PREDECESSORS)
+        {
+            if (d_data_slice -> original_vertex.GetPointer(util::DEVICE) != NULL)
+                s_id = d_data_slice -> original_vertex[s_id];
             util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                 s_id, d_data_slice->preds + d_id);
+        }
     }
 
     /**
@@ -129,8 +135,20 @@ struct SSSPFunctor {
         //VertexId node, DataSlice *d_data_slice, VertexId v = 0, SizeT nid = 0)
     {
         if (node == -1) return false;
-        return (atomicCAS(d_data_slice->sssp_marker + node, 0, 1) == 0);
-        //return (node != -1);
+        //return (atomicCAS(d_data_slice->sssp_marker + node, 0, 1) == 0);
+        
+        //LabelT old_label = atomicExch(d_data_slice -> labels + node, label);
+        //if (old_label == label) {
+            //printf("node [%d] skipped, label = %d\n",
+            //    node, label);
+            //return false;
+        //}
+        if (d_data_slice -> labels[node] == label)
+        {
+            return false;
+        }
+        d_data_slice -> labels[node] = label;
+        return true;
     }
 
     /**
@@ -157,9 +175,10 @@ struct SSSPFunctor {
 };
 
 template <
-    typename VertexId, typename SizeT, typename Value, typename Problem>
+    typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId>
 struct PQFunctor {
     typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Forward Edge Mapping condition function. Check if the destination node

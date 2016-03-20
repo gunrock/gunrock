@@ -35,9 +35,10 @@ template <
     typename    VertexId,
     typename    SizeT,
     typename    Value,
+    //bool        _MARK_PREDECESSORS>
     bool        _MARK_PATHS>
 struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
-    true, //MARK_PREDECESSORS
+    true,//_MARK_PREDECESSORS, //MARK_PREDECESSORS
     false> //ENABLE_IDEMPOTENCE
     //false, //USE_DOUBLE_BUFFER
     //false, //ENABLE_BACKWARD
@@ -45,14 +46,15 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
     //false> //KEEP_NODE_NUM
 {
     static const bool MARK_PATHS            = _MARK_PATHS;
-    static const bool MARK_PREDECESSORS     = true;
+    static const bool MARK_PREDECESSORS     = true;//_MARK_PREDECESSORS;
     static const bool ENABLE_IDEMPOTENCE    = false;
-    static const int  MAX_NUM_VERTEX_ASSOCIATES = MARK_PATHS ? 1 : 0; 
+    static const int  MAX_NUM_VERTEX_ASSOCIATES = MARK_PATHS ? 1 : 0;//MARK_PREDECESSORS ? 1 : 0;
     static const int  MAX_NUM_VALUE__ASSOCIATES = 1;
     typedef ProblemBase   <VertexId, SizeT, Value,
         MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem;
     typedef DataSliceBase <VertexId, SizeT, Value,
         MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
+    typedef unsigned char MaskT;
 
     //Helper structures
 
@@ -64,9 +66,10 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
         // device storage arrays
         util::Array1D<SizeT, Value       >    distances  ;     /**< Used for source distance */
         util::Array1D<SizeT, Value       >    weights    ;     /**< Used for storing edge weights */
-        util::Array1D<SizeT, VertexId    >    visit_lookup;    /**< Used for check duplicate */
-        util::Array1D<SizeT, float       >    delta;
-        util::Array1D<SizeT, int         >    sssp_marker;
+        //util::Array1D<SizeT, VertexId    >    visit_lookup;    /**< Used for check duplicate */
+        //util::Array1D<SizeT, float       >    delta;
+        //util::Array1D<SizeT, int         >    sssp_marker;
+        util::Array1D<SizeT, VertexId    >    original_vertex;
 
         /*
          * @brief Default constructor
@@ -75,9 +78,10 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
         {
             distances       .SetName("distances"       );
             weights         .SetName("weights"         );
-            visit_lookup    .SetName("visit_lookup"    );
-            delta           .SetName("delta"           );
-            sssp_marker     .SetName("sssp_marker"     );
+            original_vertex .SetName("original_vertex" );
+            //visit_lookup    .SetName("visit_lookup"    );
+            //delta           .SetName("delta"           );
+            //sssp_marker     .SetName("sssp_marker"     );
         }
 
         /*
@@ -87,7 +91,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
         {
             Release();
         }
-        
+
         cudaError_t Release()
         {
             cudaError_t retval = cudaSuccess;
@@ -95,9 +99,10 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = BaseDataSlice::Release()) return retval;
             if (retval = distances     .Release()) return retval;
             if (retval = weights       .Release()) return retval;
-            if (retval = visit_lookup  .Release()) return retval;
-            if (retval = delta         .Release()) return retval;
-            if (retval = sssp_marker   .Release()) return retval;
+            //if (retval = visit_lookup  .Release()) return retval;
+            //if (retval = delta         .Release()) return retval;
+            //if (retval = sssp_marker   .Release()) return retval;
+            if (retval = original_vertex.Release()) return retval;
             return retval;
         }
 
@@ -132,12 +137,15 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             //int   num_vertex_associate,
             //int   num_value__associate,
             Csr<VertexId, SizeT, Value> *graph,
+            GraphSlice<VertexId, SizeT, Value> *graph_slice,
             SizeT *num_in_nodes,
             SizeT *num_out_nodes,
-            VertexId *original_vertex,
+            //VertexId *original_vertex,
             int   delta_factor = 16,
             float queue_sizing = 2.0,
-            float in_sizing    = 1.0)
+            float in_sizing    = 1.0,
+            bool  skip_makeout_selection = false,
+            bool  keep_node_num = false)
         {
             cudaError_t retval  = cudaSuccess;
 
@@ -159,37 +167,46 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                 graph,
                 num_in_nodes,
                 num_out_nodes,
-                in_sizing)) return retval;
+                in_sizing,
+                skip_makeout_selection)) return retval;
 
-            if (retval = distances   .Allocate(graph->nodes,util::DEVICE)) return retval;
-            if (retval = weights     .Allocate(graph->edges,util::DEVICE)) return retval;
-            if (retval = delta       .Allocate(1           ,util::DEVICE)) return retval;
-            if (retval = visit_lookup.Allocate(graph->nodes,util::DEVICE)) return retval;
-            if (retval = sssp_marker .Allocate(graph->nodes,util::DEVICE)) return retval;
+            if (retval = distances   .Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = weights     .Allocate(graph->edges, util::DEVICE)) return retval;
+            if (retval = this->labels.Allocate(graph->nodes, util::DEVICE)) return retval;
+            //if (retval = delta       .Allocate(1           ,util::DEVICE)) return retval;
+            //if (retval = visit_lookup.Allocate(graph->nodes,util::DEVICE)) return retval;
+            //if (retval = sssp_marker .Allocate(graph->nodes,util::DEVICE)) return retval;
 
             weights.SetPointer(graph->edge_values, graph->edges, util::HOST);
             if (retval = weights.Move(util::HOST, util::DEVICE)) return retval;
 
-            float _delta = EstimatedDelta(graph)*delta_factor;
+            //float _delta = EstimatedDelta(graph)*delta_factor;
             // printf("estimated delta:%5f\n", _delta);
-            delta.SetPointer(&_delta, util::HOST);
-            if (retval = delta.Move(util::HOST, util::DEVICE)) return retval;
+            //delta.SetPointer(&_delta, util::HOST);
+            //if (retval = delta.Move(util::HOST, util::DEVICE)) return retval;
 
-            if (MARK_PATHS)
+            if (MARK_PATHS)//(MARK_PREDECESSORS)
             {
                 if (retval = this->preds.Allocate(graph->nodes,util::DEVICE)) return retval;
-                if (retval = this->temp_preds.Allocate(graph->nodes, util::DEVICE)) return retval;
+                //if (retval = this->temp_preds.Allocate(graph->nodes, util::DEVICE)) return retval;
             } else {
                 if (retval = this->preds.Release()) return retval;
-                if (retval = this->temp_preds.Release()) return retval;
+                //if (retval = this->temp_preds.Release()) return retval;
             }
 
             if (num_gpus >1)
             {
                 this->value__associate_orgs[0] = distances.GetPointer(util::DEVICE);
-                if (MARK_PATHS)
+                if (MARK_PATHS)//(MARK_PREDECESSORS)
+                {
                     this->vertex_associate_orgs[0] = this->preds.GetPointer(util::DEVICE);
-                if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
+                    if (!keep_node_num)
+                    this -> original_vertex.SetPointer(
+                        graph_slice -> original_vertex.GetPointer(util::DEVICE),
+                        graph_slice -> original_vertex.GetSize(),
+                        util::DEVICE);
+                    if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
+                }
                 if (retval = this->value__associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
                 //if (retval = temp_marker.Allocate(graph->nodes, util::DEVICE)) return retval;
             }
@@ -234,14 +251,14 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
             for (int gpu = 0; gpu < this -> num_gpus; gpu++)
-                this -> wait_marker[gpu] = 0;  
-            for (int i=0; i<4; i++) 
-            for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+                this -> wait_marker[gpu] = 0;
+            for (int i=0; i<4; i++)
+            for (int gpu = 0; gpu < this -> num_gpus * 2; gpu++)
             for (int stage=0; stage < this -> num_stages; stage++)
                 this -> events_set[i][gpu][stage] = false;
             for (int gpu = 0; gpu < this -> num_gpus; gpu++)
-            for (int i=0; i<2; i++) 
-                this -> in_length[i][gpu] = 0;  
+            for (int i=0; i<2; i++)
+                this -> in_length[i][gpu] = 0;
             for (int peer=0; peer<this->num_gpus; peer++)
                 this -> out_length[peer] = 1;
 
@@ -312,16 +329,31 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             if (this->distances      .GetPointer(util::DEVICE) == NULL)
                 if (retval = this->distances   .Allocate(nodes, util::DEVICE)) return retval;
 
-            if (this->preds       .GetPointer(util::DEVICE) == NULL && MARK_PATHS)
+            if (this->preds       .GetPointer(util::DEVICE) == NULL && MARK_PATHS)//MARK_PREDECESSORS)
                 if (retval = this->preds       .Allocate(nodes, util::DEVICE)) return retval;
 
-            if (this->visit_lookup.GetPointer(util::DEVICE) == NULL)
-                if (retval = this->visit_lookup.Allocate(nodes, util::DEVICE)) return retval;
+            if (this -> labels    .GetPointer(util::DEVICE) == NULL)
+                if (retval = this -> labels    .Allocate(nodes, util::DEVICE)) return retval;
 
-            if (MARK_PATHS) util::MemsetIdxKernel<<<128, 128>>>(this->preds.GetPointer(util::DEVICE), nodes);
-            util::MemsetKernel<<<128, 128>>>(this->distances   .GetPointer(util::DEVICE), util::MaxValue<Value>(), nodes);
-            util::MemsetKernel<<<128, 128>>>(this->visit_lookup.GetPointer(util::DEVICE), (VertexId)-1, nodes);
-            util::MemsetKernel<<<128, 128>>>(sssp_marker.GetPointer(util::DEVICE), (int)0, nodes);
+            //if (this->visit_lookup.GetPointer(util::DEVICE) == NULL)
+            //    if (retval = this->visit_lookup.Allocate(nodes, util::DEVICE)) return retval;
+
+            if (MARK_PATHS)//(MARK_PREDECESSORS) 
+                util::MemsetIdxKernel<<<128, 128>>>(
+                    this->preds.GetPointer(util::DEVICE), nodes);
+
+            util::MemsetKernel<<<128, 128>>>(
+                this->distances   .GetPointer(util::DEVICE), 
+                util::MaxValue<Value>(), 
+                nodes);
+
+            util::MemsetKernel<<<128, 128>>>(
+                this -> labels .GetPointer(util::DEVICE),
+                util::InvalidValue<VertexId>(),
+                nodes);
+
+            //util::MemsetKernel<<<128, 128>>>(this->visit_lookup.GetPointer(util::DEVICE), (VertexId)-1, nodes);
+            //util::MemsetKernel<<<128, 128>>>(sssp_marker.GetPointer(util::DEVICE), (int)0, nodes);
             return retval;
         }
     }; // DataSlice
@@ -340,7 +372,9 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
         false, // use_double_buffer
         false, // enable_backward
         false, // keep_order
-        false) // keep_node_num
+        true,  // keep_node_num
+        false, // skip_makeout_selection
+        true)  // unified_receive
     {
         data_slices = NULL;
     }
@@ -384,7 +418,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
     {
         cudaError_t retval = cudaSuccess;
 
-        if (this->num_gpus == 1) 
+        if (this->num_gpus == 1)
         {
 
             // Set device
@@ -393,7 +427,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             data_slices[0]->distances.SetPointer(h_distances);
             if (retval = data_slices[0]->distances.Move(util::DEVICE,util::HOST)) return retval;
 
-            if (MARK_PATHS) 
+            if (MARK_PATHS)//(MARK_PREDECESSORS)
             {
                 data_slices[0]->preds.SetPointer(h_preds);
                 if (retval = data_slices[0]->preds.Move(util::DEVICE,util::HOST)) return retval;
@@ -407,7 +441,8 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
                 if (retval = data_slices[gpu]->distances.Move(util::DEVICE,util::HOST)) return retval;
                 th_distances[gpu]=data_slices[gpu]->distances.GetPointer(util::HOST);
-                if (MARK_PATHS) {
+                if (MARK_PATHS)//(MARK_PREDECESSORS) 
+                {
                     if (retval = data_slices[gpu]->preds.Move(util::DEVICE,util::HOST)) return retval;
                     th_preds[gpu]=data_slices[gpu]->preds.GetPointer(util::HOST);
                 }
@@ -424,7 +459,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                 fflush(stdout);
             }
 
-           if (MARK_PATHS)
+           if (MARK_PATHS)//(MARK_PREDECESSORS)
                 for (VertexId node=0;node<this->nodes;node++)
                     h_preds[node]=th_preds[this->partition_tables[0][node]][this->convertion_tables[0][node]];
             for (int gpu=0;gpu<this->num_gpus;gpu++)
@@ -459,9 +494,9 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
      */
     cudaError_t Init(
             bool          stream_from_host,       // Only meaningful for single-GPU
-            Csr<VertexId, SizeT, Value> 
+            Csr<VertexId, SizeT, Value>
                          *graph,
-            Csr<VertexId, SizeT, Value> 
+            Csr<VertexId, SizeT, Value>
                          *inversegraph      = NULL,
             int           num_gpus          = 1,
             int          *gpu_idx           = NULL,
@@ -505,12 +540,15 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                 //this->num_gpus > 1? 1 : 0,
                 this->use_double_buffer,
                 &(this->sub_graphs[gpu]),
+                this -> graph_slices[gpu],
                 this->num_gpus > 1? this->graph_slices[gpu]->in_counter.GetPointer(util::HOST) : NULL,
                 this->num_gpus > 1? this->graph_slices[gpu]->out_counter.GetPointer(util::HOST): NULL,
-                this->num_gpus > 1? this->graph_slices[gpu]->original_vertex.GetPointer(util::HOST) : NULL,
+                //this->num_gpus > 1? this->graph_slices[gpu]->original_vertex.GetPointer(util::HOST) : NULL,
                 delta_factor,
                 queue_sizing,
-                in_sizing))
+                in_sizing,
+                this -> skip_makeout_selection,
+                this -> keep_node_num))
                 return retval;
         } // end for (gpu)
 
@@ -541,7 +579,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             // Set device
             if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
             if (retval = data_slices[gpu] -> Reset(
-                frontier_type, this->graph_slices[gpu], 
+                frontier_type, this->graph_slices[gpu],
                 queue_sizing, queue_sizing1)) return retval;
             if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return retval;
         }
@@ -570,7 +608,7 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                         sizeof(Value),
                         cudaMemcpyHostToDevice),
                     "SSSPProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
-        if (MARK_PATHS)
+        if (MARK_PATHS)//(MARK_PREDECESSORS)
         {
             VertexId src_pred = -1;
             if (retval = util::GRError(cudaMemcpy(

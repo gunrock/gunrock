@@ -156,18 +156,19 @@ __global__ void Expand_Incoming_Kernel(
                 {
                     tex_mask_byte |= mask_bit;
                 } else to_process = false;
+            }
 
-                if (to_process)
-                {
-                    if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key) != util::MaxValue<VertexId>())
-                        to_process = false;
-                }
+            if (to_process)
+            {
+                if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key) != util::MaxValue<VertexId>())
+                    to_process = false;
+            }
 
-                if (to_process)
-                {
-                    d_labels[key] = label;
+            if (to_process)
+            {
+                d_labels[key] = label;
+                if (KernelPolicy::Problem::ENABLE_IDEMPOTENCE)
                     d_masks[mask_pos] = tex_mask_byte;
-                }
             }
 
             //if (to_process)

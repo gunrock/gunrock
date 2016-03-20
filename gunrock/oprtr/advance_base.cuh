@@ -38,7 +38,7 @@ static __device__ __forceinline__ void ProcessNeighbor(
     typename Problem::VertexId   &v,
     typename Problem::VertexId   &u,
     typename Problem::DataSlice *&d_data_slice,
-    typename Problem::SizeT      &edge_id,
+    typename Problem::SizeT      edge_id,
     typename Problem::SizeT      input_pos,
     typename Problem::VertexId   &input_item,
     typename Problem::SizeT      output_pos,
@@ -73,17 +73,14 @@ static __device__ __forceinline__ void ProcessNeighbor(
                 reduce_value, d_reduce_frontier + output_pos);
         }
 
-        if (d_keys_out != NULL)
-        {
+        //if (d_keys_out != NULL)
+        //{
             if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E ||
                 ADVANCE_TYPE == gunrock::oprtr::advance::E2E)
             {
                 u = (typename Problem::VertexId) edge_id;
             }
-            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-                u,
-                d_keys_out + output_pos);
-        }
+        //}
 
         if (Problem::ENABLE_IDEMPOTENCE && Problem::MARK_PREDECESSORS && d_values_out != NULL)
         {
@@ -92,16 +89,22 @@ static __device__ __forceinline__ void ProcessNeighbor(
         }
 
     } else {
-        if (d_keys_out != NULL)
-            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-                util::InvalidValue<typename Problem::VertexId>(),
-                d_keys_out + output_pos);
+        //if (d_keys_out != NULL)
+        //    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+        //        util::InvalidValue<typename Problem::VertexId>(),
+        //        d_keys_out + output_pos);
+        u = util::InvalidValue<typename Problem::VertexId>();
 
         if (d_value_to_reduce != NULL)
             util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                 gunrock::oprtr::advance::Identity<typename Problem::Value, R_OP>()(),
                 d_reduce_frontier + output_pos);
     }
+
+    if (d_keys_out != NULL)
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+        u,
+        d_keys_out + output_pos);
 }
 
 template <typename VertexId, typename SizeT>

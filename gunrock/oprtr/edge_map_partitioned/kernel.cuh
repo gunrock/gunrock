@@ -89,17 +89,17 @@ struct Dispatch<KernelPolicy, Problem, Functor,
     static __device__ __forceinline__ SizeT GetNeighborListLength(
         SizeT     *&d_row_offsets,
         VertexId  *&d_column_indices,
-        VertexId   &d_vertex_id,
+        VertexId   &vertex_id,
         SizeT      &max_vertex,
         SizeT      &max_edge)
         //gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
     {
         SizeT first  = /*(d_vertex_id >= max_vertex) ?
             max_edge :*/ //d_row_offsets[d_vertex_id];
-            tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  d_vertex_id);
+            tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  vertex_id);
         SizeT second = /*(d_vertex_id + 1 >= max_vertex) ?
             max_edge :*/ //d_row_offsets[d_vertex_id+1];
-            tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  d_vertex_id + 1);
+            tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  vertex_id + 1);
 
         //printf(" d_vertex_id = %d, max_vertex = %d, max_edge = %d, first = %d, second = %d\n",
         //       d_vertex_id, max_vertex, max_edge, first, second);

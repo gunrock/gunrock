@@ -216,7 +216,8 @@ struct Block_Scan
             warp_sum = threadIdx.x < BLOCK_WARPS ?
                 temp_space. warp_counter_offset[threadIdx.x] : 0;
             Warp_Scan(warp_sum, warp_sum);
-            temp_space. warp_counter_offset[threadIdx.x] = warp_sum;
+            if (threadIdx.x < BLOCK_WARPS)
+                temp_space. warp_counter_offset[threadIdx.x] = warp_sum;
         }
         __syncthreads();
 
@@ -243,7 +244,8 @@ struct Block_Scan
             warp_sum = threadIdx.x < BLOCK_WARPS ?
                 temp_space. warp_counter_offset[threadIdx.x] : 0;
             Warp_Scan(warp_sum, warp_sum, block_sum);
-            temp_space. warp_counter_offset[threadIdx.x] = warp_sum;
+            if (threadIdx.x < BLOCK_WARPS)
+                temp_space. warp_counter_offset[threadIdx.x] = warp_sum;
             if (threadIdx.x == 0)
             {
                 temp_space.block_sum = block_sum;
@@ -273,7 +275,8 @@ struct Block_Scan
             warp_sum = threadIdx.x < BLOCK_WARPS ?
                 temp_space. warp_counter_offset[threadIdx.x] : 0;
             Warp_Scan(warp_sum, warp_sum);
-            temp_space. warp_counter_offset[threadIdx.x] = warp_sum;
+            if (threadIdx.x < BLOCK_WARPS)
+                temp_space. warp_counter_offset[threadIdx.x] = warp_sum;
         }
         __syncthreads();
 
@@ -294,7 +297,8 @@ struct Block_Scan
             warp_sum = threadIdx.x < BLOCK_WARPS ?
                 temp_space. warp_counter_offset[threadIdx.x] : 0;
             Warp_Scan(warp_sum, warp_sum, block_sum);
-            temp_space. warp_counter_offset[threadIdx.x] = warp_sum;
+            if (threadIdx.x < BLOCK_WARPS)
+                temp_space. warp_counter_offset[threadIdx.x] = warp_sum;
             if (threadIdx.x == 0)
                 temp_space. block_sum = block_sum;
         }
