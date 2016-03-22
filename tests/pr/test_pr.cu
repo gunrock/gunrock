@@ -529,6 +529,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     Value       delta               = info->info["delta"            ].get_real ();
     Value       error               = info->info["error"            ].get_real ();
     bool        scaled              = info->info["scaled"           ].get_bool ();
+    bool        compensate          = info->info["compensate"       ].get_bool ();
     CpuTimer    cpu_timer;
     cudaError_t retval              = cudaSuccess;
 
@@ -556,6 +557,60 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         if (retval = cudaMemGetInfo(&(org_size[gpu]), &dummy)) return retval;
     }
 
+    if (compensate)
+    {   
+        util::Array1D<SizeT, VertexId> zero_out_vertices;
+            
+        zero_out_vertices.Allocate(graph -> nodes, util::HOST);
+        SizeT counter = 0;
+        for (VertexId v = 0; v< graph->nodes; v++)
+        if (graph -> row_offsets[v+1] == graph -> row_offsets[v])
+        {   
+            zero_out_vertices[counter] = v;
+            counter ++; 
+        }   
+        if (counter != 0)
+        {   
+            if (!quiet_mode) printf("Adding 1 vertex and %lld edges to compensate 0 degree vertices\n",
+                (long long)counter + (long long)graph -> nodes, (long long)counter * graph -> nodes);
+            util::Array1D<SizeT, VertexId> new_column_indices;
+            util::Array1D<SizeT, SizeT   > new_row_offsets;
+            new_column_indices.Allocate(graph -> edges + counter + graph -> nodes, util::HOST);
+            new_row_offsets   .Allocate(graph -> nodes + 2);
+            SizeT edge_counter = 0;
+            for (VertexId v = 0; v < graph->nodes; v++)
+            {
+                new_row_offsets[v] = edge_counter;
+                if (graph -> row_offsets[v+1] == graph -> row_offsets[v])
+                {
+                    new_column_indices[edge_counter] = graph -> nodes;
+                    edge_counter ++;
+                } else {
+                    SizeT num_neighbors = graph -> row_offsets[v+1] - graph -> row_offsets[v];
+                    for (SizeT e = 0; e < num_neighbors; e++)
+                        new_column_indices[edge_counter + e] = graph -> column_indices[graph -> row_offsets[v] + e];
+                    edge_counter += num_neighbors;
+                }
+            }
+            for (VertexId v = 0; v< graph -> nodes; v++)
+                new_column_indices[edge_counter + v] = v;
+            new_row_offsets[graph -> nodes] = edge_counter;
+            edge_counter += graph -> nodes;
+            new_row_offsets[graph -> nodes + 1] = edge_counter;
+            delete[] graph -> column_indices;
+            graph -> column_indices = new VertexId[edge_counter];
+            memcpy(graph -> column_indices, new_column_indices.GetPointer(util::HOST),
+                sizeof(VertexId) * edge_counter);
+            new_column_indices.Release();
+            delete[] graph -> row_offsets;
+            graph -> row_offsets = new SizeT[graph -> nodes + 2];
+            memcpy(graph -> row_offsets, new_row_offsets.GetPointer(util::HOST),
+                sizeof(SizeT) * (graph -> nodes + 2));
+            graph -> edges = edge_counter;
+            graph -> nodes +=1;
+        }   
+    }
+ 
     Problem *problem = new Problem(scaled);  // allocate problem on GPU
     if (retval = util::GRError(problem->Init(
         stream_from_host,

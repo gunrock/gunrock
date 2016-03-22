@@ -1087,7 +1087,7 @@ struct DataSliceBase
         for (int gpu = 0; gpu < num_gpus; gpu++)
         for (int i=0; i<2; i++)
             in_length[i][gpu] = 0;
-        for (int peer = 0; peer < num_gpus; gpu++)
+        for (int peer = 0; peer < num_gpus; peer++)
             out_length[peer] = 1;
 
         SizeT max_queue_length = 0;

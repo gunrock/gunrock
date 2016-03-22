@@ -607,9 +607,9 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_CULL>
                 return retval;
         }
         //printf("output_length = %lld\n", (long long)frontier_attribute.output_length[0]);
-        //if (/*!parameter -> get_output_length || (parameter -> get_output_length &&*/
+        if (/*!parameter -> get_output_length || (parameter -> get_output_length &&*/
             //parameter -> frontier_attribute -> output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD)//)
-        //    parameter -> frontier_attribute -> output_length[0] < 64LL * 2 * KernelPolicy::THREADS)
+            parameter -> frontier_attribute -> output_length[0] < 64LL * 2 * KernelPolicy::THREADS)
         {
             SizeT num_blocks = (parameter -> frontier_attribute -> queue_length +
                 KernelPolicy::SCRATCH_ELEMENTS - 1) / KernelPolicy::SCRATCH_ELEMENTS;
@@ -649,8 +649,8 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_CULL>
                 parameter -> d_value_to_reduce,
                 parameter -> d_reduce_frontier);
         }
-        //else //if (/*get_output_length &&*/ parameter -> frontier_attribute -> //output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
-        /*{
+        else //if (/*get_output_length &&*/ parameter -> frontier_attribute -> //output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
+        {
             SizeT num_blocks = parameter -> frontier_attribute -> output_length[0] / 2 / KernelPolicy::THREADS; // LBPOLICY::BLOCKS
             if (num_blocks > 840)
                 num_blocks = 840;
@@ -711,7 +711,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_CULL>
                 parameter -> d_value_to_reduce,
                 parameter -> d_reduce_frontier);
             //util::DisplayDeviceResults(d_out_key_queue, output_queue_len);
-        }*/
+        }
         return retval;
     }
 };

@@ -1471,9 +1471,15 @@ public:
                     false,
                     false);
 
+                if (retval = this -> frontier_attribute[gpu * this -> num_gpus].output_length.Move(util::DEVICE, util::HOST, 
+                    1, 0, problem -> data_slices[gpu] -> streams[0]))
+                    return retval;
                 if (retval = util::GRError(cudaStreamSynchronize(problem -> data_slices[gpu] -> streams[0]),
                     "cudaStreamSynchronize failed", __FILE__, __LINE__))
                     return retval;
+                //printf("#local_vertices = %d, output_length = %d\n", 
+                //    problem -> data_slices[gpu] -> local_vertices.GetSize(),
+                //    this -> frontier_attribute[gpu * this -> num_gpus].output_length[0]);
                 //util::cpu_mt::PrintGPUArray("scanned_edges0",
                 //    partitioned_scanned_edges->GetPointer(util::DEVICE),
                 //    frontier_attribute->queue_length,
