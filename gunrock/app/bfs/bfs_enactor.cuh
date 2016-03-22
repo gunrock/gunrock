@@ -1347,6 +1347,7 @@ public:
                 "BFSEnactor cudaBindTexture row_offsets_ref failed",
                 __FILE__, __LINE__)) break;
         }
+        if (retval) return retval;
 
         for (int gpu=0;gpu<this->num_gpus;gpu++)
         {

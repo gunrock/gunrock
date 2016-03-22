@@ -322,7 +322,8 @@ void PushNeighbor(
     data_slice_p->in_iteration[t][gpu_] = enactor_stats->iteration;
     if (queue_length == 0) return;
 
-    if (data_slice_p -> keys_in[t][gpu_].GetSize() < queue_length)
+    if (data_slice_l -> keys_out[peer_].GetPointer(util::DEVICE) != NULL &&
+        data_slice_p -> keys_in[t][gpu_].GetSize() < queue_length)
         to_reallocate = true;
     if (data_slice_p -> vertex_associate_in[t][gpu_].GetSize() < queue_length * NUM_VERTEX_ASSOCIATES)
         to_reallocate = true;
@@ -334,6 +335,7 @@ void PushNeighbor(
         if (enactor -> size_check)
             if (enactor_stats -> retval = util::SetDevice(data_slice_p -> gpu_idx))
                 return;
+        if (data_slice_l -> keys_out[peer_].GetPointer(util::DEVICE) != NULL)
         if (enactor_stats -> retval = Check_Size<SizeT, VertexId>(
             enactor -> size_check, "keys_in",
             queue_length,
@@ -356,7 +358,8 @@ void PushNeighbor(
             if (enactor_stats -> retval = util::SetDevice(data_slice_l -> gpu_idx))
                 return;
     }
-
+    
+    if (data_slice_l -> keys_out[peer_].GetPointer(util::DEVICE) != NULL)
     if (enactor_stats -> retval = util::GRError(cudaMemcpyAsync(
         data_slice_p -> keys_in[t][gpu_].GetPointer(util::DEVICE),
         data_slice_l -> keys_out[peer_] .GetPointer(util::DEVICE),

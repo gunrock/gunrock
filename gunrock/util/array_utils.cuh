@@ -242,15 +242,15 @@ public:
                         name+" cudaHostUnregister failed",__FILE__,__LINE__);
                     if (retval) return retval;
                 }
+                if (ARRAY_DEBUG)
+                {
+                    printf("%s\t released on HOST, length =\t %lld, pointer = %p\n",
+                        name.c_str(), (long long) size, h_pointer);
+                    fflush(stdout);
+                }
                 delete[] h_pointer;
                 h_pointer = NULL;
                 allocated = allocated - HOST + TARGETBASE;
-                if (ARRAY_DEBUG)
-                {
-                    printf("%s\t released on HOST, length =\t %lld\n",
-                        name.c_str(), (long long) size);
-                    fflush(stdout);
-                }
             } else if ((target & HOST)==HOST && (setted & HOST) == HOST) {
                 UnSetPointer(HOST);
             }
@@ -259,8 +259,8 @@ public:
         {
             if (ARRAY_DEBUG)
             {
-                printf("%s\t releasing on DEVICE, length =\t %lld\n",
-                       name.c_str(), (long long) size);
+                printf("%s\t releasing on DEVICE, length =\t %lld, pointer = %p\n",
+                       name.c_str(), (long long) size, d_pointer);
                 fflush(stdout);
             }
             retval = GRError(cudaFree((void*)d_pointer),

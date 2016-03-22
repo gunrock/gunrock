@@ -48,7 +48,7 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
             bool &queue_reset,
             VertexId &queue_index,
             //int &num_gpus,
-            SizeT &num_elements,
+            SizeT &input_queue_length,
             //volatile int *&d_done,
             VertexId *&d_in_queue,
             VertexId *&d_out_queue,
@@ -60,19 +60,53 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
     {
         SizeT pos = (SizeT)threadIdx.x + blockIdx.x * blockDim.x;
         const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
-
-        while (pos < num_elements)
+        typedef util::Block_Scan<SizeT, KernelPolicy::CUDA_ARCH, KernelPolicy::LOG_THREADS> BlockScanT;
+                
+        __shared__ typename BlockScanT::Temp_Space scan_space;
+        if (threadIdx.x == 0 && blockIdx.x == 0)
         {
-            Functor::ApplyFilter(
-                util::InvalidValue<VertexId>(),
-                d_in_queue[pos],
-                d_data_slice, /*iteration*/
-                util::InvalidValue<SizeT>(),
-                label,
-                pos,
-                pos);
-            d_out_queue[pos] = d_in_queue[pos];
-            if (pos >= num_elements - STRIDE) break;
+            if (queue_reset)
+                work_progress.StoreQueueLength(input_queue_length, queue_index);
+            else 
+                input_queue_length = work_progress.LoadQueueLength(queue_index);
+            work_progress.StoreQueueLength(0, queue_index + 2);
+        }
+        SizeT *d_out_length = work_progress.GetQueueCounter(queue_index + 1);
+        __syncthreads();
+
+        while (pos - threadIdx.x < input_queue_length)
+        {
+            bool to_process = true;
+            if (pos < input_queue_length)
+            {
+                to_process = Functor::CondFilter(
+                    util::InvalidValue<VertexId>(),
+                    d_in_queue[pos],
+                    d_data_slice, /*iteration*/
+                    util::InvalidValue<SizeT>(),
+                    label,
+                    pos,
+                    pos);
+            } else to_process = false;
+               
+            if (to_process)
+                Functor::ApplyFilter(
+                    util::InvalidValue<VertexId>(),
+                    d_in_queue[pos],
+                    d_data_slice, /*iteration*/
+                    util::InvalidValue<SizeT>(),
+                    label,
+                    pos,
+                    pos);
+            if (d_out_queue != NULL && pos < input_queue_length)
+                d_out_queue[pos] = to_process ? d_in_queue[pos] : util::InvalidValue<VertexId>();
+            
+            SizeT output_offset;
+            BlockScanT::LogicScan(to_process, output_offset, scan_space);
+            if (threadIdx.x == blockDim.x -1)
+                atomicAdd(d_out_length, output_offset + ((to_process) ? 1 : 0));
+
+            //if (pos - threadIdx.x >= input_queue_length - STRIDE) break;
             pos += STRIDE;
         }
     }

@@ -268,7 +268,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
             if (retval = util::SetDevice( this -> gpu_idx)) return retval;
-            for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+            for (int gpu = 0; gpu < this -> num_gpus * 2; gpu++)
                 this -> wait_marker[gpu] = 0;
             for (int i=0; i<4; i++)
             for (int gpu = 0; gpu < this -> num_gpus * 2; gpu++)

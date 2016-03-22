@@ -443,7 +443,7 @@ __global__ void Make_Output_Kernel_SkipSelection(
     Value    **d_value__associate_orgs,
     VertexId  *d_keys_out,
     VertexId  *d_vertex_associate_out,
-    VertexId  *d_value__associate_out)
+    Value     *d_value__associate_out)
 {
     SizeT in_pos = (SizeT) blockIdx.x * blockDim.x + threadIdx.x;
     const SizeT STRIDE = (SizeT) blockDim.x * gridDim.x;

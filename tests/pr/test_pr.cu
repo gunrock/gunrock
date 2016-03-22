@@ -514,9 +514,9 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     int         max_grid_size       = info->info["max_grid_size"    ].get_int  ();
     int         num_gpus            = info->info["num_gpus"         ].get_int  ();
     int         max_iteration       = info->info["max_iteration"    ].get_int  ();
-    double      max_queue_sizing    = info->info["max_queue_sizing" ].get_real ();
-    double      max_queue_sizing1   = info->info["max_queue_sizing1"].get_real ();
-    double      max_in_sizing       = info->info["max_in_sizing"    ].get_real ();
+    double      max_queue_sizing    = 0.0; //info->info["max_queue_sizing" ].get_real ();
+    double      max_queue_sizing1   = 0.0; //info->info["max_queue_sizing1"].get_real ();
+    double      max_in_sizing       = 1.0; //info->info["max_in_sizing"    ].get_real ();
     std::string partition_method    = info->info["partition_method" ].get_str  ();
     double      partition_factor    = info->info["partition_factor" ].get_real ();
     int         partition_seed      = info->info["partition_seed"   ].get_int  ();
@@ -565,6 +565,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         gpu_idx,
         partition_method,
         streams,
+        context,
         max_queue_sizing,
         max_in_sizing,
         partition_factor,
@@ -596,7 +597,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             max_queue_sizing1, traversal_mode == 1 ? true : false),
             "PR Problem Data Reset Failed", __FILE__, __LINE__))
             return retval;
-        if (retval = util::GRError(enactor->Reset(),
+        if (retval = util::GRError(enactor->Reset(traversal_mode),
             "PR Enactor Reset Reset failed", __FILE__, __LINE__))
             return retval;
 
@@ -991,9 +992,9 @@ template <
 int main_Value(CommandLineArgs *args)
 {
 // disabled to reduce compile time
-    if (args -> CheckCmdLineFlag("64bit-Value"))
-        return main_<VertexId, SizeT, double>(args);
-    else
+//    if (args -> CheckCmdLineFlag("64bit-Value"))
+//        return main_<VertexId, SizeT, double>(args);
+//    else
         return main_<VertexId, SizeT, float >(args);
 }
 
@@ -1003,9 +1004,9 @@ template <
 int main_SizeT(CommandLineArgs *args)
 {
 // disabled to reduce compile time
-    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-        return main_Value<VertexId, long long>(args);
-    else
+//    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+//        return main_Value<VertexId, long long>(args);
+//    else
         return main_Value<VertexId, int      >(args);
 }
 

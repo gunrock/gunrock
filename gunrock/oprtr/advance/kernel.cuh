@@ -95,8 +95,8 @@ cudaError_t ComputeOutputLength(
     }
 
     SizeT num_block = (frontier_attribute->queue_length
-        + KernelPolicy::LOAD_BALANCED::THREADS - 1)
-        /KernelPolicy::LOAD_BALANCED::THREADS;
+        + KernelPolicy::THREADS - 1)
+        /KernelPolicy::THREADS;
     //if (num_block > 256) num_block = 256;
     if (KernelPolicy::ADVANCE_MODE == LB_BACKWARD ||
         KernelPolicy::ADVANCE_MODE == TWC_BACKWARD)
@@ -121,7 +121,7 @@ cudaError_t ComputeOutputLength(
     {
         gunrock::oprtr::edge_map_partitioned::GetEdgeCounts
             <typename KernelPolicy::LOAD_BALANCED, Problem, Functor, ADVANCE_TYPE, R_TYPE, R_OP>
-            <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(
+            <<< num_block, KernelPolicy::THREADS, 0, stream>>>(
                 d_offsets,
                 d_indices,
                 d_inv_offsets,

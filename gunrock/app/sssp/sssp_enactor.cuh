@@ -519,7 +519,7 @@ struct SSSPIteration : public IterationBase <
         }
 
         int num_blocks = num_elements / AdvanceKernelPolicy::THREADS / 2+ 1;
-        if (num_blocks > 120) num_blocks = 120;
+        if (num_blocks > 240) num_blocks = 240;
         Expand_Incoming_Kernel
             <AdvanceKernelPolicy, NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
             <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>

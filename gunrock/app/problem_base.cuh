@@ -862,6 +862,7 @@ struct DataSliceBase
                 //        .Allocate(num_in_node, util::DEVICE))
                 //        return retval;
                 //}
+                vertex_associate_in[t][gpu].SetName("vertex_associate_in[][]");
                 if (retval = vertex_associate_in[t][gpu].Allocate(num_in_node * MAX_NUM_VERTEX_ASSOCIATES, util::DEVICE))
                     return retval;
 
@@ -875,6 +876,7 @@ struct DataSliceBase
                 //        .Allocate(num_in_node, util::DEVICE))
                 //        return retval;
                 //}
+                value__associate_in[t][gpu].SetName("vertex_associate_in[][]");
                 if (retval = value__associate_in[t][gpu].Allocate(num_in_node * MAX_NUM_VALUE__ASSOCIATES, util::DEVICE))
                     return retval;
 
@@ -1076,7 +1078,7 @@ struct DataSliceBase
 
         cudaError_t retval = cudaSuccess;
         if (retval = util::SetDevice(gpu_idx)) return retval;
-        for (int gpu = 0; gpu < num_gpus; gpu++)
+        for (int gpu = 0; gpu < num_gpus * 2; gpu++)
             wait_marker[gpu] = 0;
         for (int i=0; i<4; i++)
         for (int gpu = 0; gpu < num_gpus * 2; gpu++)
@@ -1085,6 +1087,8 @@ struct DataSliceBase
         for (int gpu = 0; gpu < num_gpus; gpu++)
         for (int i=0; i<2; i++)
             in_length[i][gpu] = 0;
+        for (int peer = 0; peer < num_gpus; gpu++)
+            out_length[peer] = 1;
 
         SizeT max_queue_length = 0;
 

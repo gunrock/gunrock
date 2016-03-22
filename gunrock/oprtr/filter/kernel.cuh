@@ -416,7 +416,7 @@ struct Dispatch<Parameter, BY_PASS>
             KernelPolicy::THREADS,
             (size_t)0,
             parameter. stream>>> (
-            (VertexId)parameter. label,
+            parameter. label,
             parameter. frontier_attribute. queue_reset,
             (VertexId)parameter. frontier_attribute. queue_index,
             parameter. num_elements,

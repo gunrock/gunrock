@@ -122,7 +122,7 @@ struct Make4Vector<double>
  *
  */
 template <
-    typename VertexId, typename SizeT, typename Value, typename Problem> //typename _LabelT = VertexId >
+    typename VertexId, typename SizeT, typename Value, typename Problem> //, typename _LabelT = VertexId >
 struct PRFunctor
 {
     typedef typename Problem::DataSlice DataSlice;
@@ -181,14 +181,14 @@ struct PRFunctor
         //VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
         //VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        Value add_value = d_data_slice -> rank_curr[s_id] / d_data_slice->degrees[s_id];
+        Value add_value = d_data_slice -> rank_curr[s_id];// / d_data_slice->degrees[s_id];
         if (isfinite(add_value))
         {
             Value old_value = atomicAdd(d_data_slice->rank_next + d_id, add_value);
-            //printf("%d\t (%d, %d) rank_next[%d] += rank_curr[%d] (=%.8le) / %lld, old_value = %.8le\n",
+            //printf("%d\t (%d, %d) rank_next[%d] += rank_curr[%d] (=%.8le), old_value = %.8le\n",
             //    d_data_slice -> gpu_idx, blockIdx.x, threadIdx.x,
             //    d_id, s_id, d_data_slice -> rank_curr[s_id],
-            //    (long long) d_data_slice -> degrees[s_id], old_value);
+            //    old_value);
             //if (to_track(d_id))
             //{
             //}
@@ -220,129 +220,17 @@ struct PRFunctor
     {
         Value    old_value = d_data_slice -> rank_curr[node];
         Value    new_value = d_data_slice -> delta * d_data_slice -> rank_next[node];
-        if (!isfinite(new_value))
-            new_value = 0;
         new_value = d_data_slice -> reset_value + new_value;
+        if (d_data_slice -> degrees[node] != 0)
+            new_value /= d_data_slice -> degrees[node];
+        if (!isfinite(new_value)) new_value = 0;
         d_data_slice -> rank_curr[node] = new_value;
+        //printf("%d\t (%d, %d) rank_curr[%d] = (%.8le * %.8le + %.8le) / %d = %.8le, old_value = %.8le\n",
+        //    d_data_slice -> gpu_idx, blockIdx.x, threadIdx.x,
+        //    node, d_data_slice -> delta, d_data_slice -> rank_next[node],
+        //    d_data_slice -> reset_value, d_data_slice -> degrees[node],
+        //    new_value, old_value);
         return (fabs(new_value - old_value) > (d_data_slice->threshold * old_value));
-    }
-
-    /**
-     * @brief Vertex mapping apply function. Doing nothing for PR problem.
-     *
-     * @param[in] node Vertex identifier.
-     * @param[in] problem Data slice object.
-     * @param[in] v auxiliary value.
-     * @param[in] nid Vertex index.
-     *
-     */
-    static __device__ __forceinline__ void ApplyFilter(
-        VertexId   v,
-        VertexId   node,
-        DataSlice *d_data_slice,
-        SizeT      nid  ,
-        LabelT     label,
-        SizeT      input_pos,
-        SizeT      output_pos)
-        //VertexId node, DataSlice *d_data_slice, Value v = 0, SizeT nid = 0)
-    {
-        // Doing nothing here
-    }
-};
-
-/**
- * @brief Structure contains device functions to remove zero degree node
- *
- * @tparam VertexId    Type of signed integer to use as vertex identifier.
- * @tparam SizeT       Type of unsigned integer to use for array indexing.
- * @tparam Value       Type of float or double to use for computed values.
- * @tparam ProblemData Problem data type which contains data slice for problem.
- *
- */
-template <
-    typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId >
-struct RemoveZeroDegreeNodeFunctor
-{
-    typedef typename Problem::DataSlice DataSlice;
-    typedef _LabelT  LabelT;
-    /**
-     * @brief Forward Edge Mapping condition function. Check if the destination node
-     * has been claimed as someone else's child.
-     *
-     * @param[in] s_id Vertex Id of the edge source node
-     * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
-     *
-     * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
-     */
-    static __device__ __forceinline__ bool CondEdge(
-        VertexId   s_id,
-        VertexId   d_id,
-        DataSlice *d_data_slice,
-        SizeT      edge_id,
-        VertexId   input_item,
-        LabelT     label,
-        SizeT      input_pos,
-        SizeT     &output_pos)
-        //VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
-        //VertexId e_id = 0, VertexId e_id_in = 0)
-    {
-        return (d_data_slice->degrees[d_id] == 0);
-    }
-
-    /**
-     * @brief Forward Edge Mapping apply function. Now we know the source node
-     * has succeeded in claiming child, so it is safe to set label to its child
-     * node (destination node).
-     *
-     * @param[in] s_id Vertex Id of the edge source node
-     * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
-     *
-     */
-    static __device__ __forceinline__ void ApplyEdge(
-        VertexId   s_id,
-        VertexId   d_id,
-        DataSlice *d_data_slice,
-        SizeT      edge_id,
-        VertexId   input_item,
-        LabelT     label,
-        SizeT      input_pos,
-        SizeT     &output_pos)
-        //VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
-        //VertexId e_id = 0, VertexId e_id_in = 0)
-    {
-        atomicAdd(d_data_slice -> degrees_pong + s_id, -1);
-    }
-
-    /**
-     * @brief Vertex mapping condition function. Check if the Vertex Id is valid (not equal to -1).
-     *
-     * @param[in] node Vertex identifier.
-     * @param[in] problem Data slice object.
-     * @param[in] v auxiliary value.
-     *
-     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
-     */
-    static __device__ __forceinline__ bool CondFilter(
-        VertexId   v,
-        VertexId   node,
-        DataSlice *d_data_slice,
-        SizeT      nid  ,
-        LabelT     label,
-        SizeT      input_pos,
-        SizeT      output_pos)
-        //VertexId node, DataSlice *d_data_slice, Value v = 0)
-    {
-        //SizeT degree = problem->degrees[node];
-        //if (degree == 0)
-        //    problem -> degrees_pong[node] = -1;
-        //return (degree > 0);
-        return (d_data_slice->degrees[node] > 0);
     }
 
     /**
