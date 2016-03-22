@@ -146,9 +146,12 @@ public:
         typedef PruneFunctor        <VertexId, SizeT, Value, Problem> PruneFunctor;
         typedef LabelEdgeFunctor    <VertexId, SizeT, Value, Problem> LabelEdgeFunctor;
         typedef CollectFunctor      <VertexId, SizeT, Value, Problem> CollectFunctor;
-        typedef typename Problem::DataSlice                  DataSlice;
+        typedef MarkEdgeFunctor     <VertexId, SizeT, Value, Problem> MarkEdgeFunctor;
+        typedef CollectIDFunctor    <VertexId, SizeT, Value, Problem> CollectIDFunctor;
+
         typedef util::DoubleBuffer  <VertexId, SizeT, Value> Frontier;
         typedef GraphSlice          <VertexId, SizeT, Value> GraphSliceT;
+        typedef typename Problem::DataSlice                  DataSlice;
 
         Problem      *problem            = this -> problem;
         EnactorStats *statistics         = &this->enactor_stats     [0];
@@ -169,9 +172,9 @@ public:
         // debug configurations
         //SizeT         num_edges_origin = graph_slice->edges;
         bool          debug_info         = 0;   // used for debug purpose
+	SizeT         iterations = 1;
         //int           tmp_select          = 0; // used for debug purpose
         //int           tmp_length          = 0; // used for debug purpose
-        unsigned int   *num_selected     = new unsigned int; // used in cub select
 
         if (retval = data_slice -> scanned_edges[0].EnsureSize(edges))
             return retval;
@@ -183,13 +186,27 @@ public:
                 statistics->iteration+1,
                 (long long)nodes,
                 (long long)edges);
-            printf(":: initial read in row_offsets ::");
+           /* printf(":: initial read in row_offsets ::");
             util::DisplayDeviceResults(
                 graph_slice->row_offsets.GetPointer(util::DEVICE),
-                graph_slice->nodes + 1);
+                graph_slice->nodes + 1);*/
         }
+/*
+	if(debug_info)
+	util::debug_before_init<<<128,128,0,stream>>>(
+	    data_slice->froms_data.GetPointer(util::DEVICE),
+	    data_slice->tos_data.GetPointer(util::DEVICE),
+	    data_slice->edges_data/2);
+*/
+	// Initialize d_data_row to point to graph_slice->row_offsets
+        //if(data_slice -> d_data_row.GetPointer(util::DEVICE)==NULL)
+	//    if(retval = data_slice -> d_data_row.SetPointer
+	//	(graph_slice -> row_offsets.GetPointer(util::DEVICE),
+	//					nodes+1, util::DEVICE))
+	//	return retval;
+
         // Iterate SMInitFunctor and UpdateDegreeFunctor for two iterations
-        for(int i=0; i<2; i++)
+        for(int i=0; i<iterations; i++)
         {
             ///////////////////////////////////////////////////////////////////////////
             // Initial filtering based on node labels and degrees 
@@ -199,9 +216,10 @@ public:
             attributes->queue_length = graph_slice->nodes;
             attributes->queue_reset  = true;
 
+	    // froms marks if each data node is a candidate of any query node
             util::MemsetKernel<<<128, 128, 0, stream>>>(
                 data_slice -> froms.GetPointer(util::DEVICE),
-                (VertexId)0, nodes);
+                (unsigned long long)0, nodes);
 
             gunrock::oprtr::filter::LaunchKernel
                 <FilterKernelPolicy, Problem, SMInitFunctor>(
@@ -230,7 +248,7 @@ public:
                     return retval;
             }
 
-            if (i!=1)
+            if (i!=iterations-1)
             { //Last round doesn't need the following functor
                 ///////////////////////////////////////////////////////////////////////////
                 // Update each candidate node's valid degree by checking their neighbors
@@ -327,13 +345,15 @@ public:
             context);
         */
 
-	util::MemsetKernel<<<128,128,0,stream>>>(
-	    data_slice->d_data_degrees.GetPointer(util::DEVICE),
-	    0, data_slice->nodes_data * data_slice->nodes_query);
+
 
         // Run prune functor for several iterations
-        for(int i=0; i<2; i++)
+        for(int i=0; i<iterations; i++)
         {
+	    // d_data_degrees is used to store # of unique candidate neighbors
+	    util::MemsetKernel<<<128,128,0,stream>>>(
+	    data_slice->d_data_degrees.GetPointer(util::DEVICE),
+	    (unsigned long long)0, data_slice->nodes_data * data_slice->nodes_query);
             ///////////////////////////////////////////////////////////////////////////
             // Prune out candidates by checking candidate neighbors 
             attributes->queue_index  = 0;
@@ -371,19 +391,20 @@ public:
                 "Prune Functor Advance::LaunchKernel failed", __FILE__, __LINE__))
                 return retval;
             }
-	    }
+	} // end of prune
+
 	    if(debug_info)
 	    util::debug_init<<<128,128, 0, stream>>>(
 	        data_slice ->d_c_set.GetPointer(util::DEVICE),
 	        data_slice ->nodes_query,
 	        data_slice ->nodes_data);
 
-        // Put the candidate index of each candidate edge into d_temp_keys at its e_id position
-        // Fill the non-candidate edge positions with 0 in d_temp_keys
-        //////////////////////////////////////////////////////////////////////////////////////
+//=========================================================================
+//############
+        // d_data_degrees marks if an edge is a candidate or not
 	util::MemsetKernel<<<128,128, 0, stream>>>(
-	    data_slice -> froms.GetPointer(util::DEVICE),
-	    0, edges);
+	    data_slice -> d_data_degrees.GetPointer(util::DEVICE),
+	    (unsigned long long)0, edges);
 
         attributes->queue_index  = 0;
         attributes->selector    = 0;
@@ -391,7 +412,7 @@ public:
         attributes->queue_reset  = true;
 
 	    gunrock::oprtr::advance:: LaunchKernel
-            <AdvanceKernelPolicy, Problem, LabelEdgeFunctor>(
+            <AdvanceKernelPolicy, Problem, MarkEdgeFunctor>(
             statistics[0],
             attributes[0],
             d_data_slice,
@@ -415,68 +436,42 @@ public:
             gunrock::oprtr::advance::V2V);
 
         if (debug_info)
-        {
             if (retval = util::GRError(cudaStreamSynchronize(stream),
-                "Label Edge Functor Advance::LaunchKernel failed", __FILE__, __LINE__)) 
+                "Mark Edge Functor Advance::LaunchKernel failed", __FILE__, __LINE__)) 
             return retval;
-        }
-	if(debug_info)
+
+/*	if(debug_info)
+	{
+printf("==========debug_label1==================\n");
         util::debug_label<<<128, 128, 0, stream>>>(
-            data_slice -> froms.GetPointer(util::DEVICE),
+            data_slice -> d_data_degrees.GetPointer(util::DEVICE),
             data_slice -> edges_data);
-
-        // Use d_query_col to store the number of candidate edges for each query edge
-        util::MemsetKernel<<<128, 128, 0, stream>>>(
-            data_slice -> d_query_col.GetPointer(util::DEVICE), 
-            0, data_slice -> edges_query);
-
+	}*/
+	// collect all candidate edges together
+        Scan<mgpu::MgpuScanTypeInc>(
+            (unsigned long long*)data_slice -> d_data_degrees.GetPointer(util::DEVICE),
+            data_slice -> edges_data, 
+            (unsigned long long)0, mgpu::plus<unsigned long long>(), (unsigned long long*)NULL, (unsigned long long*)NULL,
+            (unsigned long long*)data_slice -> d_data_degrees.GetPointer(util::DEVICE), 
+            context[0]);
+	
 	util::MemsetKernel<<<128,128, 0, stream>>>(
 	    data_slice -> froms_data.GetPointer(util::DEVICE), 0, 
-		(data_slice -> edges_data/2 * data_slice->edges_query));
+		(data_slice -> edges_data/2 ));
 
 	util::MemsetKernel<<<128,128, 0, stream>>>(
 	    data_slice -> tos_data.GetPointer(util::DEVICE), 0, 
-		(data_slice -> edges_query * data_slice -> edges_data/2));
+		(data_slice -> edges_data/2));
 
-        // collect candidate edges for each query edge
-        for(SizeT i=0; i< data_slice -> edges_query; i++)
-        {
-            // Use d_data_degrees as flags of edge labels, initialized to 0
-            util::MemsetKernel<<<128, 128, 0, stream>>>(
-                data_slice -> d_data_degrees.GetPointer(util::DEVICE), 
-                (SizeT)0, edges);
-
-            // Mark the candidate edges for each query edge and store in d_data_degrees
-            util::Mark<<<128, 128, 0, stream>>>(
-                data_slice -> edges_data,
-                data_slice -> froms.GetPointer(util::DEVICE),
-                data_slice -> d_data_degrees.GetPointer(util::DEVICE));
-        
-            Scan<mgpu::MgpuScanTypeInc>(
-                (int*)data_slice -> d_data_degrees.GetPointer(util::DEVICE),
-                data_slice -> edges_data, 
-                (int)0, mgpu::plus<int>(), (int*)NULL, (int*)NULL,
-                (int*)data_slice -> d_data_degrees.GetPointer(util::DEVICE), 
-                context[0]);
-
-            // update the number of candidate edges for each query edge in d_query_col
-            util::Update<<<128, 128, 0, stream>>>(
-                i,
-                data_slice -> edges_query,
-                data_slice -> edges_data,
-                data_slice -> d_data_degrees.GetPointer(util::DEVICE),
-                data_slice -> froms.GetPointer(util::DEVICE),
-                data_slice -> d_query_col.GetPointer(util::DEVICE));
-
-            //////////////////////////////////////////////////////////////////////////////////////
-            // Collect candidate edges for each query edge using CollectFunctor
+        //////////////////////////////////////////////////////////////////////////////////////
+        // Collect candidate edges in froms_data, tos_data  using CollectIDFunctor
             attributes -> queue_reset  = false;
             attributes -> queue_length = edges;
             attributes -> queue_index  = 0;
             attributes -> selector     = 0;
 
             gunrock::oprtr::advance::LaunchKernel
-                <AdvanceKernelPolicy, Problem, CollectFunctor>(
+                <AdvanceKernelPolicy, Problem, CollectIDFunctor>(
                 statistics[0],
                 attributes[0],
                 d_data_slice,
@@ -499,28 +494,80 @@ public:
                 stream,
                 gunrock::oprtr::advance::V2V);
 
-	        if (debug_info)
-                {
-                    if (retval = util::GRError(cudaStreamSynchronize(stream),
-                    	"Collect Functor Advance::LaunchKernel failed", __FILE__, __LINE__))
-                    	return retval;
+            // froms stores the flags of candidate edges
+	    util::MemsetKernel<<<128,128, 0, stream>>>(
+	    	data_slice -> froms.GetPointer(util::DEVICE),
+	    	(unsigned long long)0, data_slice -> edges_query * edges/2);
 
-	            util::debug<<<128,128, 0, stream>>>(
-                    i,
+	    // Label candidate edges for each query edge
+	    util::Label<<<128,128,0,stream>>>(
+	        data_slice -> froms_data    .GetPointer(util::DEVICE),
+	    	data_slice -> tos_data      .GetPointer(util::DEVICE),
+	    	data_slice -> froms_query   .GetPointer(util::DEVICE),
+	    	data_slice -> tos_query     .GetPointer(util::DEVICE),
+	    	data_slice -> d_c_set       .GetPointer(util::DEVICE),
+	    	data_slice -> d_data_degrees.GetPointer(util::DEVICE),
+	    	data_slice -> froms         .GetPointer(util::DEVICE),//label results
+	    	data_slice -> edges_data,
+	    	data_slice -> nodes_data,
+	    	data_slice -> edges_query);
+
+
+/*	    if(debug_info)
+	    {
+printf("==========debug_label2==================\n");
+            util::debug_label<<<128, 128, 0, stream>>>(
+            	data_slice -> froms.GetPointer(util::DEVICE),
+            	data_slice -> edges_data/2);
+	    }*/
+            util::MemsetKernel<<<128, 128, 0, stream>>>(
+            	data_slice -> d_query_col.GetPointer(util::DEVICE), 
+            	0, data_slice -> edges_query);
+
+	    util::MemsetKernel<<<128,128, 0, stream>>>(
+	    	data_slice -> d_data_degrees.GetPointer(util::DEVICE),
+	    	(unsigned long long)0, data_slice -> edges_data/2 * data_slice -> edges_query);
+
+		if(debug_info)
+	        util::debug_before_select<<<128,128,0,stream>>>(
+		data_slice -> froms.GetPointer(util::DEVICE),
+                data_slice -> edges_data/2 * data_slice -> edges_query);
+
+       	  //  bool* d_in = NULL; 
+	    util::CUBSelect_flagged<VertexId, unsigned long long, SizeT, unsigned long long>(
+		data_slice -> d_in.GetPointer(util::DEVICE),
+                data_slice -> froms         .GetPointer(util::DEVICE),
+                data_slice -> d_data_degrees.GetPointer(util::DEVICE), //store middle results
+                data_slice -> d_query_col   .GetPointer(util::DEVICE), // d_query_col[0]
+		data_slice -> edges_query * data_slice -> edges_data/2);
+
+		if(debug_info)
+	        util::debug_select<<<128,128,0,stream>>>(
+		data_slice -> d_data_degrees.GetPointer(util::DEVICE),
+                data_slice -> d_query_col   .GetPointer(util::DEVICE));
+
+	    util::Update1<<<128, 128, 0, stream>>>(
+                data_slice -> d_data_degrees.GetPointer(util::DEVICE), //store middle results
+                data_slice -> d_query_col   .GetPointer(util::DEVICE), // d_query_col[0]
+		data_slice -> edges_data/2);
+
+	    util::Update2<<<128, 128, 0, stream>>>(
+                data_slice -> d_data_degrees.GetPointer(util::DEVICE), //store middle results
+                data_slice -> d_query_col   .GetPointer(util::DEVICE), // d_query_col[0]
+		data_slice -> edges_query,
+		data_slice -> edges_data/2);
+
+	   // if (debug_info)
+	        util::debug<<<128,128, 0, stream>>>(
                     data_slice -> froms_data    .GetPointer(util::DEVICE), 
                     data_slice -> tos_data      .GetPointer(util::DEVICE), 
                     data_slice -> froms_query   .GetPointer(util::DEVICE), 
                     data_slice -> tos_query     .GetPointer(util::DEVICE), 
+                    data_slice -> d_data_degrees.GetPointer(util::DEVICE), 
                     data_slice -> d_query_col   .GetPointer(util::DEVICE), 
                     data_slice -> edges_query, 
                     data_slice -> edges_data);
 
-                    if (retval = util::GRError(cudaStreamSynchronize(stream),
-                    	"Debug failed", __FILE__, __LINE__)) 
-                    	return retval;
-
-	        }
-        }  //end of edge collection
 
         //Joining step
 	    // Use d_query_row[0] to store the number of matched subgraphs in each join step
@@ -529,118 +576,97 @@ public:
 	        data_slice -> d_query_row.GetPointer(util::DEVICE), (SizeT)0, 
 		data_slice -> nodes_query + 1);
 
-	    util::MemsetKernel<<<128,128,0,stream>>>(
-	        data_slice -> froms.GetPointer(util::DEVICE), -1, 
-		data_slice -> nodes_data * data_slice -> nodes_data *
-		data_slice -> edges_query);
-
-	    util::MemsetKernel<<<128,128,0,stream>>>(
-	        data_slice -> tos.GetPointer(util::DEVICE), -1, 
-		data_slice -> nodes_data * data_slice -> nodes_data *
-		data_slice -> edges_query);
-
+	    // join start from the second query edge
 	    for(SizeT i=0; i< data_slice -> edges_query-1; i++)
-        {
-            // Use d_data_degrees as flags of success join, initialized to 0
-            util::MemsetKernel<<<128,128,0,stream>>>(
-                data_slice -> d_c_set.GetPointer(util::DEVICE), 
-                false, 
-		data_slice -> nodes_data * data_slice -> nodes_data * 
-		data_slice -> edges_data/2);
-
-            /////////////////////////////////////////////////////////
-            // Kernel Join
-            util::Join<<<128,128,0,stream>>>(
-                data_slice -> edges_query,
-                i,
-                data_slice -> d_query_col   .GetPointer(util::DEVICE),
-                data_slice -> d_query_row   .GetPointer(util::DEVICE),
-                data_slice -> d_c_set       .GetPointer(util::DEVICE),
-                data_slice -> flag          .GetPointer(util::DEVICE),
-                data_slice -> froms_data    .GetPointer(util::DEVICE),
-                data_slice -> tos_data      .GetPointer(util::DEVICE),
-                data_slice -> froms         .GetPointer(util::DEVICE),
-                data_slice -> tos           .GetPointer(util::DEVICE));
-
-       	    if (debug_info)
             {
-                if (retval = util::GRError(cudaStreamSynchronize(stream),
-                    "Join Kernel failed", __FILE__, __LINE__))
-                    return retval;
-            }
-
-	    if (debug_info == 1 && i==0)
-            util::debug_0<<<128,128,0,stream>>>(
-	            data_slice -> d_c_set.GetPointer(util::DEVICE),
-	            data_slice -> d_query_col.GetPointer(util::DEVICE),
-	            data_slice -> d_query_row.GetPointer(util::DEVICE),
-	            data_slice -> froms_data.GetPointer(util::DEVICE),
-	            data_slice -> tos_data.GetPointer(util::DEVICE),
-	            data_slice -> edges_data,
-		    i);
-            	
-           /* Scan<mgpu::MgpuScanTypeInc>(
-                data_slice -> data_degrees.GetPointer(util::DEVICE),
-                3000, 
-                (SizeT)0, mgpu::plus<SizeT>(), (SizeT*)NULL, (SizeT*)NULL,
-                data_slice -> data_degrees.GetPointer(util::DEVICE), 
-                context[0]);*/
-
+                // Use d_c_set as flags of success join, initialized to 0
                 util::MemsetKernel<<<128,128,0,stream>>>(
-                data_slice -> d_data_degrees.GetPointer(util::DEVICE), 0,
-			    data_slice ->nodes_data * data_slice ->nodes_data);
+                    data_slice -> d_c_set.GetPointer(util::DEVICE), 
+                    false, 
+		    data_slice -> nodes_data * data_slice -> nodes_data * 
+		    data_slice -> edges_data/2);
 
-		util::MemsetIdxKernel<<<128,128, 0, stream>>>(
-		data_slice -> d_in.GetPointer(util::DEVICE),
-		data_slice -> nodes_data * data_slice -> nodes_data *
-		data_slice -> edges_data / 2);
+                /////////////////////////////////////////////////////////
+                // Kernel Join
+                util::Join<<<128,128,0,stream>>>(
+                    data_slice -> edges_data/2,
+                    i,
+                    data_slice -> d_query_col   .GetPointer(util::DEVICE),
+                    data_slice -> d_query_row   .GetPointer(util::DEVICE),
+                    data_slice -> d_c_set       .GetPointer(util::DEVICE),
+                    data_slice -> flag          .GetPointer(util::DEVICE),
+                    data_slice -> froms_data    .GetPointer(util::DEVICE),
+                    data_slice -> tos_data      .GetPointer(util::DEVICE),
+                    data_slice -> d_data_degrees.GetPointer(util::DEVICE));// stores the candidate ids
 
-	        util::CUBSelect_flagged<VertexId, SizeT, SizeT, bool>(
+       	        if (debug_info)
+                {
+                    if (retval = util::GRError(cudaStreamSynchronize(stream),
+                       "Join Kernel failed", __FILE__, __LINE__))
+                       return retval;
+                }
+
+	        util::MemsetKernel<<<128,128,0,stream>>>(
+	            data_slice -> froms .GetPointer(util::DEVICE), (unsigned long long)0, 
+		    data_slice -> nodes_data * data_slice -> nodes_data +
+		    (data_slice -> edges_query-2) * data_slice -> edges_data/2);
+
+		//bool* d_in = NULL;
+	        util::CUBSelect_flagged<VertexId, unsigned long long, SizeT, bool>(
                 data_slice -> d_in.GetPointer(util::DEVICE),
-                data_slice -> d_c_set.GetPointer(util::DEVICE),
-                data_slice -> d_data_degrees.GetPointer(util::DEVICE), 
-                data_slice -> d_query_row.GetPointer(util::DEVICE),
+                data_slice -> d_c_set     .GetPointer(util::DEVICE),
+                data_slice -> froms       .GetPointer(util::DEVICE), 
+                data_slice -> d_query_row .GetPointer(util::DEVICE),
 		data_slice -> nodes_data * data_slice -> nodes_data *
 		data_slice -> edges_data / 2);
 
 		if(debug_info)
 	        util::debug_select<<<128,128,0,stream>>>(
-		i,
-                data_slice -> d_in.GetPointer(util::DEVICE),
-		data_slice -> nodes_data,
-		data_slice -> edges_data,
-                data_slice -> d_c_set.GetPointer(util::DEVICE),
-		data_slice -> d_data_degrees.GetPointer(util::DEVICE),
+		data_slice -> froms      .GetPointer(util::DEVICE),
                 data_slice -> d_query_row.GetPointer(util::DEVICE));
             
 
 	        // Collect the valid joined edges to consecutive places	
  	        util::Collect<<<128,128,0,stream>>>(
                 data_slice -> edges_query,
+                data_slice -> edges_data/2,
 	        i,
                 data_slice -> d_data_degrees.GetPointer(util::DEVICE),
                 data_slice -> froms_data    .GetPointer(util::DEVICE),
                 data_slice -> tos_data      .GetPointer(util::DEVICE),
                 data_slice -> froms         .GetPointer(util::DEVICE),
-                data_slice -> tos           .GetPointer(util::DEVICE),
                 data_slice -> d_query_col   .GetPointer(util::DEVICE),
                 data_slice -> d_query_row   .GetPointer(util::DEVICE));
  
-       	    if (debug_info)
-            {
-                if (retval = util::GRError(cudaStreamSynchronize(stream),
-                    "Collect Kernel failed", __FILE__, __LINE__)) 
-                break;
+       	        if (debug_info)
+                {
+                    if (retval = util::GRError(cudaStreamSynchronize(stream),
+                        "Collect Kernel failed", __FILE__, __LINE__)) 
+                    break;
+                }
+
+	        if (i != data_slice -> edges_query-2) 
+		{
+		    if(retval = util::GRError(cudaMemcpy(
+			data_slice -> d_data_degrees.GetPointer(util::DEVICE),
+			data_slice -> froms         .GetPointer(util::DEVICE),
+			(data_slice -> nodes_data * data_slice -> nodes_data +
+			(data_slice -> edges_query-2) * data_slice -> edges_data/2) * 
+			sizeof(unsigned long long),
+			cudaMemcpyDeviceToDevice),
+			"SMProblem cudaMemcpy froms to d_data_degrees failed", __FILE__, __LINE__))
+			return retval;
+		}
             }
-        }
 
 	    if(debug_info)
 	        util::debug_1<<<128,128,0,stream>>>(
 	            data_slice -> froms         .GetPointer(util::DEVICE),
-	            data_slice -> tos           .GetPointer(util::DEVICE),
-	            data_slice -> d_data_degrees.GetPointer(util::DEVICE),
+                    data_slice -> froms_data    .GetPointer(util::DEVICE),
+                    data_slice -> tos_data      .GetPointer(util::DEVICE),
 	            data_slice -> d_query_col   .GetPointer(util::DEVICE),
 	            data_slice -> d_query_row   .GetPointer(util::DEVICE),
+                    data_slice -> edges_data/2,
 	            data_slice -> edges_query);
 
         return retval;

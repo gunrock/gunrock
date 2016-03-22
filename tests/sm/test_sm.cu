@@ -101,8 +101,7 @@ template<typename VertexId, typename SizeT, typename Value>
 void DisplaySolution(
     const Csr<VertexId, SizeT, Value> &graph_query,
     const Csr<VertexId, SizeT, Value> &graph_data,
-    VertexId *h_froms,
-    VertexId *h_tos,
+    unsigned long long *h_froms,
     SizeT num_matches)
 {
     // TODO(developer): code to print out results
@@ -185,7 +184,6 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
             Problem;
     typedef SMEnactor <Problem>
             Enactor;
-
     Csr<VertexId, SizeT, Value> *graph_query = info->csr_query_ptr;
     Csr<VertexId, SizeT, Value> *graph_data  = info->csr_data_ptr;
     int      max_grid_size         = info->info["max_grid_size"     ].get_int  (); 
@@ -216,8 +214,9 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     cudaStream_t *streams = (cudaStream_t*)info->streams;
 
     // host results spaces
-    VertexId *h_froms = new VertexId[graph_data->nodes*graph_data->nodes*graph_query->edges/2];
-    VertexId *h_tos = new VertexId[graph_data->nodes*graph_data->nodes*graph_query->edges/2];
+    unsigned long long *h_froms = new unsigned long long[graph_data -> nodes * graph_data -> nodes
+							+ (graph_query -> edges/2 - 2) *
+							graph_data -> edges/2];
 
     // allocate problem on GPU create a pointer of the SMProblem type
     Problem * problem = new Problem(true);
@@ -236,7 +235,6 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         partition_factor,
         partition_seed),
         "Problem SM Initialization Failed", __FILE__, __LINE__);
-
     // allocate SM enactor map
     // allocate primitive enactor map
     Enactor *enactor = new Enactor(
@@ -279,7 +277,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     // copy results back to CPU from GPU using Extract
-    util::GRError(problem->Extract(h_froms, h_tos),
+    util::GRError(problem->Extract(h_froms),
           "SM Problem Data Extraction Failed", __FILE__, __LINE__);
     SizeT num_matches_gpu = problem->data_slices[0]->num_matches;
 
@@ -292,7 +290,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
 	    {
             if (!quiet_mode) 
                 DisplaySolution(
-                    *graph_query, *graph_data, h_froms, h_tos, num_matches_cpu);
+                    *graph_query, *graph_data, h_froms, num_matches_cpu);
             if (!quiet_mode) { printf("\nCORRECT.\n"); }
 
         } else {
@@ -309,12 +307,11 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
 
     info->ComputeCommonStats(
         enactor -> enactor_stats.GetPointer(), elapsed_gpu, (VertexId*) NULL);
-
+//cudaDeviceReset();
     // clean up if necessary
-    if (problem) delete   problem;
-    if (enactor) delete   enactor;
-    if (h_froms) delete[] h_froms;
-    if (h_tos)   delete[] h_tos;
+    if (problem) {delete   problem; problem = NULL;}
+    if (enactor) {delete   enactor; enactor = NULL;}
+    if (h_froms) {delete[] h_froms; h_froms = NULL;}
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
 }
@@ -345,8 +342,8 @@ int main_(CommandLineArgs *args, int graph_args)
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
-    graphio::RemoveStandaloneNodes<VertexId, SizeT, Value>(
-        &csr_data, args -> CheckCmdLineFlag("quite"));
+//    graphio::RemoveStandaloneNodes<VertexId, SizeT, Value>(
+//        &csr_data, args -> CheckCmdLineFlag("quite"));
 
     RunTests<VertexId, SizeT, Value>(info);  // run test
 
@@ -368,7 +365,7 @@ template <
 int main_Value(CommandLineArgs *args, int graph_args)
 {
     if (args -> CheckCmdLineFlag("64bit-Value"))
-        return main_<VertexId, SizeT, long long>(args, graph_args);
+        return main_<VertexId, SizeT, unsigned long long>(args, graph_args);
     else
         return main_<VertexId, SizeT, int      >(args, graph_args);
 }
@@ -402,7 +399,6 @@ int main(int argc, char** argv)
         Usage();
         return 1;
     }
-
     return main_VertexId(&args, graph_args);
 }
 

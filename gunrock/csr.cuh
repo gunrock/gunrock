@@ -791,7 +791,7 @@ struct Csr
      * 
      * @param[in] node_degrees node degrees to fill in
      */
-    void GetNodeDegree(SizeT *node_degrees)
+    void GetNodeDegree(unsigned long long *node_degrees)
     {
 	for(SizeT node=0; node < nodes; ++node)
 	{

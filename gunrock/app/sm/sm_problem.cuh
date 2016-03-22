@@ -66,17 +66,18 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
         //util::Array1D<SizeT, VertexId   > d_data_labels;   /** < Used for data graph labels */
         util::Array1D<SizeT, SizeT   > d_query_row;     /** < Used for query row offsets     */
         util::Array1D<SizeT, SizeT   > d_query_col;     /** < Used for query column indices  */ 
+       // util::Array1D<SizeT, SizeT   > d_data_row;     /** < Used for query row offsets     */
         //util::Array1D<SizeT, Value   > edge_weights;   /** < Used for storing query edge weights  */
-        util::Array1D<SizeT, SizeT   > d_data_degrees;  /** < Used for input data graph degrees */
-        //util::Array1D<SizeT, SizeT   > d_query_degrees; /** < Used for input query graph degrees */
-        util::Array1D<SizeT, bool   > d_c_set;         /** < Used for candidate set boolean matrix */
+        util::Array1D<SizeT, unsigned long long > d_data_degrees;  /** < Used for input data graph degrees */
+       // util::Array1D<SizeT, SizeT   > d_query_degrees; /** < Used for input query graph degrees */
+        util::Array1D<SizeT, bool    > d_c_set;         /** < Used for candidate set boolean matrix */
         util::Array1D<SizeT, VertexId> froms_query;   /** < query graph edge list: source vertex */
         util::Array1D<SizeT, VertexId> tos_query;     /** < query graph edge list: dest vertex */
         util::Array1D<SizeT, VertexId> froms_data;    /** < data graph edge list: source vertex */
         util::Array1D<SizeT, VertexId> tos_data;      /** < data graph edge list: dest vertex */
         util::Array1D<SizeT, VertexId> flag;          /** < query graph intersection node between edges */
-        util::Array1D<SizeT, VertexId> froms;         /** < output graph edge list: source vertex */
-        util::Array1D<SizeT, VertexId> tos;           /** < output graph edge list: dest vertex */
+        util::Array1D<SizeT, unsigned long long > froms;         /** < output graph edge list: source vertex */
+//        util::Array1D<SizeT, VertexId> tos;           /** < output graph edge list: dest vertex */
 	util::Array1D<SizeT, VertexId> d_in; /**< output graph edge list: dest vertex */
         SizeT    nodes_data;       /** < Used for number of data nodes  */
         SizeT	 nodes_query;      /** < Used for number of query nodes */
@@ -94,6 +95,7 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             //d_data_labels	    .SetName("d_data_labels");
             d_query_row     .SetName("d_query_row");
             d_query_col     .SetName("d_query_col");
+           // d_data_row     .SetName("d_data_row");
             //d_edge_weights.SetName("d_edge_weights");
             d_data_degrees  .SetName("d_data_degrees");
             //d_query_degrees.SetName("d_query_degrees");
@@ -104,8 +106,8 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             tos_data        .SetName("tos_data");
             flag            .SetName("flag");
             froms           .SetName("froms");
-            tos             .SetName("tos");
-	    d_in		.SetName("d_in");
+//            tos             .SetName("tos");
+	    d_in	    .SetName("d_in");
             nodes_data		= 0;
             nodes_query		= 0;	   
             edges_data 		= 0;
@@ -134,7 +136,7 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             tos_query         .Release();
             flag              .Release();
             froms             .Release();
-            tos               .Release();
+//            tos               .Release();
 	    d_in	      .Release();
         }
 
@@ -166,53 +168,75 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             //    return retval;
             //if(retval = d_data_labels  .Allocate(graph_data  -> nodes, util::DEVICE)) 
             //    return retval;
-            if(retval = d_query_row  .Allocate(graph_query -> nodes+1, util::DEVICE)) 
+            if(retval = d_query_row    .Allocate(graph_query -> nodes+1, util::DEVICE)) 
                 return retval;
-            if(retval = d_query_col  .Allocate(graph_query -> edges, util::DEVICE)) 
+            if(retval = d_query_col    .Allocate(graph_query -> edges, util::DEVICE)) 
                 return retval;
             //if(retval = data_slices[gpu]->d_edge_weights.Allocate(edges_query, util::DEVICE)) 
             //	return retval;
-            if(retval = d_c_set      .Allocate(graph_data -> nodes * graph_data -> nodes 
+            if(retval = d_c_set        .Allocate(graph_data -> nodes * graph_data -> nodes 
 						* graph_data -> edges /2, util::DEVICE))
                 return retval;
-            //if(retval = d_query_degrees.Allocate(graph_query -> nodes, util::DEVICE)) 
-            //    return retval;
-            if(retval = d_data_degrees .Allocate(graph_data -> nodes * graph_data -> nodes,  
-							util::DEVICE)) 
+//            if(retval = d_query_degrees.Allocate(graph_query -> nodes, util::DEVICE)) 
+//                return retval;
+            if(retval = d_data_degrees .Allocate(graph_data -> nodes* graph_data -> nodes  
+						+ (graph_query -> edges/2 - 2) *
+						graph_data -> edges/2, util::DEVICE)) 
                 return retval;
-            if(retval = froms_query  .Allocate(graph_query -> edges/2, util::HOST | util::DEVICE)) 
+            if(retval = froms_query    .Allocate(graph_query -> edges/2, util::HOST | util::DEVICE)) 
                 return retval;
-            if(retval = tos_query    .Allocate(graph_query -> edges/2, util::HOST | util::DEVICE)) 
+            if(retval = tos_query      .Allocate(graph_query -> edges/2, util::HOST | util::DEVICE)) 
                 return retval;
-            if(retval = froms_data   .Allocate(graph_data  -> edges * graph_query -> edges/4, util::DEVICE)) 
+            if(retval = froms_data     .Allocate(graph_data  -> edges/2, util::DEVICE)) 
                 return retval;
-            if(retval = tos_data     .Allocate(graph_data  -> edges * graph_query -> edges/4, util::DEVICE)) 
+            if(retval = tos_data       .Allocate(graph_data  -> edges/2, util::DEVICE)) 
                 return retval;
-            if(retval = flag         .Allocate(graph_query -> edges * 2, util::HOST | util::DEVICE)) 
+            if(retval = flag           .Allocate(graph_query -> edges/2 * 
+						(graph_query -> edges/2 -1), 
+						util::HOST | util::DEVICE)) 
                 return retval;
-            if(retval = froms        .Allocate(graph_data -> nodes * graph_data -> nodes
-						* graph_query -> edges /2, util::DEVICE)) 
+            if(retval = froms          .Allocate(graph_data -> nodes * graph_data -> nodes
+						+ (graph_query -> edges/2 - 2) *
+						graph_data -> edges/2, util::DEVICE)) 
                 return retval;
-            if(retval = tos          .Allocate(graph_data -> nodes * graph_data -> nodes
-						* graph_query -> edges /2, util::DEVICE)) 
+            if(retval = d_in           .Allocate(graph_data -> nodes 
+						* graph_data -> nodes * 
+						graph_data -> edges /2, util::DEVICE)) 
                 return retval;
 
-	    if(retval = d_in	     .Allocate(graph_data -> nodes * graph_data -> nodes
-						* graph_data -> edges /2, util::DEVICE))
+            util::MemsetKernel<<<128, 128>>>(
+                froms_data.GetPointer(util::DEVICE),
+                (VertexId)0, graph_data -> edges/2);
+
+            util::MemsetKernel<<<128, 128>>>(
+                tos_data.GetPointer(util::DEVICE),
+                (VertexId)0, graph_data -> edges/2);
+
+	    if(retval = util::GRError(cudaMemcpy(
+		froms_data.GetPointer(util::DEVICE),
+		graph_query->node_values,
+		graph_query->nodes * sizeof(Value),
+		cudaMemcpyHostToDevice),
+		"SMProblem cudaMemcpy froms_data failed", __FILE__, __LINE__))
 		return retval;
- 	    util::MemsetIdxKernel<<<128, 128>>>(
-               	d_in.GetPointer(util::DEVICE), 
-		graph_data -> nodes * graph_data -> nodes * graph_data -> edges / 2);
+
+	    if(retval = util::GRError(cudaMemcpy(
+		tos_data.GetPointer(util::DEVICE),
+		graph_data->node_values,
+		graph_data->nodes * sizeof(Value),
+		cudaMemcpyHostToDevice),
+		"SMProblem cudaMemcpy tos_data failed", __FILE__, __LINE__))
+		return retval;
 
             // Initialize query graph labels by given query_labels
-            froms_data.SetPointer((VertexId*)graph_query -> node_values);
-            if (retval = froms_data.Move(util::HOST, util::DEVICE))
-                return retval;
+//            froms_data.SetPointer((VertexId*)graph_query -> node_values);
+//            if (retval = froms_data.Move(util::HOST, util::DEVICE))
+//                return retval;
 
             // Initialize data graph labels by given data_labels
-            tos_data.SetPointer((VertexId*)graph_data -> node_values);
-            if (retval = tos_data.Move(util::HOST, util::DEVICE))
-                return retval;
+//            tos_data.SetPointer((VertexId*)graph_data -> node_values);
+//            if (retval = tos_data.Move(util::HOST, util::DEVICE))
+//               return retval;
 
             // Initialize query row offsets with graph_query.row_offsets
             d_query_row.SetPointer(graph_query -> row_offsets);
@@ -237,42 +261,25 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             // Initialize intersection flag positions to 0
             util::MemsetKernel<<<128, 128>>>(
                 flag.GetPointer(util::DEVICE),
-                0, 2 * graph_query -> edges);
-
-            // Initialize query graph node degrees
-            SizeT *h_query_degrees = new SizeT[graph_query -> nodes];
-            graph_query -> GetNodeDegree(h_query_degrees);
-            tos.SetPointer(h_query_degrees);
-            if (retval = tos.Move(util::HOST, util::DEVICE))
-                return retval;
+                0, graph_query -> edges/2 * (graph_query -> edges/2 -1));
 
             // Initialize data graph node degrees
-            SizeT *h_data_degrees = new SizeT[graph_data -> nodes * graph_data -> nodes];
+            unsigned long long *h_data_degrees = new unsigned long long[
+		graph_data -> nodes * graph_data -> nodes + 
+		(graph_query -> edges/2-2) * graph_data -> edges/2];
             graph_data -> GetNodeDegree(h_data_degrees);
             d_data_degrees.SetPointer(h_data_degrees);
             if (retval = d_data_degrees.Move(util::HOST, util::DEVICE))
                 return retval;
-/*
-            // Initialize data graph edge list
-            util::MemsetKernel<<<128, 128>>>(
-                froms_data.GetPointer(util::DEVICE),
-                0, graph_query -> edges * graph_data -> edges/4);
-
-            // Initialize data graph edge list
-            util::MemsetKernel<<<128, 128>>>(
-                tos_data.GetPointer(util::DEVICE),
-                0, graph_query -> edges * graph_data -> edges/4);
-*/
             // Initialize result graph edge list
             util::MemsetKernel<<<128, 128>>>(
                 froms.GetPointer(util::DEVICE),
-                0, graph_data -> nodes * graph_query -> edges/2);
+                (unsigned long long)0, graph_data -> nodes * graph_data -> nodes 
+		+(graph_query -> edges/2 - 2)* graph_data -> edges/2);
 
-            // Initialize result graph edge list
-           /* util::MemsetKernel<<<128, 128>>>(
-                tos.GetPointer(util::DEVICE),
-                0, graph_data -> nodes * graph_query -> edges/2);*/
-
+            util::MemsetIdxKernel<<<128, 128>>>(
+                d_in.GetPointer(util::DEVICE), graph_data -> nodes * graph_data -> nodes
+		* graph_data -> edges/2);
             // Construct coo from/to edge list from query graph's row_offsets and column_indices
             // Undirected graph each edge only store the one with from index < to index
             // Store a flag to note the intersections between edges
@@ -287,26 +294,29 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
 		    if(node < graph_query -> column_indices[edge]){
 	             	froms_query[count] = node;
                     	tos_query[count] = graph_query -> column_indices[edge];   
-       	 //printf("edge %d: 	%d -> %d \n", count, node, graph_query.column_indices[edge]);
 			// flag the intersection nodes
-			for(int i=0; i < count; i++){
+			// edges count has 0~count-1 possible intersected edges
+ 			// each edge after edge 0 has (count-1)*2 possible intersection nodes
+			for(int i=0; i < count; i++)
+			{
 			    if(froms_query[count] == froms_query[i])
-				flag[(count-1)*2] = i*2+1;
+				flag[(count-1+i)*2] = i*2+1;
 			    
   			    else if(froms_query[count] == tos_query[i])
-				flag[(count-1)*2] = i*2+2;
+				flag[(count-1+i)*2] = i*2+2;
 			  
 			    if(tos_query[count] == froms_query[i])
-				flag[(count-1)*2+1] = i*2+1;
+				flag[(count-1+i)*2+1] = i*2+1;
 				    
 			    else if(tos_query[count] == tos_query[i])
-				flag[(count-1)*2+1] = i*2+2;
-				    
+				flag[(count-1+i)*2+1] = i*2+2;
 			}
 			count++;
 		    }
+
 	         }
 	    }
+	
 
             if(retval = froms_query.Move(util::HOST, util::DEVICE)) return retval;
             if(retval = tos_query  .Move(util::HOST, util::DEVICE)) return retval;
@@ -321,7 +331,6 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             edges_data   = graph_data  -> edges;
             edges_query  = graph_query -> edges/2;
 
-            if (h_query_degrees) delete[] h_query_degrees;
             if (h_data_degrees) delete[] h_data_degrees;
             
             return retval;
@@ -357,13 +366,13 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = d_c_set.Allocate(nodes*nodes*edges/2,util::DEVICE))
                     return retval;
             
-            //if (query_labels.GetPointer(util::DEVICE) == NULL) 
-            //    if (retval = query_labels.Allocate(nodes_query,util::DEVICE))
-            //        return retval;
+            if (froms_query.GetPointer(util::DEVICE) == NULL) 
+                if (retval = froms_query.Allocate(edges_query, util::DEVICE))
+                    return retval;
 
-            //if (data_labels.GetPointer(util::DEVICE) == NULL) 
-            //    if (retval = data_labels.Allocate(nodes, util::DEVICE))
-            //        return retval;
+            if (tos_query.GetPointer(util::DEVICE) == NULL) 
+                if (retval = tos_query.Allocate(edges_query, util::DEVICE))
+                    return retval;
 
             if (d_query_row.GetPointer(util::DEVICE) == NULL) 
                 if (retval = d_query_row.Allocate(nodes_query+1,util::DEVICE))
@@ -373,33 +382,30 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = d_query_col.Allocate(edges_query,util::DEVICE))
                     return retval;
 
-            //if (query_degrees.GetPointer(util::DEVICE) == NULL) 
-            //    if (retval = query_degrees.Allocate(nodes_query,util::DEVICE))
-            //        return retval;
-
             if (d_data_degrees.GetPointer(util::DEVICE) == NULL)
-                if (retval = d_data_degrees.Allocate(nodes * nodes, util::DEVICE))
+                if (retval = d_data_degrees.Allocate(nodes * nodes * (edges_query-2)* edges/2, 
+			util::DEVICE))
                     return retval;
 
             if (froms_data.GetPointer(util::DEVICE) == NULL) 
-                if (retval = froms_data.Allocate(edges_query * edges/2, util::DEVICE))
+                if (retval = froms_data.Allocate(edges/2, util::DEVICE))
                     return retval;
 
             if (tos_data.GetPointer(util::DEVICE) == NULL) 
-                if (retval = tos_data.Allocate(edges_query * edges/2, util::DEVICE))
+                if (retval = tos_data.Allocate(edges/2, util::DEVICE))
                     return retval;
 
             if (flag.GetPointer(util::DEVICE) == NULL) 
-                if (retval = flag.Allocate(edges_query*nodes_query,util::DEVICE))
+                if (retval = flag.Allocate(edges_query*(edges_query-1),util::DEVICE))
                     return retval;
 
             if (froms.GetPointer(util::DEVICE) == NULL) 
-                if (retval = froms.Allocate(nodes * nodes * edges_query, util::DEVICE))
+                if (retval = froms.Allocate(nodes * nodes+ (edges_query-2)*edges/2, util::DEVICE))
                     return retval;
 
-            if (tos.GetPointer(util::DEVICE) == NULL)
-                if (retval = tos.Allocate(nodes * nodes *edges_query, util::DEVICE))
-                    return retval;
+//            if (tos.GetPointer(util::DEVICE) == NULL)
+//                if (retval = tos.Allocate(edges *edges_query/2, util::DEVICE))
+//                    return retval;
 
             // TODO: code to for other allocations here
 	    util::MemsetKernel<<<128, 128>>>(
@@ -408,12 +414,12 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
 
             util::MemsetKernel<<<128, 128>>>(
                 froms.GetPointer(util::DEVICE),
-                0, nodes * nodes * edges_query/2); 
+                (unsigned long long)0, nodes * nodes); 
 
-            util::MemsetKernel<<<128, 128>>>(
+            /*util::MemsetKernel<<<128, 128>>>(
                 tos.GetPointer(util::DEVICE),
                 0, nodes * nodes * edges_query/2);
-
+		*/
             // Initialize vertex frontier queue used for mappings
             util::MemsetIdxKernel<<<128, 128>>>(
                 this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes);
@@ -492,7 +498,7 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             util::SetDevice(this -> gpu_idx[i]);
             data_slices[i].Release();
         }
-        delete[] data_slices; data_slices = NULL;
+        if(data_slices) {delete[] data_slices; data_slices = NULL;}
     }
 
     /**
@@ -506,7 +512,7 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[out] h_tos
      *\return cudaError_t object indicates the success of all CUDA functions.
      */
-    cudaError_t Extract(VertexId *h_froms, VertexId *h_tos)
+    cudaError_t Extract(unsigned long long *h_froms)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -517,23 +523,19 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = util::SetDevice( this -> gpu_idx[gpu]))
                 return retval;
 
-	        SizeT *num_matches = new SizeT[data_slices[0]->nodes_query+1];
+	    SizeT *num_matches = new SizeT[data_slices[gpu]->nodes_query+1];
 
             data_slices[gpu] -> froms.SetPointer(h_froms);
             if(retval = data_slices[gpu] -> froms.Move(util::DEVICE, util::HOST))
         	    return retval;
-
-            data_slices[gpu] -> tos  .SetPointer(h_tos);
-            if(retval = data_slices[gpu] -> tos  .Move(util::DEVICE, util::HOST))
-			    return retval;
 
             data_slices[gpu] -> d_query_row.SetPointer(num_matches);
             if(retval = data_slices[gpu] -> d_query_row.Move(util::DEVICE, util::HOST))
                 return retval;
 
             // TODO: code to extract other results here
-		    data_slices[gpu] -> num_matches = num_matches[0];
-            delete[] num_matches; num_matches = NULL;
+	    data_slices[gpu] -> num_matches = num_matches[0];
+            if(num_matches) {delete[] num_matches; num_matches = NULL;}
 
         } else {
                 // multi-GPU extension code
@@ -564,8 +566,8 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
         float       partition_factor = -1.0f,
         int         partition_seed   = -1)
     {
-        cudaError_t retval = cudaSuccess;
-        if (retval = BaseProblem::Init(
+
+        BaseProblem::Init(
             stream_from_host,
             graph_data,
             NULL,
@@ -574,8 +576,7 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             partition_method,
             queue_sizing,
             partition_factor,
-            partition_seed))
-            return retval;
+            partition_seed);
 
         //    nodes_query = graph_query.nodes;
         //    edges_query = graph_query.edges;
@@ -601,6 +602,7 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
 	
         // No data in DataSlice needs to be copied form host
 
+        cudaError_t retval = cudaSuccess;
         data_slices = new util::Array1D<SizeT,DataSlice>[this->num_gpus];
 
         for (int gpu = 0; gpu < this -> num_gpus; gpu++)
