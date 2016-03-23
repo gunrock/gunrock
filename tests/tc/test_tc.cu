@@ -262,8 +262,6 @@ int main(int argc, char** argv)
     typedef int VertexId;  // use int as the vertex identifier
     typedef int Value;     // use int as the value type
     typedef int SizeT;     // use int as the graph size type
-    int test = 1 << 31-1;
-    printf("test int:%d\n", test);
 
     Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
     Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;

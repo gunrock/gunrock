@@ -41,6 +41,7 @@
 #include <gunrock/oprtr/intersection/kernel_policy.cuh>
 #include <cub/cub.cuh>
 #include <moderngpu.cuh>
+#include <gunrock/util/test_utils.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -189,6 +190,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             SizeT src_end = d_row_offsets[sid+1];
             SizeT dst_it = d_row_offsets[did];
             SizeT dst_end = d_row_offsets[did+1];
+            if (src_it == src_end || dst_it == dst_end) continue;
             VertexId src_edge = d_column_indices[src_it];
             VertexId dst_edge = d_column_indices[dst_it];
             while (src_it < src_end && dst_it < dst_end) {
@@ -197,16 +199,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 dst_edge = (diff >= 0) ? d_column_indices[++dst_it] : dst_edge;
                 count += (diff == 0);
             }
-            //printf("eid:%d, sid:%d, did:%d, src_start:%d, src_end:%d, dst_start:%d, dst_end:%d count:%d\n",
-             //           eid,    sid,    did,          src_it,     src_end,      dst_it,     dst_end, count);
-            
             d_output_counts[idx] += count;
         }
-        /*SizeT aggregate = BlockReduceT(temp_storage).Sum(count);
-        if (threadIdx.x == 0)
-        {
-            d_output_counts[blockIdx.x] += aggregate;
-        }*/
     }
 
     static __device__ void IntersectTwoLargeNL(
@@ -495,14 +489,14 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
     typedef typename KernelPolicy::VertexId     VertexId;
     typedef typename KernelPolicy::Value        Value;
 
-    void *d_temp_storage = NULL;
+    /*void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
     SizeT *d_total_count = NULL;
     SizeT total_counts[1] = {0};
     util::GRError(cudaMalloc(
                     &d_total_count,
-                    sizeof(long)),
-                    "Total count cudaMalloc failed.", __FILE__, __LINE__);
+                    sizeof(SizeT)),
+                    "Total count cudaMalloc failed.", __FILE__, __LINE__);*/
 
     size_t stride = (input_length + KernelPolicy::BLOCKS * KernelPolicy::THREADS - 1)
                         >> (KernelPolicy::LOG_THREADS + KernelPolicy::LOG_BLOCKS);
@@ -521,26 +515,32 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             max_vertex,
             max_edge);
 
-    cub::DeviceReduce::Sum(d_temp_storage,
+    /*util::DisplayDeviceResults(d_output_counts,10);
+    util::DisplayDeviceResults(&d_output_counts[input_length/8],10);
+    util::DisplayDeviceResults(&d_output_counts[input_length/4],10);
+    util::DisplayDeviceResults(&d_output_counts[input_length/8*3],10);*/
+
+    /*cub::DeviceReduce::Sum(d_temp_storage,
                                   temp_storage_bytes,
                                   d_output_counts,
                                   &d_total_count[0],
-                                  input_length);
+                                  10);
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
     
     cub::DeviceReduce::Sum(d_temp_storage,
                                   temp_storage_bytes,
                                   d_output_counts,
                                   &d_total_count[0],
-                                  input_length);
+                                  10);*/
 
-    util::GRError(cudaMemcpy( total_counts,
+    /*util::GRError(cudaMemcpy( total_counts,
     &d_total_count[0], sizeof(SizeT),
     cudaMemcpyDeviceToHost),"Total count cudaMemcpy failed.", __FILE__,
-    __LINE__);
+    __LINE__);*/
 
 
-    return total_counts[0];
+    return mgpu::Reduce(d_output_counts, input_length, context);
+    //return total_counts[0];
 }
 
 }  // intersection

@@ -27,9 +27,25 @@
 #include <moderngpu.cuh>
 #include <cub/cub.cuh>
 
+#include <fstream>
+
 namespace gunrock {
 namespace global_indicator {
 namespace tc {
+
+/// Selection functor type
+    struct GreaterThan
+    {
+        int compare;
+
+        __host__ __device__ __forceinline__
+            GreaterThan(int compare) : compare(compare) {}
+
+        __host__ __device__ __forceinline__
+            bool operator()(const int &a) const {
+                return (a > compare);
+            }
+    };
 
 using namespace gunrock::app;
 using namespace mgpu;
@@ -151,7 +167,7 @@ class TCEnactor :
       // Prepare src node_ids for edge list
       // TODO: move this to problem. need to send CudaContext to problem too. 
 
-      // 1) Do advance/filter to get rid of neighbors with a smaller #ofdegree.
+      // 1) Do advance/filter to get rid of neighbors whose nid < sid
       gunrock::oprtr::advance::LaunchKernel
       <AdvanceKernelPolicy, TCProblem, TCFunctor>(
       statistics[0],
@@ -176,8 +192,133 @@ class TCEnactor :
       stream,
       gunrock::oprtr::advance::V2V);
 
+      GreaterThan select_op(0);
+
+      void *d_temp_storage = NULL;
+      size_t temp_storage_bytes = 0;
+      cub::DeviceSelect::If(d_temp_storage, temp_storage_bytes,
+      queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+              graph_slice->column_indices.GetPointer(util::DEVICE), 
+              graph_slice->column_indices.GetPointer(util::DEVICE)+graph_slice->edges/2, 
+              graph_slice->edges,
+              select_op);
+      cudaMalloc(&d_temp_storage, temp_storage_bytes);
+      cub::DeviceSelect::If(d_temp_storage, temp_storage_bytes,
+      queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+              graph_slice->column_indices.GetPointer(util::DEVICE), 
+              graph_slice->column_indices.GetPointer(util::DEVICE)+graph_slice->edges/2, 
+              graph_slice->edges,
+              select_op);
+
+      //util::MemsetKernel<<<256, 1024>>>(data_slice->d_edge_list.GetPointer(util::DEVICE), 0, graph_slice->nodes+1);
+      cub::DeviceSegmentedReduce::Sum(d_temp_storage, temp_storage_bytes,
+        data_slice->d_src_node_ids.GetPointer(util::DEVICE),
+        data_slice->d_edge_list.GetPointer(util::DEVICE),
+        graph_slice->nodes,
+        graph_slice->row_offsets.GetPointer(util::DEVICE),
+        graph_slice->row_offsets.GetPointer(util::DEVICE)+1);
+
+        cudaMalloc(&d_temp_storage, temp_storage_bytes);
+
+        cub::DeviceSegmentedReduce::Sum(d_temp_storage, temp_storage_bytes,
+        data_slice->d_src_node_ids.GetPointer(util::DEVICE),
+        data_slice->d_edge_list.GetPointer(util::DEVICE),
+        graph_slice->nodes,
+        graph_slice->row_offsets.GetPointer(util::DEVICE),
+        graph_slice->row_offsets.GetPointer(util::DEVICE)+1);
+
+
+        Scan<mgpu::MgpuScanTypeExc>(
+        data_slice->d_edge_list.GetPointer(util::DEVICE),
+        graph_slice->nodes+1,
+        (int)0,
+        mgpu::plus<int>(),
+        (int*)0,
+        (int*)0,
+        graph_slice->row_offsets.GetPointer(util::DEVICE),
+        context[0]);
+
+        //util::DisplayDeviceResults(graph_slice->row_offsets.GetPointer(util::DEVICE)+graph_slice->nodes, 1);
+
+        //util::MemsetKernel<<<256, 1024>>>(data_slice->d_src_node_ids.GetPointer(util::DEVICE), 0, graph_slice->edges/2);
+
+        IntervalExpand(
+            graph_slice->edges/2,
+            graph_slice->row_offsets.GetPointer(util::DEVICE),
+            queue->keys[attributes->selector].GetPointer(util::DEVICE),
+            graph_slice->nodes,
+            data_slice->d_src_node_ids.GetPointer(util::DEVICE),
+            context[0]);
+
+        //util::DisplayDeviceResults(data_slice->d_src_node_ids.GetPointer(util::DEVICE)+graph_slice->edges/2-10, 10);
+        //util::DisplayDeviceResults(graph_slice->column_indices.GetPointer(util::DEVICE)+graph_slice->edges/2-10,10);
+
+      /*data_slice->d_edge_list.Move(util::DEVICE, util::HOST);
+      VertexId *edge_ref = data_slice->d_edge_list.GetPointer(util::HOST);
+      std::ofstream e;
+      e.open("new.txt");
+      for (int i = 0; i < graph_slice->edges/2; ++i) {
+        e << edge_ref[i] << std::endl;
+      }
+      e.close();*/
+      /*queue->keys[attributes->selector^1].Move(util::DEVICE, util::HOST);
+      VertexId *edge = queue->keys[attributes->selector^1].GetPointer(util::HOST);
+      data_slice->d_edge_list.Move(util::DEVICE, util::HOST);
+      VertexId *edge_ref = data_slice->d_edge_list.GetPointer(util::HOST);
+      printf("prepared data.\n");
+      std::ofstream e;
+      e.open("edges.txt");
+      for (int i = 0; i < graph_slice->edges; ++i) {
+        e << edge[i] << std::endl;
+      }
+      e.close();
+      e.open("edges_ref.txt");
+      for (int i = 0; i < graph_slice->edges; ++i) {
+        e << edge_ref[i] << std::endl;
+      }
+      e.close();*/
+
+        /*data_slice->d_src_node_ids.Move(util::DEVICE,util::HOST);
+        VertexId *data = data_slice->d_src_node_ids.GetPointer(util::HOST);
+        graph_slice->row_offsets.Move(util::DEVICE, util::HOST);
+        SizeT *offsets = graph_slice->row_offsets.GetPointer(util::HOST);
+        std::ofstream ref_file;
+        std::ofstream offset_file;
+
+        ref_file.open("offsets_ref.txt");
+
+        offset_file.open("offsets.txt");
+        for (int i = 0; i <= graph_slice->nodes; ++i)
+        {
+            ref_file << offsets[i] << std::endl;
+        }
+        ref_file.close();
+        ref_file.open("ref.txt");
+        int cur = 0;
+        int ref = 0;
+        int idx = 0;
+        for (int i =0 ; i < graph_slice->edges; ++i) {
+            if (i == offsets[idx]) {
+                offset_file << offsets[idx] << std::endl;
+                ++idx;
+                while (i == offsets[idx]) {
+                offset_file << offsets[idx] << std::endl;
+                ref_file << 0 << std::endl;
+                ++idx;
+                }
+                if (i!=0) {
+                    ref_file << cur-ref << std::endl;
+                    ref = cur;
+                }
+            }
+            cur += data[i];
+        } 
+        ref_file << cur-ref << std::endl;
+        ref_file.close();
+        offset_file.close();
+        printf("ref:%d\n", cur);*/
       //SegReduce
-      SegReduceCsr(
+      /*SegReduceCsr(
         data_slice->d_src_node_ids.GetPointer(util::DEVICE),
         graph_slice->row_offsets.GetPointer(util::DEVICE),
         graph_slice->edges,
@@ -186,7 +327,36 @@ class TCEnactor :
         data_slice->d_edge_list.GetPointer(util::DEVICE),
         (int)0,
         mgpu::plus<int>(),
-        context[0]);
+        context[0]);*/
+        /*void *d_temp_storage = NULL;
+        size_t temp_storage_bytes = 0;
+        cub::DeviceSegmentedReduce::Sum(d_temp_storage, temp_storage_bytes,
+        data_slice->d_src_node_ids.GetPointer(util::DEVICE),
+        data_slice->d_edge_list.GetPointer(util::DEVICE),
+        graph_slice->nodes,
+        graph_slice->row_offsets.GetPointer(util::DEVICE),
+        graph_slice->row_offsets.GetPointer(util::DEVICE)+1);
+
+        cudaMalloc(&d_temp_storage, temp_storage_bytes);
+
+        cub::DeviceSegmentedReduce::Sum(d_temp_storage, temp_storage_bytes,
+        data_slice->d_src_node_ids.GetPointer(util::DEVICE),
+        data_slice->d_edge_list.GetPointer(util::DEVICE),
+        graph_slice->nodes,
+        graph_slice->row_offsets.GetPointer(util::DEVICE),
+        graph_slice->row_offsets.GetPointer(util::DEVICE)+1);
+
+        data_slice->d_edge_list.Move(util::DEVICE, util::HOST);
+        VertexId *seg = data_slice->d_edge_list.GetPointer(util::HOST);
+
+        std::ofstream seg_file;
+        seg_file.open("output.txt");
+        int final = 0;
+        for (int i =0 ; i < graph_slice->nodes; ++i) {
+            seg_file << seg[i] << std::endl;
+            final += seg[i];
+        } 
+        seg_file.close();
 
       //Scan
       Scan<mgpu::MgpuScanTypeExc>(
@@ -205,16 +375,18 @@ class TCEnactor :
             queue->keys[attributes->selector].GetPointer(util::DEVICE),
             graph_slice->nodes,
             data_slice->d_src_node_ids.GetPointer(util::DEVICE),
-            context[0]);
-      
-      if (retval = work_progress->GetQueueLength(++attributes->queue_index, attributes->queue_length, false, stream, true)) return retval;
-      attributes->selector ^= 1;
+            context[0]);*/
+
+      //if (retval = work_progress->GetQueueLength(++attributes->queue_index, attributes->queue_length, false, stream, true)) return retval;
+      //attributes->selector ^= 1;
+
+      //printf("queue length:%d\n", attributes->queue_length);
 
       //Filter to get edge_list (done)
       //declare edge_list in problem (done)
       //modify intersection operator (done)
       //cubPartition the coarse_count is on device, need to change (done)
-      gunrock::oprtr::filter::Kernel<FilterKernelPolicy, TCProblem, TCFunctor>
+      /*gunrock::oprtr::filter::Kernel<FilterKernelPolicy, TCProblem, TCFunctor>
       <<<statistics->filter_grid_size, FilterKernelPolicy::THREADS, 0, stream>>>(
       statistics->iteration,
       attributes->queue_reset,
@@ -222,26 +394,41 @@ class TCEnactor :
       attributes->queue_length,
       queue->keys[attributes->selector].GetPointer(util::DEVICE),
       NULL,
-      graph_slice->column_indices.GetPointer(util::DEVICE),
+      data_slice->d_edge_list_partitioned.GetPointer(util::DEVICE),
       d_data_slice,
       NULL,
       work_progress[0],
       graph_slice->edges,
       graph_slice->edges,
-      statistics->filter_kernel_stats);
+      statistics->filter_kernel_stats);*/
 
-      graph_slice->edges /= 2;
+      //graph_slice->edges /= 2;
 
       //GetQueueLength of the new edge_list
-      if (retval = work_progress->GetQueueLength(++attributes->queue_index, attributes->queue_length, false, stream, true)) return retval;
+      //if (retval = work_progress->GetQueueLength(++attributes->queue_index, attributes->queue_length, false, stream, true)) return retval;
 
-      printf("queue length:%d\n", attributes->queue_length);
+      //printf("queue length:%d\n", attributes->queue_length);
 
+      /*data_slice->d_edge_list_partitioned.Move(util::DEVICE, util::HOST);
+      VertexId *edge2 = data_slice->d_edge_list_partitioned.GetPointer(util::HOST);
 
-      util::MemsetMadVectorKernel<<<256, 2014>>>(
+      std::ofstream e;
+      e.open("edges_ref.txt");
+      for (int i = 0; i < graph_slice->edges; ++i) {
+        e << edge2[i] << std::endl;
+      }
+      e.close();*/
+
+      /*VertexId *srcid = data_slice->d_src_node_ids.GetPointer(util::DEVICE);
+      VertexId *dstid = data_slice->d_edge_list_partitioned.GetPointer(util::DEVICE);
+
+      util::DisplayDeviceResults(dstid, 10);
+      util::DisplayDeviceResults(dstid+graph_slice->edges-10, 10);*/
+
+      /*util::MemsetMadVectorKernel<<<256, 2014>>>(
               data_slice->d_degrees.GetPointer(util::DEVICE),
               graph_slice->row_offsets.GetPointer(util::DEVICE),
-              graph_slice->row_offsets.GetPointer(util::DEVICE)+1, -1, graph_slice->nodes);
+              graph_slice->row_offsets.GetPointer(util::DEVICE)+1, -1, graph_slice->nodes);*/
       // 2) Do intersection using generated edge lists from the previous step.
       //gunrock::oprtr::intersection::LaunchKernel
       //<IntersectionKernelPolicy, TCProblem, TCFunctor>(
@@ -249,7 +436,7 @@ class TCEnactor :
       // Reuse d_scanned_edges
       SizeT *d_output_counts = d_scanned_edges;
 
-      util::MemsetKernel<<<256, 1024>>>(d_output_counts, (SizeT)0, attributes->queue_length);
+      util::MemsetKernel<<<256, 1024>>>(d_output_counts, (SizeT)0, graph_slice->edges);
 
       // Should make tc_count a member var to TCProblem
       long tc_count = gunrock::oprtr::intersection::LaunchKernel
@@ -263,9 +450,9 @@ class TCEnactor :
       graph_slice->column_indices.GetPointer(util::DEVICE),
       data_slice->d_degrees.GetPointer(util::DEVICE),
       d_output_counts,
-      attributes->queue_length,
+      graph_slice->edges/2,
       graph_slice->nodes,
-      graph_slice->edges,
+      graph_slice->edges/2,
       work_progress[0],
       context[0],
       stream);
