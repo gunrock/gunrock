@@ -304,7 +304,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     bool    instrument             = info->info["instrument"        ].get_bool (); 
     bool    debug                  = info->info["debug_mode"        ].get_bool (); 
     bool    size_check             = info->info["size_check"        ].get_bool ();
-    int     iterations             = 1; //set to 1 for now. info->info["num_iteration"].get_int();
+    int     iterations             = info->info["num_iteration"     ].get_int();
     CpuTimer cpu_timer;
 
     cpu_timer.Start();
@@ -371,7 +371,11 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     // perform CC
-    float elapsed = 0.0f;
+    double total_elapsed = 0.0;
+    double single_elapsed = 0.0;
+    double max_elapsed    = 0.0;
+    double min_elapsed    = 1e10;
+    json_spirit::mArray process_times;
 
     for (SizeT iter = 0; iter < iterations; ++iter)
     {
@@ -389,13 +393,24 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         util::GRError(enactor->Enact(),
             "CC Problem Enact Failed", __FILE__, __LINE__);
         cpu_timer.Stop();
+        single_elapsed = cpu_timer.ElapsedMillis();
+        total_elapsed += single_elapsed;
+        process_times.push_back(single_elapsed);
+        if (single_elapsed > max_elapsed) max_elapsed = single_elapsed;
+        if (single_elapsed < min_elapsed) min_elapsed = single_elapsed;
         if (!quiet_mode)
         {
-            printf("-------------------------\n"); fflush(stdout);
+            printf("-------------------------\n"
+                "iteration %d elapsed: %lf ms\n",
+                iter, single_elapsed); 
+            fflush(stdout);
         }
-        elapsed += cpu_timer.ElapsedMillis();
+
     }
-    elapsed /= iterations;
+    total_elapsed /= iterations;
+    info -> info["process_times"] = process_times;
+    info -> info["min_process_time"] = min_elapsed;
+    info -> info["max_process_time"] = max_elapsed;
 
     cpu_timer.Start();
     // copy out results
@@ -472,7 +487,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     info->ComputeCommonStats(  // compute running statistics
-        enactor->enactor_stats.GetPointer(), elapsed, h_component_ids, true);
+        enactor->enactor_stats.GetPointer(), total_elapsed, h_component_ids, true);
 
     if (!quiet_mode)
     {

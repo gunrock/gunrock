@@ -18,10 +18,10 @@ namespace cc {
  *
  */
 template <
-    typename VertexId, typename SizeT, typename Value, typename ProblemData >
+    typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId >
 struct UpdateMaskFunctor {
-    typedef typename ProblemData::DataSlice DataSlice;
-
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
     /**
       * @brief Vertex mapping condition function. The vertex id is always valid.
       *
@@ -33,7 +33,15 @@ struct UpdateMaskFunctor {
       * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
       */
     static __device__ __forceinline__ bool CondFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         return true;
     }
 
@@ -48,15 +56,23 @@ struct UpdateMaskFunctor {
      *
      */
     static __device__ __forceinline__ void ApplyFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         VertexId parent;
-        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            parent, problem->component_ids + node);
+        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+            parent, d_data_slice -> component_ids + node);
         if (TO_TRACK)
             if (to_track(node))
-                printf("UpdateMask [%d]: %d->%d\n", node, problem->masks[node], (parent == node) ? 0 : 1);
-        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-            (parent == node) ? 0 : 1, problem->masks + node);
+                printf("UpdateMask [%d]: %d->%d\n", node, d_data_slice -> masks[node], (parent == node) ? 0 : 1);
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            (parent == node) ? 0 : 1, d_data_slice->masks + node);
     }
 };
 
@@ -70,10 +86,10 @@ struct UpdateMaskFunctor {
  *
  */
 template <
-    typename VertexId, typename SizeT, typename Value, typename ProblemData >
+    typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId>
 struct HookInitFunctor {
-    typedef typename ProblemData::DataSlice DataSlice;
-
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
     /**
      * @brief Vertex mapping condition function. The vertex id is always valid.
      *
@@ -85,7 +101,14 @@ struct HookInitFunctor {
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
         return true;
     }
 
@@ -99,9 +122,16 @@ struct HookInitFunctor {
      * @param[in] nid Vertex index.
      */
     static __device__ __forceinline__ void ApplyFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
-        VertexId from_node = problem->froms[node];
-        VertexId to_node   = problem->tos  [node];
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        VertexId from_node = d_data_slice ->froms[node];
+        VertexId to_node   = d_data_slice ->tos  [node];
         /*util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
                 from_node, problem->froms + node);
         util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
@@ -113,7 +143,7 @@ struct HookInitFunctor {
                 printf("HookInit [%d]: ->%d\n", max_node, min_node);
         //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
         //        min_node, problem->component_ids + max_node);
-        problem->component_ids[max_node] = min_node;
+        d_data_slice -> component_ids[max_node] = min_node;
     }
 };
 
@@ -127,9 +157,10 @@ struct HookInitFunctor {
  *
  */
 template <
-    typename VertexId, typename SizeT, typename Value, typename ProblemData >
+    typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId >
 struct HookMinFunctor {
-    typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Vertex mapping condition function. The vertex id is always valid.
@@ -142,7 +173,15 @@ struct HookMinFunctor {
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         return true;
     }
 
@@ -156,33 +195,41 @@ struct HookMinFunctor {
      * @param[in] nid Vertex index.
      */
     static __device__ __forceinline__ void ApplyFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         bool mark;
-        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            mark, problem->marks + node);
+        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+            mark, d_data_slice ->marks + node);
         if (!mark) {
             VertexId from_node;
             VertexId to_node;
-            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                from_node, problem->froms + node);
-            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                to_node, problem->tos + node);
+            util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                from_node, d_data_slice->froms + node);
+            util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                to_node, d_data_slice->tos + node);
             VertexId parent_from;
             VertexId parent_to;
-            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                parent_from, problem->component_ids + from_node);
-            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                parent_to, problem->component_ids + to_node);
+            util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                parent_from, d_data_slice->component_ids + from_node);
+            util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                parent_to, d_data_slice->component_ids + to_node);
             VertexId min_node = parent_from <= parent_to ? parent_from : parent_to;
             VertexId max_node = parent_from + parent_to - min_node;
             if (max_node == min_node) {
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    true, problem->marks + node);
+                util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                    true, d_data_slice->marks + node);
             } else {
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    max_node, problem->component_ids + min_node);
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    0, problem->edge_flag + 0);
+                util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                    max_node, d_data_slice->component_ids + min_node);
+                util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                    0, d_data_slice->edge_flag + 0);
             }
         }
     }
@@ -198,9 +245,10 @@ struct HookMinFunctor {
  *
  */
 template <
-    typename VertexId, typename SizeT, typename Value, typename ProblemData >
+    typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId >
 struct HookMaxFunctor {
-    typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Vertex mapping condition function. The vertex id is always valid.
@@ -213,7 +261,15 @@ struct HookMaxFunctor {
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         return true;
     }
 
@@ -227,39 +283,47 @@ struct HookMaxFunctor {
      * @param[in] nid Vertex index.
      */
     static __device__ __forceinline__ void ApplyFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         bool mark;
-        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            mark, problem->marks + node);
+        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+            mark, d_data_slice -> marks + node);
         if (!mark) {
             VertexId from_node;
             VertexId to_node;
-            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                from_node, problem->froms + node);
-            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                to_node, problem->tos + node);
+            util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                from_node, d_data_slice->froms + node);
+            util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                to_node, d_data_slice->tos + node);
             VertexId parent_from;
             VertexId parent_to;
-            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                parent_from, problem->component_ids + from_node);
-            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                parent_to, problem->component_ids + to_node);
+            util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                parent_from, d_data_slice -> component_ids + from_node);
+            util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                parent_to  , d_data_slice -> component_ids + to_node);
             VertexId max_node = parent_from > parent_to ? parent_from : parent_to;
             VertexId min_node = parent_from + parent_to - max_node;
             if (max_node == min_node) {
                 if (TO_TRACK)
                     if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node))
                         printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d==\n", node, from_node, to_node, parent_from, parent_to, max_node, min_node);
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    true, problem->marks + node);
+                util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                    true, d_data_slice ->marks + node);
             } else { //if (problem->component_ids[max_node] > min_node)
                 if (TO_TRACK)
                     if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node))
-                        printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d->%d\n", node, from_node, to_node, parent_from, parent_to, max_node, problem->component_ids[max_node], min_node);
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    min_node, problem->component_ids + max_node);
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    0, problem->edge_flag + 0);
+                        printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d->%d\n", node, from_node, to_node, parent_from, parent_to, max_node, d_data_slice->component_ids[max_node], min_node);
+                util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                    min_node, d_data_slice->component_ids + max_node);
+                util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                    0, d_data_slice->edge_flag + 0);
             }
         }
     }
@@ -275,10 +339,10 @@ struct HookMaxFunctor {
  *
  */
 template <
-    typename VertexId, typename SizeT, typename Value, typename ProblemData >
+    typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId >
 struct PtrJumpFunctor {
-    typedef typename ProblemData::DataSlice DataSlice;
-
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
     /**
      * @brief Vertex mapping condition function. The vertex id is always valid.
      *
@@ -290,7 +354,15 @@ struct PtrJumpFunctor {
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         return true;
     }
 
@@ -305,21 +377,30 @@ struct PtrJumpFunctor {
      *
      */
     static __device__ __forceinline__ void ApplyFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         VertexId parent;
-        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            parent, problem->component_ids + node);
+        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+            parent, d_data_slice -> component_ids + node);
         VertexId grand_parent;
-        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            grand_parent, problem->component_ids + parent);
+        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+            grand_parent, d_data_slice -> component_ids + parent);
         if (parent != grand_parent) {
-            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                0, problem->vertex_flag + 0);
+            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                0, d_data_slice ->vertex_flag + 0);
             if (TO_TRACK)
                 if (to_track(node))
-                    printf("PtrJump [%d]: %d->%d\n", node, problem->component_ids[node], grand_parent);
-            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                grand_parent, problem->component_ids + node);
+                    printf("PtrJump [%d]: %d->%d\n", node, 
+                    d_data_slice ->component_ids[node], grand_parent);
+            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                grand_parent, d_data_slice -> component_ids + node);
         }
     }
 };
@@ -334,10 +415,10 @@ struct PtrJumpFunctor {
  *
  */
 template <
-    typename VertexId, typename SizeT, typename Value, typename ProblemData >
+    typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId>
 struct PtrJumpMaskFunctor {
-    typedef typename ProblemData::DataSlice DataSlice;
-
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
     /**
      * @brief Vertex mapping condition function. The vertex id is always valid.
      *
@@ -349,7 +430,15 @@ struct PtrJumpMaskFunctor {
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         return true;
     }
 
@@ -364,30 +453,38 @@ struct PtrJumpMaskFunctor {
      *
      */
     static __device__ __forceinline__ void ApplyFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         int mask;
-        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            mask, problem->masks + node);
+        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+            mask, d_data_slice -> masks + node);
         if (mask == 0) {
             VertexId parent;
-            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                parent, problem->component_ids + node);
+            util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                parent, d_data_slice -> component_ids + node);
             VertexId grand_parent;
-            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                grand_parent, problem->component_ids + parent);
+            util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                grand_parent, d_data_slice -> component_ids + parent);
             if (parent != grand_parent) {
-                problem->vertex_flag[0] = 0;
+                d_data_slice->vertex_flag[0] = 0;
                 if (TO_TRACK)
                     if (to_track(node))
-                        printf("PtrJumpMask [%d]: %d->%d\n", node, problem->component_ids[node], grand_parent);
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    grand_parent, problem->component_ids + node);
+                        printf("PtrJumpMask [%d]: %d->%d\n", node, d_data_slice->component_ids[node], grand_parent);
+                util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                    grand_parent, d_data_slice->component_ids + node);
             } else {
                 if (TO_TRACK)
                     if (to_track(node))
-                        printf("PtrJumpMask mask[%d]: %d->%d\n", node, problem->masks[node], -1);
-                util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    -1, problem->masks + node);
+                        printf("PtrJumpMask mask[%d]: %d->%d\n", node, d_data_slice->masks[node], -1);
+                util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                    -1, d_data_slice->masks + node);
             }
         } //else if (to_track(node))
         //printf("PtrJumpMask mask[%d] = %d\n", node, mask);
@@ -404,9 +501,10 @@ struct PtrJumpMaskFunctor {
  *
  */
 template <
-    typename VertexId, typename SizeT, typename Value, typename ProblemData >
+    typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId >
 struct PtrJumpUnmaskFunctor {
-    typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Vertex mapping condition function. The vertex id is always valid.
@@ -419,7 +517,15 @@ struct PtrJumpUnmaskFunctor {
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
     static __device__ __forceinline__ bool CondFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         return true;
     }
 
@@ -434,22 +540,30 @@ struct PtrJumpUnmaskFunctor {
      *
      */
     static __device__ __forceinline__ void ApplyFilter(
-        VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
         int mask;
-        util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-            mask, problem->masks + node);
+        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+            mask, d_data_slice->masks + node);
         if (mask == 1) {
             VertexId parent;
-            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                parent, problem->component_ids + node);
+            util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                parent, d_data_slice->component_ids + node);
             VertexId grand_parent;
-            util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-                grand_parent, problem->component_ids + parent);
+            util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                grand_parent, d_data_slice->component_ids + parent);
             if (TO_TRACK)
                 if (to_track(node))
                     printf("PtrJumpUnMask [%d]: %d->%d\t", node, parent, grand_parent);
-            util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                grand_parent, problem->component_ids + node);
+            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                grand_parent, d_data_slice->component_ids + node);
         }
     }
 };
