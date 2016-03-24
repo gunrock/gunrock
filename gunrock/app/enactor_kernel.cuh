@@ -435,6 +435,101 @@ __global__ void Make_Output_Kernel(
 template <typename VertexId, typename SizeT, typename Value,
           SizeT NUM_VERTEX_ASSOCIATES, SizeT NUM_VALUE__ASSOCIATES,
           int CUDA_ARCH, int LOG_THREADS>
+__global__ void Make_Output_Backward_Kernel(
+    SizeT      num_elements,
+    int        num_gpus,
+    SizeT     *d_out_length,
+    VertexId  *d_keys_in,
+    SizeT     *d_offsets,
+    int       *d_partition_table,
+    VertexId  *d_convertion_table,
+    VertexId **d_vertex_associate_orgs,
+    Value    **d_value__associate_orgs,
+    VertexId **d_keys_outs,
+    VertexId **d_vertex_associate_outs,
+    Value    **d_value__associate_outs,
+    bool       skip_convertion = false)
+{
+    typedef util::Block_Scan<SizeT, CUDA_ARCH, LOG_THREADS> BlockScanT;
+    __shared__ typename BlockScanT::Temp_Space scan_space;
+    __shared__ SizeT sum_offset[8];
+    SizeT out_pos[8];
+    unsigned char gpu_select[8];
+    //__shared__ SizeT offset[8];
+    //__shared__ SizeT offset_zero;
+
+    SizeT in_pos = (SizeT) blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT) blockDim.x * gridDim.x;
+
+    while (in_pos - threadIdx.x < num_elements)
+    {
+        VertexId key    = util::InvalidValue<VertexId>();
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+            gpu_select[gpu] = 0;
+        if (in_pos < num_elements)
+        {
+            key = d_keys_in[in_pos];
+            for (int i = d_offsets[key]; i < d_offsets[key+1]; i++)
+                gpu_select[d_partition_table[i]] = 1;
+        }
+        //SizeT    out_pos = 0, out_offset = 0;
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            BlockScanT::LogicScan(gpu_select[gpu], out_pos[gpu], scan_space);
+            if (threadIdx.x == blockDim.x-1) 
+            {
+                sum_offset[gpu] = out_pos[gpu] + gpu_select[gpu];
+            }
+            __syncthreads();
+        }
+        if (threadIdx.x < num_gpus)
+        {
+            sum_offset[threadIdx.x] = atomicAdd(d_out_length + threadIdx.x, sum_offset[threadIdx.x]);
+        }
+        __syncthreads();
+
+        if (in_pos >= num_elements) break;
+        if (key < 0) {in_pos += STRIDE; continue; }
+
+        for (int i = d_offsets[key]; i < d_offsets[key+1]; i++)
+        {
+            int target = d_partition_table[i];
+            out_pos[target] += sum_offset[target]-1;
+            if (skip_convertion)
+            {
+                d_keys_outs[target][out_pos[target]] = key;
+            } else {
+                d_keys_outs[target][out_pos[target]] = d_convertion_table[i];
+            }
+
+            if (target != 0)
+            {
+                SizeT out_offset = out_pos[target] * NUM_VERTEX_ASSOCIATES;
+                //#pragma unroll
+                for (int i = 0; i < NUM_VERTEX_ASSOCIATES; i++)
+                {
+                    d_vertex_associate_outs[target][out_offset]
+                        =d_vertex_associate_orgs[i][key];
+                    out_offset ++;
+                }
+                out_offset = out_pos[target] * NUM_VALUE__ASSOCIATES;
+                //#pragma unroll
+                for (int i = 0; i < NUM_VALUE__ASSOCIATES; i++)
+                {
+                    d_value__associate_outs[target][out_offset]
+                        =d_value__associate_orgs[i][key];
+                    out_offset ++;
+                }
+            }
+        }
+        in_pos += STRIDE;
+    }
+}
+
+
+template <typename VertexId, typename SizeT, typename Value,
+          SizeT NUM_VERTEX_ASSOCIATES, SizeT NUM_VALUE__ASSOCIATES,
+          int CUDA_ARCH, int LOG_THREADS>
 __global__ void Make_Output_Kernel_SkipSelection(
     SizeT      num_elements,
     //int        num_gpus,

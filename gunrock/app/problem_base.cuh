@@ -1131,6 +1131,7 @@ struct DataSliceBase
                 break;
             }
 
+            //printf("new_frontier_elements = %d, %d\n", new_frontier_elements[0], new_frontier_elements[1]);
             // if froniter_queue is not big enough
             if (frontier_queues[peer].keys[i].GetSize() < new_frontier_elements[i])
             {
@@ -1209,7 +1210,7 @@ struct DataSliceBase
                         return retval;
                 }
             }*/
-            return retval;
+            //return retval;
         }
 
         if (TO_TRACK)

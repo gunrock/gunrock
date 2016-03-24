@@ -311,7 +311,7 @@ public:
         //    frontier_queue -> keys[0]  .GetPointer(util::DEVICE), graph_slice->edges);
         //util::MemsetIdxKernel<<<480, 512, 0, stream>>>(
         //    frontier_queue -> values[0].GetPointer(util::DEVICE), graph_slice->nodes);
-        util::MemsetKernel   <<<480, 512, 0, stream>>>(
+        util::MemsetKernel   <<<128, 128, 0, stream>>>(
             data_slice -> marks.GetPointer(util::DEVICE), false, graph_slice->edges);
 
         if (data_slice->turn==0)
@@ -371,7 +371,7 @@ public:
         if (data_slice->num_gpus > 1)
         {
             if (data_slice->turn == 0)
-                util::MemsetIdxKernel<<<480, 512, 0, stream>>> (
+                util::MemsetIdxKernel<<<128, 128, 0, stream>>> (
                     data_slice -> old_c_ids.GetPointer(util::DEVICE),
                     graph_slice-> nodes);
             //else util::MemsetCopyVectorKernel
@@ -1564,12 +1564,13 @@ public:
         0,                                  // SATURATION QUIT
         true,                               // DEQUEUE_PROBLEM_SIZE
         8,                                  // MIN_CTA_OCCUPANCY
-        9,                                  // LOG_THREADS
+        8,                                  // LOG_THREADS
         1,                                  // LOG_LOAD_VEC_SIZE
         0,                                  // LOG_LOADS_PER_TILE
         5,                                  // LOG_RAKING_THREADS
         0,                                  // END_BITMASK (no bit-mask for cc)
-        8>                                  // LOG_SCHEDULE_GRANULARITY
+        8,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::filter::BY_PASS>
     FilterPolicy;
 
     /**

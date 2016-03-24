@@ -112,7 +112,7 @@ void Iteration_Loop(
         received_length          = frontier_attribute[0].queue_length;
         data_slice->wait_counter = 0;
         tretval                  = cudaSuccess;
-        if (num_gpus>1 && enactor_stats[0].iteration>0)
+        if (num_gpus>1 && enactor_stats[0].iteration != 0)
         {
             frontier_attribute[0].queue_reset  = true;
             frontier_attribute[0].queue_offset = 0;
@@ -1349,13 +1349,17 @@ public:
         //printf("%d Make_Output begin, num_elements = %d, size_check = %s\n",
         //    data_slice -> gpu_idx, num_elements, enactor->size_check ? "true" : "false");
         //fflush(stdout);
+        SizeT size_multi = 0;
+        if (FORWARD ) size_multi += 1;
+        if (BACKWARD) size_multi += 1;
+
         int peer_ = 0;
         for (peer_ = 0; peer_ < num_gpus; peer_++)
         {
             if (enactor_stats -> retval =
                 Check_Size<SizeT, SizeT> (
                     enactor -> size_check, "keys_out",
-                    num_elements,
+                    num_elements * size_multi,
                     (peer_ == 0) ?
                         &data_slice -> frontier_queues[0].keys[selector^1] :
                         &data_slice -> keys_out[peer_],
@@ -1375,7 +1379,7 @@ public:
                 if (enactor_stats[0].retval =
                     Check_Size <SizeT, VertexId>(
                         enactor -> size_check, "vertex_associate_outs",
-                        num_elements * NUM_VERTEX_ASSOCIATES,
+                        num_elements * NUM_VERTEX_ASSOCIATES * size_multi,
                         &data_slice->vertex_associate_out[peer_],
                         over_sized, thread_num, enactor_stats->iteration, peer_),
                         false)
@@ -1395,7 +1399,7 @@ public:
                 if (enactor_stats->retval =
                     Check_Size<SizeT, Value   >(
                         enactor -> size_check, "value__associate_outs",
-                        num_elements * NUM_VALUE__ASSOCIATES,
+                        num_elements * NUM_VALUE__ASSOCIATES * size_multi,
                         &data_slice->value__associate_out[peer_],
                         over_sized, thread_num, enactor_stats->iteration, peer_,
                         false)) break;
@@ -1492,23 +1496,44 @@ public:
                 enactor -> problem -> keep_node_num ? "true" : "false",
                 NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES);*/
                
-            Make_Output_Kernel < VertexId, SizeT, Value,
-                NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES,
-                AdvanceKernelPolicy::CUDA_ARCH,
-                AdvanceKernelPolicy::LOG_THREADS-1>
-                <<< num_blocks, AdvanceKernelPolicy::THREADS / 2, 0, stream >>> (
-                num_elements,
-                num_gpus,
-                data_slice -> out_length.GetPointer(util::DEVICE),
-                frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
-                graph_slice -> partition_table      .GetPointer(util::DEVICE),
-                graph_slice -> convertion_table     .GetPointer(util::DEVICE),
-                data_slice  -> vertex_associate_orgs.GetPointer(util::DEVICE),
-                data_slice  -> value__associate_orgs.GetPointer(util::DEVICE),
-                data_slice  -> keys_outs            .GetPointer(util::DEVICE),
-                data_slice  -> vertex_associate_outs.GetPointer(util::DEVICE),
-                data_slice  -> value__associate_outs.GetPointer(util::DEVICE),
-                enactor -> problem -> keep_node_num);
+            if (FORWARD) 
+                Make_Output_Kernel < VertexId, SizeT, Value,
+                    NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES,
+                    AdvanceKernelPolicy::CUDA_ARCH,
+                    AdvanceKernelPolicy::LOG_THREADS-1>
+                    <<< num_blocks, AdvanceKernelPolicy::THREADS / 2, 0, stream >>> (
+                    num_elements,
+                    num_gpus,
+                    data_slice -> out_length.GetPointer(util::DEVICE),
+                    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+                    graph_slice -> partition_table      .GetPointer(util::DEVICE),
+                    graph_slice -> convertion_table     .GetPointer(util::DEVICE),
+                    data_slice  -> vertex_associate_orgs.GetPointer(util::DEVICE),
+                    data_slice  -> value__associate_orgs.GetPointer(util::DEVICE),
+                    data_slice  -> keys_outs            .GetPointer(util::DEVICE),
+                    data_slice  -> vertex_associate_outs.GetPointer(util::DEVICE),
+                    data_slice  -> value__associate_outs.GetPointer(util::DEVICE),
+                    enactor -> problem -> keep_node_num);
+
+            if (BACKWARD) 
+                Make_Output_Backward_Kernel < VertexId, SizeT, Value,
+                    NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES,
+                    AdvanceKernelPolicy::CUDA_ARCH,
+                    AdvanceKernelPolicy::LOG_THREADS-1>
+                    <<< num_blocks, AdvanceKernelPolicy::THREADS / 2, 0, stream >>> (
+                    num_elements,
+                    num_gpus,
+                    data_slice -> out_length.GetPointer(util::DEVICE),
+                    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+                    graph_slice -> backward_offset      .GetPointer(util::DEVICE),
+                    graph_slice -> backward_partition   .GetPointer(util::DEVICE),
+                    graph_slice -> backward_convertion  .GetPointer(util::DEVICE),
+                    data_slice  -> vertex_associate_orgs.GetPointer(util::DEVICE),
+                    data_slice  -> value__associate_orgs.GetPointer(util::DEVICE),
+                    data_slice  -> keys_outs            .GetPointer(util::DEVICE),
+                    data_slice  -> vertex_associate_outs.GetPointer(util::DEVICE),
+                    data_slice  -> value__associate_outs.GetPointer(util::DEVICE),
+                    enactor -> problem -> keep_node_num);
 
             data_slice -> out_length.Move(util::DEVICE, util::HOST, num_gpus, 0, stream);
             frontier_attribute->selector^=1;

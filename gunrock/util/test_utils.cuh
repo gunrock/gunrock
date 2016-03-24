@@ -475,7 +475,7 @@ int CompareResults(
 
         if (!is_right)
         {
-            if (!quiet)
+            if (!quiet && flag < 10)
             {
                 printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
                 PrintValue<float>(computed[i]);

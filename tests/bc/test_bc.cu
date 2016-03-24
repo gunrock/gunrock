@@ -431,7 +431,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     bool     instrument             = info->info["instrument"        ].get_bool (); 
     bool     debug                  = info->info["debug_mode"        ].get_bool (); 
     bool     size_check             = info->info["size_check"        ].get_bool (); 
-    int      iterations             = 1; // force to 1 info->info["num_iteration"].get_int();
+    int      iterations             = info->info["num_iteration"].get_int();
     std::string ref_filename        = info->info["ref_filename"      ].get_str();
     CpuTimer cpu_timer;
     
@@ -518,8 +518,12 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     // perform BC
-    double elapsed  = 0.0f;
+    double total_elapsed = 0.0;
+    double single_elapsed = 0.0;
+    double max_elapsed    = 0.0;
+    double min_elapsed    = 1e10;
 
+    json_spirit::mArray process_times;
     VertexId start_src, end_src;
     if (src == -1)
     {
@@ -534,10 +538,10 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
 
     for (int iter = 0; iter < iterations; ++iter)
     {
-        if (!quiet_mode)
-        {
-            printf("iteration:%d\n", iter);
-        }
+        //if (!quiet_mode)
+        //{
+        //    printf("iteration:%d\n", iter);
+        //}
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
             util::SetDevice(gpu_idx[gpu]);
@@ -554,7 +558,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         {
             printf("__________________________\n"); fflush(stdout);
         }
-        cpu_timer.Start();
+        single_elapsed = 0;
         for (VertexId i = start_src; i < end_src; ++i)
         {
             util::GRError(problem->Reset(
@@ -563,9 +567,16 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
                 "BC Problem Data Reset Failed", __FILE__, __LINE__);
             util::GRError(enactor ->Reset(),
                 "BC Enactor Reset failed", __FILE__, __LINE__);
+            cpu_timer.Start();
             util::GRError(enactor ->Enact(i),
                 "BC Problem Enact Failed", __FILE__, __LINE__);
+            cpu_timer.Stop();
+            single_elapsed += cpu_timer.ElapsedMillis();
         }
+        total_elapsed += single_elapsed;
+        process_times.push_back(single_elapsed);
+        if (single_elapsed > max_elapsed) max_elapsed = single_elapsed;
+        if (single_elapsed < min_elapsed) min_elapsed = single_elapsed;
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
             util::SetDevice(gpu_idx[gpu]);
@@ -573,15 +584,17 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
                 problem -> data_slices[gpu] -> bc_values.GetPointer(util::DEVICE),
                 (Value)0.5, problem -> sub_graphs[gpu].nodes);
         }
-        cpu_timer.Stop();
         if (!quiet_mode)
         {
-            printf("--------------------------\n"); fflush(stdout);
+            printf("--------------------------\n"
+                "iteration %d elapsed: %lf ms\n",
+                iter, single_elapsed); fflush(stdout);
         }
-        elapsed += cpu_timer.ElapsedMillis();
     }
-
-    elapsed /= iterations;
+    total_elapsed /= iterations;
+    info -> info["process_times"] = process_times;
+    info -> info["min_process_time"] = min_elapsed;
+    info -> info["max_process_time"] = max_elapsed;
 
     cpu_timer.Start();
     // Copy out results
@@ -654,7 +667,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     info->ComputeTraversalStats(  // compute running statistics
-        enactor->enactor_stats.GetPointer(), elapsed, h_labels);
+        enactor->enactor_stats.GetPointer(), total_elapsed, h_labels);
 
     if (!quiet_mode)
     {
