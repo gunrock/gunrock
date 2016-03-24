@@ -400,7 +400,7 @@ template <
     //bool INSTRUMENT,
     //bool DEBUG,
     //bool SIZE_CHECK >
-void RunTests(Info<VertexId, SizeT, Value> *info)
+cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 {
     typedef BCProblem < VertexId,
             SizeT,
@@ -431,9 +431,12 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     bool     instrument             = info->info["instrument"        ].get_bool (); 
     bool     debug                  = info->info["debug_mode"        ].get_bool (); 
     bool     size_check             = info->info["size_check"        ].get_bool (); 
-    int      iterations             = info->info["num_iteration"].get_int();
+    int      iterations             = info->info["num_iteration"     ].get_int();
+    std::string src_type            = info->info["source_type"       ].get_str  ();
+    int      src_seed               = info->info["source_seed"       ].get_int  ();
     std::string ref_filename        = info->info["ref_filename"      ].get_str();
     CpuTimer cpu_timer;
+    cudaError_t retval = cudaSuccess;
     
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
@@ -462,12 +465,12 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     for (int gpu = 0; gpu < num_gpus; gpu++)
     {
         size_t dummy;
-        cudaSetDevice(gpu_idx[gpu]);
+        if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
 
     Problem* problem = new Problem(false);  // allocate problem on GPU
-    util::GRError(problem->Init(
+    if (retval = util::GRError(problem->Init(
         stream_from_host,
         graph,
         NULL,
@@ -479,15 +482,128 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         max_in_sizing,
         partition_factor,
         partition_seed),
-        "BC Problem Initialization Failed", __FILE__, __LINE__);
+        "BC Problem Initialization Failed", __FILE__, __LINE__))
+        return retval;
 
     Enactor* enactor = new Enactor(
         num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
-    util::GRError(enactor->Init(
+    if (retval = util::GRError(enactor->Init(
         context, problem, max_grid_size),
-        "BC Enactor init failed", __FILE__, __LINE__);
+        "BC Enactor init failed", __FILE__, __LINE__))
+        return retval;
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
+
+    // perform BC
+    double total_elapsed = 0.0;
+    double single_elapsed = 0.0;
+    double max_elapsed    = 0.0;
+    double min_elapsed    = 1e10;
+
+    json_spirit::mArray process_times;
+    VertexId start_src, end_src;
+    if (src_type == "random2")
+    {
+        if (src_seed == -1) src_seed = time(NULL);
+        if (!quiet_mode)
+            printf("src_seed = %d\n", src_seed);
+        srand(src_seed);
+    }
+
+    for (int iter = 0; iter < iterations; ++iter)
+    {
+        //if (!quiet_mode)
+        //{
+        //    printf("iteration:%d\n", iter);
+        //}
+        if (src_type == "random2")
+        {
+            bool src_valid = false;
+            while (!src_valid)
+            {
+                src = rand() % graph -> nodes;
+                if (graph -> row_offsets[src] != graph -> row_offsets[src+1])
+                    src_valid = true;
+            }
+        }
+        if (src == -1)
+        {
+            start_src = 0;
+            end_src = graph->nodes;
+        }
+        else
+        {
+            start_src = src;
+            end_src = src + 1;
+        } 
+
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
+            util::MemsetKernel <<< 128, 128>>>(
+                problem -> data_slices[gpu] -> bc_values.GetPointer(util::DEVICE),
+                (Value)0.0, problem->sub_graphs[gpu].nodes);
+        }
+        if (retval = util::GRError(problem->Reset(
+            0, enactor->GetFrontierType(),
+            max_queue_sizing, max_queue_sizing1),
+            "BC Problem Data Reset Failed", __FILE__, __LINE__))
+            return retval;
+
+        if (!quiet_mode)
+        {
+            printf("__________________________\n"); fflush(stdout);
+        }
+        single_elapsed = 0;
+        for (VertexId i = start_src; i < end_src; ++i)
+        {
+            if (retval = util::GRError(problem->Reset(
+                i, enactor->GetFrontierType(),
+                max_queue_sizing, max_queue_sizing1),
+                "BC Problem Data Reset Failed", __FILE__, __LINE__))
+                return retval;
+            if (retval = util::GRError(enactor ->Reset(),
+                "BC Enactor Reset failed", __FILE__, __LINE__)) 
+                return retval;
+            for (int gpu = 0; gpu < num_gpus; gpu++)
+            {
+                if (retval = util::SetDevice(gpu_idx[gpu]))
+                    return retval;
+                if (retval = util::GRError(cudaDeviceSynchronize(),
+                    "cudaDeviceSynchronize failed", __FILE__, __LINE__))
+                    return retval;
+            }
+
+            cpu_timer.Start();
+            if (retval = util::GRError(enactor ->Enact(i),
+                "BC Problem Enact Failed", __FILE__, __LINE__))
+                return retval;
+            cpu_timer.Stop();
+            single_elapsed += cpu_timer.ElapsedMillis();
+        }
+        total_elapsed += single_elapsed;
+        process_times.push_back(single_elapsed);
+        if (single_elapsed > max_elapsed) max_elapsed = single_elapsed;
+        if (single_elapsed < min_elapsed) min_elapsed = single_elapsed;
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
+            util::MemsetScaleKernel <<< 128, 128>>>(
+                problem -> data_slices[gpu] -> bc_values.GetPointer(util::DEVICE),
+                (Value)0.5, problem -> sub_graphs[gpu].nodes);
+        }
+        if (!quiet_mode)
+        {
+            printf("--------------------------\n"
+                "iteration %d elapsed: %lf ms, src = %lld\n",
+                iter, single_elapsed, (long long)src); 
+            fflush(stdout);
+        }
+    }
+    total_elapsed /= iterations;
+    info -> info["process_times"] = process_times;
+    info -> info["min_process_time"] = min_elapsed;
+    info -> info["max_process_time"] = max_elapsed;
 
     // compute reference CPU BC solution for source-distance
     if (!quick_mode)
@@ -517,90 +633,12 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         }
     }
 
-    // perform BC
-    double total_elapsed = 0.0;
-    double single_elapsed = 0.0;
-    double max_elapsed    = 0.0;
-    double min_elapsed    = 1e10;
-
-    json_spirit::mArray process_times;
-    VertexId start_src, end_src;
-    if (src == -1)
-    {
-        start_src = 0;
-        end_src = graph->nodes;
-    }
-    else
-    {
-        start_src = src;
-        end_src = src + 1;
-    }
-
-    for (int iter = 0; iter < iterations; ++iter)
-    {
-        //if (!quiet_mode)
-        //{
-        //    printf("iteration:%d\n", iter);
-        //}
-        for (int gpu = 0; gpu < num_gpus; gpu++)
-        {
-            util::SetDevice(gpu_idx[gpu]);
-            util::MemsetKernel <<< 128, 128>>>(
-                problem -> data_slices[gpu] -> bc_values.GetPointer(util::DEVICE),
-                (Value)0.0, problem->sub_graphs[gpu].nodes);
-        }
-        util::GRError(problem->Reset(
-            0, enactor->GetFrontierType(),
-            max_queue_sizing, max_queue_sizing1),
-            "BC Problem Data Reset Failed", __FILE__, __LINE__);
-
-        if (!quiet_mode)
-        {
-            printf("__________________________\n"); fflush(stdout);
-        }
-        single_elapsed = 0;
-        for (VertexId i = start_src; i < end_src; ++i)
-        {
-            util::GRError(problem->Reset(
-                i, enactor->GetFrontierType(),
-                max_queue_sizing, max_queue_sizing1),
-                "BC Problem Data Reset Failed", __FILE__, __LINE__);
-            util::GRError(enactor ->Reset(),
-                "BC Enactor Reset failed", __FILE__, __LINE__);
-            cpu_timer.Start();
-            util::GRError(enactor ->Enact(i),
-                "BC Problem Enact Failed", __FILE__, __LINE__);
-            cpu_timer.Stop();
-            single_elapsed += cpu_timer.ElapsedMillis();
-        }
-        total_elapsed += single_elapsed;
-        process_times.push_back(single_elapsed);
-        if (single_elapsed > max_elapsed) max_elapsed = single_elapsed;
-        if (single_elapsed < min_elapsed) min_elapsed = single_elapsed;
-        for (int gpu = 0; gpu < num_gpus; gpu++)
-        {
-            util::SetDevice(gpu_idx[gpu]);
-            util::MemsetScaleKernel <<< 128, 128>>>(
-                problem -> data_slices[gpu] -> bc_values.GetPointer(util::DEVICE),
-                (Value)0.5, problem -> sub_graphs[gpu].nodes);
-        }
-        if (!quiet_mode)
-        {
-            printf("--------------------------\n"
-                "iteration %d elapsed: %lf ms\n",
-                iter, single_elapsed); fflush(stdout);
-        }
-    }
-    total_elapsed /= iterations;
-    info -> info["process_times"] = process_times;
-    info -> info["min_process_time"] = min_elapsed;
-    info -> info["max_process_time"] = max_elapsed;
-
     cpu_timer.Start();
     // Copy out results
-    util::GRError(problem -> Extract(
+    if (retval = util::GRError(problem -> Extract(
         h_sigmas, h_bc_values, h_ebc_values, h_labels),
-        "BC Problem Data Extraction Failed", __FILE__, __LINE__);
+        "BC Problem Data Extraction Failed", __FILE__, __LINE__))
+        return retval;
 
     // Verify the result
     if (!quick_mode)
@@ -724,6 +762,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     if (h_labels            ) {delete[] h_labels            ; h_labels             = NULL;}
     cpu_timer.Stop();
     info -> info["postprocess_time"] = cpu_timer.ElapsedMillis();
+    return retval;
 }
 
 /******************************************************************************

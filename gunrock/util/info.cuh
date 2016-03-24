@@ -118,6 +118,7 @@ public:
         info["search_depth"]       = 0;      // search depth (iterations)
         info["size_check"]         = true;   // enable or disable size check
         info["source_type"]        = "";     // source type
+        info["source_seed"]        = 0;      // source seed
         info["source_vertex"]      = 0;      // source (BFS, SSSP)
         info["stream_from_host"]   = false;  // stream from host to device
         info["traversal_mode"]     = -1;     // advance mode
@@ -226,8 +227,17 @@ public:
                            maximum_degree, source);
                 }
                 info["source_type"] = "largest-degree";
-            }
-            else
+            } else if (source_type.compare("randomize2") == 0)
+            {
+                source = 0;
+                if (!args.CheckCmdLineFlag("quiet"))
+                    printf("Using random source vertex for each run\n");
+                info["source_type"] = "random2";
+                int src_seed = -1;
+                if (args.CheckCmdLineFlag("src-seed"))
+                    args.GetCmdLineArgument("src-seed", src_seed);
+                info["source_seed"]   = src_seed;
+            } else
             {
                 args.GetCmdLineArgument("src", source);
                 info["source_type"] = "user-defined";

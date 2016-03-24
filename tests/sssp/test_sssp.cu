@@ -319,6 +319,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     bool        size_check          = info->info["size_check"       ].get_bool ();
     int         iterations          = info->info["num_iteration"    ].get_int  ();
     int         delta_factor        = info->info["delta_factor"     ].get_int  ();
+    std::string src_type            = info->info["source_type"      ].get_str  (); 
+    int      src_seed               = info->info["source_seed"      ].get_int  (); 
     CpuTimer    cpu_timer;
     cudaError_t retval              = cudaSuccess;
 
@@ -376,36 +378,51 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
-    // compute reference CPU SSSP solution for source-distance
-    if (!quick_mode)
-    {
-        if (!quiet_mode) { printf("Computing reference value ...\n"); }
-        ReferenceSssp<VertexId, SizeT, Value, MARK_PREDECESSORS>(
-            *graph,
-            reference_check_label,
-            reference_check_pred,
-            src,
-            quiet_mode);
-        if (!quiet_mode) { printf("\n"); }
-    }
-
     // perform SSSP
     double total_elapsed  = 0.0;
     double single_elapsed = 0.0;
     double max_elapsed    = 0.0;
     double min_elapsed    = 1e10;
     json_spirit::mArray process_times;
+    if (src_type == "random2")
+    {
+        if (src_seed == -1) src_seed = time(NULL);
+        if (!quiet_mode)
+            printf("src_seed = %d\n", src_seed);
+        srand(src_seed);
+    }
 
     for (int iter = 0; iter < iterations; ++iter)
     {
+        if (src_type == "random2")
+        {
+            bool src_valid = false;
+            while (!src_valid)
+            {
+                src = rand() % graph -> nodes;
+                if (graph -> row_offsets[src] != graph -> row_offsets[src+1])
+                    src_valid = true;
+            }
+        }
+
         if (retval = util::GRError(problem->Reset(
             src, enactor->GetFrontierType(),
             max_queue_sizing, max_queue_sizing1),
             "SSSP Problem Data Reset Failed", __FILE__, __LINE__))
             return retval;
+
         if (retval = util::GRError(enactor->Reset(),
             "SSSP Enactor Reset failed", __FILE__, __LINE__))
             return retval;
+
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            if (retval = util::SetDevice(gpu_idx[gpu]))
+                return retval;
+            if (retval = util::GRError(cudaDeviceSynchronize(),
+                "cudaDeviceSynchronize failed", __FILE__, __LINE__))
+                return retval;
+        }
 
         if (!quiet_mode)
         {
@@ -424,8 +441,9 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         if (!quiet_mode)
         {
             printf("--------------------------\n"
-                "iteration %d elapsed: %lf ms\n",
-                iter, single_elapsed);
+                "iteration %d elapsed: %lf ms, src = %lld, #iteration = %lld\n",
+                iter, single_elapsed, (long long)src,
+                (long long)enactor -> enactor_stats -> iteration);
             fflush(stdout);
         }
     }
@@ -433,6 +451,19 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     info -> info["process_times"] = process_times;
     info -> info["min_process_time"] = min_elapsed;
     info -> info["max_process_time"] = max_elapsed;
+
+    // compute reference CPU SSSP solution for source-distance
+    if (!quick_mode)
+    {
+        if (!quiet_mode) { printf("Computing reference value ...\n"); }
+        ReferenceSssp<VertexId, SizeT, Value, MARK_PREDECESSORS>(
+            *graph,
+            reference_check_label,
+            reference_check_pred,
+            src,
+            quiet_mode);
+        if (!quiet_mode) { printf("\n"); }
+    }
 
     cpu_timer.Start();
     // Copy out results

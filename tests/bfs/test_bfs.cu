@@ -310,6 +310,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     bool     debug                 = info->info["debug_mode"        ].get_bool ();
     bool     size_check            = info->info["size_check"        ].get_bool ();
     int      iterations            = info->info["num_iteration"     ].get_int  ();
+    std::string src_type           = info->info["source_type"       ].get_str  ();
+    int      src_seed              = info->info["source_seed"       ].get_int  ();
     CpuTimer cpu_timer;
     cudaError_t retval             = cudaSuccess;
 
@@ -372,6 +374,80 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
+    // perform BFS
+    double total_elapsed = 0.0;
+    double single_elapsed = 0.0;
+    double max_elapsed    = 0.0;
+    double min_elapsed    = 1e10;
+    json_spirit::mArray process_times;
+    if (src_type == "random2")
+    {
+        if (src_seed == -1) src_seed = time(NULL);
+        if (!quiet_mode)
+            printf("src_seed = %d\n", src_seed);
+        srand(src_seed);
+    }
+
+    for (int iter = 0; iter < iterations; ++iter)
+    {
+        if (src_type == "random2")
+        {
+            bool src_valid = false;
+            while (!src_valid)
+            {
+                src = rand() % graph -> nodes;
+                if (graph -> row_offsets[src] != graph -> row_offsets[src+1])
+                    src_valid = true;
+            }
+        }
+
+        if (retval = util::GRError(problem->Reset(
+            src, enactor->GetFrontierType(),
+            max_queue_sizing, max_queue_sizing1),
+            "BFS Problem Reset failed", __FILE__, __LINE__))
+            return retval;
+
+        if (retval = util::GRError(enactor->Reset(),
+            "BFS Enactor Reset failed", __FILE__, __LINE__))
+            return retval;
+
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            if (retval = util::SetDevice(gpu_idx[gpu]))
+                return retval;
+            if (retval = util::GRError(cudaDeviceSynchronize(),
+                "cudaDeviceSynchronize failed", __FILE__, __LINE__))
+                return retval;
+        }
+
+        if (!quiet_mode)
+        {
+            printf("__________________________\n"); fflush(stdout);
+        }
+
+        cpu_timer.Start();
+        if (retval = util::GRError(enactor->Enact(src, traversal_mode),
+            "BFS Enact failed", __FILE__, __LINE__)) return retval;
+        cpu_timer.Stop();
+        single_elapsed = cpu_timer.ElapsedMillis();
+        total_elapsed += single_elapsed;
+        process_times.push_back(single_elapsed);
+        if (single_elapsed > max_elapsed) max_elapsed = single_elapsed;
+        if (single_elapsed < min_elapsed) min_elapsed = single_elapsed;
+        if (!quiet_mode)
+        {
+            printf("--------------------------\n"
+                "iteration %d elapsed: %lf ms, src = %lld, #iteration = %lld\n",
+                iter, single_elapsed, (long long)src,
+                (long long)enactor -> enactor_stats -> iteration);
+            fflush(stdout);
+        }
+    }
+    total_elapsed /= iterations;
+    info -> info["process_times"] = process_times;
+    info -> info["min_process_time"] = min_elapsed;
+    info -> info["max_process_time"] = max_elapsed;
+
     // compute reference CPU BFS solution for source-distance
     if (!quick_mode)
     {
@@ -391,52 +467,6 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             printf("\n");
         }
     }
-
-    // perform BFS
-    double total_elapsed = 0.0;
-    double single_elapsed = 0.0;
-    double max_elapsed    = 0.0;
-    double min_elapsed    = 1e10;
-    json_spirit::mArray process_times;
-
-    for (int iter = 0; iter < iterations; ++iter)
-    {
-        if (retval = util::GRError(problem->Reset(
-            src, enactor->GetFrontierType(),
-            max_queue_sizing, max_queue_sizing1),
-            "BFS Problem Reset failed", __FILE__, __LINE__))
-            return retval;
-
-        if (retval = util::GRError(enactor->Reset(),
-            "BFS Enactor Reset failed", __FILE__, __LINE__))
-            return retval;
-
-        if (!quiet_mode)
-        {
-            printf("__________________________\n"); fflush(stdout);
-        }
-
-        cpu_timer.Start();
-        if (retval = util::GRError(enactor->Enact(src, traversal_mode),
-            "BFS Enact failed", __FILE__, __LINE__)) return retval;
-        cpu_timer.Stop();
-        single_elapsed = cpu_timer.ElapsedMillis();
-        total_elapsed += single_elapsed;
-        process_times.push_back(single_elapsed);
-        if (single_elapsed > max_elapsed) max_elapsed = single_elapsed;
-        if (single_elapsed < min_elapsed) min_elapsed = single_elapsed;
-        if (!quiet_mode)
-        {
-            printf("--------------------------\n"
-                "iteration %d elapsed: %lf ms\n",
-                iter, single_elapsed);
-            fflush(stdout);
-        }
-    }
-    total_elapsed /= iterations;
-    info -> info["process_times"] = process_times;
-    info -> info["min_process_time"] = min_elapsed;
-    info -> info["max_process_time"] = max_elapsed;
 
     cpu_timer.Start();
     // copy out results
