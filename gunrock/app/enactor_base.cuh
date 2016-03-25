@@ -69,6 +69,12 @@ public:
     bool          instrument;
     bool          debug     ;
     bool          size_check;
+    int           communicate_latency;
+    float         communicate_multipy;
+    int           expand_latency;
+    int           subqueue_latency;
+    int           fullqueue_latency;
+    int           makeout_latency;
 
     //Device properties
     util::Array1D<SizeT, util::CudaProperties>          cuda_props        ;
@@ -76,7 +82,7 @@ public:
     // Queue size counters and accompanying functionality
     util::Array1D<SizeT, util::CtaWorkProgressLifetime<SizeT> > work_progress     ;
     util::Array1D<SizeT, EnactorStats<SizeT> >                  enactor_stats     ;
-    util::Array1D<SizeT, FrontierAttribute<SizeT> >     frontier_attribute;
+    util::Array1D<SizeT, FrontierAttribute<SizeT> >             frontier_attribute;
 
     FrontierType GetFrontierType() {return frontier_type;}
 
@@ -101,7 +107,13 @@ protected:
         gpu_idx       (_gpu_idx      ),
         instrument    (_instrument   ),
         debug         (_debug        ),
-        size_check    (_size_check   )
+        size_check    (_size_check   ),
+        communicate_latency(0        ),
+        communicate_multipy(-1.0f    ),
+        expand_latency     (0        ),
+        subqueue_latency   (0        ),
+        fullqueue_latency  (0        ),
+        makeout_latency    (0        )
     {
         cuda_props        .SetName("cuda_props"        );
         work_progress     .SetName("work_progress"     );

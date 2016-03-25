@@ -16,7 +16,7 @@
 
 #include <gunrock/app/enactor_kernel.cuh>
 #include <gunrock/app/enactor_helper.cuh>
-
+#include <gunrock/util/latency_utils.cuh>
 #include <moderngpu.cuh>
 
 using namespace mgpu;
@@ -100,6 +100,12 @@ void Iteration_Loop(
                  *scanned_edges_       =   NULL;
     int           peer, peer_, peer__, gpu_, i, iteration_, wait_count;
     bool          over_sized;
+    int           communicate_latency  =   enactor -> communicate_latency;
+    float         communicate_multipy  =   enactor -> communicate_multipy;
+    int           expand_latency       =   enactor -> expand_latency;
+    int           subqueue_latency     =   enactor -> subqueue_latency;
+    int           fullqueue_latency    =   enactor -> fullqueue_latency;
+    int           makeout_latency      =   enactor -> makeout_latency;
 
     if (enactor -> debug)
     {
@@ -244,6 +250,11 @@ void Iteration_Loop(
                             stages[peer__] = 4; break;
                         }
 
+                        if (expand_latency != 0)
+                            util::latency::Insert_Latency(
+                            expand_latency, streams[peer_],
+                            data_slice -> latency_data.GetPointer(util::DEVICE));
+
                         Iteration::template Expand_Incoming
                             <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES> (
                             enactor, streams[peer_],
@@ -281,6 +292,11 @@ void Iteration_Loop(
                             stages[peer__] = 1;
                         }
                     } else { //Push Neighbor
+                        if (communicate_latency != 0)
+                            util::latency::Insert_Latency(
+                            communicate_latency, streams[peer__],
+                            data_slice -> latency_data.GetPointer(util::DEVICE));
+
                         PushNeighbor <Enactor, GraphSliceT, DataSlice,
                                 NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES> (
                             enactor,
@@ -292,7 +308,8 @@ void Iteration_Loop(
                             s_data_slice  [peer]      .GetPointer(util::HOST),
                             s_graph_slice [thread_num],
                             s_graph_slice [peer],
-                            streams       [peer__]);
+                            streams       [peer__],
+                            communicate_multipy);
                         Set_Record(data_slice, iteration, peer__, stages[peer__], streams[peer__]);
                         stages[peer__] = 4;
                     }
@@ -364,6 +381,10 @@ void Iteration_Loop(
                             graph_slice);
                         if (enactor_stats_ -> retval) break;
                     }
+                    if (subqueue_latency != 0)
+                        util::latency::Insert_Latency(
+                        subqueue_latency, streams[peer_],
+                        data_slice -> latency_data.GetPointer(util::DEVICE));
 
                     Iteration::SubQueue_Core(
                         enactor,
@@ -639,6 +660,11 @@ void Iteration_Loop(
                         if (enactor_stats_ -> retval) break;
                     }
 
+                    if (fullqueue_latency != 0)
+                        util::latency::Insert_Latency(
+                        fullqueue_latency, streams[peer_],
+                        data_slice -> latency_data.GetPointer(util::DEVICE));
+
                     Iteration::FullQueue_Core(
                         enactor,
                         thread_num,
@@ -719,6 +745,12 @@ void Iteration_Loop(
                     &data_slice->frontier_queues[enactor -> size_check?0:num_gpus],
                     Total_Length,
                     streams[0]);
+
+                if (makeout_latency != 0)
+                    util::latency::Insert_Latency(
+                    makeout_latency, streams[0],
+                    data_slice -> latency_data.GetPointer(util::DEVICE));
+
                 Iteration::template Make_Output <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES> (
                     enactor,
                     thread_num,

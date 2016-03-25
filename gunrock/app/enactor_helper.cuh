@@ -305,7 +305,8 @@ void PushNeighbor(
     DataSlice         *data_slice_p,
     GraphSliceT       *graph_slice_l,
     GraphSliceT       *graph_slice_p,
-    cudaStream_t       stream)
+    cudaStream_t       stream,
+    float              communicate_multipy)
 {
     typedef typename Enactor::VertexId VertexId;
     typedef typename Enactor::SizeT    SizeT;
@@ -321,6 +322,8 @@ void PushNeighbor(
     data_slice_p->in_length[t][gpu_] = queue_length;
     data_slice_p->in_iteration[t][gpu_] = enactor_stats->iteration;
     if (queue_length == 0) return;
+
+    if (communicate_multipy > 1) queue_length *= communicate_multipy;
 
     if (data_slice_l -> keys_out[peer_].GetPointer(util::DEVICE) != NULL &&
         data_slice_p -> keys_in[t][gpu_].GetSize() < queue_length)

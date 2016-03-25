@@ -404,6 +404,7 @@ struct DataSliceBase
     util::Array1D<SizeT, SizeT       >  *scanned_edges           ; // length / offsets for offsets of the frontier queues
     util::Array1D<SizeT, unsigned char> *cub_scan_space;
     util::Array1D<SizeT, MaskT        > visited_mask;
+    util::Array1D<SizeT, int          > latency_data;
 
     // arrays used to track data race, containing info about pervious assigment
     util::Array1D<SizeT, int         > org_checkpoint            ; // checkpoint number
@@ -483,6 +484,7 @@ struct DataSliceBase
         org_queue_idx          .SetName("org_queue_idx"          );
         org_block_idx          .SetName("org_block_idx"          );
         org_thread_idx         .SetName("org_thread_idx"         );
+        latency_data           .SetName("latency_data"           );
 
         for (int i = 0; i < 4; i++)
         {
@@ -727,6 +729,7 @@ struct DataSliceBase
         //if (retval = temp_preds    .Release()) return retval;
         if (retval = labels        .Release()) return retval;
         if (retval = visited_mask  .Release()) return retval;
+        if (retval = latency_data  .Release()) return retval;
 
         if (retval = org_checkpoint.Release()) return retval;
         if (retval = org_d_out     .Release()) return retval;
@@ -795,6 +798,11 @@ struct DataSliceBase
             MAX_NUM_VERTEX_ASSOCIATES, util::HOST | util::DEVICE)) return retval;
         if (retval = value__associate_orgs.Allocate(
             MAX_NUM_VALUE__ASSOCIATES, util::HOST | util::DEVICE)) return retval;
+        if (retval = latency_data         .Allocate(
+            120 * 1024, util::HOST | util::DEVICE)) return retval;
+        for (SizeT i = 0; i< 120 * 1024; i++)
+            latency_data[i] = rand();
+        if (retval = latency_data.Move(util::HOST, util::DEVICE)) return retval;
 
         // Allocate / create event related variables
         wait_marker .Allocate(num_gpus * 2);
@@ -815,7 +823,8 @@ struct DataSliceBase
                 for (int stage = 0; stage < num_stages; stage++)
                 {
                     if (retval = util::GRError(
-                        cudaEventCreate(&(events[i][gpu][stage])),
+                        //cudaEventCreate(&(events[i][gpu][stage])),
+                        cudaEventCreateWithFlags(&(events[i][gpu][stage]), cudaEventDisableTiming),
                        "cudaEventCreate failed.", __FILE__, __LINE__))
                         return retval;
                     events_set[i][gpu][stage] = false;

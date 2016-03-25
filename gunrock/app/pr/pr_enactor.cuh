@@ -1162,7 +1162,8 @@ static CUT_THREADPROC PRThread(
                 problem->data_slices [0         ].GetPointer(util::HOST),
                 problem->graph_slices[thread_num],
                 problem->graph_slices[0],
-                data_slice->streams[0]);
+                data_slice->streams[0],
+                enactor -> communicate_multipy);
             Set_Record(data_slice, enactor_stats->iteration, 1, 0, data_slice->streams[0]);
             data_slice->final_event_set = true;
             //util::cpu_mt::PrintGPUArray("keys_out", data_slice->keys_out[1].GetPointer(util::DEVICE), data_slice->local_nodes, thread_num, enactor_stats->iteration, -1, data_slice->streams[0]);

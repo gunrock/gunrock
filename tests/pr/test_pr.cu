@@ -530,6 +530,14 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     Value       error               = info->info["error"            ].get_real ();
     bool        scaled              = info->info["scaled"           ].get_bool ();
     bool        compensate          = info->info["compensate"       ].get_bool ();
+    int      communicate_latency    = info->info["communicate_latency"].get_int ();
+    float    communicate_multipy    = info->info["communicate_multipy"].get_real();
+    int      expand_latency         = info->info["expand_latency"    ].get_int ();
+    int      subqueue_latency       = info->info["subqueue_latency"  ].get_int ();
+    int      fullqueue_latency      = info->info["fullqueue_latency" ].get_int ();
+    int      makeout_latency        = info->info["makeout_latency"   ].get_int ();
+    if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
+
     CpuTimer    cpu_timer;
     cudaError_t retval              = cudaSuccess;
 
@@ -572,7 +580,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         if (counter != 0)
         {   
             if (!quiet_mode) printf("Adding 1 vertex and %lld edges to compensate 0 degree vertices\n",
-                (long long)counter + (long long)graph -> nodes, (long long)counter * graph -> nodes);
+                (long long)counter + (long long)graph -> nodes);
             util::Array1D<SizeT, VertexId> new_column_indices;
             util::Array1D<SizeT, SizeT   > new_row_offsets;
             new_column_indices.Allocate(graph -> edges + counter + graph -> nodes, util::HOST);
@@ -597,15 +605,15 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             new_row_offsets[graph -> nodes] = edge_counter;
             edge_counter += graph -> nodes;
             new_row_offsets[graph -> nodes + 1] = edge_counter;
-            delete[] graph -> column_indices;
-            graph -> column_indices = new VertexId[edge_counter];
+            free(graph -> column_indices);
+            graph -> column_indices = (VertexId*) malloc((long long)edge_counter * sizeof(VertexId));
             memcpy(graph -> column_indices, new_column_indices.GetPointer(util::HOST),
-                sizeof(VertexId) * edge_counter);
+                sizeof(VertexId) * (long long)edge_counter);
             new_column_indices.Release();
-            delete[] graph -> row_offsets;
-            graph -> row_offsets = new SizeT[graph -> nodes + 2];
+            free(graph -> row_offsets);
+            graph -> row_offsets = (SizeT*) malloc (((long long)graph -> nodes + 2) * sizeof(SizeT));
             memcpy(graph -> row_offsets, new_row_offsets.GetPointer(util::HOST),
-                sizeof(SizeT) * (graph -> nodes + 2));
+                sizeof(SizeT) * ((long long)graph -> nodes + 2));
             graph -> edges = edge_counter;
             graph -> nodes +=1;
         }   
@@ -634,6 +642,43 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         context, problem, traversal_mode, max_grid_size),
         "PR Enactor Init failed", __FILE__, __LINE__))
         return retval;
+
+    enactor -> communicate_latency = communicate_latency;
+    enactor -> communicate_multipy = communicate_multipy;
+    enactor -> expand_latency      = expand_latency;
+    enactor -> subqueue_latency    = subqueue_latency;
+    enactor -> fullqueue_latency   = fullqueue_latency;
+    enactor -> makeout_latency     = makeout_latency;
+
+    if (retval = util::SetDevice(gpu_idx[0])) return retval;
+    if (retval = util::latency::Test_BaseLine(
+        "communicate_latency", communicate_latency,
+        streams[0], problem -> data_slices[0] -> latency_data))
+        return retval;
+    if (communicate_multipy > 0)
+        printf("communicate_multipy\t = %.2fx\n",
+            communicate_multipy);
+
+    if (retval = util::latency::Test_BaseLine(
+        "expand_latency  ", expand_latency,
+        streams[0], problem -> data_slices[0] -> latency_data))
+        return retval;
+
+    if (retval = util::latency::Test_BaseLine(
+        "subqueue_latency", subqueue_latency,
+        streams[0], problem -> data_slices[0] -> latency_data))
+        return retval;
+
+    if (retval = util::latency::Test_BaseLine(
+        "fullqueue_latency", fullqueue_latency,
+        streams[0], problem -> data_slices[0] -> latency_data))
+        return retval;
+
+    if (retval = util::latency::Test_BaseLine(
+        "makeout_latency  ", makeout_latency,
+        streams[0], problem -> data_slices[0] -> latency_data))
+        return retval;
+
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 

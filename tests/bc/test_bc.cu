@@ -435,6 +435,14 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     std::string src_type            = info->info["source_type"       ].get_str  ();
     int      src_seed               = info->info["source_seed"       ].get_int  ();
     std::string ref_filename        = info->info["ref_filename"      ].get_str();
+    int      communicate_latency    = info->info["communicate_latency"].get_int ();
+    float    communicate_multipy    = info->info["communicate_multipy"].get_real();
+    int      expand_latency         = info->info["expand_latency"    ].get_int ();
+    int      subqueue_latency       = info->info["subqueue_latency"  ].get_int ();
+    int      fullqueue_latency      = info->info["fullqueue_latency" ].get_int ();
+    int      makeout_latency        = info->info["makeout_latency"   ].get_int ();
+    if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
+
     CpuTimer cpu_timer;
     cudaError_t retval = cudaSuccess;
     
@@ -491,6 +499,43 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         context, problem, max_grid_size),
         "BC Enactor init failed", __FILE__, __LINE__))
         return retval;
+
+    enactor -> communicate_latency = communicate_latency;
+    enactor -> communicate_multipy = communicate_multipy;
+    enactor -> expand_latency      = expand_latency;
+    enactor -> subqueue_latency    = subqueue_latency;
+    enactor -> fullqueue_latency   = fullqueue_latency;
+    enactor -> makeout_latency     = makeout_latency;
+
+    if (retval = util::SetDevice(gpu_idx[0])) return retval;
+    if (retval = util::latency::Test_BaseLine(
+        "communicate_latency", communicate_latency,
+        streams[0], problem -> data_slices[0] -> latency_data))
+        return retval;
+    if (communicate_multipy > 0)
+        printf("communicate_multipy\t = %.2fx\n",
+            communicate_multipy);
+
+    if (retval = util::latency::Test_BaseLine(
+        "expand_latency  ", expand_latency,
+        streams[0], problem -> data_slices[0] -> latency_data))
+        return retval;
+
+    if (retval = util::latency::Test_BaseLine(
+        "subqueue_latency", subqueue_latency,
+        streams[0], problem -> data_slices[0] -> latency_data))
+        return retval;
+
+    if (retval = util::latency::Test_BaseLine(
+        "fullqueue_latency", fullqueue_latency,
+        streams[0], problem -> data_slices[0] -> latency_data))
+        return retval;
+
+    if (retval = util::latency::Test_BaseLine(
+        "makeout_latency  ", makeout_latency,
+        streams[0], problem -> data_slices[0] -> latency_data))
+        return retval;
+
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 

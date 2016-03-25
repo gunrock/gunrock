@@ -137,6 +137,12 @@ public:
         info["multi_graphs"]       = false;  // default only one input graph
         info["node_value"]         = false;  // default don't load labels
         info["label"]              = "";     // label file name used in test
+        info["communicate_latency"]= 0;      // inter-GPU communication latency
+        info["communicate_multipy"]= -1.0f;  // inter-GPU communication multiplier
+        info["expand_latency"     ]= 0;      // expand_incoming latency
+        info["subqueue_latency"   ]= 0;      // subqueue latency
+        info["fullqueue_latency"  ]= 0;      // fullqueue latency
+        info["makeout_latency"    ]= 0;      // makeout latency
         // info["gpuinfo"]
         // info["device_list"]
         // info["sysinfo"]
@@ -343,6 +349,42 @@ public:
             std::string output_filename = "";
             args.GetCmdLineArgument("output_filename", output_filename);
             info["output_filename"] = output_filename;
+        }
+        if (args.CheckCmdLineFlag("communicate-latency"))
+        {
+            int communicate_latency = 0;
+            args.GetCmdLineArgument("communicate-latency", communicate_latency);
+            info["communicate_latency"] = communicate_latency;
+        }
+        if (args.CheckCmdLineFlag("communicate-multipy"))
+        {
+            float communicate_multipy = -1;
+            args.GetCmdLineArgument("communicate-multipy", communicate_multipy);
+            info["communicate_multipy"] = communicate_multipy;
+        }
+        if (args.CheckCmdLineFlag("expand-latency"))
+        {
+            int expand_latency = 0;
+            args.GetCmdLineArgument("expand-latency", expand_latency);
+            info["expand_latency"] = expand_latency;
+        }
+        if (args.CheckCmdLineFlag("subqueue-latency"))
+        {
+            int subqueue_latency = 0;
+            args.GetCmdLineArgument("subqueue-latency", subqueue_latency);
+            info["subqueue_latency"] = subqueue_latency;
+        }
+        if (args.CheckCmdLineFlag("fullqueue-latency"))
+        {
+            int fullqueue_latency = 0;
+            args.GetCmdLineArgument("fullqueue-latency", fullqueue_latency);
+            info["fullqueue_latency"] = fullqueue_latency;
+        }
+        if (args.CheckCmdLineFlag("makeout-latency"))
+        {
+            int makeout_latency = 0;
+            args.GetCmdLineArgument("makeout-latency", makeout_latency);
+            info["makeout_latency"] = makeout_latency;
         }
 
         // parse device count and device list
