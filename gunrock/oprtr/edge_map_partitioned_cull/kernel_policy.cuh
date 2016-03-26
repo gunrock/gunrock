@@ -128,7 +128,7 @@ public:
             SizeT                       iter_output_size;
             SizeT                       iter_output_end_offset;
             VertexId                    thread_output_vertices[THREADS * OUTPUT_PER_THREAD];
-            MaskT                       tex_mask_bytes[THREADS * OUTPUT_PER_THREAD];
+            //MaskT                       tex_mask_bytes[THREADS * OUTPUT_PER_THREAD];
             //bool                        warps_cond[WARPS];
             //bool                        block_cond;
             SizeT                       block_count;

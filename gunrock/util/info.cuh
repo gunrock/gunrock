@@ -143,6 +143,7 @@ public:
         info["subqueue_latency"   ]= 0;      // subqueue latency
         info["fullqueue_latency"  ]= 0;      // fullqueue latency
         info["makeout_latency"    ]= 0;      // makeout latency
+        info["direction_optimized"]= false;  // whether to enable directional optimization
         // info["gpuinfo"]
         // info["device_list"]
         // info["sysinfo"]
@@ -191,6 +192,7 @@ public:
         info["normalized"] =  args.CheckCmdLineFlag("normalized"); // PR
         info["scaled"    ] =  args.CheckCmdLineFlag("scaled"    ); // PR
         info["compensate"] =  args.CheckCmdLineFlag("compensate"); // PR
+        info["direction_optimized"] = args.CheckCmdLineFlag("direction-optimized");
 
         info["json"] = args.CheckCmdLineFlag("json");
         if (args.CheckCmdLineFlag("jsonfile"))

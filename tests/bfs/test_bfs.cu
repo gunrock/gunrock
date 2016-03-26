@@ -318,6 +318,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     int      subqueue_latency      = info->info["subqueue_latency"  ].get_int ();
     int      fullqueue_latency     = info->info["fullqueue_latency" ].get_int ();
     int      makeout_latency       = info->info["makeout_latency"   ].get_int ();
+    bool     direction_optimized   = info->info["direction_optimized"].get_bool();
     if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
 
     CpuTimer cpu_timer;
@@ -374,7 +375,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         "BFS Problem Init failed", __FILE__, __LINE__)) return retval;
 
     Enactor* enactor = new Enactor(
-        num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
+        num_gpus, gpu_idx, instrument, debug, size_check, direction_optimized);  // enactor map
     if (retval = util::GRError(enactor->Init(
         context, problem, max_grid_size, traversal_mode),
         "BFS Enactor Init failed", __FILE__, __LINE__))
@@ -775,12 +776,12 @@ template <
     bool        MARK_PREDECESSORS >
 cudaError_t RunTests_enable_idempotence(Info<VertexId, SizeT, Value> *info)
 {
-//    if (info->info["idempotent"].get_bool())
+    if (info->info["idempotent"].get_bool())
         return RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
                  MARK_PREDECESSORS, true > (info);
-//    else
-//        return RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
-//                 MARK_PREDECESSORS, false> (info);
+    else
+        return RunTests <VertexId, SizeT, Value,/* INSTRUMENT, DEBUG, SIZE_CHECK,*/
+                 MARK_PREDECESSORS, false> (info);
 }
 
 /**

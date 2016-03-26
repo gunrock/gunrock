@@ -140,7 +140,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     d_row_indices[thread_pos] : d_column_indices[thread_pos];
             }
         } else v_id = (VertexId) -1;
-        if (v_id < 0 || v_id > max_vertex)
+        if (v_id < 0 || v_id >= max_vertex)
         {
             d_scanned_edges[thread_pos] = 0;
             return;
@@ -152,6 +152,14 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         d_scanned_edges[thread_pos] = (!out_inv) ?
             GetNeighborListLength(d_row_offsets, d_column_indices, v_id, max_vertex, max_edge):
             GetNeighborListLength(d_column_offsets, d_row_indices, v_id, max_vertex, max_edge);
+        /*if (d_scanned_edges[thread_pos] < 0)
+        {
+            printf("(%d, %d) : v_id = %d, row_offsets = %d, %d, out_inv = %s\n",
+                blockIdx.x, threadIdx.x, v_id,
+                tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  v_id),
+                tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  v_id + 1),
+                out_inv ? "true" : "false");
+        }*/
         //printf("my_id:%d, out_inv:%d, vid:%d, ncount:%d\n", my_id, out_inv, v_id, ncount);
         //SizeT num_edges = (thread_pos == num_elements) ? 0 : ncount;
         //printf("%d, %d, %dG\t", my_id, v_id, num_edges);

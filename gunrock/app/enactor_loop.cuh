@@ -647,7 +647,7 @@ void Iteration_Loop(
                     {
                         tretval = cudaStreamSynchronize(streams[peer_]);
                         if (tretval != cudaSuccess) {enactor_stats_->retval=tretval;break;}
-
+                        
                         Iteration::Check_Queue_Size(
                             enactor,
                             thread_num,

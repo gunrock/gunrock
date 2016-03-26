@@ -252,27 +252,27 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             SizeT temp_pos = (threadIdx.x << KernelPolicy::LOG_OUTPUT_PER_THREAD);
             for (int i=0; i<thread_output_count; i++)
             {
+                VertexId u = smem_storage.thread_output_vertices[temp_pos];
                 if (d_keys_out != NULL)
                 {
-                    VertexId u = smem_storage.thread_output_vertices[temp_pos];
-
                     util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                         u,
                         d_keys_out + output_pos);
-
-                    if (Problem::ENABLE_IDEMPOTENCE)
-                    {
-                        //util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-                        //    label, smem_storage.d_labels + u);
-                        smem_storage.d_labels[u] = label;
-
-                        //util::io::ModifiedStore<util::io::st::cg>::St(
-                        //    smem_storage.tex_mask_bytes[temp_pos], //mask_byte,
-                        //    smem_storage.d_visited_mask + ((u & KernelPolicy::ELEMENT_ID_MASK)>> 3));
-                        smem_storage.d_visited_mask[(u & KernelPolicy::ELEMENT_ID_MASK)>> (2 + sizeof(MaskT))] = 
-                            smem_storage.tex_mask_bytes[temp_pos];
-                    }
                 }
+
+                if (Problem::ENABLE_IDEMPOTENCE)
+                {
+                    //util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                    //    label, smem_storage.d_labels + u);
+                    //smem_storage.d_labels[u] = label;
+
+                    //util::io::ModifiedStore<util::io::st::cg>::St(
+                    //    smem_storage.tex_mask_bytes[temp_pos], //mask_byte,
+                    //    smem_storage.d_visited_mask + ((u & KernelPolicy::ELEMENT_ID_MASK)>> 3));
+                    //smem_storage.d_visited_mask[(u & KernelPolicy::ELEMENT_ID_MASK)>> (2 + sizeof(MaskT))] = 
+                    //    smem_storage.tex_mask_bytes[temp_pos];
+                }
+
                 output_pos ++;
                 temp_pos ++;
             }
@@ -487,7 +487,6 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                 SizeT output_pos = 0;
                 MaskT tex_mask_byte;
 
-
                 if (thread_output_offset < smem_storage.iter_output_end_offset)
                 {
                     if (thread_output_offset >= next_v_output_start_offset)
@@ -537,17 +536,25 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                         tex_mask_byte = tex1Dfetch(
                             gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,//cta->t_bitmask[0],
                             output_pos);//mask_byte_offset);
+                        //tex_mask_byte = smem_storage.d_visited_mask[output_pos];
 
                         if (!(mask_bit & tex_mask_byte))
                         {
-                            tex_mask_byte |= mask_bit;
-                            //util::io::ModifiedStore<util::io::st::cg>::St(
-                            //    tex_mask_byte, //mask_byte,
-                            //    smem_storage.d_visited_mask + mask_byte_offset);
-
-                            //if (smem_storage.d_labels[u] == util::MaxValue<LabelT>())
-                            if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels,  u) == util::MaxValue<LabelT>())
+                            //do 
+                            {
+                                tex_mask_byte |= mask_bit;
+                                util::io::ModifiedStore<util::io::st::cg>::St(
+                                    tex_mask_byte, //mask_byte,
+                                    smem_storage.d_visited_mask + output_pos);
+                                tex_mask_byte = smem_storage.d_visited_mask[output_pos];
+                            }// while (!(mask_bit & tex_mask_byte));
+                            
+                            if (smem_storage.d_labels[u] == util::MaxValue<LabelT>())
+                            //if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels,  u) == util::MaxValue<LabelT>())
+                            {
                                 to_process = true;
+                                d_data_slice -> labels[u] = label;
+                            }
                         }
                     } else to_process = true;
 
@@ -596,7 +603,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                             (ADVANCE_TYPE == gunrock::oprtr::advance::V2E ||
                              ADVANCE_TYPE == gunrock::oprtr::advance::E2E) ?
                              ((VertexId) edge_id) : u;
-                        smem_storage.tex_mask_bytes[output_pos] = tex_mask_byte;
+                        //smem_storage.tex_mask_bytes[output_pos] = tex_mask_byte;
                         thread_output_count ++;
                     }
                 }
@@ -816,22 +823,27 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                         MaskT mask_bit = 1 << (u & ((1 << (2 + sizeof(MaskT)))-1));
 
                         // Read byte from visited mask in tex
-                        tex_mask_byte = tex1Dfetch(
-                            gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,//cta->t_bitmask[0],
-                            output_pos);//mask_byte_offset);
+                        //tex_mask_byte = tex1Dfetch(
+                        //    gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,//cta->t_bitmask[0],
+                        //    output_pos);//mask_byte_offset);
+                        tex_mask_byte = smem_storage.d_visited_mask[output_pos];
 
                         if (!(mask_bit & tex_mask_byte))
                         {
-                            tex_mask_byte |= mask_bit;
-                            //util::io::ModifiedStore<util::io::st::cg>::St(
-                            //    tex_mask_byte, //mask_byte,
-                            //    smem_storage.d_visited_mask + mask_byte_offset);
+                            do {
+                                tex_mask_byte |= mask_bit;
+                                util::io::ModifiedStore<util::io::st::cg>::St(
+                                    tex_mask_byte, //mask_byte,
+                                    smem_storage.d_visited_mask + output_pos);
+                                tex_mask_byte = smem_storage.d_visited_mask[output_pos];
+                            } while (!(mask_bit & tex_mask_byte));
 
                             //if (smem_storage.d_labels[u] != util::MaxValue<LabelT>())
                             //    to_process = false;
-                            //if (d_data_slice -> labels[u] != util::MaxValue<LabelT>())
-                            if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels,  u) != util::MaxValue<LabelT>())
+                            if (d_data_slice -> labels[u] != util::MaxValue<LabelT>())
+                            //if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels,  u) != util::MaxValue<LabelT>())
                                 to_process = false;
+                            else d_data_slice -> labels[u] = label;
                         } else to_process = false;
                     }
 
@@ -870,7 +882,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                             (ADVANCE_TYPE == gunrock::oprtr::advance::V2E ||
                              ADVANCE_TYPE == gunrock::oprtr::advance::E2E) ?
                              ((VertexId) edge_id) : u;
-                        smem_storage.tex_mask_bytes[output_pos] = tex_mask_byte;
+                        //smem_storage.tex_mask_bytes[output_pos] = tex_mask_byte;
                         thread_output_count ++;
                     }
                 }

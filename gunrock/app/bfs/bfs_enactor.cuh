@@ -545,12 +545,12 @@ struct BFSIteration : public IterationBase <
         //    data_slice -> num_visited_vertices,
         //    rev);
         long long iteration_ = enactor_stats -> iteration % 4;
-        if (frontier_attribute -> output_length[0] > rev)
+        if (frontier_attribute -> output_length[0] > rev && enactor -> direction_optimized)
             data_slice -> direction_votes[iteration_] = BACKWARD;
         else data_slice -> direction_votes[iteration_] = FORWARD;
         data_slice -> direction_votes[(iteration_+1)%4] = UNDECIDED;
 
-        if (enactor -> num_gpus > 1 && enactor_stats -> iteration != 0)
+        if (enactor -> num_gpus > 1 && enactor_stats -> iteration != 0 && enactor -> direction_optimized)
         {
             /*int vote_counter[3];
             data_slice -> current_direction = UNDECIDED;
@@ -645,6 +645,14 @@ struct BFSIteration : public IterationBase <
                 false,
                 stream,
                 true)) return;
+
+            /*if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
+                "cudaStreamSynchronize failed", __FILE__, __LINE__))
+                return;
+            util::cpu_mt::PrintGPUArray("AdvanceResult",
+                frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+                frontier_attribute -> queue_length,
+                thread_num, enactor_stats -> iteration, -1, stream);*/
         } else {
             SizeT num_blocks = 0;
             if (data_slice -> previous_direction == FORWARD)
@@ -1226,6 +1234,8 @@ public:
     //static const bool INSTRUMENT = _INSTRUMENT;
     //static const bool DEBUG      = _DEBUG;
     //static const bool SIZE_CHECK = _SIZE_CHECK;
+
+    bool direction_optimized;
     // Methods
 
     /**
@@ -1236,13 +1246,15 @@ public:
         int  *gpu_idx    = NULL,
         bool  instrument = false,
         bool  debug      = false,
-        bool  size_check = true) :
+        bool  size_check = true,
+        bool  _direction_optimized = false) :
         BaseEnactor(
             VERTEX_FRONTIERS, num_gpus, gpu_idx,
             instrument, debug, size_check),
         thread_slices (NULL),
         thread_Ids    (NULL),
-        problem       (NULL)
+        problem       (NULL),
+        direction_optimized (_direction_optimized)
     {
     }
 

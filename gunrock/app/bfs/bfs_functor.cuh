@@ -71,14 +71,14 @@ struct BFSFunctor {
             //if (label + 1 > d_data_slice -> labels[d_id]) result = false;
         } else {
             // Check if the destination node has been claimed as someone's child
-            VertexId new_label, old_label;
+            VertexId /*new_label,*/ old_label;
             //if (Problem::MARK_PREDECESSORS) {
             //    util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
             //        new_label, d_data_slice -> labels + s_id);
             //} else new_label = label;
-            new_label = label + 1;
-            old_label = atomicMin(d_data_slice -> labels + d_id, new_label);
-            result = new_label < old_label;
+            //new_label = label + 1;
+            old_label = atomicMin(d_data_slice -> labels + d_id, /*new_*/label);
+            result = /*new_*/label < old_label;
         }
         //if (result && TO_TRACK && util::to_track(d_data_slice -> gpu_idx, d_id))
         //     printf("%d\t %d\t CondEdge\t labels[%d] (%d) -> %d = labels[%d] + 1\n",

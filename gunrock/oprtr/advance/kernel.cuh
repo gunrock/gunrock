@@ -98,12 +98,16 @@ cudaError_t ComputeOutputLength(
         + KernelPolicy::THREADS - 1)
         /KernelPolicy::THREADS;
     //if (num_block > 256) num_block = 256;
+    //printf("queue_length = %lld, num_blocks = %lld, block_size = %d\n",
+    //    (long long)frontier_attribute -> queue_length,
+    //    (long long)num_block,
+    //    KernelPolicy::THREADS);
     if (KernelPolicy::ADVANCE_MODE == LB_BACKWARD ||
         KernelPolicy::ADVANCE_MODE == TWC_BACKWARD)
     {
         gunrock::oprtr::edge_map_partitioned_backward::GetEdgeCounts
-            <typename KernelPolicy::LOAD_BALANCED, Problem, Functor>
-            <<< num_block, KernelPolicy::LOAD_BALANCED::THREADS, 0, stream>>>(
+            <KernelPolicy, Problem, Functor>
+            <<< num_block, KernelPolicy::THREADS, 0, stream>>>(
                 d_inv_offsets,
                 d_inv_indices,
                 d_in_key_queue,
@@ -120,7 +124,7 @@ cudaError_t ComputeOutputLength(
              KernelPolicy::ADVANCE_MODE == LB_CULL)
     {
         gunrock::oprtr::edge_map_partitioned::GetEdgeCounts
-            <typename KernelPolicy::LOAD_BALANCED, Problem, Functor, ADVANCE_TYPE, R_TYPE, R_OP>
+            <KernelPolicy, Problem, Functor, ADVANCE_TYPE, R_TYPE, R_OP>
             <<< num_block, KernelPolicy::THREADS, 0, stream>>>(
                 d_offsets,
                 d_indices,
