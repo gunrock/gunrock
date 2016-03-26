@@ -22,6 +22,7 @@
 #include <gunrock/graphio/rmat.cuh>
 #include <gunrock/graphio/grmat.cuh>
 #include <gunrock/graphio/rgg.cuh>
+#include <gunrock/graphio/small_world.cuh>
 
 // Information stats utilities
 #include <boost/filesystem.hpp>
