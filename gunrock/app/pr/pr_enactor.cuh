@@ -461,7 +461,7 @@ struct PRIteration : public IterationBase <
                     data_slice -> rank_next.GetPointer(util::DEVICE),
                     data_slice -> rank_curr.GetPointer(util::DEVICE));*/
 
-            util::MemsetKernel<<<256, 256, 0, stream>>>(
+            util::MemsetKernel<<<240, 512, 0, stream>>>(
                 data_slice->rank_next.GetPointer(util::DEVICE),
                 (Value)0.0, graph_slice->nodes);
 
@@ -1051,7 +1051,7 @@ static CUT_THREADPROC PRThread(
     int           thread_num         =   thread_data -> thread_num;
     int           gpu_idx            =   problem     -> gpu_idx            [thread_num] ;
     DataSlice    *data_slice         =   problem     -> data_slices        [thread_num].GetPointer(util::HOST);
-    GraphSliceT  *graph_slice        =   problem     -> graph_slices       [thread_num] ;
+    //GraphSliceT  *graph_slice        =   problem     -> graph_slices       [thread_num] ;
     FrontierAttribute<SizeT>
                  *frontier_attribute = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
     EnactorStats<SizeT> *enactor_stats
@@ -1099,145 +1099,13 @@ static CUT_THREADPROC PRThread(
         {
             data_slice->value__associate_orgs[0] = data_slice->rank_next.GetPointer(util::DEVICE);
             data_slice->value__associate_orgs.Move(util::HOST, util::DEVICE);
-            //util::cpu_mt::IncrementnWaitBarrier(cpu_barrier, thread_num);
-            //for (int i=0; i<4; i++)
-            //for (int gpu=0; gpu<num_gpus; gpu++)
-            //for (int stage=0; stage<data_slice->num_stages; stage++)
-            //    data_slice->events_set[i][gpu][stage] = false;
-            //util::cpu_mt::IncrementnWaitBarrier(cpu_barrier+1, thread_num);
         }
-        //data_slice -> edge_map_queue_len = frontier_attribute[0].queue_length;
-        //util::cpu_mt::PrintGPUArray("degrees", data_slice->degrees.GetPointer(util::DEVICE), graph_slice->nodes, thread_num);
 
         // Step through PR iterations
         gunrock::app::Iteration_Loop
             <Enactor, Functor,
             PRIteration<AdvanceKernelPolicy, FilterKernelPolicy, Enactor>,
             0, 1 > (thread_data);
-
-        int num_blocks = data_slice -> local_vertices.GetSize() / 512 + 1;
-        if (num_blocks > 480) num_blocks = 480;
-        Assign_Final_Value_Kernel <<<num_blocks, 512, 0, data_slice -> streams[0]>>>(
-            data_slice -> local_vertices.GetSize(),
-            data_slice -> local_vertices.GetPointer(util::DEVICE),
-            data_slice -> degrees.GetPointer(util::DEVICE),
-            data_slice -> rank_curr.GetPointer(util::DEVICE),
-            (thread_num == 0) ? (Value*) NULL : 
-                data_slice -> value__associate_out[1].GetPointer(util::DEVICE));
-       
-        if (thread_num > 0)
-        {
-            /*bool over_sized = false;
-            if (enactor_stats -> retval = Check_Size<SizeT, Value>(
-                enactor -> size_check, "values_out",
-                data_slice -> local_nodes, &data_slice -> value__associate_out[1][0],
-                over_sized, thread_num, enactor_stats -> iteration, -1)) break;
-            if (enactor_stats -> retval = Check_Size<SizeT, VertexId>(
-                enactor -> size_check, "keys_out",
-                data_slice -> local_nodes, &data_slice -> keys_out[1],
-                over_sized, thread_num, enactor_stats -> iteration, -1)) break;
-            if (enactor_stats -> retval = Check_Size<SizeT, VertexId>(
-                enactor -> size_check, "keys_out",
-                data_slice -> local_nodes, &data_slice -> keys_out[0],
-                over_sized, thread_num, enactor_stats -> iteration, -1)) break;*/
-            //Assign_Values_PR <VertexId, SizeT, Value>
-            //    <<<480, 512, 0, data_slice->streams[0]>>> (
-            //    data_slice -> local_vertices.GetSize(),//data_slice->local_nodes,
-                //data_slice->keys_out[0].GetPointer(util::DEVICE),
-            //    data_slice->rank_curr.GetPointer(util::DEVICE),
-            //    data_slice->value__associate_out[1].GetPointer(util::DEVICE));
-            /*util::MemsetCopyVectorKernel<<<128, 128, 0, data_slice->streams[0]>>> (
-                data_slice->keys_out[1].GetPointer(util::DEVICE),
-                data_slice->keys_out[0].GetPointer(util::DEVICE),
-                data_slice->local_nodes);*/
-            //enactor_stats->iteration++;
-            enactor_stats -> iteration = 0;
-            PushNeighbor <Enactor, GraphSliceT, DataSlice, 0, 1> (
-                enactor,
-                thread_num,
-                0,
-                data_slice -> local_vertices.GetSize(),//data_slice->local_nodes,
-                enactor_stats,
-                problem->data_slices [thread_num].GetPointer(util::HOST),
-                problem->data_slices [0         ].GetPointer(util::HOST),
-                problem->graph_slices[thread_num],
-                problem->graph_slices[0],
-                data_slice->streams[0],
-                enactor -> communicate_multipy);
-            Set_Record(data_slice, enactor_stats->iteration, 1, 0, data_slice->streams[0]);
-            data_slice->final_event_set = true;
-            //util::cpu_mt::PrintGPUArray("keys_out", data_slice->keys_out[1].GetPointer(util::DEVICE), data_slice->local_nodes, thread_num, enactor_stats->iteration, -1, data_slice->streams[0]);
-            //util::cpu_mt::PrintGPUArray("values_out", data_slice->value__associate_out[1][0].GetPointer(util::DEVICE), data_slice->local_nodes, thread_num, enactor_stats->iteration, -1, data_slice->streams[0]);
-            
-        } else {
-            int counter = 0;
-            for (int peer=0; peer<num_gpus; peer++)
-            {
-                markers[peer] = 0;
-                if (peer != 0)
-                {
-                    if (enactor_stats -> retval = util::GRError(
-                        cudaMemcpyAsync(data_slice -> remote_vertices_in[peer].GetPointer(util::DEVICE),
-                        problem -> data_slices[peer] -> local_vertices.GetPointer(util::HOST),
-                        sizeof(VertexId) * problem -> data_slices[peer] -> local_vertices.GetSize(),
-                        cudaMemcpyHostToDevice, data_slice -> streams[peer]),
-                        "cudaMemcpyAsync failed", __FILE__, __LINE__))
-                        break;
-                }
-            }
-            
-            while (counter < num_gpus-1)
-            {
-                for (int peer=1; peer<num_gpus; peer++)
-                if (markers[peer] == 0 && problem->data_slices[peer]->final_event_set)
-                {
-                    markers[peer] =1 ;
-                    counter ++;
-                    problem->data_slices[peer]->final_event_set = false;
-                    int peer_iteration = enactor->enactor_stats[peer * num_gpus].iteration;
-                    cudaStreamWaitEvent(data_slice->streams[peer],
-                        problem->data_slices[peer]->events[peer_iteration%4][0][0], 0);
-                    Expand_Incoming_Final<VertexId, SizeT, Value>
-                        <<<480, 512, 0, data_slice->streams[peer]>>> (
-                        problem -> data_slices[peer] -> local_vertices.GetSize(), //problem->data_slices[peer]->local_nodes,
-                        data_slice -> remote_vertices_in[peer].GetPointer(util::DEVICE), //data_slice->keys_in[peer_iteration%2][peer].GetPointer(util::DEVICE),
-                        data_slice->value__associate_in[peer_iteration%2][peer].GetPointer(util::DEVICE),
-                        data_slice->rank_curr.GetPointer(util::DEVICE));
-                }
-            }
-            for (int peer=1; peer<num_gpus; peer++)
-            {
-                int peer_iteration = enactor->enactor_stats[peer * num_gpus].iteration;
-                if (enactor_stats->retval = util::GRError(cudaStreamSynchronize(data_slice->streams[peer]),
-                    "cudaStreamSynchronize failed", __FILE__, __LINE__)) break;
-                //util::cpu_mt::PrintGPUArray("keys_in", data_slice->keys_in[peer_iteration%2][peer].GetPointer(util::DEVICE), problem->data_slices[peer]->local_nodes, thread_num, peer_iteration, peer);
-                //util::cpu_mt::PrintGPUArray("ranks_in", data_slice->value__associate_in[peer_iteration%2][peer][0].GetPointer(util::DEVICE), problem->data_slices[peer]->local_nodes, thread_num, peer_iteration, peer);
-            }
-
-            // release some space on GPU, will be allocated again during Reset
-            //data_slice -> frontier_queues[0].keys[0].Release();
-            //data_slice -> frontier_queues[0].keys[1].Release();
-            data_slice -> rank_next.Release();
-            data_slice -> degrees.Release();
-            if (enactor_stats -> retval = data_slice->node_ids.Allocate(graph_slice->nodes, util::DEVICE))
-                break;
-            util::MemsetIdxKernel<<<128, 128>>>(
-                data_slice-> node_ids.GetPointer(util::DEVICE), graph_slice->nodes);
-
-            // sort according to the rank of nodes
-            util::CUBRadixSort<Value, VertexId>(
-                false, graph_slice->nodes,
-                data_slice->rank_curr.GetPointer(util::DEVICE),
-                data_slice->node_ids.GetPointer(util::DEVICE));
-
-            if (problem -> scaled)
-            {
-                util::MemsetScaleKernel<<<128, 128>>>(
-                    data_slice->rank_curr.GetPointer(util::DEVICE),
-                    (Value) (1.0 / (Value) (problem->org_graph->nodes)),
-                    graph_slice -> nodes);
-            }
-        }
 
         thread_data -> status = ThreadSlice::Status::Idle;
     }
@@ -1276,6 +1144,8 @@ public:
     typedef typename Problem::VertexId VertexId;
     typedef typename Problem::Value    Value   ;
     typedef EnactorBase<SizeT>         BaseEnactor;
+    typedef PREnactor                  Enactor;
+    typedef GraphSlice<VertexId, SizeT, Value> GraphSliceT;
     //static const bool INSTRUMENT = _INSTRUMENT;
     //static const bool DEBUG      = _DEBUG;
     //static const bool SIZE_CHECK = _SIZE_CHECK;
@@ -1418,6 +1288,154 @@ public:
                 std::this_thread::yield();
             }
         }
+        return retval;
+    }
+
+    cudaError_t Extract()
+    {
+        cudaError_t retval = cudaSuccess;
+        typedef typename Problem::DataSlice DataSlice;
+        DataSlice *data_slice = NULL;
+        EnactorStats<SizeT> *enactor_stats = NULL;
+        int num_blocks = 0;
+        for (int thread_num = 1; thread_num < this -> num_gpus; thread_num ++)
+        {
+            if (retval = util::SetDevice(this -> gpu_idx[thread_num]))
+                return retval;
+            data_slice = problem -> data_slices[thread_num].GetPointer(util::HOST);
+            enactor_stats = &(this  -> enactor_stats      [thread_num * this -> num_gpus]);
+         
+            num_blocks = data_slice -> local_vertices.GetSize() / 512 + 1;
+            if (num_blocks > 240) num_blocks = 240;
+            Assign_Final_Value_Kernel <<<num_blocks, 512, 0, data_slice -> streams[0]>>>(
+                data_slice -> local_vertices.GetSize(),
+                data_slice -> local_vertices.GetPointer(util::DEVICE),
+                data_slice -> degrees.GetPointer(util::DEVICE),
+                data_slice -> rank_curr.GetPointer(util::DEVICE),
+                (thread_num == 0) ? (Value*) NULL : 
+                    data_slice -> value__associate_out[1].GetPointer(util::DEVICE));
+       
+            enactor_stats -> iteration = 0;
+            PushNeighbor <Enactor, GraphSliceT, DataSlice, 0, 1> (
+                this,
+                thread_num,
+                0,
+                data_slice -> local_vertices.GetSize(),//data_slice->local_nodes,
+                enactor_stats,
+                problem->data_slices [thread_num].GetPointer(util::HOST),
+                problem->data_slices [0         ].GetPointer(util::HOST),
+                problem->graph_slices[thread_num],
+                problem->graph_slices[0],
+                data_slice->streams[0],
+                this -> communicate_multipy);
+            Set_Record(data_slice, enactor_stats->iteration, 1, 0, data_slice->streams[0]);
+            data_slice->final_event_set = true;
+        }
+        
+        if (retval = util::SetDevice(this -> gpu_idx[0]))
+            return retval;
+        data_slice = problem -> data_slices[0].GetPointer(util::HOST);
+        enactor_stats = this -> enactor_stats + 0;
+
+        num_blocks = data_slice -> local_vertices.GetSize() / 512 + 1;
+        if (num_blocks > 240) num_blocks = 240;
+        Assign_Final_Value_Kernel <<<num_blocks, 512, 0, data_slice -> streams[0]>>>(
+            data_slice -> local_vertices.GetSize(),
+            data_slice -> local_vertices.GetPointer(util::DEVICE),
+            data_slice -> degrees.GetPointer(util::DEVICE),
+            data_slice -> rank_curr.GetPointer(util::DEVICE),
+            (Value*) NULL);
+
+
+        for (int peer=1; peer< this -> num_gpus; peer++)
+        {
+            if (retval = util::GRError(
+                cudaMemcpyAsync(data_slice -> remote_vertices_in[peer].GetPointer(util::DEVICE),
+                problem -> data_slices[peer] -> local_vertices.GetPointer(util::HOST),
+                sizeof(VertexId) * problem -> data_slices[peer] -> local_vertices.GetSize(),
+                cudaMemcpyHostToDevice, data_slice -> streams[peer]),
+                "cudaMemcpyAsync failed", __FILE__, __LINE__))
+                return retval;
+        }
+        
+        for (int peer=1; peer< this -> num_gpus; peer++)
+        {
+            int peer_iteration = this->enactor_stats[peer * this -> num_gpus].iteration;
+            if (retval = util::GRError(
+                cudaStreamWaitEvent(data_slice->streams[peer],
+                problem->data_slices[peer]->events[peer_iteration%4][0][0], 0),
+                "cudaStreamWaitEvent failed", __FILE__, __LINE__)) 
+                return retval;
+            Expand_Incoming_Final<VertexId, SizeT, Value>
+                <<<240, 512, 0, data_slice->streams[peer]>>> (
+                problem -> data_slices[peer] -> local_vertices.GetSize(), //problem->data_slices[peer]->local_nodes,
+                data_slice -> remote_vertices_in[peer].GetPointer(util::DEVICE), //data_slice->keys_in[peer_iteration%2][peer].GetPointer(util::DEVICE),
+                data_slice->value__associate_in[peer_iteration%2][peer].GetPointer(util::DEVICE),
+                data_slice->rank_curr.GetPointer(util::DEVICE));
+            if (retval = util::GRError(
+                cudaEventRecord(data_slice -> events[enactor_stats -> iteration %4][peer][0],
+                data_slice -> streams[peer]),
+                "cudaEventRecord failed", __FILE__, __LINE__)) return retval;
+            if (retval = util::GRError(
+                cudaStreamWaitEvent(data_slice -> streams[0],
+                data_slice -> events[enactor_stats -> iteration %4][peer][0], 0),
+                "cudaStreamWaitEvent failed", __FILE__, __LINE__)) return retval;
+        }
+        
+        //if (retval = data_slice -> degrees .Release()) return retval;
+        if (retval = data_slice -> node_ids.Allocate(data_slice -> nodes, util::DEVICE))
+            return retval;
+        if (retval = data_slice -> temp_vertex.Allocate(data_slice -> nodes, util::DEVICE))
+            return retval;
+        util::MemsetIdxKernel<<<240, 512, 0, data_slice -> streams[0]>>>(
+            data_slice -> node_ids.GetPointer(util::DEVICE), 
+            data_slice -> nodes);        
+        size_t cub_required_size = 0;
+        void* temp_storage = NULL;
+        cub::DoubleBuffer<Value>  key_buffer(
+            data_slice -> rank_curr.GetPointer(util::DEVICE),
+            data_slice -> rank_next.GetPointer(util::DEVICE));
+        cub::DoubleBuffer<VertexId> value_buffer(
+            data_slice -> node_ids .GetPointer(util::DEVICE),
+            data_slice -> temp_vertex.GetPointer(util::DEVICE));
+
+        if (retval = util::GRError(
+            cub::DeviceRadixSort::SortPairsDescending(
+                temp_storage,
+                cub_required_size,
+                key_buffer,
+                value_buffer,
+                data_slice -> nodes),
+            "cubDeviceRadixSort failed", __FILE__, __LINE__))
+            return retval;
+        //printf("required_size = %d\n", cub_required_size);
+        if (retval = data_slice -> cub_sort_storage.Allocate(cub_required_size, util::DEVICE))
+            return retval;
+
+
+        // sort according to the rank of nodes
+        util::CUBRadixSort<Value, VertexId>(
+            false, data_slice -> nodes,
+            data_slice -> rank_curr  .GetPointer(util::DEVICE),
+            data_slice -> node_ids   .GetPointer(util::DEVICE),
+            data_slice -> rank_next  .GetPointer(util::DEVICE),
+            data_slice -> temp_vertex.GetPointer(util::DEVICE),
+            data_slice -> cub_sort_storage.GetPointer(util::DEVICE),
+            data_slice -> cub_sort_storage.GetSize(),
+            data_slice -> streams[0]);
+
+        if (problem -> scaled)
+        {
+            util::MemsetScaleKernel<<<240, 512, 0, data_slice -> streams[0]>>>(
+                data_slice->rank_curr.GetPointer(util::DEVICE),
+                (Value) (1.0 / (Value) (problem->org_graph->nodes)),
+                data_slice -> nodes);
+        }
+
+        if (retval = util::GRError(
+            cudaStreamSynchronize(data_slice -> streams[0]),
+            "cudaStreamSynchronize failed", __FILE__, __LINE__))
+            return retval;
         return retval;
     }
 

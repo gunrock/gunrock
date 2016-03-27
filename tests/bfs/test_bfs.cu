@@ -359,7 +359,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             "cudaMemGetInfo failed", __FILE__, __LINE__)) return retval;
     }
 
-    Problem* problem = new Problem;  // allocate problem on GPU
+    Problem* problem = new Problem(direction_optimized);  // allocate problem on GPU
     if (retval = util::GRError(problem->Init(
         stream_from_host,
         graph,

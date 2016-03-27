@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <cub/cub.cuh>
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/util/memset_kernel.cuh>
 
@@ -106,6 +107,8 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
         //util::Array1D<SizeT, ContextPtr> context;
         util::Array1D<int, SizeT> in_counters;
         util::Array1D<int, SizeT> out_counters;
+        util::Array1D<SizeT, unsigned char> cub_sort_storage;
+        util::Array1D<SizeT, VertexId     > temp_vertex;
 
         /*
          * @brief Default constructor
@@ -139,6 +142,8 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             local_vertices.SetName("local_vertices");
             in_counters   .SetName("in_counters"   );
             out_counters  .SetName("out_counters"  );
+            cub_sort_storage.SetName("cub_sort_storage");
+            temp_vertex   .SetName("temp_vertex");
         }
 
         /*
@@ -161,6 +166,8 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = node_ids    .Release()) return retval;
             if (retval = in_counters .Release()) return retval;
             if (retval = out_counters.Release()) return retval;
+            if (retval = cub_sort_storage.Release()) return retval;
+            if (retval = temp_vertex .Release()) return retval;
             //if (retval = markers     .Release()) return retval;
             //if (temp_keys_out != NULL) {delete[] temp_keys_out; temp_keys_out = NULL;}
             //if (retval = context     .Release()) return retval;
@@ -361,7 +368,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             //}
 
             // Allocate output page ranks if necessary
-            if (retval = node_ids.Release(util::DEVICE)) return retval;
+            //if (retval = node_ids.Release(util::DEVICE)) return retval;
             if (this -> num_gpus > 1)
             for (int peer = 0; peer < this -> num_gpus; peer++)
             {
@@ -587,8 +594,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
                 return retval;
             if (retval = this -> graph_slices[gpu] -> out_degrees    .Release()) 
                 return retval;
-            if (retval = this -> graph_slices[gpu] -> original_vertex.Release()) 
-                return retval;
+            if (retval = this -> graph_slices[gpu] -> original_vertex.Release()) return retval;
             if (retval = this -> graph_slices[gpu] -> convertion_table.Release()) 
                 return retval;
             if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST)) 

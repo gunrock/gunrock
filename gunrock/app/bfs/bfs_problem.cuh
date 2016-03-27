@@ -436,12 +436,12 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
     /**
      * @brief BFSProblem default constructor
      */
-    BFSProblem() : BaseProblem(
+    BFSProblem(bool direction_optimized) : BaseProblem(
         MARK_PREDECESSORS && ENABLE_IDEMPOTENCE, // use_double_buffer
         false,                                   // enable_backward
         false,                                   // keep_order
         true,                                   // keep_node_num
-        true,                                  // skip_makeout_selection
+        direction_optimized,                                  // skip_makeout_selection
         true),                                   // unified_receive
         data_slices(NULL)
     {

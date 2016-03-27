@@ -731,6 +731,9 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
     cpu_timer.Start();
     // copy out results
+    if (retval = util::GRError(enactor->Extract(),
+        "PR Enactor extract failed", __FILE__, __LINE__))
+        return retval;
     if (retval = util::GRError(problem->Extract(h_rank, h_node_id),
         "PR Problem Data Extraction Failed", __FILE__, __LINE__))
         return retval;
