@@ -524,7 +524,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     bool        debug               = info->info["debug_mode"       ].get_bool ();
     bool        size_check          = info->info["size_check"       ].get_bool ();
     int         iterations          = info->info["num_iteration"    ].get_int  ();
-    int         traversal_mode      = info->info["traversal_mode"   ].get_int  ();
+    std::string traversal_mode      = info->info["traversal_mode"   ].get_str  ();
     std::string ref_filename        = info->info["ref_filename"     ].get_str  ();
     Value       delta               = info->info["delta"            ].get_real ();
     Value       error               = info->info["error"            ].get_real ();
@@ -688,13 +688,14 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     double max_elapsed    = 0.0;
     double min_elapsed    = 1e10;
     json_spirit::mArray process_times;
+    if (!quiet_mode) printf("Using traversal mode %s\n", traversal_mode.c_str());
 
     for (int iter = 0; iter < iterations; ++iter)
     {
         if (retval = util::GRError(problem->Reset(
             src, delta, error, max_iteration,
             enactor->GetFrontierType(), max_queue_sizing,
-            max_queue_sizing1, traversal_mode == 1 ? true : false),
+            max_queue_sizing1, traversal_mode == "TWC" ? true : false),
             "PR Problem Data Reset Failed", __FILE__, __LINE__))
             return retval;
         if (retval = util::GRError(enactor->Reset(traversal_mode),

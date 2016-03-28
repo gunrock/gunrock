@@ -102,8 +102,7 @@ cudaError_t ComputeOutputLength(
     //    (long long)frontier_attribute -> queue_length,
     //    (long long)num_block,
     //    KernelPolicy::THREADS);
-    if (KernelPolicy::ADVANCE_MODE == LB_BACKWARD ||
-        KernelPolicy::ADVANCE_MODE == TWC_BACKWARD)
+    if (isBackward<KernelPolicy::ADVANCE_MODE>())
     {
         gunrock::oprtr::edge_map_partitioned_backward::GetEdgeCounts
             <KernelPolicy, Problem, Functor>
@@ -118,11 +117,11 @@ cudaError_t ComputeOutputLength(
                 ADVANCE_TYPE);
         //util::DisplayDeviceResults(partitioned_scanned_edges, frontier_attribute->queue_length);
     }
-    else if (KernelPolicy::ADVANCE_MODE == LB ||
-             KernelPolicy::ADVANCE_MODE == LB_LIGHT ||
-             KernelPolicy::ADVANCE_MODE == TWC_FORWARD ||
-             KernelPolicy::ADVANCE_MODE == LB_CULL)
-    {
+    //else if (KernelPolicy::ADVANCE_MODE == LB ||
+    //         KernelPolicy::ADVANCE_MODE == LB_LIGHT ||
+    //         KernelPolicy::ADVANCE_MODE == TWC_FORWARD ||
+    //         KernelPolicy::ADVANCE_MODE == LB_CULL)
+    else {
         gunrock::oprtr::edge_map_partitioned::GetEdgeCounts
             <KernelPolicy, Problem, Functor, ADVANCE_TYPE, R_TYPE, R_OP>
             <<< num_block, KernelPolicy::THREADS, 0, stream>>>(
@@ -589,6 +588,61 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
 };
 
 template <typename Parameter>
+struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_LIGHT>
+{
+    typedef typename Parameter::Problem::SizeT         SizeT;
+    typedef typename Parameter::Problem::VertexId      VertexId;
+    typedef typename Parameter::Problem::Value         Value;
+    typedef typename Parameter::KernelPolicy::LOAD_BALANCED LBPOLICY;
+
+    static cudaError_t Launch(Parameter *parameter)
+    {
+        cudaError_t retval = cudaSuccess;
+        // load edge-expand-partitioned kernel
+        SizeT num_block = (parameter -> frontier_attribute -> queue_length +
+             LBPOLICY::THREADS - 1) / LBPOLICY::THREADS;
+
+        if (parameter -> get_output_length)
+        {
+            if (retval = ComputeOutputLength(parameter))
+                return retval;
+        }
+
+        gunrock::oprtr::edge_map_partitioned::RelaxLightEdges
+            <LBPOLICY,
+            typename Parameter::Problem,
+            typename Parameter::Functor,
+            Parameter::ADVANCE_TYPE,
+            Parameter::R_TYPE,
+            Parameter::R_OP>
+            <<< num_block, LBPOLICY::THREADS, 0, parameter -> stream>>>(
+            parameter -> frontier_attribute -> queue_reset,
+            parameter -> frontier_attribute -> queue_index,
+            parameter -> label, //parameter -> enactor_stats -> iteration,
+            parameter -> d_row_offsets,
+            parameter -> d_column_offsets,
+            parameter -> d_column_indices,
+            parameter -> d_row_indices,
+            parameter -> d_partitioned_scanned_edges, // TODO: +1?
+            parameter -> d_in_key_queue,
+            parameter -> d_out_key_queue,
+            parameter -> d_out_value_queue,
+            parameter -> d_data_slice,
+            parameter -> frontier_attribute -> queue_length,
+            parameter -> frontier_attribute -> output_length.GetPointer(util::DEVICE),
+            parameter -> max_in,
+            parameter -> max_out,
+            parameter -> work_progress[0],
+            parameter -> enactor_stats -> advance_kernel_stats,
+            parameter -> input_inverse_graph,
+            parameter -> output_inverse_graph,
+            parameter -> d_value_to_reduce,
+            parameter -> d_reduce_frontier);
+        return retval;
+   }
+};
+
+template <typename Parameter>
 struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_CULL>
 {
     typedef typename Parameter::Problem::SizeT         SizeT;
@@ -721,34 +775,40 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_CULL>
 };
 
 template <typename Parameter>
-struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_LIGHT>
+struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_LIGHT_CULL>
 {
     typedef typename Parameter::Problem::SizeT         SizeT;
     typedef typename Parameter::Problem::VertexId      VertexId;
     typedef typename Parameter::Problem::Value         Value;
-    typedef typename Parameter::KernelPolicy::LOAD_BALANCED LBPOLICY;
+    typedef typename Parameter::KernelPolicy::LOAD_BALANCED_CULL KernelPolicy;
 
     static cudaError_t Launch(Parameter *parameter)
     {
         cudaError_t retval = cudaSuccess;
         // load edge-expand-partitioned kernel
-        SizeT num_block = (parameter -> frontier_attribute -> queue_length +
-             LBPOLICY::THREADS - 1) / LBPOLICY::THREADS;
+
 
         if (parameter -> get_output_length)
         {
             if (retval = ComputeOutputLength(parameter))
                 return retval;
+            if (retval = util::GRError(cudaStreamSynchronize(parameter -> stream),
+                "cudaStreamSynchronize failed", __FILE__, __LINE__))
+                return retval;
         }
 
-        gunrock::oprtr::edge_map_partitioned::RelaxLightEdges
-            <LBPOLICY,
+        SizeT num_blocks = (parameter -> frontier_attribute -> queue_length +
+            KernelPolicy::SCRATCH_ELEMENTS - 1) / KernelPolicy::SCRATCH_ELEMENTS;
+        //if (num_blocks > 480 ) num_blocks = 480;
+        //printf("using RelaxLightEdges, num_bolocks = %d, labels = %p\n", num_blocks, parameter->h_data_slice->labels.GetPointer(util::DEVICE));
+        gunrock::oprtr::edge_map_partitioned_cull::RelaxLightEdges
+            <KernelPolicy,
             typename Parameter::Problem,
             typename Parameter::Functor,
             Parameter::ADVANCE_TYPE,
             Parameter::R_TYPE,
             Parameter::R_OP>
-            <<< num_block, LBPOLICY::THREADS, 0, parameter -> stream>>>(
+            <<< num_blocks, KernelPolicy::THREADS, 0, parameter -> stream>>>(
             parameter -> frontier_attribute -> queue_reset,
             parameter -> frontier_attribute -> queue_index,
             parameter -> label, //parameter -> enactor_stats -> iteration,
@@ -767,12 +827,15 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_LIGHT>
             parameter -> max_out,
             parameter -> work_progress[0],
             parameter -> enactor_stats -> advance_kernel_stats,
+            //ADVANCE_TYPE,
             parameter -> input_inverse_graph,
             parameter -> output_inverse_graph,
+            //R_TYPE,
+            //R_OP,
             parameter -> d_value_to_reduce,
             parameter -> d_reduce_frontier);
-        return retval;
-   }
+       return retval;
+    }
 };
 
 /**

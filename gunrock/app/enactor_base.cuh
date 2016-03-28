@@ -75,6 +75,7 @@ public:
     int           subqueue_latency;
     int           fullqueue_latency;
     int           makeout_latency;
+    int           min_sm_version;
 
     //Device properties
     util::Array1D<SizeT, util::CudaProperties>          cuda_props        ;
@@ -124,12 +125,16 @@ protected:
             num_gpus         , util::HOST, true, 
             cudaHostAllocMapped | cudaHostAllocPortable)) 
             return;
+        min_sm_version = -1;
         for (int gpu=0;gpu<num_gpus;gpu++)
         {
             if (util::SetDevice(gpu_idx[gpu])) return;
             // Setup work progress (only needs doing once since we maintain
             // it in our kernel code)
             cuda_props   [gpu].Setup(gpu_idx[gpu]);
+            if (min_sm_version == -1 ||
+                cuda_props[gpu].device_sm_version < min_sm_version)
+                min_sm_version = cuda_props[gpu].device_sm_version;
         }      
     }
 

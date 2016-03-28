@@ -305,7 +305,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     bool     quiet_mode            = info->info["quiet_mode"        ].get_bool ();
     bool     quick_mode            = info->info["quick_mode"        ].get_bool ();
     bool     stream_from_host      = info->info["stream_from_host"  ].get_bool ();
-    int      traversal_mode        = info->info["traversal_mode"    ].get_int  ();
+    std::string traversal_mode     = info->info["traversal_mode"    ].get_str  ();
     bool     instrument            = info->info["instrument"        ].get_bool ();
     bool     debug                 = info->info["debug_mode"        ].get_bool ();
     bool     size_check            = info->info["size_check"        ].get_bool ();
@@ -433,7 +433,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             printf("src_seed = %d\n", src_seed);
         srand(src_seed);
     }
-
+    if (!quiet_mode)
+        printf("Using traversal-mode %s\n", traversal_mode.c_str());
     for (int iter = 0; iter < iterations; ++iter)
     {
         if (src_type == "random2")

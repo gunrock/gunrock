@@ -76,7 +76,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         //util::Array1D<SizeT, SizeT         > input_counter;
         //util::Array1D<SizeT, SizeT         > output_counter;
         //util::Array1D<SizeT, int           > edge_marker;
-        //util::Array1D<SizeT, SizeT         > vertex_markers[2];
+        util::Array1D<SizeT, SizeT         > vertex_markers[2];
         SizeT num_visited_vertices;
         DIRECTION current_direction, previous_direction;
         util::Array1D<SizeT, VertexId      > unvisited_vertices[2];
@@ -95,8 +95,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             //input_counter   .SetName("input_counter"   );
             //output_counter  .SetName("output_counter"  );
             //edge_marker     .SetName("edge_marker"     );
-            //vertex_markers[0].SetName("vertex_markers[0]");
-            //vertex_markers[1].SetName("vertex_markers[1]");
+            vertex_markers[0].SetName("vertex_markers[0]");
+            vertex_markers[1].SetName("vertex_markers[1]");
             unvisited_vertices[0].SetName("unvisited_vertices[0]");
             unvisited_vertices[1].SetName("unvisited_vertices[1]");
             local_vertices.SetName("local_vertices");
@@ -123,8 +123,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             //if (retval = input_counter  .Release()) return retval;
             //if (retval = output_counter .Release()) return retval;
             //if (retval = edge_marker    .Release()) return retval;
-            //if (retval = vertex_markers[0].Release()) return retval;
-            //if (retval = vertex_markers[1].Release()) return retval;
+            if (retval = vertex_markers[0].Release()) return retval;
+            if (retval = vertex_markers[1].Release()) return retval;
             if (retval = unvisited_vertices[0].Release()) return retval;
             if (retval = unvisited_vertices[1].Release()) return retval;
             if (retval = split_lengths.Release()) return retval;

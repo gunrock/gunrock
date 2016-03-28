@@ -348,7 +348,7 @@ __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
 void Kernel(
     bool                                    queue_reset,
     typename KernelPolicy::VertexId         queue_index,
-    int                                     label,
+    typename Functor::LabelT                label,
     typename KernelPolicy::SizeT            *d_row_offsets,
     typename KernelPolicy::SizeT            *d_inverse_row_offsets,
     typename KernelPolicy::VertexId         *d_column_indices,

@@ -203,6 +203,50 @@ template <typename Problem, typename KernelPolicy>
 __global__ void From_Unvisited_Queue(
     typename Problem::SizeT     num_nodes,
     typename Problem::SizeT    *d_out_length,
+    typename Problem::VertexId *d_keys_out)
+{
+    typedef typename Problem::VertexId VertexId;
+    typedef typename Problem::SizeT    SizeT;
+    typedef typename Problem::MaskT    MaskT;
+    typedef util::Block_Scan<SizeT, KernelPolicy::CUDA_ARCH, KernelPolicy::LOG_THREADS> BlockScanT;
+
+    __shared__ typename BlockScanT::Temp_Space scan_space;
+    __shared__ SizeT block_offset;
+    SizeT x = (SizeT) blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT) blockDim.x * gridDim.x;
+
+    while (x - threadIdx.x < num_nodes)
+    {
+        bool to_process = true;
+        SizeT output_pos = 0;
+        if (x < num_nodes)
+        {
+            //printf("(%d, %d) : x = %d\n", blockIdx.x, threadIdx.x, x);
+            if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, x)
+                != util::MaxValue<VertexId>())
+                to_process = false;
+        } else to_process = false;
+
+        BlockScanT::LogicScan(to_process, output_pos, scan_space);
+        if (threadIdx.x == blockDim.x -1)
+        {
+            block_offset = atomicAdd(d_out_length, output_pos + ((to_process) ? 1 : 0));
+        }
+        __syncthreads();
+        if (to_process)
+        {
+            output_pos += block_offset;
+            d_keys_out[output_pos] = x;
+        }
+        __syncthreads();
+        x += STRIDE;
+    }
+}
+
+template <typename Problem, typename KernelPolicy>
+__global__ void From_Unvisited_Queue_IDEM(
+    typename Problem::SizeT     num_nodes,
+    typename Problem::SizeT    *d_out_length,
     typename Problem::VertexId *d_keys_out,
     typename Problem::MaskT    *d_visited_mask)
 {
@@ -239,6 +283,7 @@ __global__ void From_Unvisited_Queue(
                 else {
                     key = (x << (sizeof(MaskT) + 2)) + i;
                     if (key >= num_nodes) break;
+
                     if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key) != util::MaxValue<VertexId>())
                     {
                         to_process = false;
@@ -279,6 +324,53 @@ __global__ void From_Unvisited_Queue(
 
 template <typename Problem, typename KernelPolicy>
 __global__ void From_Unvisited_Queue_Local(
+    typename Problem::SizeT     num_local_vertices,
+    typename Problem::VertexId *d_local_vertices,
+    typename Problem::SizeT    *d_out_length,
+    typename Problem::VertexId *d_keys_out)
+{
+    typedef typename Problem::VertexId VertexId;
+    typedef typename Problem::SizeT    SizeT;
+    typedef typename Problem::MaskT    MaskT;
+    typedef util::Block_Scan<SizeT, KernelPolicy::CUDA_ARCH, KernelPolicy::LOG_THREADS> BlockScanT;
+
+    __shared__ typename BlockScanT::Temp_Space scan_space;
+    __shared__ SizeT block_offset;
+    SizeT x = (SizeT) blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT) blockDim.x * gridDim.x;  
+
+    while ((x - threadIdx.x) < num_local_vertices)
+    {
+        bool to_process = true;
+        VertexId key = 0;
+        SizeT output_pos = 0;
+        
+        if (x < num_local_vertices)
+        {
+            key = d_local_vertices[x];
+            if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key)
+                != util::MaxValue<VertexId>())
+                to_process = false;
+        } else to_process = false;
+
+        BlockScanT::LogicScan(to_process, output_pos, scan_space);
+        if (threadIdx.x == blockDim.x -1)
+        {
+            block_offset = atomicAdd(d_out_length, output_pos + ((to_process) ? 1 : 0));
+        }
+        __syncthreads();
+        if (to_process)
+        {
+            output_pos += block_offset;
+            d_keys_out[output_pos] = key;
+        }
+        __syncthreads();
+        x += STRIDE;
+    }
+}
+
+template <typename Problem, typename KernelPolicy>
+__global__ void From_Unvisited_Queue_Local_IDEM(
     typename Problem::SizeT     num_local_vertices,
     typename Problem::VertexId *d_local_vertices,
     typename Problem::SizeT    *d_out_length,
@@ -376,7 +468,7 @@ __global__ void Inverse_Expand(
             key = d_unvisited_key_in[x];
         } else to_process = false;
 
-        if (to_process)
+        if (to_process && Problem::ENABLE_IDEMPOTENCE)
         {
             mask_pos = (key & KernelPolicy::LOAD_BALANCED_CULL::ELEMENT_ID_MASK) >> (2+sizeof(MaskT));
             mask_byte = tex1Dfetch(
@@ -391,8 +483,11 @@ __global__ void Inverse_Expand(
         {
             if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key) != util::MaxValue<VertexId>())
             {
-                mask_byte |= mask_bit;
-                d_visited_mask[mask_pos] = mask_byte;
+                if (Problem::ENABLE_IDEMPOTENCE)
+                {
+                    mask_byte |= mask_bit;
+                    d_visited_mask[mask_pos] = mask_byte;
+                }
                 to_process = false;
             }
         }
@@ -414,8 +509,11 @@ __global__ void Inverse_Expand(
 
         if (discoverable)
         {
-            mask_byte |= mask_bit;
-            d_visited_mask[mask_pos] = mask_byte;
+            if (Problem::ENABLE_IDEMPOTENCE)
+            {
+                mask_byte |= mask_bit;
+                d_visited_mask[mask_pos] = mask_byte;
+            }
             d_labels[key] = label;
         }
 
@@ -502,14 +600,6 @@ struct BFSIteration : public IterationBase <
         ContextPtr                     context,
         cudaStream_t                   stream)
     {
-        if (enactor -> debug)
-            util::cpu_mt::PrintMessage("Advance begin",
-                thread_num, enactor_stats->iteration, peer_);
-        //if (enactor_stats -> retval = util::cpu_mt::PrintGPUArray<SizeT, VertexId>("PreAdvance",
-        //    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
-        //    frontier_attribute -> queue_length,
-        //    thread_num, enactor_stats -> iteration, peer_, stream))
-        //    return;
         if (TO_TRACK)
         {
             printf("%d\t %lld\t %d SubQueue_Core queue_length = %lld\n",
@@ -531,8 +621,7 @@ struct BFSIteration : public IterationBase <
             //    data_slice -> labels.GetPointer(util::DEVICE),
             //    (Value)(enactor_stats -> iteration));
         }
-        frontier_attribute->queue_reset = true;
-        enactor_stats     ->nodes_queued[0] += frontier_attribute->queue_length;
+
         data_slice -> num_visited_vertices += frontier_attribute -> queue_length;
         SizeT num_unvisited_vertices = graph_slice -> nodes - data_slice -> num_visited_vertices;
         float rev = data_slice -> num_visited_vertices == 0 ?
@@ -595,9 +684,15 @@ struct BFSIteration : public IterationBase <
         //util::MemsetKernel<<<256, 256, 0, stream>>>(
         //    data_slice -> edge_marker.GetPointer(util::DEVICE),
         //    0, graph_slice -> edges);
-
+        
         if (data_slice -> current_direction == FORWARD)
         {
+            frontier_attribute->queue_reset = true;
+            enactor_stats     ->nodes_queued[0] += frontier_attribute->queue_length;
+
+            if (enactor -> debug)
+                util::cpu_mt::PrintMessage("Forward Advance begin",
+                    thread_num, enactor_stats->iteration, peer_);
             // Edge Map
             gunrock::oprtr::advance::LaunchKernel
                 <AdvanceKernelPolicy, Problem, Functor, gunrock::oprtr::advance::V2V>(
@@ -627,11 +722,14 @@ struct BFSIteration : public IterationBase <
                 false,
                 false,
                 false);
+            if (enactor -> debug)
+                util::cpu_mt::PrintMessage("Forward Advance end",
+                    thread_num, enactor_stats->iteration, peer_);
 
             frontier_attribute -> queue_reset = false;
             frontier_attribute -> queue_index++;
             frontier_attribute -> selector ^= 1;
-            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB_CULL)
+            if (gunrock::oprtr::advance::hasPreScan<AdvanceKernelPolicy::ADVANCE_MODE>())
             {
                 enactor_stats -> edges_queued[0] += frontier_attribute -> output_length[0];
             } else {
@@ -639,21 +737,86 @@ struct BFSIteration : public IterationBase <
                     work_progress  -> template GetQueueLengthPointer<unsigned int>(
                         frontier_attribute -> queue_index), stream);
             }
-            if (enactor_stats->retval = work_progress -> GetQueueLength(
+
+            /*if (enactor_stats->retval = work_progress -> GetQueueLength(
                 frontier_attribute->queue_index,
                 frontier_attribute->queue_length,
                 false,
                 stream,
                 true)) return;
-
-            /*if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
+            if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
                 "cudaStreamSynchronize failed", __FILE__, __LINE__))
                 return;
             util::cpu_mt::PrintGPUArray("AdvanceResult",
                 frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
                 frontier_attribute -> queue_length,
                 thread_num, enactor_stats -> iteration, -1, stream);*/
-        } else {
+
+            if (!gunrock::oprtr::advance::isFused<AdvanceKernelPolicy::ADVANCE_MODE>())
+            {
+                // Filter
+                if (enactor -> debug)
+                    util::cpu_mt::PrintMessage("Filter begin.",
+                        thread_num, enactor_stats->iteration);
+                gunrock::oprtr::filter::LaunchKernel
+                    <FilterKernelPolicy, Problem, Functor> (
+                    enactor_stats[0],
+                    frontier_attribute[0],
+                    (VertexId)enactor_stats -> iteration + 1,
+                    data_slice,
+                    d_data_slice,
+                    data_slice -> vertex_markers[enactor_stats -> iteration % 2].GetPointer(util::DEVICE),
+                    data_slice -> visited_mask.GetPointer(util::DEVICE),
+                    frontier_queue->keys  [frontier_attribute -> selector  ].GetPointer(util::DEVICE),
+                    frontier_queue->keys  [frontier_attribute -> selector^1].GetPointer(util::DEVICE),
+                    frontier_queue->values[frontier_attribute -> selector  ].GetPointer(util::DEVICE),
+                    (Value*)NULL,
+                    frontier_attribute -> output_length[0],
+                    graph_slice -> nodes,
+                    work_progress[0],
+                    context[0],
+                    stream,
+                    frontier_queue -> keys  [frontier_attribute -> selector  ].GetSize(),
+                    frontier_queue -> keys  [frontier_attribute -> selector^1].GetSize(),
+                    enactor_stats -> filter_kernel_stats,
+                    true, // filtering_flag
+                    false); // skip_marking
+                if (enactor -> debug)
+                    util::cpu_mt::PrintMessage("Filter end.",
+                        thread_num, enactor_stats->iteration);
+
+                //if (FilterKernelPolicy::FILTER_MODE == gunrock::oprtr::filter::SIMPLIFIED)
+                //    util::MemsetKernel<<<256, 256, 0, stream>>>(
+                //        data_slice -> vertex_markers[(enactor_stats -> iteration +1)%2].GetPointer(util::DEVICE), (SizeT)0, graph_slice -> nodes + 1);
+                //if (enactor -> debug && (enactor_stats->retval =
+                //    util::GRError("filter_forward::Kernel failed", __FILE__, __LINE__))) return;
+                frontier_attribute->queue_index++;
+                frontier_attribute->selector ^= 1;
+
+                /*if (enactor_stats->retval = work_progress -> GetQueueLength(
+                    frontier_attribute->queue_index,
+                    frontier_attribute->queue_length,
+                    false,
+                    stream,
+                    true)) return;
+                if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
+                    "cudaStreamSynchronize failed", __FILE__, __LINE__))
+                    return;
+                util::cpu_mt::PrintGPUArray("FilterResult",
+                    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+                    frontier_attribute -> queue_length,
+                    thread_num, enactor_stats -> iteration, -1, stream);*/
+
+            }
+
+            if (enactor_stats -> retval = work_progress -> GetQueueLength(
+                frontier_attribute -> queue_index,
+                frontier_attribute -> queue_length,
+                false,
+                stream,
+                true)) return;
+
+        } else { // backward
             SizeT num_blocks = 0;
             if (data_slice -> previous_direction == FORWARD)
             {
@@ -662,24 +825,45 @@ struct BFSIteration : public IterationBase <
                 if (enactor -> num_gpus == 1)
                 //if (true)
                 {
-                    num_blocks = graph_slice -> nodes / AdvanceKernelPolicy::THREADS + 1;
-                    if (num_blocks > 480) num_blocks = 480;
-                    From_Unvisited_Queue<Problem, AdvanceKernelPolicy>
-                        <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
-                        (graph_slice -> nodes,
-                        data_slice -> split_lengths.GetPointer(util::DEVICE),
-                        data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE),
-                        data_slice -> visited_mask.GetPointer(util::DEVICE));
+                    if (Problem::ENABLE_IDEMPOTENCE)
+                    {
+                        num_blocks = (graph_slice -> nodes >> (2 + /*sizeof(Problem::MaskT)*/1))/ AdvanceKernelPolicy::THREADS + 1;
+                        if (num_blocks > 480) num_blocks = 480;
+                        From_Unvisited_Queue_IDEM<Problem, AdvanceKernelPolicy>
+                            <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
+                            (graph_slice -> nodes,
+                            data_slice -> split_lengths.GetPointer(util::DEVICE),
+                            data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE),
+                            data_slice -> visited_mask.GetPointer(util::DEVICE));
+                    } else {
+                        num_blocks = graph_slice -> nodes / AdvanceKernelPolicy::THREADS + 1;
+                        if (num_blocks > 480) num_blocks = 480;
+                        From_Unvisited_Queue<Problem, AdvanceKernelPolicy>
+                            <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
+                            (graph_slice -> nodes,
+                            data_slice -> split_lengths.GetPointer(util::DEVICE),
+                            data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE));
+                    }
                 } else {
                     num_blocks = data_slice -> local_vertices.GetSize() / AdvanceKernelPolicy::THREADS + 1;
                     if (num_blocks > 480) num_blocks = 480;
-                    From_Unvisited_Queue_Local<Problem, AdvanceKernelPolicy>
-                        <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
-                        (data_slice -> local_vertices.GetSize(),
-                        data_slice -> local_vertices.GetPointer(util::DEVICE),
-                        data_slice -> split_lengths.GetPointer(util::DEVICE),
-                        data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE),
-                        data_slice -> visited_mask.GetPointer(util::DEVICE));
+                    if (Problem::ENABLE_IDEMPOTENCE)
+                    {
+                        From_Unvisited_Queue_Local_IDEM<Problem, AdvanceKernelPolicy>
+                            <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
+                            (data_slice -> local_vertices.GetSize(),
+                            data_slice -> local_vertices.GetPointer(util::DEVICE),
+                            data_slice -> split_lengths.GetPointer(util::DEVICE),
+                            data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE),
+                            data_slice -> visited_mask.GetPointer(util::DEVICE));
+                    } else {
+                        From_Unvisited_Queue_Local<Problem, AdvanceKernelPolicy>
+                            <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
+                            (data_slice -> local_vertices.GetSize(),
+                            data_slice -> local_vertices.GetPointer(util::DEVICE),
+                            data_slice -> split_lengths.GetPointer(util::DEVICE),
+                            data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE));
+                    }
                 }
                 data_slice -> split_lengths.Move(util::DEVICE, util::HOST, 1, 0, stream);
                 if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
@@ -691,8 +875,9 @@ struct BFSIteration : public IterationBase <
             } else {
                 num_unvisited_vertices = data_slice -> split_lengths[0];
             }
-            //printf("unvisited = %d\n", num_unvisited_vertices);
-            //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("unvisited0", data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE), num_unvisited_vertices, data_slice -> gpu_idx, enactor_stats -> iteration, -1, stream);
+            //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("unvisited0", 
+            //    data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE), 
+            //    num_unvisited_vertices, data_slice -> gpu_idx, enactor_stats -> iteration, -1, stream);
 
             data_slice -> split_lengths[0] = 0;
             data_slice -> split_lengths[1] = 0;
@@ -721,15 +906,9 @@ struct BFSIteration : public IterationBase <
             frontier_attribute -> queue_reset = false;
             frontier_attribute -> queue_index++;
             frontier_attribute -> selector ^= 1;
-
-
         }
         data_slice -> previous_direction = data_slice -> current_direction;
         // Only need to reset queue for once
-        if (enactor -> debug)
-            util::cpu_mt::PrintMessage("Advance end",
-                thread_num, enactor_stats->iteration, peer_);
-
         //if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
         //    "cudaStreamSynchronize failed", __FILE__, __LINE__))
         //    return;
@@ -768,49 +947,6 @@ struct BFSIteration : public IterationBase <
             //    work_progress -> template GetQueueLengthPointer<unsigned int, SizeT>(
             //        frontier_attribute->queue_index));
         }
-
-        // Filter
-        /*gunrock::oprtr::filter::LaunchKernel
-            <FilterKernelPolicy, Problem, Functor> (
-            enactor_stats[0],
-            frontier_attribute[0],
-            (VertexId)enactor_stats -> iteration + 1,
-            data_slice,
-            d_data_slice,
-            data_slice -> vertex_markers[enactor_stats -> iteration % 2].GetPointer(util::DEVICE),
-            data_slice->visited_mask.GetPointer(util::DEVICE),
-            frontier_queue->keys  [frontier_attribute -> selector  ].GetPointer(util::DEVICE),
-            frontier_queue->keys  [frontier_attribute -> selector^1].GetPointer(util::DEVICE),
-            frontier_queue->values[frontier_attribute -> selector  ].GetPointer(util::DEVICE),
-            (Value*)NULL,
-            frontier_attribute -> output_length[0],
-            graph_slice -> nodes,
-            work_progress[0],
-            context[0],
-            stream,
-            frontier_queue -> keys  [frontier_attribute -> selector  ].GetSize(),
-            frontier_queue -> keys  [frontier_attribute -> selector^1].GetSize(),
-            enactor_stats -> filter_kernel_stats,
-            true, // filtering_flag
-            false); // skip_marking
-
-        //if (FilterKernelPolicy::FILTER_MODE == gunrock::oprtr::filter::SIMPLIFIED)
-        //    util::MemsetKernel<<<256, 256, 0, stream>>>(
-        //        data_slice -> vertex_markers[(enactor_stats -> iteration +1)%2].GetPointer(util::DEVICE), (SizeT)0, graph_slice -> nodes + 1);
-        if (enactor -> debug && (enactor_stats->retval =
-            util::GRError("filter_forward::Kernel failed", __FILE__, __LINE__))) return;
-        if (enactor -> debug)
-            util::cpu_mt::PrintMessage("Filter end.",
-                thread_num, enactor_stats->iteration);
-        frontier_attribute->queue_index++;
-        frontier_attribute->selector ^= 1;
-        if (enactor_stats_->retval = work_progress[peer_].GetQueueLength(
-            frontier_attribute_->queue_index,
-            frontier_attribute_->queue_length,
-            false,
-            streams[peer_],
-            true)) break;
-        */
 
         if (TO_TRACK)
         {
@@ -992,8 +1128,9 @@ struct BFSIteration : public IterationBase <
         //printf("SIZE_CHECK = %s\n", Enactor::SIZE_CHECK ? "true" : "false");
         bool over_sized = false;
         if (!enactor -> size_check &&
-            (AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_FORWARD ||
-             AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_BACKWARD))
+            (!gunrock::oprtr::advance::hasPreScan<AdvanceKernelPolicy::ADVANCE_MODE>()))
+            //(AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_FORWARD ||
+            // AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_BACKWARD))
         {
             frontier_attribute -> output_length[0] = 0;
             return retval;
@@ -1062,7 +1199,13 @@ struct BFSIteration : public IterationBase <
             fflush(stdout);
         }
 
-        if (AdvanceKernelPolicy::ADVANCE_MODE != gunrock::oprtr::advance::LB_CULL)
+        if (!enactor -> size_check &&
+            (!gunrock::oprtr::advance::hasPreScan<AdvanceKernelPolicy::ADVANCE_MODE>()))
+        {    
+            frontier_attribute -> output_length[0] = 0; 
+            return;
+        } else if (!gunrock::oprtr::advance::isFused<AdvanceKernelPolicy::ADVANCE_MODE>())
+            //(AdvanceKernelPolicy::ADVANCE_MODE != gunrock::oprtr::advance::LB_CULL)
         {
             if (enactor_stats->retval =
                 Check_Size</*true,*/ SizeT, VertexId > (
@@ -1338,16 +1481,16 @@ public:
                     problem->data_slices[gpu]->visited_mask.GetPointer(util::DEVICE),
                     num_mask_elements * sizeof(MaskT)),
                     "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
-
-                cudaChannelFormatDesc   labels_desc = cudaCreateChannelDesc<VertexId>();
-                gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels.channelDesc = labels_desc;
-                if (retval = util::GRError(cudaBindTexture(
-                    0,
-                    gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels,
-                    problem->data_slices[gpu]->labels.GetPointer(util::DEVICE),
-                    problem->graph_slices[gpu]->nodes * sizeof(VertexId)),
-                    "BFSEnactor cudaBindTexture labels_tex_ref failed", __FILE__, __LINE__)) break;
             }
+
+            cudaChannelFormatDesc   labels_desc = cudaCreateChannelDesc<VertexId>();
+            gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels.channelDesc = labels_desc;
+            if (retval = util::GRError(cudaBindTexture(
+                0,
+                gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels,
+                problem->data_slices[gpu]->labels.GetPointer(util::DEVICE),
+                problem->graph_slices[gpu]->nodes * sizeof(VertexId)),
+                "BFSEnactor cudaBindTexture labels_tex_ref failed", __FILE__, __LINE__)) break;
 
             cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
             gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
@@ -1466,7 +1609,6 @@ public:
     typedef gunrock::oprtr::filter::KernelPolicy<
         Problem,                            // Problem data type
         300,                                // CUDA_ARCH
-        //INSTRUMENT,                         // INSTRUMENT
         0,                                  // SATURATION QUIT
         true,                               // DEQUEUE_PROBLEM_SIZE
         8,                                  // MIN_CTA_OCCUPANCY
@@ -1482,7 +1624,6 @@ public:
     typedef gunrock::oprtr::advance::KernelPolicy<
         Problem,                            // Problem data type
         300,                                // CUDA_ARCH
-        //INSTRUMENT,                         // INSTRUMENT
         8,                                  // MIN_CTA_OCCUPANCY
         7,                                  // LOG_THREADS
         8,                                  // LOG_BLOCKS
@@ -1494,12 +1635,11 @@ public:
         128 * 4,                            // CTA_GATHER_THRESHOLD
         7,                                  // LOG_SCHEDULE_GRANULARITY
         gunrock::oprtr::advance::TWC_FORWARD>
-    ForwardAdvanceKernelPolicy_IDEM;
+    TWCAdvanceKernelPolicy_IDEM;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
         Problem,                            // Problem data type
         300,                                // CUDA_ARCH
-        //INSTRUMENT,                         // INSTRUMENT
         1,                                  // MIN_CTA_OCCUPANCY
         7,                                  // LOG_THREADS
         8,                                  // LOG_BLOCKS
@@ -1511,12 +1651,11 @@ public:
         128 * 4,                            // CTA_GATHER_THRESHOLD
         7,                                  // LOG_SCHEDULE_GRANULARITY
         gunrock::oprtr::advance::TWC_FORWARD>
-    ForwardAdvanceKernelPolicy;
+    TWCAdvanceKernelPolicy;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
         Problem,                            // Problem data type
         300,                                // CUDA_ARCH
-        //INSTRUMENT,                         // INSTRUMENT
         8,                                  // MIN_CTA_OCCUPANCY
         10,                                 // LOG_THREADS
         9,                                  // LOG_BLOCKS
@@ -1527,14 +1666,12 @@ public:
         32,                                 // WARP_GATHER_THRESHOLD
         128 * 4,                            // CTA_GATHER_THRESHOLD
         7,                                  // LOG_SCHEDULE_GRANULARITY
-        //gunrock::oprtr::advance::LB_LIGHT>
-        gunrock::oprtr::advance::LB_CULL>
+        gunrock::oprtr::advance::LB>
     LBAdvanceKernelPolicy_IDEM;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
         Problem,                            // Problem data type
         300,                                // CUDA_ARCH
-        //INSTRUMENT,                         // INSTRUMENT
         1,                                  // MIN_CTA_OCCUPANCY
         10,                                 // LOG_THREADS
         9,                                  // LOG_BLOCKS
@@ -1545,9 +1682,104 @@ public:
         32,                                 // WARP_GATHER_THRESHOLD
         128 * 4,                            // CTA_GATHER_THRESHOLD
         7,                                  // LOG_SCHEDULE_GRANULARITY
-        //gunrock::oprtr::advance::LB_LIGHT>
         gunrock::oprtr::advance::LB>
     LBAdvanceKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        8,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        9,                                  // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB_LIGHT>
+    LB_LIGHT_AdvanceKernelPolicy_IDEM;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        1,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        9,                                  // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB_LIGHT>
+    LB_LIGHT_AdvanceKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        8,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        9,                                  // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB_CULL>
+    LB_CULL_AdvanceKernelPolicy_IDEM;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        1,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        9,                                  // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB_CULL>
+    LB_CULL_AdvanceKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        8,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        9,                                  // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB_LIGHT_CULL>
+    LB_LIGHT_CULL_AdvanceKernelPolicy_IDEM;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        1,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        9,                                  // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB_LIGHT_CULL>
+    LB_LIGHT_CULL_AdvanceKernelPolicy;
 
     template<
         typename AdvanceKernelPolicy,
@@ -1555,14 +1787,14 @@ public:
         typename AdvanceKernelPolicy_IDEM,
         typename FilterKernelPolicy_IDEM,
         bool ENABLE_IDEMPOTENCE>
-    struct IDEM_SWICTH{};
+    struct IDEM_SWITCH{};
 
     template<
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy ,
         typename AdvanceKernelPolicy_IDEM,
         typename FilterKernelPolicy_IDEM>
-    struct IDEM_SWICTH<
+    struct IDEM_SWITCH<
         AdvanceKernelPolicy, FilterKernelPolicy,
         AdvanceKernelPolicy_IDEM, FilterKernelPolicy_IDEM, true>
     {
@@ -1586,7 +1818,7 @@ public:
         typename FilterKernelPolicy ,
         typename AdvanceKernelPolicy_IDEM,
         typename FilterKernelPolicy_IDEM>
-    struct IDEM_SWICTH<
+    struct IDEM_SWITCH<
         AdvanceKernelPolicy, FilterKernelPolicy,
         AdvanceKernelPolicy_IDEM, FilterKernelPolicy_IDEM, false>
     {
@@ -1605,6 +1837,106 @@ public:
         }
     };
 
+    template <
+        bool ENABLE_IDEMPOTENCE,
+        gunrock::oprtr::advance::MODE A_MODE>
+    struct MODE_SWITCH{};
+
+    template <bool ENABLE_IDEMPOTENCE>
+    struct MODE_SWITCH<ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::LB>
+    {
+        typedef IDEM_SWITCH<
+                LBAdvanceKernelPolicy     , FilterKernelPolicy,
+                LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy,
+                ENABLE_IDEMPOTENCE> I_SWITCH;
+ 
+        static cudaError_t Enact(Enactor &enactor, VertexId src)
+        {
+            return I_SWITCH::Enact(enactor, src);
+        }
+        
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
+        {
+            return I_SWITCH::Init(enactor, context, problem, max_grid_size);
+        }
+    };
+
+    template <bool ENABLE_IDEMPOTENCE>
+    struct MODE_SWITCH<ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::TWC_FORWARD>
+    {
+        typedef IDEM_SWITCH<
+                TWCAdvanceKernelPolicy     , FilterKernelPolicy,
+                TWCAdvanceKernelPolicy_IDEM, FilterKernelPolicy,
+                ENABLE_IDEMPOTENCE> I_SWITCH;
+ 
+        static cudaError_t Enact(Enactor &enactor, VertexId src)
+        {
+            return I_SWITCH::Enact(enactor, src);
+        }
+        
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
+        {
+            return I_SWITCH::Init(enactor, context, problem, max_grid_size);
+        }
+    };
+
+    template <bool ENABLE_IDEMPOTENCE>
+    struct MODE_SWITCH<ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::LB_LIGHT>
+    {
+        typedef IDEM_SWITCH<
+                LB_LIGHT_AdvanceKernelPolicy     , FilterKernelPolicy,
+                LB_LIGHT_AdvanceKernelPolicy_IDEM, FilterKernelPolicy,
+                ENABLE_IDEMPOTENCE> I_SWITCH;
+ 
+        static cudaError_t Enact(Enactor &enactor, VertexId src)
+        {
+            return I_SWITCH::Enact(enactor, src);
+        }
+        
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
+        {
+            return I_SWITCH::Init(enactor, context, problem, max_grid_size);
+        }
+    };
+
+    template <bool ENABLE_IDEMPOTENCE>
+    struct MODE_SWITCH<ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::LB_CULL>
+    {
+        typedef IDEM_SWITCH<
+                LB_CULL_AdvanceKernelPolicy     , FilterKernelPolicy,
+                LB_CULL_AdvanceKernelPolicy_IDEM, FilterKernelPolicy,
+                ENABLE_IDEMPOTENCE> I_SWITCH;
+ 
+        static cudaError_t Enact(Enactor &enactor, VertexId src)
+        {
+            return I_SWITCH::Enact(enactor, src);
+        }
+        
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
+        {
+            return I_SWITCH::Init(enactor, context, problem, max_grid_size);
+        }
+    };
+
+    template <bool ENABLE_IDEMPOTENCE>
+    struct MODE_SWITCH<ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::LB_LIGHT_CULL>
+    {
+        typedef IDEM_SWITCH<
+                LB_LIGHT_CULL_AdvanceKernelPolicy     , FilterKernelPolicy,
+                LB_LIGHT_CULL_AdvanceKernelPolicy_IDEM, FilterKernelPolicy,
+                ENABLE_IDEMPOTENCE> I_SWITCH;
+ 
+        static cudaError_t Enact(Enactor &enactor, VertexId src)
+        {
+            return I_SWITCH::Enact(enactor, src);
+        }
+        
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
+        {
+            return I_SWITCH::Init(enactor, context, problem, max_grid_size);
+        }
+    };
+
     /**
      * \addtogroup PublicInterface
      * @{
@@ -1620,44 +1952,25 @@ public:
      */
     cudaError_t Enact(
         VertexId    src,
-        int traversal_mode = 0)
+        std::string traversal_mode = "LB")
     {
-        int min_sm_version = -1;
-        for (int i = 0; i < this->num_gpus; i++)
+        if (this -> min_sm_version >= 300)
         {
-            if (min_sm_version == -1 ||
-                this->cuda_props[i].device_sm_version < min_sm_version)
-            {
-                min_sm_version = this->cuda_props[i].device_sm_version;
-            }
-        }
-
-        if (min_sm_version >= 300)
-        {
-            //if (traversal_mode == 0)
-                return IDEM_SWICTH<
-                    LBAdvanceKernelPolicy, FilterKernelPolicy,
-                    LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy,
-                    Problem::ENABLE_IDEMPOTENCE>::Enact(*this, src);
-            //else return IDEM_SWITCH<
-            //        ForwardAdvanceKernelPolicy, FilterKernelPolicy,
-            //        ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy,
-            //        Problem::ENABLE_IDEMPOTENCE>::Enact(*this, src);
-
-            /*if (Problem::ENABLE_IDEMPOTENCE)
-            {
-//                if (traversal_mode == 0)
-                    return EnactBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
-//                else
-//                    return EnactBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(src);
-            }
-            else
-            {
-//                if (traversal_mode == 0)
-                    return EnactBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(src);
-//                else
-//                    return EnactBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(src);
-            }*/
+            if (traversal_mode == "LB")
+                return MODE_SWITCH<Problem::ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::LB>
+                    ::Enact(*this, src);
+            else if (traversal_mode == "TWC")
+                 return MODE_SWITCH<Problem::ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::TWC_FORWARD>
+                    ::Enact(*this, src);
+            else if (traversal_mode == "LB_CULL")
+                 return MODE_SWITCH<Problem::ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::LB_CULL>
+                    ::Enact(*this, src);
+            else if (traversal_mode == "LB_LIGHT")
+                 return MODE_SWITCH<Problem::ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::LB_LIGHT>
+                    ::Enact(*this, src);
+            else if (traversal_mode == "LB_LIGHT_CULL")
+                 return MODE_SWITCH<Problem::ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::LB_LIGHT_CULL>
+                    ::Enact(*this, src);
         }
 
         //to reduce compile time, get rid of other architecture for now
@@ -1673,7 +1986,6 @@ public:
      * @param[in] context CudaContext pointer for ModernGPU API.
      * @param[in] problem Pointer to Problem object.
      * @param[in] max_grid_size Maximum grid size for kernel calls.
-     * @param[in] size_check Whether or not to enable size check.
      * @param[in] traversal_mode Load-balanced or Dynamic cooperative.
      *
      * \return cudaError_t object Indicates the success of all CUDA calls.
@@ -1682,49 +1994,25 @@ public:
         ContextPtr  *context,
         Problem     *problem,
         int         max_grid_size  = 0,
-        //bool        size_check     = true,
-        int         traversal_mode = 0)
+        std::string traversal_mode = "LB")
     {
-        int min_sm_version = -1;
-        for (int i=0;i<this->num_gpus;i++)
+        if (this -> min_sm_version >= 300)
         {
-            if (min_sm_version == -1 ||
-                this->cuda_props[i].device_sm_version < min_sm_version)
-            {
-                min_sm_version = this->cuda_props[i].device_sm_version;
-            }
-        }
-
-        if (min_sm_version >= 300)
-        {
-            //if (traversal_mode == 0)
-                return IDEM_SWICTH<
-                    LBAdvanceKernelPolicy, FilterKernelPolicy,
-                    LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy,
-                    Problem::ENABLE_IDEMPOTENCE>::Init(*this, context, problem, max_grid_size);
-            //else return IDEM_SWITCH<
-            //        ForwardAdvanceKernelPolicy, FilterKernelPolicy,
-            //        ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy,
-            //        Problem::ENABLE_IDEMPOTENCE>::Init(*this, context, problem, max_grid_size);
-
-            /*if (Problem::ENABLE_IDEMPOTENCE)
-            {
-//                if (traversal_mode == 0)
-                    return InitBFS<     LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
-                            context, problem, max_grid_size);
-//                else
-//                    return InitBFS<ForwardAdvanceKernelPolicy_IDEM, FilterKernelPolicy>(
-//                            context, problem, max_grid_size);
-            }
-            else
-            {
-//                if (traversal_mode == 0)
-                    return InitBFS<     LBAdvanceKernelPolicy     , FilterKernelPolicy>(
-                            context, problem, max_grid_size);
-//                else
-//                    return InitBFS<ForwardAdvanceKernelPolicy     , FilterKernelPolicy>(
-//                            context, problem, max_grid_size);
-            }*/
+            if (traversal_mode == "LB")
+                return MODE_SWITCH<Problem::ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::LB>
+                    ::Init(*this, context, problem, max_grid_size);
+            else if (traversal_mode == "TWC")
+                 return MODE_SWITCH<Problem::ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::TWC_FORWARD>
+                    ::Init(*this, context, problem, max_grid_size);
+            else if (traversal_mode == "LB_CULL")
+                 return MODE_SWITCH<Problem::ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::LB_CULL>
+                    ::Init(*this, context, problem, max_grid_size);
+            else if (traversal_mode == "LB_LIGHT")
+                 return MODE_SWITCH<Problem::ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::LB_LIGHT>
+                    ::Init(*this, context, problem, max_grid_size);
+            else if (traversal_mode == "LB_LIGHT_CULL")
+                 return MODE_SWITCH<Problem::ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::LB_LIGHT_CULL>
+                    ::Init(*this, context, problem, max_grid_size);
         }
 
         //to reduce compile time, get rid of other architecture for now

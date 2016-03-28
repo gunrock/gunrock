@@ -381,7 +381,7 @@ struct PRIteration : public IterationBase <
         {
             //frontier_attribute->queue_length = data_slice -> edge_map_queue_len;
             frontier_attribute -> queue_length = data_slice -> local_vertices.GetSize();
-            enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
+            enactor_stats->nodes_queued[0] += frontier_attribute->queue_length;
             frontier_attribute -> queue_reset = true;
 
             if (enactor -> debug)
@@ -554,9 +554,10 @@ struct PRIteration : public IterationBase <
         //    false, stream, true))
         //    return;
         //enactor_stats->edges_queued[0] += frontier_attribute->queue_length;
-        enactor_stats -> AccumulateEdges(
-            work_progress ->template GetQueueLengthPointer<unsigned int>(
-                frontier_attribute -> queue_index + 1), stream);
+        //enactor_stats -> AccumulateEdges(
+        //    work_progress ->template GetQueueLengthPointer<unsigned int>(
+        //        frontier_attribute -> queue_index + 1), stream);
+        enactor_stats -> edges_queued[0] += graph_slice -> edges;
         //frontier_attribute -> queue_length = data_slice->edge_map_queue_len;
 
         /*if (enactor_stats -> iteration == 0)
@@ -1071,8 +1072,8 @@ static CUT_THREADPROC PRThread(
         while (thread_data -> status == ThreadSlice::Status::Wait ||
                thread_data -> status == ThreadSlice::Status::Idle)
         {
-            //sleep(0);
-            std::this_thread::yield();
+            sleep(0);
+            //std::this_thread::yield();
         }
         if (thread_data -> status == ThreadSlice::Status::ToKill)
             break;
@@ -1285,7 +1286,8 @@ public:
         {
             while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
             {
-                std::this_thread::yield();
+                //std::this_thread::yield();
+                sleep(0);
             }
         }
         return retval;
@@ -1523,7 +1525,8 @@ public:
         {
             while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
             {
-                std::this_thread::yield();
+                //std::this_thread::yield();
+                sleep(0);
             }
         }
 
@@ -1559,7 +1562,6 @@ public:
     typedef gunrock::oprtr::advance::KernelPolicy<
         Problem,                            // Problem data type
         300,                                // CUDA_ARCH
-        //INSTRUMENT,                         // INSTRUMENT
         1,                                  // MIN_CTA_OCCUPANCY
         10,                                 // LOG_THREADS
         8,                                  // LOG_BLOCKS
@@ -1571,12 +1573,27 @@ public:
         128 * 4,                            // CTA_GATHER_THRESHOLD
         7,                                  // LOG_SCHEDULE_GRANULARITY
         gunrock::oprtr::advance::LB>
-    LBAdvanceKernelPolicy;
+    LB_AdvanceKernelPolicy;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
         Problem,                            // Problem data type
         300,                                // CUDA_ARCH
-        //INSTRUMENT,                         // INSTRUMENT
+        1,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        8,                                  // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB_LIGHT>
+    LB_LIGHT_AdvanceKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
         1,                                  // MIN_CTA_OCCUPANCY
         7,                                  // LOG_THREADS
         8,                                  // LOG_BLOCKS
@@ -1588,7 +1605,64 @@ public:
         128 * 4,                            // CTA_GATHER_THRESHOLD
         7,                                  // LOG_SCHEDULE_GRANULARITY
         gunrock::oprtr::advance::TWC_FORWARD>
-    FWDAdvanceKernelPolicy;
+    TWC_AdvanceKernelPolicy;
+
+    template <typename Dummy, gunrock::oprtr::advance::MODE A_MODE>
+    struct MODE_SWITCH {};
+
+    template <typename Dummy>
+    struct MODE_SWITCH<Dummy, gunrock::oprtr::advance::LB>
+    {
+        static cudaError_t Enact(Enactor &enactor)
+        {
+            return enactor.EnactPR<LB_AdvanceKernelPolicy, FilterKernelPolicy>();
+        }
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 512)
+        {
+            return enactor.InitPR <LB_AdvanceKernelPolicy, FilterKernelPolicy>
+                (context, problem, max_grid_size);
+        }
+        static cudaError_t Reset(Enactor &enactor)
+        {
+            return enactor.ResetPR<LB_AdvanceKernelPolicy, FilterKernelPolicy>();
+        }
+    };
+
+    template <typename Dummy>
+    struct MODE_SWITCH<Dummy, gunrock::oprtr::advance::LB_LIGHT>
+    {
+        static cudaError_t Enact(Enactor &enactor)
+        {
+            return enactor.EnactPR<LB_LIGHT_AdvanceKernelPolicy, FilterKernelPolicy>();
+        }
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 512)
+        {
+            return enactor.InitPR <LB_LIGHT_AdvanceKernelPolicy, FilterKernelPolicy>
+                (context, problem, max_grid_size);
+        }
+        static cudaError_t Reset(Enactor &enactor)
+        {
+            return enactor.ResetPR<LB_LIGHT_AdvanceKernelPolicy, FilterKernelPolicy>();
+        }
+    };
+
+    template <typename Dummy>
+    struct MODE_SWITCH<Dummy, gunrock::oprtr::advance::TWC_FORWARD>
+    {
+        static cudaError_t Enact(Enactor &enactor)
+        {
+            return enactor.EnactPR<TWC_AdvanceKernelPolicy, FilterKernelPolicy>();
+        }
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 512)
+        {
+            return enactor.InitPR <TWC_AdvanceKernelPolicy, FilterKernelPolicy>
+                (context, problem, max_grid_size);
+        }
+        static cudaError_t Reset(Enactor &enactor)
+        {
+            return enactor.ResetPR<TWC_AdvanceKernelPolicy, FilterKernelPolicy>();
+        }
+    };
 
     /**
      * @brief PageRank Enact kernel entry.
@@ -1598,19 +1672,16 @@ public:
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Enact(
-        int   traversal_mode)
+        std::string traversal_mode = "LB")
     {
-        int min_sm_version = -1;
-        for (int gpu=0; gpu<this->num_gpus; gpu++)
-            if (min_sm_version == -1 || this->cuda_props[gpu].device_sm_version < min_sm_version)
-                min_sm_version = this->cuda_props[gpu].device_sm_version;
-
-        if (min_sm_version >= 300)
+        if (this -> min_sm_version >= 300)
         {
-//            if (traversal_mode == 1)
-//                return EnactPR<FWDAdvanceKernelPolicy, FilterKernelPolicy>();
-//            else
-                return EnactPR< LBAdvanceKernelPolicy, FilterKernelPolicy>();
+            if (traversal_mode == "LB")
+                return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB         >::Enact(*this);
+            else if (traversal_mode == "LB_LIGHT")
+                return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_LIGHT   >::Enact(*this);
+            else if (traversal_mode == "TWC")
+                return MODE_SWITCH<SizeT, gunrock::oprtr::advance::TWC_FORWARD>::Enact(*this);
         }
 
         //to reduce compile time, get rid of other architecture for now
@@ -1627,19 +1698,16 @@ public:
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Reset(
-        int   traversal_mode)
+        std::string   traversal_mode = "LB")
     {
-        int min_sm_version = -1;
-        for (int gpu=0; gpu<this->num_gpus; gpu++)
-            if (min_sm_version == -1 || this->cuda_props[gpu].device_sm_version < min_sm_version)
-                min_sm_version = this->cuda_props[gpu].device_sm_version;
-
-        if (min_sm_version >= 300)
+        if (this -> min_sm_version >= 300)
         {
-//            if (traversal_mode == 1)
-//                return EnactPR<FWDAdvanceKernelPolicy, FilterKernelPolicy>();
-//            else
-                return ResetPR< LBAdvanceKernelPolicy, FilterKernelPolicy>();
+            if (traversal_mode == "LB")
+                return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB         >::Reset(*this);
+            else if (traversal_mode == "LB_LIGHT")
+                return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_LIGHT   >::Reset(*this);
+            else if (traversal_mode == "TWC")
+                return MODE_SWITCH<SizeT, gunrock::oprtr::advance::TWC_FORWARD>::Reset(*this);
         }
 
         //to reduce compile time, get rid of other architecture for now
@@ -1662,26 +1730,20 @@ public:
     cudaError_t Init(
         ContextPtr *context,
         Problem    *problem,
-        int         traversal_mode,
-        //int       max_iteration,
+        std::string traversal_mode = "LB",
         int         max_grid_size = 512)
     {
-        int min_sm_version = -1;
-        for (int gpu=0; gpu<this->num_gpus; gpu++)
+        if (this -> min_sm_version >= 300)
         {
-            if (min_sm_version == -1 ||
-                this->cuda_props[gpu].device_sm_version < min_sm_version)
-                min_sm_version = this->cuda_props[gpu].device_sm_version;
-        }
-
-        if (min_sm_version >= 300)
-        {
-//            if (traversal_mode == 1)
-//                return InitPR<FWDAdvanceKernelPolicy, FilterKernelPolicy>(
-//                    context, problem, /*max_iteration,*/ max_grid_size);
-//            else
-                return InitPR<LBAdvanceKernelPolicy, FilterKernelPolicy>(
-                    context, problem, /*max_iteration,*/ max_grid_size);
+            if (traversal_mode == "LB")
+                return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB         >
+                    ::Init(*this, context, problem, max_grid_size);
+            else if (traversal_mode == "LB_LIGHT")
+                return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_LIGHT   >
+                    ::Init(*this, context, problem, max_grid_size);
+            else if (traversal_mode == "TWC")
+                return MODE_SWITCH<SizeT, gunrock::oprtr::advance::TWC_FORWARD>
+                    ::Init(*this, context, problem, max_grid_size);
         }
 
         //to reduce compile time, get rid of other architecture for now

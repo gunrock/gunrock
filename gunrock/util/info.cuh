@@ -33,7 +33,7 @@ private:
     int            num_iters;  // Number of times invoke primitive test
     int            max_iters;  // Maximum number of super-steps allowed
     int            grid_size;  // Maximum grid size (0: up to the enactor)
-    int            traversal;  // Load-balanced or Dynamic cooperative
+    std::string traversal_mode;  // Load-balanced or Dynamic cooperative
     int             num_gpus;  // Number of GPUs used
     double          q_sizing;  // Maximum size scaling factor for work queues
     double         q_sizing1;  // Value of max_queue_sizing1
@@ -121,7 +121,7 @@ public:
         info["source_seed"]        = 0;      // source seed
         info["source_vertex"]      = 0;      // source (BFS, SSSP)
         info["stream_from_host"]   = false;  // stream from host to device
-        info["traversal_mode"]     = -1;     // advance mode
+        info["traversal_mode"]     = "default";     // advance mode
         info["edges_queued"]       = 0;      // number of edges in queue
         info["nodes_queued"]       = 0;      // number of nodes in queue
         info["undirected"]         = true;   // default use undirected input
@@ -301,15 +301,16 @@ public:
             args.GetCmdLineArgument("partition-seed", par_seed);
             info["partition_seed"] = par_seed;
         }
+        traversal_mode = "default";
         if (args.CheckCmdLineFlag("traversal-mode"))
         {
-            args.GetCmdLineArgument("traversal-mode", traversal);
-            info["traversal_mode"] = traversal;
+            args.GetCmdLineArgument("traversal-mode", traversal_mode);
+            info["traversal_mode"] = traversal_mode;
         }
-        if (traversal == -1)
+        if (traversal_mode == "default")
         {
-            traversal = csr_ptr->GetAverageDegree() > 5 ? 0 : 1;
-            info["traversal_mode"] = traversal;
+            traversal_mode = (csr_ptr->GetAverageDegree() > 5) ? "LB" : "TWC";
+            info["traversal_mode"] = traversal_mode;
         }
         if (args.CheckCmdLineFlag("ref_filename"))
         {
@@ -681,6 +682,8 @@ public:
             double rmat_b = 0.19;
             double rmat_c = 0.19;
             double rmat_d = 1 - (rmat_a + rmat_b + rmat_c);
+            double rmat_vmin = 1;
+            double rmat_vmultipiler = 64;
             int rmat_seed = -1;
 
             args.GetCmdLineArgument("rmat_scale", rmat_scale);
@@ -695,6 +698,8 @@ public:
             rmat_d = 1 - (rmat_a + rmat_b + rmat_c);
             args.GetCmdLineArgument("rmat_d", rmat_d);
             args.GetCmdLineArgument("rmat_seed", rmat_seed);
+            args.GetCmdLineArgument("rmat_vmin", rmat_vmin);
+            args.GetCmdLineArgument("rmat_vmultipiler", rmat_vmultipiler);
 
             std::vector<int> temp_devices;
             if (args.CheckCmdLineFlag("device"))  // parse device list
@@ -724,6 +729,8 @@ public:
             info["rmat_nodes"] = (int64_t)rmat_nodes;
             info["rmat_edges"] = (int64_t)rmat_edges;
             info["rmat_edgefactor"] = (int64_t)rmat_edgefactor;
+            info["rmat_vmin"] = rmat_vmin;
+            info["rmat_vmultipiler"] = rmat_vmultipiler;
 
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
@@ -740,8 +747,8 @@ public:
                     rmat_b,
                     rmat_c,
                     rmat_d,
-                    1,
-                    1,
+                    rmat_vmultipiler,
+                    rmat_vmin,
                     rmat_seed,
                     args.CheckCmdLineFlag("quiet")) != 0)
                 {
@@ -758,8 +765,8 @@ public:
                     rmat_b,
                     rmat_c,
                     rmat_d,
-                    1,
-                    1,
+                    rmat_vmultipiler,
+                    rmat_vmin,
                     rmat_seed,
                     args.CheckCmdLineFlag("quiet"),
                     temp_devices.size(),
@@ -1125,6 +1132,7 @@ public:
             } else if (info["algorithm"].get_str().compare("PageRank") == 0)
             {
                 edges_visited = csr_ptr -> edges;
+                nodes_visited = csr_ptr -> nodes;
             }
 
             if (nodes_queued > nodes_visited)

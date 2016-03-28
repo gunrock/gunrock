@@ -34,7 +34,34 @@ enum MODE {
     LB,
     LB_LIGHT,
     LB_CULL,
+    LB_LIGHT_CULL,
 };
+
+template <MODE A_MODE>
+bool isFused()
+{
+    if (A_MODE == LB_CULL) return true;
+    else if (A_MODE == LB_LIGHT_CULL) return true;
+    else return false;
+}
+
+template <MODE A_MODE>
+bool hasPreScan()
+{
+    if (A_MODE == LB      ) return true;
+    else if (A_MODE == LB_LIGHT) return true;
+    else if (A_MODE == LB_CULL ) return true;
+    else if (A_MODE == LB_LIGHT_CULL) return true;
+    else return false;
+}
+
+template <MODE A_MODE>
+bool isBackward()
+{
+    if (A_MODE == TWC_BACKWARD) return true;
+    else if (A_MODE == LB_BACKWARD)  return true;
+    else return false;
+}
 
 /**
  * @brief Four types of advance operator
@@ -284,7 +311,9 @@ struct KernelPolicy {
         ((ADVANCE_MODE == LB_LIGHT    ) ?
             LOAD_BALANCED           ::CTA_OCCUPANCY :
         ((ADVANCE_MODE == LB_CULL     ) ?
-            LOAD_BALANCED_CULL      ::CTA_OCCUPANCY : 0)))));
+            LOAD_BALANCED_CULL      ::CTA_OCCUPANCY : 
+        ((ADVANCE_MODE == LB_LIGHT_CULL) ?
+            LOAD_BALANCED_CULL      ::CTA_OCCUPANCY : 0))))));
 };
 
 } //advance

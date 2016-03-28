@@ -252,6 +252,7 @@ struct Cta
                             tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
                             //row_id = util::InvalidValue<VertexId>();
                         } else {
+                            cta -> d_data_slice -> labels[row_id] = cta -> label;
                             if (Problem::MARK_PREDECESSORS) {
                                 if (Functor::CondFilter(
                                     tile->pred_id[LOAD][VEC],
