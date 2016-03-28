@@ -145,6 +145,46 @@ struct HookInitFunctor {
         //        min_node, problem->component_ids + max_node);
         d_data_slice -> component_ids[max_node] = min_node;
     }
+
+     /** 
+     * @brief impement HookInitFunctor using advance instead of filter 
+     *
+     * @param[in] s_id Vertex Id of the edge source node
+     * @param[in] d_id Vertex Id of the edge destination node
+     * @param[in] problem Data slice object
+     * @param[in] e_id output edge id
+     * @param[in] e_id_in input edge id
+     *
+     * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
+     */
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId s_id,
+        VertexId d_id,
+        DataSlice *d_data_slice,
+        SizeT    edge_id   ,   
+        VertexId input_item,
+        LabelT   label     ,   
+        SizeT    input_pos ,
+        SizeT   &output_pos)
+    {
+        VertexId max_node = s_id > d_id ? s_id : d_id;
+        VertexId min_node = s_id > d_id ? d_id : s_id;
+        d_data_slice -> component_ids[max_node] = min_node;
+        return false;
+    }
+
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId s_id,
+        VertexId d_id,
+        DataSlice *d_data_slice,
+        SizeT    edge_id   ,   
+        VertexId input_item,
+        LabelT   label     ,   
+        SizeT    input_pos ,
+        SizeT   &output_pos)
+    {
+        // nothing here
+    }
 };
 
 /**
@@ -326,6 +366,81 @@ struct HookMaxFunctor {
                     0, d_data_slice->edge_flag + 0);
             }
         }
+    }
+
+    /** 
+     * @brief implement HookMaxFunctor using advance instead of filter
+     *
+     * @param[in] s_id Vertex Id of the edge source node
+     * @param[in] d_id Vertex Id of the edge destination node
+     * @param[in] problem Data slice object
+     * @param[in] e_id output edge id
+     * @param[in] e_id_in input edge id
+     *
+     * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
+     */
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId s_id,
+        VertexId d_id,
+        DataSlice *d_data_slice,
+        SizeT    edge_id   ,   
+        VertexId input_item,
+        LabelT   label     ,   
+        SizeT    input_pos ,
+        SizeT   &output_pos)
+    {
+         //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0) {
+        bool mark;
+        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+            mark, d_data_slice -> marks + edge_id);
+        if (mark) return false;
+
+        //VertexId from_node; = s_id
+        //VertexId to_node; = d_id
+        //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+        //    from_node, d_data_slice->froms + node);
+        //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+        //    to_node, d_data_slice->tos + node);
+        VertexId parent_from;
+        VertexId parent_to;
+        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+            parent_from, d_data_slice -> component_ids + /*from_node*/ s_id);
+        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+            parent_to  , d_data_slice -> component_ids + /*to_node*/ d_id);
+        VertexId max_node = parent_from > parent_to ? parent_from : parent_to;
+        //VertexId min_node = parent_from + parent_to - max_node;
+        VertexId min_node = parent_from > parent_to ? parent_to : parent_from;
+
+        if (max_node == min_node) 
+        {
+            //if (TO_TRACK)
+            //    if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node))
+            //        printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d==\n", node, from_node, to_node, parent_from, parent_to, max_node, min_node);
+            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                true, d_data_slice ->marks + /*node*/ edge_id);
+        } else { //if (problem->component_ids[max_node] > min_node)
+            //if (TO_TRACK)
+            //    if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node))
+            //        printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d->%d\n", node, from_node, to_node, parent_from, parent_to, max_node, d_data_slice->component_ids[max_node], min_node);
+            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                min_node, d_data_slice->component_ids + max_node);
+            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                0, d_data_slice->edge_flag + 0);
+        }
+        return false;
+    }
+
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId s_id,
+        VertexId d_id,
+        DataSlice *d_data_slice,
+        SizeT    edge_id   ,   
+        VertexId input_item,
+        LabelT   label     ,   
+        SizeT    input_pos ,
+        SizeT   &output_pos)
+    {
+        // nothing here
     }
 };
 

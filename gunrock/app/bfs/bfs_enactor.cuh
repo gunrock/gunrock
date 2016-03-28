@@ -1109,6 +1109,8 @@ struct BFSIteration : public IterationBase <
     static cudaError_t Compute_OutputLength(
         Enactor                        *enactor,
         FrontierAttribute<SizeT>       *frontier_attribute,
+        //DataSlice                       data_slice,
+        //DataSlice                      *d_data_slice,
         SizeT                          *d_offsets,
         VertexId                       *d_indices,
         SizeT                          *d_inv_offsets,

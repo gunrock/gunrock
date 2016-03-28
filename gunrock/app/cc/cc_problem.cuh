@@ -67,13 +67,16 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, SizeT   > CID_markers;
         util::Array1D<SizeT, int     > masks;         /**< Size equals to node number, show if a node is the root */
         util::Array1D<SizeT, bool    > marks;         /**< Size equals to edge number, show if two vertices belong to the same component */
-        util::Array1D<SizeT, VertexId> froms;         /**< Size equals to edge number, from vertex of one edge */
-        util::Array1D<SizeT, VertexId> tos;           /**< Size equals to edge number, to vertex of one edge */
+        //util::Array1D<SizeT, VertexId> froms;         /**< Size equals to edge number, from vertex of one edge */
+        //util::Array1D<SizeT, VertexId> tos;           /**< Size equals to edge number, to vertex of one edge */
         util::Array1D<SizeT, int     > vertex_flag;   /**< Finish flag for per-vertex kernels in CC algorithm */
         util::Array1D<SizeT, int     > edge_flag;     /**< Finish flag for per-edge kernels in CC algorithm */
+        util::Array1D<SizeT, VertexId> local_vertices;
+
         int turn;
         //DataSlice *d_pointer;
         bool has_change;
+        bool scanned_queue_computed;
         //util::CtaWorkProgressLifetime *work_progress;
 
         /*
@@ -86,14 +89,16 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             CID_markers  .SetName("CID_markers"  );
             masks        .SetName("masks"        );
             marks        .SetName("marks"        );
-            froms        .SetName("froms"        );
-            tos          .SetName("tos"          );
+            //froms        .SetName("froms"        );
+            //tos          .SetName("tos"          );
             vertex_flag  .SetName("vertex_flag"  );
             edge_flag    .SetName("edge_flag"    );
+            local_vertices.SetName("local_vertices");
             turn          = 0;
             //d_pointer     = NULL;
             //work_progress = NULL;
             has_change    = true;
+            scanned_queue_computed = false;
         }
 
         /*
@@ -107,10 +112,11 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             CID_markers  .Release();
             masks        .Release();
             marks        .Release();
-            froms        .Release();
-            tos          .Release();
+            //froms        .Release();
+            //tos          .Release();
             vertex_flag  .Release();
             edge_flag    .Release();
+            local_vertices.Release();
             //d_pointer     = NULL;
             //work_progress = NULL;
         }
@@ -183,7 +189,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
 
             //printf("@ gpu %d: nodes = %d, edges = %d\n", gpu_idx, nodes, edges);
             // Create a single data slice for the currently-set gpu
-            if (retval = froms .Allocate(edges, util::HOST | util::DEVICE)) return retval;
+            /*if (retval = froms .Allocate(edges, util::HOST | util::DEVICE)) return retval;
             if (retval = tos   .Allocate(edges, util::DEVICE)) return retval;
             if (retval = tos   .SetPointer(graph->column_indices)) return retval;
             // Construct coo from/to edge list from row_offsets and column_indices
@@ -212,7 +218,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = froms.Move(util::HOST, util::DEVICE)) return retval;
             if (retval = tos  .Move(util::HOST, util::DEVICE)) return retval;
             if (retval = froms.Release(util::HOST)) return retval;
-            if (retval = tos  .Release(util::HOST)) return retval;
+            if (retval = tos  .Release(util::HOST)) return retval;*/
 
             // Create SoA on device
             if (retval = component_ids.Allocate(nodes  , util::DEVICE)) return retval;
@@ -222,17 +228,21 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = marks        .Allocate(edges  , util::DEVICE)) return retval;
             if (retval = vertex_flag  .Allocate(1, util::HOST | util::DEVICE)) return retval;
             if (retval = edge_flag    .Allocate(1, util::HOST | util::DEVICE)) return retval;
-
-            if (retval = this->frontier_queues[0].keys  [0].Allocate(edges+2, util::DEVICE)) return retval;
+            if (retval = this -> frontier_queues[0].keys  [0].Allocate(nodes + 2, util::DEVICE)) return retval;
+            if (retval = this -> scanned_edges[0].Allocate(nodes + 2, util::DEVICE)) return retval;
+            scanned_queue_computed = false;
+            //if (retval = this->frontier_queues[0].keys  [0].Allocate(edges+2, util::DEVICE)) return retval;
             //if (retval = this->frontier_queues[0].keys  [1].Allocate(edges+2, util::DEVICE)) return retval;
-            if (retval = this->frontier_queues[0].values[0].Allocate(nodes+2, util::DEVICE)) return retval;
+            //if (retval = this->frontier_queues[0].values[0].Allocate(nodes+2, util::DEVICE)) return retval;
             //if (retval = this->frontier_queues[0].values[1].Allocate(nodes+2, util::DEVICE)) return retval;
-            if (num_gpus > 1) {
-                this->frontier_queues[num_gpus].keys  [0].SetPointer(this->frontier_queues[0].keys  [0].GetPointer(util::DEVICE), edges+2, util::DEVICE);
+            /*if (num_gpus > 1) {
+                this->frontier_queues[num_gpus].keys  [0].SetPointer(
+                    this->frontier_queues[0].keys  [0].GetPointer(util::DEVICE), edges+2, util::DEVICE);
                 //this->frontier_queues[num_gpus].keys  [1].SetPointer(this->frontier_queues[0].keys  [1].GetPointer(util::DEVICE), edges+2, util::DEVICE);
-                this->frontier_queues[num_gpus].values[0].SetPointer(this->frontier_queues[0].values[0].GetPointer(util::DEVICE), nodes+2, util::DEVICE);
+                this->frontier_queues[num_gpus].values[0].SetPointer(
+                    this->frontier_queues[0].values[0].GetPointer(util::DEVICE), nodes+2, util::DEVICE);
                 //this->frontier_queues[num_gpus].values[1].SetPointer(this->frontier_queues[0].values[1].GetPointer(util::DEVICE), nodes+2, util::DEVICE);
-            }
+            }*/
             return retval;
         }
 
@@ -259,10 +269,11 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = util::SetDevice(this->gpu_idx)) return retval;
 
             //if (retval = data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu], queue_sizing, _USE_DOUBLE_BUFFER)) return retval;
-            if (retval = this -> frontier_queues[0].keys  [0].EnsureSize(edges+2)) return retval;
+            //if (retval = this -> frontier_queues[0].keys  [0].EnsureSize(edges+2)) return retval;
             //if (retval = this -> frontier_queues[0].keys  [1].EnsureSize(edges+2)) return retval;
-            if (retval = this -> frontier_queues[0].values[0].EnsureSize(nodes+2)) return retval;
+            //if (retval = this -> frontier_queues[0].values[0].EnsureSize(nodes+2)) return retval;
             //if (retval = this -> frontier_queues[0].values[1].EnsureSize(nodes+2)) return retval;
+            if (retval = this -> frontier_queues[0].keys[0].EnsureSize(nodes + 2)) return retval;
 
             // Allocate output component_ids if necessary
             util::MemsetIdxKernel<<<128, 128>>>(component_ids .GetPointer(util::DEVICE), nodes);
@@ -282,10 +293,14 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = edge_flag  .Move(util::HOST, util::DEVICE)) return retval;
 
             // Initialize edge frontier_queue
-            util::MemsetIdxKernel<<<128, 128>>>(this -> frontier_queues[0].keys  [0].GetPointer(util::DEVICE), edges);
+            //util::MemsetIdxKernel<<<128, 128>>>(this -> frontier_queues[0].keys  [0].GetPointer(util::DEVICE), edges);
 
             // Initialize vertex frontier queue
-            util::MemsetIdxKernel<<<128, 128>>>(this -> frontier_queues[0].values[0].GetPointer(util::DEVICE), nodes);
+            //util::MemsetIdxKernel<<<128, 128>>>(this -> frontier_queues[0].values[0].GetPointer(util::DEVICE), nodes);
+            util::MemsetIdxKernel<<<240, 512>>>(this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes);
+
+            if (this -> num_gpus > 1)
+                util::MemsetIdxKernel<<<240, 512>>>(old_c_ids.GetPointer(util::DEVICE), nodes);
             return retval;
         }
     };
@@ -301,8 +316,8 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
     /**
      * @brief CCProblem default constructor
      */
-    CCProblem(bool use_double_buffer) : BaseProblem(
-        use_double_buffer,
+    CCProblem() : BaseProblem(
+        false, // use_double_buffer
         false, // enable_backward
         false, // keep_order
         true,  // keep_node_num

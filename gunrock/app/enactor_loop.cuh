@@ -327,6 +327,8 @@ void Iteration_Loop(
                     if (enactor_stats_->retval = Iteration::Compute_OutputLength(
                         enactor,
                         frontier_attribute_,
+                        //data_slice,
+                        //s_data_slice[thread_num].GetPointer(util::DEVICE),
                         graph_slice    ->row_offsets     .GetPointer(util::DEVICE),
                         graph_slice    ->column_indices  .GetPointer(util::DEVICE),
                         graph_slice    ->column_offsets  .GetPointer(util::DEVICE),
@@ -628,6 +630,8 @@ void Iteration_Loop(
                     enactor_stats_->retval = Iteration::Compute_OutputLength(
                         enactor,
                         frontier_attribute_,
+                        //data_slice,
+                        //s_data_slice[thread_num].GetPointer(util::DEVICE),
                         graph_slice    ->row_offsets     .GetPointer(util::DEVICE),
                         graph_slice    ->column_indices  .GetPointer(util::DEVICE),
                         graph_slice    ->column_offsets  .GetPointer(util::DEVICE),

@@ -300,7 +300,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     bool    quiet_mode             = info->info["quiet_mode"        ].get_bool ();
     bool    quick_mode             = info->info["quick_mode"        ].get_bool ();
     bool    stream_from_host       = info->info["stream_from_host"  ].get_bool ();
-    int     traversal_mode         = info->info["traversal_mode"    ].get_int  ();
+    std::string traversal_mode     = info->info["traversal_mode"    ].get_str  ();
     bool    instrument             = info->info["instrument"        ].get_bool (); 
     bool    debug                  = info->info["debug_mode"        ].get_bool (); 
     bool    size_check             = info->info["size_check"        ].get_bool ();
@@ -347,7 +347,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
 
-    Problem* problem = new Problem(false);  // allocate problem on GPU
+    Problem* problem = new Problem;  // allocate problem on GPU
     if (retval = util::GRError(problem->Init(
         stream_from_host,
         graph,
@@ -366,7 +366,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     Enactor* enactor = new Enactor(
         num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
     if (retval = util::GRError(enactor->Init(
-        context, problem, max_grid_size),
+        context, problem, traversal_mode, max_grid_size),
         "CC Enactor Init failed", __FILE__, __LINE__))
         return retval;
 
@@ -423,7 +423,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     double max_elapsed    = 0.0;
     double min_elapsed    = 1e10;
     json_spirit::mArray process_times;
-
+    if (!quiet_mode) printf("Using traversal mode %s\n", traversal_mode.c_str());
     for (SizeT iter = 0; iter < iterations; ++iter)
     {
         if (retval = util::GRError(problem->Reset(
@@ -439,7 +439,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             printf("_________________________\n"); fflush(stdout);
         }
         cpu_timer.Start();
-        if (retval = util::GRError(enactor->Enact(),
+        if (retval = util::GRError(enactor->Enact(traversal_mode),
             "CC Problem Enact Failed", __FILE__, __LINE__))
             return retval;
         cpu_timer.Stop();

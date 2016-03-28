@@ -77,11 +77,12 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
         while (pos - threadIdx.x < input_queue_length)
         {
             bool to_process = true;
+            VertexId input_item = (d_in_queue == NULL) ? pos : d_in_queue[pos];
             if (pos < input_queue_length)
             {
                 to_process = Functor::CondFilter(
                     util::InvalidValue<VertexId>(),
-                    d_in_queue[pos],
+                    input_item,
                     d_data_slice, /*iteration*/
                     util::InvalidValue<SizeT>(),
                     label,
@@ -92,7 +93,7 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
             if (to_process)
                 Functor::ApplyFilter(
                     util::InvalidValue<VertexId>(),
-                    d_in_queue[pos],
+                    input_item,//d_in_queue[pos],
                     d_data_slice, /*iteration*/
                     util::InvalidValue<SizeT>(),
                     label,

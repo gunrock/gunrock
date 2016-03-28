@@ -134,7 +134,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E ||
                 ADVANCE_TYPE == gunrock::oprtr::advance::V2V)
             {
-                v_id = d_queue[thread_pos];
+                v_id = (d_queue == NULL) ? thread_pos : d_queue[thread_pos];
             } else {
                 v_id = (in_inv) ?
                     d_row_indices[thread_pos] : d_column_indices[thread_pos];
@@ -254,7 +254,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             VertexId thread_input = iter_input_start + threadIdx.x;
             if (thread_input <= block_input_end && thread_input < input_queue_len)
             {
-                VertexId input_item = d_queue[thread_input];
+                VertexId input_item = (d_queue == NULL) ? thread_input : d_queue[thread_input];
                 smem_storage.output_offset[threadIdx.x] =
                     d_scanned_edges [thread_input] - block_output_start;
                 smem_storage.input_queue  [threadIdx.x] = input_item;
@@ -389,7 +389,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
 
         if (thread_input < input_queue_length)
         {
-            input_item = d_queue[thread_input];
+            input_item = (d_queue == NULL) ? thread_input : d_queue[thread_input];
             smem_storage.input_queue  [threadIdx.x] = input_item;
             smem_storage.output_offset[threadIdx.x] = d_scanned_edges[thread_input] - block_output_start;
             if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V ||
@@ -442,7 +442,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                 row_offset_v = smem_storage.row_offset[v_index];
             }
 
-            SizeT edge_id = row_offset_v - v_output_start_offset + thread_output;
+            volatile SizeT edge_id = row_offset_v - v_output_start_offset + thread_output;
             VertexId u = column_indices[edge_id];
             //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
             //    u, column_indices + edge_id);
