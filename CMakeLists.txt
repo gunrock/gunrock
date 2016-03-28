@@ -8,9 +8,14 @@ add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MIN
 cmake_minimum_required(VERSION 2.8)
 
 # begin /* Suppress "deprecated auto_ptr" warnings caused by moderngpu */
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-deprecated-declarations")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
-add_definitions ("-Wno-deprecated-declarations")
+option(WARNING_DEP_FLAG "Deprecated declarations warning flag." OFF)
+if (WARNING_DEP_FLAG)
+  # moderngpu will give auto_ptr warning.
+else (WARNING_DEP_FLAG)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-deprecated-declarations")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
+  add_definitions ("-Wno-deprecated-declarations")
+endif (WARNING_DEP_FLAG)
 # end /* Suppress "deprecated auto_ptr" warnings caused by moderngpu */
 
 option(CMAKE_VERBOSE_MAKEFILE ON)
@@ -93,6 +98,54 @@ option(GUNROCK_BUILD_SHARED_LIBS
 option(GUNROCK_BUILD_APPLICATIONS
   "If on, builds the sample applications."
   ON)
+
+option(GUNROCK_APP_BC
+  "If on, builds only BC application."
+  OFF)
+
+option(GUNROCK_APP_BFS
+  "If on, builds only BFS application."
+  OFF)
+
+option(GUNROCK_APP_CC
+  "If on, builds only CC application."
+  OFF)
+
+option(GUNROCK_APP_PR
+  "If on, builds only PR application."
+  OFF)
+
+option(GUNROCK_APP_SSSP
+  "If on, builds only SSSP application."
+  OFF)
+
+option(GUNROCK_APP_DOBFS
+  "If on, builds only DOBFS application."
+  OFF)
+
+option(GUNROCK_APP_HITS
+  "If on, builds only HITS application."
+  OFF)
+
+option(GUNROCK_APP_SALSA
+  "If on, builds only SALSA application."
+  OFF)
+
+option(GUNROCK_APP_MST
+  "If on, builds only MST application."
+  OFF)
+
+option(GUNROCK_APP_WTF
+  "If on, builds only WTF application."
+  OFF)
+
+option(GUNROCK_APP_TOPK
+  "If on, builds only TOPK application."
+  OFF)
+
+#option(GUNROCK_APP_SAMPLE
+#  "If on, builds only SAMPLE application."
+#  OFF)
 
 option(GUNROCK_GENCODE_SM10
   "ON to generate code for Compute Capability 1.0 devices (e.g. Tesla C870)"
@@ -199,6 +252,57 @@ if(GUNROCK_BUILD_APPLICATIONS)
   #add_subdirectory(tests/template)
   #add_subdirectory(tests/vis)
   #add_subdirectory(tests/mis)
+
+# Individual options to build specific applications
+else(GUNROCK_BUILD_APPLICATIONS)
+  if(GUNROCK_APP_BC)
+    add_subdirectory(tests/bc)
+  endif(GUNROCK_APP_BC)
+
+  if(GUNROCK_APP_BFS)
+    add_subdirectory(tests/bfs)
+  endif(GUNROCK_APP_BFS)
+
+  if(GUNROCK_APP_CC)
+    add_subdirectory(tests/cc)
+  endif(GUNROCK_APP_CC)
+
+  if(GUNROCK_APP_PR)
+    add_subdirectory(tests/pr)
+  endif(GUNROCK_APP_PR)
+
+  if(GUNROCK_APP_SSSP)
+    add_subdirectory(tests/sssp)
+  endif(GUNROCK_APP_SSSP)
+
+  if(GUNROCK_APP_DOBFS)
+    add_subdirectory(tests/dobfs)
+  endif(GUNROCK_APP_DOBFS)
+
+  if(GUNROCK_APP_HITS)
+    add_subdirectory(tests/hits)
+  endif(GUNROCK_APP_HITS)
+
+  if(GUNROCK_APP_SALSA)
+    add_subdirectory(tests/salsa)
+  endif(GUNROCK_APP_SALSA)
+
+  if(GUNROCK_APP_MST)
+    add_subdirectory(tests/mst)
+  endif(GUNROCK_APP_MST)
+
+  if(GUNROCK_APP_WTF)
+    add_subdirectory(tests/wtf)
+  endif(GUNROCK_APP_WTF)
+
+  if(GUNROCK_APP_TOPK)
+    add_subdirectory(tests/topk)
+  endif(GUNROCK_APP_TOPK)
+
+  # if(GUNROCK_APP_SAMPLE)
+  #   add_subdirectory(tests/sample)
+  # endif(GUNROCK_APP_SAMPLE)
+
 endif(GUNROCK_BUILD_APPLICATIONS)
 # end /* Add premitives' subdirectories */
 
