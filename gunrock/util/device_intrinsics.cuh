@@ -15,6 +15,7 @@
 #pragma once
 
 #include <gunrock/util/cuda_properties.cuh>
+#include <gunrock/util/types.cuh>
 
 // atomic addition from Jon Cohen at NVIDIA
 __device__ static double atomicAdd(double *addr, double val)
@@ -27,14 +28,14 @@ __device__ static double atomicAdd(double *addr, double val)
                __double_as_longlong(assumed),
                __double_as_longlong(val + assumed)));
     } while( assumed!=old );
-    return old; 
+    return old;
 }
 
 __device__ static long long atomicCAS(long long *addr, long long comp, long long val)
 {
     return (long long)atomicCAS(
-        (unsigned long long*)addr, 
-        (unsigned long long )comp, 
+        (unsigned long long*)addr,
+        (unsigned long long )comp,
         (unsigned long long ) val);
 }
 
@@ -62,7 +63,7 @@ namespace util {
  */
 __device__ __forceinline__ void ThreadExit() {
     asm("exit;");
-}   
+}
 
 
 /**
@@ -98,12 +99,12 @@ __device__ __forceinline__ int FastMul(int a, int b)
     return a * b;
 #else
     return __mul24(a, b);
-#endif  
+#endif
 }
 
 
 /**
- * Wrapper for performing atomic operations on integers of type size_t 
+ * Wrapper for performing atomic operations on integers of type size_t
  */
 template <typename T, int SizeT = sizeof(T)>
 struct AtomicInt;
@@ -129,4 +130,3 @@ struct AtomicInt<T, 8>
 
 } // namespace util
 } // namespace gunrock
-
