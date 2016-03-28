@@ -224,6 +224,20 @@ protected:
                     gpu, filter_occupancy , max_grid_size);
                 if (retval = enactor_stats_ -> Init(node_lock_size))
                     return retval;
+
+                if (gpu != peer)
+                {
+                    int peer_access_avail;
+                    if (retval = util::GRError(cudaDeviceCanAccessPeer(&peer_access_avail, gpu_idx[gpu], gpu_idx[peer]),
+                        "cudaDeviceCanAccess failed", __FILE__, __LINE__))
+                        return retval;
+                    if (peer_access_avail)
+                    {
+                        if (retval = util::GRError(cudaDeviceEnablePeerAccess(gpu_idx[peer],0),
+                            "cudaDeviceEnablePeerAccess failed", __FILE__, __LINE__))
+                            return retval;
+                    }
+                }
             }
         }
         return retval;
