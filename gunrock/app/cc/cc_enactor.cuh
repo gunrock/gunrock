@@ -107,8 +107,14 @@ __global__ void Expand_Incoming_Kernel(
     while (x < num_elements)
     {
         VertexId key = keys_in[x];
-        if (vertex_associate_in[x] < vertex_associate_org[key])
-            vertex_associate_org[key] = vertex_associate_in[x];
+        VertexId new_pred = vertex_associate_in[x];
+        VertexId old_pred = atomicMin(vertex_associate_org + key, new_pred);
+        if (new_pred < old_pred)
+        {
+            //vertex_associate_org[key] = new_pred;
+            //vertex_associate_org[old_pred] = new_pred;
+            atomicMin(vertex_associate_org + old_pred, new_pred);
+        }
         x += STRIDE;
     }
 }
@@ -142,7 +148,7 @@ __global__ void Make_Output_Kernel(
             if (old_cid == new_cid)
                 to_process = false;
             else {
-                old_component_ids[x] = new_cid;
+                //old_component_ids[x] = new_cid;
             }
         } else to_process = false;
 
@@ -346,6 +352,7 @@ public:
         //    frontier_queue -> keys[0]  .GetPointer(util::DEVICE), graph_slice->edges);
         //util::MemsetIdxKernel<<<480, 512, 0, stream>>>(
         //    frontier_queue -> values[0].GetPointer(util::DEVICE), graph_slice->nodes);
+        if (data_slice -> turn == 0)
         util::MemsetKernel   <<<240, 512, 0, stream>>>(
             data_slice -> marks.GetPointer(util::DEVICE), false, graph_slice->edges);
 
@@ -353,7 +360,8 @@ public:
         {
             frontier_attribute -> queue_index  = 0;
             frontier_attribute -> selector     = 0;
-            frontier_attribute -> queue_length = graph_slice -> nodes;//graph_slice->edges;
+            frontier_attribute -> queue_length = data_slice -> num_gpus == 1 ? graph_slice -> nodes :
+                data_slice -> local_vertices.GetSize();//graph_slice->edges;
             frontier_attribute -> queue_reset  = true;
 
             bool over_sized = false;
@@ -379,7 +387,8 @@ public:
                     graph_slice -> column_indices.GetPointer(util::DEVICE),
                     (SizeT*)NULL,
                     (VertexId*)NULL,
-                    (VertexId*)NULL,//d_in_key_queue,
+                    (data_slice -> num_gpus == 1) ? (VertexId*)NULL :
+                        data_slice -> local_vertices.GetPointer(util::DEVICE),//d_in_key_queue,
                     scanned_edges->GetPointer(util::DEVICE),
                     graph_slice -> nodes,
                     graph_slice -> edges,
@@ -449,7 +458,8 @@ public:
                 (bool*    )NULL,
                 (bool*    )NULL,
                 scanned_edges -> GetPointer(util::DEVICE),
-                (VertexId*)NULL,
+                data_slice -> num_gpus == 1 ? (VertexId*)NULL :
+                    data_slice -> local_vertices.GetPointer(util::DEVICE),
                 (VertexId*)NULL,
                 (Value*   )NULL,
                 (Value*   )NULL,
@@ -525,6 +535,11 @@ public:
         frontier_attribute -> queue_length = graph_slice->nodes;
         frontier_attribute -> queue_reset  = true;
 
+        util::MemsetCopyVectorKernel <<<240, 512, 0, stream>>>(
+            data_slice -> old_c_ids.GetPointer(util::DEVICE),
+            data_slice -> component_ids.GetPointer(util::DEVICE),
+            data_slice -> nodes);
+
         // First Pointer Jumping Round
         data_slice -> vertex_flag[0] = 0;
         while (!data_slice -> vertex_flag[0]) {
@@ -591,6 +606,12 @@ public:
             if (data_slice->vertex_flag[0]) break;
         }
 
+        if (data_slice -> turn > 1)
+        {
+            enactor_stats->iteration = data_slice->turn;
+            return;
+        }
+
         frontier_attribute->queue_index   = 0;        // Work queue index
         frontier_attribute->selector      = 0;
         frontier_attribute->queue_length  = graph_slice->nodes;
@@ -646,10 +667,11 @@ public:
 
         enactor_stats->iteration = 1;
         data_slice->edge_flag[0] = 0;
-        while (!data_slice->edge_flag[0])
+        while (!data_slice->edge_flag[0] && data_slice -> turn <= 1)
         {
             frontier_attribute->queue_index  = 0;        // Work queue index
-            frontier_attribute->queue_length = graph_slice -> nodes;//graph_slice->edges;
+            frontier_attribute->queue_length = (data_slice -> num_gpus == 1) ? graph_slice -> nodes :
+                data_slice -> local_vertices.GetSize();//graph_slice->edges;
             frontier_attribute->selector     = 0;
             frontier_attribute->queue_reset  = true;
             data_slice->edge_flag[0] = 1;
@@ -729,7 +751,8 @@ public:
                 (bool*    )NULL,
                 (bool*    )NULL,
                 scanned_edges -> GetPointer(util::DEVICE),
-                (VertexId*)NULL,
+                (data_slice -> num_gpus == 1)  ? (VertexId*)NULL :
+                    data_slice -> local_vertices.GetPointer(util::DEVICE),
                 (VertexId*)NULL,
                 (Value*   )NULL,
                 (Value*   )NULL,

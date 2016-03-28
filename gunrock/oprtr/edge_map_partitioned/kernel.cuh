@@ -442,7 +442,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                 row_offset_v = smem_storage.row_offset[v_index];
             }
 
-            volatile SizeT edge_id = row_offset_v - v_output_start_offset + thread_output;
+            SizeT edge_id = row_offset_v - v_output_start_offset + thread_output;
             VertexId u = column_indices[edge_id];
             //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
             //    u, column_indices + edge_id);

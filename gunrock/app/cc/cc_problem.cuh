@@ -144,6 +144,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             //int   num_vertex_associate,
             //int   num_value__associate,
             Csr<VertexId, SizeT, Value> *graph,
+            GraphSlice<VertexId, SizeT, Value> *graph_slice,
             SizeT *num_in_nodes,
             SizeT *num_out_nodes,
             VertexId *original_vertex,
@@ -243,6 +244,24 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
                     this->frontier_queues[0].values[0].GetPointer(util::DEVICE), nodes+2, util::DEVICE);
                 //this->frontier_queues[num_gpus].values[1].SetPointer(this->frontier_queues[0].values[1].GetPointer(util::DEVICE), nodes+2, util::DEVICE);
             }*/
+
+            if (num_gpus > 1)
+            {
+                SizeT num_local_vertices = 0;
+                for (VertexId v=0; v<nodes; v++)
+                    if (graph_slice -> partition_table[v] == 0)
+                        num_local_vertices ++;
+                if (retval = local_vertices.Allocate(num_local_vertices, util::HOST | util::DEVICE))
+                    return retval;
+                num_local_vertices = 0;
+                for (VertexId v=0; v<nodes; v++)
+                    if (graph_slice -> partition_table[v] == 0)
+                    {
+                        local_vertices[num_local_vertices] = v;
+                        num_local_vertices ++;
+                    }    
+                if (retval = local_vertices.Move(util::HOST, util::DEVICE)) return retval;
+            }
             return retval;
         }
 
@@ -531,6 +550,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
                     //this->num_gpus>1? 1:0,
                     //0,
                     &(this->sub_graphs[gpu]),
+                    this -> graph_slices[gpu],
                     this->num_gpus>1? this->graph_slices[gpu]->in_counter .GetPointer(util::HOST) : NULL,
                     this->num_gpus>1? this->graph_slices[gpu]->out_counter.GetPointer(util::HOST) : NULL,
                     this->num_gpus>1? this->graph_slices[gpu]->original_vertex.GetPointer(util::HOST) : NULL,
