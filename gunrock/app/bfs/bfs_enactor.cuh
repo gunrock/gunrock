@@ -622,11 +622,13 @@ struct BFSIteration : public IterationBase <
             //    (Value)(enactor_stats -> iteration));
         }
 
-        data_slice -> num_visited_vertices += frontier_attribute -> queue_length;
+        //if (data_slice -> previous_direction == FORWARD)
+            data_slice -> num_visited_vertices += frontier_attribute -> queue_length;
         SizeT num_unvisited_vertices = graph_slice -> nodes - data_slice -> num_visited_vertices;
         float rev = data_slice -> num_visited_vertices == 0 ?
             std::numeric_limits<float>::infinity() :
             num_unvisited_vertices * 1.0 * graph_slice -> nodes / data_slice -> num_visited_vertices;
+        rev /= enactor -> num_gpus;
         //printf("%d\t %d\t %d\t queue_length = %d, output_length = %d, visited = %d, rev = %f\n",
         //    data_slice -> gpu_idx, enactor_stats -> iteration, peer_,
         //    frontier_attribute -> queue_length,
@@ -634,9 +636,19 @@ struct BFSIteration : public IterationBase <
         //    data_slice -> num_visited_vertices,
         //    rev);
         long long iteration_ = enactor_stats -> iteration % 4;
-        if (frontier_attribute -> output_length[0] > rev && enactor -> direction_optimized)
-            data_slice -> direction_votes[iteration_] = BACKWARD;
-        else data_slice -> direction_votes[iteration_] = FORWARD;
+        if (enactor -> direction_optimized)
+        {
+            if (data_slice -> previous_direction == FORWARD)
+            {
+                if (frontier_attribute -> output_length[0] > rev / 30)
+                     data_slice -> direction_votes[iteration_] = BACKWARD;
+                else data_slice -> direction_votes[iteration_] = FORWARD;
+            } else {
+                if (frontier_attribute -> output_length[0] > rev / 50)
+                     data_slice -> direction_votes[iteration_] = BACKWARD;
+                else data_slice -> direction_votes[iteration_] = FORWARD;
+            }
+        } else data_slice -> direction_votes[iteration_] = FORWARD;
         data_slice -> direction_votes[(iteration_+1)%4] = UNDECIDED;
 
         if (enactor -> num_gpus > 1 && enactor_stats -> iteration != 0 && enactor -> direction_optimized)
@@ -675,6 +687,17 @@ struct BFSIteration : public IterationBase <
         else {
             data_slice -> current_direction = data_slice -> direction_votes[iteration_];
         }
+        /*if (thread_num == 0 && enactor -> direction_optimized) 
+            printf("%d\t %lld\t \t queue = %lld,\t output = %lld,\t visited = %lld,\t "
+                "unvisited = %lld,\t rev = %.0f,\t direction = %s, ratio = %.4f\n",
+                thread_num, enactor_stats -> iteration, 
+                (long long)frontier_attribute -> queue_length,
+                (long long)frontier_attribute -> output_length[0],
+                (long long)data_slice -> num_visited_vertices, 
+                (long long)num_unvisited_vertices,
+                rev, data_slice -> current_direction == FORWARD ? "FORWARD" : "BACKWARD",
+                rev / (frontier_attribute -> output_length[0] == 0 ? 1 : frontier_attribute -> output_length[0]));*/
+                
         //util::MemsetKernel<<<256, 256, 0, stream>>>(
         //    data_slice -> output_counter.GetPointer(util::DEVICE),
         //    0, frontier_attribute -> output_length[0]);
@@ -872,6 +895,7 @@ struct BFSIteration : public IterationBase <
                 num_unvisited_vertices = data_slice -> split_lengths[0];
 
                 data_slice -> num_visited_vertices = graph_slice -> nodes - num_unvisited_vertices;
+                //printf("%d\t actual unvisited = %lld\n", thread_num, (long long)num_unvisited_vertices);
             } else {
                 num_unvisited_vertices = data_slice -> split_lengths[0];
             }
@@ -882,6 +906,7 @@ struct BFSIteration : public IterationBase <
             data_slice -> split_lengths[0] = 0;
             data_slice -> split_lengths[1] = 0;
             data_slice -> split_lengths.Move(util::HOST, util::DEVICE, 2, 0, stream);
+            enactor_stats     ->nodes_queued[0] += num_unvisited_vertices;
 
             num_blocks = num_unvisited_vertices / AdvanceKernelPolicy::THREADS + 1;
             if (num_blocks > 480) num_blocks = 480;
@@ -900,8 +925,11 @@ struct BFSIteration : public IterationBase <
             if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
                 "cudaStreamSynchronize failed", __FILE__, __LINE__))
                 return;
-            //printf("discovered = %d, unvisited = %d\n", data_slice -> split_lengths[1], data_slice -> split_lengths[0]);
+            //printf("%d\t discovered = %d, unvisited = %d\n",
+            //    thread_num,
+            //    data_slice -> split_lengths[1], data_slice -> split_lengths[0]);
             frontier_attribute -> queue_length = data_slice -> split_lengths[1];
+            data_slice -> num_visited_vertices = data_slice -> nodes - num_unvisited_vertices;
             enactor_stats -> edges_queued[0] += frontier_attribute -> output_length[0];
             frontier_attribute -> queue_reset = false;
             frontier_attribute -> queue_index++;

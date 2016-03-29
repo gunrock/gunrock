@@ -426,6 +426,7 @@ public:
             h_pointer = pointer;
         if (target == DEVICE)
             d_pointer = pointer;
+        return cudaSuccess;
     }
 
     void ForceUnSetPointer(unsigned int target = HOST)
