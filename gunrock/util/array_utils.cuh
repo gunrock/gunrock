@@ -420,6 +420,14 @@ public:
         return retval;
     } // SetPointer(...)
 
+    cudaError_t ForceSetPointer(Value* pointer, unsigned int target = HOST)
+    {
+        if (target == HOST)
+            h_pointer = pointer;
+        if (target == DEVICE)
+            d_pointer = pointer;
+    }
+
     void ForceUnSetPointer(unsigned int target = HOST)
     {
         if ((setted & target) == target)

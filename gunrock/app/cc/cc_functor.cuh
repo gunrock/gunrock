@@ -68,9 +68,9 @@ struct UpdateMaskFunctor {
         VertexId parent;
         util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
             parent, d_data_slice -> component_ids + node);
-        if (TO_TRACK)
-            if (to_track(node))
-                printf("UpdateMask [%d]: %d->%d\n", node, d_data_slice -> masks[node], (parent == node) ? 0 : 1);
+        //if (TO_TRACK)
+        //    if (to_track(node))
+        //        printf("UpdateMask [%d]: %d->%d\n", node, d_data_slice -> masks[node], (parent == node) ? 0 : 1);
         util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
             (parent == node) ? 0 : 1, d_data_slice->masks + node);
     }
@@ -138,9 +138,9 @@ struct HookInitFunctor {
                 to_node, problem->tos + node);*/
         VertexId max_node = from_node > to_node ? from_node : to_node;
         VertexId min_node = from_node + to_node - max_node;
-        if (TO_TRACK)
-            if (to_track(max_node) || to_track(min_node))
-                printf("HookInit [%d]: ->%d\n", max_node, min_node);
+        //if (TO_TRACK)
+        //    if (to_track(max_node) || to_track(min_node))
+        //        printf("HookInit [%d]: ->%d\n", max_node, min_node);
         //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
         //        min_node, problem->component_ids + max_node);
         d_data_slice -> component_ids[max_node] = min_node;
@@ -350,16 +350,17 @@ struct HookMaxFunctor {
                 parent_to  , d_data_slice -> component_ids + to_node);
             VertexId max_node = parent_from > parent_to ? parent_from : parent_to;
             VertexId min_node = parent_from + parent_to - max_node;
-            if (max_node == min_node) {
-                if (TO_TRACK)
-                    if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node))
-                        printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d==\n", node, from_node, to_node, parent_from, parent_to, max_node, min_node);
+            if (max_node == min_node) 
+            {
+                //if (TO_TRACK)
+                //    if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node))
+                //        printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d==\n", node, from_node, to_node, parent_from, parent_to, max_node, min_node);
                 util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                     true, d_data_slice ->marks + node);
             } else { //if (problem->component_ids[max_node] > min_node)
-                if (TO_TRACK)
-                    if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node))
-                        printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d->%d\n", node, from_node, to_node, parent_from, parent_to, max_node, d_data_slice->component_ids[max_node], min_node);
+                //if (TO_TRACK)
+                //    if (to_track(max_node) || to_track(from_node) || to_track(to_node) || to_track(min_node))
+                //        printf("HookMax n=%d, f_n=%d, t_n=%d, f_p=%d, t_p=%d: [%d] %d->%d\n", node, from_node, to_node, parent_from, parent_to, max_node, d_data_slice->component_ids[max_node], min_node);
                 util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                     min_node, d_data_slice->component_ids + max_node);
                 util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
@@ -510,12 +511,15 @@ struct PtrJumpFunctor {
         if (parent != grand_parent) {
             util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                 0, d_data_slice ->vertex_flag + 0);
-            if (TO_TRACK)
-                if (to_track(node))
-                    printf("PtrJump [%d]: %d->%d\n", node, 
-                    d_data_slice ->component_ids[node], grand_parent);
-            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-                grand_parent, d_data_slice -> component_ids + node);
+            //if (TO_TRACK)
+            //    if (to_track(node))
+            //        printf("PtrJump [%d]: %d->%d\n", node, 
+            //        d_data_slice ->component_ids[node], grand_parent);
+            //if (grand_parent < parent)
+                util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                    grand_parent, d_data_slice -> component_ids + node);
+            //else util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            //        parent, d_data_slice -> component_ids + grand_parent);
         }
     }
 };
@@ -589,15 +593,15 @@ struct PtrJumpMaskFunctor {
                 grand_parent, d_data_slice -> component_ids + parent);
             if (parent != grand_parent) {
                 d_data_slice->vertex_flag[0] = 0;
-                if (TO_TRACK)
-                    if (to_track(node))
-                        printf("PtrJumpMask [%d]: %d->%d\n", node, d_data_slice->component_ids[node], grand_parent);
+                //if (TO_TRACK)
+                //    if (to_track(node))
+                //        printf("PtrJumpMask [%d]: %d->%d\n", node, d_data_slice->component_ids[node], grand_parent);
                 util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                     grand_parent, d_data_slice->component_ids + node);
             } else {
-                if (TO_TRACK)
-                    if (to_track(node))
-                        printf("PtrJumpMask mask[%d]: %d->%d\n", node, d_data_slice->masks[node], -1);
+                //if (TO_TRACK)
+                //    if (to_track(node))
+                //        printf("PtrJumpMask mask[%d]: %d->%d\n", node, d_data_slice->masks[node], -1);
                 util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                     -1, d_data_slice->masks + node);
             }
@@ -674,9 +678,9 @@ struct PtrJumpUnmaskFunctor {
             VertexId grand_parent;
             util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
                 grand_parent, d_data_slice->component_ids + parent);
-            if (TO_TRACK)
-                if (to_track(node))
-                    printf("PtrJumpUnMask [%d]: %d->%d\t", node, parent, grand_parent);
+            //if (TO_TRACK)
+            //    if (to_track(node))
+            //        printf("PtrJumpUnMask [%d]: %d->%d\t", node, parent, grand_parent);
             util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                 grand_parent, d_data_slice->component_ids + node);
         }

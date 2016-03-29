@@ -20,16 +20,15 @@ namespace gunrock {
 namespace util {
 
 #define TO_TRACK false
-#define NUM_TO_TRACK 10
+#define NUM_TO_TRACK 3
 #define MAX_GPU 0
 
 template <typename VertexId>
 static __device__ __host__ __inline__ bool to_track(VertexId node) {
     const VertexId node_to_track[] = {
-        81561706,
-        48459810,
-        18876984,
-        1902};
+        2131537,
+        13839597,
+        15173021};
     if (!TO_TRACK) return false;
     else {
         #pragma unroll

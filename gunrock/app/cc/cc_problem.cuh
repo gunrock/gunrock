@@ -72,11 +72,13 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, int     > vertex_flag;   /**< Finish flag for per-vertex kernels in CC algorithm */
         util::Array1D<SizeT, int     > edge_flag;     /**< Finish flag for per-edge kernels in CC algorithm */
         util::Array1D<SizeT, VertexId> local_vertices;
-
+        util::Array1D<SizeT, VertexId*> vertex_associate_ins;
         int turn;
         //DataSlice *d_pointer;
         bool has_change;
         bool scanned_queue_computed;
+        VertexId *temp_vertex_out;
+        VertexId *temp_comp_out;
         //util::CtaWorkProgressLifetime *work_progress;
 
         /*
@@ -94,11 +96,14 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             vertex_flag  .SetName("vertex_flag"  );
             edge_flag    .SetName("edge_flag"    );
             local_vertices.SetName("local_vertices");
+            vertex_associate_ins.SetName("vertex_associate_ins");
             turn          = 0;
             //d_pointer     = NULL;
             //work_progress = NULL;
             has_change    = true;
             scanned_queue_computed = false;
+            temp_vertex_out = NULL;
+            temp_comp_out = NULL;
         }
 
         /*
@@ -117,6 +122,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             vertex_flag  .Release();
             edge_flag    .Release();
             local_vertices.Release();
+            vertex_associate_ins.Release();
             //d_pointer     = NULL;
             //work_progress = NULL;
         }
@@ -231,6 +237,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = edge_flag    .Allocate(1, util::HOST | util::DEVICE)) return retval;
             if (retval = this -> frontier_queues[0].keys  [0].Allocate(nodes + 2, util::DEVICE)) return retval;
             if (retval = this -> scanned_edges[0].Allocate(nodes + 2, util::DEVICE)) return retval;
+            if (retval = vertex_associate_ins.Allocate(num_gpus, util::HOST | util::DEVICE)) return retval;
             scanned_queue_computed = false;
             //if (retval = this->frontier_queues[0].keys  [0].Allocate(edges+2, util::DEVICE)) return retval;
             //if (retval = this->frontier_queues[0].keys  [1].Allocate(edges+2, util::DEVICE)) return retval;
@@ -292,7 +299,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             //if (retval = this -> frontier_queues[0].keys  [1].EnsureSize(edges+2)) return retval;
             //if (retval = this -> frontier_queues[0].values[0].EnsureSize(nodes+2)) return retval;
             //if (retval = this -> frontier_queues[0].values[1].EnsureSize(nodes+2)) return retval;
-            if (retval = this -> frontier_queues[0].keys[0].EnsureSize(nodes + 2)) return retval;
+            //if (retval = this -> frontier_queues[0].keys[0].EnsureSize(nodes + 2)) return retval;
 
             // Allocate output component_ids if necessary
             util::MemsetIdxKernel<<<128, 128>>>(component_ids .GetPointer(util::DEVICE), nodes);
@@ -316,10 +323,12 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
 
             // Initialize vertex frontier queue
             //util::MemsetIdxKernel<<<128, 128>>>(this -> frontier_queues[0].values[0].GetPointer(util::DEVICE), nodes);
-            util::MemsetIdxKernel<<<240, 512>>>(this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes);
+            //util::MemsetIdxKernel<<<240, 512>>>(this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes);
 
             if (this -> num_gpus > 1)
                 util::MemsetIdxKernel<<<240, 512>>>(old_c_ids.GetPointer(util::DEVICE), nodes);
+            util::MemsetKernel   <<<240, 512>>>(
+                marks.GetPointer(util::DEVICE), false, edges);
             return retval;
         }
     };
@@ -379,44 +388,85 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
         int *marker=new int[this->nodes];
         memset(marker, 0, sizeof(int) * this->nodes);
 
-        do {
-            if (this->num_gpus == 1) {
-                if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
-                data_slices[0]->component_ids.SetPointer(h_component_ids);
-                if (retval = data_slices[0]->component_ids.Move(util::DEVICE, util::HOST)) 
+        if (this->num_gpus == 1) {
+            if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
+            data_slices[0]->component_ids.SetPointer(h_component_ids);
+            if (retval = data_slices[0]->component_ids.Move(util::DEVICE, util::HOST)) 
+                return retval;
+            num_components=0;
+            for (int node=0; node<this->nodes; node++)
+            if (marker[h_component_ids[node]] == 0)
+            {
+                num_components++;
+                //printf("%d\t ",node);
+                marker[h_component_ids[node]]=1;
+            }
+
+        } else {
+            VertexId **th_component_ids = new VertexId*[this->num_gpus];
+            for (int gpu=0; gpu< this->num_gpus; gpu++)
+            {
+                if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
+                if (retval = data_slices[gpu]->component_ids.Move(util::DEVICE, util::HOST)) 
                     return retval;
-                num_components=0;
-                for (int node=0; node<this->nodes; node++)
+                th_component_ids[gpu] = data_slices[gpu]->component_ids.GetPointer(util::HOST);
+            }
+
+            num_components=0;
+            for (VertexId node=0; node<this->nodes; node++)
+            {
+                h_component_ids[node]=th_component_ids[this->partition_tables[0][node]][this->convertion_tables[0][node]];
                 if (marker[h_component_ids[node]] == 0)
                 {
                     num_components++;
-                    //printf("%d\t ",node);
+                    //printf("%d ",node);
                     marker[h_component_ids[node]]=1;
                 }
+            }
 
-            } else {
-                VertexId **th_component_ids = new VertexId*[this->num_gpus];
-                for (int gpu=0; gpu< this->num_gpus; gpu++)
+            VertexId **temp_cids = new VertexId*[this -> num_gpus];
+            for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+            {
+                temp_cids[gpu] = new VertexId[this -> nodes];
+                for (SizeT i = 0; i < this -> nodes; i++)
+                    temp_cids[gpu][i] = util::InvalidValue<VertexId>();
+                for (SizeT v_ = 0; v_ < this -> graph_slices[gpu] -> nodes; v_++)
                 {
-                    if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-                    if (retval = data_slices[gpu]->component_ids.Move(util::DEVICE, util::HOST)) 
-                        return retval;
-                    th_component_ids[gpu] = data_slices[gpu]->component_ids.GetPointer(util::HOST);
+                    temp_cids[gpu][this -> graph_slices[gpu] -> original_vertex[v_]] = th_component_ids[gpu][v_];
                 }
+            }
 
-                num_components=0;
-                for (VertexId node=0; node<this->nodes; node++)
+            SizeT num_diff = 0;
+            for (VertexId node = 0; node < this->nodes; node++)
+            {
+                VertexId host_cid = h_component_ids[node];
+                bool difference_found = false;
+                for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
                 {
-                    h_component_ids[node]=th_component_ids[this->partition_tables[0][node]][this->convertion_tables[0][node]];
-                    if (marker[h_component_ids[node]] == 0)
+                    if (temp_cids[gpu][node] != util::InvalidValue<VertexId>()
+                        && temp_cids[gpu][node] != host_cid)
                     {
-                        num_components++;
-                        //printf("%d ",node);
-                        marker[h_component_ids[node]]=1;
+                        difference_found = true;
+                        break;
                     }
                 }
-            } //end if
-        } while(0);
+                if (difference_found)
+                {
+                    if (num_diff < 10)
+                    {
+                        printf("Node %d : ", node);
+                        for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+                        {
+                            if (gpu != 0) printf(", ");
+                            printf("%d -> %d", temp_cids[gpu][node], temp_cids[gpu][temp_cids[gpu][node]]);
+                        }
+                        printf(" host = %d\n", this -> partition_tables[0][node]);
+                    }
+                    num_diff ++;
+                }
+            }
+            if (num_diff != 0) printf("Number of differences = %lld\n", (long long)num_diff);
+        } //end if
 
         return retval;
     }

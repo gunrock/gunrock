@@ -359,6 +359,7 @@ struct DataSliceBase
     //int    num_value__associate; // Number of associate values in Value type for each vertex
     int    num_stages          ; // Number of stages
     SizeT  nodes               ; // Number of vertices
+    SizeT  edges               ; // Number of edges
     bool   use_double_buffer   ;
     typedef unsigned char MaskT;
 
@@ -774,6 +775,7 @@ struct DataSliceBase
         this->gpu_idx              = gpu_idx;
         this->use_double_buffer    = use_double_buffer;
         this->nodes                = graph->nodes;
+        this->edges                = graph->edges;
         //this->num_vertex_associate = num_vertex_associate;
         //this->num_value__associate = num_value__associate;
 
