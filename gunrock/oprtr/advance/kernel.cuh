@@ -23,6 +23,7 @@
 #include <gunrock/oprtr/edge_map_partitioned_backward/kernel.cuh>
 #include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
 #include <gunrock/oprtr/edge_map_partitioned_cull/kernel.cuh>
+#include <gunrock/oprtr/all_edges_advance/kernel.cuh>
 
 #include <gunrock/util/multithread_utils.cuh>
 
@@ -837,6 +838,48 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_LIGHT_CULL>
        return retval;
     }
 };
+
+template <typename Parameter>
+struct LaunchKernel_<Parameter, gunrock::oprtr::advance::ALL_EDGES>
+{
+    typedef typename Parameter::Problem::SizeT         SizeT;
+    typedef typename Parameter::Problem::VertexId      VertexId;
+    typedef typename Parameter::Problem::Value         Value;
+    typedef typename Parameter::KernelPolicy::EDGES KernelPolicy;
+
+    static cudaError_t Launch(Parameter *parameter)
+    {
+        cudaError_t retval = cudaSuccess;
+        // load edge-expand-partitioned kernel
+        SizeT num_blocks = (parameter -> frontier_attribute -> queue_length +
+             KernelPolicy::THREADS - 1) / KernelPolicy::THREADS;
+        if (num_blocks > 480) num_blocks = 480;
+
+        gunrock::oprtr::all_edges_advance::Advance_Edges
+            <KernelPolicy,
+            typename Parameter::Problem,
+            typename Parameter::Functor,
+            Parameter::ADVANCE_TYPE,
+            Parameter::R_TYPE,
+            Parameter::R_OP>
+            <<< num_blocks, KernelPolicy::THREADS, 0, parameter -> stream>>>(
+            parameter -> frontier_attribute -> queue_reset,
+            parameter -> frontier_attribute -> queue_index,
+            parameter -> label, //parameter -> enactor_stats -> iteration,
+            parameter -> max_in,
+            parameter -> max_out,
+            parameter -> d_row_offsets,
+            parameter -> d_column_indices,
+            (SizeT*) NULL,
+            (SizeT*) NULL,
+            parameter -> d_data_slice,
+            parameter -> frontier_attribute -> queue_length,
+            parameter -> frontier_attribute -> output_length.GetPointer(util::DEVICE),
+            parameter -> work_progress[0]);
+        return retval;
+   }
+};
+
 
 /**
  * @brief Advance operator kernel entry point.

@@ -566,11 +566,11 @@ struct BFSIteration : public IterationBase <
     //typedef typename Enactor::Frontier   Frontier  ;
     typedef typename util::DoubleBuffer<VertexId, SizeT, Value>
                                         Frontier;
-    typedef GraphSlice<VertexId, SizeT, Value> GraphSlice;
+    typedef GraphSlice<VertexId, SizeT, Value> GraphSliceT;
     typedef BFSFunctor<VertexId, SizeT, Value, Problem> Functor;
 
-    /*
-     * @brief SubQueue_Core function.
+    /*   
+     * @brief FullQueue_Gather function.
      *
      * @param[in] thread_num Number of threads.
      * @param[in] peer_ Peer GPU index.
@@ -585,7 +585,7 @@ struct BFSIteration : public IterationBase <
      * @param[in] context CudaContext for ModernGPU API.
      * @param[in] stream CUDA stream.
      */
-    static void FullQueue_Core(
+    static void FullQueue_Gather(
         Enactor                       *enactor,
         int                            thread_num,
         int                            peer_,
@@ -595,40 +595,19 @@ struct BFSIteration : public IterationBase <
         EnactorStats<SizeT>           *enactor_stats,
         DataSlice                     *data_slice,
         DataSlice                     *d_data_slice,
-        GraphSlice                    *graph_slice,
+        GraphSliceT                   *graph_slice,
         util::CtaWorkProgressLifetime<SizeT> *work_progress,
         ContextPtr                     context,
         cudaStream_t                   stream)
-    {
-        if (TO_TRACK)
-        {
-            printf("%d\t %lld\t %d SubQueue_Core queue_length = %lld\n",
-                thread_num, (long long)enactor_stats->iteration, peer_,
-                (long long)frontier_attribute -> queue_length);
-            fflush(stdout);
-            //util::MemsetKernel<<<256, 256, 0, stream>>>(
-            //    frontier_queue -> keys[frontier_attribute -> selector^1].GetPointer(util::DEVICE),
-            //    (VertexId)-2,
-            //    frontier_queue -> keys[frontier_attribute -> selector^1].GetSize());
-            util::Check_Exist<<<256, 256, 0, stream>>>(
-                frontier_attribute -> queue_length,
-                data_slice->gpu_idx, 2, enactor_stats -> iteration,
-                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
-            //util::Verify_Value<<<256, 256, 0, stream>>>(
-            //    data_slice -> gpu_idx, 2, frontier_attribute -> queue_length,
-            //    enactor_stats -> iteration,
-            //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
-            //    data_slice -> labels.GetPointer(util::DEVICE),
-            //    (Value)(enactor_stats -> iteration));
-        }
-
-        //if (data_slice -> previous_direction == FORWARD)
+    {   
+         //if (data_slice -> previous_direction == FORWARD)
             data_slice -> num_visited_vertices += frontier_attribute -> queue_length;
-        SizeT num_unvisited_vertices = graph_slice -> nodes - data_slice -> num_visited_vertices;
-        float rev = data_slice -> num_visited_vertices == 0 ?
+        data_slice -> num_unvisited_vertices = graph_slice -> nodes - data_slice -> num_visited_vertices;
+        float predicted_backward_visits = data_slice -> num_visited_vertices == 0 ?
             std::numeric_limits<float>::infinity() :
-            num_unvisited_vertices * 1.0 * graph_slice -> nodes / data_slice -> num_visited_vertices;
-        rev /= enactor -> num_gpus;
+            data_slice -> num_unvisited_vertices * 1.0 * graph_slice -> nodes / data_slice -> num_visited_vertices;
+        //predicted_reverse_edge_visits /= enactor -> num_gpus;
+        float predicted_forward_visits = frontier_attribute -> queue_length * 1.0 * graph_slice -> edges / graph_slice -> nodes;
         //printf("%d\t %d\t %d\t queue_length = %d, output_length = %d, visited = %d, rev = %f\n",
         //    data_slice -> gpu_idx, enactor_stats -> iteration, peer_,
         //    frontier_attribute -> queue_length,
@@ -640,11 +619,13 @@ struct BFSIteration : public IterationBase <
         {
             if (data_slice -> previous_direction == FORWARD)
             {
-                if (frontier_attribute -> output_length[0] > rev / 30)
+                if (predicted_forward_visits > predicted_backward_visits * enactor -> do_a &&
+                    !data_slice -> been_in_backward)
                      data_slice -> direction_votes[iteration_] = BACKWARD;
                 else data_slice -> direction_votes[iteration_] = FORWARD;
             } else {
-                if (frontier_attribute -> output_length[0] > rev / 50)
+                data_slice -> been_in_backward = true;
+                if (predicted_forward_visits > predicted_backward_visits * enactor -> do_b)
                      data_slice -> direction_votes[iteration_] = BACKWARD;
                 else data_slice -> direction_votes[iteration_] = FORWARD;
             }
@@ -687,17 +668,82 @@ struct BFSIteration : public IterationBase <
         else {
             data_slice -> current_direction = data_slice -> direction_votes[iteration_];
         }
-        /*if (thread_num == 0 && enactor -> direction_optimized) 
-            printf("%d\t %lld\t \t queue = %lld,\t output = %lld,\t visited = %lld,\t "
-                "unvisited = %lld,\t rev = %.0f,\t direction = %s, ratio = %.4f\n",
+        if (false)//(thread_num == 0 && enactor -> direction_optimized) 
+            printf("%d\t %lld\t \t queue = %lld,\t pre_output = %lld,\t visited = %lld,\t "
+                "unvisited = %lld,\t predicted_forward = %.0f,\t predicted_backward = %.0f,\t "
+                "direction = %s, ratio = %.8f\n",
+                //" ratio2 = %.4f, ratio3 = %.4f, %.4f, ratio4 = %.4f, ratio5 = %.4f\n",
                 thread_num, enactor_stats -> iteration, 
                 (long long)frontier_attribute -> queue_length,
                 (long long)frontier_attribute -> output_length[0],
                 (long long)data_slice -> num_visited_vertices, 
-                (long long)num_unvisited_vertices,
-                rev, data_slice -> current_direction == FORWARD ? "FORWARD" : "BACKWARD",
-                rev / (frontier_attribute -> output_length[0] == 0 ? 1 : frontier_attribute -> output_length[0]));*/
-                
+                (long long)data_slice -> num_unvisited_vertices,
+                predicted_forward_visits,
+                predicted_backward_visits,
+                data_slice -> current_direction == FORWARD ? "FORWARD" : "BACKWARD",
+                predicted_forward_visits / predicted_backward_visits);
+                //data_slice -> num_visited_vertices * 1.0 / data_slice -> nodes,
+                //data_slice -> num_visited_vertices * 1.0 / data_slice -> num_unvisited_vertices,
+                //data_slice -> num_unvisited_vertices * 1.0 / data_slice -> num_visited_vertices,
+                //frontier_attribute -> queue_length * 1.0 / data_slice -> num_unvisited_vertices,
+                //frontier_attribute -> queue_length * 1.0 * data_slice -> edges / data_slice -> nodes / 
+                //(data_slice -> num_unvisited_vertices * 1.0 * data_slice -> nodes / data_slice -> num_visited_vertices));
+    }  
+
+    /*
+     * @brief SubQueue_Core function.
+     *
+     * @param[in] thread_num Number of threads.
+     * @param[in] peer_ Peer GPU index.
+     * @param[in] frontier_queue Pointer to the frontier queue.
+     * @param[in] partitioned_scanned_edges Pointer to the scanned edges.
+     * @param[in] frontier_attribute Pointer to the frontier attribute.
+     * @param[in] enactor_stats Pointer to the enactor statistics.
+     * @param[in] data_slice Pointer to the data slice we process on.
+     * @param[in] d_data_slice Pointer to the data slice on the device.
+     * @param[in] graph_slice Pointer to the graph slice we process on.
+     * @param[in] work_progress Pointer to the work progress class.
+     * @param[in] context CudaContext for ModernGPU API.
+     * @param[in] stream CUDA stream.
+     */
+    static void FullQueue_Core(
+        Enactor                       *enactor,
+        int                            thread_num,
+        int                            peer_,
+        Frontier                      *frontier_queue,
+        util::Array1D<SizeT, SizeT>   *scanned_edges,
+        FrontierAttribute<SizeT>      *frontier_attribute,
+        EnactorStats<SizeT>           *enactor_stats,
+        DataSlice                     *data_slice,
+        DataSlice                     *d_data_slice,
+        GraphSliceT                   *graph_slice,
+        util::CtaWorkProgressLifetime<SizeT> *work_progress,
+        ContextPtr                     context,
+        cudaStream_t                   stream)
+    {
+        if (TO_TRACK)
+        {
+            printf("%d\t %lld\t %d SubQueue_Core queue_length = %lld\n",
+                thread_num, (long long)enactor_stats->iteration, peer_,
+                (long long)frontier_attribute -> queue_length);
+            fflush(stdout);
+            //util::MemsetKernel<<<256, 256, 0, stream>>>(
+            //    frontier_queue -> keys[frontier_attribute -> selector^1].GetPointer(util::DEVICE),
+            //    (VertexId)-2,
+            //    frontier_queue -> keys[frontier_attribute -> selector^1].GetSize());
+            util::Check_Exist<<<256, 256, 0, stream>>>(
+                frontier_attribute -> queue_length,
+                data_slice->gpu_idx, 2, enactor_stats -> iteration,
+                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
+            //util::Verify_Value<<<256, 256, 0, stream>>>(
+            //    data_slice -> gpu_idx, 2, frontier_attribute -> queue_length,
+            //    enactor_stats -> iteration,
+            //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE),
+            //    data_slice -> labels.GetPointer(util::DEVICE),
+            //    (Value)(enactor_stats -> iteration));
+        }
+
+               
         //util::MemsetKernel<<<256, 256, 0, stream>>>(
         //    data_slice -> output_counter.GetPointer(util::DEVICE),
         //    0, frontier_attribute -> output_length[0]);
@@ -892,12 +938,12 @@ struct BFSIteration : public IterationBase <
                 if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
                     "cudaStreamSynchronize failed", __FILE__, __LINE__))
                     return;
-                num_unvisited_vertices = data_slice -> split_lengths[0];
+                data_slice -> num_unvisited_vertices = data_slice -> split_lengths[0];
 
-                data_slice -> num_visited_vertices = graph_slice -> nodes - num_unvisited_vertices;
+                data_slice -> num_visited_vertices = graph_slice -> nodes - data_slice -> num_unvisited_vertices;
                 //printf("%d\t actual unvisited = %lld\n", thread_num, (long long)num_unvisited_vertices);
             } else {
-                num_unvisited_vertices = data_slice -> split_lengths[0];
+                data_slice -> num_unvisited_vertices = data_slice -> split_lengths[0];
             }
             //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("unvisited0", 
             //    data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE), 
@@ -906,13 +952,13 @@ struct BFSIteration : public IterationBase <
             data_slice -> split_lengths[0] = 0;
             data_slice -> split_lengths[1] = 0;
             data_slice -> split_lengths.Move(util::HOST, util::DEVICE, 2, 0, stream);
-            enactor_stats     ->nodes_queued[0] += num_unvisited_vertices;
+            enactor_stats     ->nodes_queued[0] += data_slice -> num_unvisited_vertices;
 
-            num_blocks = num_unvisited_vertices / AdvanceKernelPolicy::THREADS + 1;
+            num_blocks = data_slice -> num_unvisited_vertices / AdvanceKernelPolicy::THREADS + 1;
             if (num_blocks > 480) num_blocks = 480;
             Inverse_Expand<Problem, AdvanceKernelPolicy>
                 <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
-                (num_unvisited_vertices,
+                (data_slice -> num_unvisited_vertices,
                 enactor_stats -> iteration + 1,
                 data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE),
                 graph_slice -> column_indices.GetPointer(util::DEVICE), //should be inverse, only works for undirected graph
@@ -929,7 +975,7 @@ struct BFSIteration : public IterationBase <
             //    thread_num,
             //    data_slice -> split_lengths[1], data_slice -> split_lengths[0]);
             frontier_attribute -> queue_length = data_slice -> split_lengths[1];
-            data_slice -> num_visited_vertices = data_slice -> nodes - num_unvisited_vertices;
+            data_slice -> num_visited_vertices = data_slice -> nodes - data_slice -> num_unvisited_vertices;
             enactor_stats -> edges_queued[0] += frontier_attribute -> output_length[0];
             frontier_attribute -> queue_reset = false;
             frontier_attribute -> queue_index++;
@@ -996,55 +1042,6 @@ struct BFSIteration : public IterationBase <
             //    data_slice -> labels.GetPointer(util::DEVICE),
             //    (Value)enactor_stats -> iteration+1);
         }
-    }
-
-    /*
-     * @brief Expand incoming function.
-     *
-     * @tparam NUM_VERTEX_ASSOCIATES
-     * @tparam NUM_VALUE__ASSOCIATES
-     *
-     * @param[in] grid_size
-     * @param[in] block_size
-     * @param[in] shared_size
-     * @param[in] stream
-     * @param[in] num_elements
-     * @param[in] keys_in
-     * @param[in] keys_out
-     * @param[in] array_size
-     * @param[in] array
-     * @param[in] data_slice
-     */
-    template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
-    static void Expand_Incoming_Old(
-        Enactor        *enactor,
-        int             grid_size,
-        int             block_size,
-        size_t          shared_size,
-        cudaStream_t    stream,
-        SizeT           &num_elements,
-        VertexId*       keys_in,
-        util::Array1D<SizeT, VertexId>* keys_out,
-        const size_t    array_size,
-        char*           array,
-        DataSlice*      data_slice,
-        EnactorStats<SizeT>           *enactor_stats)
-    {
-        bool over_sized = false;
-        Check_Size</*Enactor::SIZE_CHECK,*/ SizeT, VertexId>(
-            enactor -> size_check,
-            "queue1", num_elements, keys_out, over_sized, -1, -1, -1);
-        Expand_Incoming_BFS
-            <VertexId, SizeT, Value, NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
-            <<<grid_size, block_size, shared_size, stream>>> (
-            num_elements,
-            keys_in,
-            keys_out->GetPointer(util::DEVICE),
-            array_size,
-            array,
-            data_slice -> gpu_idx,
-            (VertexId)enactor_stats -> iteration,
-            data_slice -> labels.GetPointer(util::DEVICE));
     }
 
     template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
@@ -1157,8 +1154,9 @@ struct BFSIteration : public IterationBase <
         cudaError_t retval = cudaSuccess;
         //printf("SIZE_CHECK = %s\n", Enactor::SIZE_CHECK ? "true" : "false");
         bool over_sized = false;
-        if (!enactor -> size_check &&
+        if ((!enactor -> size_check &&
             (!gunrock::oprtr::advance::hasPreScan<AdvanceKernelPolicy::ADVANCE_MODE>()))
+            || (enactor -> problem -> data_slices[0] -> current_direction == BACKWARD))
             //(AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_FORWARD ||
             // AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_BACKWARD))
         {
@@ -1214,7 +1212,7 @@ struct BFSIteration : public IterationBase <
         Frontier                      *frontier_queue,
         FrontierAttribute<SizeT>      *frontier_attribute,
         EnactorStats<SizeT>           *enactor_stats,
-        GraphSlice                    *graph_slice)
+        GraphSliceT                   *graph_slice)
     {
         bool over_sized = false;
         int  selector   = frontier_attribute->selector;
@@ -1289,7 +1287,7 @@ struct BFSIteration : public IterationBase <
      */
     static void Iteration_Update_Preds(
         Enactor                       *enactor,
-        GraphSlice                    *graph_slice,
+        GraphSliceT                   *graph_slice,
         DataSlice                     *data_slice,
         FrontierAttribute<SizeT>
                                       *frontier_attribute,
@@ -1409,6 +1407,7 @@ public:
     //static const bool SIZE_CHECK = _SIZE_CHECK;
 
     bool direction_optimized;
+    float do_a, do_b;
     // Methods
 
     /**
@@ -1427,7 +1426,9 @@ public:
         thread_slices (NULL),
         thread_Ids    (NULL),
         problem       (NULL),
-        direction_optimized (_direction_optimized)
+        direction_optimized (_direction_optimized),
+        do_a          (0.001),
+        do_b          (0.200)
     {
     }
 

@@ -144,6 +144,8 @@ public:
         info["fullqueue_latency"  ]= 0;      // fullqueue latency
         info["makeout_latency"    ]= 0;      // makeout latency
         info["direction_optimized"]= false;  // whether to enable directional optimization
+        info["do_a"               ]= 0.001;  // direction optimization parameter
+        info["do_b"               ]= 0.200;  // direction optimization parameter
         // info["gpuinfo"]
         // info["device_list"]
         // info["sysinfo"]
@@ -388,6 +390,18 @@ public:
             int makeout_latency = 0;
             args.GetCmdLineArgument("makeout-latency", makeout_latency);
             info["makeout_latency"] = makeout_latency;
+        }
+        if (args.CheckCmdLineFlag("do_a"))
+        {
+            float do_a = 0.001;
+            args.GetCmdLineArgument("do_a", do_a);
+            info["do_a"] = do_a;
+        }
+        if (args.CheckCmdLineFlag("do_b"))
+        {
+            float do_b = 0.200;
+            args.GetCmdLineArgument("do_b", do_b);
+            info["do_b"] = do_b;
         }
 
         // parse device count and device list

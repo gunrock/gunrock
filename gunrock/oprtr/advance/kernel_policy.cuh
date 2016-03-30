@@ -19,6 +19,7 @@
 #include <gunrock/oprtr/edge_map_partitioned_backward/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_partitioned/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_partitioned_cull/kernel_policy.cuh>
+#include <gunrock/oprtr/all_edges_advance/kernel_policy.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -35,6 +36,7 @@ enum MODE {
     LB_LIGHT,
     LB_CULL,
     LB_LIGHT_CULL,
+    ALL_EDGES,
 };
 
 template <MODE A_MODE>
@@ -273,7 +275,7 @@ struct KernelPolicy {
         _Problem,
         _CUDA_ARCH,
         //_INSTRUMENT,
-        1,
+        _MAX_CTA_OCCUPANCY,
         _LOG_THREADS,
         _LOG_BLOCKS,
         _LIGHT_EDGE_THRESHOLD>
@@ -283,7 +285,7 @@ struct KernelPolicy {
         _Problem,
         _CUDA_ARCH,
         //_INSTRUMENT,
-        1,
+        _MAX_CTA_OCCUPANCY,
         _LOG_THREADS,
         _LOG_BLOCKS,
         _LIGHT_EDGE_THRESHOLD>
@@ -293,11 +295,20 @@ struct KernelPolicy {
         _Problem,
         _CUDA_ARCH,
         //_INSTRUMENT,
-        1,
+        _MAX_CTA_OCCUPANCY,
         _LOG_THREADS,
         _LOG_BLOCKS,
         _LIGHT_EDGE_THRESHOLD>
     LOAD_BALANCED_CULL;
+
+    typedef gunrock::oprtr::all_edges_advance::KernelPolicy<
+        _Problem,
+        _CUDA_ARCH,
+        //_INSTRUMENT,
+        _MAX_CTA_OCCUPANCY,
+        _LOG_THREADS,
+        _LOG_BLOCKS>
+    EDGES;
 
     static const int CTA_OCCUPANCY =
          (ADVANCE_MODE == TWC_FORWARD ) ?
@@ -313,7 +324,9 @@ struct KernelPolicy {
         ((ADVANCE_MODE == LB_CULL     ) ?
             LOAD_BALANCED_CULL      ::CTA_OCCUPANCY : 
         ((ADVANCE_MODE == LB_LIGHT_CULL) ?
-            LOAD_BALANCED_CULL      ::CTA_OCCUPANCY : 0))))));
+            LOAD_BALANCED_CULL      ::CTA_OCCUPANCY : 
+        ((ADVANCE_MODE == ALL_EDGES    ) ?
+            EDGES                   ::CTA_OCCUPANCY : 0)))))));
 };
 
 } //advance

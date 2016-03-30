@@ -319,6 +319,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     int      fullqueue_latency     = info->info["fullqueue_latency" ].get_int ();
     int      makeout_latency       = info->info["makeout_latency"   ].get_int ();
     bool     direction_optimized   = info->info["direction_optimized"].get_bool();
+    float    do_a                  = info->info["do_a"              ].get_real();
+    float    do_b                  = info->info["do_b"              ].get_real();
     if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
 
     CpuTimer cpu_timer;
@@ -387,6 +389,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     enactor -> subqueue_latency    = subqueue_latency;
     enactor -> fullqueue_latency   = fullqueue_latency;
     enactor -> makeout_latency     = makeout_latency;
+    enactor -> do_a                = do_a;
+    enactor -> do_b                = do_b;
 
     if (retval = util::SetDevice(gpu_idx[0])) return retval;
     if (retval = util::latency::Test_BaseLine(

@@ -292,8 +292,12 @@ public:
         {
             frontier_attribute -> queue_index  = 0;
             frontier_attribute -> selector     = 0;
-            frontier_attribute -> queue_length = data_slice -> num_gpus == 1 ? graph_slice -> nodes :
-                data_slice -> local_vertices.GetSize();//graph_slice->edges;
+            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::ALL_EDGES)
+                frontier_attribute -> queue_length = graph_slice -> edges;
+            else 
+                frontier_attribute -> queue_length = 
+                    (data_slice -> num_gpus == 1 )? graph_slice -> nodes :
+                    data_slice -> local_vertices.GetSize();//graph_slice->edges;
             frontier_attribute -> queue_reset  = true;
 
             bool over_sized = false;
@@ -301,9 +305,10 @@ public:
                  (gunrock::oprtr::advance::hasPreScan<AdvanceKernelPolicy::ADVANCE_MODE>())) &&
                 (!data_slice -> scanned_queue_computed))
             {
+                printf("scaned, queue_sizing = %d\n", frontier_attribute -> queue_length);fflush(stdout);
                 if (enactor_stats -> retval = Check_Size</*Enactor::SIZE_CHECK,*/ SizeT, SizeT> (
                     enactor -> size_check,
-                    "scanned_edges", frontier_attribute -> queue_length,
+                    "scanned_edges", frontier_attribute -> queue_length + 1,
                     scanned_edges, over_sized, -1, -1, -1, false))
                     return;
                 if (enactor_stats -> retval = gunrock::oprtr::advance::ComputeOutputLength
@@ -399,7 +404,7 @@ public:
         ContextPtr                     context,
         cudaStream_t                   stream)
     {
-        if (data_slice -> turn == 2 && data_slice -> num_gpus > 1 && (enactor -> problem -> edges / 3 > enactor -> problem -> nodes))
+        /*if (data_slice -> turn == 2 && data_slice -> num_gpus > 1 && (enactor -> problem -> edges / 3 > enactor -> problem -> nodes))
         { // special expand_incoming for first data exchagne
             for (int peer = 1; peer < data_slice -> num_gpus; peer++)
                 data_slice -> vertex_associate_ins[peer] = 
@@ -417,7 +422,7 @@ public:
                 data_slice -> keys_out[peer].ForceSetPointer(data_slice -> temp_vertex_out, util::DEVICE);
                 data_slice -> vertex_associate_out[peer].ForceSetPointer(data_slice -> temp_comp_out, util::DEVICE);
             }
-        }
+        }*/
 
         enactor_stats      -> iteration    = 0;
         frontier_attribute -> queue_index  = 0;
@@ -527,7 +532,10 @@ public:
         while (!data_slice->edge_flag[0])
         {
             frontier_attribute->queue_index  = 0;        // Work queue index
-            frontier_attribute->queue_length = (data_slice -> num_gpus == 1) ? graph_slice -> nodes :
+            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::ALL_EDGES)
+                frontier_attribute -> queue_length = graph_slice -> edges;
+            else frontier_attribute->queue_length = 
+                (data_slice -> num_gpus == 1) ? graph_slice -> nodes :
                 data_slice -> local_vertices.GetSize();//graph_slice->edges;
             frontier_attribute->selector     = 0;
             frontier_attribute->queue_reset  = true;
@@ -768,7 +776,7 @@ public:
     {
         //printf("%d\t %d\t Expand_Incoming num_elements = %d\n",
         //    h_data_slice -> gpu_idx, enactor_stats -> iteration, num_elements);
-        if (h_data_slice -> turn == 1 && (enactor -> problem -> edges / 3 > enactor -> problem -> nodes)) return;
+        //if (h_data_slice -> turn == 1 && (enactor -> problem -> edges / 3 > enactor -> problem -> nodes)) return;
         int num_blocks = num_elements / AdvanceKernelPolicy::THREADS / 2 + 1;
         if (num_blocks > 480) num_blocks = 480;
         Expand_Incoming_Kernel <VertexId, SizeT>
@@ -903,7 +911,7 @@ public:
         cudaStream_t                   stream)
     {
         DataSlice *data_slice = data_slice_ -> GetPointer(util::HOST);
-        if (data_slice -> turn == 1 && (enactor -> problem -> edges / 3 > enactor -> problem -> nodes))
+        /*if (data_slice -> turn == 1 && (enactor -> problem -> edges / 3 > enactor -> problem -> nodes))
         {
             //util::MemsetCopyVectorKernel<<<240, 512, 0, stream>>>(
             //    data_slice -> vertex_associate_out[1].GetPointer(util::DEVICE),
@@ -924,7 +932,7 @@ public:
                 data_slice -> vertex_associate_out[peer_].ForceSetPointer(data_slice -> component_ids.GetPointer(util::DEVICE), util::DEVICE);
             }
             data_slice -> out_length[1] = graph_slice -> nodes + 1;
-        } else {
+        } else*/ {
             data_slice -> out_length[1] = 1;
             data_slice -> out_length.Move(util::HOST, util::DEVICE, 1, 1, stream);
             int num_blocks = data_slice -> nodes / AdvanceKernelPolicy::THREADS + 1;
@@ -1277,7 +1285,7 @@ public:
         Problem,                            //Problem data type
         300,                                //CUDA_ARCH
         8,                                  // MIN_CTA_OCCUPANCY,
-        7,                                  // LOG_THREADS,
+        8,                                  // LOG_THREADS,
         8,                                  // LOG_BLOCKS,
         32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
         1,                                  // LOG_LOAD_VEC_SIZE,
@@ -1293,7 +1301,7 @@ public:
         Problem,                            //Problem data type
         300,                                //CUDA_ARCH
         8,                                  // MIN_CTA_OCCUPANCY,
-        7,                                  // LOG_THREADS,
+        8,                                  // LOG_THREADS,
         8,                                  // LOG_BLOCKS,
         32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
         1,                                  // LOG_LOAD_VEC_SIZE,
@@ -1302,7 +1310,23 @@ public:
         32,                                 // WART_GATHER_THRESHOLD,
         128 * 4,                            // CTA_GATHER_THRESHOLD,
         7,                                  // LOG_SCHEDULE_GRANULARITY,
-        gunrock::oprtr::advance::LB>
+        gunrock::oprtr::advance::ALL_EDGES>
+    EDGES_AdvanceKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            //Problem data type
+        300,                                //CUDA_ARCH
+        8,                                  // MIN_CTA_OCCUPANCY,
+        8,                                  // LOG_THREADS,
+        8,                                  // LOG_BLOCKS,
+        32*128,                             // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        1,                                  // LOG_LOAD_VEC_SIZE,
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS,
+        32,                                 // WART_GATHER_THRESHOLD,
+        128 * 4,                            // CTA_GATHER_THRESHOLD,
+        7,                                  // LOG_SCHEDULE_GRANULARITY,
+        gunrock::oprtr::advance::LB_LIGHT>
     LB_LIGHT_AdvanceKernelPolicy;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
@@ -1318,7 +1342,7 @@ public:
         32,                                 // WART_GATHER_THRESHOLD,
         128 * 4,                            // CTA_GATHER_THRESHOLD,
         7,                                  // LOG_SCHEDULE_GRANULARITY,
-        gunrock::oprtr::advance::LB>
+        gunrock::oprtr::advance::TWC_FORWARD>
     TWC_AdvanceKernelPolicy;
 
     typedef gunrock::oprtr::filter::KernelPolicy<
@@ -1326,8 +1350,8 @@ public:
         300,                                // CUDA_ARCH
         0,                                  // SATURATION QUIT
         true,                               // DEQUEUE_PROBLEM_SIZE
-        8,                                  // MIN_CTA_OCCUPANCY
-        8,                                  // LOG_THREADS
+        4,                                  // MIN_CTA_OCCUPANCY
+        9,                                  // LOG_THREADS
         1,                                  // LOG_LOAD_VEC_SIZE
         0,                                  // LOG_LOADS_PER_TILE
         5,                                  // LOG_RAKING_THREADS
@@ -1381,6 +1405,20 @@ public:
         }
     };
 
+    template <typename Dummy>
+    struct MODE_SWITCH<Dummy, gunrock::oprtr::advance::ALL_EDGES>
+    {
+        static cudaError_t Enact(Enactor &enactor)
+        {
+            return enactor.EnactCC<EDGES_AdvanceKernelPolicy, FilterKernelPolicy>();
+        }
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 512)
+        {
+            return enactor.InitCC <EDGES_AdvanceKernelPolicy, FilterKernelPolicy>
+                (context, problem, max_grid_size);
+        }
+    };
+
     /**
      * @brief CC Enact kernel entry.
      *
@@ -1400,6 +1438,8 @@ public:
                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_LIGHT   >::Enact(*this);
             else if (traversal_mode == "TWC")
                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::TWC_FORWARD>::Enact(*this);
+            else if (traversal_mode == "ALL_EDGES")
+                return MODE_SWITCH<SizeT, gunrock::oprtr::advance::ALL_EDGES  >::Enact(*this);
         }
 
         //to reduce compile time, get rid of other architecture for now
@@ -1435,6 +1475,9 @@ public:
                     ::Init(*this, context, problem, max_grid_size);
             else if (traversal_mode == "TWC")
                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::TWC_FORWARD>
+                    ::Init(*this, context, problem, max_grid_size);
+            else if (traversal_mode == "ALL_EDGES")
+                return MODE_SWITCH<SizeT, gunrock::oprtr::advance::ALL_EDGES  >
                     ::Init(*this, context, problem, max_grid_size);
         }
 

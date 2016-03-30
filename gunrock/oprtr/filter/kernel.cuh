@@ -408,11 +408,13 @@ struct Dispatch<Parameter, BY_PASS>
     static cudaError_t Launch(Parameter &parameter)
     {
         cudaError_t retval = cudaSuccess;
+        int num_blocks = parameter.num_elements / KernelPolicy::THREADS / 4 + 1;
+        if (num_blocks > 480) num_blocks = 480;
         gunrock::oprtr::bypass_filter::Kernel<
             KernelPolicy,
             typename Parameter::Problem,
             typename Parameter::Functor>
-            <<<parameter. enactor_stats.filter_grid_size,
+            <<<num_blocks, //parameter. enactor_stats.filter_grid_size,
             KernelPolicy::THREADS,
             (size_t)0,
             parameter. stream>>> (

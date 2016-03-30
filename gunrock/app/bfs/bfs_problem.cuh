@@ -77,7 +77,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         //util::Array1D<SizeT, SizeT         > output_counter;
         //util::Array1D<SizeT, int           > edge_marker;
         util::Array1D<SizeT, SizeT         > vertex_markers[2];
-        SizeT num_visited_vertices;
+        SizeT num_visited_vertices, num_unvisited_vertices;
+        bool been_in_backward;
         DIRECTION current_direction, previous_direction;
         util::Array1D<SizeT, VertexId      > unvisited_vertices[2];
         util::Array1D<SizeT, SizeT         > split_lengths;
@@ -263,6 +264,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             SizeT new_frontier_elements[2] = {0,0};
             SizeT max_queue_length = 0;
             num_visited_vertices = 0;
+            num_unvisited_vertices = 0;
+            been_in_backward = false;
             current_direction = FORWARD;
             previous_direction = FORWARD;
             if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
