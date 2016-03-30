@@ -681,7 +681,7 @@ public:
                 return 1;
             }
         }
-        else if (graph_type == "rmat" || graph_type == "grmat")  // R-MAT graph
+        else if (graph_type == "rmat" || graph_type == "grmat" || graph_type == "metarmat")  // R-MAT graph
         {
             if (!args.CheckCmdLineFlag("quiet"))
             {
@@ -771,6 +771,26 @@ public:
             } else if (graph_type == "grmat")
             {
                 if (graphio::grmat::BuildRmatGraph<EDGE_VALUE>(
+                    rmat_nodes,
+                    rmat_edges,
+                    csr_ref,
+                    info["undirected"].get_bool(),
+                    rmat_a,
+                    rmat_b,
+                    rmat_c,
+                    rmat_d,
+                    rmat_vmultipiler,
+                    rmat_vmin,
+                    rmat_seed,
+                    args.CheckCmdLineFlag("quiet"),
+                    temp_devices.size(),
+                    gpu_idx) != 0)
+                {
+                    return 1;
+                }
+            } else // must be metarmat
+            {
+                if (graphio::grmat::BuildMetaRmatGraph<EDGE_VALUE>(
                     rmat_nodes,
                     rmat_edges,
                     csr_ref,

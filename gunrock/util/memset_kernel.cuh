@@ -16,7 +16,7 @@
 /******************************************************************************
  * Simple Memset Kernel
  ******************************************************************************/
-
+#include <gunrock/coo.cuh>
 #pragma once
 
 namespace gunrock {
@@ -49,6 +49,18 @@ __global__ void MemsetKernel(T *d_out, T value, SizeT length)
     {
         d_out[idx] = value;
     }
+}
+
+template <typename VertexId, typename SizeT, typename Value>
+__global__ void MemsetAddEdgeValKernel(Coo<VertexId, Value> *d_out, VertexId value, SizeT length)
+{
+   const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
+         idx < length; idx += STRIDE)
+    {
+        d_out[idx].row += value;
+        d_out[idx].col += value;
+    } 
 }
 
 /**
