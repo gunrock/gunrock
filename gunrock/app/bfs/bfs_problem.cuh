@@ -560,8 +560,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                         h_preds[v] = th_preds[gpu][v_];
                 }
                 else {
-                    printf("OutOfBound: node = %d, partition = %d, convertion = %d\n",
-                        v, gpu, v_);
+                    printf("OutOfBound: node = %lld, partition = %d, convertion = %lld\n",
+                        (long long)v, gpu, (long long)v_);
                     fflush(stdout);
                 }
             }

@@ -437,18 +437,18 @@ void Print_Vertex(
     int*   partition_table,
     VertexId** convertion_tables)
 {
-    printf("{%d ", v);
+    printf("{%lld ", (long long)v);
     if (num_gpus > 1)
     {
         for (int gpu=0; gpu<num_gpus; gpu++)
-            printf(", %d", convertion_tables[gpu][v]);
+            printf(", %lld", (long long)convertion_tables[gpu][v]);
     }
     printf("},\n\t\t");
     if (num_gpus > 1)
         printf("host = %d, ", partition_table[v]);
     if (fabs(results[v] - references[v]) >= error_threshold)
-        printf("reference = %d, ", references[v]);
-    printf("result = %d, ", results[v]);
+        printf("reference = %lld, ", (long long)references[v]);
+    printf("result = %lld, ", (long long)results[v]);
     printf("\n");
 }
 

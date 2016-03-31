@@ -157,7 +157,7 @@ public:
         CTA_OCCUPANCY                   = GR_MIN(_MAX_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
 
         VALID                           = (CTA_OCCUPANCY > 0),
-        ELEMENT_ID_MASK	                = ~(1<<(sizeof(VertexId)*8-2)),
+        ELEMENT_ID_MASK	                = ~(1ULL<<(sizeof(VertexId)*8-2)),
     };
 };
 

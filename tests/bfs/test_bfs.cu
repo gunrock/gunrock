@@ -247,8 +247,8 @@ void ReferenceBFS(
 
     if (!quiet)
     {
-        printf("CPU BFS finished in %lf msec. cpu_search_depth: %d\n",
-               elapsed, search_depth);
+        printf("CPU BFS finished in %lf msec. cpu_search_depth: %lld\n",
+               elapsed, (long long)search_depth);
     }
 }
 
@@ -552,7 +552,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 if (pred >= graph->nodes || pred < 0)
                 {
                     //if (num_errors == 0)
-                        printf("INCORRECT: pred[%d] : %d out of bound\n", v, pred);
+                        printf("INCORRECT: pred[%lld] : %lld out of bound\n", 
+                            (long long)v, (long long)pred);
                     #pragma omp atomic
                     num_errors ++;
                     continue;
@@ -560,8 +561,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 if (h_labels[v] != h_labels[pred] + 1)
                 {
                     //if (num_errors == 0)
-                        printf("INCORRECT: label[%d] (%d) != label[%d] (%d) + 1\n",
-                            v, h_labels[v], pred, h_labels[pred]);
+                        printf("INCORRECT: label[%lld] (%lld) != label[%lld] (%lld) + 1\n",
+                            (long long)v, (long long)h_labels[v], (long long)pred, (long long)h_labels[pred]);
                     #pragma omp atomic
                     num_errors ++;
                     continue;
@@ -577,8 +578,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 if (!v_found)
                 {
                     //if (num_errors == 0)
-                        printf("INCORRECT: Vertex %d not in Vertex %d's neighbor list\n",
-                            v, pred);
+                        printf("INCORRECT: Vertex %lld not in Vertex %lld's neighbor list\n",
+                            (long long)v, (long long)pred);
                     #pragma omp atomic
                     num_errors ++;
                     continue;
@@ -877,7 +878,7 @@ template <
 int main_SizeT(CommandLineArgs *args)
 {
 // disabled to reduce compile time
-    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+    if (args -> CheckCmdLineFlag("64bit-SizeT") || sizeof(VertexId) > 4)
         return main_Value<VertexId, long long>(args);
     else
         return main_Value<VertexId, int      >(args);
@@ -886,9 +887,9 @@ int main_SizeT(CommandLineArgs *args)
 int main_VertexId(CommandLineArgs *args)
 {
 // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
-//    if (args -> CheckCmdLineFlag("64bit-VertexId"))
-//        return main_SizeT<long long>(args);
-//    else
+    if (args -> CheckCmdLineFlag("64bit-VertexId"))
+        return main_SizeT<long long>(args);
+    else
         return main_SizeT<int      >(args);
 }
 

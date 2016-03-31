@@ -31,6 +31,30 @@ namespace edge_map_partitioned_cull {
 /**
  * Arch dispatch
  */
+template <
+    typename VertexId, 
+    typename SizeT>
+struct LoadRowOffset {};
+
+template <typename VertexId>
+struct LoadRowOffset<VertexId, int>
+{
+    static __device__ __forceinline__ int Load 
+        (int *&d_row_offsets, VertexId &pos)
+    {
+        return tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<int>::row_offsets, pos);
+    }    
+};
+
+template <typename VertexId>
+struct LoadRowOffset<VertexId, long long>
+{
+    static __device__ __forceinline__ long long Load 
+        (long long *&d_row_offsets, VertexId &pos)
+    {    
+        return __ldg(d_row_offsets + pos);
+    }    
+};
 
 /**
  * Not valid for this arch (default)
@@ -142,14 +166,16 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         SizeT      &max_edge)
         //gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
     {
-        SizeT first  = /*(d_vertex_id >= max_vertex) ?
+        SizeT first  = LoadRowOffset<VertexId, SizeT>::Load(d_row_offsets, d_vertex_id);
+            /*(d_vertex_id >= max_vertex) ?
             max_edge :*/ //d_row_offsets[d_vertex_id];
             //tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  d_vertex_id);
-            __ldg(d_row_offsets + (d_vertex_id));
-        SizeT second = /*(d_vertex_id + 1 >= max_vertex) ?
+            //__ldg(d_row_offsets + (d_vertex_id));
+        SizeT second = LoadRowOffset<VertexId, SizeT>::Load(d_row_offsets, d_vertex_id + 1);
+            /*(d_vertex_id + 1 >= max_vertex) ?
             max_edge :*/ //d_row_offsets[d_vertex_id+1];
             //tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  d_vertex_id + 1);
-            __ldg(d_row_offsets + (d_vertex_id+1));
+            //__ldg(d_row_offsets + (d_vertex_id+1));
 
         //printf(" d_vertex_id = %d, max_vertex = %d, max_edge = %d, first = %d, second = %d\n",
         //       d_vertex_id, max_vertex, max_edge, first, second);
@@ -422,10 +448,14 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     {
                         //smem_storage.vertices [threadIdx.x] = input_item;
                         if (input_item >= 0)
-                            smem_storage.row_offset[threadIdx.x]= //row_offsets[input_item];
+                            smem_storage.row_offset[threadIdx.x]= (output_inverse_graph) ?
+                                __ldg(d_inverse_row_offsets + input_item) :
+                                LoadRowOffset<VertexId, SizeT>::Load(d_row_offsets, input_item);
+                            
+                                //row_offsets[input_item];
                                 //tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  input_item);
-                                __ldg(((output_inverse_graph) ? d_inverse_row_offsets :
-                                     d_row_offsets) + input_item);
+                                //__ldg(((output_inverse_graph) ? d_inverse_row_offsets :
+                                //     d_row_offsets) + input_item);
                         else smem_storage.row_offset[threadIdx.x] = util::MaxValue<SizeT>();
                     }
                     else if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V ||
@@ -741,9 +771,12 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     {
                         //smem_storage.vertices[threadIdx.x] = input_item;
                         if (input_item >= 0)
-                            smem_storage.row_offset[threadIdx.x] = //row_offsets[input_item];
+                            smem_storage.row_offset[threadIdx.x] =  (output_inverse_graph) ?
+                                __ldg(d_inverse_row_offsets + input_item) :
+                                LoadRowOffset<VertexId, SizeT>::Load(d_row_offsets, input_item);
+                                //row_offsets[input_item];
                                 //tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  input_item);
-                                __ldg(row_offsets + input_item);
+                                //__ldg(row_offsets + input_item);
                         else smem_storage.row_offset[threadIdx.x] = util::MaxValue<SizeT>();
                     } else if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V ||
                         ADVANCE_TYPE == gunrock::oprtr::advance::E2E)

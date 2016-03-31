@@ -108,6 +108,31 @@ __global__ void Expand_Incoming_BFS (
 }
 
 template <
+    typename VertexId, 
+    typename SizeT>
+struct LoadLabel {};
+
+template <typename SizeT>
+struct LoadLabel<int, SizeT>
+{
+    static __device__ __forceinline__ int Load
+        (int *&d_labels, SizeT &pos)
+    {
+        return tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<int>::labels, pos); 
+    }
+};
+
+template <typename SizeT>
+struct LoadLabel<long long, SizeT>
+{
+    static __device__ __forceinline__ long long Load
+        (long long *&d_labels, SizeT &pos)
+    {
+        return __ldg(d_labels + pos);
+    }
+};
+
+template <
     typename KernelPolicy,
     int      NUM_VERTEX_ASSOCIATES,
     int      NUM_VALUE__ASSOCIATES>
@@ -161,9 +186,8 @@ __global__ void Expand_Incoming_Kernel(
 
             if (to_process)
             {
-                if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key) != util::MaxValue<VertexId>())
-                //if (__ldg(d_labels + key) != util::MaxValue<VertexId>())
-                    to_process = false;
+                if (LoadLabel<VertexId, VertexId>::Load(d_labels, key) != util::MaxValue<VertexId>())
+                        to_process = false;
             }
 
             if (to_process)
@@ -207,7 +231,8 @@ template <typename Problem, typename KernelPolicy>
 __global__ void From_Unvisited_Queue(
     typename Problem::SizeT     num_nodes,
     typename Problem::SizeT    *d_out_length,
-    typename Problem::VertexId *d_keys_out)
+    typename Problem::VertexId *d_keys_out,
+    typename Problem::VertexId *d_labels)
 {
     typedef typename Problem::VertexId VertexId;
     typedef typename Problem::SizeT    SizeT;
@@ -226,8 +251,9 @@ __global__ void From_Unvisited_Queue(
         if (x < num_nodes)
         {
             //printf("(%d, %d) : x = %d\n", blockIdx.x, threadIdx.x, x);
-            if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, x)
-                != util::MaxValue<VertexId>())
+            //if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, x)
+            //    != util::MaxValue<VertexId>())
+            if (LoadLabel<VertexId, SizeT>::Load(d_labels, x) != util::MaxValue<VertexId>())
                 to_process = false;
         } else to_process = false;
 
@@ -336,7 +362,8 @@ __global__ void From_Unvisited_Queue_Local(
     typename Problem::SizeT     num_local_vertices,
     typename Problem::VertexId *d_local_vertices,
     typename Problem::SizeT    *d_out_length,
-    typename Problem::VertexId *d_keys_out)
+    typename Problem::VertexId *d_keys_out,
+    typename Problem::VertexId *d_labels)
 {
     typedef typename Problem::VertexId VertexId;
     typedef typename Problem::SizeT    SizeT;
@@ -357,7 +384,8 @@ __global__ void From_Unvisited_Queue_Local(
         if (x < num_local_vertices)
         {
             key = d_local_vertices[x];
-            if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key)
+            //if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key)
+            if (LoadLabel<VertexId, VertexId>::Load(d_labels, key)
                 != util::MaxValue<VertexId>())
                 to_process = false;
         } else to_process = false;
@@ -384,7 +412,8 @@ __global__ void From_Unvisited_Queue_Local_IDEM(
     typename Problem::VertexId *d_local_vertices,
     typename Problem::SizeT    *d_out_length,
     typename Problem::VertexId *d_keys_out,
-    typename Problem::MaskT    *d_visited_mask)
+    typename Problem::MaskT    *d_visited_mask,
+    typename Problem::VertexId *d_labels)
 {
     typedef typename Problem::VertexId VertexId;
     typedef typename Problem::SizeT    SizeT;
@@ -417,7 +446,8 @@ __global__ void From_Unvisited_Queue_Local_IDEM(
             if (mask_byte & mask_bit)
                 to_process = false;
             else {
-                if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key) != util::MaxValue<VertexId>())
+                //if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key) != util::MaxValue<VertexId>())
+                if (LoadLabel<VertexId, VertexId>::Load(d_labels, key) != util::MaxValue<VertexId>())
                 {
                     mask_byte |= mask_bit;
                     d_visited_mask[mask_pos] = mask_byte;
@@ -492,7 +522,8 @@ __global__ void Inverse_Expand(
 
         if (to_process)// && !Problem::ENABLE_IDEMPOTENCE)
         {
-            if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key) != util::MaxValue<VertexId>())
+            //if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key) != util::MaxValue<VertexId>())
+            if (LoadLabel<VertexId, VertexId>::Load(d_labels, key) != util::MaxValue<VertexId>())
             {
                 if (Problem::ENABLE_IDEMPOTENCE)
                 {
@@ -511,8 +542,9 @@ __global__ void Inverse_Expand(
                 __ldg(d_inverse_row_offsets + (key+1));
             for (SizeT edge_id = edge_start; edge_id < edge_end; edge_id++)
             {
-                VertexId neighbor = __ldg(d_inverse_column_indices + edge_id);//d_inverse_column_indices[edge_id];
-                if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, neighbor) == label-1)
+                VertexId neighbor = d_inverse_column_indices[edge_id];
+                //if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, neighbor) == label-1)
+                if (LoadLabel<VertexId, VertexId>::Load(d_labels, neighbor) == label -1)
                 {
                     discoverable = true;
                     break;
@@ -1113,7 +1145,8 @@ struct BFSIteration : public IterationBase <
                             <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
                             (graph_slice -> nodes,
                             data_slice -> split_lengths.GetPointer(util::DEVICE),
-                            data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE));
+                            data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE),
+                            data_slice -> labels.GetPointer(util::DEVICE));
                     }
                 } else {
                     num_blocks = data_slice -> local_vertices.GetSize() / AdvanceKernelPolicy::THREADS + 1;
@@ -1126,14 +1159,16 @@ struct BFSIteration : public IterationBase <
                             data_slice -> local_vertices.GetPointer(util::DEVICE),
                             data_slice -> split_lengths.GetPointer(util::DEVICE),
                             data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE),
-                            data_slice -> visited_mask.GetPointer(util::DEVICE));
+                            data_slice -> visited_mask.GetPointer(util::DEVICE),
+                            data_slice -> labels.GetPointer(util::DEVICE));
                     } else {
                         From_Unvisited_Queue_Local<Problem, AdvanceKernelPolicy>
                             <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
                             (data_slice -> local_vertices.GetSize(),
                             data_slice -> local_vertices.GetPointer(util::DEVICE),
                             data_slice -> split_lengths.GetPointer(util::DEVICE),
-                            data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE));
+                            data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE),
+                            data_slice -> labels.GetPointer(util::DEVICE));
                     }
                 }
                 data_slice -> split_lengths.Move(util::DEVICE, util::HOST, 1, 0, stream);
@@ -1810,24 +1845,30 @@ public:
                     "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
             }
 
-            cudaChannelFormatDesc   labels_desc = cudaCreateChannelDesc<VertexId>();
-            gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels.channelDesc = labels_desc;
-            if (retval = util::GRError(cudaBindTexture(
-                0,
-                gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels,
-                problem->data_slices[gpu]->labels.GetPointer(util::DEVICE),
-                problem->graph_slices[gpu]->nodes * sizeof(VertexId)),
-                "BFSEnactor cudaBindTexture labels_tex_ref failed", __FILE__, __LINE__)) break;
+            if (sizeof(VertexId) == 4)
+            {
+                cudaChannelFormatDesc   labels_desc = cudaCreateChannelDesc<VertexId>();
+                gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels.channelDesc = labels_desc;
+                if (retval = util::GRError(cudaBindTexture(
+                    0,
+                    gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels,
+                    problem->data_slices[gpu]->labels.GetPointer(util::DEVICE),
+                    problem->graph_slices[gpu]->nodes * sizeof(VertexId)),
+                    "BFSEnactor cudaBindTexture labels_tex_ref failed", __FILE__, __LINE__)) break;
+            }
 
-            /*cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
-            gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
-            if (retval = util::GRError(cudaBindTexture(
-                0,
-                gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,
-                problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
-                ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
-                "BFSEnactor cudaBindTexture row_offsets_ref failed",
-                __FILE__, __LINE__)) break;*/
+            if (sizeof(SizeT) == 4)
+            {
+                cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
+                gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
+                if (retval = util::GRError(cudaBindTexture(
+                    0,
+                    gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,
+                    problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
+                    ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
+                    "BFSEnactor cudaBindTexture row_offsets_ref failed",
+                    __FILE__, __LINE__)) break;
+            }
         }
         if (retval) return retval;
 
@@ -1938,7 +1979,7 @@ public:
         300,                                // CUDA_ARCH
         0,                                  // SATURATION QUIT
         true,                               // DEQUEUE_PROBLEM_SIZE
-        8,                                  // MIN_CTA_OCCUPANCY
+        (sizeof(VertexId) == 4) ? 8 : 4,    // MIN_CTA_OCCUPANCY
         8,                                  // LOG_THREADS
         2,                                  // LOG_LOAD_VEC_SIZE
         0,                                  // LOG_LOADS_PER_TILE
