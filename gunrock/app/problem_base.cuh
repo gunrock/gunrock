@@ -50,6 +50,7 @@
 #include <gunrock/app/brp/brp_partitioner.cuh>
 #include <gunrock/app/metisp/metis_partitioner.cuh>
 #include <gunrock/app/sp/sp_partitioner.cuh>
+#include <gunrock/app/dup/dup_partitioner.cuh>
 
 #include <moderngpu.cuh>
 
@@ -1656,6 +1657,11 @@ struct ProblemBase
                     /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
                     (*graph, num_gpus, NULL, enable_backward, keep_order, keep_node_num);
             }
+            else if (partition_method == "duplicate")
+            {
+                partitioner = new dup::DuplicatePartitioner<VertexId, SizeT, Value>
+                    (*graph, num_gpus, NULL, enable_backward, keep_order, keep_node_num);
+            }
             else
             {
                 util::GRError("partition_method invalid", __FILE__, __LINE__);
@@ -1680,18 +1686,18 @@ struct ProblemBase
 
             //graph->DisplayGraph("org_graph",graph->nodes);
             //util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);
-            /*util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion0",convertion_tables[0],graph->nodes);
+            //util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion0",convertion_tables[0],graph->nodes);
             //util::cpu_mt::PrintCPUArray<SizeT,Value>("edge_value",graph->edge_values,graph->edges);
-            for (int gpu=0;gpu<num_gpus;gpu++)
-            {
-                sub_graphs[gpu].DisplayGraph("sub_graph",sub_graphs[gpu].nodes);
-                printf("%d\n",gpu);
-                util::cpu_mt::PrintCPUArray<SizeT,int     >("partition"           , partition_tables    [gpu+1], sub_graphs[gpu].nodes);
-                util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion"          , convertion_tables   [gpu+1], sub_graphs[gpu].nodes);
+            //for (int gpu=0;gpu<num_gpus;gpu++)
+            //{
+            //    sub_graphs[gpu].DisplayGraph("sub_graph",sub_graphs[gpu].nodes);
+            //    printf("%d\n",gpu);
+            //    util::cpu_mt::PrintCPUArray<SizeT,int     >("partition"           , partition_tables    [gpu+1], sub_graphs[gpu].nodes);
+            //    util::cpu_mt::PrintCPUArray<SizeT,VertexId>("convertion"          , convertion_tables   [gpu+1], sub_graphs[gpu].nodes);
                 //util::cpu_mt::PrintCPUArray<SizeT,SizeT   >("backward_offsets"    , backward_offsets    [gpu], sub_graphs[gpu].nodes);
                 //util::cpu_mt::PrintCPUArray<SizeT,int     >("backward_partitions" , backward_partitions [gpu], backward_offsets[gpu][sub_graphs[gpu].nodes]);
                 //util::cpu_mt::PrintCPUArray<SizeT,VertexId>("backward_convertions", backward_convertions[gpu], backward_offsets[gpu][sub_graphs[gpu].nodes]);
-            }*/
+            //}
             //for (int gpu=0;gpu<num_gpus;gpu++)
             //{
             //    cross_counter[gpu][num_gpus]=0;

@@ -146,6 +146,7 @@ public:
         info["direction_optimized"]= false;  // whether to enable directional optimization
         info["do_a"               ]= 0.001;  // direction optimization parameter
         info["do_b"               ]= 0.200;  // direction optimization parameter
+        info["duplicate_graph"    ]= false;  // whether to duplicate graph on every GPUs
         // info["gpuinfo"]
         // info["device_list"]
         // info["sysinfo"]
@@ -407,6 +408,13 @@ public:
         // parse device count and device list
         info["device_list"] = GetDeviceList(args);
 
+        if (args.CheckCmdLineFlag("duplicate-graph"))
+        {
+            DuplicateGraph(args, *csr_ptr, info["edge_value"].get_bool());
+            info["duplicate_graph"] = true;
+        }
+
+
         ///////////////////////////////////////////////////////////////////////
         // initialize CUDA streams and context for MordernGPU API.
         // TODO: streams and context initialization can be removed after merge
@@ -632,6 +640,77 @@ public:
         json_spirit::write_stream(
             json_spirit::mValue(info), of,
             json_spirit::pretty_print);
+    }
+
+    int DuplicateGraph(
+        util::CommandLineArgs &args,
+        Csr<VertexId, SizeT, Value> &graph,
+        bool edge_value = false)
+    {
+        VertexId org_src = info["source_vertex"].get_int64();
+        int num_gpus     = info["num_gpus"     ].get_int  ();
+        bool undirected  = info["undirected"   ].get_bool ();
+
+        if (num_gpus == 1) return 0;
+
+        SizeT org_nodes = graph. nodes;
+        SizeT org_edges = graph. edges;
+        SizeT new_nodes = graph. nodes * num_gpus + 1;
+        SizeT new_edges = graph. edges * num_gpus + ((undirected) ? 2 : 1) * num_gpus;
+        printf("Duplicatiing graph, #V = %lld -> %lld, #E = %lld -> %lld, src = %lld -> 0\n",
+            (long long)org_nodes, (long long)new_nodes,
+            (long long)org_edges, (long long)new_edges,
+            (long long)org_src);
+
+        SizeT    *new_row_offsets    = (SizeT*)malloc(sizeof(SizeT) * (new_nodes+1));
+        VertexId *new_column_indices = (VertexId*)malloc(sizeof(VertexId) * new_edges);
+        new_row_offsets[0] = 0;
+        for (int gpu = 0; gpu < num_gpus; gpu ++)
+            new_column_indices[gpu] = org_nodes * gpu + 1 + org_src;
+        new_row_offsets[new_nodes] = new_edges;
+        info["source_vertex"] = 0;
+        source = 0;
+
+        #pragma omp parallel for
+        for (VertexId org_v = 0; org_v < org_nodes; org_v ++)
+        {
+            SizeT org_row_offset = graph. row_offsets[org_v];
+            SizeT out_degree = graph. row_offsets[org_v + 1] - org_row_offset;
+            for (int gpu = 0; gpu < num_gpus; gpu ++)
+            {
+                VertexId new_v = org_nodes * gpu + 1 + org_v;
+                SizeT new_row_offset = num_gpus + org_edges * gpu + org_row_offset;
+                if (undirected) 
+                {
+                    new_row_offset += gpu;
+                    if (org_v > org_src) new_row_offset ++;
+                }
+                new_row_offsets[new_v] = new_row_offset;
+                SizeT start_pos = new_row_offset;
+
+                if (org_v == org_src && undirected)
+                {
+                    new_column_indices[start_pos] = 0;
+                    start_pos ++;
+                }
+
+                for (SizeT i = 0; i < out_degree; i++)
+                {
+                    VertexId org_u = graph. column_indices[org_row_offset + i];
+                    VertexId new_u = org_nodes * gpu + 1 + org_u;
+                    new_column_indices[start_pos + i] = new_u;
+                }
+            }
+        }
+
+        free(graph. row_offsets   ); graph. row_offsets    = new_row_offsets;
+        free(graph. column_indices); graph. column_indices = new_column_indices;
+        graph. nodes = new_nodes;
+        graph. edges = new_edges;
+        new_row_offsets = NULL;
+        new_column_indices = NULL;
+
+        return 0;
     }
 
     /**

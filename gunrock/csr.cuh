@@ -471,10 +471,11 @@ struct Csr
 	SizeT nodes,
 	bool quiet = false)
     {
-	if(!quiet) printf("  Converting the labels of %lld vertices to binary format...\n", 
+	    if(!quiet) printf("  Converting the labels of %lld vertices to binary format...\n", 
 				(long long)nodes);
-	if(LOAD_NODE_VALUES) WriteBinary_SM(output_file, nodes, labels);
+	    if(LOAD_NODE_VALUES) WriteBinary_SM(output_file, nodes, labels);
     }
+
     /**
      * @brief Build CSR graph from COO graph, sorted or unsorted
      *
