@@ -47,7 +47,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
 {
     static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
     static const bool ENABLE_IDEMPOTENCE    = false;
-    static const int  MAX_NUM_VERTEX_ASSOCIATES = 2;
+    static const int  MAX_NUM_VERTEX_ASSOCIATES = 1;
     static const int  MAX_NUM_VALUE__ASSOCIATES = 2;
     typedef ProblemBase  <VertexId, SizeT, Value, 
         MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem; 
@@ -73,6 +73,11 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
         std::vector<SizeT>                *forward_queue_offsets;
         util::Array1D<SizeT, VertexId  >  original_vertex;
         util::Array1D<int, unsigned char> *barrier_markers;
+        util::Array1D<SizeT, bool      >  first_backward_incoming;
+        util::Array1D<SizeT, VertexId  >  local_vertices;
+        util::Array1D<SizeT, bool      >  middle_event_set;
+        util::Array1D<SizeT, cudaEvent_t> middle_events;
+        VertexId                          middle_iteration;
 
         /*
          * @brief Default constructor
@@ -85,6 +90,11 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             deltas      .SetName("deltas"      );
             src_node    .SetName("src_node"    );
             original_vertex.SetName("original_vertex");
+            first_backward_incoming.SetName("first_backward_incoming");
+            local_vertices.SetName("local_vertices");
+            middle_event_set.SetName("middle_event_set");
+            middle_events.SetName("middle_events");
+            middle_iteration      = 0;
             forward_output        = NULL;
             forward_queue_offsets = NULL;
             barrier_markers       = NULL;
@@ -108,6 +118,10 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = deltas        .Release()) return retval;
             if (retval = src_node      .Release()) return retval;
             if (retval = original_vertex.Release()) return retval;
+            if (retval = first_backward_incoming.Release()) return retval;
+            if (retval = local_vertices.Release()) return retval;
+            if (retval = middle_events .Release()) return retval;
+            if (retval = middle_event_set.Release()) return retval;
             for (int gpu=0;gpu<this->num_gpus;gpu++)
             {
                 if (retval = forward_output       [gpu].Release()) return retval;
@@ -175,11 +189,6 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = sigmas    .Allocate(graph->nodes, util::DEVICE | util::HOST)) return retval;
             if (retval = deltas    .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = src_node  .Allocate(1           , util::DEVICE)) return retval;
-            if (num_gpus > 1 && !keep_node_num)
-                original_vertex.SetPointer(
-                    graph_slice -> original_vertex.GetPointer(util::DEVICE),
-                    graph_slice -> original_vertex.GetSize(),
-                    util::DEVICE);
             util::MemsetKernel<<<128, 128>>>( bc_values.GetPointer(util::DEVICE), (Value)0.0, graph->nodes);
             util::MemsetKernel<<<128, 128>>>(ebc_values.GetPointer(util::DEVICE), (Value)0.0, graph->edges);
 
@@ -191,6 +200,40 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                 forward_queue_offsets[gpu].push_back(0);
                 forward_output[gpu].SetName("forward_output[]");
                 if (retval = forward_output[gpu].Allocate(graph->nodes, util::DEVICE)) return retval;
+            }
+
+            if (num_gpus > 1)
+            {
+                if (retval = first_backward_incoming.Allocate(num_gpus, util::HOST)) return retval;
+                if (num_gpus > 1 && !keep_node_num)
+                    original_vertex.SetPointer(
+                        graph_slice -> original_vertex.GetPointer(util::DEVICE),
+                        graph_slice -> original_vertex.GetSize(),
+                        util::DEVICE);
+
+                SizeT local_counter = 0;
+                for (VertexId v= 0; v < graph_slice -> nodes; v++)
+                if (graph_slice -> partition_table[v] == 0)
+                    local_counter ++;
+                if (retval = local_vertices.Allocate(local_counter, util::HOST | util::DEVICE)) return retval;
+                local_counter = 0;
+                for (VertexId v= 0; v < graph_slice -> nodes; v++)
+                if (graph_slice -> partition_table[v] == 0)
+                {
+                    local_vertices[local_counter] = v;
+                    local_counter ++;
+                }
+                if (retval = local_vertices.Move(util::HOST, util::DEVICE)) return retval;
+
+                if (retval = middle_event_set.Allocate(num_gpus, util::HOST)) return retval;
+                if (retval = middle_events.Allocate(num_gpus, util::HOST)) return retval;
+                for (int gpu = 0; gpu < num_gpus; gpu++)
+                {
+                    if (retval = util::GRError(
+                        cudaEventCreateWithFlags(middle_events + gpu, cudaEventDisableTiming),
+                        "cudaEventCreateWithFlag failed", __FILE__, __LINE__))
+                        return retval;
+                }
             }
             return retval;
         } // Init
@@ -254,19 +297,19 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                 this->src_node.GetPointer(util::DEVICE), &tsrc,
                 sizeof(VertexId), cudaMemcpyHostToDevice), "BCProblem cudaMemcpy src_node failed", __FILE__, __LINE__)) return retval;
 
-            for (int i=0;i<this->num_gpus;i++)
+            for (int gpu = 0; gpu < this->num_gpus; gpu++)
+            //for (int i=0;i<this->num_gpus;i++)
             {
-                if (this->forward_output[i].GetPointer(util::DEVICE) == NULL)
-                    if (retval = this->forward_output[i].Allocate(nodes, util::DEVICE)) return retval;
-            }
+                if (this->forward_output[gpu].GetPointer(util::DEVICE) == NULL)
+                    if (retval = this->forward_output[gpu].Allocate(nodes, util::DEVICE)) return retval;
 
-            for (int gpu=0;gpu<this->num_gpus;gpu++)
-            {
                 forward_queue_offsets[gpu].clear();
                 forward_queue_offsets[gpu].reserve(nodes);
                 forward_queue_offsets[gpu].push_back(0);
-            }
 
+                if (this -> num_gpus > 1) middle_event_set[gpu] = false;
+            }
+            middle_iteration = -1;
             return retval;
         }
     };  // DataSlice
@@ -285,7 +328,9 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
         use_double_buffer,
         true , // enable_backward
         false, // keep_order
-        false) // keep_node_num
+        true, // keep_node_num
+        false, // skip_makeout_selection
+        true)  // unified_receive
     {
         data_slices = NULL;
     }
@@ -477,13 +522,13 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             data_slices[gpu].SetName("data_slices[]");
             if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
             if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST)) return retval;
-            DataSlice* _data_slice = data_slices[gpu].GetPointer(util::HOST);
-            _data_slice->streams.SetPointer(&streams[gpu*num_gpus*2],num_gpus*2);
+            DataSlice* data_slice = data_slices[gpu].GetPointer(util::HOST);
+            data_slice->streams.SetPointer(&streams[gpu*num_gpus*2],num_gpus*2);
             GraphSlice<VertexId, SizeT, Value> *graph_slice
                 = this -> graph_slices[gpu];
 
             //if (this->num_gpus > 1)
-                retval = _data_slice->Init(
+                retval = data_slice->Init(
                     this -> num_gpus,
                     this -> gpu_idx[gpu],
                     this -> use_double_buffer,
@@ -503,8 +548,31 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                     NULL,
                     queue_sizing,
                     in_sizing);*/
-
             if (retval) return retval;
+            if (this -> num_gpus > 1)
+            {
+                if (data_slice -> vertex_associate_out[1].GetSize() < 
+                    data_slice -> local_vertices.GetSize())
+                {
+                    if (retval = data_slice -> vertex_associate_out[1].EnsureSize(
+                        data_slice -> local_vertices.GetSize()))
+                        return retval;
+                    data_slice -> vertex_associate_outs[1] = 
+                        data_slice -> vertex_associate_out[1].GetPointer(util::DEVICE); 
+                }
+                data_slice -> vertex_associate_outs.Move(util::HOST, util::DEVICE);
+
+                if (data_slice -> value__associate_out[1].GetSize() < 
+                    data_slice -> local_vertices.GetSize())
+                {
+                    if (retval = data_slice -> value__associate_out[1].EnsureSize(
+                        data_slice -> local_vertices.GetSize()))
+                        return retval;
+                    data_slice -> value__associate_outs[1] = 
+                        data_slice -> value__associate_out[1].GetPointer(util::DEVICE); 
+                }
+                data_slice -> value__associate_outs.Move(util::HOST, util::DEVICE);
+            }
         }
 
         return retval;

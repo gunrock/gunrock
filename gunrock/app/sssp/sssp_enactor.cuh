@@ -1250,15 +1250,7 @@ public:
         VertexId     src,
         std::string traversal_mode = "LB")
     {
-        int min_sm_version = -1;
-        for (int i=0;i<this->num_gpus;i++)
-        {
-            if (min_sm_version == -1 ||
-                this->cuda_props[i].device_sm_version < min_sm_version)
-                min_sm_version = this->cuda_props[i].device_sm_version;
-        }
-
-        if (min_sm_version >= 300)
+        if (this -> min_sm_version >= 300)
         {
             if (traversal_mode == "LB")
                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB>
@@ -1306,15 +1298,7 @@ public:
         //bool         size_check = true,
         std::string  traversal_mode = "LB")
     {
-        int min_sm_version = -1;
-        for (int i=0;i<this->num_gpus;i++)
-        {
-            if (min_sm_version == -1 ||
-                this->cuda_props[i].device_sm_version < min_sm_version)
-                min_sm_version = this->cuda_props[i].device_sm_version;
-        }
-
-        if (min_sm_version >= 300)
+        if (this -> min_sm_version >= 300)
         {
             if (traversal_mode == "LB")
                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB>

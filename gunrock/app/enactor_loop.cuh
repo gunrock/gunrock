@@ -1503,6 +1503,7 @@ public:
         {
             for (int i=0; i< num_gpus; i++) data_slice -> out_length[i] = 1;
             data_slice -> out_length.Move(util::HOST, util::DEVICE, num_gpus, 0, stream);
+            //printf("Make_Output direction = %s %s\n", FORWARD ? "FORWARD" : "", BACKWARD ? "BACKWARD" : "");
 
             /*printf("num_blocks = %d, num_threads = %d, stream = %p, "
                 "num_elements = %d, num_gpus = %d, out_length = %p, (%d)"

@@ -139,6 +139,12 @@ __device__ __host__ __forceinline__ long long AllOnes<long long>()
     return (long long)0xFFFFFFFFFFFFFFFFLL;
 }
 
+template <>
+__device__ __host__ __forceinline__ unsigned char AllOnes<unsigned char>()
+{
+    return (unsigned char)0xFF;
+}
+
 template <typename T>
 __device__ __host__ __forceinline__ T InvalidValue()
 {

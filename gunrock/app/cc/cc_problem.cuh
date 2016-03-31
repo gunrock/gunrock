@@ -64,11 +64,11 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
         // device storage arrays
         util::Array1D<SizeT, VertexId> component_ids; /**< Used for component id */
         util::Array1D<SizeT, VertexId> old_c_ids;
-        util::Array1D<SizeT, SizeT   > CID_markers;
-        util::Array1D<SizeT, int     > masks;         /**< Size equals to node number, show if a node is the root */
+        //util::Array1D<SizeT, SizeT   > CID_markers;
+        util::Array1D<SizeT, signed char> masks;         /**< Size equals to node number, show if a node is the root */
         util::Array1D<SizeT, bool    > marks;         /**< Size equals to edge number, show if two vertices belong to the same component */
-        //util::Array1D<SizeT, VertexId> froms;         /**< Size equals to edge number, from vertex of one edge */
-        //util::Array1D<SizeT, VertexId> tos;           /**< Size equals to edge number, to vertex of one edge */
+        util::Array1D<SizeT, VertexId> froms;         /**< Size equals to edge number, from vertex of one edge */
+        util::Array1D<SizeT, VertexId> tos;           /**< Size equals to edge number, to vertex of one edge */
         util::Array1D<SizeT, int     > vertex_flag;   /**< Finish flag for per-vertex kernels in CC algorithm */
         util::Array1D<SizeT, int     > edge_flag;     /**< Finish flag for per-edge kernels in CC algorithm */
         util::Array1D<SizeT, VertexId> local_vertices;
@@ -88,14 +88,14 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
         {
             component_ids.SetName("component_ids");
             old_c_ids    .SetName("old_c_ids"    );
-            CID_markers  .SetName("CID_markers"  );
+            //CID_markers  .SetName("CID_markers"  );
             masks        .SetName("masks"        );
             marks        .SetName("marks"        );
-            //froms        .SetName("froms"        );
-            //tos          .SetName("tos"          );
+            froms        .SetName("froms"        );
+            tos          .SetName("tos"          );
             vertex_flag  .SetName("vertex_flag"  );
             edge_flag    .SetName("edge_flag"    );
-            local_vertices.SetName("local_vertices");
+            //local_vertices.SetName("local_vertices");
             vertex_associate_ins.SetName("vertex_associate_ins");
             turn          = 0;
             //d_pointer     = NULL;
@@ -114,14 +114,14 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             if (util::SetDevice(this->gpu_idx)) return;
             component_ids.Release();
             old_c_ids    .Release();
-            CID_markers  .Release();
+            //CID_markers  .Release();
             masks        .Release();
             marks        .Release();
-            //froms        .Release();
-            //tos          .Release();
+            froms        .Release();
+            tos          .Release();
             vertex_flag  .Release();
             edge_flag    .Release();
-            local_vertices.Release();
+            //local_vertices.Release();
             vertex_associate_ins.Release();
             //d_pointer     = NULL;
             //work_progress = NULL;
@@ -196,9 +196,11 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
 
             //printf("@ gpu %d: nodes = %d, edges = %d\n", gpu_idx, nodes, edges);
             // Create a single data slice for the currently-set gpu
-            /*if (retval = froms .Allocate(edges, util::HOST | util::DEVICE)) return retval;
-            if (retval = tos   .Allocate(edges, util::DEVICE)) return retval;
-            if (retval = tos   .SetPointer(graph->column_indices)) return retval;
+            if (retval = froms .Allocate(edges, util::HOST | util::DEVICE)) return retval;
+            //if (retval = tos   .Allocate(edges, util::DEVICE)) return retval;
+            if (retval = tos   .SetPointer(
+                graph_slice -> column_indices.GetPointer(util::DEVICE), 
+                graph_slice -> edges, util::DEVICE)) return retval;
             // Construct coo from/to edge list from row_offsets and column_indices
             for (VertexId node=0; node < graph->nodes; node++)
             {
@@ -223,20 +225,21 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
                 }
             }
             if (retval = froms.Move(util::HOST, util::DEVICE)) return retval;
-            if (retval = tos  .Move(util::HOST, util::DEVICE)) return retval;
+            //if (retval = tos  .Move(util::HOST, util::DEVICE)) return retval;
             if (retval = froms.Release(util::HOST)) return retval;
-            if (retval = tos  .Release(util::HOST)) return retval;*/
+            //if (retval = tos  .Release(util::HOST)) return retval;
 
             // Create SoA on device
             if (retval = component_ids.Allocate(nodes  , util::DEVICE)) return retval;
-            if (retval = old_c_ids    .Allocate(nodes  , util::DEVICE)) return retval;
-            if (retval = CID_markers  .Allocate(nodes+1, util::DEVICE)) return retval;
+            if (num_gpus > 1)
+                if (retval = old_c_ids    .Allocate(nodes  , util::DEVICE)) return retval;
+            //if (retval = CID_markers  .Allocate(nodes+1, util::DEVICE)) return retval;
             if (retval = masks        .Allocate(nodes  , util::DEVICE)) return retval;
             if (retval = marks        .Allocate(edges  , util::DEVICE)) return retval;
             if (retval = vertex_flag  .Allocate(1, util::HOST | util::DEVICE)) return retval;
             if (retval = edge_flag    .Allocate(1, util::HOST | util::DEVICE)) return retval;
-            if (retval = this -> frontier_queues[0].keys  [0].Allocate(nodes + 2, util::DEVICE)) return retval;
-            if (retval = this -> scanned_edges[0].Allocate(nodes + 2, util::DEVICE)) return retval;
+            //if (retval = this -> frontier_queues[0].keys  [0].Allocate(nodes + 2, util::DEVICE)) return retval;
+            //if (retval = this -> scanned_edges[0].Allocate(nodes + 2, util::DEVICE)) return retval;
             if (retval = vertex_associate_ins.Allocate(num_gpus, util::HOST | util::DEVICE)) return retval;
             scanned_queue_computed = false;
             //if (retval = this->frontier_queues[0].keys  [0].Allocate(edges+2, util::DEVICE)) return retval;
@@ -252,7 +255,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
                 //this->frontier_queues[num_gpus].values[1].SetPointer(this->frontier_queues[0].values[1].GetPointer(util::DEVICE), nodes+2, util::DEVICE);
             }*/
 
-            if (num_gpus > 1)
+            if (false) //(num_gpus > 1)
             {
                 SizeT num_local_vertices = 0;
                 for (VertexId v=0; v<nodes; v++)
@@ -308,7 +311,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             util::MemsetKernel   <<<128, 128>>>(marks         .GetPointer(util::DEVICE), false, edges);
 
             // Allocate masks if necessary
-            util::MemsetKernel    <<<128, 128>>>(masks        .GetPointer(util::DEVICE),     0, nodes);
+            util::MemsetKernel    <<<128, 128>>>(masks        .GetPointer(util::DEVICE), (signed char)0, nodes);
 
             // Allocate vertex_flag if necessary
             vertex_flag[0]=1;

@@ -274,6 +274,7 @@ public:
             UnSetPointer(DEVICE);
         }
 
+        if (target == TARGETALL) size = 0;
         return retval;
     } // Release(...)
 

@@ -95,9 +95,7 @@ cudaError_t ComputeOutputLength(
         return retval;
     }
 
-    SizeT num_block = (frontier_attribute->queue_length
-        + KernelPolicy::THREADS - 1)
-        /KernelPolicy::THREADS;
+    SizeT num_block = frontier_attribute->queue_length/KernelPolicy::THREADS + 1;
     //if (num_block > 256) num_block = 256;
     //printf("queue_length = %lld, num_blocks = %lld, block_size = %d\n",
     //    (long long)frontier_attribute -> queue_length,
@@ -391,9 +389,8 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_BACKWARD>
     {
         cudaError_t retval = cudaSuccess;
          // Load Thread Warp CTA Backward Kernel
-        SizeT num_block = (parameter -> frontier_attribute -> queue_length +
-            LBPOLICY::THREADS - 1) /
-            LBPOLICY::THREADS;
+        SizeT num_block = parameter -> frontier_attribute -> queue_length/
+            LBPOLICY::THREADS + 1;
         if (parameter -> get_output_length)
         {
             if (retval = ComputeOutputLength<Parameter>(parameter))
@@ -443,8 +440,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
     {
         cudaError_t retval = cudaSuccess;
         // load edge-expand-partitioned kernel
-        SizeT num_block = (parameter -> frontier_attribute -> queue_length +
-            LBPOLICY::THREADS - 1) / LBPOLICY::THREADS;
+        SizeT num_block = parameter -> frontier_attribute -> queue_length / LBPOLICY::THREADS + 1;
         if (parameter -> get_output_length)
         {
             if (retval = ComputeOutputLength(parameter))
@@ -495,7 +491,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
         }
         else //if (/*get_output_length &&*/ parameter -> frontier_attribute -> output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
         {
-            int num_blocks = parameter -> frontier_attribute -> output_length[0] / 2 / LBPOLICY::THREADS; // LBPOLICY::BLOCKS
+            int num_blocks = parameter -> frontier_attribute -> output_length[0] / 2 / LBPOLICY::THREADS + 1; // LBPOLICY::BLOCKS
             if (num_blocks > LBPOLICY::BLOCKS)
                 num_blocks = LBPOLICY::BLOCKS;
             SizeT split_val = (parameter -> frontier_attribute -> output_length[0] +
@@ -710,7 +706,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_CULL>
         }
         else //if (/*get_output_length &&*/ parameter -> frontier_attribute -> //output_length[0] >= LBPOLICY::LIGHT_EDGE_THRESHOLD)
         {
-            SizeT num_blocks = parameter -> frontier_attribute -> output_length[0] / 2 / KernelPolicy::THREADS; // LBPOLICY::BLOCKS
+            SizeT num_blocks = parameter -> frontier_attribute -> output_length[0] / 2 / KernelPolicy::THREADS + 1; // LBPOLICY::BLOCKS
             if (num_blocks > 840)
                 num_blocks = 840;
             if (num_blocks < 1) num_blocks = 1;

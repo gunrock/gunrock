@@ -321,7 +321,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                 }
 
                 SizeT edge_id = row_offset_v + thread_output_offset + block_first_v_skip_count - v_output_start_offset;
-                VertexId u = column_indices[edge_id];
+                VertexId u = __ldg(column_indices + edge_id);
                 //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
                 //    u, column_indices + edge_id);
                 //u = tex1Dfetch(ColumnIndicesTex<VertexId>::column_indices,
@@ -443,7 +443,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             }
 
             SizeT edge_id = row_offset_v - v_output_start_offset + thread_output;
-            VertexId u = column_indices[edge_id];
+            VertexId u = __ldg(column_indices + edge_id);
             //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
             //    u, column_indices + edge_id);
             ProcessNeighbor<KernelPolicy, Problem, Functor,

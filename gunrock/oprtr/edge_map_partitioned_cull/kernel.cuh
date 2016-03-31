@@ -242,6 +242,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         //    .ExclusiveSum(thread_output_count, output_pos);
         if (threadIdx.x == KernelPolicy::THREADS -1)
         {
+            if (output_pos + thread_output_count != 0)
             smem_storage.block_offset = atomicAdd(smem_storage.d_output_counter, output_pos + thread_output_count);
         }
         __syncthreads();
@@ -512,7 +513,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     //VertexId u = (output_inverse_graph) ?
                     //    d_inverse_column_indices[edge_id] :
                     //    d_column_indices[edge_id];
-                    VertexId u = smem_storage.d_column_indices[edge_id];
+                    VertexId u = __ldg(smem_storage.d_column_indices + edge_id);
                     //output_pos = block_output_start + thread_output_offset;
                     /*if (TO_TRACK && (util::to_track(d_data_slice -> gpu_idx, u)))// || util::pred_to_track(d_data_slice -> gpu_idx, v)))
                         printf("(%4d, %4d) : Expand %4d, label = %d, "
@@ -546,7 +547,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                                 util::io::ModifiedStore<util::io::st::cg>::St(
                                     tex_mask_byte, //mask_byte,
                                     smem_storage.d_visited_mask + output_pos);
-                                tex_mask_byte = smem_storage.d_visited_mask[output_pos];
+                                //tex_mask_byte = smem_storage.d_visited_mask[output_pos];
                             }// while (!(mask_bit & tex_mask_byte));
                             
                             if (smem_storage.d_labels[u] == util::MaxValue<LabelT>())
@@ -801,7 +802,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     }
 
                     SizeT edge_id = row_offset_v - v_output_start_offset + thread_output;
-                    VertexId u = column_indices[edge_id];
+                    VertexId u = __ldg(column_indices + edge_id);
                     //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
                     //    u, column_indices + edge_id);
                     //ProcessNeighbor<KernelPolicy, Problem, Functor,

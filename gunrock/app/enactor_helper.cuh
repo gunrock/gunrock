@@ -363,13 +363,21 @@ void PushNeighbor(
     }
     
     if (data_slice_l -> keys_out[peer_].GetPointer(util::DEVICE) != NULL)
-    if (enactor_stats -> retval = util::GRError(cudaMemcpyAsync(
-        data_slice_p -> keys_in[t][gpu_].GetPointer(util::DEVICE),
-        data_slice_l -> keys_out[peer_] .GetPointer(util::DEVICE),
-        sizeof(VertexId) * queue_length,
-        cudaMemcpyDefault, stream),
-        "cudamemcpyPeer keys failed", __FILE__, __LINE__))
-        return;
+    {
+        if (enactor_stats -> retval = util::GRError(cudaMemcpyAsync(
+            data_slice_p -> keys_in[t][gpu_].GetPointer(util::DEVICE),
+            data_slice_l -> keys_out[peer_] .GetPointer(util::DEVICE),
+            sizeof(VertexId) * queue_length,
+            cudaMemcpyDefault, stream),
+            "cudamemcpyPeer keys failed", __FILE__, __LINE__))
+            return;
+        //printf("%d @ %p -> %d @ %p, size = %d\n",
+        //    gpu , data_slice_l -> keys_out[peer_].GetPointer(util::DEVICE),
+        //    peer, data_slice_p -> keys_in[t][gpu_].GetPointer(util::DEVICE),
+        //    sizeof(VertexId) * queue_length);
+    } else {
+        //printf("push key skiped\n");
+    }
     if (NUM_VERTEX_ASSOCIATES != 0)
     if (enactor_stats -> retval = util::GRError(cudaMemcpyAsync(
         data_slice_p -> vertex_associate_in[t][gpu_].GetPointer(util::DEVICE),

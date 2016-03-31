@@ -84,6 +84,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, SizeT         > split_lengths;
         util::Array1D<SizeT, VertexId      > local_vertices;
         util::Array1D<SizeT, DIRECTION     > direction_votes;
+        util::Array1D<SizeT, MaskT         > old_mask;
+        util::Array1D<SizeT, MaskT*        > in_masks;
 
         /*
          * @brief Default constructor
@@ -103,6 +105,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             local_vertices.SetName("local_vertices");
             split_lengths.SetName("split_length");
             direction_votes.SetName("direction_votes");
+            old_mask.SetName("old_mask");
+            in_masks.SetName("in_masks");
         }
 
         /*
@@ -131,6 +135,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = split_lengths.Release()) return retval;
             if (retval = local_vertices.Release()) return retval;
             if (retval = direction_votes.Release()) return retval;
+            if (retval = old_mask.Release()) return retval;
+            if (retval = in_masks.Release()) return retval;
             return retval;
         }
 
@@ -201,8 +207,24 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
 
             if (ENABLE_IDEMPOTENCE)
             {
-                if (retval = this -> visited_mask.Allocate((graph->nodes + sizeof(MaskT) -1)/sizeof(MaskT), util::DEVICE))
+                if (retval = this -> visited_mask.Allocate(graph->nodes / (sizeof(MaskT)*8) + 2*sizeof(VertexId), util::DEVICE))
                     return retval;
+                if (false) //(num_gpus > 1 && !MARK_PREDECESSORS)
+                {
+                    if (retval = old_mask.Allocate(graph -> nodes / (sizeof(MaskT)*8) + 2*sizeof(VertexId), util::DEVICE))
+                        return retval;
+                    if (retval = in_masks.Allocate(num_gpus, util::HOST | util::DEVICE)) return retval;
+                    for (int gpu = 0; gpu < num_gpus; gpu++)
+                    {
+                        if (retval = this -> keys_out[gpu].Release()) return retval;
+                        this -> keys_out[gpu].SetPointer(
+                            (VertexId*)(this -> visited_mask.GetPointer(util::DEVICE)),
+                            (graph -> nodes / (sizeof(MaskT)*8) + 1) * sizeof(MaskT) / sizeof(VertexId) + 1,
+                            util::DEVICE);
+                        this -> keys_outs[gpu] = (VertexId*)(this -> visited_mask.GetPointer(util::DEVICE)); 
+                    }
+                    this -> keys_outs.Move(util::HOST, util::DEVICE);
+                }
             }
 
             if (num_gpus > 1)
@@ -422,9 +444,16 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             }
             if (ENABLE_IDEMPOTENCE) {
                 //SizeT visited_mask_bytes  = ;
-                SizeT visited_mask_elements = (nodes + sizeof(MaskT) -1 )/sizeof(MaskT);//visited_mask_bytes * sizeof(unsigned char);
-                util::MemsetKernel<<<128, 128>>>(this->visited_mask.GetPointer(util::DEVICE),
+                SizeT visited_mask_elements = this -> visited_mask.GetSize();//nodes / (sizeof(MaskT)*8) + 2*sizeof(VertexId);//visited_mask_bytes * sizeof(unsigned char);
+
+                util::MemsetKernel<<<128, 128>>>(
+                    this->visited_mask.GetPointer(util::DEVICE),
                     (MaskT)0, visited_mask_elements);
+
+                if (false) //(this -> num_gpus > 1 && !MARK_PREDECESSORS)
+                    util::MemsetKernel<<<128, 128>>>(
+                        this -> old_mask.GetPointer(util::DEVICE),
+                        (MaskT)0, visited_mask_elements);
             }
 
             return retval;
@@ -692,7 +721,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__))
             return retval;
 
-       if (MARK_PREDECESSORS)// && !ENABLE_IDEMPOTENCE)
+        if (MARK_PREDECESSORS)// && !ENABLE_IDEMPOTENCE)
         {
             VertexId src_pred = -1;
             if (retval = util::GRError(cudaMemcpy(
@@ -702,7 +731,29 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 cudaMemcpyHostToDevice),
                 "BFSProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__))
                 return retval;
-       }
+        }
+
+        if (ENABLE_IDEMPOTENCE)
+        {
+            MaskT mask_byte = 1 << (tsrc % (8 * sizeof(MaskT)));
+            VertexId mask_pos = tsrc / (8 * sizeof(MaskT));
+            if (retval = util::GRError(cudaMemcpy(
+                data_slices[gpu] -> visited_mask.GetPointer(util::DEVICE) + mask_pos,
+                &mask_byte,
+                sizeof(MaskT),
+                cudaMemcpyHostToDevice),
+                "BFSProblem cudaMemcpy visited_mask failed", __FILE__, __LINE__))
+                return retval;
+
+            if (false)//(this -> num_gpus > 1 && !MARK_PREDECESSORS)
+            if (retval = util::GRError(cudaMemcpy(
+                data_slices[gpu] -> old_mask.GetPointer(util::DEVICE) + mask_pos,
+                &mask_byte,
+                sizeof(MaskT),
+                cudaMemcpyHostToDevice),
+                "BFSProblem cudaMemcpy visited_mask failed", __FILE__, __LINE__))
+                return retval; 
+        }
 
        return retval;
     } // reset

@@ -484,6 +484,7 @@ __global__ void Make_Output_Backward_Kernel(
         }
         if (threadIdx.x < num_gpus)
         {
+            if (sum_offset[threadIdx.x] != 0)
             sum_offset[threadIdx.x] = atomicAdd(d_out_length + threadIdx.x, sum_offset[threadIdx.x]);
         }
         __syncthreads();
@@ -520,6 +521,8 @@ __global__ void Make_Output_Backward_Kernel(
                         =d_value__associate_orgs[i][key];
                     out_offset ++;
                 }
+                //printf("Make_Output : values[%2d, %2d] = %.4f, %.4f\n",
+                //    key, out_pos[target], d_value__associate_orgs[0][key], d_value__associate_orgs[1][key]);
             }
         }
         in_pos += STRIDE;

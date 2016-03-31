@@ -49,9 +49,9 @@ __global__ void Expand_Incoming_Kernel(
 
     while (x < num_elements)
     {
-        VertexId key = keys_in[x];
-        VertexId new_pred = vertex_associate_in[x];
-        VertexId old_pred = vertex_associate_org[key];
+        VertexId key      = __ldg(keys_in + x);
+        VertexId new_pred = __ldg(vertex_associate_in + x);
+        VertexId old_pred = __ldg(vertex_associate_org + key);
         if (new_pred != old_pred)
         {
             if (new_pred < old_pred) vertex_associate_org[old_pred] = new_pred;
@@ -90,6 +90,10 @@ __global__ void First_Expand_Incoming_Kernel(
 {
     SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
     const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
+    __shared__ VertexId *s_component_id_ins[8];
+    if (threadIdx.x < num_gpus) s_component_id_ins[threadIdx.x] = component_id_ins[threadIdx.x];
+    __syncthreads();
+
     VertexId pred_ins[8], min_pred;
     while (x < nodes)
     {
@@ -97,7 +101,7 @@ __global__ void First_Expand_Incoming_Kernel(
         min_pred = pred_ins[0];
         for (int gpu=1; gpu<num_gpus; gpu++)
         {
-            pred_ins[gpu] = component_id_ins[gpu][x];
+            pred_ins[gpu] = s_component_id_ins[gpu][x];
             if (pred_ins[gpu] < min_pred) min_pred = pred_ins[gpu];
         }
 
@@ -136,14 +140,14 @@ __global__ void Make_Output_Kernel(
         VertexId old_cid = 0, new_cid = 0, min_cid = 0;
         if (x < num_vertices)
         {
-            old_cid = old_component_ids[x];
-            new_cid = component_ids    [x];
+            old_cid = __ldg(old_component_ids + x);
+            new_cid = __ldg(component_ids     + x);
             min_cid = min(new_cid, old_cid);
             if (old_cid == min_cid)
                 to_process = false;
             else {
                 old_component_ids[x] = min_cid;
-                VertexId old_grandparent = component_ids[old_cid];
+                VertexId old_grandparent = __ldg(component_ids + old_cid);
                 if (min_cid != old_grandparent)
                 {
                     //printf("%d\t Make_Output : not updated, old_cid = %d, min_cid = %d, old_grandparent = %d\n",
@@ -164,6 +168,7 @@ __global__ void Make_Output_Kernel(
         BlockScanT::LogicScan(to_process, output_pos, scan_space);
         if (threadIdx.x == blockDim.x -1)
         {
+            if (output_pos != 0 || to_process)
             block_offset = atomicAdd(output_length, output_pos + ((to_process) ? 1 : 0));
         }        
         __syncthreads();
@@ -292,21 +297,21 @@ public:
         {
             frontier_attribute -> queue_index  = 0;
             frontier_attribute -> selector     = 0;
-            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::ALL_EDGES)
+            //if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::ALL_EDGES)
                 frontier_attribute -> queue_length = graph_slice -> edges;
-            else 
-                frontier_attribute -> queue_length = 
-                    (data_slice -> num_gpus == 1 )? graph_slice -> nodes :
-                    data_slice -> local_vertices.GetSize();//graph_slice->edges;
+            //else 
+            //    frontier_attribute -> queue_length = 
+            //        (data_slice -> num_gpus == 1 )? graph_slice -> nodes :
+            //        data_slice -> local_vertices.GetSize();//graph_slice->edges;
             frontier_attribute -> queue_reset  = true;
 
-            bool over_sized = false;
+            /*bool over_sized = false;
             if ((enactor -> size_check ||
                  (gunrock::oprtr::advance::hasPreScan<AdvanceKernelPolicy::ADVANCE_MODE>())) &&
                 (!data_slice -> scanned_queue_computed))
             {
                 printf("scaned, queue_sizing = %d\n", frontier_attribute -> queue_length);fflush(stdout);
-                if (enactor_stats -> retval = Check_Size</*Enactor::SIZE_CHECK,*/ SizeT, SizeT> (
+                if (enactor_stats -> retval = Check_Size< SizeT, SizeT> (
                     enactor -> size_check,
                     "scanned_edges", frontier_attribute -> queue_length + 1,
                     scanned_edges, over_sized, -1, -1, -1, false))
@@ -362,7 +367,30 @@ public:
                 stream,
                 false,
                 false,
-                false);
+                false);*/
+            gunrock::oprtr::filter::LaunchKernel
+                <FilterKernelPolicy, Problem, HookInitFunctor>(
+                enactor_stats[0],
+                frontier_attribute[0],
+                (VertexId) enactor_stats -> iteration,
+                data_slice,
+                d_data_slice,
+                (SizeT*)NULL, // vertex_markers
+                (unsigned char*)NULL, // visited_mask
+                (VertexId*)NULL, //keys_in
+                (VertexId*)NULL,
+                (Value*)NULL,
+                (Value*)NULL,
+                graph_slice -> edges,
+                graph_slice -> nodes,
+                work_progress[0],
+                context[0],
+                stream,
+                graph_slice -> edges,
+                util::MaxValue<SizeT>(),
+                enactor_stats -> filter_kernel_stats,
+                false, // By-Pass
+                false); //skip_marking
             if (enactor -> debug && (enactor_stats -> retval = 
                 util::GRError("filter::Kernel Initial HookInit Operation failed", 
                     __FILE__, __LINE__))) return;
@@ -532,17 +560,41 @@ public:
         while (!data_slice->edge_flag[0])
         {
             frontier_attribute->queue_index  = 0;        // Work queue index
-            if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::ALL_EDGES)
+            //if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::ALL_EDGES)
                 frontier_attribute -> queue_length = graph_slice -> edges;
-            else frontier_attribute->queue_length = 
-                (data_slice -> num_gpus == 1) ? graph_slice -> nodes :
-                data_slice -> local_vertices.GetSize();//graph_slice->edges;
+            //else frontier_attribute->queue_length = 
+            //    (data_slice -> num_gpus == 1) ? graph_slice -> nodes :
+            //    data_slice -> local_vertices.GetSize();//graph_slice->edges;
             frontier_attribute->selector     = 0;
             frontier_attribute->queue_reset  = true;
             data_slice->edge_flag[0] = 1;
-            data_slice->edge_flag.Move(util::HOST, util::DEVICE, 1, 0, stream);
+            data_slice->edge_flag.Move(util::HOST, util::DEVICE, 1, 0, stream); 
 
-             gunrock::oprtr::advance::LaunchKernel
+            gunrock::oprtr::filter::LaunchKernel
+                <FilterKernelPolicy, Problem, HookMaxFunctor>(
+                enactor_stats[0],
+                frontier_attribute[0],
+                (VertexId)enactor_stats -> iteration,
+                data_slice,
+                d_data_slice,
+                (SizeT*)NULL, // vertex_markers,
+                (unsigned char*) NULL, // visited_mask,
+                (VertexId*)NULL, // keys_in
+                (VertexId*)NULL,
+                (Value*)NULL,
+                (Value*)NULL,
+                graph_slice -> edges,
+                graph_slice -> nodes,
+                work_progress[0],
+                context[0],
+                stream,
+                graph_slice -> edges,
+                util::MaxValue<SizeT>(),
+                enactor_stats -> filter_kernel_stats,
+                false, // By-Pass
+                false); // skip_marking
+
+            /*gunrock::oprtr::advance::LaunchKernel
                 <AdvanceKernelPolicy, Problem, HookMaxFunctor, gunrock::oprtr::advance::V2V>(
                 enactor_stats[0],
                 frontier_attribute[0],
@@ -569,7 +621,7 @@ public:
                 stream,
                 false,
                 false,
-                false);
+                false);*/
             //}
             if (enactor -> debug && (enactor_stats->retval = 
                 util::GRError("filter::Kernel Hook Min/Max Operation failed", 

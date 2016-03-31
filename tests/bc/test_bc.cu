@@ -441,6 +441,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     int      subqueue_latency       = info->info["subqueue_latency"  ].get_int ();
     int      fullqueue_latency      = info->info["fullqueue_latency" ].get_int ();
     int      makeout_latency        = info->info["makeout_latency"   ].get_int ();
+    std::string traversal_mode      = info->info["traversal_mode"    ].get_str ();
     if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
 
     CpuTimer cpu_timer;
@@ -496,7 +497,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     Enactor* enactor = new Enactor(
         num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
     if (retval = util::GRError(enactor->Init(
-        context, problem, max_grid_size),
+        context, problem, max_grid_size, traversal_mode),
         "BC Enactor init failed", __FILE__, __LINE__))
         return retval;
 
@@ -554,6 +555,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             printf("src_seed = %d\n", src_seed);
         srand(src_seed);
     }
+    if (!quiet_mode)
+        printf("Using traversal-mode %s\n", traversal_mode.c_str());
 
     for (int iter = 0; iter < iterations; ++iter)
     {
@@ -620,7 +623,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             }
 
             cpu_timer.Start();
-            if (retval = util::GRError(enactor ->Enact(i),
+            if (retval = util::GRError(enactor ->Enact(i, traversal_mode),
                 "BC Problem Enact Failed", __FILE__, __LINE__))
                 return retval;
             cpu_timer.Stop();
