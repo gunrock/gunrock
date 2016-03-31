@@ -115,7 +115,7 @@ public:
             SizeT                      *d_output_counter;
             VertexId                   *d_labels;
             MaskT                      *d_visited_mask;
-            SizeT                      *d_column_indices;
+            VertexId                   *d_column_indices;
             SizeT                       block_output_start;
             SizeT                       block_output_end;
             SizeT                       block_output_size;

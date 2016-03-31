@@ -1393,7 +1393,7 @@ public:
         for (peer_ = 0; peer_ < num_gpus; peer_++)
         {
             if (enactor_stats -> retval =
-                Check_Size<SizeT, SizeT> (
+                Check_Size<SizeT, VertexId> (
                     enactor -> size_check, "keys_out",
                     num_elements * size_multi,
                     (peer_ == 0) ?

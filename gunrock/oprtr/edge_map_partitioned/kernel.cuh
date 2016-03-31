@@ -96,10 +96,12 @@ struct Dispatch<KernelPolicy, Problem, Functor,
     {
         SizeT first  = /*(d_vertex_id >= max_vertex) ?
             max_edge :*/ //d_row_offsets[d_vertex_id];
-            tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  vertex_id);
+            //tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  vertex_id);
+            __ldg(d_row_offsets + vertex_id);
         SizeT second = /*(d_vertex_id + 1 >= max_vertex) ?
             max_edge :*/ //d_row_offsets[d_vertex_id+1];
-            tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  vertex_id + 1);
+            //tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  vertex_id + 1);
+            __ldg(d_row_offsets + (vertex_id + 1));
 
         //printf(" d_vertex_id = %d, max_vertex = %d, max_edge = %d, first = %d, second = %d\n",
         //       d_vertex_id, max_vertex, max_edge, first, second);
@@ -264,7 +266,8 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     //smem_storage.vertices [threadIdx.x] = input_item;
                     if (input_item >= 0)
                         smem_storage.row_offset[threadIdx.x]= //row_offsets[input_item];
-                            tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  input_item);
+                            //tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  input_item);
+                            __ldg(row_offsets + input_item);
                     else smem_storage.row_offset[threadIdx.x] = util::MaxValue<SizeT>();
                 }
                 else if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V ||
@@ -321,7 +324,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                 }
 
                 SizeT edge_id = row_offset_v + thread_output_offset + block_first_v_skip_count - v_output_start_offset;
-                VertexId u = __ldg(column_indices + edge_id);
+                VertexId u = column_indices[edge_id];
                 //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
                 //    u, column_indices + edge_id);
                 //u = tex1Dfetch(ColumnIndicesTex<VertexId>::column_indices,
@@ -443,7 +446,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             }
 
             SizeT edge_id = row_offset_v - v_output_start_offset + thread_output;
-            VertexId u = __ldg(column_indices + edge_id);
+            VertexId u = column_indices [edge_id];
             //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
             //    u, column_indices + edge_id);
             ProcessNeighbor<KernelPolicy, Problem, Functor,

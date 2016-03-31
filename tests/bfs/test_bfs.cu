@@ -877,9 +877,9 @@ template <
 int main_SizeT(CommandLineArgs *args)
 {
 // disabled to reduce compile time
-//    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-//        return main_Value<VertexId, long long>(args);
-//    else
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_Value<VertexId, long long>(args);
+    else
         return main_Value<VertexId, int      >(args);
 }
 

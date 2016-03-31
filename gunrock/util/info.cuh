@@ -904,10 +904,10 @@ public:
             args.GetCmdLineArgument("sw_vmin"       , sw_vmin);
 
             info["sw_seed"       ] = sw_seed       ;
-            info["sw_scale"      ] = sw_scale      ;
-            info["sw_nodes"      ] = sw_nodes      ;
+            info["sw_scale"      ] = (int64_t)sw_scale      ;
+            info["sw_nodes"      ] = (int64_t)sw_nodes      ;
             info["sw_p"          ] = sw_p          ;
-            info["sw_k"          ] = sw_k          ;
+            info["sw_k"          ] = (int64_t)sw_k          ;
             info["sw_vmultipiler"] = sw_vmultipiler;
             info["sw_vmin"       ] = sw_vmin       ;
 

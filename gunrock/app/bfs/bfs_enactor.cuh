@@ -448,6 +448,7 @@ __global__ void Inverse_Expand(
     typename Problem::SizeT     num_unvisited_vertices,
     typename Problem::VertexId  label,
     typename Problem::VertexId *d_unvisited_key_in,
+    typename Problem::SizeT    *d_inverse_row_offsets,
     typename Problem::VertexId *d_inverse_column_indices,
     typename Problem::SizeT    *d_split_lengths,
     typename Problem::VertexId *d_unvisited_key_out,
@@ -504,8 +505,10 @@ __global__ void Inverse_Expand(
 
         if (to_process)
         {
-            SizeT edge_start = tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets, key);
-            SizeT edge_end = tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets, key+1);
+            SizeT edge_start = //tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets, key);
+                __ldg(d_inverse_row_offsets + key);
+            SizeT edge_end = //tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets, key+1);
+                __ldg(d_inverse_row_offsets + (key+1));
             for (SizeT edge_id = edge_start; edge_id < edge_end; edge_id++)
             {
                 VertexId neighbor = __ldg(d_inverse_column_indices + edge_id);//d_inverse_column_indices[edge_id];
@@ -1162,6 +1165,7 @@ struct BFSIteration : public IterationBase <
                 (data_slice -> num_unvisited_vertices,
                 enactor_stats -> iteration + 1,
                 data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE),
+                graph_slice -> row_offsets.GetPointer(util::DEVICE),
                 graph_slice -> column_indices.GetPointer(util::DEVICE), //should be inverse, only works for undirected graph
                 data_slice -> split_lengths.GetPointer(util::DEVICE),
                 data_slice -> unvisited_vertices[frontier_attribute -> selector ^ 1].GetPointer(util::DEVICE),
@@ -1815,7 +1819,7 @@ public:
                 problem->graph_slices[gpu]->nodes * sizeof(VertexId)),
                 "BFSEnactor cudaBindTexture labels_tex_ref failed", __FILE__, __LINE__)) break;
 
-            cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
+            /*cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
             gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
             if (retval = util::GRError(cudaBindTexture(
                 0,
@@ -1823,7 +1827,7 @@ public:
                 problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
                 ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
                 "BFSEnactor cudaBindTexture row_offsets_ref failed",
-                __FILE__, __LINE__)) break;
+                __FILE__, __LINE__)) break;*/
         }
         if (retval) return retval;
 

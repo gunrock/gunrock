@@ -251,12 +251,12 @@ struct HookMinFunctor {
         if (!mark) {
             VertexId from_node;
             VertexId to_node;
-            //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
-            //    from_node, d_data_slice->froms + node);
-            from_node = __ldg(d_data_slice -> froms + node);
-            //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
-            //    to_node, d_data_slice->tos + node);
-            to_node = __ldg(d_data_slice -> tos + node);
+            util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                from_node, d_data_slice->froms + node);
+            //from_node = __ldg(d_data_slice -> froms + node);
+            util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+                to_node, d_data_slice->tos + node);
+            //to_node = __ldg(d_data_slice -> tos + node);
             VertexId parent_from;
             VertexId parent_to;
             util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(

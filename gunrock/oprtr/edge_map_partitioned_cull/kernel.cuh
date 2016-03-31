@@ -144,10 +144,12 @@ struct Dispatch<KernelPolicy, Problem, Functor,
     {
         SizeT first  = /*(d_vertex_id >= max_vertex) ?
             max_edge :*/ //d_row_offsets[d_vertex_id];
-            tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  d_vertex_id);
+            //tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  d_vertex_id);
+            __ldg(d_row_offsets + (d_vertex_id));
         SizeT second = /*(d_vertex_id + 1 >= max_vertex) ?
             max_edge :*/ //d_row_offsets[d_vertex_id+1];
-            tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  d_vertex_id + 1);
+            //tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  d_vertex_id + 1);
+            __ldg(d_row_offsets + (d_vertex_id+1));
 
         //printf(" d_vertex_id = %d, max_vertex = %d, max_edge = %d, first = %d, second = %d\n",
         //       d_vertex_id, max_vertex, max_edge, first, second);
@@ -421,7 +423,9 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                         //smem_storage.vertices [threadIdx.x] = input_item;
                         if (input_item >= 0)
                             smem_storage.row_offset[threadIdx.x]= //row_offsets[input_item];
-                                tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  input_item);
+                                //tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  input_item);
+                                __ldg(((output_inverse_graph) ? d_inverse_row_offsets :
+                                     d_row_offsets) + input_item);
                         else smem_storage.row_offset[threadIdx.x] = util::MaxValue<SizeT>();
                     }
                     else if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V ||
@@ -513,7 +517,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     //VertexId u = (output_inverse_graph) ?
                     //    d_inverse_column_indices[edge_id] :
                     //    d_column_indices[edge_id];
-                    VertexId u = __ldg(smem_storage.d_column_indices + edge_id);
+                    VertexId u = smem_storage.d_column_indices [edge_id];
                     //output_pos = block_output_start + thread_output_offset;
                     /*if (TO_TRACK && (util::to_track(d_data_slice -> gpu_idx, u)))// || util::pred_to_track(d_data_slice -> gpu_idx, v)))
                         printf("(%4d, %4d) : Expand %4d, label = %d, "
@@ -738,7 +742,8 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                         //smem_storage.vertices[threadIdx.x] = input_item;
                         if (input_item >= 0)
                             smem_storage.row_offset[threadIdx.x] = //row_offsets[input_item];
-                                tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  input_item);
+                                //tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  input_item);
+                                __ldg(row_offsets + input_item);
                         else smem_storage.row_offset[threadIdx.x] = util::MaxValue<SizeT>();
                     } else if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V ||
                         ADVANCE_TYPE == gunrock::oprtr::advance::E2E)
@@ -802,7 +807,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     }
 
                     SizeT edge_id = row_offset_v - v_output_start_offset + thread_output;
-                    VertexId u = __ldg(column_indices + edge_id);
+                    VertexId u = column_indices [edge_id];
                     //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
                     //    u, column_indices + edge_id);
                     //ProcessNeighbor<KernelPolicy, Problem, Functor,
