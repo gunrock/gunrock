@@ -185,12 +185,12 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = this->preds     .Allocate(graph->nodes, util::DEVICE)) return retval;
             //if (retval = this->temp_preds.Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = bc_values .Allocate(graph->nodes, util::DEVICE)) return retval;
-            if (retval = ebc_values.Allocate(graph->edges, util::DEVICE)) return retval;
+            //if (retval = ebc_values.Allocate(graph->edges, util::DEVICE)) return retval;
             if (retval = sigmas    .Allocate(graph->nodes, util::DEVICE | util::HOST)) return retval;
             if (retval = deltas    .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = src_node  .Allocate(1           , util::DEVICE)) return retval;
             util::MemsetKernel<<<128, 128>>>( bc_values.GetPointer(util::DEVICE), (Value)0.0, graph->nodes);
-            util::MemsetKernel<<<128, 128>>>(ebc_values.GetPointer(util::DEVICE), (Value)0.0, graph->edges);
+            //util::MemsetKernel<<<128, 128>>>(ebc_values.GetPointer(util::DEVICE), (Value)0.0, graph->edges);
 
             forward_queue_offsets = new std::vector<SizeT>[num_gpus];
             forward_output = new util::Array1D<SizeT, VertexId>[num_gpus];
@@ -257,7 +257,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
         {
             cudaError_t retval = cudaSuccess;
             SizeT nodes = graph_slice->nodes;
-            SizeT edges = graph_slice->edges;
+            //SizeT edges = graph_slice->edges;
             if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
             if (retval = BaseDataSlice::Reset(
@@ -277,8 +277,8 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             // Allocate bc_values if necessary
             if (this->bc_values .GetPointer(util::DEVICE) == NULL)
                 if (retval = this->bc_values .Allocate(nodes, util::DEVICE)) return retval;
-            if (this->ebc_values.GetPointer(util::DEVICE) == NULL)
-                if (retval = this->ebc_values.Allocate(edges, util::DEVICE)) return retval;
+            //if (this->ebc_values.GetPointer(util::DEVICE) == NULL)
+            //    if (retval = this->ebc_values.Allocate(edges, util::DEVICE)) return retval;
 
             // Allocate deltas if necessary
             if (this->deltas    .GetPointer(util::DEVICE) == NULL)
@@ -379,93 +379,91 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
     {
         cudaError_t retval = cudaSuccess;
 
-        do {
-            if (this->num_gpus == 1) {
+        if (this->num_gpus == 1) {
 
-                // Set device
-                if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
+            // Set device
+            if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
+
+            if (h_bc_values) {
+                data_slices[0]->bc_values.SetPointer(h_bc_values);
+                if (retval = data_slices[0]->bc_values.Move(util::DEVICE, util::HOST)) return retval;
+            }
+
+            if (h_ebc_values) {
+                //data_slices[0]->ebc_values.SetPointer(h_ebc_values);
+                //if (retval = data_slices[0]->ebc_values.Move(util::DEVICE, util::HOST)) return retval;
+            }
+
+            if (h_sigmas) {
+                data_slices[0]->sigmas.SetPointer(h_sigmas);
+                if (retval = data_slices[0]->sigmas.Move(util::DEVICE, util::HOST)) return retval;
+            }
+
+            if (h_labels) {
+                data_slices[0]->labels.SetPointer(h_labels);
+                if (retval = data_slices[0]->labels.Move(util::DEVICE, util::HOST)) return retval;
+            }
+        } else {
+            Value **th_bc_values  = new Value*[this->num_gpus];
+            //Value **th_ebc_values = new Value*[this->num_gpus];
+            Value **th_sigmas     = new Value*[this->num_gpus];
+            SizeT **th_row_offsets= new SizeT*[this->num_gpus];
+            VertexId **th_labels  = new VertexId*[this->num_gpus];
+
+            for (int gpu=0; gpu< this->num_gpus; gpu++)
+            {
+                if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
 
                 if (h_bc_values) {
-                    data_slices[0]->bc_values.SetPointer(h_bc_values);
-                    if (retval = data_slices[0]->bc_values.Move(util::DEVICE, util::HOST)) return retval;
+                    if (retval = data_slices[gpu]->bc_values.Move(util::DEVICE,util::HOST)) return retval;
+                    th_bc_values[gpu] = data_slices[gpu]->bc_values.GetPointer(util::HOST);
                 }
 
                 if (h_ebc_values) {
-                    data_slices[0]->ebc_values.SetPointer(h_ebc_values);
-                    if (retval = data_slices[0]->ebc_values.Move(util::DEVICE, util::HOST)) return retval;
+                    //if (retval = data_slices[gpu]->ebc_values.Move(util::DEVICE,util::HOST)) return retval;
+                    //th_ebc_values [gpu] = data_slices [gpu]->ebc_values .GetPointer(util::HOST);
+                    th_row_offsets[gpu] = this->graph_slices[gpu]->row_offsets.GetPointer(util::HOST);
                 }
-
                 if (h_sigmas) {
-                    data_slices[0]->sigmas.SetPointer(h_sigmas);
-                    if (retval = data_slices[0]->sigmas.Move(util::DEVICE, util::HOST)) return retval;
+                    if (retval = data_slices[gpu]->sigmas.Move(util::DEVICE, util::HOST)) return retval;
+                    th_sigmas[gpu] = data_slices[gpu]->sigmas.GetPointer(util::HOST);
                 }
-
                 if (h_labels) {
-                    data_slices[0]->labels.SetPointer(h_labels);
-                    if (retval = data_slices[0]->labels.Move(util::DEVICE, util::HOST)) return retval;
+                    if (retval = data_slices[gpu]->labels.Move(util::DEVICE, util::HOST)) return retval;
+                    th_labels[gpu] = data_slices[gpu]->labels.GetPointer(util::HOST);
                 }
-            } else {
-                Value **th_bc_values  = new Value*[this->num_gpus];
-                Value **th_ebc_values = new Value*[this->num_gpus];
-                Value **th_sigmas     = new Value*[this->num_gpus];
-                SizeT **th_row_offsets= new SizeT*[this->num_gpus];
-                VertexId **th_labels  = new VertexId*[this->num_gpus];
+            } // end for(gpu)
 
-                for (int gpu=0; gpu< this->num_gpus; gpu++)
-                {
-                    if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
+            for (VertexId node=0;node<this->nodes;node++)
+            {
+                int      gpu   = this->partition_tables [0][node];
+                VertexId _node = this->convertion_tables[0][node];
+                if (h_bc_values) h_bc_values[node] = th_bc_values[gpu][_node];
+                if (h_sigmas   ) h_sigmas   [node] = th_sigmas   [gpu][_node];
+                if (h_labels   ) h_labels   [node] = th_labels   [gpu][_node];
+                //if (h_ebc_values) {
+                //    SizeT n_edges=this->org_graph->row_offsets[node+1] - this->org_graph->row_offsets[node];
+                //    for (SizeT _edge=0;_edge<n_edges;_edge++)
+                //    {
+                        //h_ebc_values [ this->org_graph->row_offsets[node] + _edge] =
+                        //    th_ebc_values [gpu][th_row_offsets[gpu][_node] + _edge];
+                //    }
+                //}
+            }
 
-                    if (h_bc_values) {
-                        if (retval = data_slices[gpu]->bc_values.Move(util::DEVICE,util::HOST)) return retval;
-                        th_bc_values[gpu] = data_slices[gpu]->bc_values.GetPointer(util::HOST);
-                    }
-
-                    if (h_ebc_values) {
-                        if (retval = data_slices[gpu]->ebc_values.Move(util::DEVICE,util::HOST)) return retval;
-                        th_ebc_values [gpu] = data_slices [gpu]->ebc_values .GetPointer(util::HOST);
-                        th_row_offsets[gpu] = this->graph_slices[gpu]->row_offsets.GetPointer(util::HOST);
-                    }
-                    if (h_sigmas) {
-                        if (retval = data_slices[gpu]->sigmas.Move(util::DEVICE, util::HOST)) return retval;
-                        th_sigmas[gpu] = data_slices[gpu]->sigmas.GetPointer(util::HOST);
-                    }
-                    if (h_labels) {
-                        if (retval = data_slices[gpu]->labels.Move(util::DEVICE, util::HOST)) return retval;
-                        th_labels[gpu] = data_slices[gpu]->labels.GetPointer(util::HOST);
-                    }
-                } // end for(gpu)
-
-                for (VertexId node=0;node<this->nodes;node++)
-                {
-                    int      gpu   = this->partition_tables [0][node];
-                    VertexId _node = this->convertion_tables[0][node];
-                    if (h_bc_values) h_bc_values[node] = th_bc_values[gpu][_node];
-                    if (h_sigmas   ) h_sigmas   [node] = th_sigmas   [gpu][_node];
-                    if (h_labels   ) h_labels   [node] = th_labels   [gpu][_node];
-                    if (h_ebc_values) {
-                        SizeT n_edges=this->org_graph->row_offsets[node+1] - this->org_graph->row_offsets[node];
-                        for (SizeT _edge=0;_edge<n_edges;_edge++)
-                        {
-                            h_ebc_values [ this->org_graph->row_offsets[node] + _edge] =
-                                th_ebc_values [gpu][th_row_offsets[gpu][_node] + _edge];
-                        }
-                    }
-                }
-
-                for (int gpu=0; gpu< this->num_gpus; gpu++)
-                {
-                    if (retval = data_slices[gpu]->bc_values .Release(util::HOST)) return retval;
-                    if (retval = data_slices[gpu]->ebc_values.Release(util::HOST)) return retval;
-                    if (retval = data_slices[gpu]->sigmas    .Release(util::HOST)) return retval;
-                    if (retval = data_slices[gpu]->labels    .Release(util::HOST)) return retval;
-                }
-                delete[] th_row_offsets; th_row_offsets = NULL;
-                delete[] th_bc_values  ; th_bc_values   = NULL;
-                delete[] th_ebc_values ; th_ebc_values  = NULL;
-                delete[] th_sigmas     ; th_sigmas      = NULL;
-                delete[] th_labels     ; th_labels      = NULL;
-            } //end if
-        } while(0);
+            for (int gpu=0; gpu< this->num_gpus; gpu++)
+            {
+                if (retval = data_slices[gpu]->bc_values .Release(util::HOST)) return retval;
+                //if (retval = data_slices[gpu]->ebc_values.Release(util::HOST)) return retval;
+                if (retval = data_slices[gpu]->sigmas    .Release(util::HOST)) return retval;
+                if (retval = data_slices[gpu]->labels    .Release(util::HOST)) return retval;
+            }
+            delete[] th_row_offsets; th_row_offsets = NULL;
+            delete[] th_bc_values  ; th_bc_values   = NULL;
+            //delete[] th_ebc_values ; th_ebc_values  = NULL;
+            delete[] th_sigmas     ; th_sigmas      = NULL;
+            delete[] th_labels     ; th_labels      = NULL;
+        } //end if
 
         return retval;
     }
