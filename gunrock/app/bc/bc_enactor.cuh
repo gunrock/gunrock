@@ -723,7 +723,7 @@ public:
         } else {
             if (retval = Check_Size<SizeT, SizeT> (
                 enactor -> size_check, "scanned_edges", 
-                frontier_attribute -> queue_length, 
+                frontier_attribute -> queue_length + 2, 
                 partitioned_scanned_edges, over_sized, -1, -1, -1, false)) 
                 return retval;
             retval = gunrock::oprtr::advance::ComputeOutputLength
@@ -815,14 +815,14 @@ public:
             }
         } else {
             if (enactor_stats->retval =
-                Check_Size</*true,*/ SizeT, VertexId > (
+                Check_Size< SizeT, VertexId > (
                     true, "queue3", graph_slice -> nodes * 1.2,
                     &frontier_queue->keys  [selector^1],
                     over_sized, thread_num, iteration, peer_, false)) return;
             if (enactor -> problem -> use_double_buffer)
             {
                 if (enactor_stats->retval =
-                    Check_Size</*true,*/ SizeT, Value> (
+                    Check_Size< SizeT, Value> (
                         true, "queue3", graph_slice->nodes * 1.2,
                         &frontier_queue->values[selector^1],
                         over_sized, thread_num, iteration, peer_, false )) return;
@@ -1275,7 +1275,7 @@ public:
         } else {
             if (retval = Check_Size<SizeT, SizeT> (
                 enactor -> size_check, "scanned_edges", 
-                frontier_attribute->queue_length, 
+                frontier_attribute->queue_length + 2, 
                 partitioned_scanned_edges, 
                 over_sized, -1, -1, -1, false)) return retval;
             retval = gunrock::oprtr::advance::ComputeOutputLength
