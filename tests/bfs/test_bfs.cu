@@ -293,6 +293,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
     // parse configurations from mObject info
     Csr<VertexId, SizeT, Value> *graph = info->csr_ptr;
+    Csr<VertexId, SizeT, Value> *inv_graph = info->csc_ptr;
     VertexId src                   = info->info["source_vertex"     ].get_int64();
     int      max_grid_size         = info->info["max_grid_size"     ].get_int  ();
     int      num_gpus              = info->info["num_gpus"          ].get_int  ();
@@ -365,7 +366,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     if (retval = util::GRError(problem->Init(
         stream_from_host,
         graph,
-        NULL,
+        inv_graph,
         num_gpus,
         gpu_idx,
         partition_method,
@@ -835,14 +836,15 @@ int main_(CommandLineArgs *args)
     //typedef int Value;     // Use int as the value type
     //typedef long long SizeT;     // Use int as the graph size type
 
-    Csr<VertexId, SizeT, Value> csr(false);  // graph we process on
+    Csr<VertexId, SizeT, Value> csr(false);  // CSR graph we process on
+    Csr<VertexId, SizeT, Value> csc(false);  // CSC graph we process on
     Info<VertexId, SizeT, Value> *info = new Info<VertexId, SizeT, Value>;
 
     // graph construction or generation related parameters
     info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
 
     cpu_timer2.Start();
-    info->Init("BFS", *args, csr);  // initialize Info structure
+    info->Init("BFS", *args, csr, csc);  // initialize Info structure
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 

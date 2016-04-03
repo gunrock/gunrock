@@ -82,7 +82,7 @@ struct Csr
         this->pinned = pinned;
     }
 
-    void FromCsr(Csr<VertexId, Value, SizeT> &source)
+    void FromCsr(Csr<VertexId, SizeT, Value> &source)
     {
         nodes = source.nodes;
         edges = source.edges;
@@ -122,8 +122,8 @@ struct Csr
 
     
     template <typename Tuple>
-    void CsrToCsc(Csr<VertexId, Value, SizeT> &target, 
-            Csr<VertexId, Value, SizeT> &source)
+    void CsrToCsc(Csr<VertexId, SizeT, Value> &target, 
+            Csr<VertexId, SizeT, Value> &source)
     {
         target.nodes = source.nodes;
         target.edges = source.edges;

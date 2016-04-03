@@ -474,7 +474,8 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
         false,                                   // keep_order
         true,                                   // keep_node_num
         direction_optimized,                                  // skip_makeout_selection
-        true),                                   // unified_receive
+        true,                                   // unified_receive
+        direction_optimized),                   // use_inv_graph
         data_slices(NULL)
     {
     }

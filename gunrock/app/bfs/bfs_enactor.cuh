@@ -544,12 +544,17 @@ __global__ void Inverse_Expand(
             {
                 VertexId neighbor = d_inverse_column_indices[edge_id];
                 //if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, neighbor) == label-1)
+                //printf("%lld <- %lld, edge_id = %lld\n",
+                //    (long long)key, (long long)neighbor, (long long)edge_id);
                 if (LoadLabel<VertexId, VertexId>::Load(d_labels, neighbor) == label -1)
                 {
                     discoverable = true;
+                    //printf("Found %lld from %lld, label = %lld\n",
+                    //(long long)key, (long long)neighbor, (long long)label);    
                     break;
                 }
             }
+                   
         }
 
         if (discoverable)
@@ -1197,12 +1202,16 @@ struct BFSIteration : public IterationBase <
             if (num_blocks > 480) num_blocks = 480;
             Inverse_Expand<Problem, AdvanceKernelPolicy>
                 <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
-                (data_slice -> num_unvisited_vertices,
+                (data_slice   -> num_unvisited_vertices,
                 enactor_stats -> iteration + 1,
-                data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE),
-                graph_slice -> row_offsets.GetPointer(util::DEVICE),
-                graph_slice -> column_indices.GetPointer(util::DEVICE), //should be inverse, only works for undirected graph
-                data_slice -> split_lengths.GetPointer(util::DEVICE),
+                data_slice    -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE),
+                (graph_slice  -> column_offsets  .GetPointer(util::DEVICE) != NULL) ?
+                    graph_slice -> column_offsets.GetPointer(util::DEVICE) :
+                    graph_slice -> row_offsets   .GetPointer(util::DEVICE),
+                (graph_slice  -> row_indices     .GetPointer(util::DEVICE) != NULL) ?
+                    graph_slice -> row_indices   .GetPointer(util::DEVICE) :
+                    graph_slice -> column_indices.GetPointer(util::DEVICE),
+                data_slice -> split_lengths      .GetPointer(util::DEVICE),
                 data_slice -> unvisited_vertices[frontier_attribute -> selector ^ 1].GetPointer(util::DEVICE),
                 output_key_pointer, //frontier_queue -> keys[frontier_attribute -> selector^1].GetPointer(util::DEVICE),
                 data_slice -> visited_mask.GetPointer(util::DEVICE),

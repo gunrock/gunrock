@@ -88,6 +88,7 @@ struct GraphSlice
     int             index   ; // Slice index
     VertexId        nodes   ; // Number of nodes in slice
     SizeT           edges   ; // Number of edges in slice
+    SizeT           inverse_edges; // Number of inverse_edges in slice
 
     Csr<VertexId, SizeT, Value   > *graph             ; // Pointer to CSR format subgraph
     util::Array1D<SizeT, SizeT   > row_offsets        ; // CSR format row offset
@@ -210,6 +211,9 @@ struct GraphSlice
         this->graph            = graph;
         this->nodes            = graph->nodes;
         this->edges            = graph->edges;
+        if (inverstgraph != NULL)
+            this->inverse_edges    = inverstgraph -> edges;
+        else this -> inverse_edges = 0;
         if (partition_table  != NULL) this->partition_table    .SetPointer(partition_table      , nodes     );
         if (convertion_table != NULL) this->convertion_table   .SetPointer(convertion_table     , nodes     );
         if (original_vertex  != NULL) this->original_vertex    .SetPointer(original_vertex      , nodes     );
@@ -221,7 +225,7 @@ struct GraphSlice
         if (inverstgraph != NULL)
         {
             this->column_offsets .SetPointer(inverstgraph->row_offsets, nodes + 1);
-            this->row_indices    .SetPointer(inverstgraph->column_indices   , edges  );
+            this->row_indices    .SetPointer(inverstgraph->column_indices   , inverstgraph -> edges  );
         }
 
         // Set device using slice index
@@ -252,7 +256,7 @@ struct GraphSlice
             if (retval = this->column_offsets.Move    (util::HOST, util::DEVICE)) return retval;
 
             // Allocate and initialize row_indices
-            if (retval = this->row_indices   .Allocate(edges     , util::DEVICE)) return retval;
+            if (retval = this->row_indices   .Allocate(inverstgraph -> edges, util::DEVICE)) return retval;
             if (retval = this->row_indices   .Move    (util::HOST, util::DEVICE)) return retval;
 
             if (retval = this->in_degrees    .Allocate(nodes     , util::DEVICE)) return retval;
@@ -1427,6 +1431,7 @@ struct ProblemBase
     bool keep_node_num;
     bool skip_makeout_selection;
     bool unified_receive;
+    bool use_inv_graph;
 
     /**
      * Load instruction cache-modifier const defines.
@@ -1446,6 +1451,7 @@ struct ProblemBase
     GraphSlice<VertexId, SizeT, Value>
     **graph_slices        ; // Set of graph slices (one for each GPU)
     Csr<VertexId, SizeT, Value> *sub_graphs     ; // Subgraphs for multi-GPU implementation
+    Csr<VertexId, SizeT, Value> *inv_subgraphs  ; // inverse subgraphs
     Csr<VertexId, SizeT, Value> *org_graph      ; // Original graph
     PartitionerBase<VertexId, SizeT, Value> //, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM>
     *partitioner          ; // Partitioner
@@ -1470,7 +1476,8 @@ struct ProblemBase
         bool _keep_order,
         bool _keep_node_num,
         bool _skip_makeout_selection = false,
-        bool _unified_receive = false) :
+        bool _unified_receive = false,
+        bool _use_inv_graph   = false) :
         num_gpus            (0   ),
         gpu_idx             (NULL),
         nodes               (0   ),
@@ -1493,7 +1500,8 @@ struct ProblemBase
         keep_order          (_keep_order       ),
         keep_node_num       (_keep_node_num    ),
         skip_makeout_selection(_skip_makeout_selection),
-        unified_receive     (_unified_receive)
+        unified_receive     (_unified_receive),
+        use_inv_graph       (_use_inv_graph)
     {
     } // end ProblemBase()
 
@@ -1683,6 +1691,55 @@ struct ProblemBase
             cpu_timer.Stop();
 
             printf("partition end. (%f ms)\n", cpu_timer.ElapsedMillis());
+            //graph -> DisplayGraph("org_graph");
+
+            if (inverse_graph != NULL && keep_node_num && num_gpus > 1 && use_inv_graph)
+            {
+                inv_subgraphs = new Csr<VertexId, SizeT, Value>[num_gpus];
+                SizeT *inv_edge_counters = new SizeT[num_gpus];
+                for (int gpu = 0; gpu < num_gpus; gpu++)
+                    inv_edge_counters[gpu] = 0;
+
+                for (VertexId v = 0; v < graph -> nodes; v++)
+                    inv_edge_counters[partition_tables[0][v]] += 
+                        inverse_graph -> row_offsets[v+1] - inverse_graph -> row_offsets[v];
+
+                for (int gpu = 0; gpu < num_gpus; gpu++)
+                {
+                    Csr<VertexId, SizeT, Value> *inv_subgraph = inv_subgraphs + gpu;
+                    //Csr<VertexId, SizeT, Value> *sub_graph = sub_graphs + gpu;
+                    inv_subgraph -> template FromScratch<false, false>(graph->nodes, inv_edge_counters[gpu]);
+                    for (VertexId v = 0; v< graph -> nodes +1; v++)
+                        inv_subgraph -> row_offsets[v] = 0;
+                }
+
+                for (VertexId v = 0; v < graph -> nodes; v++)
+                {
+                    inv_subgraphs[partition_tables[0][v]].row_offsets[v+1] =
+                        inverse_graph -> row_offsets[v+1] - inverse_graph -> row_offsets[v];
+                }
+
+                for (int gpu = 0; gpu < num_gpus; gpu ++)
+                {
+                    Csr<VertexId, SizeT, Value> *inv_subgraph = inv_subgraphs + gpu;
+                    for (VertexId v = 0; v < graph -> nodes; v++)
+                    {
+                        SizeT offset = inv_subgraph -> row_offsets[v];
+                        SizeT in_degree = inv_subgraph -> row_offsets[v+1];
+                        if (in_degree > 0)
+                        {
+                            memcpy(inv_subgraph -> column_indices + offset,
+                                inverse_graph -> column_indices + inverse_graph -> row_offsets[v],
+                                sizeof(VertexId) * in_degree);
+                        }
+                        inv_subgraph -> row_offsets[v+1] += offset;
+                    }
+
+                    //printf("GPU %d\n", gpu);
+                    //sub_graphs[gpu].DisplayGraph("sub_graph");
+                    //inv_subgraphs[gpu].DisplayGraph("inv_graph");
+                }
+            }
 
             //graph->DisplayGraph("org_graph",graph->nodes);
             //util::cpu_mt::PrintCPUArray<SizeT,int>("partition0",partition_tables[0],graph->nodes);
@@ -1729,7 +1786,7 @@ struct ProblemBase
                         stream_from_host,
                         num_gpus,
                         &(sub_graphs     [gpu]),
-                        NULL,
+                        (inv_subgraphs != NULL) ? inv_subgraphs + gpu : NULL,
                         partition_tables    [gpu + 1],
                         convertion_tables   [gpu + 1],
                         original_vertexes   [gpu],
@@ -1746,7 +1803,7 @@ struct ProblemBase
                         stream_from_host,
                         num_gpus,
                         &(sub_graphs[gpu]),
-                        NULL,
+                        (inv_subgraphs != NULL) ? inv_subgraphs + gpu : NULL,
                         partition_tables [gpu + 1],
                         convertion_tables[gpu + 1],
                         original_vertexes[gpu],
