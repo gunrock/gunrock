@@ -1467,7 +1467,7 @@ public:
                 bool over_sized = false;
                 if (retval = Check_Size<SizeT, SizeT> (
                     this -> size_check, "scanned_edges",
-                    problem -> data_slices[gpu] -> local_vertices.GetSize(),
+                    problem -> data_slices[gpu] -> local_vertices.GetSize() + 2,
                     problem -> data_slices[gpu] -> scanned_edges,
                     over_sized, -1, -1, -1, false)) return retval;
                 this -> frontier_attribute [gpu * this -> num_gpus].queue_length 
@@ -1479,7 +1479,7 @@ public:
                     this -> frontier_attribute + gpu * this -> num_gpus,//frontier_attribute,
                     problem -> graph_slices[gpu] -> row_offsets.GetPointer(util::DEVICE),//d_offsets,
                     problem -> graph_slices[gpu] -> column_indices.GetPointer(util::DEVICE),//d_indices,
-                    (SizeT*)NULL, ///d_inv_offsets,
+                    (SizeT   *)NULL, ///d_inv_offsets,
                     (VertexId*)NULL,//d_inv_indices,
                     problem -> data_slices[gpu] -> local_vertices.GetPointer(util::DEVICE),//d_in_key_queue,
                     problem -> data_slices[gpu] -> scanned_edges[0].GetPointer(util::DEVICE),//partitioned_scanned_edges->GetPointer(util::DEVICE),
