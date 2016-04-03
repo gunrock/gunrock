@@ -1467,7 +1467,7 @@ public:
                 bool over_sized = false;
                 if (retval = Check_Size<SizeT, SizeT> (
                     this -> size_check, "scanned_edges",
-                    problem -> data_slices[gpu] -> local_vertices.GetSize(),
+                    problem -> data_slices[gpu] -> local_vertices.GetSize() + 2,
                     problem -> data_slices[gpu] -> scanned_edges,
                     over_sized, -1, -1, -1, false)) return retval;
                 this -> frontier_attribute [gpu * this -> num_gpus].queue_length 

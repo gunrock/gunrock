@@ -1416,7 +1416,7 @@ struct BFSIteration : public IterationBase <
             //printf("Size check runs\n");
             if (retval = Check_Size</*Enactor::SIZE_CHECK,*/ SizeT, SizeT> (
                 enactor -> size_check,
-                "scanned_edges", frontier_attribute->queue_length,
+                "scanned_edges", frontier_attribute->queue_length + 2,
                 partitioned_scanned_edges, over_sized, -1, -1, -1, false))
                 return retval;
             retval = gunrock::oprtr::advance::ComputeOutputLength
@@ -1508,19 +1508,19 @@ struct BFSIteration : public IterationBase <
                         over_sized, thread_num, iteration, peer_, true )) return;
             }
         } else {
-            if (enactor_stats->retval =
-                Check_Size</*true,*/ SizeT, VertexId > (
+            /*if (enactor_stats->retval =
+                Check_Size< SizeT, VertexId > (
                     true, "queue3", graph_slice -> nodes * 1.2,
                     &frontier_queue->keys  [selector^1],
                     over_sized, thread_num, iteration, peer_, false)) return;
             if (enactor -> problem -> use_double_buffer)
             {
                 if (enactor_stats->retval =
-                    Check_Size</*true,*/ SizeT, Value> (
+                    Check_Size< SizeT, Value> (
                         true, "queue3", graph_slice->nodes * 1.2,
                         &frontier_queue->values[selector^1],
                         over_sized, thread_num, iteration, peer_, false )) return;
-            }
+            }*/
         }
     }
 

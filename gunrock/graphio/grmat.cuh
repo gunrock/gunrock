@@ -204,7 +204,7 @@ cudaError_t BuildRmatGraph(
         return util::GRError("Invalid graph size");
     }
 
-    VertexId directed_edges = (undirected) ? num_edges * 2 : num_edges;
+    SizeT directed_edges = (undirected) ? num_edges * 2 : num_edges;
     EdgeTupleType *coo = (EdgeTupleType*) malloc (
         sizeof(EdgeTupleType) * directed_edges);
 
@@ -239,7 +239,7 @@ cudaError_t BuildRmatGraph(
         if (retval = edges[gpu].SetPointer(coo + start_edge * (undirected ? 2 : 1), edge_count, util::HOST))
             return retval;
 
-        int block_size = 1024;
+        int block_size = (sizeof(VertexId) == 4) ? 1024 : 512;
         int grid_size = edge_count / block_size + 1;
         if (grid_size > 480) grid_size = 480;
         if (retval = rand_states[gpu].Allocate(block_size * grid_size, util::DEVICE))
@@ -341,7 +341,7 @@ cudaError_t BuildMetaRmatGraph(
         return util::GRError("Invalid graph size");
     }
 
-    VertexId directed_edges = (undirected) ? num_edges * 2 : num_edges;
+    SizeT directed_edges = (undirected) ? num_edges * 2 : num_edges;
     EdgeTupleType *coo = (EdgeTupleType*) malloc (
             sizeof(EdgeTupleType) * (directed_edges*num_gpus+((num_gpus>1)?num_gpus:0)));
 

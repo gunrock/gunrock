@@ -198,9 +198,9 @@ int BuildRmatGraph(
 
     // construct COO format graph
 
-    VertexId directed_edges = (undirected) ? edges * 2 : edges;
+    SizeT directed_edges = (undirected) ? edges * 2 : edges;
     EdgeTupleType *coo = (EdgeTupleType*) malloc (
-        sizeof(EdgeTupleType) * directed_edges);
+        sizeof(EdgeTupleType) * SizeT(directed_edges));
 
     if (seed == -1) seed = time(NULL);
     if (!quiet)
