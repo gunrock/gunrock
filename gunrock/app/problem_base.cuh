@@ -1432,6 +1432,7 @@ struct ProblemBase
     bool skip_makeout_selection;
     bool unified_receive;
     bool use_inv_graph;
+    bool undirected   ;
 
     /**
      * Load instruction cache-modifier const defines.
@@ -1477,7 +1478,8 @@ struct ProblemBase
         bool _keep_node_num,
         bool _skip_makeout_selection = false,
         bool _unified_receive = false,
-        bool _use_inv_graph   = false) :
+        bool _use_inv_graph   = false,
+        bool _undirected      = false) :
         num_gpus            (0   ),
         gpu_idx             (NULL),
         nodes               (0   ),
@@ -1501,7 +1503,8 @@ struct ProblemBase
         keep_node_num       (_keep_node_num    ),
         skip_makeout_selection(_skip_makeout_selection),
         unified_receive     (_unified_receive),
-        use_inv_graph       (_use_inv_graph)
+        use_inv_graph       (_use_inv_graph),
+        undirected          (_undirected)
     {
     } // end ProblemBase()
 
@@ -1614,7 +1617,7 @@ struct ProblemBase
         this->edges             = graph->edges;
         this->num_gpus          = num_gpus;
         this->gpu_idx           = new int [num_gpus];
-
+        bool have_inv_graph     = false;
         if (num_gpus == 1 && gpu_idx == NULL)
         {
             if (retval = util::GRError(cudaGetDevice(&(this->gpu_idx[0])),
@@ -1693,7 +1696,7 @@ struct ProblemBase
             printf("partition end. (%f ms)\n", cpu_timer.ElapsedMillis());
             //graph -> DisplayGraph("org_graph");
 
-            if (inverse_graph != NULL && keep_node_num && num_gpus > 1 && use_inv_graph)
+            if (inverse_graph != NULL && keep_node_num && num_gpus > 1 && use_inv_graph && !undirected)
             {
                 inv_subgraphs = new Csr<VertexId, SizeT, Value>[num_gpus];
                 SizeT *inv_edge_counters = new SizeT[num_gpus];
@@ -1739,6 +1742,7 @@ struct ProblemBase
                     //sub_graphs[gpu].DisplayGraph("sub_graph");
                     //inv_subgraphs[gpu].DisplayGraph("inv_graph");
                 }
+                have_inv_graph = true;
             }
 
             //graph->DisplayGraph("org_graph",graph->nodes);
@@ -1786,7 +1790,7 @@ struct ProblemBase
                         stream_from_host,
                         num_gpus,
                         &(sub_graphs     [gpu]),
-                        (inv_subgraphs != NULL) ? inv_subgraphs + gpu : NULL,
+                        (have_inv_graph) ? inv_subgraphs + gpu : NULL,
                         partition_tables    [gpu + 1],
                         convertion_tables   [gpu + 1],
                         original_vertexes   [gpu],
@@ -1803,7 +1807,7 @@ struct ProblemBase
                         stream_from_host,
                         num_gpus,
                         &(sub_graphs[gpu]),
-                        (inv_subgraphs != NULL) ? inv_subgraphs + gpu : NULL,
+                        (have_inv_graph) ? inv_subgraphs + gpu : NULL,
                         partition_tables [gpu + 1],
                         convertion_tables[gpu + 1],
                         original_vertexes[gpu],

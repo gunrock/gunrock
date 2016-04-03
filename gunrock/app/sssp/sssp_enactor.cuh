@@ -595,7 +595,7 @@ struct SSSPIteration : public IterationBase <
         } else {
             if (retval = Check_Size<SizeT, SizeT> (
                 enactor -> size_check, "scanned_edges",
-                frontier_attribute->queue_length,
+                frontier_attribute->queue_length + 2,
                 partitioned_scanned_edges, over_sized, -1, -1, -1, false))
                 return retval;
             retval = gunrock::oprtr::advance::ComputeOutputLength

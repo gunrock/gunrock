@@ -322,6 +322,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     bool     direction_optimized   = info->info["direction_optimized"].get_bool();
     float    do_a                  = info->info["do_a"              ].get_real();
     float    do_b                  = info->info["do_b"              ].get_real();
+    bool     undirected            = info->info["undirected"        ].get_bool();
+
     if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
 
     CpuTimer cpu_timer;
@@ -362,7 +364,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             "cudaMemGetInfo failed", __FILE__, __LINE__)) return retval;
     }
 
-    Problem* problem = new Problem(direction_optimized);  // allocate problem on GPU
+    Problem* problem = new Problem(direction_optimized, undirected);  // allocate problem on GPU
     if (retval = util::GRError(problem->Init(
         stream_from_host,
         graph,

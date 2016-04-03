@@ -677,6 +677,7 @@ int main_(CommandLineArgs *args)
     // graph construction or generation related parameters
     info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
     info->info["edge_value"] = true;  // require per edge weight values
+    info->info["random_edge_value"] = args -> CheckCmdLineFlag("random-edge-value");
 
     cpu_timer2.Start();
     info->Init("SSSP", *args, csr);  // initialize Info structure

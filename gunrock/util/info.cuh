@@ -89,6 +89,7 @@ public:
         info["output_filename"]    = "";     // output filename
         info["engine"]             = "";     // engine name - Gunrock
         info["edge_value"]         = false;  // default don't load weights
+        info["random_edge_value"]  = false;  // whether to generate edge weights
         info["git_commit_sha1"]    = "";     // git commit sha1
         info["graph_type"]         = "";     // input graph type
         info["gunrock_version"]    = "";     // gunrock version number
@@ -472,13 +473,23 @@ public:
         Csr<VertexId, SizeT, Value> &csr_ref)
     {
         // load or generate input graph
-        if (info["edge_value"].get_bool())
+        if (info["edge_value"].get_bool() && !info["random_edge_value"].get_bool())
         {
             LoadGraph<true, false>(args, csr_ref);  // load graph with weighs
         }
         else
         {
             LoadGraph<false, false>(args, csr_ref);  // load without weights
+            if (info["random_edge_value"].get_bool())
+            {
+                if (csr_ref.edge_values != NULL) free(csr_ref.edge_values);
+                csr_ref.edge_values = (Value*)malloc(csr_ref.edges * sizeof(Value));
+                srand(time(NULL));
+                for (SizeT e= 0; e < csr_ref.edges; e++)
+                {
+                    csr_ref.edge_values[e] = rand() %64;
+                }
+            }
         }
         csr_ptr = &csr_ref;  // set graph pointer
         InitBase(algorithm_name, args);
