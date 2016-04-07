@@ -119,6 +119,9 @@ In Proceedings of the Second ACM Conference on Online Social Networks,
 COSN '14, pages 63–68, October 2014.
 [[DOI](http://dx.doi.org/10.1145/2660460.2660481) | [http](http://escholarship.org/uc/item/5xq3q8k0)]
 
+Presentations
+GTC 2016, Gunrock: A Fast and Programmable Multi-GPU Graph Processing Library [[slides](https://github.com/gunrock/gunrock/raw/master/doc/GTC%202016_Gunrock-%20a%20Fast%20and%20Programmable%20Multi-GPU%20Graph%20Processing%20Library.pdf)]
+
 Road Map
 ========
 
@@ -143,7 +146,7 @@ Gunrock Developers
 - [Yangzihao Wang](http://www.idav.ucdavis.edu/~yzhwang/),
   University of California, Davis
 
-- Yuechao Pan, University of California, Davis
+- [Yuechao Pan](https://sites.google.com/site/panyuechao/home), University of California, Davis
 
 - [Yuduo Wu](http://www.ece.ucdavis.edu/~wyd855/),
   University of California, Davis
