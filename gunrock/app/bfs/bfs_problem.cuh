@@ -33,19 +33,19 @@ namespace bfs {
  * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer.
  */
 template <
-    typename    VertexId,
-    typename    SizeT,
-    typename    Value,
-    bool        _MARK_PREDECESSORS,
+    typename    VertexId,                       
+    typename    SizeT,                          
+    typename    Value,                          
+    bool        _MARK_PREDECESSORS,             
     bool        _ENABLE_IDEMPOTENCE,
     bool        _USE_DOUBLE_BUFFER>
 struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
-    _MARK_PREDECESSORS,
+    _MARK_PREDECESSORS, 
     _ENABLE_IDEMPOTENCE,
-    _USE_DOUBLE_BUFFER,
+    _USE_DOUBLE_BUFFER, 
     false, // _ENABLE_BACKWARD
     false, // _KEEP_ORDER
-    false> // _KEEP_NODE_NUM
+    false> // _KEEP_NODE_NUM*/
 {
     //Helper structures
 
