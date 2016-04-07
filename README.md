@@ -149,7 +149,7 @@ Gunrock Developers
 
 - [Yuechao Pan](https://sites.google.com/site/panyuechao/home), University of California, Davis
 
-- [Yuduo Wu](http://www.ece.ucdavis.edu/~wyd855/),
+- [Yuduo Wu](http://www.yuduowu.com),
   University of California, Davis
 
 - [Carl Yang](http://web.ece.ucdavis.edu/~ctcyang/),
