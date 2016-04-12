@@ -309,36 +309,36 @@ endif(GUNROCK_BUILD_APPLICATIONS)
 enable_testing()
 
 ### primitive tests with bips98_606 graph
-add_test(NAME TEST_BFS COMMAND breadth_first_search market
+add_test(NAME TEST_BFS COMMAND bfs market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
 set_tests_properties(TEST_BFS PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
-add_test(NAME TEST_BC COMMAND betweenness_centrality market
+add_test(NAME TEST_BC COMMAND bc market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
 set_tests_properties(TEST_BC PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
-add_test(NAME TEST_CC COMMAND connected_component market
+add_test(NAME TEST_CC COMMAND cc market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx)
 set_tests_properties(TEST_CC PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
-add_test(NAME TEST_SSSP COMMAND single_source_shortest_path market
+add_test(NAME TEST_SSSP COMMAND sssp market
   ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx --undirected --src=0)
 set_tests_properties(TEST_SSSP PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
-add_test(NAME TEST_PAGERANK COMMAND pagerank market
+add_test(NAME TEST_PAGERANK COMMAND pr market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
 set_tests_properties(TEST_PAGERANK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
-add_test(NAME TEST_DOBFS COMMAND direction_optimizing_bfs market
+add_test(NAME TEST_DOBFS COMMAND dobfs market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
 set_tests_properties(TEST_DOBFS PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
-add_test(NAME TEST_TOPK COMMAND degree_centrality market
+add_test(NAME TEST_TOPK COMMAND dc market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
 set_tests_properties(TEST_TOPK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
 # bips98_606.mtx is not fully-connected graph so use largest small graph instead
-add_test(NAME TEST_MST COMMAND minimum_spanning_tree market
+add_test(NAME TEST_MST COMMAND mst market
   ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx)
 set_tests_properties(TEST_MST PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
@@ -362,6 +362,9 @@ set_tests_properties(SHARED_LIB_TEST_SSSP
 add_test(NAME SHARED_LIB_TEST_PAGERANK COMMAND shared_lib_pr)
 set_tests_properties(SHARED_LIB_TEST_PAGERANK
   PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*2.*: Score.*1.2*")
+
+# note: Some premitives are not added as test because they don't have 
+#	cpu reference code.
 
 #add_test(NAME SimpleExample COMMAND simple_example market
 #    data/simple_example/bips98_606.mtx)
