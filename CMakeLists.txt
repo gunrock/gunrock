@@ -263,6 +263,61 @@ add_test(NAME TEST_MST COMMAND minimum_spanning_tree market
   ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx)
 set_tests_properties(TEST_MST PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
+if(DEFINED DEVICES)
+  set(DEVICES "--device=${DEVICES}")
+else(DEFINED DEVICES)
+  set(DEVICES "")
+endif(DEFINED DEVICES)
+
+option(ALLTEST "ALLTEST" OFF)
+if(ALLTEST)
+  execute_process(COMMAND make
+    WORKING_DIRECTORY ${gunrock_INCLUDE_DIRS}/dataset/large/delaunay_n21/)
+  execute_process(COMMAND make
+    WORKING_DIRECTORY ${gunrock_INCLUDE_DIRS}/dataset/large/belgium_osm/)
+  execute_process(COMMAND make
+    WORKING_DIRECTORY ${gunrock_INCLUDE_DIRS}/dataset/large/coAuthorsDBLP/)
+  execute_process(COMMAND make
+    WORKING_DIRECTORY ${gunrock_INCLUDE_DIRS}/dataset/large/delaunay_n13/)
+  FOREACH(MTX ${gunrock_INCLUDE_DIRS}/dataset/large/delaunay_n21/delaunay_n21.mtx
+              ${gunrock_INCLUDE_DIRS}/dataset/large/belgium_osm/belgium_osm.mtx
+              ${gunrock_INCLUDE_DIRS}/dataset/large/coAuthorsDBLP/coAuthorsDBLP.mtx
+              ${gunrock_INCLUDE_DIRS}/dataset/large/delaunay_n13/delaunay_n13.mtx)
+
+    add_test(NAME TEST_BFS_${MTX} COMMAND breadth_first_search market
+      ${MTX} ${DEVICES} --undirected --src=0)
+    set_tests_properties(TEST_BFS_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+    add_test(NAME TEST_BC_${MTX} COMMAND betweenness_centrality market
+      ${MTX} ${DEVICES} --undirected --src=0)
+    set_tests_properties(TEST_BC_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+    add_test(NAME TEST_CC_${MTX} COMMAND connected_component market
+      ${MTX} ${DEVICES})
+    set_tests_properties(TEST_CC_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+    add_test(NAME TEST_SSSP_${MTX} COMMAND single_source_shortest_path market
+      ${MTX} ${DEVICES} --undirected --src=0)
+    set_tests_properties(TEST_SSSP_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+    add_test(NAME TEST_PAGERANK_${MTX} COMMAND pagerank market
+      ${MTX} ${DEVICES} --undirected)
+    set_tests_properties(TEST_PAGERANK_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+    add_test(NAME TEST_DOBFS_${MTX} COMMAND direction_optimizing_bfs market
+      ${MTX} ${DEVICES} --undirected --src=0)
+    set_tests_properties(TEST_DOBFS_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+    add_test(NAME TEST_TOPK_${MTX} COMMAND degree_centrality market
+      ${MTX} ${DEVICES} --undirected)
+    set_tests_properties(TEST_TOPK_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+    add_test(NAME TEST_MST_${MTX} COMMAND minimum_spanning_tree market
+      ${MTX} ${DEVICES})
+    set_tests_properties(TEST_MST_${MTX} PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+  ENDFOREACH(MTX)
+endif(ALLTEST)
+
 ### shared library application interface tests
 add_test(NAME SHARED_LIB_TEST_BFS COMMAND shared_lib_bfs)
 set_tests_properties(SHARED_LIB_TEST_BFS
