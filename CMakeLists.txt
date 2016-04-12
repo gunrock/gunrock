@@ -363,6 +363,9 @@ add_test(NAME SHARED_LIB_TEST_PAGERANK COMMAND shared_lib_pr)
 set_tests_properties(SHARED_LIB_TEST_PAGERANK
   PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*2.*: Score.*1.2*")
 
+# note: Some premitives are not added as test because they don't have 
+#	cpu reference code.
+
 #add_test(NAME SimpleExample COMMAND simple_example market
 #    data/simple_example/bips98_606.mtx)
 #set_tests_properties(SimpleExample
