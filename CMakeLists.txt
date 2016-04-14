@@ -147,6 +147,10 @@ option(GUNROCK_APP_TOPK
 #  "If on, builds only SAMPLE application."
 #  OFF)
 
+option(GUNROCK_MGPU_TESTS
+  "If on, tests multi GPU primitives with ctest"
+  OFF)
+
 option(GUNROCK_GENCODE_SM10
   "ON to generate code for Compute Capability 1.0 devices (e.g. Tesla C870)"
   OFF)
@@ -306,6 +310,7 @@ else(GUNROCK_BUILD_APPLICATIONS)
 endif(GUNROCK_BUILD_APPLICATIONS)
 # end /* Add premitives' subdirectories */
 
+# begin /* Enable Testing for `ctest` */
 enable_testing()
 
 ### primitive tests with bips98_606 graph
@@ -366,12 +371,56 @@ set_tests_properties(SHARED_LIB_TEST_PAGERANK
 # note: Some premitives are not added as test because they don't have
 #	cpu reference code.
 
-#add_test(NAME SimpleExample COMMAND simple_example market
+# add_test(NAME SimpleExample COMMAND simple_example market
 #    data/simple_example/bips98_606.mtx)
-#set_tests_properties(SimpleExample
+# set_tests_properties(SimpleExample
 #    PROPERTIES PASS_REGULAR_EXPRESSION "TEST PASSED")
 
-#add_test(NAME TestBFS COMMAND test_bfs market
+# add_test(NAME TestBFS COMMAND test_bfs market
 #    data/simple_example/bips98_606.mtx --src=largestdegree)
-#set_tests_properties(TestBFS
+# set_tests_properties(TestBFS
 #    PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+if(GUNROCK_MGPU_TESTS)
+  if(DEFINED DEVICES)
+ 	   set(DEVICES "--device=${DEVICES}")
+  else(DEFINED DEVICES)
+	   message(WARNING "GUNROCK_MGPU_TESTS was set ON, but devices were not specified. Using `-DDEVICES=0,0` (default).")
+  	 set(DEVICES "--device=0,0")
+  endif(DEFINED DEVICES)
+
+  add_test(NAME TEST_MGPU_BFS COMMAND bfs market
+    ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected --src=0)
+  set_tests_properties(TEST_BFS PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+  # add_test(NAME TEST_MGPU_BC COMMAND bc market
+  #  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected --src=0)
+  # set_tests_properties(TEST_BC PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+  add_test(NAME TEST_MGPU_CC COMMAND cc market
+    ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES})
+  set_tests_properties(TEST_CC PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+  add_test(NAME TEST_MGPU_SSSP COMMAND sssp market
+    ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx ${DEVICES} --undirected --src=0)
+  set_tests_properties(TEST_SSSP PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+  add_test(NAME TEST_MGPU_PR COMMAND pr market
+    ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
+  set_tests_properties(TEST_PAGERANK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+  # add_test(NAME TEST_MGPU_DOBFS COMMAND dobfs market
+  #  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected --src=0)
+  # set_tests_properties(TEST_DOBFS PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+  # add_test(NAME TEST_MGPU_TOPK COMMAND topk market
+  #  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
+  # set_tests_properties(TEST_TOPK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+  # add_test(NAME TEST_MGPU_MST COMMAND mst market
+  #  ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx ${DEVICES})
+  # set_tests_properties(TEST_MST PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+endif(GUNROCK_MGPU_TESTS)
+
+# end /* Enable Testing for `ctest` */
