@@ -7,6 +7,10 @@ add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MIN
 
 cmake_minimum_required(VERSION 2.8)
 
+# begin /* Added make check target to improve ctest command */
+add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure)
+# end /* Added make check target to improve ctest command */
+
 # begin /* Suppress "deprecated auto_ptr" warnings caused by moderngpu */
 option(WARNING_DEP_FLAG "Deprecated declarations warning flag." OFF)
 if (WARNING_DEP_FLAG)
