@@ -10,11 +10,11 @@ var searchData=
   ['serialscan',['SerialScan',['../structgunrock_1_1util_1_1scan_1_1_serial_scan.html',1,'gunrock::util::scan']]],
   ['serialsoareduce',['SerialSoaReduce',['../structgunrock_1_1util_1_1reduction_1_1soa_1_1_serial_soa_reduce.html',1,'gunrock::util::reduction::soa']]],
   ['serialsoascan',['SerialSoaScan',['../structgunrock_1_1util_1_1scan_1_1soa_1_1_serial_soa_scan.html',1,'gunrock::util::scan::soa']]],
+  ['smemstorage',['SmemStorage',['../structgunrock_1_1oprtr_1_1edge__map__backward_1_1_kernel_policy_1_1_smem_storage.html',1,'gunrock::oprtr::edge_map_backward::KernelPolicy']]],
+  ['smemstorage',['SmemStorage',['../structgunrock_1_1oprtr_1_1filter_1_1_kernel_policy_1_1_smem_storage.html',1,'gunrock::oprtr::filter::KernelPolicy']]],
   ['smemstorage',['SmemStorage',['../structgunrock_1_1oprtr_1_1edge__map__partitioned__backward_1_1_kernel_policy_1_1_smem_storage.html',1,'gunrock::oprtr::edge_map_partitioned_backward::KernelPolicy']]],
   ['smemstorage',['SmemStorage',['../structgunrock_1_1oprtr_1_1edge__map__forward_1_1_kernel_policy_1_1_smem_storage.html',1,'gunrock::oprtr::edge_map_forward::KernelPolicy']]],
-  ['smemstorage',['SmemStorage',['../structgunrock_1_1oprtr_1_1edge__map__backward_1_1_kernel_policy_1_1_smem_storage.html',1,'gunrock::oprtr::edge_map_backward::KernelPolicy']]],
   ['smemstorage',['SmemStorage',['../structgunrock_1_1oprtr_1_1edge__map__partitioned_1_1_kernel_policy_1_1_smem_storage.html',1,'gunrock::oprtr::edge_map_partitioned::KernelPolicy']]],
-  ['smemstorage',['SmemStorage',['../structgunrock_1_1oprtr_1_1filter_1_1_kernel_policy_1_1_smem_storage.html',1,'gunrock::oprtr::filter::KernelPolicy']]],
   ['soascanop',['SoaScanOp',['../structgunrock_1_1oprtr_1_1edge__map__forward_1_1_kernel_policy_1_1_soa_scan_op.html',1,'gunrock::oprtr::edge_map_forward::KernelPolicy']]],
   ['soascanop',['SoaScanOp',['../structgunrock_1_1oprtr_1_1edge__map__backward_1_1_kernel_policy_1_1_soa_scan_op.html',1,'gunrock::oprtr::edge_map_backward::KernelPolicy']]],
   ['sssp_5fparameter',['SSSP_Parameter',['../struct_s_s_s_p___parameter.html',1,'']]],
@@ -25,8 +25,8 @@ var searchData=
   ['succfunctor',['SuccFunctor',['../structgunrock_1_1app_1_1mst_1_1_succ_functor.html',1,'gunrock::app::mst']]],
   ['sum',['Sum',['../structgunrock_1_1util_1_1_sum.html',1,'gunrock::util']]],
   ['surmfunctor',['SuRmFunctor',['../structgunrock_1_1app_1_1mst_1_1_su_rm_functor.html',1,'gunrock::app::mst']]],
-  ['sweep',['Sweep',['../structgunrock_1_1oprtr_1_1edge__map__forward_1_1_sweep.html',1,'gunrock::oprtr::edge_map_forward']]],
   ['sweep',['Sweep',['../structgunrock_1_1oprtr_1_1edge__map__backward_1_1_sweep.html',1,'gunrock::oprtr::edge_map_backward']]],
+  ['sweep',['Sweep',['../structgunrock_1_1oprtr_1_1edge__map__forward_1_1_sweep.html',1,'gunrock::oprtr::edge_map_forward']]],
   ['sweeppass',['SweepPass',['../structgunrock_1_1oprtr_1_1filter_1_1_sweep_pass.html',1,'gunrock::oprtr::filter']]],
   ['switchtonormalfunctor',['SwitchToNormalFunctor',['../structgunrock_1_1app_1_1dobfs_1_1_switch_to_normal_functor.html',1,'gunrock::app::dobfs']]]
 ];

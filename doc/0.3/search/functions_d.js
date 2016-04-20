@@ -1,4 +1,15 @@
 var searchData=
 [
-  ['operator_3d',['operator=',['../structgunrock_1_1app_1_1_graph_slice.html#a3cb4e0629fc2272b716cbecca6f58c7f',1,'gunrock::app::GraphSlice']]]
+  ['pagerank',['pagerank',['../pr__app_8cu.html#a2ac3e7b77f87aec2f189be76f171c68e',1,'pagerank(int *node_ids, float *pagerank, const int num_nodes, const int num_edges, const int *row_offsets, const int *col_indices):&#160;pr_app.cu'],['../gunrock_8h.html#a2ac3e7b77f87aec2f189be76f171c68e',1,'pagerank(int *node_ids, float *pagerank, const int num_nodes, const int num_edges, const int *row_offsets, const int *col_indices):&#160;pr_app.cu']]],
+  ['partition',['Partition',['../structgunrock_1_1app_1_1_partitioner_base.html#a61fff7cb5e34ab55390f72fef87be5e0',1,'gunrock::app::PartitionerBase::Partition(GraphT *&amp;sub_graphs, int **&amp;partition_tables, VertexId **&amp;convertion_tables, VertexId **&amp;original_vertexes, SizeT **&amp;out_offsets, SizeT **&amp;cross_counter, float factor=-1, int seed=-1)'],['../structgunrock_1_1app_1_1_partitioner_base.html#af6be82ad935bb86865fee28d677993b0',1,'gunrock::app::PartitionerBase::Partition(GraphT *&amp;sub_graphs, int **&amp;partition_tables, VertexId **&amp;convertion_tables, VertexId **&amp;original_vertexes, SizeT **&amp;in_counter, SizeT **&amp;out_offsets, SizeT **&amp;out_counter, SizeT **&amp;backward_offsets, int **&amp;backward_partitions, VertexId **&amp;backward_convertions, float factor=-1, int seed=-1)']]],
+  ['partitionerbase',['PartitionerBase',['../structgunrock_1_1app_1_1_partitioner_base.html#a224315924d9329a385152184d31743d1',1,'gunrock::app::PartitionerBase']]],
+  ['prenactor',['PREnactor',['../group___public_interface.html#ga936349b10513b34dbbb7b2a856a34046',1,'gunrock::app::pr::PREnactor']]],
+  ['print',['Print',['../structgunrock_1_1util_1_1_raking_grid.html#abbc2085665ac4f5e9ef0a41d8721e432',1,'gunrock::util::RakingGrid']]],
+  ['printhistogram',['PrintHistogram',['../group___public_interface.html#ga704dcec481bb24a3fb84e4bdf8a4ba3f',1,'gunrock::Csr']]],
+  ['printinfo',['PrintInfo',['../structgunrock_1_1app_1_1_test_parameter___base.html#a3e6b45f5be72a60dd2851525a8002c5b',1,'gunrock::app::TestParameter_Base']]],
+  ['printjson',['PrintJson',['../structgunrock_1_1app_1_1_info.html#a29d8a58c2b6e93ae40c435926775cc2e',1,'gunrock::app::Info']]],
+  ['printparameters',['PrintParameters',['../structgunrock_1_1app_1_1_test_parameter___base.html#aa11a42b2b08121e0bbf3160793f363b6',1,'gunrock::app::TestParameter_Base']]],
+  ['problembase',['ProblemBase',['../structgunrock_1_1app_1_1_problem_base.html#a73579638c62129063e129927985d499a',1,'gunrock::app::ProblemBase']]],
+  ['processtile',['ProcessTile',['../structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta.html#adc8d441ed807bf2e0b93206bb63cd0ac',1,'gunrock::oprtr::edge_map_backward::Cta::ProcessTile()'],['../structgunrock_1_1oprtr_1_1edge__map__forward_1_1_cta.html#ac6d6e3897179bee1c018c4758555dd51',1,'gunrock::oprtr::edge_map_forward::Cta::ProcessTile()'],['../structgunrock_1_1oprtr_1_1filter_1_1_cta.html#a05f58ac3499461b9bd99969c37d33d19',1,'gunrock::oprtr::filter::Cta::ProcessTile()']]],
+  ['prproblem',['PRProblem',['../structgunrock_1_1app_1_1pr_1_1_p_r_problem.html#a41e8231360f1eadf5a9e9d7cd856da54',1,'gunrock::app::pr::PRProblem']]]
 ];
