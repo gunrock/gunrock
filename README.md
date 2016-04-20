@@ -98,7 +98,7 @@ Publications
 Yuduo Wu, Yangzihao Wang, Yuechao Pan, Carl Yang, and John D. Owens.
 **Performance Characterization for High-Level Programming Models for GPU Graph
 Analytics.** In IEEE International Symposium on Workload Characterization,
-IISWC2015, October 2015. [[DOI](http://dx.doi.org/10.1109/IISWC.2015.13) | [http](web.ece.ucdavis.edu/~wyd855/iiswc-submission-2015.pdf)]
+IISWC2015, October 2015. [[DOI](http://dx.doi.org/10.1109/IISWC.2015.13) | [http](http://web.ece.ucdavis.edu/~wyd855/iiswc-submission-2015.pdf)]
 
 Yuechao Pan, Yangzihao Wang, Yuduo Wu, Carl Yang, and John D. Owens.
 **Multi-GPU Graph Analytics.** CoRR, abs/1504.04804(1504.04804v2), April 2016.
@@ -106,7 +106,7 @@ Yuechao Pan, Yangzihao Wang, Yuduo Wu, Carl Yang, and John D. Owens.
 
 Yangzihao Wang, Andrew Davidson, Yuechao Pan, Yuduo Wu, Andy Riffel, and John D. Owens.
 **Gunrock: A High-Performance Graph Processing Library on the GPU.**
-In Proceedings of the 21st ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming, PPoPP '16, Article No. 11, March 2016. [[DOI](http://dx.doi.org/10.1145/2851141.2851145) | [http](http://escholarship.org/uc/item/6xz7z9k0))
+In Proceedings of the 21st ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming, PPoPP '16, Article No. 11, March 2016. [[DOI](http://dx.doi.org/10.1145/2851141.2851145) | [http](http://escholarship.org/uc/item/6xz7z9k0)]
 
 Carl Yang, Yangzihao Wang, and John D. Owens.
 **Fast Sparse Matrix and Sparse Vector Multiplication Algorithm on the GPU.**
@@ -122,8 +122,11 @@ COSN '14, pages 63–68, October 2014.
 Presentations
 -------------
 GTC 2016, Gunrock: A Fast and Programmable Multi-GPU Graph Processing Library [[slides](http://on-demand.gputechconf.com/gtc/2016/presentation/s6374-yangzihao-wang-gunrock.pdf)]
+
 GPU Technology Theater at SC15, Gunrock: A Fast and Programmable Multi-GPU Graph processing Library [[slides](http://images.nvidia.com/events/sc15/pdfs/SC5139-gunrock-multi-gpu-processing-library.pdf) | [video](http://images.nvidia.com/events/sc15/SC5139-gunrock-multi-gpu-processing-library.html)]
+
 GTC 2014, High-Performance Graph Primitives on the GPU: design and Implementation of Gunrock [[slides](http://on-demand.gputechconf.com/gtc/2014/presentations/S4609-hi-perf-graph-primitives-on-gpus.pdf) | [video](http://on-demand.gputechconf.com/gtc/2014/video/S4609-hi-perf-graph-primitives-on-gpus.mp4)]
+
 
 Road Map
 ========
