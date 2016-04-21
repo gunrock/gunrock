@@ -76,10 +76,12 @@ void Usage()
         "[--instrumented]          Keep kernels statics [Default: Disable].\n"
         "                          total_queued, search_depth and barrier duty.\n"
         "                          (a relative indicator of load imbalance.)\n"
-        "[--src=<Vertex-ID|randomize|largestdegree>]\n"
+        "[--src=<Vertex-ID|largestdegree|randomize|randomize2|list>]\n"
         "                          Begins traversal from the source (Default: 0).\n"
-        "                          If randomize: from a random source vertex.\n"
         "                          If largestdegree: from largest degree vertex.\n"
+        "                          If randomize: from a random source vertex.\n"
+        "                          If randomize2: from a different random source vertex for each iteration.\n"
+        "                          If list: need to provide a source list through --source_list=n0,n1,...,nk\n"
         "[--quick]                 Skip the CPU reference validation process.\n"
         "[--mark-pred]             Keep both label info and predecessor info.\n"
         "[--disable-size-check]    Disable frontier queue size check.\n"
@@ -332,7 +334,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
-    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
+    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int(); 
 
     // TODO: remove after merge mgpu-cq
     ContextPtr   *context = (ContextPtr*)  info->context;
@@ -442,6 +444,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     }
     if (!quiet_mode)
         printf("Using traversal-mode %s\n", traversal_mode.c_str());
+
+    json_spirit::mArray source_list = info->info["source_list"].get_array();
     for (int iter = 0; iter < iterations; ++iter)
     {
         if (src_type == "random2")
@@ -452,6 +456,15 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 src = rand() % graph -> nodes;
                 if (graph -> row_offsets[src] != graph -> row_offsets[src+1])
                     src_valid = true;
+            }
+        } else if (src_type == "list")
+        {
+            if (source_list.size() == 0) {
+                if (!quiet_mode)
+                    printf("No source list found. Use 0 as source.\n");
+                src = 0;
+            } else {
+            src = source_list[iter].get_int();
             }
         }
 

@@ -249,11 +249,17 @@ public:
                 if (args.CheckCmdLineFlag("src-seed"))
                     args.GetCmdLineArgument("src-seed", src_seed);
                 info["source_seed"]   = src_seed;
+            } else if (source_type.compare("list") == 0)
+            { 
+                if (!args.CheckCmdLineFlag("quiet"))
+                    printf("Using user specified source vertex for each run\n");
+                info["source_type"] = "list";
             } else
             {
                 args.GetCmdLineArgument("src", source);
                 info["source_type"] = "user-defined";
             }
+            info["source_list"] = GetSourceList(args); 
             info["source_vertex"] = (int64_t)source;
             if (!args.CheckCmdLineFlag("quiet"))
             {
@@ -265,7 +271,7 @@ public:
             args.GetCmdLineArgument("grid-size", grid_size);
             info["max_grid_size"] = grid_size;
         }
-        if (args.CheckCmdLineFlag("iteration-num"))
+        if (args.CheckCmdLineFlag("iteration-num") && !args.CheckCmdLineFlag("source-list"))
         {
             args.GetCmdLineArgument("iteration-num", num_iters);
             info["num_iteration"] = num_iters;
@@ -605,6 +611,30 @@ public:
             }
         }
         return device_list;
+    }
+
+    /**
+     * @brief Utility function to parse source node list.
+     *
+     * @param[in] args Command line arguments.
+     *
+     * \return json_spirit::mArray object contain source nodes used.
+     */
+    json_spirit::mArray GetSourceList(util::CommandLineArgs &args)
+    {
+        json_spirit::mArray source_list;      // return mArray
+        std::vector<int> srcs;             // temp storage
+        if (args.CheckCmdLineFlag("source-list"))  // parse command
+        {
+            args.GetCmdLineArguments<int>("source-list", srcs);
+            int num_sources = srcs.size();
+            info["num_iteration"] = num_sources;  // update number of devices
+            for (int i = 0; i < num_sources; i++)
+            {
+                source_list.push_back(srcs[i]);
+            }
+        }
+        return source_list;
     }
 
     /**
