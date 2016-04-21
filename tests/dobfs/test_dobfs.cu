@@ -284,7 +284,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     Csr<VertexId, SizeT, Value> *csc = info->csc_ptr;
     VertexId src                    = info->info["source_vertex"    ].get_int64();
     int      max_grid_size          = info->info["max_grid_size"    ].get_int  ();
-    int      num_gpus               = info->info["num_gpus"         ].get_int  ();
+    int      num_gpus               = 1; //info->info["num_gpus"         ].get_int  ();
     double   max_queue_sizing       = info->info["max_queue_sizing" ].get_real ();
     double   max_queue_sizing1      = info->info["max_queue_sizing1"].get_real ();
     double   max_in_sizing          = info->info["max_in_sizing"    ].get_real ();

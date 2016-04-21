@@ -17,6 +17,7 @@
 #include <gunrock/util/cuda_properties.cuh>
 #include <gunrock/util/types.cuh>
 
+#if __CUDACC_VER_MAJOR__ < 8
 // atomic addition from Jon Cohen at NVIDIA
 __device__ static double atomicAdd(double *addr, double val)
 {
@@ -30,6 +31,7 @@ __device__ static double atomicAdd(double *addr, double val)
     } while( assumed!=old );
     return old;
 }
+#endif
 
 __device__ static long long atomicCAS(long long *addr, long long comp, long long val)
 {

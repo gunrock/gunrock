@@ -263,7 +263,7 @@ void RunTest(Info<VertexId, SizeT, Value> *info)
             Enactor;
 
     Csr<VertexId, SizeT, Value>* graph = info->csr_ptr;
-    int     num_gpus                = info->info["num_gpus"         ].get_int ();
+    int     num_gpus                = 1; //info->info["num_gpus"         ].get_int ();
     int     max_grid_size           = info->info["max_grid_size"    ].get_int ();
     int     iterations              = 1; //force to 1 info->info["num_iteration"].get_int();
     bool    quiet_mode              = info->info["quiet_mode"       ].get_bool ();

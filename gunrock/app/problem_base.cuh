@@ -1414,31 +1414,31 @@ struct ProblemBase
                 {
                     partitioner = new rp::RandomPartitioner     <VertexId, SizeT, Value
                         /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
-                        (*graph, num_gpus);
+                        (*graph, num_gpus, NULL, enable_backward, keep_order, keep_node_num);
                 }
                 else if (partition_method == "metis")
                 {
                     partitioner = new metisp::MetisPartitioner  <VertexId, SizeT, Value
                         /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
-                        (*graph, num_gpus);
+                        (*graph, num_gpus, NULL, enable_backward, keep_order, keep_node_num);
                 }
                 else if (partition_method == "static")
                 {
                     partitioner = new sp::StaticPartitioner     <VertexId, SizeT, Value
                         /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
-                        (*graph, num_gpus);
+                        (*graph, num_gpus, NULL, enable_backward, keep_order, keep_node_num);
                 }
                 else if (partition_method == "cluster")
                 {
                    partitioner = new cp::ClusterPartitioner     <VertexId, SizeT, Value
                         /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
-                        (*graph, num_gpus);
+                        (*graph, num_gpus, NULL, enable_backward, keep_order, keep_node_num);
                 }
                 else if (partition_method == "biasrandom")
                 {
                     partitioner = new brp::BiasRandomPartitioner<VertexId, SizeT, Value
                         /*, _ENABLE_BACKWARD, _KEEP_ORDER, _KEEP_NODE_NUM*/>
-                        (*graph, num_gpus);
+                        (*graph, num_gpus, NULL, enable_backward, keep_order, keep_node_num);
                 }
                 else
                 {

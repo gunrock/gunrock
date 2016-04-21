@@ -28,27 +28,36 @@ namespace metisp {
 template <
     typename VertexId,
     typename SizeT,
-    typename Value,
+    typename Value/*,
     bool     ENABLE_BACKWARD = false,
     bool     KEEP_ORDER      = false,
-    bool     KEEP_NODE_NUM   = false>
-struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value,
-    ENABLE_BACKWARD, KEEP_ORDER, KEEP_NODE_NUM>
+    bool     KEEP_NODE_NUM   = false*/>
+struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value/*,
+    ENABLE_BACKWARD, KEEP_ORDER, KEEP_NODE_NUM*/>
 {
+    typedef PartitionerBase<VertexId, SizeT, Value> BasePartitioner;
     typedef Csr<VertexId,SizeT,Value> GraphT;
 
     // Members
     float *weitage;
 
     // Methods
-    MetisPartitioner()
+    /*MetisPartitioner()
     {
         weitage=NULL;
-    }
+    }*/
 
-    MetisPartitioner(const GraphT &graph,
-                      int   num_gpus,
-                      float *weitage = NULL)
+    MetisPartitioner(
+        const  GraphT &graph,
+        int    num_gpus,
+        float *weitage = NULL,
+        bool   _enable_backward = false,
+        bool   _keep_order      = false,
+        bool   _keep_node_num   = false) :
+        BasePartitioner(
+            _enable_backward,
+            _keep_order,
+            _keep_node_num)
     {
         Init2(graph,num_gpus,weitage);
     }
@@ -109,7 +118,7 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value,
         for (idx_t edge = 0; edge < edges; edge++)
             tcolumn_indices[edge] = this->graph->column_indices[edge];
 
-      if(METIS_FOUND)
+#ifdef METIS_FOUND
       {
         //int Status =
                 METIS_PartGraphKway(
@@ -145,11 +154,13 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value,
         backward_partitions  = this->backward_partitions;
         backward_convertions = this->backward_convertions;
 
-      } else
+      }
+#else
       {
         const char * str = "Metis was not found during installation, therefore metis partitioner cannot be used.";
         retval = util::GRError(cudaErrorUnknown, str, __FILE__, __LINE__);
       } // METIS_FOUND
+#endif
         return retval;
     }
 };
