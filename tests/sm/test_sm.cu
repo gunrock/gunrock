@@ -101,12 +101,12 @@ template<typename VertexId, typename SizeT, typename Value>
 void DisplaySolution(
     const Csr<VertexId, SizeT, Value> &graph_query,
     const Csr<VertexId, SizeT, Value> &graph_data,
-    unsigned long long *h_froms,
+    VertexId *h_edges,
     SizeT num_matches)
 {
     // TODO(developer): code to print out results
-    printf("Number of matched subgraphs: %lld.\n",
-        (long long)num_matches);
+    printf("Number of matched subgraphs: %d.\n",
+        num_matches);
 
 }
 
@@ -214,9 +214,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     cudaStream_t *streams = (cudaStream_t*)info->streams;
 
     // host results spaces
-    unsigned long long *h_froms = new unsigned long long[graph_data -> nodes * graph_data -> nodes
-							+ (graph_query -> edges/2 - 2) *
-							graph_data -> edges/2];
+    VertexId *h_edges = new VertexId [graph_data -> edges * graph_query -> edges/4];
 
     // allocate problem on GPU create a pointer of the SMProblem type
     Problem * problem = new Problem(true);
@@ -277,7 +275,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     // copy results back to CPU from GPU using Extract
-    util::GRError(problem->Extract(h_froms),
+    util::GRError(problem->Extract(h_edges),
           "SM Problem Data Extraction Failed", __FILE__, __LINE__);
     SizeT num_matches_gpu = problem->data_slices[0]->num_matches;
 
@@ -290,7 +288,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
 	    {
             if (!quiet_mode) 
                 DisplaySolution(
-                    *graph_query, *graph_data, h_froms, num_matches_cpu);
+                    *graph_query, *graph_data, h_edges, num_matches_cpu);
             if (!quiet_mode) { printf("\nCORRECT.\n"); }
 
         } else {
@@ -311,7 +309,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     // clean up if necessary
     if (problem) {delete   problem; problem = NULL;}
     if (enactor) {delete   enactor; enactor = NULL;}
-    if (h_froms) {delete[] h_froms; h_froms = NULL;}
+    if (h_edges) {delete[] h_edges; h_edges = NULL;}
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
 }
@@ -365,9 +363,9 @@ template <
 int main_Value(CommandLineArgs *args, int graph_args)
 {
     if (args -> CheckCmdLineFlag("64bit-Value"))
-        return main_<VertexId, SizeT, unsigned long long>(args, graph_args);
+        return main_<VertexId, SizeT, long long      >(args, graph_args);
     else
-        return main_<VertexId, SizeT, int      >(args, graph_args);
+        return main_<VertexId, SizeT,  int      >(args, graph_args);
 }
 
 template <
@@ -378,7 +376,7 @@ int main_SizeT(CommandLineArgs *args, int graph_args)
     //if (args -> CheckCmdLineFlag("64bit-SizeT"))
     //    return main_Value<VertexId, long long>(args, graph_args);
     //else
-        return main_Value<VertexId, int      >(args, graph_args);
+        return main_Value<VertexId,  int      >(args, graph_args);
 }
 
 int main_VertexId(CommandLineArgs *args, int graph_args)
@@ -387,7 +385,7 @@ int main_VertexId(CommandLineArgs *args, int graph_args)
     //if (args -> CheckCmdLineFlag("64bit-VertexId"))
     //    return main_SizeT<long long>(args, graph_args);
     //else 
-        return main_SizeT<int      >(args, graph_args);
+        return main_SizeT< int      >(args, graph_args);
 }
 
 int main(int argc, char** argv)

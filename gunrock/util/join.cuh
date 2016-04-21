@@ -15,80 +15,34 @@
 namespace gunrock {
 namespace util {
 
-template<typename SizeT>
-__global__ void Mark(
-    const SizeT		edges,
-    const SizeT* const 	keys,
-          bool* 	flag)
-{
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
-    while (x < edges)
-    {
-	if(keys[x]%2==1) 
-	    flag[x]=1;
-	else flag[x]=0;
-	x += STRIDE;
-    }
-}
 
-template<typename SizeT>
-__global__ void Update1(
-    const unsigned long long* const    froms,
-	  SizeT*          d_query_col,
+
+template<typename SizeT, typename T>
+__global__ void Update(
+    	  T*              indices,
+	  SizeT*          pos,
     const SizeT           edges_data)
 {
     const SizeT STRIDE = gridDim.x * blockDim.x;
     unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
-    SizeT size = d_query_col[0];
-    if(x==0) printf("size1=%d\n", size);
+    SizeT size = pos[0];
+//    if(x==0) printf("size1=%d\n", size);
     while(x < size)
     {
-	if(x==(size-1) || froms[x]/edges_data < froms[x+1]/edges_data)
-	{printf("x:%d, froms[x]/edges_data=%d\n", x, froms[x]/edges_data);
-	    d_query_col[froms[x]/edges_data] = x+1;
+	if(x==(size-1) || indices[x]/edges_data < indices[x+1]/edges_data)
+	{ 
+	    pos[indices[x]/edges_data] = x+1;
 	}
+	__syncthreads();
+	indices[x] %= edges_data;
 	x += STRIDE;
     }
 }
  
-template<typename SizeT>
-__global__ void Update2(
-          unsigned long long*        froms,
-    const SizeT* const  d_query_col,
-    const SizeT         edges_query,
-    const SizeT         edges_data)
-{
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
-    SizeT size = d_query_col[edges_query-1];
-    if(x==0) printf("size2=%d\n", size);
-    while(x < size)
-    {
-	froms[x] %= edges_data;
-	x += STRIDE;
-    }
-}
-
-
-template<typename VertexId, typename SizeT>
-__global__ void debug_before_init(
-    const VertexId* const froms_data,
-    const VertexId* const tos_data,
-    const SizeT           edges_data)
-{
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
-    while (x < edges_data)
-    {
-	printf("%d: froms_data:%d tos_data:%d\n", x, froms_data[x], tos_data[x]);
-	x += STRIDE;
-    }
-}
 
 template<typename SizeT>
 __global__ void debug_init(
-    const bool* const d_c_set,
+    const char* const d_c_set,
     const SizeT        nodes_query,
     const SizeT        nodes_data)
 {
@@ -114,13 +68,13 @@ __global__ void debug_label(
     }
 }
 
-template<typename VertexId, typename SizeT>
+template<typename VertexId, typename SizeT, typename Value, typename T>
 __global__ void debug(
-    const VertexId* const froms_data,
+    const Value*    const froms_data,
     const VertexId* const tos_data,
     const VertexId* const froms_query,
     const VertexId* const tos_query,
-    const unsigned long long*    const tos,
+    const T*        const tos,
     const SizeT*    const d_query_col,
     const SizeT	    edges_query,
     const SizeT     edges_data)
@@ -145,6 +99,8 @@ __global__ void debug(
 	x += STRIDE;
     }*/
 }
+
+
 /*
  * @brief Join Kernel function.
  *
@@ -160,87 +116,97 @@ __global__ void debug(
  * @param[out]tos_out   output edge list destination node id
  */
 template <
-    typename VertexId,
-    typename SizeT>
+    typename VertexId, typename SizeT, typename Value, typename T>
 __global__ void Join(
     const SizeT                 edges_data,
-    const SizeT 		iter,
-    const SizeT*    const       pos,
-          SizeT*        	counts,
-          bool*    	        flag,
+    const SizeT                 edges_query,
+    const SizeT*    const       pos,// store the start positions for each query edge's candidates
+          SizeT*        	counts,// store the number of matches
     const VertexId* const	intersect,
-    const VertexId* const       froms,
+    const Value*    const       froms,
     const VertexId* const       tos,
-    const unsigned long long*    const       d_data_degrees)
+    const T*        const       edges,
+    	  VertexId*             output)  // store candidate edges in query edge order
 {
-    counts[1]=counts[0]; // store the previous iteration's number of matches in counts[1]
-    const SizeT size = ((iter==0) ? pos[iter]:counts[0]) * (pos[iter+1]-pos[iter]);
+    unsigned long long size = pos[0];
+
+//printf("pos[0]:%d, pos[1]-pos[0]:%d, pos[2]-pos[1]:%d\n", pos[0], pos[1]-pos[0], pos[2]-pos[1]);
+
+    for(int i=0; i<edges_query-1; i++)
+        size *= (pos[i+1] - pos[i]);
     const SizeT STRIDE = gridDim.x * blockDim.x;
-
-    // x: is the number of matched middle results * edges_query
-    VertexId x = blockIdx.x * blockDim.x + threadIdx.x;
-    if(x==0) printf(" size=%d\n", size);
-    if(x==0) printf("iter=%d pos[0]=%d, pos[1]=%d, pos[2]=%d, counts[0]=%d counts[1]=%d\n",iter, pos[0], pos[1], pos[2], counts[0], counts[1]);
-//    if(iter==0 && x<pos[iter]) printf("Collected candidate edges: froms[%d]:%d->tos[%d]:%d\n", x, froms[x], x, tos[x]);
-
+    unsigned long long edge_id[3];
+    SizeT iter;
+    SizeT offset;
+    SizeT edge;
+    unsigned long long x = blockIdx.x * blockDim.x + threadIdx.x;
+if(x==0) printf("===size=%lld===\n",size);
     while (x < size)
     {
-
-	SizeT a = (x%((iter==0)?pos[iter]:counts[0]));
-	SizeT b = ((iter==0)?pos[iter]:counts[0])+x/((iter==0)?pos[iter]:counts[0]); // edge iter+1 e_id
-
-	SizeT offset = iter*(iter+1)/2;
-	SizeT edge;
-        unsigned long long edgeId = d_data_degrees[a];
-
-	for(edge = 0; edge < iter+1; edge++)
+	unsigned long long id = x;
+	for(iter = edges_query-1; iter > 0; iter--)    // query edge 1+'s candidate edge ids
 	{
+	    edge_id[iter] = pos[iter-1] + id % (pos[iter]-pos[iter-1]);
+	    id /= (pos[iter]-pos[iter-1]);
+	    edge_id[iter] = edges[edge_id[iter]];
+	}
+	edge_id[iter] = edges[id];
+//printf("edge_id[0]:%lld, edge_id[1]:%lld, edge_id[2]:%lld\n", edge_id[0], edge_id[1], edge_id[2]);
+	for(iter=0; iter < edges_query-1; iter++)
+	{
+	   offset = iter*(iter+1)/2;
+	   
+	   for(edge = 0; edge < iter+1; edge++)
+	   {
+	    if(edge_id[iter+1]==edge_id[edge]) break; //two edges in one combination have the same id
+
 	    VertexId c = intersect[(offset+edge)*2];
 	    VertexId d = intersect[(offset+edge)*2+1];
-
+//printf("iter:%d, edge:%d, iter+1:%d, c:%d, d:%d, edge_id[%d]:%d, edge_id[%d]:%d\n", iter,edge,iter+1, c, d, edge, edge_id[edge], iter+1, edge_id[iter+1]);
   	    if(c!=0)  
  	    {
 	        if(c%2==1){
-		    if(froms[edgeId % edges_data] != froms[d_data_degrees[b]])     {flag[x] = 0;  break;}
+		    if(froms[edge_id[edge]] != froms[edge_id[iter+1]])     break;
 	        }
 	        else{ 
-		    if(tos[  edgeId % edges_data] != froms[d_data_degrees[b]])	   {flag[x] = 0;  break;}
+		    if(tos[  edge_id[edge]] != froms[edge_id[iter+1]])	   break;
 	        }
 	    }
 	    else 
 	    {
-	        if(froms[d_data_degrees[b]] == froms[edgeId % edges_data] 
-			|| froms[d_data_degrees[b]] == tos[edgeId % edges_data])
-	        {
-	      	    flag[x] = 0;
-		    break;
-		}    
+	        if(froms[edge_id[iter+1]] == froms[edge_id[edge]] 
+			|| froms[edge_id[iter+1]] == tos[edge_id[edge]])   break;
 	    }
 
 	    if(d!=0)
 	    {
 	        if(d%2==1){
-		    if(froms[edgeId % edges_data] != tos[d_data_degrees[b]])       {flag[x] = 0;  break;}
+		    if(froms[edge_id[edge]] != tos[edge_id[iter+1]])       break;
 		}
 	        else{
-		    if(tos[  edgeId % edges_data] != tos[d_data_degrees[b]])       {flag[x] = 0;  break;}
+		    if(tos[  edge_id[edge]] != tos[edge_id[iter+1]])       break;
 		}
 	    }
 	    else
 	    { 
-	        if(tos[d_data_degrees[b]] == froms[edgeId % edges_data] 
-			|| tos[d_data_degrees[b]] == tos[edgeId % edges_data])
-	        {
-	    	    flag[x] = 0; 
-		    break;
-		}
+	        if(tos[edge_id[iter+1]] == froms[edge_id[edge]] 
+			|| tos[edge_id[iter+1]] == tos[edge_id[edge]])     break;
 	    }
 
-	    edgeId /= edges_data;
-	}
+	   }
 
-	if(edge==iter+1)  flag[x]=1;
-	x += STRIDE;
+	   if(edge!=iter+1) // the current join fails
+	       break;
+     }
+     if(iter == edges_query - 1)  // the current join succeeds for all query edges
+     {
+//printf("=====current join succeeds====\n");
+	for(iter = 0; iter<edges_query; iter++)
+	    output[counts[0]*edges_query + iter] = edge_id[iter];
+
+	atomicAdd(counts, 1);
+     }
+     x += STRIDE;
 
     }
 } // Join Kernel
@@ -249,7 +215,7 @@ __global__ void Join(
 template<typename SizeT,
 typename VertexId>
 __global__ void debug_0(
-    const bool* const flag,
+    const char* const flag,
     const SizeT* const pos,
     const SizeT* const counts,
     const VertexId* const froms,
@@ -271,64 +237,13 @@ __global__ void debug_0(
 	x += STRIDE;
     }
 }
-/*
- * @brief Collect Kernel function.
- *
- * @tparam VertexID
- * @tparam SizeT
- * 
- * @param[in] edges	number of query edges
- * @param[in] iter	iteration number
- * @param[in] flag      index of each valid middle result
- * @param[in] froms     source node id for each candidate edge
- * @param[in] tos       destination node id for each candidate edge
- * @param[in] pos       address of the first candidate for each query edge
- */
-template <
-    typename VertexId,
-    typename SizeT>
-__global__ void Collect(
-    const SizeT                 edges_query,
-    const SizeT                 edges_data,
-    const SizeT 		iter,
-    const unsigned long long*    const 	d_data_degrees,
-    const VertexId* const	froms_data,
-    const VertexId* const	tos_data,
-    	  unsigned long long* 	        flag, // store selected indices
-    	  SizeT*     	        pos,
-	  SizeT*		counts)
-{
-    const SizeT STRIDE = gridDim.x * blockDim.x;
-    VertexId x = blockIdx.x * blockDim.x + threadIdx.x;
-
-    //if(x==0) printf("iter=%d, counts[0]=%d, counts[1]=%d, edges = %d, counts[0]*edges=%d, pos[iter]=%d\n",iter, counts[0], counts[1], edges, counts[0]*edges, pos[iter]);
-
-    while (x < counts[0])
-    {
-
-	SizeT a = (flag[x]%((iter==0)?pos[iter]:counts[1]));
-	SizeT b = pos[iter]+flag[x]/((iter==0)?pos[iter]:counts[1]);
-
-	__syncthreads();
-
-    	flag[x] = d_data_degrees[b] * pow(edges_data, iter+1) + d_data_degrees[a];
-	x += STRIDE;
-    }
-
-    while (x >= counts[0] && x < counts[0]+ pos[edges_query-1]-pos[iter]) 
-    {
-	flag[x] = d_data_degrees[x-counts[0]+pos[iter]];
-	x += STRIDE;
-    }
-	
-} // Collect Kernel
 
 
 
-template<typename VertexId, typename SizeT>
+template<typename VertexId, typename SizeT, typename Value, typename T>
 __global__ void debug_1(
-    const unsigned long long*    const froms,
-    const VertexId* const froms_data,
+    const T*        const froms,
+    const Value*    const froms_data,
     const VertexId* const tos_data,
     const SizeT*    const pos,
     const SizeT*    const counts,
@@ -340,7 +255,7 @@ __global__ void debug_1(
     while (x < counts[0])
     {
         if(x==0) printf("Number of matched tris: %d\n", counts[0]);
-	unsigned long long edgeId = froms[x];
+	VertexId edgeId = froms[x];
 	    for(int edge = 0; edge< edges_query; edge++)
 	    {
 		printf("edges[%d]: froms[%d]: %d -> tos[%d]: %d	\n", edge, x,froms_data[edgeId%edges_data],x,tos_data[edgeId%edges_data]);	
@@ -349,9 +264,9 @@ __global__ void debug_1(
     }
 }
 
-template<typename SizeT>
+template<typename SizeT, typename VertexId>
 __global__ void debug_before_select(
-    const unsigned long long* const d_out,
+    const VertexId* const d_out,
     const SizeT        num_selected)
 {
     const SizeT STRIDE = gridDim.x * blockDim.x;
@@ -360,14 +275,14 @@ __global__ void debug_before_select(
     if(x==0) printf("# of elements: %d\n",num_selected);
     while (x < num_selected)
     {
-        printf("element %d's flag:%lld\n",x,d_out[x]); 
+        printf("element %d's flag:%d\n",x,d_out[x]); 
 	x += STRIDE;
     }
 }
 
-template<typename SizeT>
+template<typename SizeT, typename T>
 __global__ void debug_select(
-    const unsigned long long* const d_out,
+    const T*     const d_out,
     const SizeT* const num_selected)
 {
     const SizeT STRIDE = gridDim.x * blockDim.x;
@@ -381,25 +296,23 @@ __global__ void debug_select(
     }
 }
 
-template<typename VertexId, typename SizeT>
+
+
+template<typename VertexId, typename SizeT, typename Value>
 __global__ void Label(
-    const VertexId* const      froms_data,
+    const Value*    const      froms_data,
     const VertexId* const      tos_data,
     const VertexId* const      froms_query,
     const VertexId* const      tos_query,
-    const bool*     const      d_c_set,
-          unsigned long long*  froms,
-          unsigned long long*  d_data_degrees,
+    const VertexId* const      d_c_set,
+          VertexId*            label,
+    const VertexId* const      d_query_row,
     const SizeT                edges_data,
-    const SizeT                nodes_data,
     const SizeT                edges_query)
 {
     const SizeT STRIDE = gridDim.x * blockDim.x;
     VertexId x = blockIdx.x * blockDim.x + threadIdx.x;
-    SizeT size = froms[edges_data-1];
-    if(x==0) printf("size=%d, edges_data/2=%d\n", size, edges_data/2);
-    // size < edges_data/2
- //   if(x < edges_data) froms[x]=0;
+    SizeT size = d_query_row[0];
     while (x < size)
     {
 	#pragma unroll
@@ -407,9 +320,9 @@ __global__ void Label(
 	{
 	    VertexId src  = froms_query[i];
 	    VertexId dest = tos_query[i];
-	    if(d_c_set[froms_data[x] + src  * nodes_data] == 1 &&
-	       d_c_set[tos_data[  x] + dest * nodes_data] == 1)
-	       d_data_degrees[x + i*edges_data/2] = 1; 
+	    if( ((d_c_set[froms_data[x]] >> src ) % 2 == 1) &&
+	        ((d_c_set[tos_data[  x]] >> dest) % 2 == 1) )
+	       label[x + i*edges_data/2] = 1; 
 	    
 	}
 	x += STRIDE;
