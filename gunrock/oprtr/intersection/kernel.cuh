@@ -191,13 +191,28 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             SizeT dst_it = d_row_offsets[did];
             SizeT dst_end = d_row_offsets[did+1];
             if (src_it == src_end || dst_it == dst_end) continue;
-            VertexId src_edge = d_column_indices[src_it];
-            VertexId dst_edge = d_column_indices[dst_it];
-            while (src_it < src_end && dst_it < dst_end) {
-                VertexId diff = src_edge - dst_edge;
-                src_edge = (diff <= 0) ? d_column_indices[++src_it] : src_edge;
-                dst_edge = (diff >= 0) ? d_column_indices[++dst_it] : dst_edge;
-                count += (diff == 0);
+            SizeT src_nl_size = src_end - src_it;
+            SizeT dst_nl_size = dst_end - dst_it;
+            SizeT min_nl = (src_nl_size > dst_nl_size) ? dst_nl_size : src_nl_size;
+            SizeT max_nl = src_nl_size + dst_nl_size - min_nl;
+            if ( min_nl * ilog2((unsigned int)(max_nl)) * 10 < min_nl + max_nl ) {
+                // search
+                SizeT min_it = (min_nl == src_nl_size) ? src_it : dst_it;
+                SizeT max_it = (min_it == src_it) ? dst_it : src_it;
+                VertexId *keys = &d_column_indices[max_it];
+                while ( min_it < min_it + min_nl) {
+                    VertexId small_edge = d_column_indices[min_it++];
+                    count += BinarySearch(keys, max_nl, small_edge);
+                }
+            } else {
+                VertexId src_edge = d_column_indices[src_it];
+                VertexId dst_edge = d_column_indices[dst_it];
+                while (src_it < src_end && dst_it < dst_end) {
+                    VertexId diff = src_edge - dst_edge;
+                    src_edge = (diff <= 0) ? d_column_indices[++src_it] : src_edge;
+                    dst_edge = (diff >= 0) ? d_column_indices[++dst_it] : dst_edge;
+                    count += (diff == 0);
+                }
             }
             d_output_counts[idx] += count;
         }
