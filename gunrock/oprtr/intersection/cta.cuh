@@ -72,18 +72,18 @@ __device__ int SerialSetIntersection(VertexId* aData,
                                     }
 
 template<typename VertexId, typename SizeT>
-__device__ bool BinarySearch(VertexId* keys, SizeT count, VertexId key) {
+__device__ int BinarySearch(VertexId* keys, SizeT count, VertexId key) {
     SizeT begin = 0;
     SizeT end = count;
     while (begin < end) {
         SizeT mid = (begin + end) >> 1;
         VertexId item = keys[mid];
-        if (item == key) return true;
+        if (item == key) return 1;
         bool larger = (item > key);
         if (larger) end = mid;
         else begin = mid+1;
         }
-        return false;
+        return 0;
 }
 
 __device__ unsigned ilog2(unsigned int v)

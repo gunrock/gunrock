@@ -194,13 +194,15 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             SizeT src_nl_size = src_end - src_it;
             SizeT dst_nl_size = dst_end - dst_it;
             SizeT min_nl = (src_nl_size > dst_nl_size) ? dst_nl_size : src_nl_size;
-            SizeT max_nl = src_nl_size + dst_nl_size - min_nl;
+            SizeT max_nl = (src_nl_size < dst_nl_size) ? dst_nl_size : src_nl_size;
             if ( min_nl * ilog2((unsigned int)(max_nl)) * 10 < min_nl + max_nl ) {
                 // search
-                SizeT min_it = (min_nl == src_nl_size) ? src_it : dst_it;
-                SizeT max_it = (min_it == src_it) ? dst_it : src_it;
+                SizeT min_it = (src_nl_size < dst_nl_size) ? src_it : dst_it;
+                SizeT min_end = min_it + min_nl;
+                SizeT max_it = (src_nl_size < dst_nl_size) ? dst_it : src_it;
                 VertexId *keys = &d_column_indices[max_it];
-                while ( min_it < min_it + min_nl) {
+                //printf("src:%d,dst:%d, src_it:%d, dst_it:%d, min_it:%d max_it:%d, min max nl size: %d, %d\n",sid, did, src_it, dst_it, min_it, max_it, min_nl, max_nl);
+                while ( min_it < min_end) {
                     VertexId small_edge = d_column_indices[min_it++];
                     count += BinarySearch(keys, max_nl, small_edge);
                 }

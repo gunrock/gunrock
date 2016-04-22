@@ -238,9 +238,10 @@ class TCEnactor :
         graph_slice->row_offsets.GetPointer(util::DEVICE),
         context[0]);
 
-        //util::DisplayDeviceResults(graph_slice->row_offsets.GetPointer(util::DEVICE)+graph_slice->nodes, 1);
+        //util::DisplayDeviceResults(graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes);
 
-        //util::MemsetKernel<<<256, 1024>>>(data_slice->d_src_node_ids.GetPointer(util::DEVICE), 0, graph_slice->edges/2);
+        //util::DisplayDeviceResults(graph_slice->column_indices.GetPointer(util::DEVICE), graph_slice->edges/2);
+
 
         IntervalExpand(
             graph_slice->edges/2,
