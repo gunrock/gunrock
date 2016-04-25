@@ -1255,15 +1255,18 @@ public:
         for (int gpu=0; gpu<this->num_gpus; gpu++)
         {
             if (retval = util::SetDevice(this -> gpu_idx[gpu])) return retval;
-            cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
-            gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
-            if (retval = util::GRError(cudaBindTexture(
-                0,   
-                gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,
-                problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
-                ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
-                "BFSEnactor cudaBindTexture row_offsets_ref failed",
-                __FILE__, __LINE__)) return retval;
+            if (sizeof(SizeT) <= 4)
+            {
+                cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
+                gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
+                if (retval = util::GRError(cudaBindTexture(
+                    0,   
+                    gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,
+                    problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
+                    ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
+                    "BFSEnactor cudaBindTexture row_offsets_ref failed",
+                    __FILE__, __LINE__)) return retval;
+            }
         }
 
         for (int gpu=0;gpu<this->num_gpus;gpu++)
@@ -1549,7 +1552,7 @@ public:
         //INSTRUMENT,                         // INSTRUMENT
         0,                                  // SATURATION QUIT
         true,                               // DEQUEUE_PROBLEM_SIZE
-        8,                                  // MIN_CTA_OCCUPANCY
+        sizeof(VertexId) == 4 ? 8 : 4,      // MIN_CTA_OCCUPANCY
         8,                                  // LOG_THREADS
         1,                                  // LOG_LOAD_VEC_SIZE
         0,                                  // LOG_LOADS_PER_TILE

@@ -378,33 +378,14 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     enactor -> makeout_latency     = makeout_latency;
 
     if (retval = util::SetDevice(gpu_idx[0])) return retval;
-    if (retval = util::latency::Test_BaseLine(
-        "communicate_latency", communicate_latency,
-        streams[0], problem -> data_slices[0] -> latency_data))
-        return retval;
-    if (communicate_multipy > 0)
-        printf("communicate_multipy\t = %.2fx\n",
-            communicate_multipy);
-
-    if (retval = util::latency::Test_BaseLine(
-        "expand_latency  ", expand_latency,
-        streams[0], problem -> data_slices[0] -> latency_data))
-        return retval;
-
-    if (retval = util::latency::Test_BaseLine(
-        "subqueue_latency", subqueue_latency,
-        streams[0], problem -> data_slices[0] -> latency_data))
-        return retval;
-
-    if (retval = util::latency::Test_BaseLine(
-        "fullqueue_latency", fullqueue_latency,
-        streams[0], problem -> data_slices[0] -> latency_data))
-        return retval;
-
-    if (retval = util::latency::Test_BaseLine(
-        "makeout_latency  ", makeout_latency,
-        streams[0], problem -> data_slices[0] -> latency_data))
-        return retval;
+    if (retval = util::latency::Test(
+        streams[0], problem -> data_slices[0] -> latency_data,
+        communicate_latency,
+        communicate_multipy,
+        expand_latency,
+        subqueue_latency,
+        fullqueue_latency,
+        makeout_latency)) return retval;
 
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
@@ -451,8 +432,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         if (!quiet_mode)
         {
             printf("-------------------------\n"
-                "iteration %d elapsed: %lf ms\n",
-                iter, single_elapsed); 
+                "iteration %lld elapsed: %lf ms\n",
+                (long long)iter, single_elapsed); 
             fflush(stdout);
         }
 
@@ -649,9 +630,9 @@ template <
 int main_SizeT(CommandLineArgs *args)
 {
 // disabled to reduce compile time
-//    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-//        return main_Value<VertexId, long long>(args);
-//    else
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_Value<VertexId, long long>(args);
+    else
         return main_Value<VertexId, int      >(args);
 }
 

@@ -396,33 +396,14 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     enactor -> do_b                = do_b;
 
     if (retval = util::SetDevice(gpu_idx[0])) return retval;
-    if (retval = util::latency::Test_BaseLine(
-        "communicate_latency", communicate_latency, 
-        streams[0], problem -> data_slices[0] -> latency_data)) 
-        return retval;
-    if (communicate_multipy > 0)
-        printf("communicate_multipy\t = %.2fx\n",
-            communicate_multipy);
- 
-    if (retval = util::latency::Test_BaseLine(
-        "expand_latency  ", expand_latency, 
-        streams[0], problem -> data_slices[0] -> latency_data)) 
-        return retval;
-
-    if (retval = util::latency::Test_BaseLine(
-        "subqueue_latency", subqueue_latency, 
-        streams[0], problem -> data_slices[0] -> latency_data)) 
-        return retval;
-
-    if (retval = util::latency::Test_BaseLine(
-        "fullqueue_latency", fullqueue_latency, 
-        streams[0], problem -> data_slices[0] -> latency_data)) 
-        return retval;
-
-    if (retval = util::latency::Test_BaseLine(
-        "makeout_latency  ", makeout_latency, 
-        streams[0], problem -> data_slices[0] -> latency_data)) 
-        return retval;
+    if (retval = util::latency::Test(
+        streams[0], problem -> data_slices[0] -> latency_data,
+        communicate_latency,
+        communicate_multipy,
+        expand_latency,
+        subqueue_latency,
+        fullqueue_latency,
+        makeout_latency)) return retval;
 
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();

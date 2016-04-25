@@ -390,7 +390,7 @@ void PushNeighbor(
     if (enactor_stats -> retval = util::GRError(cudaMemcpyAsync(
         data_slice_p -> value__associate_in[t][gpu_].GetPointer(util::DEVICE),
         data_slice_l -> value__associate_out[peer_] .GetPointer(util::DEVICE),
-        sizeof(VertexId) * queue_length * NUM_VALUE__ASSOCIATES,
+        sizeof(Value) * queue_length * NUM_VALUE__ASSOCIATES,
         cudaMemcpyDefault, stream),
         "cudamemcpyPeer keys failed", __FILE__, __LINE__))
         return;
