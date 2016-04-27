@@ -123,10 +123,6 @@ option(GUNROCK_APP_SSSP
   "If on, builds only SSSP application."
   OFF)
 
-option(GUNROCK_APP_DOBFS
-  "If on, builds only DOBFS application."
-  OFF)
-
 option(GUNROCK_APP_HITS
   "If on, builds only HITS application."
   OFF)
@@ -251,7 +247,6 @@ if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(tests/cc)
   add_subdirectory(tests/pr)
   add_subdirectory(tests/sssp)
-  add_subdirectory(tests/dobfs)
   add_subdirectory(tests/hits)
   add_subdirectory(tests/salsa)
   add_subdirectory(tests/mst)
@@ -282,10 +277,6 @@ else(GUNROCK_BUILD_APPLICATIONS)
   if(GUNROCK_APP_SSSP)
     add_subdirectory(tests/sssp)
   endif(GUNROCK_APP_SSSP)
-
-  if(GUNROCK_APP_DOBFS)
-    add_subdirectory(tests/dobfs)
-  endif(GUNROCK_APP_DOBFS)
 
   if(GUNROCK_APP_HITS)
     add_subdirectory(tests/hits)
@@ -337,10 +328,6 @@ set_tests_properties(TEST_SSSP PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 add_test(NAME TEST_PAGERANK COMMAND pr market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
 set_tests_properties(TEST_PAGERANK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
-
-add_test(NAME TEST_DOBFS COMMAND dobfs market
-  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
-set_tests_properties(TEST_DOBFS PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
 add_test(NAME TEST_TOPK COMMAND topk market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
@@ -412,10 +399,6 @@ if(GUNROCK_MGPU_TESTS)
   add_test(NAME TEST_MGPU_PR COMMAND pr market
     ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
   set_tests_properties(TEST_PAGERANK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
-
-  # add_test(NAME TEST_MGPU_DOBFS COMMAND dobfs market
-  #  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected --src=0)
-  # set_tests_properties(TEST_DOBFS PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
   # add_test(NAME TEST_MGPU_TOPK COMMAND topk market
   #  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
