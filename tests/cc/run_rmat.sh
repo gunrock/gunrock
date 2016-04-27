@@ -1,13 +1,13 @@
 #!/bin/bash
 
-OPTION="--traversal-mode=LB_LIGHT --in-sizing=1.1 --iteration-num=10 --partition-method=metis"
-MARK=".LB_LIGHT.32bitSizeT.do"
+OPTION="--in-sizing=1.1 --iteration-num=10 --partition-method=random --quick"
+MARK=".32bitSizeT"
 EXECUTION="./bin/test_cc_7.5_x86_64"
 DATADIR="/data/gunrock_dataset/large"
 
-for d in 4 #{1..4}
+for d in {2..3}
 do
-    SUFFIX="ubuntu14_04.k40cx${d}.metis"
+    SUFFIX="ubuntu14_04.k40cx${d}.rand"
     mkdir -p eval/$SUFFIX
     DEVICE="0"
     for i in {1..8}
