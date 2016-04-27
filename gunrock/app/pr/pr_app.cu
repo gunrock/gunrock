@@ -141,7 +141,7 @@ void runPageRank(GRGraph *output, PR_Parameter *parameter)
     Value         delta              = parameter -> delta;
     Value         error              = parameter -> error;
     SizeT         max_iter           = parameter -> max_iter;
-    int           traversal_mode     = parameter -> traversal_mode;
+    std::string   traversal_mode     = parameter -> traversal_mode;
     bool          instrument         = parameter -> instrumented;
     bool          debug              = parameter -> debug;
     bool          size_check         = parameter -> size_check;
@@ -167,6 +167,7 @@ void runPageRank(GRGraph *output, PR_Parameter *parameter)
             gpu_idx,
             partition_method,
             streams,
+            context,
             max_queue_sizing,
             max_in_sizing,
             partition_factor,
@@ -233,7 +234,7 @@ void runPageRank(GRGraph *output, PR_Parameter *parameter)
 void dispatchPageRank(
     GRGraph       *grapho,
     const GRGraph *graphi,
-    const GRSetup  config,
+    const GRSetup *config,
     const GRTypes  data_t,
     ContextPtr*    context,
     cudaStream_t*  streams)
@@ -243,13 +244,13 @@ void dispatchPageRank(
     parameter->src[0] = -1;
     parameter->context      =  context;
     parameter->streams      =  streams;
-    parameter->g_quiet      = config.quiet;
-    parameter->num_gpus     = config.num_devices;
-    parameter->gpu_idx      = config.device_list;
-    parameter->delta        = config.pagerank_delta;
-    parameter->error        = config.pagerank_error;
-    parameter->max_iter     = config.max_iters;
-    parameter->normalized   = config.pagerank_normalized;
+    parameter->g_quiet      = config -> quiet;
+    parameter->num_gpus     = config -> num_devices;
+    parameter->gpu_idx      = config -> device_list;
+    parameter->delta        = config -> pagerank_delta;
+    parameter->error        = config -> pagerank_error;
+    parameter->max_iter     = config -> max_iters;
+    parameter->normalized   = config -> pagerank_normalized;
     parameter->g_undirected = true;
 
     switch (data_t.VTXID_TYPE)
@@ -310,7 +311,7 @@ void dispatchPageRank(
 void gunrock_pagerank(
     GRGraph       *grapho,
     const GRGraph *graphi,
-    const GRSetup  config,
+    const GRSetup *config,
     const GRTypes  data_t)
 {
     // GPU-related configurations
@@ -319,20 +320,20 @@ void gunrock_pagerank(
     ContextPtr    *context = NULL;
     cudaStream_t  *streams = NULL;
 
-    num_gpus = config.num_devices;
+    num_gpus = config -> num_devices;
     gpu_idx  = new int [num_gpus];
     for (int i = 0; i < num_gpus; ++i)
     {
-        gpu_idx[i] = config.device_list[i];
+        gpu_idx[i] = config -> device_list[i];
     }
 
     // Create streams and MordernGPU context for each GPU
     streams = new cudaStream_t[num_gpus * num_gpus * 2];
     context = new ContextPtr[num_gpus * num_gpus];
-    if (!config.quiet) { printf(" using %d GPUs:", num_gpus); }
+    if (!config -> quiet) { printf(" using %d GPUs:", num_gpus); }
     for (int gpu = 0; gpu < num_gpus; ++gpu)
     {
-        if (!config.quiet) { printf(" %d ", gpu_idx[gpu]); }
+        if (!config -> quiet) { printf(" %d ", gpu_idx[gpu]); }
         util::SetDevice(gpu_idx[gpu]);
         for (int i = 0; i < num_gpus * 2; ++i)
         {
@@ -347,7 +348,7 @@ void gunrock_pagerank(
             }
         }
     }
-    if (!config.quiet) { printf("\n"); }
+    if (!config -> quiet) { printf("\n"); }
 
     dispatchPageRank(grapho, graphi, config, data_t, context, streams);
 }
@@ -377,9 +378,9 @@ void pagerank(
     data_t.SIZET_TYPE = SIZET_INT;    // integer graph size type
     data_t.VALUE_TYPE = VALUE_FLOAT;  // float attributes type
 
-    struct GRSetup config = InitSetup(1, NULL);  // primitive-specific configures
-    config.top_nodes      = 10;           // number of top nodes
-    config.pagerank_normalized     = normalized;
+    struct GRSetup *config = InitSetup(1, NULL);  // primitive-specific configures
+    config -> top_nodes      = 10;           // number of top nodes
+    config -> pagerank_normalized     = normalized;
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));

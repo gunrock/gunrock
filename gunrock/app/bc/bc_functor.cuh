@@ -16,6 +16,7 @@
 
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/app/bc/bc_problem.cuh>
+#include <gunrock/util/device_intrinsics.cuh>
 
 namespace gunrock {
 namespace app {
@@ -92,7 +93,7 @@ struct ForwardFunctor {
             //VertexId label_d;
             //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
             //    label_d, d_data_slice->labels + d_id);
-            //label_d = __ldg(d_data_slice -> labels + d_id);
+            //label_d = _ldg(d_data_slice -> labels + d_id);
             //if (label_d == label /*+ 1*/) {
                 //Accumulate sigma value
                 atomicAdd(d_data_slice->sigmas + d_id, d_data_slice->sigmas[s_id]);
@@ -229,10 +230,10 @@ struct BackwardFunctor {
         VertexId d_label;
         //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
         //    s_label, d_data_slice->labels + s_id);
-        s_label = __ldg(d_data_slice -> labels + s_id);
+        s_label = _ldg(d_data_slice -> labels + s_id);
         //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
         //    d_label, d_data_slice->labels + d_id);
-        d_label = __ldg(d_data_slice -> labels + d_id);
+        d_label = _ldg(d_data_slice -> labels + d_id);
         return (d_label == s_label + 1);
     }
 
@@ -265,17 +266,17 @@ struct BackwardFunctor {
         Value from_sigma;
         //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
         //    from_sigma, d_data_slice->sigmas + s_id);
-        from_sigma = __ldg(d_data_slice -> sigmas + s_id);
+        from_sigma = _ldg(d_data_slice -> sigmas + s_id);
 
         Value to_sigma;
         //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
         //    to_sigma, d_data_slice->sigmas + d_id);
-        to_sigma = __ldg(d_data_slice -> sigmas + d_id);
+        to_sigma = _ldg(d_data_slice -> sigmas + d_id);
 
         Value to_delta;
         //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
         //    to_delta, d_data_slice->deltas + d_id);
-        to_delta = __ldg(d_data_slice -> deltas + d_id);
+        to_delta = _ldg(d_data_slice -> deltas + d_id);
 
         Value result = from_sigma / to_sigma * (1.0 + to_delta);
 

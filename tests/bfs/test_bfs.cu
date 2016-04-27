@@ -426,7 +426,9 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     if (!quiet_mode)
         printf("Using traversal-mode %s\n", traversal_mode.c_str());
 
-    json_spirit::mArray source_list = info->info["source_list"].get_array();
+    json_spirit::mArray source_list;
+    if (src_type == "list")
+        source_list = info->info["source_list"].get_array();
     for (int iter = 0; iter < iterations; ++iter)
     {
         if (src_type == "random2")
@@ -440,12 +442,13 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             }
         } else if (src_type == "list")
         {
-            if (source_list.size() == 0) {
+            if (source_list.size() == 0) 
+            {
                 if (!quiet_mode)
                     printf("No source list found. Use 0 as source.\n");
                 src = 0;
             } else {
-            src = source_list[iter].get_int();
+                src = source_list[iter].get_int();
             }
         }
 
@@ -875,7 +878,7 @@ template <
     typename VertexId>
 int main_SizeT(CommandLineArgs *args)
 {
-// disabled to reduce compile time
+// can be disabled to reduce compile time
     if (args -> CheckCmdLineFlag("64bit-SizeT") || sizeof(VertexId) > 4)
         return main_Value<VertexId, long long>(args);
     else
@@ -884,9 +887,17 @@ int main_SizeT(CommandLineArgs *args)
 
 int main_VertexId(CommandLineArgs *args)
 {
-// disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
+// can be disabled to reduce compile time
+// atomicMin(long long) is only available for compute capability 3.5 or higher
     if (args -> CheckCmdLineFlag("64bit-VertexId"))
+#if __GR_CUDA_ARCH__ <= 300
+    {
+        printf("64bit-VertexId disabled, because atomicMin(long long) is only supported by compute capability 3.5 or higher\n");
+        return 1;
+    }
+#else
         return main_SizeT<long long>(args);
+#endif
     else
         return main_SizeT<int      >(args);
 }

@@ -21,9 +21,10 @@ namespace latency {
 #define NUM_BLOCKS 120
 #define BLOCK_SIZE 1024
 
+template <typename SizeT>
 __global__ void Load_Kernel(
-    long long num_repeats,
-    long long num_elements,
+    SizeT num_repeats,
+    SizeT num_elements,
     int *d_data)
 {
     int pos = blockDim.x * blockIdx.x + threadIdx.x;
@@ -45,11 +46,12 @@ __global__ void Load_Kernel(
     }
 }
 
+template <typename SizeT>
 cudaError_t Get_BaseLine(
     //int num_blocks,
     //int block_size,
-    long long num_repeats,
-    long long num_elements,
+    SizeT num_repeats,
+    SizeT num_elements,
     cudaStream_t stream,
     float &elapsed_ms,
     int *d_data)
@@ -92,11 +94,12 @@ cudaError_t Test_BaseLine(
     return retval;
 }
 
+template <typename SizeT>
 cudaError_t Insert_Latency(
     //int num_blocks,
     //int block_size,
-    long long num_repeats,
-    long long num_elements,
+    SizeT num_repeats,
+    SizeT num_elements,
     cudaStream_t stream,
     int *d_data)
 {

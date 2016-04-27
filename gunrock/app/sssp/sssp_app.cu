@@ -139,7 +139,7 @@ void runSSSP(GRGraph* output, SSSP_Parameter *parameter)
     int           partition_seed     = parameter -> partition_seed;
     bool          g_stream_from_host = parameter -> g_stream_from_host;
     int           delta_factor       = parameter -> delta_factor;
-    int           traversal_mode     = parameter -> traversal_mode;
+    std::string   traversal_mode     = parameter -> traversal_mode;
     bool          instrument         = parameter -> instrumented;
     bool          debug              = parameter -> debug;
     bool          size_check         = parameter -> size_check;
@@ -147,6 +147,7 @@ void runSSSP(GRGraph* output, SSSP_Parameter *parameter)
     // Allocate host-side distance arrays
     Value    *h_distances = new Value[graph->nodes];
     VertexId *h_preds  = MARK_PREDECESSORS ? new VertexId[graph->nodes] : NULL;
+    if (max_queue_sizing < 1.2) max_queue_sizing=1.2;
 
     for (int gpu = 0; gpu < num_gpus; gpu++)
     {
@@ -227,7 +228,7 @@ void runSSSP(GRGraph* output, SSSP_Parameter *parameter)
 void dispatchSSSP(
     GRGraph*       grapho,
     const GRGraph* graphi,
-    const GRSetup  config,
+    const GRSetup* config,
     const GRTypes  data_t,
     ContextPtr*    context,
     cudaStream_t*  streams)
@@ -236,12 +237,12 @@ void dispatchSSSP(
     parameter->src = (long long*)malloc(sizeof(long long));
     parameter->context  = context;
     parameter->streams  = streams;
-    parameter->g_quiet  = config.quiet;
-    parameter->num_gpus = config.num_devices;
-    parameter->gpu_idx  = config.device_list;
-    parameter->delta_factor = config.delta_factor;
-    parameter->traversal_mode = config.traversal_mode;
-    parameter->mark_predecessors  = config.mark_predecessors;
+    parameter->g_quiet  = config -> quiet;
+    parameter->num_gpus = config -> num_devices;
+    parameter->gpu_idx  = config -> device_list;
+    parameter->delta_factor = config -> delta_factor;
+    parameter->traversal_mode = std::string(config -> traversal_mode);
+    parameter->mark_predecessors  = config -> mark_predecessors;
 
     switch (data_t.VTXID_TYPE)
     {
@@ -264,7 +265,7 @@ void dispatchSSSP(
                 parameter->graph = &csr;
 
                 // determine source vertex to start
-                switch (config.source_mode)
+                switch (config -> source_mode)
                 {
                 case randomize:
                 {
@@ -279,7 +280,7 @@ void dispatchSSSP(
                 }
                 case manually:
                 {
-                    parameter->src[0] = config.source_vertex[0];
+                    parameter->src[0] = config -> source_vertex[0];
                     break;
                 }
                 default:
@@ -335,7 +336,7 @@ void dispatchSSSP(
 void gunrock_sssp(
     GRGraph*       grapho,
     const GRGraph* graphi,
-    const GRSetup  config,
+    const GRSetup* config,
     const GRTypes  data_t)
 {
     // GPU-related configurations
@@ -344,20 +345,20 @@ void gunrock_sssp(
     ContextPtr    *context = NULL;
     cudaStream_t  *streams = NULL;
 
-    num_gpus = config.num_devices;
+    num_gpus = config -> num_devices;
     gpu_idx  = new int [num_gpus];
     for (int i = 0; i < num_gpus; ++i)
     {
-        gpu_idx[i] = config.device_list[i];
+        gpu_idx[i] = config -> device_list[i];
     }
 
     // Create streams and MordernGPU context for each GPU
     streams = new cudaStream_t[num_gpus * num_gpus * 2];
     context = new ContextPtr[num_gpus * num_gpus];
-    if (!config.quiet) { printf(" using %d GPUs:", num_gpus); }
+    if (!config -> quiet) { printf(" using %d GPUs:", num_gpus); }
     for (int gpu = 0; gpu < num_gpus; ++gpu)
     {
-        if (!config.quiet) { printf(" %d ", gpu_idx[gpu]); }
+        if (!config -> quiet) { printf(" %d ", gpu_idx[gpu]); }
         util::SetDevice(gpu_idx[gpu]);
         for (int i = 0; i < num_gpus * 2; ++i)
         {
@@ -372,7 +373,7 @@ void gunrock_sssp(
             }
         }
     }
-    if (!config.quiet) { printf("\n"); }
+    if (!config -> quiet) { printf("\n"); }
 
     dispatchSSSP(grapho, graphi, config, data_t, context, streams);
 }
@@ -401,9 +402,9 @@ void sssp(
     data_t.SIZET_TYPE = SIZET_INT;  // integer graph size type
     data_t.VALUE_TYPE = VALUE_INT;  // integer attributes type
 
-    struct GRSetup config = InitSetup(1, NULL);  // primitive-specific configures
-    config.source_vertex[0]     = source;    // source vertex to start
-    config.mark_predecessors = false;     // do not mark predecessors
+    struct GRSetup *config = InitSetup(1, NULL);  // primitive-specific configures
+    config -> source_vertex[0]     = source;    // source vertex to start
+    config -> mark_predecessors = false;     // do not mark predecessors
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));

@@ -721,7 +721,7 @@ struct SSSPIteration : public IterationBase <
                     over_sized, thread_num, iteration, peer_, false)) return;
             if (enactor_stats->retval =
                 Check_Size</*true,*/ SizeT, VertexId > (
-                    true, "queue3", graph_slice->nodes+2,
+                    true, "queue3", graph_slice->nodes * 1.2 + 2,
                     &frontier_queue->keys  [selector  ],
                     over_sized, thread_num, iteration, peer_, true )) return;
             if (enactor -> problem -> use_double_buffer)
@@ -733,7 +733,7 @@ struct SSSPIteration : public IterationBase <
                         over_sized, thread_num, iteration, peer_, false)) return;
                 if (enactor_stats->retval =
                     Check_Size</*true,*/ SizeT, Value> (
-                        true, "queue3", graph_slice->nodes+2,
+                        true, "queue3", graph_slice->nodes * 1.2 + 2,
                         &frontier_queue->values[selector  ],
                         over_sized, thread_num, iteration, peer_, true )) return;
             }
@@ -1318,7 +1318,7 @@ public:
             else if (traversal_mode == "LB_LIGHT_CULL")
                  return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_LIGHT_CULL>
                     ::Init(*this, context, problem, max_grid_size);
-
+            else printf("Traversal_mode %s is undefined for SSSP\n", traversal_mode.c_str());
 //            if (traversal_mode == 0)
 //                return InitSSSP< LBAdvanceKernelPolicy, FilterKernelPolicy>(
 //                    context, problem, max_grid_size);

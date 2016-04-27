@@ -100,12 +100,12 @@ void Iteration_Loop(
                  *scanned_edges_       =   NULL;
     int           peer, peer_, peer__, gpu_, i, iteration_, wait_count;
     bool          over_sized;
-    int           communicate_latency  =   enactor -> communicate_latency;
+    SizeT         communicate_latency  =   enactor -> communicate_latency;
     float         communicate_multipy  =   enactor -> communicate_multipy;
-    int           expand_latency       =   enactor -> expand_latency;
-    int           subqueue_latency     =   enactor -> subqueue_latency;
-    int           fullqueue_latency    =   enactor -> fullqueue_latency;
-    int           makeout_latency      =   enactor -> makeout_latency;
+    SizeT         expand_latency       =   enactor -> expand_latency;
+    SizeT         subqueue_latency     =   enactor -> subqueue_latency;
+    SizeT         fullqueue_latency    =   enactor -> fullqueue_latency;
+    SizeT         makeout_latency      =   enactor -> makeout_latency;
 
     if (enactor -> debug)
     {

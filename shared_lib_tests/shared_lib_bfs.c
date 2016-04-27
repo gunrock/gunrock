@@ -15,7 +15,7 @@ int main(int argc, char* argv[])
     data_t.VALUE_TYPE = VALUE_INT;         // attributes type
     int srcs[1] = {1};
 
-    struct GRSetup config = InitSetup(1, srcs);   // gunrock configurations
+    struct GRSetup *config = InitSetup(1, srcs);   // gunrock configurations
 
     int num_nodes = 7, num_edges = 15;  // number of nodes and edges
     int row_offsets[8]  = {0, 3, 6, 9, 11, 14, 15, 15};

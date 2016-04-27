@@ -49,9 +49,9 @@ __global__ void Expand_Incoming_Kernel(
 
     while (x < num_elements)
     {
-        VertexId key      = __ldg(keys_in + x);
-        VertexId new_pred = __ldg(vertex_associate_in + x);
-        VertexId old_pred = __ldg(vertex_associate_org + key);
+        VertexId key      = _ldg(keys_in + x);
+        VertexId new_pred = _ldg(vertex_associate_in + x);
+        VertexId old_pred = _ldg(vertex_associate_org + key);
         if (new_pred != old_pred)
         {
             if (new_pred < old_pred) vertex_associate_org[old_pred] = new_pred;
@@ -140,14 +140,14 @@ __global__ void Make_Output_Kernel(
         VertexId old_cid = 0, new_cid = 0, min_cid = 0;
         if (x < num_vertices)
         {
-            old_cid = __ldg(old_component_ids + x);
-            new_cid = __ldg(component_ids     + x);
+            old_cid = _ldg(old_component_ids + x);
+            new_cid = _ldg(component_ids     + x);
             min_cid = min(new_cid, old_cid);
             if (old_cid == min_cid)
                 to_process = false;
             else {
                 old_component_ids[x] = min_cid;
-                VertexId old_grandparent = __ldg(component_ids + old_cid);
+                VertexId old_grandparent = _ldg(component_ids + old_cid);
                 if (min_cid != old_grandparent)
                 {
                     //printf("%d\t Make_Output : not updated, old_cid = %d, min_cid = %d, old_grandparent = %d\n",

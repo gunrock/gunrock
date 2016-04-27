@@ -331,6 +331,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
     CpuTimer    cpu_timer;
     cudaError_t retval              = cudaSuccess;
+    if (max_queue_sizing < 1.2) max_queue_sizing=1.2;
 
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();

@@ -2226,6 +2226,7 @@ public:
             else if (traversal_mode == "LB_LIGHT_CULL")
                  return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_LIGHT_CULL>
                     ::Init(*this, context, problem, max_grid_size);
+            else printf("Traversal mode %s is not supported by BC at the moment\n", traversal_mode.c_str());
         }
 
         //to reduce compile time, get rid of other architecture for now

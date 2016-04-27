@@ -240,18 +240,18 @@ void runBC(GRGraph* output, BC_Parameter *parameter)
 void dispatchBC(
     GRGraph*        grapho,
     const GRGraph*  graphi,
-    const GRSetup   config,
+    const GRSetup*  config,
     const GRTypes   data_t,
     ContextPtr*     context,
     cudaStream_t*   streams)
 {
     BC_Parameter* parameter = new BC_Parameter;
     parameter->src = (long long*)malloc(sizeof(long long));
-    parameter->g_quiet  = config.quiet;
+    parameter->g_quiet  = config -> quiet;
     parameter->context  = context;
     parameter->streams  = streams;
-    parameter->num_gpus = config.num_devices;
-    parameter->gpu_idx  = config.device_list;
+    parameter->num_gpus = config -> num_devices;
+    parameter->gpu_idx  = config -> device_list;
 
     switch (data_t.VTXID_TYPE)
     {
@@ -286,7 +286,7 @@ void dispatchBC(
                 parameter->graph = &csr;
 
                 // determine source vertex to start
-                switch (config.source_mode)
+                switch (config -> source_mode)
                 {
                 case randomize:
                 {
@@ -301,7 +301,7 @@ void dispatchBC(
                 }
                 case manually:
                 {
-                    parameter->src[0] = config.source_vertex[0];
+                    parameter->src[0] = config -> source_vertex[0];
                     break;
                 }
                 default:
@@ -341,7 +341,7 @@ void dispatchBC(
 void gunrock_bc(
     GRGraph       *grapho,
     const GRGraph *graphi,
-    const GRSetup  config,
+    const GRSetup *config,
     const GRTypes  data_t)
 {
     // GPU-related configurations
@@ -350,20 +350,20 @@ void gunrock_bc(
     ContextPtr    *context = NULL;
     cudaStream_t  *streams = NULL;
 
-    num_gpus = config.num_devices;
+    num_gpus = config -> num_devices;
     gpu_idx  = new int [num_gpus];
     for (int i = 0; i < num_gpus; ++i)
     {
-        gpu_idx[i] = config.device_list[i];
+        gpu_idx[i] = config -> device_list[i];
     }
 
     // Create streams and MordernGPU context for each GPU
     streams = new cudaStream_t[num_gpus * num_gpus * 2];
     context = new ContextPtr[num_gpus * num_gpus];
-    if (!config.quiet) { printf(" using %d GPUs:", num_gpus); }
+    if (!config -> quiet) { printf(" using %d GPUs:", num_gpus); }
     for (int gpu = 0; gpu < num_gpus; ++gpu)
     {
-        if (!config.quiet) { printf(" %d ", gpu_idx[gpu]); }
+        if (!config -> quiet) { printf(" %d ", gpu_idx[gpu]); }
         util::SetDevice(gpu_idx[gpu]);
         for (int i = 0; i < num_gpus * 2; ++i)
         {
@@ -378,7 +378,7 @@ void gunrock_bc(
             }
         }
     }
-    if (!config.quiet) { printf("\n"); }
+    if (!config -> quiet) { printf("\n"); }
 
     dispatchBC(grapho, graphi, config, data_t, context, streams);
 }
@@ -406,8 +406,8 @@ void bc(
     data_t.SIZET_TYPE = SIZET_INT;    // integer graph size type
     data_t.VALUE_TYPE = VALUE_FLOAT;  // float attributes type
 
-    struct GRSetup config = InitSetup(1, NULL);  // primitive-specific configures
-    config.source_vertex[0] = source;        // source vertex to start
+    struct GRSetup *config = InitSetup(1, NULL);  // primitive-specific configures
+    config -> source_vertex[0] = source;        // source vertex to start
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));

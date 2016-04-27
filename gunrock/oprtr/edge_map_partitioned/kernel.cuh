@@ -17,6 +17,7 @@
 #include <gunrock/util/cta_work_distribution.cuh>
 #include <gunrock/util/cta_work_progress.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
+#include <gunrock/util/device_intrinsics.cuh>
 
 #include <gunrock/oprtr/edge_map_partitioned/cta.cuh>
 
@@ -97,11 +98,11 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         SizeT first  = /*(d_vertex_id >= max_vertex) ?
             max_edge :*/ //d_row_offsets[d_vertex_id];
             //tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  vertex_id);
-            __ldg(d_row_offsets + vertex_id);
+            _ldg(d_row_offsets + vertex_id);
         SizeT second = /*(d_vertex_id + 1 >= max_vertex) ?
             max_edge :*/ //d_row_offsets[d_vertex_id+1];
             //tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  vertex_id + 1);
-            __ldg(d_row_offsets + (vertex_id + 1));
+            _ldg(d_row_offsets + (vertex_id + 1));
 
         //printf(" d_vertex_id = %d, max_vertex = %d, max_edge = %d, first = %d, second = %d\n",
         //       d_vertex_id, max_vertex, max_edge, first, second);
@@ -267,7 +268,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     if (input_item >= 0)
                         smem_storage.row_offset[threadIdx.x]= //row_offsets[input_item];
                             //tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  input_item);
-                            __ldg(row_offsets + input_item);
+                            _ldg(row_offsets + input_item);
                     else smem_storage.row_offset[threadIdx.x] = util::MaxValue<SizeT>();
                 }
                 else if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V ||

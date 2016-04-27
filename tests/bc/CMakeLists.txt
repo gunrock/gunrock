@@ -12,6 +12,12 @@ set (mgpu_SOURCE_FILES
   ${mgpu_SOURCE_DIRS}/mgpucontext.cu
   ${mgpu_SOURCE_DIRS}/mgpuutil.cpp)
 
+if (cub_INCLUDE_DIRS)
+  include_directories(${cub_INCLUDE_DIRS})
+else()
+  message(SEND_ERROR "CUB include directory not set.")
+endif()
+
 CUDA_ADD_EXECUTABLE(betweenness_centrality
   test_bc.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/test_utils.cu

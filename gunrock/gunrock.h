@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 /**
  * @brief VertexId data type enumerators.
@@ -103,7 +104,7 @@ struct GRSetup
     float     pagerank_error;  // PageRank specific value
     bool pagerank_normalized;  // PageRank specific flag
     float   max_queue_sizing;  // Setting frontier queue size
-    int       traversal_mode;  // Traversal mode: 0 for LB, 1 TWC
+    char* traversal_mode;  // Traversal mode: 0 for LB, 1 TWC
     enum SrcMode source_mode;  // Source mode rand/largest_degree
 };
 
@@ -117,12 +118,12 @@ struct GRSetup
 // Link mentions is an issue with C99, not a clang specific issue
 static
 #endif
-inline struct GRSetup InitSetup(int num_iters, int* source)
+inline struct GRSetup* InitSetup(int num_iters, int* source)
 {
-    struct GRSetup configurations;
-    configurations.quiet = true;
-    configurations.mark_predecessors = true;
-    configurations.enable_idempotence = false;
+    struct GRSetup *configurations = (struct GRSetup*)malloc(sizeof(struct GRSetup));
+    configurations -> quiet = true;
+    configurations -> mark_predecessors = true;
+    configurations -> enable_idempotence = false;
     int* sources = (int*)malloc(sizeof(int)*num_iters);
     int i;
     if (source == NULL)
@@ -132,20 +133,22 @@ inline struct GRSetup InitSetup(int num_iters, int* source)
     {
         for (i = 0; i < num_iters; ++i) sources[i] = source[i];
     }
-    configurations.source_vertex = sources;
-    configurations.delta_factor = 32;
-    configurations.num_devices = 1;
-    configurations.max_iters = 50;
-    configurations.num_iters = num_iters;
-    configurations.top_nodes = 10;
-    configurations.pagerank_delta = 0.85f;
-    configurations.pagerank_error = 0.01f;
-    configurations.pagerank_normalized = false;
-    configurations.max_queue_sizing = 1.0;
-    configurations.traversal_mode = 0;
-    configurations.source_mode = manually;
+    configurations -> source_vertex = sources;
+    configurations -> delta_factor = 32;
+    configurations -> num_devices = 1;
+    configurations -> max_iters = 50;
+    configurations -> num_iters = num_iters;
+    configurations -> top_nodes = 10;
+    configurations -> pagerank_delta = 0.85f;
+    configurations -> pagerank_error = 0.01f;
+    configurations -> pagerank_normalized = false;
+    configurations -> max_queue_sizing = 1.0;
+    configurations -> traversal_mode = (char*)malloc(sizeof(char) * 3);
+    strcpy(configurations -> traversal_mode, "LB");
+    configurations -> traversal_mode[2] = '\0';
+    configurations -> source_mode = manually;
     int* gpu_idx = (int*)malloc(sizeof(int)); gpu_idx[0] = 0;
-    configurations.device_list = gpu_idx;
+    configurations -> device_list = gpu_idx;
     return configurations;
 }
 
@@ -164,7 +167,7 @@ extern "C" {
 float gunrock_bfs(
     struct GRGraph*       grapho,   // Output graph / results
     const struct GRGraph* graphi,   // Input graph structure
-    const struct GRSetup  config,   // Flag configurations
+    const struct GRSetup* config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
 /*
@@ -204,7 +207,7 @@ float bfs(
 void gunrock_bc(
     struct GRGraph*       grapho,   // Output graph / results
     const struct GRGraph* graphi,   // Input graph structure
-    const struct GRSetup  config,   // Flag configurations
+    const struct GRSetup* config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
 /**
@@ -236,7 +239,7 @@ void bc(
 void gunrock_cc(
     struct GRGraph*       grapho,   // Output graph / results
     const struct GRGraph* graphi,   // Input graph structure
-    const struct GRSetup  config,   // Flag configurations
+    const struct GRSetup* config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
 /**
@@ -268,7 +271,7 @@ int cc(
 void gunrock_sssp(
     struct GRGraph*       grapho,   // Output graph / results
     const struct GRGraph* graphi,   // Input graph structure
-    const struct GRSetup  config,   // Flag configurations
+    const struct GRSetup* config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
 /**
@@ -302,7 +305,7 @@ void sssp(
 void gunrock_pagerank(
     struct GRGraph*       grapho,   // Output graph / results
     const struct GRGraph* graphi,   // Input graph structure
-    const struct GRSetup  config,   // Flag configurations
+    const struct GRSetup* config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
 /**

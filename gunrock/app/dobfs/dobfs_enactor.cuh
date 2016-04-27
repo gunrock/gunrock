@@ -276,6 +276,7 @@ public:
                     enactor_stats[0],
                     frontier_attribute[0],
                     enactor_stats->iteration+1,
+                    data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*    )NULL,
@@ -494,10 +495,11 @@ public:
                     enactor_stats -> nodes_queued[0] += frontier_attribute -> queue_length;
                     // Edge Map
                     gunrock::oprtr::advance::LaunchKernel
-                        <BackwardAdvanceKernelPolicy, Problem, RBFSFunctor>(
+                        <BackwardAdvanceKernelPolicy, Problem, RBFSFunctor, gunrock::oprtr::advance::V2V>(
                         enactor_stats[0],
                         frontier_attribute[0],
                         enactor_stats->iteration+1,
+                        data_slice,
                         d_data_slice,
                         data_slice->d_index_queue,
                         data_slice->d_frontier_map_in,
@@ -689,9 +691,10 @@ public:
                     enactor_stats -> nodes_queued[0] += frontier_attribute -> queue_length;
                     // Edge Map
                     gunrock::oprtr::advance::LaunchKernel
-                        <AdvanceKernelPolicy, Problem, BfsFunctor>(
+                        <AdvanceKernelPolicy, Problem, BfsFunctor, gunrock::oprtr::advance::V2V>(
                         enactor_stats[0],
                         frontier_attribute[0],
+                        data_slice,
                         d_data_slice,
                         (VertexId*)NULL,
                         (bool*    )NULL,

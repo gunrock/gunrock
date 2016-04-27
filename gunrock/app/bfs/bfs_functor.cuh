@@ -15,6 +15,7 @@
 #pragma once
 
 #include <gunrock/util/track_utils.cuh>
+#include <gunrock/util/device_intrinsics.cuh>
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/app/bfs/bfs_problem.cuh>
 
