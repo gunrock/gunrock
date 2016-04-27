@@ -116,7 +116,7 @@ void Usage()
         "[--iteration-num=<num>]   Number of runs to perform the test.\n"
         "[--max-iter=<num>]        Max iteration for rank score distribution\n"
         "                          before one round of PageRank run end.\n"
-        "[--partition_method=<random|biasrandom|clustered|metis>]\n"
+        "[--partition-method=<random|biasrandom|clustered|metis>]\n"
         "                          Choose partitioner (Default use random).\n"
         "[--delta=<delta>]         Delta for PageRank (Default 0.85f).\n"
         "[--error=<error>]         Error threshold for PageRank (Default 0.01f).\n"
@@ -1088,8 +1088,8 @@ template <
     typename VertexId>
 int main_SizeT(CommandLineArgs *args)
 {
-// disabled to reduce compile time
-    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+// can be disabled to reduce compile time
+    if (args -> CheckCmdLineFlag("64bit-SizeT") || sizeof(VertexId) > 4)
         return main_Value<VertexId, long long>(args);
     else
         return main_Value<VertexId, int      >(args);
@@ -1097,7 +1097,7 @@ int main_SizeT(CommandLineArgs *args)
 
 int main_VertexId(CommandLineArgs *args)
 {
-    // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
+    // can be disabled to reduce compile time
     if (args -> CheckCmdLineFlag("64bit-VertexId"))
         return main_SizeT<long long>(args);
     else

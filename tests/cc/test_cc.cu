@@ -106,7 +106,7 @@ void Usage()
         "                          (graph-edges * <factor>). (Default: 1.0)\n"
         "[--v]                     Print verbose per iteration debug info.\n"
         "[--iteration-num=<num>]   Number of runs to perform the test.\n"
-        "[--partition_method=<random|biasrandom|clustered|metis>]\n"
+        "[--partition-method=<random|biasrandom|clustered|metis>]\n"
         "                          Choose partitioner (Default use random).\n"
         "[--quiet]                 No output (unless --json is specified).\n"
         "[--json]                  Output JSON-format statistics to STDOUT.\n"
@@ -284,7 +284,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     typedef CCEnactor < Problem>
             //INSTRUMENT,
             //DEBUG,
-            //SIZE_CHECK > 
+            //SIZE_CHECK >
             Enactor;
 
     // parse configurations from mObject info
@@ -641,7 +641,7 @@ int main_VertexId(CommandLineArgs *args)
     // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
     //if (args -> CheckCmdLineFlag("64bit-VertexId"))
     //    return main_SizeT<long long>(args);
-    //else 
+    //else
         return main_SizeT<int      >(args);
 }
 

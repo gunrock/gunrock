@@ -98,7 +98,7 @@ void Usage()
         "[--traversal-mode=<0|1>]  Set traversal strategy, 0 for Load-Balanced\n"
         "                          1 for Dynamic-Cooperative (Default: dynamic\n"
         "                          determine based on average degree).\n"
-        "[--partition_method=<random|biasrandom|clustered|metis>]\n"
+        "[--partition-method=<random|biasrandom|clustered|metis>]\n"
         "                          Choose partitioner (Default use random).\n"
         "[--delta_factor=<factor>] Delta factor for delta-stepping SSSP.\n"
         "[--quiet]                 No output (unless --json is specified).\n"
