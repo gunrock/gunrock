@@ -35,10 +35,12 @@ template<
   typename VertexId,
   typename SizeT,
   typename Value,
-  typename ProblemData>
+  typename Problem,
+  typename _LabelT = VertexId>
 struct SuccFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+  typedef typename Problem::DataSlice DataSlice;
+  typedef _LabelT LabelT;
 
   /**
    * @brief Forward Advance Kernel condition function.
@@ -53,11 +55,17 @@ struct SuccFunctor
    * the destination node in the next frontier.
    */
   static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
+    VertexId    s_id,
+    VertexId    d_id,
+    DataSlice   *d_data_slice,
+    SizeT       edge_id,
+    VertexId    input_item,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       &output_pos)
   {
     // find successors that contribute to the reduced weight value
-    return problem->reduce_val[s_id] == problem->edge_value[e_id];
+    return d_data_slice->reduce_val[s_id] == d_data_slice->edge_value[edge_id];
   }
 
   /**
@@ -70,11 +78,17 @@ struct SuccFunctor
    * @param[in] e_id_in Input edge index
    */
   static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id,  VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
+    VertexId    s_id,
+    VertexId    d_id,
+    DataSlice   *d_data_slice,
+    SizeT       edge_id,
+    VertexId    input_item,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       &output_pos)
   {
     // select one successor with minimum vertex id
-    atomicMin(&problem->successors[s_id], d_id);
+    atomicMin(&d_data_slice->successors[s_id], d_id);
   }
 };
 
@@ -92,10 +106,12 @@ template<
   typename VertexId,
   typename SizeT,
   typename Value,
-  typename ProblemData>
+  typename Problem,
+  typename _LabelT = VertexId>
 struct EdgeFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+  typedef typename Problem::DataSlice DataSlice;
+  typedef _LabelT LabelT;
 
   /**
    * @brief Forward Advance Kernel condition function.
@@ -110,11 +126,17 @@ struct EdgeFunctor
    * the destination node in the next frontier.
    */
   static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
+    VertexId    s_id,
+    VertexId    d_id,
+    DataSlice   *d_data_slice,
+    SizeT       edge_id,
+    VertexId    input_item,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       &output_pos)
   {
-    return problem->successors[s_id] == d_id &&
-      problem->reduce_val[s_id] == problem->edge_value[e_id];
+    return d_data_slice->successors[s_id] == d_id &&
+      d_data_slice->reduce_val[s_id] == d_data_slice->edge_value[edge_id];
   }
 
   /**
@@ -127,11 +149,17 @@ struct EdgeFunctor
    * @param[in] e_id_in Input edge index
    */
   static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id,  VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
+    VertexId    s_id,
+    VertexId    d_id,
+    DataSlice   *d_data_slice,
+    SizeT       edge_id,
+    VertexId    input_item,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       &output_pos)
   {
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      problem->original_e[e_id], problem->temp_index + s_id);
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+      d_data_slice->original_e[edge_id], d_data_slice->temp_index + s_id);
   }
 };
 
@@ -149,10 +177,12 @@ template<
   typename VertexId,
   typename SizeT,
   typename Value,
-  typename ProblemData>
+  typename Problem,
+  typename _LabelT = VertexId>
 struct MarkFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+  typedef typename Problem::DataSlice DataSlice;
+  typedef _LabelT LabelT;
 
   /**
    * @brief Forward Advance Kernel condition function.
@@ -167,8 +197,14 @@ struct MarkFunctor
    * the destination node in the next frontier.
    */
   static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
   {
     return true;
   }
@@ -183,11 +219,17 @@ struct MarkFunctor
    * @param[in] e_id_in Input edge index
    */
   static __device__ __forceinline__ void ApplyEdge(
-  VertexId s_id, VertexId d_id, DataSlice *problem,
-  VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *problem,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
   {
         // mark minimum spanning tree output edges
-        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
             (SizeT)1, problem->mst_output + problem->temp_index[s_id]);
   }
 };
@@ -206,10 +248,12 @@ template<
   typename VertexId,
   typename SizeT,
   typename Value,
-  typename ProblemData>
+  typename Problem,
+  typename _LabelT=VertexId>
 struct CyRmFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+  typedef typename Problem::DataSlice DataSlice;
+  typedef _LabelT LabelT;
 
   /**
    * @brief Forward Advance Kernel condition function.
@@ -224,8 +268,14 @@ struct CyRmFunctor
    * the destination node in the next frontier.
    */
   static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *problem,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
   {
     // cycle of length two
     return problem->successors[s_id] > s_id &&
@@ -242,15 +292,21 @@ struct CyRmFunctor
    * @param[in] e_id_in Input edge index
    */
   static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *problem,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
   {
     // remove cycles by assigning successor to its s_id
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
       s_id, problem->successors + s_id);
 
     // remove some edges in the MST output result
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
         (SizeT)0, problem->mst_output + problem->temp_index[s_id]);
   }
 };
@@ -268,10 +324,12 @@ template<
   typename VertexId,
   typename SizeT,
   typename Value,
-  typename ProblemData>
+  typename Problem,
+  typename _LabelT=VertexId>
 struct PJmpFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+  typedef typename Problem::DataSlice DataSlice;
+  typedef _LabelT LabelT;
 
   /**
    * @brief Filter Kernel condition function. The vertex id is always valid.
@@ -285,7 +343,13 @@ struct PJmpFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+    VertexId    v,
+    VertexId    node,
+    DataSlice    *d_data_slice,
+    SizeT       nid,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       output_pos)
   {
     return true;
   }
@@ -300,20 +364,20 @@ struct PJmpFunctor
    * @param[in] nid Node ID
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
+    VertexId    v,
+    VertexId    node,
+    DataSlice    *problem,
+    SizeT       nid,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       output_pos)
   {
-    VertexId parent;
-    util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-      parent, problem->successors + node);
-    VertexId grand_parent;
-    util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-      grand_parent, problem->successors + parent);
+    VertexId parent = problem->successors[node];
+    VertexId grand_parent = problem->successors[parent];
     if (parent != grand_parent)
     {
-      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        0, problem->done_flags + 0);
-      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        grand_parent, problem->successors + node);
+        problem->done_flags[0] = 0;
+        problem->successors[node] = grand_parent;
     }
   }
 };
@@ -332,10 +396,12 @@ template<
   typename VertexId,
   typename SizeT,
   typename Value,
-  typename ProblemData>
+  typename Problem,
+  typename _LabelT=VertexId>
 struct EgRmFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+  typedef typename Problem::DataSlice DataSlice;
+  typedef _LabelT LabelT;
 
   /**
    * @brief Forward Advance Kernel condition function.
@@ -350,8 +416,14 @@ struct EgRmFunctor
    * the destination node in the next frontier.
    */
   static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *problem,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
   {
     return problem->successors[s_id] == problem->successors[d_id];
   }
@@ -368,18 +440,24 @@ struct EgRmFunctor
    * @param[in] e_id_in Input edge index
    */
   static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *problem,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
   {
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      (VertexId)-1, problem->keys_array + e_id);
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      (VertexId)-1, problem->colindices + e_id);
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+      (VertexId)-1, problem->keys_array + edge_id);
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+      (VertexId)-1, problem->colindices + edge_id);
     //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
     //  (Value)-1, problem->edge_value + e_id);
-    problem->edge_value[e_id] = (Value) -1;
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      (VertexId)-1, problem->original_e + e_id);
+    problem->edge_value[edge_id] = (Value) -1;
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+      (VertexId)-1, problem->original_e + edge_id);
   }
 
   /**
@@ -394,7 +472,13 @@ struct EgRmFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+    VertexId    v,
+    VertexId    node,
+    DataSlice    *d_data_slice,
+    SizeT       nid,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       output_pos)
   {
     return true;
   }
@@ -409,12 +493,18 @@ struct EgRmFunctor
    * @param[in] nid Node ID
    */
   static __device__ __forceinline__ void ApplyFilter(
-  VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+    VertexId    v,
+    VertexId    node,
+    DataSlice    *problem,
+    SizeT       nid,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       output_pos)
   {
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
       problem->super_idxs[problem->keys_array[node]],
       problem->keys_array + node);
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
       problem->super_idxs[problem->colindices[node]],
       problem->colindices + node);
   }
@@ -435,10 +525,12 @@ template<
   typename VertexId,
   typename SizeT,
   typename Value,
-  typename ProblemData>
+  typename Problem,
+  typename _LabelT=VertexId>
 struct RIdxFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+  typedef typename Problem::DataSlice DataSlice;
+  typedef _LabelT LabelT;
 
   /**
    * @brief Filter Kernel condition function.
@@ -453,7 +545,13 @@ struct RIdxFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+    VertexId    v,
+    VertexId    node,
+    DataSlice    *problem,
+    SizeT       nid,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       output_pos)
   {
     return problem->flag_array[node] == 1;
   }
@@ -468,9 +566,15 @@ struct RIdxFunctor
    *
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+    VertexId    v,
+    VertexId    node,
+    DataSlice    *problem,
+    SizeT       nid,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       output_pos)
   {
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
       node, problem->row_offset + problem->keys_array[node]);
   }
 };
@@ -489,10 +593,12 @@ template<
   typename VertexId,
   typename SizeT,
   typename Value,
-  typename ProblemData>
+  typename Problem,
+  typename _LabelT=VertexId>
 struct EIdxFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+  typedef typename Problem::DataSlice DataSlice;
+  typedef _LabelT LabelT;
 
   /**
    * @brief Filter Kernel condition function. Calculate new row_offsets
@@ -506,7 +612,13 @@ struct EIdxFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+    VertexId    v,
+    VertexId    node,
+    DataSlice    *problem,
+    SizeT       nid,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       output_pos)
   {
     return problem->edge_flags[node] == 1;
   }
@@ -520,9 +632,15 @@ struct EIdxFunctor
    * @param[in] nid Node ID
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+    VertexId    v,
+    VertexId    node,
+    DataSlice    *problem,
+    SizeT       nid,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       output_pos)
   {
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
       node, problem->row_offset + problem->temp_index[node]);
   }
 };
@@ -541,10 +659,12 @@ template<
   typename VertexId,
   typename SizeT,
   typename Value,
-  typename ProblemData>
+  typename Problem,
+  typename _LabelT=VertexId>
 struct SuRmFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+  typedef typename Problem::DataSlice DataSlice;
+  typedef _LabelT LabelT;
 
   /**
    * @brief Filter Kernel condition function.
@@ -559,7 +679,13 @@ struct SuRmFunctor
    * it in the outgoing vertex frontier.
    */
   static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+    VertexId    v,
+    VertexId    node,
+    DataSlice    *problem,
+    SizeT       nid,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       output_pos)
   {
     return problem->edge_flags[node] == 0;
   }
@@ -573,15 +699,21 @@ struct SuRmFunctor
    * @param[in] nid Node ID
    */
   static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+    VertexId    v,
+    VertexId    node,
+    DataSlice    *problem,
+    SizeT       nid,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       output_pos)
   {
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
       (VertexId)-1, problem->keys_array + node);
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
       (VertexId)-1, problem->colindices + node);
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
       (Value)   -1, problem->edge_value + node);
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
       (VertexId)-1, problem->original_e + node);
   }
 };

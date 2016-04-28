@@ -20,9 +20,7 @@
 #include <gunrock/util/mark_segment.cuh>
 
 #include <gunrock/oprtr/advance/kernel.cuh>
-#include <gunrock/oprtr/advance/kernel_policy.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
-#include <gunrock/oprtr/filter/kernel_policy.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/mst/mst_problem.cuh>
@@ -172,12 +170,12 @@ public:
 
         Problem                  *problem       =  this -> problem;
         FrontierAttribute<SizeT> *attributes    = &this -> frontier_attribute[0];
-        EnactorStats             *statistics    = &this -> enactor_stats[0];
+        EnactorStats<SizeT>      *statistics    = &this -> enactor_stats[0];
         GraphSliceT              *graph_slice   = problem -> graph_slices[0];
         DataSlice                *d_data_slice  = problem -> d_data_slices[0];
         DataSlice                *data_slice    = problem -> data_slices[0];
         Frontier                 *queue         = &data_slice->frontier_queues[0];
-        util::CtaWorkProgressLifetime
+        util::CtaWorkProgressLifetime<SizeT>
                                  *work_progress = &this -> work_progress[0];
         cudaStream_t              stream        = data_slice->streams[0];
         ContextPtr                context       =  this -> context[0];
@@ -324,9 +322,11 @@ public:
                     graph_slice->nodes);
 
                 gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, SuccFunctor>(
+                    <AdvanceKernelPolicy, Problem, SuccFunctor, gunrock::oprtr::advance::V2V>(
                     statistics[0],
                     attributes[0],
+                    typename SuccFunctor::LabelT(),
+                    data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*    )NULL,
@@ -344,8 +344,7 @@ public:
                     graph_slice->edges,
                     work_progress[0],
                     context[0],
-                    stream,
-                    gunrock::oprtr::advance::V2V);
+                    stream);
 
                 if (this -> debug)
                 {
@@ -362,9 +361,11 @@ public:
                 attributes->queue_reset  = true;
 
                 gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, EdgeFunctor>(
+                    <AdvanceKernelPolicy, Problem, EdgeFunctor, gunrock::oprtr::advance::V2V>(
                     statistics[0],
                     attributes[0],
+                    typename EdgeFunctor::LabelT(),
+                    data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*    )NULL,
@@ -382,8 +383,7 @@ public:
                     graph_slice->edges,
                     work_progress[0],
                     context[0],
-                    stream,
-                    gunrock::oprtr::advance::V2V);
+                    stream);
 
                 if (this -> debug && (retval = util::GRError(cudaStreamSynchronize(stream),
                   "advance::Kernel failed", __FILE__, __LINE__))) break;
@@ -396,9 +396,11 @@ public:
                 attributes->queue_reset  = true;
 
                 gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, MarkFunctor>(
+                    <AdvanceKernelPolicy, Problem, MarkFunctor, gunrock::oprtr::advance::V2E>(
                     statistics[0],
                     attributes[0],
+                    typename MarkFunctor::LabelT(),
+                    data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*    )NULL,
@@ -416,8 +418,7 @@ public:
                     graph_slice->edges,
                     work_progress[0],
                     context[0],
-                    stream,
-                    gunrock::oprtr::advance::V2E);
+                    stream);
 
                 if (this -> debug && (retval = util::GRError(cudaStreamSynchronize(stream),
                   "advance::Kernel failed", __FILE__, __LINE__))) break;
@@ -430,9 +431,11 @@ public:
                 attributes->queue_reset  = true;
 
                 gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, CyRmFunctor>(
+                    <AdvanceKernelPolicy, Problem, CyRmFunctor, gunrock::oprtr::advance::V2E>(
                     statistics[0],
                     attributes[0],
+                    typename CyRmFunctor::LabelT(),
+                    data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*    )NULL,
@@ -450,8 +453,7 @@ public:
                     graph_slice->edges,
                     work_progress[0],
                     context[0],
-                    stream,
-                    gunrock::oprtr::advance::V2E);
+                    stream);
 
                 if (this -> debug)
                 {
@@ -495,23 +497,27 @@ public:
 
                     gunrock::oprtr::filter::LaunchKernel
                         <FilterKernelPolicy, Problem, PJmpFunctor>(
-                        statistics->filter_grid_size,
-                        FilterKernelPolicy::THREADS, 
-                        (size_t)0, 
-                        stream,
-                        statistics->iteration + 1,
-                        attributes->queue_reset,
-                        attributes->queue_index,
-                        attributes->queue_length,
-                        queue->keys[attributes->selector  ].GetPointer(util::DEVICE),
-                        (Value*)NULL,
-                        queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+                        statistics[0],
+                        attributes[0],
+                        (VertexId)statistics->iteration+1,
+                        data_slice,
                         d_data_slice,
-                        (unsigned char*)NULL,
+                        (SizeT*)NULL,
+                        data_slice->visited_mask.GetPointer(util::DEVICE),
+                        queue->keys[attributes->selector  ].GetPointer(util::DEVICE),
+                        queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+                        (Value*)NULL,
+                        (Value*)NULL, 
+                        attributes->output_length[0],
+                        graph_slice->nodes,
                         work_progress[0],
+                        context[0],
+                        stream,
                         queue->keys[attributes->selector  ].GetSize(),
                         queue->keys[attributes->selector^1].GetSize(),
-                        statistics->filter_kernel_stats);
+                        statistics->filter_kernel_stats,
+                        true,
+                        false);
 
                     // prepare for next iteration, only reset once
                     attributes->queue_reset = false;
@@ -647,9 +653,11 @@ public:
                 attributes->queue_reset  = true;
 
                 gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, EgRmFunctor>(
+                    <AdvanceKernelPolicy, Problem, EgRmFunctor, gunrock::oprtr::advance::V2E>(
                     statistics[0],
                     attributes[0],
+                    typename EgRmFunctor::LabelT(),
+                    data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*)NULL,
@@ -667,8 +675,7 @@ public:
                     graph_slice->edges,
                     work_progress[0],
                     context[0],
-                    stream,
-                    gunrock::oprtr::advance::V2E);
+                    stream);
 
                 // Back to default stream, as Cub calls do not support GPU steam for now
                 if (retval = util::GRError(cudaStreamSynchronize(stream),
@@ -771,23 +778,27 @@ public:
 
                 gunrock::oprtr::filter::LaunchKernel
                     <FilterKernelPolicy, Problem, EgRmFunctor>(
-                    statistics->filter_grid_size,
-                    FilterKernelPolicy::THREADS, 
-                    (size_t)0, 
-                    stream,
-                    statistics->iteration + 1,
-                    attributes->queue_reset,
-                    attributes->queue_index,
-                    attributes->queue_length,
-                    queue->values[attributes->selector  ].GetPointer(util::DEVICE),
-                    (Value*)NULL,
-                    queue->values[attributes->selector^1].GetPointer(util::DEVICE),
-                    d_data_slice,
-                    (unsigned char*)NULL,
-                    work_progress[0],
-                    queue->keys[attributes->selector  ].GetSize(),
-                    queue->keys[attributes->selector^1].GetSize(),
-                    statistics->filter_kernel_stats);
+                        statistics[0],
+                        attributes[0],
+                        (VertexId)statistics->iteration+1,
+                        data_slice,
+                        d_data_slice,
+                        (SizeT*)NULL,
+                        data_slice->visited_mask.GetPointer(util::DEVICE),
+                        (VertexId*)NULL,
+                        (VertexId*)NULL,
+                        queue->values[attributes->selector  ].GetPointer(util::DEVICE),
+                        queue->values[attributes->selector^1].GetPointer(util::DEVICE),
+                        attributes->output_length[0],
+                        graph_slice->nodes,
+                        work_progress[0],
+                        context[0],
+                        stream,
+                        queue->keys[attributes->selector  ].GetSize(),
+                        queue->keys[attributes->selector^1].GetSize(),
+                        statistics->filter_kernel_stats,
+                        true,
+                        false);
 
                 // Back to default stream, as Cub calls do not support GPU steam for now
                 if (retval = util::GRError(cudaStreamSynchronize(stream),
@@ -868,23 +879,27 @@ public:
 
                 gunrock::oprtr::filter::LaunchKernel
                     <FilterKernelPolicy, Problem, RIdxFunctor>(
-                    statistics->filter_grid_size,
-                    FilterKernelPolicy::THREADS, 
-                    (size_t)0, 
-                    stream,
-                    statistics->iteration + 1,
-                    attributes->queue_reset,
-                    attributes->queue_index,
-                    attributes->queue_length,
-                    queue->values[attributes->selector  ].GetPointer(util::DEVICE),
-                    (Value*)NULL,
-                    queue->values[attributes->selector^1].GetPointer(util::DEVICE),
-                    d_data_slice,
-                    (unsigned char*)NULL,
-                    work_progress[0],
-                    queue->keys[attributes->selector  ].GetSize(),
-                    queue->keys[attributes->selector^1].GetSize(),
-                    statistics->filter_kernel_stats);
+                        statistics[0],
+                        attributes[0],
+                        (VertexId)statistics->iteration+1,
+                        data_slice,
+                        d_data_slice,
+                        (SizeT*)NULL,
+                        data_slice->visited_mask.GetPointer(util::DEVICE),
+                        (VertexId*)NULL,
+                        (VertexId*)NULL,
+                        queue->values[attributes->selector  ].GetPointer(util::DEVICE),
+                        queue->values[attributes->selector^1].GetPointer(util::DEVICE),
+                        attributes->output_length[0],
+                        graph_slice->nodes,
+                        work_progress[0],
+                        context[0],
+                        stream,
+                        queue->keys[attributes->selector  ].GetSize(),
+                        queue->keys[attributes->selector^1].GetSize(),
+                        statistics->filter_kernel_stats,
+                        true,
+                        false);
 
                 ////////////////////////////////////////////////////////////////////////
                 // copy back d_col_indices back to column indices in graph_slice
@@ -956,16 +971,16 @@ public:
     typedef gunrock::oprtr::filter::KernelPolicy<
         Problem,         // Problem data type
         300,                // CUDA_ARCH
-        //INSTRUMENT,         // INSTRUMENT
         0,                  // SATURATION QUIT
         true,               // DEQUEUE_PROBLEM_SIZE
-        8,                  // MIN_CTA_OCCUPANCY
+        (sizeof(VertexId)==4)?8:4,                  // MIN_CTA_OCCUPANCY
         8,                  // LOG_THREADS
-        1,                  // LOG_LOAD_VEC_SIZE
+        2,                  // LOG_LOAD_VEC_SIZE
         0,                  // LOG_LOADS_PER_TILE
         5,                  // LOG_RAKING_THREADS
         5,                  // END_BITMASK_CULL
-        8>                  // LOG_SCHEDULE_GRANULARITY
+        8,                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::filter::CULL>
         FilterKernelPolicy;
 
     typedef gunrock::oprtr::advance::KernelPolicy<

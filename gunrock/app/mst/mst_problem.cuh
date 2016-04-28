@@ -62,6 +62,7 @@ struct MSTProblem : ProblemBase <
     typedef DataSliceBase<VertexId, SizeT, Value,
         MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
     bool use_double_buffer;
+    typedef unsigned char MaskT;
 
     // helper structures
 

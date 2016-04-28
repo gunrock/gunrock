@@ -28,10 +28,11 @@ namespace wtf {
  * @tparam ProblemData         Problem data type which contains data slice for WTF problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData, typename _LabelT=VertexId>
 struct PRFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Forward Edge Mapping condition function. Check if the destination node
@@ -45,9 +46,17 @@ struct PRFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
-        return (problem->out_degrees[d_id] > 0 && problem->out_degrees[s_id] > 0);
+        return (d_data_slice->out_degrees[d_id] > 0 && d_data_slice->out_degrees[s_id] > 0);
     }
 
     /**
@@ -62,9 +71,17 @@ struct PRFunctor
      * @param[in] e_id_in Input edge id
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
-        atomicAdd(&problem->rank_next[d_id], problem->rank_curr[s_id]/problem->out_degrees[s_id]);
+        atomicAdd(&d_data_slice->rank_next[d_id], d_data_slice->rank_curr[s_id]/d_data_slice->out_degrees[s_id]);
     }
 
     /**
@@ -77,7 +94,14 @@ struct PRFunctor
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
-    static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+    static __device__ __forceinline__ bool CondFilter(
+    VertexId    v,
+    VertexId    node,
+    DataSlice    *problem,
+    SizeT       nid,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       output_pos)
     {
         Value delta = problem->delta;
         VertexId src_node = problem->src_node;
@@ -97,7 +121,14 @@ struct PRFunctor
      * @param[in] nid Node ID
      *
      */
-    static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+    static __device__ __forceinline__ void ApplyFilter(
+    VertexId    v,
+    VertexId    node,
+    DataSlice    *d_data_slice,
+    SizeT       nid,
+    LabelT      label,
+    SizeT       input_pos,
+    SizeT       output_pos)
     {
         // Doing nothing here
     }
@@ -111,10 +142,11 @@ struct PRFunctor
  * @tparam ProblemData         Problem data type which contains data slice for WTF problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData, typename _LabelT=VertexId>
 struct COTFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Forward Edge Mapping condition function. Check if the destination node
@@ -128,7 +160,15 @@ struct COTFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
         return true;
     }
@@ -145,9 +185,17 @@ struct COTFunctor
      * @param[in] e_id_in Input edge id
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
-        atomicAdd(&problem->in_degrees[d_id], 1);
+        atomicAdd(&d_data_slice->in_degrees[d_id], 1);
     }
 };
 
@@ -159,10 +207,11 @@ struct COTFunctor
  * @tparam ProblemData         Problem data type which contains data slice for HITS problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData, typename _LabelT=VertexId>
 struct HUBFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Forward Edge Mapping condition function. Check if the destination node
@@ -176,7 +225,15 @@ struct HUBFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
         return true;
     }
@@ -193,7 +250,15 @@ struct HUBFunctor
      * @param[in] e_id_in Input edge id
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *problem,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
         Value val = (s_id == problem->src_node ? problem->alpha/problem->out_degrees[s_id] : 0)
                   + (1-problem->alpha)*problem->refscore_curr[d_id]/problem->in_degrees[d_id];
@@ -210,10 +275,11 @@ struct HUBFunctor
  * @tparam ProblemData         Problem data type which contains data slice for HITS problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData, typename _LabelT=VertexId>
 struct AUTHFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Forward Edge Mapping condition function. Check if the destination node
@@ -227,7 +293,15 @@ struct AUTHFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
         return true;
     }
@@ -244,7 +318,15 @@ struct AUTHFunctor
      * @param[in] e_id_in Input edge id
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *problem,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
         Value val = problem->rank_curr[s_id]/ (problem->out_degrees[s_id] > 0 ? problem->out_degrees[s_id] : 1.0);
         atomicAdd(&problem->refscore_next[d_id], val);
