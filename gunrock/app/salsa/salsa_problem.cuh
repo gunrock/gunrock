@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <cub/cub.cuh>
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/util/memset_kernel.cuh>
 
@@ -48,6 +49,7 @@ struct SALSAProblem : ProblemBase<VertexId, SizeT, Value,
         MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem;
     typedef DataSliceBase <VertexId, SizeT, Value,
         MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
+    typedef unsigned char MaskT;
 
     //Helper structures
 

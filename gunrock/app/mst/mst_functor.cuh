@@ -625,45 +625,59 @@ struct RIdxFunctor
  * @tparam ProblemData Problem data type contains data slice for MST problem
  */
 template<
-  typename VertexId,
-  typename SizeT,
-  typename Value,
-  typename ProblemData>
+    typename VertexId,
+    typename SizeT,
+    typename Value,
+    typename Problem,
+    typename _LabelT = VertexId>
 struct EIdxFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
-  /**
-   * @brief Filter Kernel condition function. Calculate new row_offsets
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   * @param[in] v node value (if any)
-   * @param[in] nid Node ID
-   *
-   * \return Whether to load the apply function for the node and include
-   * it in the outgoing vertex frontier.
-   */
-  static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-  {
-    return problem->edge_flags[node] == 1;
-  }
+    /**
+    * @brief Filter Kernel condition function. Calculate new row_offsets
+    *
+    * @param[in] node Vertex Id
+    * @param[in] problem Data slice object
+    * @param[in] v node value (if any)
+    * @param[in] nid Node ID
+    *
+    * \return Whether to load the apply function for the node and include
+    * it in the outgoing vertex frontier.
+    */
+    static __device__ __forceinline__ bool CondFilter(
+        VertexId    v,
+        VertexId    node,
+        DataSlice    *d_data_slice,
+        SizeT       nid,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       output_pos)
+    {
+        return d_data_slice->edge_flags[node] == 1;
+    }
 
-  /**
-   * @brief Filter Kernel apply function.
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   * @param[in] v node value (if any)
-   * @param[in] nid Node ID
-   */
-  static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-  {
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      node, problem->row_offset + problem->temp_index[node]);
-  }
+    /**
+    * @brief Filter Kernel apply function.
+    *
+    * @param[in] node Vertex Id
+    * @param[in] problem Data slice object
+    * @param[in] v node value (if any)
+    * @param[in] nid Node ID
+    */
+    static __device__ __forceinline__ void ApplyFilter(
+        VertexId    v,
+        VertexId    node,
+        DataSlice    *d_data_slice,
+        SizeT       nid,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       output_pos)
+    {
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            node, d_data_slice ->row_offset + d_data_slice->temp_index[node]);
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -677,52 +691,66 @@ struct EIdxFunctor
  *
  */
 template<
-  typename VertexId,
-  typename SizeT,
-  typename Value,
-  typename ProblemData>
+    typename VertexId,
+    typename SizeT,
+    typename Value,
+    typename Problem,
+    typename _LabelT = VertexId>
 struct SuRmFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
-  /**
-   * @brief Filter Kernel condition function.
-   *   mark -1 for unselected edges / weights / keys / eId.
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   * @param[in] v node value (if any)
-   * @param[in] nid Node ID
-   *
-   * \return Whether to load the apply function for the node and include
-   * it in the outgoing vertex frontier.
-   */
-  static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-  {
-    return problem->edge_flags[node] == 0;
-  }
+    /**
+    * @brief Filter Kernel condition function.
+    *   mark -1 for unselected edges / weights / keys / eId.
+    *
+    * @param[in] node Vertex Id
+    * @param[in] problem Data slice object
+    * @param[in] v node value (if any)
+    * @param[in] nid Node ID
+    *
+    * \return Whether to load the apply function for the node and include
+    * it in the outgoing vertex frontier.
+    */
+    static __device__ __forceinline__ bool CondFilter(
+        VertexId    v,
+        VertexId    node,
+        DataSlice    *d_data_slice,
+        SizeT       nid,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       output_pos)
+    {
+        return d_data_slice->edge_flags[node] == 0;
+    }
 
-  /**
-   * @brief Filter Kernel apply function.
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   * @param[in] v node value (if any)
-   * @param[in] nid Node ID
-   */
-  static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-  {
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      (VertexId)-1, problem->keys_array + node);
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      (VertexId)-1, problem->colindices + node);
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      (Value)   -1, problem->edge_value + node);
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      (VertexId)-1, problem->original_e + node);
-  }
+    /**
+    * @brief Filter Kernel apply function.
+    *
+    * @param[in] node Vertex Id
+    * @param[in] problem Data slice object
+    * @param[in] v node value (if any)
+    * @param[in] nid Node ID
+    */
+    static __device__ __forceinline__ void ApplyFilter(
+        VertexId    v,
+        VertexId    node,
+        DataSlice    *d_data_slice,
+        SizeT       nid,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       output_pos)
+    {
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+          (VertexId)-1, d_data_slice ->keys_array + node);
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+          (VertexId)-1, d_data_slice ->colindices + node);
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+          (Value)   -1, d_data_slice ->edge_value + node);
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+          (VertexId)-1, d_data_slice ->original_e + node);
+    }
 };
 
 } // mst

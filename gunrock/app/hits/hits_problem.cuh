@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <cub/cub.cuh>
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/util/memset_kernel.cuh>
 
@@ -43,11 +44,12 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
     static const bool MARK_PREDECESSORS     = true;
     static const bool ENABLE_IDEMPOTENCE    = false;
     static const int  MAX_NUM_VERTEX_ASSOCIATES = 0; // TODO: update for multi-GPU  
-    static const int  MAX_NUM_VALUE__ASSOCIATES = 0; // TODO: update for multi-GPU
+    static const int  MAX_NUM_VALUE__ASSOCIATES = 1; // TODO: update for multi-GPU
     typedef ProblemBase   <VertexId, SizeT, Value,
         MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem;
     typedef DataSliceBase <VertexId, SizeT, Value,
         MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
+    typedef unsigned char MaskT;
 
     //Helper structures
 
@@ -210,17 +212,11 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
             int          *gpu_idx          = NULL,
             std::string   partition_method = "random",
             cudaStream_t *streams          = NULL,
-            float         queue_sizing     = 2.0,
-            float         in_sizing        = 1.0,
-            float         partition_factor = -1.0,
+            float         queue_sizing     = 2.0f,
+            float         in_sizing        = 1.0f,
+            float         partition_factor = -1.0f,
             int           partition_seed   = -1)
     {
-        //nodes = hub_graph.nodes;
-        //edges = hub_graph.edges;
-        //SizeT *h_row_offsets = hub_graph.row_offsets;
-        //VertexId *h_column_indices = hub_graph.column_indices;
-        //SizeT *h_col_offsets = auth_graph.row_offsets;
-        //VertexId *h_row_indices = auth_graph.column_indices;
         BaseProblem::Init(
             stream_from_host,
             &hub_graph,
