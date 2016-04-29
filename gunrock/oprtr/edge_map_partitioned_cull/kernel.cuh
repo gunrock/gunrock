@@ -105,7 +105,7 @@ __device__ __forceinline__ void KernelPolicy
 
     if (partition_starts != NULL)
     {
-        block_output_start = blockIdx.x * partition_size;
+        block_output_start = (SizeT)blockIdx.x * partition_size;
         if (block_output_start >= output_queue_len[0]) return;
         block_output_end   = min(
             block_output_start + partition_size, output_queue_len[0]);
@@ -743,7 +743,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         //SizeT partition_start    = (long long)input_queue_length * blockIdx.x / gridDim.x;
         //SizeT partition_end      = (long long)input_queue_length * (blockIdx.x + 1) / gridDim.x;
         VertexId input_item      = 0;
-        SizeT block_input_start  = blockIdx.x * KernelPolicy::SCRATCH_ELEMENTS;//partition_start;
+        SizeT block_input_start  = (SizeT) blockIdx.x * KernelPolicy::SCRATCH_ELEMENTS;//partition_start;
         SizeT thread_output_count = 0;
 
         //while (block_input_start < partition_end)

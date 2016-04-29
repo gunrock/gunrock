@@ -238,7 +238,7 @@ public:
         GraphSlice<VertexId, SizeT, Value> 
                   *graph_slice   =  problem -> graph_slices[0];
         DataSlice *data_slice    =  problem -> data_slices [0].GetPointer(util::HOST);
-        util::CtaWorkProgressLifetime
+        util::CtaWorkProgressLifetime<SizeT>
                   *work_progress = &this->work_progress    [0];
         SizeT      nodes         = graph_slice -> nodes;
         cudaError_t retval       = cudaSuccess;
@@ -278,7 +278,7 @@ public:
 
         // check if any of the frontiers overflowed due to redundant expansion
         bool overflowed = false;
-        if (retval = work_progress -> CheckOverflow<SizeT>(overflowed)) return retval;
+        if (retval = work_progress -> CheckOverflow(overflowed)) return retval;
         if (overflowed)
         {
             retval = util::GRError(

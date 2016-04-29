@@ -32,50 +32,68 @@ namespace mst {
  * @tparam ProblemData Problem data type contains data slice for MST problem
  */
 template<
-  typename VertexId,
-  typename SizeT,
-  typename Value,
-  typename ProblemData>
+    typename VertexId,
+    typename SizeT,
+    typename Value,
+    typename Problem,
+    typename _LabelT = VertexId>
 struct SuccFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
-  /**
-   * @brief Forward Advance Kernel condition function.
-   *
-   * @param[in] s_id Vertex Id of the edge source node
-   * @param[in] d_id Vertex Id of the edge destination node
-   * @param[in] problem Data slice object
-   * @param[in] e_id Output edge index
-   * @param[in] e_id_in Input edge index
-   *
-   * \return Whether to load the apply function for the edge and include
-   * the destination node in the next frontier.
-   */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
-  {
-    // find successors that contribute to the reduced weight value
-    return problem->reduce_val[s_id] == problem->edge_value[e_id];
-  }
+    /**
+     * @brief Forward Advance Kernel condition function.
+     *
+     * @param[in] s_id Vertex Id of the edge source node
+     * @param[in] d_id Vertex Id of the edge destination node
+     * @param[in] problem Data slice object
+     * @param[in] e_id Output edge index
+     * @param[in] e_id_in Input edge index
+     *
+     * \return Whether to load the apply function for the edge and include
+     * the destination node in the next frontier.
+     */
+    static __device__ __forceinline__ bool CondEdge(
+        //VertexId s_id, VertexId d_id, DataSlice *problem,
+        //VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId   s_id,
+        VertexId   d_id,
+        DataSlice *d_data_slice,
+        SizeT      edge_id   ,   
+        VertexId   input_item,
+        LabelT     label     ,   
+        SizeT      input_pos ,
+        SizeT     &output_pos)
+    {
+        // find successors that contribute to the reduced weight value
+        return d_data_slice -> reduce_val[s_id] == d_data_slice -> edge_value[edge_id];
+    }
 
-  /**
-   * @brief Forward Advance Kernel apply function.
-   *
-   * @param[in] s_id Vertex Id of the edge source node
-   * @param[in] d_id Vertex Id of the edge destination node
-   * @param[in] problem Data slice object
-   * @param[in] e_id Output edge index
-   * @param[in] e_id_in Input edge index
-   */
-  static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id,  VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
-  {
-    // select one successor with minimum vertex id
-    atomicMin(&problem->successors[s_id], d_id);
-  }
+   /**
+     * @brief Forward Advance Kernel apply function.
+     *
+     * @param[in] s_id Vertex Id of the edge source node
+     * @param[in] d_id Vertex Id of the edge destination node
+     * @param[in] problem Data slice object
+     * @param[in] e_id Output edge index
+     * @param[in] e_id_in Input edge index
+     */
+    static __device__ __forceinline__ void ApplyEdge(
+        //VertexId s_id,  VertexId d_id, DataSlice *problem,
+        //VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId   s_id,
+        VertexId   d_id,
+        DataSlice *d_data_slice,
+        SizeT      edge_id   ,   
+        VertexId   input_item,
+        LabelT     label     ,   
+        SizeT      input_pos ,
+        SizeT     &output_pos)
+    {
+        // select one successor with minimum vertex id
+        atomicMin(&d_data_slice -> successors[s_id], d_id);
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -89,50 +107,68 @@ struct SuccFunctor
  * @tparam ProblemData Problem data type contains data slice for MST problem
  */
 template<
-  typename VertexId,
-  typename SizeT,
-  typename Value,
-  typename ProblemData>
+    typename VertexId,
+    typename SizeT,
+    typename Value,
+    typename Problem,
+    typename _LabelT = VertexId>
 struct EdgeFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
-  /**
-   * @brief Forward Advance Kernel condition function.
-   *
-   * @param[in] s_id Vertex Id of the edge source node
-   * @param[in] d_id Vertex Id of the edge destination node
-   * @param[in] problem Data slice object
-   * @param[in] e_id Output edge index
-   * @param[in] e_id_in Input edge index
-   *
-   * \return Whether to load the apply function for the edge and include
-   * the destination node in the next frontier.
-   */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
-  {
-    return problem->successors[s_id] == d_id &&
-      problem->reduce_val[s_id] == problem->edge_value[e_id];
-  }
+    /**
+    * @brief Forward Advance Kernel condition function.
+    *
+    * @param[in] s_id Vertex Id of the edge source node
+    * @param[in] d_id Vertex Id of the edge destination node
+    * @param[in] problem Data slice object
+    * @param[in] e_id Output edge index
+    * @param[in] e_id_in Input edge index
+    *
+    * \return Whether to load the apply function for the edge and include
+    * the destination node in the next frontier.
+    */
+    static __device__ __forceinline__ bool CondEdge(
+        //VertexId s_id, VertexId d_id, DataSlice *problem,
+        //VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId   s_id,
+        VertexId   d_id,
+        DataSlice *d_data_slice,
+        SizeT      edge_id   ,   
+        VertexId   input_item,
+        LabelT     label     ,   
+        SizeT      input_pos ,
+        SizeT     &output_pos)
+    {
+        return d_data_slice -> successors[s_id] == d_id &&
+            d_data_slice -> reduce_val[s_id] == d_data_slice ->edge_value[edge_id];
+    }
 
-  /**
-   * @brief Forward Advance Kernel apply function.
-   *
-   * @param[in] s_id Vertex Id of the edge source node
-   * @param[in] d_id Vertex Id of the edge destination node
-   * @param[in] problem Data slice object
-   * @param[in] e_id Output edge index
-   * @param[in] e_id_in Input edge index
-   */
-  static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id,  VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
-  {
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      problem->original_e[e_id], problem->temp_index + s_id);
-  }
+    /**
+    * @brief Forward Advance Kernel apply function.
+    *
+    * @param[in] s_id Vertex Id of the edge source node
+    * @param[in] d_id Vertex Id of the edge destination node
+    * @param[in] problem Data slice object
+    * @param[in] e_id Output edge index
+    * @param[in] e_id_in Input edge index
+    */
+    static __device__ __forceinline__ void ApplyEdge(
+        //VertexId s_id,  VertexId d_id, DataSlice *problem,
+        //VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId   s_id,
+        VertexId   d_id,
+        DataSlice *d_data_slice,
+        SizeT      edge_id   ,   
+        VertexId   input_item,
+        LabelT     label     ,   
+        SizeT      input_pos ,
+        SizeT     &output_pos)
+    {
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            d_data_slice -> original_e[edge_id], d_data_slice -> temp_index + s_id);
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -146,50 +182,68 @@ struct EdgeFunctor
  * @tparam ProblemData Problem data type contains data slice for MST problem
  */
 template<
-  typename VertexId,
-  typename SizeT,
-  typename Value,
-  typename ProblemData>
+    typename VertexId,
+    typename SizeT,
+    typename Value,
+    typename Problem,
+    typename _LabelT = VertexId>
 struct MarkFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
-  /**
-   * @brief Forward Advance Kernel condition function.
-   *
-   * @param[in] s_id Vertex Id of the edge source node
-   * @param[in] d_id Vertex Id of the edge destination node
-   * @param[in] problem Data slice object
-   * @param[in] e_id Output edge index
-   * @param[in] e_id_in Input edge index
-   *
-   * \return Whether to load the apply function for the edge and include
-   * the destination node in the next frontier.
-   */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
-  {
-    return true;
-  }
+    /**
+    * @brief Forward Advance Kernel condition function.
+    *
+    * @param[in] s_id Vertex Id of the edge source node
+    * @param[in] d_id Vertex Id of the edge destination node
+    * @param[in] problem Data slice object
+    * @param[in] e_id Output edge index
+    * @param[in] e_id_in Input edge index
+    *
+    * \return Whether to load the apply function for the edge and include
+    * the destination node in the next frontier.
+    */
+    static __device__ __forceinline__ bool CondEdge(
+        //VertexId s_id, VertexId d_id, DataSlice *problem,
+        //VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId   s_id,
+        VertexId   d_id,
+        DataSlice *d_data_slice,
+        SizeT      edge_id   ,   
+        VertexId   input_item,
+        LabelT     label     ,   
+        SizeT      input_pos ,
+        SizeT     &output_pos)
+    {
+        return true;
+    }
 
-  /**
-   * @brief Forward Advance Kernel apply function.
-   *
-   * @param[in] s_id Vertex Id of the edge source node
-   * @param[in] d_id Vertex Id of the edge destination node
-   * @param[in] problem Data slice object
-   * @param[in] e_id Output edge index
-   * @param[in] e_id_in Input edge index
-   */
-  static __device__ __forceinline__ void ApplyEdge(
-  VertexId s_id, VertexId d_id, DataSlice *problem,
-  VertexId e_id = 0, VertexId e_id_in = 0)
-  {
+    /**
+    * @brief Forward Advance Kernel apply function.
+    *
+    * @param[in] s_id Vertex Id of the edge source node
+    * @param[in] d_id Vertex Id of the edge destination node
+    * @param[in] problem Data slice object
+    * @param[in] e_id Output edge index
+    * @param[in] e_id_in Input edge index
+    */
+    static __device__ __forceinline__ void ApplyEdge(
+        //VertexId s_id, VertexId d_id, DataSlice *problem,
+        //VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId   s_id,
+        VertexId   d_id,
+        DataSlice *d_data_slice,
+        SizeT      edge_id   ,   
+        VertexId   input_item,
+        LabelT     label     ,   
+        SizeT      input_pos ,
+        SizeT     &output_pos)
+    {
         // mark minimum spanning tree output edges
-        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-            (SizeT)1, problem->mst_output + problem->temp_index[s_id]);
-  }
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            (SizeT)1, d_data_slice ->mst_output + d_data_slice -> temp_index[s_id]);
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -203,56 +257,74 @@ struct MarkFunctor
  * @tparam ProblemData Problem data type contains data slice for MST problem
  */
 template<
-  typename VertexId,
-  typename SizeT,
-  typename Value,
-  typename ProblemData>
+    typename VertexId,
+    typename SizeT,
+    typename Value,
+    typename Problem,
+    typename _LabelT = VertexId>
 struct CyRmFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
-  /**
-   * @brief Forward Advance Kernel condition function.
-   *
-   * @param[in] s_id Vertex Id of the edge source node
-   * @param[in] d_id Vertex Id of the edge destination node
-   * @param[in] problem Data slice object
-   * @param[in] e_id Output edge index
-   * @param[in] e_id_in Input edge index
-   *
-   * \return Whether to load the apply function for the edge and include
-   * the destination node in the next frontier.
-   */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
-  {
-    // cycle of length two
-    return problem->successors[s_id] > s_id &&
-      problem->successors[problem->successors[s_id]] == s_id;
-  }
+    /**
+    * @brief Forward Advance Kernel condition function.
+    *
+    * @param[in] s_id Vertex Id of the edge source node
+    * @param[in] d_id Vertex Id of the edge destination node
+    * @param[in] problem Data slice object
+    * @param[in] e_id Output edge index
+    * @param[in] e_id_in Input edge index
+    *
+    * \return Whether to load the apply function for the edge and include
+    * the destination node in the next frontier.
+    */
+    static __device__ __forceinline__ bool CondEdge(
+        //VertexId s_id, VertexId d_id, DataSlice *problem,
+        //VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId   s_id,
+        VertexId   d_id,
+        DataSlice *d_data_slice,
+        SizeT      edge_id   ,   
+        VertexId   input_item,
+        LabelT     label     ,   
+        SizeT      input_pos ,
+        SizeT     &output_pos)
+    {
+        // cycle of length two
+        return d_data_slice ->successors[s_id] > s_id &&
+            d_data_slice -> successors[d_data_slice->successors[s_id]] == s_id;
+    }
 
-  /**
-   * @brief Forward Advance Kernel apply function.
-   *
-   * @param[in] s_id Vertex Id of the edge source node
-   * @param[in] d_id Vertex Id of the edge destination node
-   * @param[in] problem Data slice object
-   * @param[in] e_id Output edge index
-   * @param[in] e_id_in Input edge index
-   */
-  static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
-  {
-    // remove cycles by assigning successor to its s_id
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      s_id, problem->successors + s_id);
+    /**
+    * @brief Forward Advance Kernel apply function.
+    *
+    * @param[in] s_id Vertex Id of the edge source node
+    * @param[in] d_id Vertex Id of the edge destination node
+    * @param[in] problem Data slice object
+    * @param[in] e_id Output edge index
+    * @param[in] e_id_in Input edge index
+    */
+    static __device__ __forceinline__ void ApplyEdge(
+        //VertexId s_id, VertexId d_id, DataSlice *problem,
+        //VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId   s_id,
+        VertexId   d_id,
+        DataSlice *d_data_slice,
+        SizeT      edge_id   ,   
+        VertexId   input_item,
+        LabelT     label     ,   
+        SizeT      input_pos ,
+        SizeT     &output_pos)
+    {
+        // remove cycles by assigning successor to its s_id
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            s_id, d_data_slice->successors + s_id);
 
-    // remove some edges in the MST output result
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        (SizeT)0, problem->mst_output + problem->temp_index[s_id]);
-  }
+        // remove some edges in the MST output result
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            (SizeT)0, d_data_slice->mst_output + d_data_slice->temp_index[s_id]);
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -265,57 +337,73 @@ struct CyRmFunctor
  * @tparam ProblemData Problem data type contains data slice for MST problem
  */
 template<
-  typename VertexId,
-  typename SizeT,
-  typename Value,
-  typename ProblemData>
+    typename VertexId,
+    typename SizeT,
+    typename Value,
+    typename Problem,
+    typename _LabelT = VertexId>
 struct PJmpFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
-  /**
-   * @brief Filter Kernel condition function. The vertex id is always valid.
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   * @param[in] v Vertex value
-   * @param[in] nid Node ID
-   *
-   * \return Whether to load the apply function for the node and include
-   * it in the outgoing vertex frontier.
-   */
-  static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-  {
-    return true;
-  }
-
-  /**
-   * @brief Filter Kernel apply function. Point the current node to the
-   * parent node of its parent node.
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   * @param[in] v Vertex value
-   * @param[in] nid Node ID
-   */
-  static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
-  {
-    VertexId parent;
-    util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-      parent, problem->successors + node);
-    VertexId grand_parent;
-    util::io::ModifiedLoad<ProblemData::COLUMN_READ_MODIFIER>::Ld(
-      grand_parent, problem->successors + parent);
-    if (parent != grand_parent)
+    /**
+    * @brief Filter Kernel condition function. The vertex id is always valid.
+    *
+    * @param[in] node Vertex Id
+    * @param[in] problem Data slice object
+    * @param[in] v Vertex value
+    * @param[in] nid Node ID
+    *
+    * \return Whether to load the apply function for the node and include
+    * it in the outgoing vertex frontier.
+    */
+    static __device__ __forceinline__ bool CondFilter(
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
     {
-      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        0, problem->done_flags + 0);
-      util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        grand_parent, problem->successors + node);
+        return true;
     }
-  }
+
+    /**
+    * @brief Filter Kernel apply function. Point the current node to the
+    * parent node of its parent node.
+    *
+    * @param[in] node Vertex Id
+    * @param[in] problem Data slice object
+    * @param[in] v Vertex value
+    * @param[in] nid Node ID
+    */
+    static __device__ __forceinline__ void ApplyFilter(
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        VertexId parent;
+        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+            parent, d_data_slice -> successors + node);
+        VertexId grand_parent;
+        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+          grand_parent, d_data_slice -> successors + parent);
+        if (parent != grand_parent)
+        {
+            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                0, d_data_slice -> done_flags + 0);
+            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                grand_parent, d_data_slice -> successors + node);
+        }
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -329,95 +417,130 @@ struct PJmpFunctor
  * @tparam ProblemData Problem data type contains data slice for MST problem
  */
 template<
-  typename VertexId,
-  typename SizeT,
-  typename Value,
-  typename ProblemData>
+    typename VertexId,
+    typename SizeT,
+    typename Value,
+    typename Problem,
+    typename _LabelT = VertexId>
 struct EgRmFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
-  /**
-   * @brief Forward Advance Kernel condition function.
-   *
-   * @param[in] s_id Vertex Id of the edge source node
-   * @param[in] d_id Vertex Id of the edge destination node
-   * @param[in] problem Data slice object
-   * @param[in] e_id Output edge index
-   * @param[in] e_id_in Input edge index
-   *
-   * \return Whether to load the apply function for the edge and include
-   * the destination node in the next frontier.
-   */
-  static __device__ __forceinline__ bool CondEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
-  {
-    return problem->successors[s_id] == problem->successors[d_id];
-  }
+    /**
+    * @brief Forward Advance Kernel condition function.
+    *
+    * @param[in] s_id Vertex Id of the edge source node
+    * @param[in] d_id Vertex Id of the edge destination node
+    * @param[in] problem Data slice object
+    * @param[in] e_id Output edge index
+    * @param[in] e_id_in Input edge index
+    *
+    * \return Whether to load the apply function for the edge and include
+    * the destination node in the next frontier.
+    */
+    static __device__ __forceinline__ bool CondEdge(
+        //VertexId s_id, VertexId d_id, DataSlice *problem,
+        //VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId   s_id,
+        VertexId   d_id,
+        DataSlice *d_data_slice,
+        SizeT      edge_id   ,   
+        VertexId   input_item,
+        LabelT     label     ,   
+        SizeT      input_pos ,
+        SizeT     &output_pos)
+    {
+        return d_data_slice -> successors[s_id] == d_data_slice -> successors[d_id];
+    }
 
-  /**
-   * @brief Forward Advance Kernel apply function.
-   * Each edge looks at the super-vertex id of both endpoints
-   * and mark -1 (to be removed) if the id is the same
-   *
-   * @param[in] s_id Vertex Id of the edge source node
-   * @param[in] d_id Vertex Id of the edge destination node
-   * @param[in] problem Data slice object
-   * @param[in] e_id Output edge index
-   * @param[in] e_id_in Input edge index
-   */
-  static __device__ __forceinline__ void ApplyEdge(
-    VertexId s_id, VertexId d_id, DataSlice *problem,
-    VertexId e_id = 0, VertexId e_id_in = 0)
-  {
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      (VertexId)-1, problem->keys_array + e_id);
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      (VertexId)-1, problem->colindices + e_id);
-    //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-    //  (Value)-1, problem->edge_value + e_id);
-    problem->edge_value[e_id] = (Value) -1;
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      (VertexId)-1, problem->original_e + e_id);
-  }
+    /**
+    * @brief Forward Advance Kernel apply function.
+    * Each edge looks at the super-vertex id of both endpoints
+    * and mark -1 (to be removed) if the id is the same
+    *
+    * @param[in] s_id Vertex Id of the edge source node
+    * @param[in] d_id Vertex Id of the edge destination node
+    * @param[in] problem Data slice object
+    * @param[in] e_id Output edge index
+    * @param[in] e_id_in Input edge index
+    */
+    static __device__ __forceinline__ void ApplyEdge(
+        //VertexId s_id, VertexId d_id, DataSlice *problem,
+        //VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId   s_id,
+        VertexId   d_id,
+        DataSlice *d_data_slice,
+        SizeT      edge_id   ,   
+        VertexId   input_item,
+        LabelT     label     ,   
+        SizeT      input_pos ,
+        SizeT     &output_pos)
+    {
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            (VertexId)-1, d_data_slice -> keys_array + edge_id);
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            (VertexId)-1, d_data_slice -> colindices + edge_id);
+        //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
+        //  (Value)-1, problem->edge_value + e_id);
+        d_data_slice -> edge_value[edge_id] = (Value) -1;
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            (VertexId)-1, d_data_slice -> original_e + edge_id);
+    }
 
-  /**
-   * @brief Filter Kernel condition function.
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   * @param[in] v Vertex value
-   * @param[in] nid Node ID
-   *
-   * \return Whether to load the apply function for the node and include
-   * it in the outgoing vertex frontier.
-   */
-  static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-  {
-    return true;
-  }
+    /**
+    * @brief Filter Kernel condition function.
+    *
+    * @param[in] node Vertex Id
+    * @param[in] problem Data slice object
+    * @param[in] v Vertex value
+    * @param[in] nid Node ID
+    *
+    * \return Whether to load the apply function for the node and include
+    * it in the outgoing vertex frontier.
+    */
+    static __device__ __forceinline__ bool CondFilter(
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        return true;
+    }
 
-  /**
-   * @brief Filter Kernel apply function.
-   * removing edges belonging to the same super-vertex
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   * @param[in] v Vertex value
-   * @param[in] nid Node ID
-   */
-  static __device__ __forceinline__ void ApplyFilter(
-  VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-  {
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      problem->super_idxs[problem->keys_array[node]],
-      problem->keys_array + node);
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      problem->super_idxs[problem->colindices[node]],
-      problem->colindices + node);
-  }
+    /**
+    * @brief Filter Kernel apply function.
+    * removing edges belonging to the same super-vertex
+    *
+    * @param[in] node Vertex Id
+    * @param[in] problem Data slice object
+    * @param[in] v Vertex value
+    * @param[in] nid Node ID
+    */
+    static __device__ __forceinline__ void ApplyFilter(
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        if (node >= d_data_slice -> nodes) return;
+        if (d_data_slice -> keys_array[node] >= d_data_slice -> nodes) return;
+        
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            d_data_slice->super_idxs[ d_data_slice->keys_array[node]],
+            d_data_slice->keys_array + node);
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            d_data_slice->super_idxs[ d_data_slice->colindices[node]],
+            d_data_slice->colindices + node);
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -432,47 +555,63 @@ struct EgRmFunctor
  *
  */
 template<
-  typename VertexId,
-  typename SizeT,
-  typename Value,
-  typename ProblemData>
+    typename VertexId,
+    typename SizeT,
+    typename Value,
+    typename Problem,
+    typename _LabelT = VertexId>
 struct RIdxFunctor
 {
-  typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
-  /**
-   * @brief Filter Kernel condition function.
-   *   calculate new row_offsets
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   * @param[in] v Vertex value
-   * @param[in] nid Node ID
-   *
-   * \return Whether to load the apply function for the node and include
-   * it in the outgoing vertex frontier.
-   */
-  static __device__ __forceinline__ bool CondFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-  {
-    return problem->flag_array[node] == 1;
-  }
+    /**
+    * @brief Filter Kernel condition function.
+    *   calculate new row_offsets
+    *
+    * @param[in] node Vertex Id
+    * @param[in] problem Data slice object
+    * @param[in] v Vertex value
+    * @param[in] nid Node ID
+    *
+    * \return Whether to load the apply function for the node and include
+    * it in the outgoing vertex frontier.
+    */
+    static __device__ __forceinline__ bool CondFilter(
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        return d_data_slice -> flag_array[node] == 1;
+    }
 
-  /**
-   * @brief Filter Kernel apply function.
-   *
-   * @param[in] node Vertex Id
-   * @param[in] problem Data slice object
-   * @param[in] v Vertex value
-   * @param[in] nid Node ID
-   *
-   */
-  static __device__ __forceinline__ void ApplyFilter(
-    VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-  {
-    util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-      node, problem->row_offset + problem->keys_array[node]);
-  }
+    /**
+    * @brief Filter Kernel apply function.
+    *
+    * @param[in] node Vertex Id
+    * @param[in] problem Data slice object
+    * @param[in] v Vertex value
+    * @param[in] nid Node ID
+    *
+    */
+    static __device__ __forceinline__ void ApplyFilter(
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            node, d_data_slice -> row_offset + d_data_slice -> keys_array[node]);
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////

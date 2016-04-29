@@ -312,7 +312,7 @@ extern "C" {
     //void PrintCPUArray(const char* const name, const _Value* const array, const _SizeT limit, const int gpu=-1, const int iteration=-1, clock_t stime = -1)
     void PrintCPUArray(const char* const name, const _Value* const array, const _SizeT limit, const int gpu=-1, const int iteration=-1, int peer = -1)
     {
-        char *buffer = new char[1024 * 128];
+        char *buffer = new char[1024 * 1024];
 
         sprintf(buffer, "%s = ", name);
 

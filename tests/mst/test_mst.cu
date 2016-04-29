@@ -420,14 +420,14 @@ void RunTest_connectivity_check(Info<VertexId, SizeT, Value> *info)
     data_t.SIZET_TYPE = SIZET_INT;  // graph size type
     data_t.VALUE_TYPE = VALUE_INT;  // attributes type
 
-    struct GRSetup config           = InitSetup(1, NULL);  // gunrock configurations
+    struct GRSetup *config          = InitSetup(1, NULL);  // gunrock configurations
     int num_gpus                    = info->info["num_gpus"].get_int();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int *gpu_idx                    = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) 
         gpu_idx[i] = device_list[i].get_int();
-    delete config.device_list;
-    config.device_list = gpu_idx;
+    delete config -> device_list;
+    config -> device_list = gpu_idx;
 
     struct GRGraph *grapho = (GRGraph*)malloc(sizeof(GRGraph));
     struct GRGraph *graphi = (GRGraph*)malloc(sizeof(GRGraph));

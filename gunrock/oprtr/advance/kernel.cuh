@@ -440,7 +440,6 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
     {
         cudaError_t retval = cudaSuccess;
         // load edge-expand-partitioned kernel
-        SizeT num_block = parameter -> frontier_attribute -> queue_length / LBPOLICY::THREADS + 1;
         if (parameter -> get_output_length)
         {
             if (retval = ComputeOutputLength(parameter))
@@ -454,6 +453,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
             //parameter -> frontier_attribute -> output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD)//)
             parameter -> frontier_attribute -> output_length[0] < 64 * 2 * LBPOLICY::THREADS)
         {
+            SizeT num_block = parameter -> frontier_attribute -> queue_length / LBPOLICY::SCRATCH_ELEMENTS + 1;
             //printf("using RelaxLightEdges\n");
             gunrock::oprtr::edge_map_partitioned::RelaxLightEdges
                 <LBPOLICY,
@@ -597,7 +597,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_LIGHT>
         cudaError_t retval = cudaSuccess;
         // load edge-expand-partitioned kernel
         SizeT num_block = (parameter -> frontier_attribute -> queue_length +
-             LBPOLICY::THREADS - 1) / LBPOLICY::THREADS;
+             LBPOLICY::SCRATCH_ELEMENTS - 1) / LBPOLICY::SCRATCH_ELEMENTS;
 
         if (parameter -> get_output_length)
         {

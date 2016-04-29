@@ -62,6 +62,7 @@ struct MSTProblem : ProblemBase <
     typedef DataSliceBase<VertexId, SizeT, Value,
         MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
     bool use_double_buffer;
+    typedef unsigned char MaskT;
 
     // helper structures
 
@@ -396,12 +397,12 @@ struct MSTProblem : ProblemBase <
                 // initialize reduce_key to a vector of zeros
                 util::MemsetKernel<<<128, 128>>>(
                   data_slices[gpu]->reduce_key.GetPointer(util::DEVICE),
-                  (VertexId)0, this -> edges);
+                  (VertexId)0, this -> nodes);
 
                 // initialize successors to a vector of zeros
                 util::MemsetKernel<<<128, 128>>>(
                   data_slices[gpu]->successors.GetPointer(util::DEVICE),
-                  (VertexId)0, this -> edges);
+                  (VertexId)0, this -> nodes);
 
                 // initialize original node IDs from 0 to nodes
                 util::MemsetIdxKernel<<<128, 128>>>(
@@ -434,7 +435,7 @@ struct MSTProblem : ProblemBase <
                 // initialize reduce_val to a vector of zeros
                 util::MemsetKernel<<<128, 128>>>(
                   data_slices[gpu]->reduce_val.GetPointer(util::DEVICE),
-                  (Value)0, this -> edges);
+                  (Value)0, this -> nodes);
 
                 // initialize edge_value with graph.column_indices
                 data_slices[gpu]->edge_value.SetPointer(graph -> edge_values);
@@ -495,6 +496,12 @@ struct MSTProblem : ProblemBase <
                 queue_sizing,
                 queue_sizing1);
 
+          if (ret = data_slices[gpu] -> frontier_queues[0].keys[0].EnsureSize(
+            this -> nodes, util::DEVICE))
+                return ret;
+          if (ret = data_slices[gpu] -> frontier_queues[0].keys[1].EnsureSize(
+            this -> edges, util::DEVICE))
+                return ret;
           //
           // Allocate outputs if necessary
           //
