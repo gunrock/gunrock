@@ -1,11 +1,16 @@
 Building Gunrock              {#building_gunrock}
 ==============
 
-This default branch has currently been tested on Linux and has only been tuned
+This default branch has been tested on Linux and has only been tuned
 for architectures with CUDA
 [compute capability](http://docs.nvidia.com/cuda/cuda-c-programming-guide/#compute-capability)
 equal to or larger than 3.0. It is most likely that we will concentrate our
 future effort on 3.0+-capability devices going forward.
+
+CUDA Version {#cuda_version}
+============
+
+Gunrock uses C++11 internally and thus requires a CUDA compiler that supports C++11 (CUDA 7.0 or greater). We identified and reported a compiler bug in CUDA 7.0 that was fixed in recent CUDA 7.5 builds, so we recommend CUDA 7.5 or higher. CUDA 7.0 may allow successful building of some primitives but not all. CUDA 8 release candidates appear to successfully compile and run Gunrock.
 
 Boost Dependency           {#build_boost}
 =================
@@ -18,6 +23,8 @@ You will need to
 [install Boost](http://www.boost.org/doc/libs/1_58_0/doc/html/bbv2/installation.html)
 to build test applications.
 
+One external user has reported that a user-installed Boost in a local directory did not work but Boost installed as root does work, so we recommend the latter.
+
 METIS Dependency {#build_metis}
 =================
 Gunrock uses the
@@ -26,12 +33,16 @@ possible partitioner. You will need to
 [install METIS](http://glaros.dtc.umn.edu/gkhome/metis/metis/download)
 to build test applications.
 
+One external user has reported that a user-installed METIS in a local directory did not work but METIS installed as root does work, so we recommend the latter. This is particularly important for finding METIS header files.
+
+If the build cannot find your METIS library, please set the `METIS_DLL` environment variable to the full path of the library.
+
 ModernGPU & CUB Dependency           {#build_mgpu}
 =================
 
 Gunrock uses APIs from [Modern GPU](https://github.com/NVlabs/moderngpu)
 and [CUB](http://nvlabs.github.io/cub/). You
-will need to download or clone them and place them to `gunrock/externals`.
+will need to download or clone them and place them into `gunrock/externals`.
 Alternatively, you can clone gunrock recursively with the git command:
 
     git clone --recursive https://github.com/gunrock/gunrock
@@ -40,6 +51,9 @@ or if you already cloned gunrock, under `gunrock/`:
 
     git submodule init
     git submodule update
+    
+Even if users have these two packages elsewhere on their systems, please
+install them into gunrock/externals for proper compilation.
 
 Generating Datasets           {#generating_datasets}
 ===================
