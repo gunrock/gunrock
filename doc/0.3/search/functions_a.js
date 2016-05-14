@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['loadgraph',['LoadGraph',['../structgunrock_1_1app_1_1_info.html#af3ce4b5753b83d3520dc0884eb4751f4',1,'gunrock::app::Info']]]
+  ['jsondir',['JsonDir',['../structgunrock_1_1app_1_1_info.html#adcc21e59b7cdb96ea9e6fb1532f3e4b8',1,'gunrock::app::Info']]]
 ];
