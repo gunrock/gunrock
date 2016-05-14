@@ -11,7 +11,7 @@ code size and minimal GPU programming knowledge.
 For more details, please visit our [website](http://gunrock.github.io/), read
 [Why Gunrock](http://gunrock.github.io/gunrock/doc/latest/why-gunrock.html),
 our PPoPP 2016 paper,
-[Gunrock: A High-Performance Graph Processing Library on the GPU]http://escholarship.org/uc/item/6xz7z9k0),
+[Gunrock: A High-Performance Graph Processing Library on the GPU](http://escholarship.org/uc/item/6xz7z9k0),
 and check out the
 [Publications](#Publications) section. See [Release Notes](http://gunrock.github.io/gunrock/doc/latest/release_notes.html) to keep up with the changes in latest release.
 
