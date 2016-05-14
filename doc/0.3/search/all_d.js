@@ -1,5 +1,6 @@
 var searchData=
 [
+  ['magnitudeshift',['MagnitudeShift',['../basic__utils_8h.html#a0a5767c350b946c24453b1303d30450e',1,'gunrock::util']]],
   ['makesubgraph',['MakeSubGraph',['../structgunrock_1_1app_1_1_partitioner_base.html#ae9e85768cfbc5f1a02c5ee4cb0f28f29',1,'gunrock::app::PartitionerBase']]],
   ['makesubgraph_5fthread',['MakeSubGraph_Thread',['../structgunrock_1_1app_1_1_partitioner_base.html#a79692048476afa7a19904c340ac9e61d',1,'gunrock::app::PartitionerBase']]],
   ['mark_5fsegment_2ecuh',['mark_segment.cuh',['../mark__segment_8cuh.html',1,'']]],
@@ -7,6 +8,8 @@ var searchData=
   ['markfunctor',['MarkFunctor',['../structgunrock_1_1app_1_1mst_1_1_mark_functor.html',1,'gunrock::app::mst']]],
   ['markpredecessorssssp',['markPredecessorsSSSP',['../sssp__app_8cu.html#a85c1ca18e346b3a40730b545e3baefca',1,'sssp_app.cu']]],
   ['marks',['marks',['../structgunrock_1_1app_1_1cc_1_1_c_c_problem_1_1_data_slice.html#a456acc61a429406eb36b4528c8181134',1,'gunrock::app::cc::CCProblem::DataSlice']]],
+  ['marksegmentfromindices',['MarkSegmentFromIndices',['../mark__segment_8cuh.html#aa3ed88a60f324a994b80b244122ae318',1,'gunrock::util']]],
+  ['marksegmentfromkeys',['MarkSegmentFromKeys',['../mark__segment_8cuh.html#a214052bed85034f12e62faf9d2f39070',1,'gunrock::util']]],
   ['masks',['masks',['../structgunrock_1_1app_1_1cc_1_1_c_c_problem_1_1_data_slice.html#aa528990191ad7f8e2511fd80a66d8c01',1,'gunrock::app::cc::CCProblem::DataSlice']]],
   ['max_5fqueue_5flength',['max_queue_length',['../structgunrock_1_1priority__queue_1_1_priority_queue.html#a2e3cf9e828e85827471ed2837a9b16fb',1,'gunrock::priority_queue::PriorityQueue']]],
   ['maxgridsize',['MaxGridSize',['../classgunrock_1_1app_1_1_enactor_base.html#a4d9d0fd49279fdf99dba3987d5706391',1,'gunrock::app::EnactorBase']]],
@@ -22,6 +25,7 @@ var searchData=
   ['metis_5fpartitioner_2ecuh',['metis_partitioner.cuh',['../metis__partitioner_8cuh.html',1,'']]],
   ['misc_5futils_2ecu',['misc_utils.cu',['../misc__utils_8cu.html',1,'']]],
   ['misc_5futils_2ecuh',['misc_utils.cuh',['../misc__utils_8cuh.html',1,'']]],
+  ['mode',['MODE',['../oprtr_2advance_2kernel__policy_8cuh.html#a8cb2bf1bbef00c2209f3ec4908385d2b',1,'gunrock::oprtr::advance']]],
   ['modified_5fload_2ecuh',['modified_load.cuh',['../modified__load_8cuh.html',1,'']]],
   ['modified_5fstore_2ecuh',['modified_store.cuh',['../modified__store_8cuh.html',1,'']]],
   ['modifiedload',['ModifiedLoad',['../structgunrock_1_1util_1_1io_1_1_modified_load.html',1,'gunrock::util::io']]],
@@ -30,8 +34,8 @@ var searchData=
   ['mst_5fenactor_2ecuh',['mst_enactor.cuh',['../mst__enactor_8cuh.html',1,'']]],
   ['mst_5ffunctor_2ecuh',['mst_functor.cuh',['../mst__functor_8cuh.html',1,'']]],
   ['mst_5fproblem_2ecuh',['mst_problem.cuh',['../mst__problem_8cuh.html',1,'']]],
-  ['mstenactor',['MSTEnactor',['../classgunrock_1_1app_1_1mst_1_1_m_s_t_enactor.html#a9205f1cdc4049bf641a616e0a57945ac',1,'gunrock::app::mst::MSTEnactor']]],
   ['mstenactor',['MSTEnactor',['../classgunrock_1_1app_1_1mst_1_1_m_s_t_enactor.html',1,'gunrock::app::mst']]],
+  ['mstenactor',['MSTEnactor',['../classgunrock_1_1app_1_1mst_1_1_m_s_t_enactor.html#a9205f1cdc4049bf641a616e0a57945ac',1,'gunrock::app::mst::MSTEnactor']]],
   ['mstproblem',['MSTProblem',['../structgunrock_1_1app_1_1mst_1_1_m_s_t_problem.html',1,'gunrock::app::mst']]],
   ['mstproblem',['MSTProblem',['../structgunrock_1_1app_1_1mst_1_1_m_s_t_problem.html#acb454e67ebe02fbab596468db0452c0e',1,'gunrock::app::mst::MSTProblem::MSTProblem()'],['../structgunrock_1_1app_1_1mst_1_1_m_s_t_problem.html#a327a67e673dbd0c9585d51014b31e5ad',1,'gunrock::app::mst::MSTProblem::MSTProblem(bool stream_from_host, const Csr&lt; VertexId, Value, SizeT &gt; &amp;graph, int num_gpus)']]],
   ['multi_5fscan_2ecuh',['multi_scan.cuh',['../multi__scan_8cuh.html',1,'']]],

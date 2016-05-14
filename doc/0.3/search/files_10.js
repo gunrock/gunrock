@@ -3,6 +3,7 @@ var searchData=
   ['test_5fbc_2ecu',['test_bc.cu',['../test__bc_8cu.html',1,'']]],
   ['test_5fbfs_2ecu',['test_bfs.cu',['../test__bfs_8cu.html',1,'']]],
   ['test_5fcc_2ecu',['test_cc.cu',['../test__cc_8cu.html',1,'']]],
+  ['test_5fcolor_2ecu',['test_color.cu',['../test__color_8cu.html',1,'']]],
   ['test_5fdobfs_2ecu',['test_dobfs.cu',['../test__dobfs_8cu.html',1,'']]],
   ['test_5fhits_2ecu',['test_hits.cu',['../test__hits_8cu.html',1,'']]],
   ['test_5fmst_2ecu',['test_mst.cu',['../test__mst_8cu.html',1,'']]],

@@ -6,7 +6,6 @@ var searchData=
   ['sample_5fenactor_2ecuh',['sample_enactor.cuh',['../sample__enactor_8cuh.html',1,'']]],
   ['sample_5ffunctor_2ecuh',['sample_functor.cuh',['../sample__functor_8cuh.html',1,'']]],
   ['sample_5fproblem_2ecuh',['sample_problem.cuh',['../sample__problem_8cuh.html',1,'']]],
-  ['sarray_5futils_5ftemp_2ecuh',['sarray_utils_temp.cuh',['../sarray__utils__temp_8cuh.html',1,'']]],
   ['scatter_5ftile_2ecuh',['scatter_tile.cuh',['../scatter__tile_8cuh.html',1,'']]],
   ['select_5futils_2ecuh',['select_utils.cuh',['../select__utils_8cuh.html',1,'']]],
   ['serial_5freduce_2ecuh',['serial_reduce.cuh',['../serial__reduce_8cuh.html',1,'']]],
