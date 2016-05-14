@@ -8,7 +8,7 @@ primitives and optimization strategies with a high-level programming model
 that allows programmers to quickly develop new graph primitives with small
 code size and minimal GPU programming knowledge.
 
-For more details, please visit our **[website](http://gunrock.github.io/)**, read
+For more details, please visit our [website](http://gunrock.github.io/), read
 [Why Gunrock](http://gunrock.github.io/gunrock/doc/latest/why-gunrock.html),
 our PPoPP 2016 paper,
 [Gunrock: A High-Performance Graph Processing Library on the GPU]http://escholarship.org/uc/item/6xz7z9k0),
@@ -42,7 +42,7 @@ for two typical graph primitives.
 - For details on upcoming changes and features, see the [Road Map](http://gunrock.github.io/gunrock/doc/latest/road_map.html).
 
 Reporting Problems
-----------------------------
+------------------
 
 To report Gunrock bugs or request features, please file an issue
 directly using [Github](https://github.com/gunrock/gunrock/issues).
@@ -52,6 +52,8 @@ directly using [Github](https://github.com/gunrock/gunrock/issues).
 
 <a name="Publications"></a>
 Publications
+------------
+
 Leyuan Wang, Yangzihao Wang, Carl Yang, and John D. Owens. **A Comparative Study on Exact Triangle Counting Algorithms on the GPU**. In Proceedings of the 1st High Performance Graph Processing Workshop, HPGP '16, May 2016. 
 [[DOI](http://dx.doi.org/10.1145/2915516.2915521) |
 [http](http://www.escholarship.org/uc/item/9hf0m6w3)]
@@ -62,7 +64,7 @@ Yuechao Pan, Yangzihao Wang, Yuduo Wu, Carl Yang, and John D. Owens.
 
 Yangzihao Wang, Andrew Davidson, Yuechao Pan, Yuduo Wu, Andy Riffel, and John D. Owens.
 **Gunrock: A High-Performance Graph Processing Library on the GPU**.
-In Proceedings of the 21st ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming, PPoPP '16, pages 11:1&ndash;11:12, March 2016. Distinguished Paper. [[DOI](http://dx.doi.org/10.1145/2851141.2851145) | [http](http://escholarship.org/uc/item/6xz7z9k0)]
+In Proceedings of the 21st ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming, PPoPP '16, pages 11:1--11:12, March 2016. Distinguished Paper. [[DOI](http://dx.doi.org/10.1145/2851141.2851145) | [http](http://escholarship.org/uc/item/6xz7z9k0)]
 
 Yuduo Wu, Yangzihao Wang, Yuechao Pan, Carl Yang, and John D. Owens.
 **Performance Characterization for High-Level Programming Models for GPU Graph
@@ -77,10 +79,11 @@ In Graph Algorithms Building Blocks, GABB 2015, May 2015.
 Afton Geil, Yangzihao Wang, and John D. Owens.
 **WTF, GPU! Computing Twitter's Who-To-Follow on the GPU**.
 In Proceedings of the Second ACM Conference on Online Social Networks,
-COSN '14, pages 63&ndash;68, October 2014.
+COSN '14, pages 63--68, October 2014.
 [[DOI](http://dx.doi.org/10.1145/2660460.2660481) | [http](http://escholarship.org/uc/item/5xq3q8k0)]
 
 Presentations
+-------------
 
 GTC 2016, Gunrock: A Fast and Programmable Multi-GPU Graph Processing Library, April 2016. [[slides](http://on-demand.gputechconf.com/gtc/2016/presentation/s6374-yangzihao-wang-gunrock.pdf)]
 
@@ -148,13 +151,13 @@ DARPA STTR award D14PC00023. Our
 XDATA principal investigator is Eric Whyne of
 [Data Tactics Corporation](http://www.data-tactics.com/) and our DARPA
 program managers are Dr. Christopher White (2012--2014) and [Mr. Wade
-Shen](http://www.darpa.mil/staff/mr-wade-shen) (2015--now).
+Shen](http://www.darpa.mil/staff/mr-wade-shen) (2015--present).
 
 Copyright and Software License
 ----------------------------
 
 Gunrock is copyright The Regents of the University of
-California, 2015. The library, examples, and all source code are
+California, 2013--2016. The library, examples, and all source code are
 released under
 [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0).
 
