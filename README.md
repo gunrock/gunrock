@@ -1,31 +1,19 @@
-Gunrock documentation
+Gunrock
 =====================
-
-News!
-=====
-
-Gunrock v0.3 released! Check out the [release notes](http://gunrock.github.io/gunrock/doc/latest/release_notes.html)!
-
-Introduction
-============
-
 Gunrock is a CUDA library for graph-processing designed specifically for the
 GPU. It uses a high-level, bulk-synchronous, data-centric abstraction focused
 on operations on a vertex or edge frontier. Gunrock achieves a balance between
 performance and expressiveness by coupling high performance GPU computing
 primitives and optimization strategies with a high-level programming model
 that allows programmers to quickly develop new graph primitives with small
-code size and minimal GPU programming knowledge. For more details, please read
+code size and minimal GPU programming knowledge.
+
+For more details, please visit our **[website](http://gunrock.github.io/)**, read
 [Why Gunrock](http://gunrock.github.io/gunrock/doc/latest/why-gunrock.html),
 our paper on arXiv:
 [Gunrock: A High-Performance Graph Processing Library on the GPU](http://arxiv.org/abs/1501.05387),
 and check out the
-[Publications](#Publications) section.
-
-Homepage
----------
-
-Homepage for Gunrock: <http://gunrock.github.io/>
+[Publications](#Publications) section. See [Release Notes](http://gunrock.github.io/gunrock/doc/latest/release_notes.html) to keep up with the changes in latest release.
 
 Getting Started with Gunrock
 ----------------------------
@@ -33,9 +21,7 @@ Getting Started with Gunrock
 [FAQ](http://gunrock.github.io/gunrock/doc/latest/faq.html).
 
 - For information on building Gunrock, see
-[Building Gunrock](http://gunrock.github.io/gunrock/doc/latest/building_gunrock.html)
-and refer to
-[Operating System Support and Requirements](#OS_Support).
+[Building Gunrock](http://gunrock.github.io/gunrock/doc/latest/building_gunrock.html).
 
 - The "tests" subdirectory included with Gunrock has a comprehensive test
 application for most the functionality of Gunrock.
@@ -53,65 +39,37 @@ and how to
 as well as [annotated code](http://gunrock.github.io/gunrock/doc/annotated_primitives/annotated_primitives.html)
 for two typical graph primitives.
 
+- For details on upcoming changes and features, see the [Road Map](http://gunrock.github.io/gunrock/doc/latest/road_map.html).
+
 Reporting Problems
-==================
+----------------------------
 
 To report Gunrock bugs or request features, please file an issue
 directly using [Github](https://github.com/gunrock/gunrock/issues).
 
 <!-- TODO: Algorithm Input Size Limitations -->
 
-<a name="OS_Support"></a>
-Operating System Support and Requirements
-=========================================
-
-This release (0.3) has been tested on Linux Mint 15 (64-bit), Ubuntu
-12.04, 14.04 and 15.10 with CUDA 7.5 installed. We expect Gunrock to build
-and run correctly on other 64-bit and 32-bit Linux distributions, Mac OS,
-and Windows.
-
-Requirements
-------------
-
-CUDA version 7.5 (or greater) and compute capability 3.0 (or greater) is
-required.
-
-Several graph primitives' CPU validation code uses Boost Graph Library.
-We are also using Boost Spirit, filesystem, and timer in our utility code.
-A boost version > 1.56.0 is required (1.58.0 is recommended).
-
-CUDA
-====
-
-Gunrock is implemented in [CUDA C/C++](http://developer.nvidia.com/cuda).  It
-requires the CUDA Toolkit. Please see the NVIDIA
-[CUDA](http://developer.nvidia.com/cuda-downloads) homepage to download CUDA as
-well as the CUDA Programming Guide and CUDA SDK, which includes many CUDA code
-examples. Please refer to [NVIDIA CUDA Getting Started Guide for
-Linux](http://docs.nvidia.com/cuda/cuda-getting-started-guide-for-linux) for
-detailed information.
-
 
 <a name="Publications"></a>
 Publications
-============
+----------------------------
 Yuduo Wu, Yangzihao Wang, Yuechao Pan, Carl Yang, and John D. Owens.
 **Performance Characterization for High-Level Programming Models for GPU Graph
 Analytics.** In IEEE International Symposium on Workload Characterization,
-IISWC2015, October 2015.
+IISWC2015, October 2015. [[DOI](http://dx.doi.org/10.1109/IISWC.2015.13) | [http](http://web.ece.ucdavis.edu/~wyd855/iiswc-submission-2015.pdf)]
 
 Yuechao Pan, Yangzihao Wang, Yuduo Wu, Carl Yang, and John D. Owens.
-**Multi-GPU Graph Analytics.** CoRR, abs/1504.04804(1504.04804v1), April 2015.
+**Multi-GPU Graph Analytics.** CoRR, abs/1504.04804(1504.04804v2), April 2016.
 [[arXiv](http://arxiv.org/abs/1504.04804)]
 
 Yangzihao Wang, Andrew Davidson, Yuechao Pan, Yuduo Wu, Andy Riffel, and John D. Owens.
 **Gunrock: A High-Performance Graph Processing Library on the GPU.**
-CoRR, abs/1501.05387v2), March 2015. [[arXiv](http://arxiv.org/abs/1501.05387v2)]
+In Proceedings of the 21st ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming, PPoPP '16, Article No. 11, March 2016. [[DOI](http://dx.doi.org/10.1145/2851141.2851145) | [http](http://escholarship.org/uc/item/6xz7z9k0)]
 
 Carl Yang, Yangzihao Wang, and John D. Owens.
 **Fast Sparse Matrix and Sparse Vector Multiplication Algorithm on the GPU.**
 In Graph Algorithms Building Blocks, GABB 2015, May 2015.
-[[http](http://www.escholarship.org/uc/item/1rq9t3j3)]
+[[DOI](http://dx.doi.org/10.1109/IPDPSW.2015.77) | [http](http://www.escholarship.org/uc/item/1rq9t3j3)]
 
 Afton Geil, Yangzihao Wang, and John D. Owens.
 **WTF, GPU! Computing Twitter's Who-To-Follow on the GPU.**
@@ -120,26 +78,12 @@ COSN '14, pages 63–68, October 2014.
 [[DOI](http://dx.doi.org/10.1145/2660460.2660481) | [http](http://escholarship.org/uc/item/5xq3q8k0)]
 
 Presentations
--------------
-GTC 2016, Gunrock: A Fast and Programmable Multi-GPU Graph Processing Library [[slides](https://github.com/gunrock/gunrock/raw/master/doc/GTC%202016_Gunrock-%20a%20Fast%20and%20Programmable%20Multi-GPU%20Graph%20Processing%20Library.pdf)]
+----------------------------
+GTC 2016, Gunrock: A Fast and Programmable Multi-GPU Graph Processing Library [[slides](http://on-demand.gputechconf.com/gtc/2016/presentation/s6374-yangzihao-wang-gunrock.pdf)]
 
-Road Map
-========
+GPU Technology Theater at SC15, Gunrock: A Fast and Programmable Multi-GPU Graph processing Library [[slides](http://images.nvidia.com/events/sc15/pdfs/SC5139-gunrock-multi-gpu-processing-library.pdf) | [video](http://images.nvidia.com/events/sc15/SC5139-gunrock-multi-gpu-processing-library.html)]
 
- - Framework: In v0.3 we have integrated single-GPU and multi-GPU frameworks
-   into a unified framework. We are exploring more operators such as
-   Gather-Reduce and matrix operators. Generally we want to find the right set
-   of operators that can abstract most graph primitives while delivering high
-   performance.
-
- - Primitives: Our near-term goal is to implement maximal independent set
-   and graph matching algorithms, build better support for bipartite
-   graph algorithms, and explore community detection algorithms. Our long term
-   goals include algorithms on dynamic graphs, priority queue support, graph
-   partitioning, and more flexible and scalable multi-GPU algorithms.
-
-Credits
-=======
+GTC 2014, High-Performance Graph Primitives on the GPU: design and Implementation of Gunrock [[slides](http://on-demand.gputechconf.com/gtc/2014/presentations/S4609-hi-perf-graph-primitives-on-gpus.pdf) | [video](http://on-demand.gputechconf.com/gtc/2014/video/S4609-hi-perf-graph-primitives-on-gpus.mp4)]
 
 Gunrock Developers
 ------------------
@@ -159,7 +103,6 @@ Gunrock Developers
 
 - [Huan Zhang](http://www.huan-zhang.com/),
   University of California, Davis
-
 
 - [John Owens](http://www.ece.ucdavis.edu/~jowens/),
   University of California, Davis
@@ -192,10 +135,11 @@ XDATA principal investigator is Eric Whyne of
 program managers are Dr. Christopher White (2012--2014) and [Mr. Wade
 Shen](http://www.darpa.mil/staff/mr-wade-shen) (2015--now).
 
-Gunrock Copyright and Software License
-======================================
+Copyright and Software License
+----------------------------
 
 Gunrock is copyright The Regents of the University of
 California, 2015. The library, examples, and all source code are
 released under
 [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0).
+
