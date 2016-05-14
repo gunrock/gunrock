@@ -77,7 +77,7 @@ In Graph Algorithms Building Blocks, GABB 2015, May 2015.
 Afton Geil, Yangzihao Wang, and John D. Owens.
 **WTF, GPU! Computing Twitter's Who-To-Follow on the GPU**.
 In Proceedings of the Second ACM Conference on Online Social Networks,
-COSN '14, pages 63–68, October 2014.
+COSN '14, pages 63&ndash;68, October 2014.
 [[DOI](http://dx.doi.org/10.1145/2660460.2660481) | [http](http://escholarship.org/uc/item/5xq3q8k0)]
 
 Presentations
