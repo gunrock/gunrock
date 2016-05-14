@@ -6,8 +6,6 @@ var searchData=
   ['_7ebfsproblem',['~BFSProblem',['../structgunrock_1_1app_1_1bfs_1_1_b_f_s_problem.html#a522eea1f2e9336ae072145e7cc1a315b',1,'gunrock::app::bfs::BFSProblem']]],
   ['_7eccenactor',['~CCEnactor',['../classgunrock_1_1app_1_1cc_1_1_c_c_enactor.html#af79e553c699af1d110a1778bf213d9cf',1,'gunrock::app::cc::CCEnactor']]],
   ['_7eccproblem',['~CCProblem',['../structgunrock_1_1app_1_1cc_1_1_c_c_problem.html#aab97a248606e64b0d59f353c07bcb9f0',1,'gunrock::app::cc::CCProblem']]],
-  ['_7ecolorenactor',['~ColorEnactor',['../classgunrock_1_1app_1_1color_1_1_color_enactor.html#ae5e3dc75a72eac872e7072ab799122a9',1,'gunrock::app::color::ColorEnactor']]],
-  ['_7ecolorproblem',['~ColorProblem',['../structgunrock_1_1app_1_1color_1_1_color_problem.html#a3e0dfb55d69efd5c5ce1a09451e2be2a',1,'gunrock::app::color::ColorProblem']]],
   ['_7ecsr',['~Csr',['../structgunrock_1_1_csr.html#a0bbcc94ff9bf08c3d934fbdca763bb0f',1,'gunrock::Csr']]],
   ['_7ectaworkprogresslifetime',['~CtaWorkProgressLifetime',['../classgunrock_1_1util_1_1_cta_work_progress_lifetime.html#abe85805510e45943029bc0cadb938e13',1,'gunrock::util::CtaWorkProgressLifetime']]],
   ['_7edataslicebase',['~DataSliceBase',['../structgunrock_1_1app_1_1_data_slice_base.html#a348e1e8803189fe113bab0bee3087e4a',1,'gunrock::app::DataSliceBase']]],
