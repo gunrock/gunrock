@@ -78,8 +78,27 @@ COSN '14, pages 63–68, October 2014.
 [[DOI](http://dx.doi.org/10.1145/2660460.2660481) | [http](http://escholarship.org/uc/item/5xq3q8k0)]
 
 Presentations
+<<<<<<< HEAD
 ----------------------------
 GTC 2016, Gunrock: A Fast and Programmable Multi-GPU Graph Processing Library [[slides](http://on-demand.gputechconf.com/gtc/2016/presentation/s6374-yangzihao-wang-gunrock.pdf)]
+=======
+-------------
+GTC 2016, Gunrock: A Fast and Programmable Multi-GPU Graph Processing Library [[slides](http://on-demand.gputechconf.com/gtc/2016/presentation/s6374-yangzihao-wang-gunrock.pdf)]
+
+GPU Technology Theater at SC15, Gunrock: A Fast and Programmable Multi-GPU Graph processing Library [[slides](http://images.nvidia.com/events/sc15/pdfs/SC5139-gunrock-multi-gpu-processing-library.pdf) | [video](http://images.nvidia.com/events/sc15/SC5139-gunrock-multi-gpu-processing-library.html)]
+
+GTC 2014, High-Performance Graph Primitives on the GPU: design and Implementation of Gunrock [[slides](http://on-demand.gputechconf.com/gtc/2014/presentations/S4609-hi-perf-graph-primitives-on-gpus.pdf) | [video](http://on-demand.gputechconf.com/gtc/2014/video/S4609-hi-perf-graph-primitives-on-gpus.mp4)]
+
+
+Road Map
+========
+
+ - Framework: In v0.3 we have integrated single-GPU and multi-GPU frameworks
+   into a unified framework. We are exploring more operators such as
+   Gather-Reduce and matrix operators. Generally we want to find the right set
+   of operators that can abstract most graph primitives while delivering high
+   performance.
+>>>>>>> c0678c645c5d5175562ce329b8e6d40a4d977ebb
 
 GPU Technology Theater at SC15, Gunrock: A Fast and Programmable Multi-GPU Graph processing Library [[slides](http://images.nvidia.com/events/sc15/pdfs/SC5139-gunrock-multi-gpu-processing-library.pdf) | [video](http://images.nvidia.com/events/sc15/SC5139-gunrock-multi-gpu-processing-library.html)]
 
