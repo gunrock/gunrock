@@ -1212,7 +1212,7 @@ public:
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
     template<
-        typename AdvanceKernelPolity,
+        typename AdvanceKernelPolicy,
         typename FilterKernelPolicy>
     cudaError_t InitCC(
         ContextPtr  *context,
@@ -1225,7 +1225,7 @@ public:
         if (retval = BaseEnactor::Init(
             //problem,
             max_grid_size,
-            AdvanceKernelPolity::CTA_OCCUPANCY,
+            AdvanceKernelPolicy::CTA_OCCUPANCY,
             FilterKernelPolicy::CTA_OCCUPANCY)) 
             return retval;
 
@@ -1266,7 +1266,7 @@ public:
             thread_slices[gpu].status       = ThreadSlice::Status::Inited;
             thread_slices[gpu].thread_Id = cutStartThread(
                 (CUT_THREADROUTINE)&(CCThread<
-                    AdvanceKernelPolity, FilterKernelPolicy,
+                    AdvanceKernelPolicy, FilterKernelPolicy,
                     CCEnactor<Problem> >),
                     (void*)&(thread_slices[gpu]));
             thread_Ids[gpu] = thread_slices[gpu].thread_Id;

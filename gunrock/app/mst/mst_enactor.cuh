@@ -1051,7 +1051,7 @@ public:
         //INSTRUMENT,         // INSTRUMENT
         8,                  // MIN_CTA_OCCUPANCY
         10,                 // LOG_THREADS
-        8,                  // LOG_BLOCKS
+        9,                  // LOG_BLOCKS
         32 * 128,           // LIGHT_EDGE_THRESHOLD
         1,                  // LOG_LOAD_VEC_SIZE
         0,                  // LOG_LOADS_PER_TILE
@@ -1059,7 +1059,7 @@ public:
         32,                 // WARP_GATHER_THRESHOLD
         128 * 4,            // CTA_GATHER_THRESHOLD
         7,                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::advance::LB_LIGHT>
+        gunrock::oprtr::advance::LB_CULL>
         AdvanceKernelPolicy;
 
     /** 

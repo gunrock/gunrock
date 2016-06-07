@@ -105,7 +105,7 @@ void runCC(GRGraph* output, CC_Parameter *parameter)
         cudaSetDevice(gpu_idx[gpu]);
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
-
+ 
     Problem* problem = new Problem;  // Allocate problem on GPU
     util::GRError(
         problem->Init(
@@ -124,6 +124,7 @@ void runCC(GRGraph* output, CC_Parameter *parameter)
 
     Enactor* enactor = new Enactor(
         num_gpus, gpu_idx, instrument, debug, size_check);  // CC enactor map
+ 
     util::GRError(
         enactor->Init(context, problem, traversal_mode, max_grid_size),
         "CC Enactor Init failed", __FILE__, __LINE__);
@@ -137,6 +138,7 @@ void runCC(GRGraph* output, CC_Parameter *parameter)
     util::GRError(
         enactor->Reset(), "CC Enactor Reset failed", __FILE__, __LINE__);
 
+    printf("frontier type:%d\n", enactor->GetFrontierType());
     cpu_timer.Start();
     util::GRError(
         enactor->Enact(), "CC Problem Enact Failed", __FILE__, __LINE__);

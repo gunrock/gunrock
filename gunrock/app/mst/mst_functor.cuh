@@ -94,6 +94,40 @@ struct SuccFunctor
         // select one successor with minimum vertex id
         atomicMin(&d_data_slice -> successors[s_id], d_id);
     }
+
+    static __device__ __forceinline__ bool CondFilter(
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        return true;
+    }
+
+    /**
+    * @brief Filter Kernel apply function. Point the current node to the
+    * parent node of its parent node.
+    *
+    * @param[in] node Vertex Id
+    * @param[in] problem Data slice object
+    * @param[in] v Vertex value
+    * @param[in] nid Node ID
+    */
+    static __device__ __forceinline__ void ApplyFilter(
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -169,6 +203,40 @@ struct EdgeFunctor
         util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
             d_data_slice -> original_e[edge_id], d_data_slice -> temp_index + s_id);
     }
+
+    static __device__ __forceinline__ bool CondFilter(
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        return true;
+    }
+
+    /**
+    * @brief Filter Kernel apply function. Point the current node to the
+    * parent node of its parent node.
+    *
+    * @param[in] node Vertex Id
+    * @param[in] problem Data slice object
+    * @param[in] v Vertex value
+    * @param[in] nid Node ID
+    */
+    static __device__ __forceinline__ void ApplyFilter(
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -243,6 +311,40 @@ struct MarkFunctor
         // mark minimum spanning tree output edges
         util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
             (SizeT)1, d_data_slice ->mst_output + d_data_slice -> temp_index[s_id]);
+    }
+
+    static __device__ __forceinline__ bool CondFilter(
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        return true;
+    }
+
+    /**
+    * @brief Filter Kernel apply function. Point the current node to the
+    * parent node of its parent node.
+    *
+    * @param[in] node Vertex Id
+    * @param[in] problem Data slice object
+    * @param[in] v Vertex value
+    * @param[in] nid Node ID
+    */
+    static __device__ __forceinline__ void ApplyFilter(
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
     }
 };
 
@@ -324,6 +426,40 @@ struct CyRmFunctor
         // remove some edges in the MST output result
         util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
             (SizeT)0, d_data_slice->mst_output + d_data_slice->temp_index[s_id]);
+    }
+
+    static __device__ __forceinline__ bool CondFilter(
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
+        return true;
+    }
+
+    /**
+    * @brief Filter Kernel apply function. Point the current node to the
+    * parent node of its parent node.
+    *
+    * @param[in] node Vertex Id
+    * @param[in] problem Data slice object
+    * @param[in] v Vertex value
+    * @param[in] nid Node ID
+    */
+    static __device__ __forceinline__ void ApplyFilter(
+        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
+        VertexId   v,  
+        VertexId   node,
+        DataSlice *d_data_slice,
+        SizeT      nid  ,
+        LabelT     label,
+        SizeT      input_pos,
+        SizeT      output_pos)
+    {
     }
 };
 
