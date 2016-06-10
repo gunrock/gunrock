@@ -66,7 +66,10 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
         // device storage arrays
         util::Array1D<SizeT, Value       >    g_cost  ;     /**< Used for source distance */
         util::Array1D<SizeT, Value       >    f_cost  ;     /**< Used for source distance */
-        util::Array1D<SizeT, Value       >    weights    ;     /**< Used for storing edge weights */
+        util::Array1D<SizeT, Value       >    weights ;     /**< Used for storing edge weights */
+        util::Array1D<SizeT, VertexId    >    bfs_levels;   /**< Used for storing BFS levels */
+        util::Array1D<SizeT, VertexId    >    dst_node;   /**< Used for storing dst node ID */
+        util::Array1D<SizeT, Value       >    sample_weight;   /**< Used for storing sample weight (avg or min)*/
         util::Array1D<SizeT, VertexId    >    original_vertex;
 
         /*
@@ -77,6 +80,9 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
             g_cost          .SetName("g_cost"          );
             f_cost          .SetName("f_cost"          );
             weights         .SetName("weights"         );
+            bfs_levels      .SetName("bfs_levels"      );
+            dst_node        .SetName("dst_node"        );
+            sample_weight   .SetName("sample_weight"   );
             original_vertex .SetName("original_vertex" );
         }
 
@@ -96,6 +102,9 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = g_cost        .Release()) return retval;
             if (retval = f_cost        .Release()) return retval;
             if (retval = weights       .Release()) return retval;
+            if (retval = dst_node      .Release()) return retval;
+            if (retval = sample_weight .Release()) return retval;
+            if (retval = bfs_levels    .Release()) return retval;
             if (retval = original_vertex.Release()) return retval;
             return retval;
         }
@@ -167,10 +176,16 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = g_cost      .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = f_cost      .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = weights     .Allocate(graph->edges, util::DEVICE)) return retval;
+            if (retval = dst_node    .Allocate(1, util::DEVICE)) return retval;
+            if (retval = sample_weight.Allocate(1, util::DEVICE)) return retval;
             if (retval = this->labels.Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = bfs_levels  .Allocate(graph->nodes, util::DEVICE)) return retval;
 
             weights.SetPointer(graph->edge_values, graph->edges, util::HOST);
             if (retval = weights.Move(util::HOST, util::DEVICE)) return retval;
+
+            bfs_levels.SetPointer(graph->node_values, graph->nodes, util::HOST);
+            if (retval = bfs_levels.Move(util::HOST, util::DEVICE)) return retval;
 
             if (MARK_PATHS)//(MARK_PREDECESSORS)
             {
@@ -543,6 +558,8 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
      */
     cudaError_t Reset(
             VertexId    src,
+            VertexId    dst,
+            Value       sample_weight,
             FrontierType frontier_type,
             double queue_sizing,
             double queue_sizing1 = -1)
@@ -577,6 +594,20 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
                         sizeof(VertexId),
                         cudaMemcpyHostToDevice),
                     "ASTARProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
+
+        if (retval = util::GRError(cudaMemcpy(
+                        data_slices[gpu]->dst_node.GetPointer(util::DEVICE),
+                        &dst,
+                        sizeof(VertexId),
+                        cudaMemcpyHostToDevice),
+                    "ASTARProblem cudaMemcpy dst_node failed", __FILE__, __LINE__)) return retval;
+
+        if (retval = util::GRError(cudaMemcpy(
+                        data_slices[gpu]->sample_weight.GetPointer(util::DEVICE),
+                        &sample_weight,
+                        sizeof(Value),
+                        cudaMemcpyHostToDevice),
+                    "ASTARProblem cudaMemcpy sample_weight failed", __FILE__, __LINE__)) return retval;
         Value src_distance = 0;
         if (retval = util::GRError(cudaMemcpy(
                         data_slices[gpu]->g_cost.GetPointer(util::DEVICE)+tsrc,
@@ -590,6 +621,7 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
                         sizeof(Value),
                         cudaMemcpyHostToDevice),
                     "ASTARProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
+
         if (MARK_PATHS)//(MARK_PREDECESSORS)
         {
             VertexId src_pred = -1;
