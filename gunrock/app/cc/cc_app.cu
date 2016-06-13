@@ -21,6 +21,8 @@
 #include <gunrock/app/cc/cc_problem.cuh>
 #include <gunrock/app/cc/cc_functor.cuh>
 
+#include <unistd.h>
+
 using namespace gunrock;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
@@ -138,10 +140,11 @@ void runCC(GRGraph* output, CC_Parameter *parameter)
     util::GRError(
         enactor->Reset(), "CC Enactor Reset failed", __FILE__, __LINE__);
 
-    printf("frontier type:%d\n", enactor->GetFrontierType());
+    //printf("frontier type:%d\n", enactor->GetFrontierType());
+    usleep(1000);
     cpu_timer.Start();
     util::GRError(
-        enactor->Enact(), "CC Problem Enact Failed", __FILE__, __LINE__);
+        enactor->Enact(traversal_mode), "CC Problem Enact Failed", __FILE__, __LINE__);
     cpu_timer.Stop();
 
     float elapsed = cpu_timer.ElapsedMillis();
