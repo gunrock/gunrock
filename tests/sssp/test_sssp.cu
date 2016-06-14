@@ -26,8 +26,9 @@
 #include <gunrock/app/sssp/sssp_problem.cuh>
 #include <gunrock/app/sssp/sssp_functor.cuh>
 
-//#include <gunrock/app/astar/astar_problem.cuh>
-//#include <gunrock/app/astar/astar_functor.cuh>
+#include <gunrock/app/astar/astar_enactor.cuh>
+#include <gunrock/app/astar/astar_problem.cuh>
+#include <gunrock/app/astar/astar_functor.cuh>
 
 // Operator includes
 #include <gunrock/oprtr/advance/kernel.cuh>

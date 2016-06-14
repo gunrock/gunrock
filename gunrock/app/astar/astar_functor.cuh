@@ -144,14 +144,7 @@ struct ASTARFunctor {
         //VertexId node, DataSlice *d_data_slice, VertexId v = 0, SizeT nid = 0)
     {
         if (node == -1) return false;
-        //return (atomicCAS(d_data_slice->sssp_marker + node, 0, 1) == 0);
         
-        //LabelT old_label = atomicExch(d_data_slice -> labels + node, label);
-        //if (old_label == label) {
-            //printf("node [%d] skipped, label = %d\n",
-            //    node, label);
-            //return false;
-        //}
         if (d_data_slice -> labels[node] == label)
         {
             return false;
