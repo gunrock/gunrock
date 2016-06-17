@@ -18,6 +18,7 @@
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/util/memset_kernel.cuh>
 #include <gunrock/util/array_utils.cuh>
+#include <gunrock/priority_queue/kernel.cuh>
 
 namespace gunrock {
 namespace app {
@@ -55,6 +56,9 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
     typedef DataSliceBase <VertexId, SizeT, Value,
         MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
     typedef unsigned char MaskT;
+    
+    typedef gunrock::priority_queue::PriorityQueue<VertexId, SizeT>
+        NearFarPriorityQueue;
 
     //Helper structures
 
@@ -72,6 +76,8 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, Value       >    sample_weight;   /**< Used for storing sample weight (avg or min)*/
         util::Array1D<SizeT, VertexId    >    original_vertex;
 
+        NearFarPriorityQueue *pq;
+
         /*
          * @brief Default constructor
          */
@@ -84,6 +90,7 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
             dst_node        .SetName("dst_node"        );
             sample_weight   .SetName("sample_weight"   );
             original_vertex .SetName("original_vertex" );
+            pq = new NearFarPriorityQueue;
         }
 
         /*
@@ -106,6 +113,7 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = sample_weight .Release()) return retval;
             if (retval = bfs_levels    .Release()) return retval;
             if (retval = original_vertex.Release()) return retval;
+            delete pq;
             return retval;
         }
 
@@ -172,6 +180,10 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
                 num_out_nodes,
                 in_sizing,
                 skip_makeout_selection)) return retval;
+
+                util::GRError(pq->Init(graph->edges, queue_sizing),
+                    "Priority Queue A* Initialization Failed", __FILE__,
+                    __LINE__);
 
             if (retval = g_cost      .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = f_cost      .Allocate(graph->nodes, util::DEVICE)) return retval;
@@ -365,7 +377,6 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
     // Members
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice>          *data_slices;
-
     // Methods
 
     /**
@@ -510,7 +521,7 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
             queue_sizing,
             partition_factor,
             partition_seed))
-            return retval;
+            return retval; 
 
         // No data in DataSlice needs to be copied from host
 

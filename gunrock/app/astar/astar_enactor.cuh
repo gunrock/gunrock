@@ -213,6 +213,9 @@ struct ASTARIteration : public IterationBase <
                                         Frontier  ;
     typedef ASTARFunctor<VertexId, SizeT, Value, Problem>
                                         Functor   ;
+    typedef PQFunctor<VertexId, SizeT, Value, Problem> PqFunctor;
+    typedef gunrock::priority_queue::PriorityQueue<VertexId, SizeT>
+        NearFarPriorityQueue;
     typedef typename Functor::LabelT    LabelT    ;
     typedef IterationBase <
         AdvanceKernelPolicy, FilterKernelPolicy, Enactor,
@@ -250,6 +253,16 @@ struct ASTARIteration : public IterationBase <
         ContextPtr                     context,
         cudaStream_t                   stream)
     {
+        typedef gunrock::priority_queue::KernelPolicy<
+        Problem,
+        300,
+        false,
+        8,
+        10>
+        PriorityQueueKernelPolicy;
+
+        NearFarPriorityQueue *pq = data_slice->pq;
+
         frontier_attribute->queue_reset = true;
         enactor_stats     ->nodes_queued[0] += frontier_attribute -> queue_length;
 
@@ -348,16 +361,16 @@ struct ASTARIteration : public IterationBase <
         { // when #gpus == 1, use priority queue
             frontier_attribute->queue_index ++;
             frontier_attribute->selector ^= 1;
-            /*if (enactor_stats->retval = util::GRError(
-                work_progress -> GetQueueLength(frointer_attribute->queue_index,
+            if (enactor_stats->retval = util::GRError(
+                work_progress -> GetQueueLength(frontier_attribute->queue_index,
                 frontier_attribute->queue_length, true, stream),
                 "work_progress -> GetQueueLength failed", __FILE__, __LINE__))
                 return;
-            out_length = 0;
+            unsigned int out_length = 0;
 
             if (frontier_attribute->queue_length > 0) {
                 out_length = gunrock::priority_queue::Bisect
-                    <PriorityQueueKernelPolicy, SSSPProblem,
+                    <PriorityQueueKernelPolicy, Problem,
                     NearFarPriorityQueue, PqFunctor>(
                     (int*)frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE),
                     pq,
@@ -365,37 +378,37 @@ struct ASTARIteration : public IterationBase <
                     d_data_slice,
                     frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
                     pq->queue_length,
-                    pq_level,
-                    (pq_level+1),
+                    pq->level,
+                    (pq->level+1),
                     context[0],
                     graph_slice->nodes);
                 //printf("out:%d, pq_length:%d\n", out_length, pq->queue_length);
-                if (retval = work_progress->SetQueueLength(frontier_attribute->queue_index, out_length)) break;
+                if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index, out_length)) return;
             }
             //
             //If the output queue is empty and far queue is not, then add priority level and split the far pile.
             if ( out_length == 0 && pq->queue_length > 0) {
                 while (pq->queue_length > 0 && out_length == 0) {
                     pq->selector ^= 1;
-                    pq_level++;
+                    pq->level++;
                     out_length = gunrock::priority_queue::Bisect
-                        <PriorityQueueKernelPolicy, SSSPProblem, NearFarPriorityQueue, PqFunctor>(
+                        <PriorityQueueKernelPolicy, Problem, NearFarPriorityQueue, PqFunctor>(
                         (int*)pq->nf_pile[0]->d_queue[pq->selector^1],
                         pq,
                         (unsigned int)pq->queue_length,
                         d_data_slice,
                         graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1],
                         0,
-                        pq_level,
-                        (pq_level+1),
+                        pq->level,
+                        (pq->level+1),
                         context[0],
                         graph_slice->nodes);
                     //printf("out after p:%d, pq_length:%d\n", out_length, pq->queue_length);
                     if (out_length > 0) {
-                        if (retval = work_progress->SetQueueLength(frontier_attribute->queue_index, out_length)) break;
+                        if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index, out_length)) return;
                     }
                 }
-            }*/
+            }
             //util::MemsetKernel<<<128, 128, 0, stream>>> (
             //    data_slice -> sssp_marker.GetPointer(util::DEVICE),
             //    (int)0, graph_slice->nodes);
