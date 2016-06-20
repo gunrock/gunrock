@@ -13,7 +13,7 @@ int main(int argc, char* argv[])
     data_t.VTXID_TYPE = VTXID_INT;         // vertex identifier
     data_t.SIZET_TYPE = SIZET_INT;         // graph size type
     data_t.VALUE_TYPE = VALUE_INT;         // attributes type
-    int srcs[1] = {1};
+    int srcs[2] = {1,2};
 
     struct GRSetup config = InitSetup(1, srcs);   // gunrock configurations
 

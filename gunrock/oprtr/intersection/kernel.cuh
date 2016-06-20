@@ -184,12 +184,12 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         for (VertexId idx = start; idx < input_length; idx += KernelPolicy::BLOCKS*KernelPolicy::THREADS) {
             SizeT count = 0;
             // get nls start and end index for two ids
-            VertexId sid = d_src_node_ids[idx];
-            VertexId did = d_dst_node_ids[idx];
-            SizeT src_it = d_row_offsets[sid];
-            SizeT src_end = d_row_offsets[sid+1];
-            SizeT dst_it = d_row_offsets[did];
-            SizeT dst_end = d_row_offsets[did+1];
+            VertexId sid = __ldg(d_src_node_ids+idx);
+            VertexId did = __ldg(d_dst_node_ids+idx);
+            SizeT src_it = __ldg(d_row_offsets+sid);
+            SizeT src_end = __ldg(d_row_offsets+sid+1);
+            SizeT dst_it = __ldg(d_row_offsets+did);
+            SizeT dst_end = __ldg(d_row_offsets+did+1);
             if (src_it == src_end || dst_it == dst_end) continue;
             SizeT src_nl_size = src_end - src_it;
             SizeT dst_nl_size = dst_end - dst_it;
@@ -207,12 +207,12 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                     count += BinarySearch(keys, max_nl, small_edge);
                 }
             } else {
-                VertexId src_edge = d_column_indices[src_it];
-                VertexId dst_edge = d_column_indices[dst_it];
+                VertexId src_edge = __ldg(d_column_indices+src_it);
+                VertexId dst_edge = __ldg(d_column_indices+dst_it);
                 while (src_it < src_end && dst_it < dst_end) {
                     VertexId diff = src_edge - dst_edge;
-                    src_edge = (diff <= 0) ? d_column_indices[++src_it] : src_edge;
-                    dst_edge = (diff >= 0) ? d_column_indices[++dst_it] : dst_edge;
+                    src_edge = (diff <= 0) ? __ldg(d_column_indices+(++src_it)) : src_edge;
+                    dst_edge = (diff >= 0) ? __ldg(d_column_indices+(++dst_it)) : dst_edge;
                     count += (diff == 0);
                 }
             }
