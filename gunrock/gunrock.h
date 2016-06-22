@@ -173,7 +173,8 @@ float gunrock_bfs(
 /*
  * @brief Simple interface take in CSR arrays as input
  *
- * @param[out] bfs_label            Return BFS label (depth) per nodes or the predecessor per nodes
+ * @param[out] bfs_label            Return BFS label (depth) per nodes
+ * @param[out] bfs_label            Return the predecessor per nodes
  * @param[in]  num_nodes            Number of nodes of the input graph
  * @param[in]  num_edges            Number of edges of the input graph
  * @param[in]  row_offsets          CSR-formatted graph input row offsets
@@ -186,6 +187,7 @@ float gunrock_bfs(
  */
 float bfs(
     int*       bfs_label,
+    int*       bfs_pred,
     const int  num_nodes,
     const int  num_edges,
     const int* row_offsets,
@@ -268,7 +270,7 @@ int cc(
  * @param[in]  config Primitive-specific configurations.
  * @param[in]  data_t Primitive-specific data type setting.
  */
-void gunrock_sssp(
+float gunrock_sssp(
     struct GRGraph*       grapho,   // Output graph / results
     const struct GRGraph* graphi,   // Input graph structure
     const struct GRSetup* config,   // Flag configurations
@@ -285,14 +287,17 @@ void gunrock_sssp(
  * @param[in] edge_values Input graph edge weight.
  * @param[in] source Source node to start.
  */
-void sssp(
+float sssp(
     unsigned int*       distances,    // Return shortest distances
+    int*                preds,
     const int           num_nodes,    // Input graph number of nodes
     const int           num_edges,    // Input graph number of edges
     const int*          row_offsets,  // Input graph row_offsets
     const int*          col_indices,  // Input graph col_indices
     const unsigned int* edge_values,  // Input graph edge weight
-    const int           source);      // Source node to start
+    const int           num_iters,
+    int*                source,
+    const bool          mark_preds);
 
 /**
  * @brief PageRank public interface.
