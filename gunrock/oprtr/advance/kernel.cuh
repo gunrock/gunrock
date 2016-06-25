@@ -33,6 +33,19 @@ namespace gunrock {
 namespace oprtr {
 namespace advance {
 
+// Steps for adding reduce:
+// fix block_dim=512/1024 and items_per_thread=7 or 11, make block number a variable
+// creating flag, value
+// flag comes from whether two threads' smem_storage.iter_input_start + v_index equal
+// value is sent in
+// load BlockScan with special reduce operation
+// __syncthreads()
+// block store
+// __syncthreads()
+// for each item and next per thread, if smem_storage.iter_input_start + v_index are different
+// atomicAdd/Min/Max item to global mem according to reduction type
+//
+
 /*
  * @brief Compute output frontier queue length.
  *
