@@ -137,6 +137,11 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
     // TODO: remove after merge mgpu-cq
     ContextPtr* context = (ContextPtr*)info->context;
 
+
+    VertexId *h_srcs              = new VertexId[graph->edges/2];
+    VertexId *h_dsts              = new VertexId[graph->edges/2];
+    SizeT    *h_tc                = new SizeT[graph->edges/2];
+
     // allocate MST enactor map
     TCEnactor < Problem,
                false,        // INSTRUMENT
@@ -148,8 +153,6 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
     Problem * problem = new Problem;
 
     // host results spaces
-    VertexId * edge_mask = new VertexId[graph->edges];
-
     if (!quiet_mode) { printf("\nTC TEST\n"); }
 
     // copy data from CPU to GPU initialize data members in DataSlice
@@ -176,6 +179,20 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
 
         gpu_timer.Stop();
         elapsed_gpu += gpu_timer.ElapsedMillis();
+    }
+
+    // copy out results
+    util::GRError(problem->Extract(h_srcs, h_dsts, h_tc),
+                  "TC Problem Data Extraction Failed", __FILE__, __LINE__);
+
+    // write to mtx file
+    std::ofstream fout("tc_weight_graph.mtx");
+    if (fout.is_open())
+    {
+        fout << graph->nodes << " " << graph->nodes << " " << graph->edges/2 << std::endl;
+        for (int i = 0; i < graph->edges/2; ++i)
+            fout << h_srcs[i]+1 << " " << h_dsts[i]+1 << " " << h_tc[i] << std::endl;
+        fout.close();
     }
 
     elapsed_gpu /= iterations;

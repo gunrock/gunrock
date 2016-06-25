@@ -435,9 +435,8 @@ class TCEnactor :
       //<IntersectionKernelPolicy, TCProblem, TCFunctor>(
       //);
       // Reuse d_scanned_edges
-      SizeT *d_output_counts = d_scanned_edges;
+      //SizeT *d_output_counts = d_scanned_edges;
 
-      util::MemsetKernel<<<256, 1024>>>(d_output_counts, (SizeT)0, graph_slice->edges);
 
       // Should make tc_count a member var to TCProblem
       long tc_count = gunrock::oprtr::intersection::LaunchKernel
@@ -450,7 +449,7 @@ class TCEnactor :
       data_slice->d_src_node_ids.GetPointer(util::DEVICE),
       graph_slice->column_indices.GetPointer(util::DEVICE),
       data_slice->d_degrees.GetPointer(util::DEVICE),
-      d_output_counts,
+      data_slice->d_edge_tc.GetPointer(util::DEVICE),
       graph_slice->edges/2,
       graph_slice->nodes,
       graph_slice->edges/2,

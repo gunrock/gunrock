@@ -50,12 +50,11 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
     struct DataSlice : DataSliceBase<SizeT, VertexId, Value>{
         // device storage arrays
 	util::Array1D<SizeT, VertexId> d_src_node_ids;  // Used for ...
+	util::Array1D<SizeT, SizeT> d_edge_tc;  // Used for ...
 
     util::Array1D<SizeT, VertexId> labels; // does not used in MST
     util::Array1D<SizeT, VertexId> d_edge_list;
-    util::Array1D<SizeT, VertexId> d_edge_list_partitioned;
     util::Array1D<SizeT, SizeT> d_degrees; // Used for store node degree
-	util::Array1D<SizeT, SizeT> d_flags;         /** < Used for candidate set boolean matrix */
 
 	/*
          * @brief Default constructor
@@ -64,10 +63,9 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
         {
 	    labels		.SetName("labels");
 	    d_src_node_ids	.SetName("d_src_node_ids");
+	    d_edge_tc	    .SetName("d_edge_tc");
 	    d_edge_list	    .SetName("d_edge_list");
-	    d_edge_list_partitioned	    .SetName("d_edge_list_partitioned");
         d_degrees. SetName("d_degrees");
-	    d_flags		    .SetName("d_flags");
 	}
 	 /*
          * @brief Default destructor
@@ -76,11 +74,10 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
         {
             if (util::SetDevice(this->gpu_idx)) return;
             d_src_node_ids.Release();
+            d_edge_tc.Release();
             d_edge_list.Release();
-            d_edge_list_partitioned.Release();
             d_degrees.Release();
             labels.Release();
-            d_flags.Release();
 	}
         
     }; // DataSlice
@@ -149,10 +146,27 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[out] h_labels
      *\return cudaError_t object indicates the success of all CUDA functions.
      */
-    cudaError_t Extrac(void) {
+    cudaError_t Extract(VertexId *source_ids, VertexId *dest_ids, SizeT *edge_tc) {
         cudaError_t retval = cudaSuccess;
 
         do {
+            if (this->num_gpus == 1) {
+                // Set device
+                if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
+
+                data_slices[0]->d_src_node_ids.SetPointer(source_ids);
+                if (retval = data_slices[0]->d_src_node_ids.Move(util::DEVICE,util::HOST)) return retval;
+            
+                this->graph_slices[0]->edges /= 2;
+                this->graph_slices[0]->column_indices.SetPointer(dest_ids);
+                if (retval = this->graph_slices[0]->column_indices.Move(util::DEVICE,util::HOST)) return retval;
+
+                data_slices[0]->d_edge_tc.SetPointer(edge_tc);
+                if (retval = data_slices[0]->d_edge_tc.Move(util::DEVICE,util::HOST)) return retval;
+
+            } else {
+            // does not support multi-GPU yet
+            }
         } while (0);
 
         return retval;
@@ -234,10 +248,9 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
 
         // create SoA on device
 		if(retval = data_slices[gpu]->d_src_node_ids.Allocate(edges, util::DEVICE))  return retval; 
+		if(retval = data_slices[gpu]->d_edge_tc.Allocate(edges, util::DEVICE))  return retval; 
 		if(retval = data_slices[gpu]->d_edge_list.Allocate(edges, util::DEVICE))   return retval;
-		if(retval = data_slices[gpu]->d_edge_list_partitioned.Allocate(edges, util::DEVICE))   return retval;
 		if(retval = data_slices[gpu]->d_degrees.Allocate(nodes, util::DEVICE))   return retval;
-		if(retval = data_slices[gpu]->d_flags.Allocate(edges, util::DEVICE))  return retval;
 		if(retval = data_slices[gpu]->labels.Allocate(nodes, util::DEVICE))  return retval;
 
         }
@@ -278,17 +291,14 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
         if (data_slices[gpu]->d_src_node_ids.GetPointer(util::DEVICE) == NULL) 
             if (retval = data_slices[gpu]->d_src_node_ids.Allocate(edges, util::DEVICE)) 
                 return retval;
+        if (data_slices[gpu]->d_edge_tc.GetPointer(util::DEVICE) == NULL) 
+            if (retval = data_slices[gpu]->d_edge_tc.Allocate(edges, util::DEVICE)) 
+                return retval;
         if (data_slices[gpu]->d_edge_list.GetPointer(util::DEVICE) == NULL) 
             if (retval = data_slices[gpu]->d_edge_list.Allocate(edges, util::DEVICE)) 
                 return retval;
-        if (data_slices[gpu]->d_edge_list_partitioned.GetPointer(util::DEVICE) == NULL) 
-            if (retval = data_slices[gpu]->d_edge_list_partitioned.Allocate(edges, util::DEVICE)) 
-                return retval;
         if (data_slices[gpu]->d_degrees.GetPointer(util::DEVICE) == NULL) 
             if (retval = data_slices[gpu]->d_degrees.Allocate(nodes, util::DEVICE)) 
-                return retval;
-        if (data_slices[gpu]->d_flags.GetPointer(util::DEVICE) == NULL) 
-            if (retval = data_slices[gpu]->d_flags.Allocate(edges, util::DEVICE)) 
                 return retval;
 if (data_slices[gpu]->labels.GetPointer(util::DEVICE) == NULL) 
             if (retval = data_slices[gpu]->labels.Allocate(nodes, util::DEVICE)) 
@@ -305,8 +315,10 @@ if (data_slices[gpu]->labels.GetPointer(util::DEVICE) == NULL)
             }
 
            // TODO: fill in the initial input_queue for problem
-        util::MemsetIdxKernel<<<128, 128>>>(
+        util::MemsetIdxKernel<<<256, 1024>>>(
                 data_slices[0]->frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes);
+
+        util::MemsetKernel<<<256, 1024>>>(data_slices[0]->d_edge_tc.GetPointer(util::DEVICE), (SizeT)0, edges);
 
         util::MemsetMadVectorKernel<<<128, 128>>>(
                 data_slices[0]->d_degrees.GetPointer(util::DEVICE),
