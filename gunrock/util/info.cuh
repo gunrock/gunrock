@@ -130,7 +130,7 @@ public:
         info["beta"]               = 6.0f;   // default beta for DOBFS
         info["top_nodes"]          = 0;      // default number of nodes for top-k primitive
         info["normalized"]         = false;  // default normalized for PageRank
-	info["multi_graphs"]       = false;  // default only one input graph
+        info["multi_graphs"]       = false;  // default only one input graph
         info["node_value"]         = false;  // default don't load labels
         info["label"]              = "";     // label file name used in test
         // info["gpuinfo"]
@@ -414,7 +414,7 @@ public:
         Csr<VertexId, SizeT, Value> &csr_ref,
         Csr<VertexId, SizeT, Value> &csc_ref)
     {
-	// Special initialization for SM problem
+        // Special initialization for SM problem
         if(algorithm_name == "SM") return Init_SM(args,csr_ref,csc_ref);
 
          // load or generate input graph
@@ -551,7 +551,10 @@ public:
                 std::remove(filename.begin(), filename.end(), bad_chars[i]),
                 filename.end());
         }
-        std::ofstream of(filename.data());
+        std::string ofname = filename.data();
+        std::ofstream of(ofname);
+        // now store the filename back into the JSON structure
+        info["jsonfile"] = ofname;        
         json_spirit::write_stream(
             json_spirit::mValue(info), of,
             json_spirit::pretty_print);
@@ -814,7 +817,7 @@ public:
                         market_filename,
                         label_filename,
                         csr_ref,
-			 info["undirected"].get_bool(),
+                         info["undirected"].get_bool(),
                         false,
                         args.CheckCmdLineFlag("quiet")) != 0)
             {
