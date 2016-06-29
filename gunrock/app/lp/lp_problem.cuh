@@ -97,6 +97,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, Value> node_weights; // Weight value per node
         util::Array1D<SizeT, Value> edge_weights; // Weight value per edge (reused as updated weights in the computation
         util::Array1D<SizeT, Value> weight_reg; // Regularizer of weights
+        util::Array1D<SizeT, SizeT   > degrees;             /**< Used for keeping out-degree for each vertex */
         util::Array1D<SizeT, VertexId> froms; // Edge source node ID
         util::Array1D<SizeT, VertexId> tos; // Edge destination node ID
         
@@ -107,6 +108,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             node_weights.SetName("node_weights");
             edge_weights.SetName("edge_weights");
             weight_reg.SetName("weight_reg");
+            degrees.SetName("degrees");
             froms.SetName("froms");
             tos.SetName("tos");
         }
@@ -118,6 +120,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             node_weights.Release();
             edge_weights.Release();
             weight_reg.Release();
+            degrees.Release();
             froms.Release();
             tos.Release();
         }
@@ -150,6 +153,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = node_weights  .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = edge_weights  .Allocate(graph->edges, util::DEVICE)) return retval;
             if (retval = weight_reg  .Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = degrees  .Allocate(graph->nodes, util::DEVICE)) return retval;
 
             edge_weights.SetPointer(graph->edge_values, graph->edges, util::HOST);
             if (retval = edge_weights.Move(util::HOST, util::DEVICE)) return retval;
@@ -229,10 +233,19 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             if (weight_reg.GetPointer(util::DEVICE) == NULL)
                 if (retval = weight_reg.Allocate(graph_slice -> nodes, util::DEVICE))
                     return retval;
+
+            if (degrees.GetPointer(util::DEVICE) == NULL)
+                if (retval = degrees.Allocate(graph_slice -> nodes, util::DEVICE))
+                    return retval;
             
             util::MemsetIdxKernel <<< 256, 1024>>>(this->labels.GetPointer(util::DEVICE), graph_slice -> nodes);
             util::MemsetKernel <<< 256, 1024>>>(edge_weights.GetPointer(util::DEVICE), 0.0f, graph_slice->nodes);
             util::MemsetKernel <<< 256, 1024>>>(weight_reg.GetPointer(util::DEVICE), 1.0f, graph_slice->nodes);
+
+            util::MemsetMadVectorKernel <<<256, 1024>>>(
+                degrees.GetPointer(util::DEVICE),
+                graph_slice -> row_offsets.GetPointer(util::DEVICE),
+                graph_slice -> row_offsets.GetPointer(util::DEVICE)+1, (SizeT)-1, graph_slice->nodes);
 
             return retval;
         }

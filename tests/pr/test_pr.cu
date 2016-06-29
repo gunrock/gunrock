@@ -30,7 +30,9 @@
 #include <gunrock/app/pr/pr_functor.cuh>
 
 
+#include <gunrock/app/lp/lp_enactor.cuh>
 #include <gunrock/app/lp/lp_problem.cuh>
+#include <gunrock/app/lp/lp_functor.cuh>
 
 // Operator includes
 #include <gunrock/oprtr/advance/kernel.cuh>
