@@ -83,6 +83,8 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
     typedef DataSliceBase<VertexId, SizeT, Value,
         MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
 
+    typedef cub::KeyValuePair<VertexId, Value> KVPair;
+
     /**
      * @brief Data slice structure which contains problem specific data.
      *
@@ -93,24 +95,33 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
     struct DataSlice : BaseDataSlice
     {
         // device storage arrays
-        util::Array1D<SizeT, VertexId> labels_argmax; // Updated community ID (argmax of neighgor weights
+        util::Array1D<SizeT, Value> labels_argmax; // Updated community ID (argmax of neighgor weights
         util::Array1D<SizeT, Value> node_weights; // Weight value per node
         util::Array1D<SizeT, Value> edge_weights; // Weight value per edge (reused as updated weights in the computation
+        util::Array1D<SizeT, Value> reduced_weights; // Reduced per node weight
         util::Array1D<SizeT, Value> weight_reg; // Regularizer of weights
         util::Array1D<SizeT, SizeT   > degrees;             /**< Used for keeping out-degree for each vertex */
         util::Array1D<SizeT, VertexId> froms; // Edge source node ID
         util::Array1D<SizeT, VertexId> tos; // Edge destination node ID
+        util::Array1D<SizeT, SizeT> offsets; // Point to graph_slice's row_offsets
+        util::Array1D<SizeT, KVPair> argmax_kv;
+        util::Array1D<SizeT, int     > stable_flag;     /**< Finish flag for label propagation, indicates that all labels are stable.*/
+        SizeT    max_iter;
         
 
-        DataSlice() : BaseDataSlice()
+        DataSlice() : BaseDataSlice(), max_iter(0)
         {
             labels_argmax.SetName("labels_argmax");
             node_weights.SetName("node_weights");
-            edge_weights.SetName("edge_weights");
+            edge_weights.SetName("edge_weights"); 
+            reduced_weights.SetName("reduced_weights");
             weight_reg.SetName("weight_reg");
             degrees.SetName("degrees");
             froms.SetName("froms");
             tos.SetName("tos");
+            argmax_kv.SetName("argmax_kv");
+            offsets.SetName("offsets");
+            stable_flag.SetName("stable_flag");
         }
 
         ~DataSlice()
@@ -119,10 +130,14 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             labels_argmax.Release();
             node_weights.Release();
             edge_weights.Release();
+            reduced_weights.Release();
             weight_reg.Release();
             degrees.Release();
             froms.Release();
             tos.Release();
+            argmax_kv.Release();
+            offsets.Release();
+            stable_flag.Release();
         }
 
         cudaError_t Init(
@@ -152,17 +167,25 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = labels_argmax  .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = node_weights  .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = edge_weights  .Allocate(graph->edges, util::DEVICE)) return retval;
+            if (retval = reduced_weights  .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = weight_reg  .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = degrees  .Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = stable_flag  .Allocate(1, util::HOST | util::DEVICE)) return retval;
 
             edge_weights.SetPointer(graph->edge_values, graph->edges, util::HOST);
             if (retval = edge_weights.Move(util::HOST, util::DEVICE)) return retval;
 
             if (retval = froms  .Allocate(graph->edges, util::DEVICE)) return retval;
 
+            if (retval = argmax_kv  .Allocate(graph->nodes, util::DEVICE)) return retval;
+
             if (retval = tos  .SetPointer(
                 graph_slice->column_indices.GetPointer(util::DEVICE),
                 graph_slice->edges, util::DEVICE)) return retval;
+
+            if (retval = offsets  .SetPointer(
+                graph_slice->row_offsets.GetPointer(util::DEVICE),
+                graph_slice->nodes+1, util::DEVICE)) return retval;
 
             /*for (VertexId node = 0; node < graph->nodes; ++node) {
                 SizeT start = graph->row_offsets[node];
@@ -208,9 +231,10 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
                     frontier_type,
             GraphSlice<VertexId, SizeT, Value>
                    *graph_slice,
+            SizeT   max_iter,
             double  queue_sizing       = 2.0, 
-            bool    use_double_buffer  = false,
             double  queue_sizing1      = -1.0,
+            bool    use_double_buffer  = false,
             bool    skip_scanned_edges = false)
         {
             cudaError_t retval = cudaSuccess;
@@ -230,6 +254,9 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             if (edge_weights.GetPointer(util::DEVICE) == NULL)
                 if (retval = edge_weights.Allocate(graph_slice -> nodes, util::DEVICE))
                     return retval;
+            if (reduced_weights.GetPointer(util::DEVICE) == NULL)
+                if (retval = reduced_weights.Allocate(graph_slice -> nodes, util::DEVICE))
+                    return retval;
             if (weight_reg.GetPointer(util::DEVICE) == NULL)
                 if (retval = weight_reg.Allocate(graph_slice -> nodes, util::DEVICE))
                     return retval;
@@ -246,6 +273,11 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
                 degrees.GetPointer(util::DEVICE),
                 graph_slice -> row_offsets.GetPointer(util::DEVICE),
                 graph_slice -> row_offsets.GetPointer(util::DEVICE)+1, (SizeT)-1, graph_slice->nodes);
+
+            stable_flag[0]=0;
+            if (retval = stable_flag  .Move(util::HOST, util::DEVICE)) return retval;
+
+            this->max_iter = max_iter;
 
             return retval;
         }
@@ -418,6 +450,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
      */
     cudaError_t Reset(
         FrontierType frontier_type,  // type (i.e., edge / vertex / mixed)
+        SizeT   max_iter,
         double queue_sizing,
         double queue_sizing1 = -1.0) 
     {
@@ -437,6 +470,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = data_slices[gpu]->Reset(
                 frontier_type, 
                 this->graph_slices[gpu], 
+                max_iter,
                 queue_sizing, 
                 queue_sizing1)) 
                 return retval;

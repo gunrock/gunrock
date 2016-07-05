@@ -318,7 +318,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = vertex_flag.Move(util::HOST, util::DEVICE)) return retval;
 
             // Allocate edge_flag if necessary
-            vertex_flag[0]=1;
+            edge_flag[0]=1;
             if (retval = edge_flag  .Move(util::HOST, util::DEVICE)) return retval;
 
             // Initialize edge frontier_queue

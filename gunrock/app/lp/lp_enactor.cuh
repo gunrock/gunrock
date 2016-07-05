@@ -175,7 +175,12 @@ class LpEnactor :
         //int         max_grid_size = 0) 
     {
         // Define functors for primitive
-        typedef LpFunctor     <VertexId, SizeT, Value, Problem> Functor;
+        typedef LpHookFunctor     <VertexId, SizeT, Value, Problem> HookFunctor;
+        typedef LpPtrJumpFunctor     <VertexId, SizeT, Value, Problem> PtrJumpFunctor;
+        typedef LpWeightUpdateFunctor     <VertexId, SizeT, Value, Problem> WeightUpdateFunctor;
+        typedef LpAssignWeightFunctor     <VertexId, SizeT, Value, Problem> AssignWeightFunctor;
+        typedef LpSwapLabelFunctor     <VertexId, SizeT, Value, Problem> SwapLabelFunctor;
+
         typedef typename Problem::DataSlice                DataSlice;
         typedef util::DoubleBuffer<VertexId, SizeT, Value> Frontier;
         typedef GraphSlice        <VertexId, SizeT, Value> GraphSliceT;
@@ -193,19 +198,198 @@ class LpEnactor :
         cudaStream_t  stream             =  data_slice->streams     [0];
         ContextPtr    context            =  this -> context         [0];
         cudaError_t   retval             = cudaSuccess;
+        SizeT                    *d_scanned_edges = NULL;  // Used for LB
 
+        void *d_temp_storage = NULL;
+        size_t temp_storage_bytes = 0;
+        cub::DeviceSegmentedReduce::ArgMax(d_temp_storage,
+                                           temp_storage_bytes,
+                                           data_slice->reduced_weights.GetPointer(util::DEVICE),
+                                           data_slice->argmax_kv.GetPointer(util::DEVICE),
+                                           graph_slice->nodes,
+                                           data_slice->offsets.GetPointer(util::DEVICE),
+                                           data_slice->offsets.GetPointer(util::DEVICE)+1);
+        // Note that if num_edges < num_nodes (chain), there will be problem.
         do 
         {
-            // TODO:
-            // while (!all_label_stable && iteration < max_step) {
-            // advance for each node use atomicAdd to accumulate weight_reg
-            // weight_reg[label[v]] -= degrees[u]/2*num_edges (if label[u] == label[v])
-            // for each node use atomicAdd to accumulate edge_weights (\sum node_weight(u) where label[u] == label[v])
-            // 
-            // reduce by key to find largest_weight for each node store into weight_reg (reuse)
-            // use advance to choose argmax and store in labels_argmax
-            // swap labels_argmax and labels (also return if all_label_stable)
-            // clear weight_reg to 1, edge_weights to 0
+            // single-GPU graph slice
+            if (retval = util::GRError(cudaMalloc(
+                (void**)&d_scanned_edges, graph_slice->edges * sizeof(SizeT)),
+                "Problem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__))
+            {
+                return retval;
+            }
+            // TODO: 
+            // one pass of connected component.
+
+            // initialize frontier as edge index using memsetidx
+            util::MemsetIdxKernel<<<256, 1024>>>(frontier_queue->keys[0].GetPointer(util::DEVICE), graph_slice->edges);
+            frontier_attribute->queue_length = graph_slice->edges;
+            frontier_attribute -> queue_reset = true;
+            //
+            // launch filter, for edge(u,v) u=froms[node], v=tos[node]
+            // if node_weights[u] == node_weights[v],
+            // assign labels[u] = labels[v] = min(labels[u],labels[v])
+            gunrock::oprtr::filter::LaunchKernel
+            <FilterKernelPolicy, Problem, HookFunctor>(
+                enactor_stats[0],
+                frontier_attribute[0],
+                typename HookFunctor::LabelT(),
+                data_slice,
+                d_data_slice,
+                NULL,
+                (unsigned char*)NULL,
+                frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), // d_in_queue
+                frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+                (Value   *) NULL,
+                (Value   *) NULL,
+                frontier_attribute->queue_length,
+                graph_slice -> nodes,
+                work_progress[0],
+                context[0],
+                stream,
+                util::MaxValue<SizeT>(),
+                util::MaxValue<SizeT>(),
+                enactor_stats -> filter_kernel_stats);
+
+            frontier_attribute->selector ^= 1;
+            frontier_attribute -> queue_reset = false;
+            frontier_attribute -> queue_index++;
+
+            if (enactor_stats -> retval = work_progress -> GetQueueLength(
+                frontier_attribute -> queue_index,
+                frontier_attribute -> queue_length,
+                false,
+                stream,
+                true)) return;
+            //
+            // launch filter, do pointer jumping for each froms[node]
+            //
+            gunrock::oprtr::filter::LaunchKernel
+            <FilterKernelPolicy, Problem, PtrJumpFunctor>(
+                enactor_stats[0],
+                frontier_attribute[0],
+                typename HookFunctor::LabelT(),
+                data_slice,
+                d_data_slice,
+                NULL,
+                (unsigned char*)NULL,
+                frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_in_queue
+                frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), // d_out_queue
+                (Value   *) NULL,
+                (Value   *) NULL,
+                frontier_attribute->queue_length,
+                graph_slice -> nodes,
+                work_progress[0],
+                context[0],
+                stream,
+                util::MaxValue<SizeT>(),
+                util::MaxValue<SizeT>(),
+                enactor_stats -> filter_kernel_stats);
+
+            frontier_attribute -> queue_reset = true;
+            // initialize frontier as edge index using memsetidx
+            //
+            util::MemsetIdxKernel<<<256, 1024>>>(frontier_queue->keys[0].GetPointer(util::DEVICE), graph_slice->edges);
+            frontier_attribute->queue_length = graph_slice->edges;
+            frontier_attribute->selector = 0;
+            while (d_data_slice->stable_flag[0] == 0 || enactor_stats->iteration < data_slice->max_iter) { 
+                //
+                // filter for each edge use atomicAdd to accumulate weight_reg
+                // weight_reg[label[v]] -= degrees[u]/2*num_edges (if label[u] == label[v]) <- Cond
+                // for each edge use atomicAdd to accumulate edge_weights[labels[v]] = (\sum node_weight(u) where label[u] == label[v]) <-Apply
+                gunrock::oprtr::filter::LaunchKernel
+                    <FilterKernelPolicy, Problem, WeightUpdateFunctor>(
+                            enactor_stats[0],
+                            frontier_attribute[0],
+                            typename HookFunctor::LabelT(),
+                            data_slice,
+                            d_data_slice,
+                            NULL,
+                            (unsigned char*)NULL,
+                            frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), // d_in_queue
+                            (VertexId*)NULL,//frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+                            (Value   *) NULL,
+                            (Value   *) NULL,
+                            frontier_attribute->queue_length,
+                            graph_slice -> nodes,
+                            work_progress[0],
+                            context[0],
+                            stream,
+                            util::MaxValue<SizeT>(),
+                            util::MaxValue<SizeT>(),
+                            enactor_stats -> filter_kernel_stats);
+
+                // this is simple. For each node n, reduced_weights[n] = edge_weights[labels[tos[n]]]*weight_reg[labels[tos[n]]]
+                frontier_attribute->queue_length = graph_slice->edges;
+                gunrock::oprtr::filter::LaunchKernel
+                    <FilterKernelPolicy, Problem, AssignWeightFunctor>(
+                            enactor_stats[0],
+                            frontier_attribute[0],
+                            typename HookFunctor::LabelT(),
+                            data_slice,
+                            d_data_slice,
+                            NULL,
+                            (unsigned char*)NULL,
+                            frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), // d_in_queue
+                            (VertexId *)NULL,//frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+                            (Value   *) NULL,
+                            (Value   *) NULL,
+                            frontier_attribute->queue_length,
+                            graph_slice -> nodes,
+                            work_progress[0],
+                            context[0],
+                            stream,
+                            util::MaxValue<SizeT>(),
+                            util::MaxValue<SizeT>(),
+                            enactor_stats -> filter_kernel_stats,
+                            false);
+                //
+                // reduce by key to find largest_weight for each node store into reduced_weight
+                // use advance to choose argmax and store in labels_argmax (can we use customized reduction op to compute argmax?)
+                //
+                cub::DeviceSegmentedReduce::ArgMax(d_temp_storage,
+                        temp_storage_bytes,
+                        data_slice->reduced_weights.GetPointer(util::DEVICE),
+                        data_slice->argmax_kv.GetPointer(util::DEVICE),
+                        graph_slice->nodes,
+                        data_slice->offsets.GetPointer(util::DEVICE),
+                        data_slice->offsets.GetPointer(util::DEVICE)+1);
+                
+                // swap labels_argmax and labels (also return if all_label_stable, simple kernel)
+                frontier_attribute->queue_length = graph_slice->nodes;
+                gunrock::oprtr::filter::LaunchKernel
+                    <FilterKernelPolicy, Problem, SwapLabelFunctor>(
+                            enactor_stats[0],
+                            frontier_attribute[0],
+                            typename HookFunctor::LabelT(),
+                            data_slice,
+                            d_data_slice,
+                            NULL,
+                            (unsigned char*)NULL,
+                            frontier_queue->keys[frontier_attribute->selector].GetPointer(util::DEVICE), // d_in_queue
+                            (VertexId *)NULL,//frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE), // d_out_queue
+                            (Value   *) NULL,
+                            (Value   *) NULL,
+                            frontier_attribute->queue_length,
+                            graph_slice -> nodes,
+                            work_progress[0],
+                            context[0],
+                            stream,
+                            util::MaxValue<SizeT>(),
+                            util::MaxValue<SizeT>(),
+                            enactor_stats -> filter_kernel_stats,
+                            false);
+                //
+                // clear weight_reg to 1, edge_weights to 0
+                util::MemsetKernel <<< 256, 1024>>>(data_slice->edge_weights.GetPointer(util::DEVICE), 0.0f, graph_slice->nodes);
+                util::MemsetKernel <<< 256, 1024>>>(data_slice->weight_reg.GetPointer(util::DEVICE), 1.0f, graph_slice->nodes);
+
+                enactor_stats->iteration++;
+            }
+
+            if (d_scanned_edges) cudaFree(d_scanned_edges);
+            if (retval) break;
         } while (0);
 
         if (this -> debug) 
@@ -216,36 +400,37 @@ class LpEnactor :
         return retval;
     }
 
-    typedef oprtr::filter::KernelPolicy <
-        Problem,             // Problem data type
-        300,                 // CUDA_ARCH
-        //INSTRUMENT,          // INSTRUMENT
-        0,                   // SATURATION QUIT
-        true,                // DEQUEUE_PROBLEM_SIZE
-        8,                   // MIN_CTA_OCCUPANCY
-        8,                   // LOG_THREADS
-        1,                   // LOG_LOAD_VEC_SIZE
-        0,                   // LOG_LOADS_PER_TILE
-        5,                   // LOG_RAKING_THREADS
-        5,                   // END_BITMASK_CULL
-        8 >                  // LOG_SCHEDULE_GRANULARITY
-    FilterPolicy;
+    typedef gunrock::oprtr::filter::KernelPolicy<
+        Problem,         // Problem data type
+        300,                // CUDA_ARCH
+        0,                  // SATURATION QUIT
+        true,               // DEQUEUE_PROBLEM_SIZE
+        (sizeof(VertexId)==4)?8:4,                  // MIN_CTA_OCCUPANCY
+        8,                  // LOG_THREADS
+        2,                  // LOG_LOAD_VEC_SIZE
+        0,                  // LOG_LOADS_PER_TILE
+        5,                  // LOG_RAKING_THREADS
+        5,                  // END_BITMASK_CULL
+        8,                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::filter::CULL>
+        FilterKernelPolicy;
 
-    typedef oprtr::advance::KernelPolicy <
-        Problem,             // Problem data type
-        300,                 // CUDA_ARCH
-        //INSTRUMENT,          // INSTRUMENT
-        1,                   // MIN_CTA_OCCUPANCY
-        10,                  // LOG_THREADS
-        8,                   // LOG_BLOCKS
-        32 * 128,            // LIGHT_EDGE_THRESHOLD (used for LB)
-        1,                   // LOG_LOAD_VEC_SIZE
-        0,                   // LOG_LOADS_PER_TILE
-        5,                   // LOG_RAKING_THREADS
-        32,                  // WARP_GATHER_THRESHOLD
-        128 * 4,             // CTA_GATHER_THRESHOLD
-        7,                   // LOG_SCHEDULE_GRANULARITY
-    oprtr::advance::LB > AdvancePolicy;
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,         // Problem data type
+        300,                // CUDA_ARCH
+        //INSTRUMENT,         // INSTRUMENT
+        8,                  // MIN_CTA_OCCUPANCY
+        10,                 // LOG_THREADS
+        9,                  // LOG_BLOCKS
+        32 * 128,           // LIGHT_EDGE_THRESHOLD
+        1,                  // LOG_LOAD_VEC_SIZE
+        0,                  // LOG_LOADS_PER_TILE
+        5,                  // LOG_RAKING_THREADS
+        32,                 // WARP_GATHER_THRESHOLD
+        128 * 4,            // CTA_GATHER_THRESHOLD
+        7,                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB_CULL>
+        AdvanceKernelPolicy;
 
     /**
      * \addtogroup PublicInterface
@@ -288,7 +473,7 @@ class LpEnactor :
 
         if (min_sm_version >= 300) 
         {
-            return InitLp<AdvancePolicy, FilterPolicy> (
+            return InitLp<AdvanceKernelPolicy, FilterKernelPolicy> (
                 context, problem, max_grid_size);
         }
 
@@ -322,7 +507,7 @@ class LpEnactor :
 
         if (min_sm_version >= 300) 
         {
-            return EnactLp<AdvancePolicy, FilterPolicy> ();
+            return EnactLp<AdvanceKernelPolicy, FilterKernelPolicy> ();
                 //context, problem, max_grid_size);
         }
 
