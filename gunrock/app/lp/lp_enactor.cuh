@@ -204,7 +204,7 @@ class LpEnactor :
         size_t temp_storage_bytes = 0;
         cub::DeviceSegmentedReduce::ArgMax(d_temp_storage,
                                            temp_storage_bytes,
-                                           data_slice->reduced_weights.GetPointer(util::DEVICE),
+                                           data_slice->final_weights.GetPointer(util::DEVICE),
                                            data_slice->argmax_kv.GetPointer(util::DEVICE),
                                            graph_slice->nodes,
                                            data_slice->offsets.GetPointer(util::DEVICE),
@@ -265,6 +265,9 @@ class LpEnactor :
             //
             // launch filter, do pointer jumping for each froms[node]
             //
+            while (!data_slice->stable_flag[0]) {
+            data_slice->stable_flag[0] = 1;
+            data_slice->stable_flag.Move(util::HOST, util::DEVICE, 1, 0, stream);
             gunrock::oprtr::filter::LaunchKernel
             <FilterKernelPolicy, Problem, PtrJumpFunctor>(
                 enactor_stats[0],
@@ -286,6 +289,9 @@ class LpEnactor :
                 util::MaxValue<SizeT>(),
                 util::MaxValue<SizeT>(),
                 enactor_stats -> filter_kernel_stats);
+                
+                data_slice->stable_flag.Move(util::HOST, util::DEVICE, 1, 0, stream);
+                }
 
             frontier_attribute -> queue_reset = true;
             // initialize frontier as edge index using memsetidx
@@ -294,10 +300,11 @@ class LpEnactor :
             frontier_attribute->queue_length = graph_slice->edges;
             frontier_attribute->selector = 0;
             while (d_data_slice->stable_flag[0] == 0 || enactor_stats->iteration < data_slice->max_iter) { 
+                data_slice->stable_flag[0] = 1;
+                data_slice->stable_flag.Move(util::HOST, util::DEVICE, 1, 0, stream);
                 //
                 // filter for each edge use atomicAdd to accumulate weight_reg
-                // weight_reg[label[v]] -= degrees[u]/2*num_edges (if label[u] == label[v]) <- Cond
-                // for each edge use atomicAdd to accumulate edge_weights[labels[v]] = (\sum node_weight(u) where label[u] == label[v]) <-Apply
+                // weight_reg[label[v]] -= degrees[u]/2*num_edges
                 gunrock::oprtr::filter::LaunchKernel
                     <FilterKernelPolicy, Problem, WeightUpdateFunctor>(
                             enactor_stats[0],
@@ -318,9 +325,10 @@ class LpEnactor :
                             stream,
                             util::MaxValue<SizeT>(),
                             util::MaxValue<SizeT>(),
-                            enactor_stats -> filter_kernel_stats);
+                            enactor_stats -> filter_kernel_stats,
+                            false);
 
-                // this is simple. For each node n, reduced_weights[n] = edge_weights[labels[tos[n]]]*weight_reg[labels[tos[n]]]
+                // this is simple. For each node n, final_weights[n] = edge_weights[labels[tos[n]]]*weight_reg[labels[tos[n]]]
                 frontier_attribute->queue_length = graph_slice->edges;
                 gunrock::oprtr::filter::LaunchKernel
                     <FilterKernelPolicy, Problem, AssignWeightFunctor>(
@@ -350,7 +358,7 @@ class LpEnactor :
                 //
                 cub::DeviceSegmentedReduce::ArgMax(d_temp_storage,
                         temp_storage_bytes,
-                        data_slice->reduced_weights.GetPointer(util::DEVICE),
+                        data_slice->final_weights.GetPointer(util::DEVICE),
                         data_slice->argmax_kv.GetPointer(util::DEVICE),
                         graph_slice->nodes,
                         data_slice->offsets.GetPointer(util::DEVICE),
@@ -385,6 +393,7 @@ class LpEnactor :
                 util::MemsetKernel <<< 256, 1024>>>(data_slice->edge_weights.GetPointer(util::DEVICE), 0.0f, graph_slice->nodes);
                 util::MemsetKernel <<< 256, 1024>>>(data_slice->weight_reg.GetPointer(util::DEVICE), 1.0f, graph_slice->nodes);
 
+                data_slice->stable_flag.Move(util::DEVICE, util::HOST, 1, 0, stream);
                 enactor_stats->iteration++;
             }
 

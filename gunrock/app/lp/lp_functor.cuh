@@ -14,6 +14,7 @@
 
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/app/lp/lp_problem.cuh>
+#include <gunrock/util/device_intrinsics.cuh>
 
 namespace gunrock {
 namespace app {
@@ -49,7 +50,12 @@ struct LpHookFunctor
         SizeT      input_pos,
         SizeT      output_pos)
     {
-        return true;
+        VertexId from = _ldg(d_data_slice->froms + node);
+        VertexId to = _ldg(d_data_slice->tos + node);
+        Value weight_from = _ldg(d_data_slice->node_weights + from);
+        Value weight_to = _ldg(d_data_slice->node_weights + to);
+        return fabs(weight_from-weight_to) < 1e-5f;
+
     }
 
     /**
@@ -71,6 +77,11 @@ struct LpHookFunctor
         SizeT      input_pos,
         SizeT      output_pos)
     {
+        VertexId from = _ldg(d_data_slice->froms + node);
+        VertexId to = _ldg(d_data_slice->tos + node);
+        VertexId max_node = from > to ? from : to;
+        VertexId min_node = from > to ? to : from;
+        d_data_slice->labels[max_node] = min_node;
     }
 };
 
@@ -125,8 +136,14 @@ struct LpPtrJumpFunctor
         LabelT     label,
         SizeT      input_pos,
         SizeT      output_pos)
-    {
-    }
+        {
+            VertexId parent = d_data_slice->labels[node];
+            VertexId grandpa = d_data_slice->labels[parent];
+            if (parent != grandpa) {
+                d_data_slice->stable_flag[0] = 0;
+                d_data_slice->labels[node] = grandpa;
+            }
+        }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -181,6 +198,10 @@ struct LpWeightUpdateFunctor
         SizeT      input_pos,
         SizeT      output_pos)
     {
+        VertexId from = _ldg(d_data_slice->froms + node);
+        VertexId to = _ldg(d_data_slice->tos + node);
+        Value l = _ldg(d_data_slice->labels + from);
+        atomicAdd(&d_data_slice->weight_reg[l], -d_data_slice->degrees[to]);
     }
 };
 
@@ -236,6 +257,10 @@ struct LpAssignWeightFunctor
         SizeT      input_pos,
         SizeT      output_pos)
     {
+        VertexId to = _ldg(d_data_slice->tos + node);
+        VertexId l = _ldg(d_data_slice->labels + to);
+        Value w_reg = _ldg(d_data_slice->weight_reg + l);
+        d_data_slice->final_weights[node] = _ldg(d_data_slice->edge_weights + node)*w_reg*l;
     }
 };
 
@@ -291,6 +316,14 @@ struct LpSwapLabelFunctor
         SizeT      input_pos,
         SizeT      output_pos)
     {
+        cub::KeyValuePair<SizeT, Value> argmax = _ldg(d_data_slice->argmax_kv+node);
+        VertexId l = d_data_slice->labels[node];
+        SizeT offset = _ldg(d_data_slice->offsets + node);
+        VertexId new_l = _ldg(d_data_slice->tos + offset + argmax.key); 
+        if (l != new_l) {
+            d_data_slice->stable_flag[0] = 0;
+            d_data_slice->labels[node] = new_l;
+        }
     }
 };
 

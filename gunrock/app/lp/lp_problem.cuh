@@ -83,7 +83,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
     typedef DataSliceBase<VertexId, SizeT, Value,
         MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
 
-    typedef cub::KeyValuePair<VertexId, Value> KVPair;
+    typedef cub::KeyValuePair<SizeT, Value> KVPair;
 
     /**
      * @brief Data slice structure which contains problem specific data.
@@ -98,9 +98,9 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, Value> labels_argmax; // Updated community ID (argmax of neighgor weights
         util::Array1D<SizeT, Value> node_weights; // Weight value per node
         util::Array1D<SizeT, Value> edge_weights; // Weight value per edge (reused as updated weights in the computation
-        util::Array1D<SizeT, Value> reduced_weights; // Reduced per node weight
+        util::Array1D<SizeT, Value> final_weights; // final weights edge_weight*weight_reg
         util::Array1D<SizeT, Value> weight_reg; // Regularizer of weights
-        util::Array1D<SizeT, SizeT   > degrees;             /**< Used for keeping out-degree for each vertex */
+        util::Array1D<SizeT, Value   > degrees;             /**< Used for keeping out-degree for each vertex */
         util::Array1D<SizeT, VertexId> froms; // Edge source node ID
         util::Array1D<SizeT, VertexId> tos; // Edge destination node ID
         util::Array1D<SizeT, SizeT> offsets; // Point to graph_slice's row_offsets
@@ -114,7 +114,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             labels_argmax.SetName("labels_argmax");
             node_weights.SetName("node_weights");
             edge_weights.SetName("edge_weights"); 
-            reduced_weights.SetName("reduced_weights");
+            final_weights.SetName("final_weights");
             weight_reg.SetName("weight_reg");
             degrees.SetName("degrees");
             froms.SetName("froms");
@@ -130,7 +130,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             labels_argmax.Release();
             node_weights.Release();
             edge_weights.Release();
-            reduced_weights.Release();
+            final_weights.Release();
             weight_reg.Release();
             degrees.Release();
             froms.Release();
@@ -167,7 +167,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = labels_argmax  .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = node_weights  .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = edge_weights  .Allocate(graph->edges, util::DEVICE)) return retval;
-            if (retval = reduced_weights  .Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = final_weights  .Allocate(graph->edges, util::DEVICE)) return retval;
             if (retval = weight_reg  .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = degrees  .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = stable_flag  .Allocate(1, util::HOST | util::DEVICE)) return retval;
@@ -254,8 +254,8 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             if (edge_weights.GetPointer(util::DEVICE) == NULL)
                 if (retval = edge_weights.Allocate(graph_slice -> nodes, util::DEVICE))
                     return retval;
-            if (reduced_weights.GetPointer(util::DEVICE) == NULL)
-                if (retval = reduced_weights.Allocate(graph_slice -> nodes, util::DEVICE))
+            if (final_weights.GetPointer(util::DEVICE) == NULL)
+                if (retval = final_weights.Allocate(graph_slice -> edges, util::DEVICE))
                     return retval;
             if (weight_reg.GetPointer(util::DEVICE) == NULL)
                 if (retval = weight_reg.Allocate(graph_slice -> nodes, util::DEVICE))
@@ -271,8 +271,13 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
 
             util::MemsetMadVectorKernel <<<256, 1024>>>(
                 degrees.GetPointer(util::DEVICE),
-                graph_slice -> row_offsets.GetPointer(util::DEVICE),
-                graph_slice -> row_offsets.GetPointer(util::DEVICE)+1, (SizeT)-1, graph_slice->nodes);
+                (Value*)graph_slice -> row_offsets.GetPointer(util::DEVICE),
+                (Value*)(graph_slice -> row_offsets.GetPointer(util::DEVICE)+1), (SizeT)-1, graph_slice->nodes);
+            Value norm = 1.0f/(2*graph_slice->edges);
+            util::MemsetScaleKernel <<<256, 1024>>>(
+                degrees.GetPointer(util::DEVICE),
+                norm,
+                graph_slice->nodes);
 
             stable_flag[0]=0;
             if (retval = stable_flag  .Move(util::HOST, util::DEVICE)) return retval;
