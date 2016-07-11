@@ -211,6 +211,8 @@ int ReadMarketStream(
     SizeT nodes = 0;
     SizeT edges = 0;
     EdgeTupleType *coo = NULL; // read in COO format
+    bool  skew  = false; //whether edge values are the inverse for symmetric matrices
+    bool  array = false; //whether the mtx file is in dense array format
 
     time_t mark0 = time(NULL);
     if (!quiet)
@@ -235,6 +237,14 @@ int ReadMarketStream(
         {
 
             // Comment
+            if (strlen(line) >= 2 && line[1] == '%')
+            {
+                // Banner
+                if (!undirected)
+                    undirected = (strstr(line, "symmetric") != NULL);
+                skew       = (strstr(line, "skew"     ) != NULL);
+                array      = (strstr(line, "array"    ) != NULL);
+            }
 
         }
         else if (edges_read == -1)
@@ -242,24 +252,34 @@ int ReadMarketStream(
 
             // Problem description
             long long ll_nodes_x, ll_nodes_y, ll_edges;
-            if (sscanf(line, "%lld %lld %lld",
-                       &ll_nodes_x, &ll_nodes_y, &ll_edges) != 3)
+            int items_scanned = sscanf(line, "%lld %lld %lld",
+                       &ll_nodes_x, &ll_nodes_y, &ll_edges);
+
+            if (array && items_scanned == 2)
             {
+                ll_edges = ll_nodes_x * ll_nodes_y;
+            } 
+
+            else if (!array && items_scanned == 3)
+            {
+                if (ll_nodes_x != ll_nodes_y)
+                {
+                    fprintf(stderr,
+                            "Error parsing MARKET graph: not square (%lld, %lld)\n",
+                            ll_nodes_x, ll_nodes_y);
+                    return -1;
+                }
+                if (undirected) ll_edges *=2;
+            } 
+
+            else {
                 fprintf(stderr, "Error parsing MARKET graph:"
                         " invalid problem description.\n");
                 return -1;
             }
 
-            if (ll_nodes_x != ll_nodes_y)
-            {
-                fprintf(stderr,
-                        "Error parsing MARKET graph: not square (%lld, %lld)\n",
-                        ll_nodes_x, ll_nodes_y);
-                return -1;
-            }
-
             nodes = ll_nodes_x;
-            edges = (undirected) ? ll_edges * 2 : ll_edges;
+            edges = ll_edges;
 
             if (!quiet)
             {
@@ -309,15 +329,23 @@ int ReadMarketStream(
             int num_input;
             if (LOAD_VALUES)
             {
-                if ((num_input = sscanf(
-                                     line, "%lld %lld %lld",
-                                     &ll_row, &ll_col, &ll_value)) < 2)
+                num_input = sscanf(line, "%lld %lld %lld",
+                                   &ll_row, &ll_col, &ll_value);
+                if (array && (num_input == 1))
+                {
+                    ll_value = ll_row;
+                    ll_col   = edges_read / nodes;
+                    ll_row   = edges_read - nodes * ll_col;
+                } 
+
+                else if (array || num_input < 2)
                 {
                     fprintf(stderr,
                             "Error parsing MARKET graph: badly formed edge\n");
                     if (coo) free(coo);
                     return -1;
                 }
+
                 else if (num_input == 2)
                 {
                     ll_value = rand() % 64;
@@ -325,7 +353,16 @@ int ReadMarketStream(
             }
             else
             {
-                if (sscanf(line, "%lld %lld", &ll_row, &ll_col) != 2)
+                num_input = sscanf(line, "%lld %lld", &ll_row, &ll_col);
+
+                if (array && (num_input == 1))
+                {
+                    ll_value = ll_row;
+                    ll_col   = edges_read / nodes;
+                    ll_row   = edges_read - nodes * ll_col;
+                } 
+
+                else if (array || (num_input != 2))
                 {
                     fprintf(stderr,
                             "Error parsing MARKET graph: badly formed edge\n");
@@ -361,7 +398,7 @@ int ReadMarketStream(
 
                 if (LOAD_VALUES)
                 {
-                    coo[edges_read].val = ll_value;
+                    coo[edges_read].val = ll_value * (skew ? -1 : 1);
                 }
 
                 ordered_rows = false;
