@@ -12,6 +12,8 @@
  * @brief A* Problem Enactor
  */
 
+// Stop_Condition
+
 #pragma once
 
 #include <thread>
@@ -682,6 +684,44 @@ struct ASTARIteration : public IterationBase <
             enactor_stats, data_slice_, graph_slice,
             work_progress, context, stream);
     }*/
+
+    /*
+     * @brief Stop_Condition check function.
+     *
+     * @param[in] enactor_stats Pointer to the enactor statistics.
+     * @param[in] frontier_attribute Pointer to the frontier attribute.
+     * @param[in] data_slice Pointer to the data slice we process on.
+     * @param[in] num_gpus Number of GPUs used.
+     */
+    static bool Stop_Condition (
+        EnactorStats<SizeT>             *enactor_stats,
+        FrontierAttribute<SizeT>        *frontier_attribute,
+        util::Array1D<SizeT, DataSlice> *data_slice,
+        int num_gpus)
+    {
+        bool reached_final = true;
+        for (int gpu = 0; gpu < num_gpus*num_gpus; gpu++)
+        if (enactor_stats[gpu].retval != cudaSuccess)
+        {
+            //printf("(CUDA error %d @ GPU %d: %s\n", enactor_stats[gpu].retval, gpu%num_gpus, cudaGetErrorString(enactor_stats[gpu].retval)); fflush(stdout);
+            return true;
+        }
+
+        for (int gpu =0; gpu < num_gpus; gpu++)
+        if (!data_slice[gpu]->quit_flag)//PR_queue_length > 0)
+        {
+            //printf("data_slice[%d].PR_queue_length = %d\n", gpu, data_slice[gpu]->PR_queue_length);
+            reached_final = false;
+        }
+
+        if (reached_final) {
+            return true;
+        } else {
+            return false;
+        }
+
+        return true;
+    }
 
     /*
      * @brief Check frontier queue size function.

@@ -12,6 +12,7 @@
  * @brief GPU Storage management Structure for A* Problem Data
  */
 
+
 #pragma once
 
 #include <limits>
@@ -73,8 +74,11 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, Value       >    weights ;     /**< Used for storing edge weights */
         util::Array1D<SizeT, VertexId    >    bfs_levels;   /**< Used for storing BFS levels */
         util::Array1D<SizeT, VertexId    >    dst_node;   /**< Used for storing dst node ID */
+        util::Array1D<SizeT, int     >        quit_flag;     /**< Finish flag for label propagation, indicates that all labels are stable.*/
         util::Array1D<SizeT, Value       >    sample_weight;   /**< Used for storing sample weight (avg or min)*/
         util::Array1D<SizeT, VertexId    >    original_vertex;
+        util::Array1D<SizeT, Value       >    pointx;
+        util::Array1D<SizeT, Value       >    pointy;
 
         NearFarPriorityQueue *pq;
 
@@ -88,8 +92,11 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
             weights         .SetName("weights"         );
             bfs_levels      .SetName("bfs_levels"      );
             dst_node        .SetName("dst_node"        );
+            quit_flag       .Setname("quit_flag"       );
             sample_weight   .SetName("sample_weight"   );
             original_vertex .SetName("original_vertex" );
+            pointx.SetName("pointx");
+            pointy.SetName("pointy");
             pq = new NearFarPriorityQueue;
         }
 
@@ -110,8 +117,11 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = f_cost        .Release()) return retval;
             if (retval = weights       .Release()) return retval;
             if (retval = dst_node      .Release()) return retval;
+            if (retval = quit_flag      .Release()) return retval;
             if (retval = sample_weight .Release()) return retval;
             if (retval = bfs_levels    .Release()) return retval;
+            if (retval = pointx    .Release()) return retval;
+            if (retval = pointy    .Release()) return retval;
             if (retval = original_vertex.Release()) return retval;
             delete pq;
             return retval;
@@ -151,6 +161,8 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
             GraphSlice<VertexId, SizeT, Value> *graph_slice,
             SizeT *num_in_nodes,
             SizeT *num_out_nodes,
+            Value *latitudes,
+            Value *longitudes,
             //VertexId *original_vertex,
             int   delta_factor = 16,
             float queue_sizing = 2.0,
@@ -189,9 +201,12 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = f_cost      .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = weights     .Allocate(graph->edges, util::DEVICE)) return retval;
             if (retval = dst_node    .Allocate(1, util::DEVICE)) return retval;
+            if (retval = quit_flag  .Allocate(1, util::HOST | util::DEVICE)) return retval;
             if (retval = sample_weight.Allocate(1, util::DEVICE)) return retval;
             if (retval = this->labels.Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = bfs_levels  .Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = pointx  .Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = pointy  .Allocate(graph->nodes, util::DEVICE)) return retval;
 
             weights.SetPointer(graph->edge_values, graph->edges, util::HOST);
             if (retval = weights.Move(util::HOST, util::DEVICE)) return retval;
@@ -370,6 +385,9 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
                 util::InvalidValue<VertexId>(),
                 nodes);
 
+            quit_flag[0] = 0;
+            if (retval = quit_flag.Move(util::HOST, util::DEVICE)) return retval;
+
             return retval;
         }
     }; // DataSlice
@@ -496,6 +514,8 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
      */
     cudaError_t Init(
             bool          stream_from_host,       // Only meaningful for single-GPU
+            Value*        latitudes,
+            Value*        longitudes,
             Csr<VertexId, SizeT, Value>
                          *graph,
             Csr<VertexId, SizeT, Value>
@@ -546,6 +566,8 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
                 this->num_gpus > 1? this->graph_slices[gpu]->in_counter.GetPointer(util::HOST) : NULL,
                 this->num_gpus > 1? this->graph_slices[gpu]->out_counter.GetPointer(util::HOST): NULL,
                 //this->num_gpus > 1? this->graph_slices[gpu]->original_vertex.GetPointer(util::HOST) : NULL,
+                latitudes,
+                longitudes,
                 delta_factor,
                 queue_sizing,
                 in_sizing,
@@ -642,7 +664,7 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
                 sizeof(Value),
                 cudaMemcpyHostToDevice),
                 "ASTARProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
-        }
+        } 
         return retval;
     }
 
