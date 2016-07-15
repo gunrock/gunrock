@@ -316,7 +316,7 @@ struct LpSwapLabelFunctor
         SizeT      input_pos,
         SizeT      output_pos)
     {
-        cub::KeyValuePair<SizeT, Value> argmax = _ldg(d_data_slice->argmax_kv+node);
+        cub::KeyValuePair<SizeT, Value> argmax = d_data_slice->argmax_kv[node];
         VertexId l = d_data_slice->labels[node];
         SizeT offset = _ldg(d_data_slice->offsets + node);
         VertexId new_l = _ldg(d_data_slice->tos + offset + argmax.key); 

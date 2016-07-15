@@ -133,8 +133,6 @@ class LpEnactor :
         this -> problem = problem;
         this -> context = context;
 
-        GraphSlice<VertexId, SizeT, Value>
-            *graph_slice = problem -> graph_slices[0];
         typename Problem::DataSlice
             *data_slice  = problem -> data_slices [0].GetPointer(util::HOST);
 
@@ -207,8 +205,8 @@ class LpEnactor :
                                            data_slice->final_weights.GetPointer(util::DEVICE),
                                            data_slice->argmax_kv.GetPointer(util::DEVICE),
                                            graph_slice->nodes,
-                                           data_slice->offsets.GetPointer(util::DEVICE),
-                                           data_slice->offsets.GetPointer(util::DEVICE)+1);
+                                           (int*)data_slice->offsets.GetPointer(util::DEVICE),
+                                           (int*)data_slice->offsets.GetPointer(util::DEVICE)+1);
         // Note that if num_edges < num_nodes (chain), there will be problem.
         do 
         {
@@ -261,7 +259,7 @@ class LpEnactor :
                 frontier_attribute -> queue_length,
                 false,
                 stream,
-                true)) return;
+                true)) return retval;
             //
             // launch filter, do pointer jumping for each froms[node]
             //
@@ -361,8 +359,8 @@ class LpEnactor :
                         data_slice->final_weights.GetPointer(util::DEVICE),
                         data_slice->argmax_kv.GetPointer(util::DEVICE),
                         graph_slice->nodes,
-                        data_slice->offsets.GetPointer(util::DEVICE),
-                        data_slice->offsets.GetPointer(util::DEVICE)+1);
+                        (int*)data_slice->offsets.GetPointer(util::DEVICE),
+                        (int*)data_slice->offsets.GetPointer(util::DEVICE)+1);
                 
                 // swap labels_argmax and labels (also return if all_label_stable, simple kernel)
                 frontier_attribute->queue_length = graph_slice->nodes;

@@ -34,9 +34,9 @@ template<typename VertexId, typename SizeT, typename Value>
 void ComputeNodeTC(VertexId *key, Value *value, Value *output, SizeT input_len) {
    void *d_temp_storage = NULL;
    size_t temp_storage_bytes = 0;
-   cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, NULL, value, output, NULL, cub::Sum(), input_len);
+   cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, (VertexId*)NULL, value, output, (VertexId*)NULL, cub::Sum(), input_len);
    cudaMalloc(&d_temp_storage, temp_storage_bytes);
-   cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, NULL, value, output, NULL, cub::Sum(), input_len);
+   cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, (VertexId*)NULL, value, output, (VertexId*)NULL, cub::Sum(), input_len);
 }
 
 template<typename VertexId, typename SizeT, typename Value>
@@ -44,9 +44,9 @@ void ComputeNodeWeights(VertexId *key, Value *value, Value *output, SizeT input_
     CustomMax reduction_op;
    void *d_temp_storage = NULL;
    size_t temp_storage_bytes = 0;
-   cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, NULL, value, output, NULL, reduction_op, input_len);
+   cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, (VertexId*)NULL, value, output, (VertexId*)NULL, reduction_op, input_len);
    cudaMalloc(&d_temp_storage, temp_storage_bytes);
-   cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, NULL, value, output, NULL, reduction_op, input_len);
+   cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, (VertexId*)NULL, value, output, (VertexId*)NULL, reduction_op, input_len);
 }
 
 /**
@@ -82,6 +82,8 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
         MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem; 
     typedef DataSliceBase<VertexId, SizeT, Value,
         MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
+
+    typedef unsigned char MaskT;
 
     typedef cub::KeyValuePair<SizeT, Value> KVPair;
 
@@ -207,7 +209,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             mgpu::IntervalExpand(graph->edges, graph_slice->row_offsets.GetPointer(util::DEVICE),
             node_weights.GetPointer(util::DEVICE), graph->nodes, temp_val, context[0]);
 
-            util::MemsetDivVectorKernel(edge_weights.GetPointer(util::DEVICE), temp_val, graph->edges);
+            util::MemsetDivVectorKernel<<<256, 1024>>>(edge_weights.GetPointer(util::DEVICE), (Value*)temp_val, graph->edges);
 
             ComputeNodeWeights(froms.GetPointer(util::DEVICE), edge_weights.GetPointer(util::DEVICE), node_weights.GetPointer(util::DEVICE), graph->edges);
             delete[] temp_val;
@@ -272,7 +274,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             util::MemsetMadVectorKernel <<<256, 1024>>>(
                 degrees.GetPointer(util::DEVICE),
                 (Value*)graph_slice -> row_offsets.GetPointer(util::DEVICE),
-                (Value*)(graph_slice -> row_offsets.GetPointer(util::DEVICE)+1), (SizeT)-1, graph_slice->nodes);
+                (Value*)graph_slice -> row_offsets.GetPointer(util::DEVICE)+1, -1.0f, graph_slice->nodes);
             Value norm = 1.0f/(2*graph_slice->edges);
             util::MemsetScaleKernel <<<256, 1024>>>(
                 degrees.GetPointer(util::DEVICE),
@@ -291,6 +293,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
     //int       num_gpus;
     //SizeT     nodes;
     //SizeT     edges;
+    SizeT       num_components;
 
     // data slices (one for each GPU)
     //DataSlice **data_slices;
@@ -311,6 +314,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             false, // enable_backward
             false, // keep_order
             false), // keep_node_num
+        num_components(0),
         data_slices(NULL)
     {
     }
@@ -358,16 +362,24 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
     cudaError_t Extract(VertexId *h_labels)
     {
         cudaError_t retval = cudaSuccess;
+        int *marker = new int[this->nodes];
+        memset(marker, 0, sizeof(int) * this->nodes);
 
         if (this -> num_gpus == 1) 
         {
             int gpu = 0;
             if (retval = util::SetDevice(this -> gpu_idx[gpu]))
                 return retval;
-
             data_slices[gpu] -> labels.SetPointer(h_labels);
             if (retval = data_slices[gpu] -> labels.Move(util::DEVICE, util::HOST))
                 return retval;
+            num_components = 0;
+            for (int node=0; node < this->nodes; ++node) {
+                if (marker[h_labels[node]] == 0) {
+                    num_components++;
+                    marker[h_labels[node]] = 1;
+                }
+            }
 
         } else {
             // multi-GPU extension code

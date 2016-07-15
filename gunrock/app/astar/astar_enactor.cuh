@@ -719,8 +719,6 @@ struct ASTARIteration : public IterationBase <
         } else {
             return false;
         }
-
-        return true;
     }
 
     /*

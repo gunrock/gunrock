@@ -12,6 +12,17 @@
  * @brief Simple test driver program for single source shortest path.
  */
 
+// Handle graph reading task (original graph should be the same,
+// but add mapping to names and longitude,latitude tuple)
+//
+// Refactor current BGL code into a function called RefAStar
+//
+// Add GPU Kernel driver code
+//
+// test on 1k city list
+// test on 42k city list
+
+
 #include <stdio.h>
 #include <string>
 #include <deque>
@@ -48,6 +59,90 @@ using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::astar;
 using namespace std;
+
+void Usage()
+{
+    printf(
+    "test <graph-type> [graph-type-arguments]\n"
+    "Graph type and graph type arguments:\n"
+    "    market <matrix-market-file-name>\n"
+    "        Reads a Matrix-Market coordinate-formatted graph of\n"
+    "        directed/undirected edges from STDIN (or from the\n"
+    "        optionally-specified file).\n"
+    "    rmat (default: rmat_scale = 10, a = 0.57, b = c = 0.19)\n"
+    "        Generate R-MAT graph as input\n"
+    "        --rmat_scale=<vertex-scale>\n"
+    "        --rmat_nodes=<number-nodes>\n"
+    "        --rmat_edgefactor=<edge-factor>\n"
+    "        --rmat_edges=<number-edges>\n"
+    "        --rmat_a=<factor> --rmat_b=<factor> --rmat_c=<factor>\n"
+    "        --rmat_seed=<seed>\n"
+    "    rgg (default: rgg_scale = 10, rgg_thfactor = 0.55)\n"
+    "        Generate Random Geometry Graph as input\n"
+    "        --rgg_scale=<vertex-scale>\n"
+    "        --rgg_nodes=<number-nodes>\n"
+    "        --rgg_thfactor=<threshold-factor>\n"
+    "        --rgg_threshold=<threshold>\n"
+    "        --rgg_vmultipiler=<vmultipiler>\n"
+    "        --rgg_seed=<seed>\n\n"
+    "Optional arguments:\n"
+    "[--device=<device_index>] Set GPU(s) for testing (Default: 0).\n"
+    "[--undirected]            Treat the graph as undirected (symmetric).\n"
+    "[--instrumented]          Keep kernels statics [Default: Disable].\n"
+    "                          total_queued, search_depth and barrier duty.\n"
+    "                          (a relative indicator of load imbalance.)\n"
+    "[--src=<Vertex-ID|randomize|largestdegree>]\n"
+    "                          Begins traversal from the source (Default: 0).\n"
+    "                          If randomize: from a random source vertex.\n"
+    "                          If largestdegree: from largest degree vertex.\n"
+    "[--quick]                 Skip the CPU reference validation process.\n"
+    "[--mark-pred]             Keep both label info and predecessor info.\n"
+    "[--disable-size-check]    Disable frontier queue size check.\n"
+    "[--grid-size=<grid size>] Maximum allowed grid size setting.\n"
+    "[--queue-sizing=<factor>] Allocates a frontier queue sized at: \n"
+    "                          (graph-edges * <factor>). (Default: 1.0)\n"
+    "[--in-sizing=<in/out_queue_scale_factor>]\n"
+    "                          Allocates a frontier queue sized at: \n"
+    "                          (graph-edges * <factor>). (Default: 1.0)\n"
+    "[--v]                     Print verbose per iteration debug info.\n"
+    "[--iteration-num=<num>]   Number of runs to perform the test.\n"
+    "[--traversal-mode=<0|1>]  Set traversal strategy, 0 for Load-Balanced\n"
+    "                          1 for Dynamic-Cooperative (Default: dynamic\n"
+    "                          determine based on average degree).\n"
+    "[--partition-method=<random|biasrandom|clustered|metis>]\n"
+    "                          Choose partitioner (Default use random).\n"
+    "[--delta_factor=<factor>] Delta factor for delta-stepping SSSP.\n"
+    "[--quiet]                 No output (unless --json is specified).\n"
+    "[--json]                  Output JSON-format statistics to STDOUT.\n"
+    "[--jsonfile=<name>]       Output JSON-format statistics to file <name>\n"
+    "[--jsondir=<dir>]         Output JSON-format statistics to <dir>/name,\n"
+    "                          where name is auto-generated.\n"); 
+}
+
+/**
+ * @brief Displays the SSSP result (i.e., distance from source)
+ *
+ * @tparam VertexId
+ * @tparam SizeT
+ *
+ * @param[in] source_path Search depth from the source for each node.
+ * @param[in] num_nodes Number of nodes in the graph.
+ */
+template<typename VertexId, typename SizeT>
+void DisplaySolution (VertexId *source_path, SizeT num_nodes)
+{
+    if (num_nodes > 40) num_nodes = 40;
+
+    printf("[");
+    for (VertexId i = 0; i < num_nodes; ++i)
+    {
+        PrintValue(i);
+        printf(":");
+        PrintValue(source_path[i]);
+        printf(" ");
+    }
+    printf("]\n");
+}
 
 // auxiliary types
 struct location
