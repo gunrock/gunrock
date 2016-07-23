@@ -214,11 +214,15 @@ struct ASTARIteration : public IterationBase <
     typedef typename util::DoubleBuffer<VertexId, SizeT, Value>
                                         Frontier  ;
     typedef ASTARFunctor<VertexId, SizeT, Value, Problem>
-                                        Functor   ;
+                                        GraphFunctor   ;
+
+    typedef ASTARDistanceFunctor<VertexId, SizeT, Value, Problem>
+                                        DistanceFunctor;
+        
     typedef PQFunctor<VertexId, SizeT, Value, Problem> PqFunctor;
     typedef gunrock::priority_queue::PriorityQueue<VertexId, SizeT>
         NearFarPriorityQueue;
-    typedef typename Functor::LabelT    LabelT    ;
+    typedef typename DistanceFunctor::LabelT    LabelT    ;
     typedef IterationBase <
         AdvanceKernelPolicy, FilterKernelPolicy, Enactor,
         false, true, false, true, Enactor::Problem::MARK_PATHS>//MARK_PREDECESSORS>
@@ -277,9 +281,11 @@ struct ASTARIteration : public IterationBase <
         //    frontier_attribute -> queue_length,
         //    thread_num, enactor_stats -> iteration, peer_, stream);
 
+        //printf("Advance:\n");
+        //util::DisplayDeviceResults(frontier_queue->keys[frontier_attribute->selector]  .GetPointer(util::DEVICE), frontier_attribute -> queue_length);
         // Edge Map
         gunrock::oprtr::advance::LaunchKernel
-            <AdvanceKernelPolicy, Problem, Functor, gunrock::oprtr::advance::V2V>(
+            <AdvanceKernelPolicy, Problem, DistanceFunctor, gunrock::oprtr::advance::V2V>(
             enactor_stats[0],
             frontier_attribute[0],
             enactor_stats -> iteration + 1,//util::InvalidValue<LabelT>(),
@@ -319,6 +325,8 @@ struct ASTARIteration : public IterationBase <
                     frontier_attribute -> queue_index + 1), stream);
         }
 
+        //util::DisplayDeviceResults(frontier_queue->keys[frontier_attribute->selector^1]  .GetPointer(util::DEVICE), frontier_attribute -> output_length[0]);
+
         if (!gunrock::oprtr::advance::isFused<AdvanceKernelPolicy::ADVANCE_MODE>())
         {
             frontier_attribute -> queue_index++;
@@ -329,7 +337,7 @@ struct ASTARIteration : public IterationBase <
                     thread_num, enactor_stats -> iteration, peer_);
             //Vertex Map
             gunrock::oprtr::filter::LaunchKernel
-                <FilterKernelPolicy, Problem, Functor> (
+                <FilterKernelPolicy, Problem, DistanceFunctor> (
                 enactor_stats[0],
                 frontier_attribute[0],
                 enactor_stats -> iteration + 1,//util::InvalidValue<VertexId>(),
@@ -356,6 +364,8 @@ struct ASTARIteration : public IterationBase <
                 util::cpu_mt::PrintMessage("Filter end.",
                     thread_num, enactor_stats->iteration, peer_);
         }
+        
+        //data_slice -> quit_flag.Move(util::DEVICE, util::HOST, 1, 0, stream);
 
         //TODO: split the output queue into near/far pile, put far pile in far queue, put near pile as the input queue
         //for next round.
@@ -363,7 +373,7 @@ struct ASTARIteration : public IterationBase <
         { // when #gpus == 1, use priority queue
             frontier_attribute->queue_index ++;
             frontier_attribute->selector ^= 1;
-            if (enactor_stats->retval = util::GRError(
+            /*if (enactor_stats->retval = util::GRError(
                 work_progress -> GetQueueLength(frontier_attribute->queue_index,
                 frontier_attribute->queue_length, true, stream),
                 "work_progress -> GetQueueLength failed", __FILE__, __LINE__))
@@ -399,7 +409,7 @@ struct ASTARIteration : public IterationBase <
                         pq,
                         (unsigned int)pq->queue_length,
                         d_data_slice,
-                        graph_slice->frontier_queues[peer_].keys[frontier_attribute->selector^1],
+                        (int*)frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
                         0,
                         pq->level,
                         (pq->level+1),
@@ -410,7 +420,7 @@ struct ASTARIteration : public IterationBase <
                         if (enactor_stats->retval = work_progress->SetQueueLength(frontier_attribute->queue_index, out_length)) return;
                     }
                 }
-            }
+            }*/
             //util::MemsetKernel<<<128, 128, 0, stream>>> (
             //    data_slice -> sssp_marker.GetPointer(util::DEVICE),
             //    (int)0, graph_slice->nodes);
@@ -424,6 +434,12 @@ struct ASTARIteration : public IterationBase <
             false,
             stream,
             true)) return;
+        // Move the device quit_flag to host. If frontier is empty, unreachable node, so directly set quit_flag to 1
+        //data_slice -> quit_flag.Move(util::DEVICE, util::HOST, 1, 0, stream);
+        /*if (frontier_attribute->queue_length == 0)
+            data_slice->quit_flag[0] = 1;*/
+
+        //util::DisplayDeviceResults(frontier_queue->keys[frontier_attribute->selector]  .GetPointer(util::DEVICE), frontier_attribute -> queue_length);
 
         //cudaStreamSynchronize(stream);
         //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys2",
@@ -555,7 +571,7 @@ struct ASTARIteration : public IterationBase <
             out_length.GetPointer(util::DEVICE) + ((enactor -> problem -> unified_receive) ? 0: peer_),
             keys_out.GetPointer(util::DEVICE),
             h_data_slice -> preds.GetPointer(util::DEVICE),
-            h_data_slice -> distances.GetPointer(util::DEVICE),
+            h_data_slice -> f_cost.GetPointer(util::DEVICE),
             h_data_slice -> labels.GetPointer(util::DEVICE));
 
         if (!enactor -> problem -> unified_receive)
@@ -614,7 +630,7 @@ struct ASTARIteration : public IterationBase <
                 partitioned_scanned_edges, over_sized, -1, -1, -1, false))
                 return retval;
             retval = gunrock::oprtr::advance::ComputeOutputLength
-                <AdvanceKernelPolicy, Problem, Functor,
+                <AdvanceKernelPolicy, Problem, DistanceFunctor,
                 gunrock::oprtr::advance::V2V>(
                 frontier_attribute,
                 d_offsets,
@@ -693,7 +709,7 @@ struct ASTARIteration : public IterationBase <
      * @param[in] data_slice Pointer to the data slice we process on.
      * @param[in] num_gpus Number of GPUs used.
      */
-    static bool Stop_Condition (
+    /*static bool Stop_Condition (
         EnactorStats<SizeT>             *enactor_stats,
         FrontierAttribute<SizeT>        *frontier_attribute,
         util::Array1D<SizeT, DataSlice> *data_slice,
@@ -708,7 +724,7 @@ struct ASTARIteration : public IterationBase <
         }
 
         for (int gpu =0; gpu < num_gpus; gpu++)
-        if (!data_slice[gpu]->quit_flag)//PR_queue_length > 0)
+        if (!data_slice[gpu]->quit_flag[0])//PR_queue_length > 0)
         {
             //printf("data_slice[%d].PR_queue_length = %d\n", gpu, data_slice[gpu]->PR_queue_length);
             reached_final = false;
@@ -719,7 +735,7 @@ struct ASTARIteration : public IterationBase <
         } else {
             return false;
         }
-    }
+    }*/
 
     /*
      * @brief Check frontier queue size function.

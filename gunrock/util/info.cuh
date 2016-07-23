@@ -39,6 +39,7 @@ private:
     double         q_sizing1;  // Value of max_queue_sizing1
     double          i_sizing;  // Maximum size scaling factor for communication
     long long         source;  // Source vertex ID to start
+    long long       destination_vertex; // Destination vertex ID
     std::string ref_filename;  // CPU reference input file name
     std::string    file_stem;  // Market filename path stem
     std::string       ofname;  // Used for jsonfile command
@@ -121,6 +122,7 @@ public:
         info["source_type"]        = "";     // source type
         info["source_seed"]        = 0;      // source seed
         info["source_vertex"]      = 0;      // source (BFS, SSSP)
+        info["destination_vertex"] = -1;     // destination
         info["stream_from_host"]   = false;  // stream from host to device
         info["traversal_mode"]     = "default";     // advance mode
         info["edges_queued"]       = 0;      // number of edges in queue
@@ -265,6 +267,11 @@ public:
             {
                 printf("Source vertex: %lld\n", source);
             }
+        }
+        if (args.CheckCmdLineFlag("dst-node"))
+        {
+            args.GetCmdLineArgument("dst-node", destination_vertex);
+            info["destination_vertex"] = (int)destination_vertex;
         }
         if (args.CheckCmdLineFlag("grid-size"))
         {
@@ -499,6 +506,8 @@ public:
         }
         csr_ptr = &csr_ref;  // set graph pointer
         InitBase(algorithm_name, args);
+        if (info["destination_vertex"].get_int64() < 0 || info["destination_vertex"].get_int64()>=(int)csr_ref.nodes)
+            info["destination_vertex"] = (int)csr_ref.nodes-1;   //if not set or something is wrong, set it to the largest vertex ID
     }
 
     /**
@@ -549,6 +558,7 @@ public:
         csr_ptr = &csr_ref;  // set CSR pointer
         csc_ptr = &csc_ref;  // set CSC pointer
         InitBase(algorithm_name, args);
+        info["destination_vertex"] = (int)csr_ref.nodes-1;   //by default set it to the largest vertex ID
     }
 
     /**

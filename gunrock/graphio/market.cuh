@@ -324,12 +324,12 @@ int ReadMarketStream(
                 return -1;
             }
 
-            long long ll_row, ll_col, ll_value;
-            // Value ll_value;  // used for parse float / double
+            long long ll_row, ll_col;
+            Value ll_value;  // used for parse float / double
             int num_input;
             if (LOAD_VALUES)
             {
-                num_input = sscanf(line, "%lld %lld %lld",
+                num_input = sscanf(line, "%lld %lld %f",
                                    &ll_row, &ll_col, &ll_value);
                 if (array && (num_input == 1))
                 {

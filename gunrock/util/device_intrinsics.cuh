@@ -69,6 +69,18 @@ __device__ static long long atomicAdd(long long *addr, long long val)
 }*/
 #endif
 
+__device__ static float atomicMin(float* addr, float val)
+{
+    int* addr_as_int = (int*)addr;
+    int old = *addr_as_int;
+    int expected;
+    do {
+        expected = old;
+        old = ::atomicCAS(addr_as_int, expected, __float_as_int(::fminf(val, __int_as_float(expected))));
+    } while (expected != old);
+    return __int_as_float(old);
+}
+
 template <typename T>
 __device__ __forceinline__ T _ldg(T* addr)
 {

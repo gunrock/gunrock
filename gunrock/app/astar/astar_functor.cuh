@@ -39,8 +39,8 @@ struct ASTARFunctor {
     static __device__ __forceinline__ float GraphHeuristicFunc(
         VertexId cur_vid,
         DataSlice *d_data_slice) {
-        VertexId dst_node = _ldg(d_data_slice->dst_node);
-        Value sample_weight = _ldg(d_data_slice->sample_weight);
+        VertexId dst_node = _ldg(&d_data_slice->dst_node[0]);
+        Value sample_weight = _ldg(&d_data_slice->sample_weight[0]);
         VertexId levels = abs(_ldg(d_data_slice -> bfs_levels+cur_vid) - _ldg(d_data_slice->bfs_levels+dst_node));
         return levels * sample_weight; 
     }
@@ -168,9 +168,9 @@ struct ASTARFunctor {
         SizeT      output_pos)
         //VertexId node, DataSlice *d_data_slice, VertexId v = 0, SizeT nid = 0)
     {
-        VertexId dst_node = _ldg(d_data_slice->dst_node);
-        if (dst_node == node && d_data_slice->quit_flag[0] == 0)
-            d_data_slice->quit_flag[0] = 1;
+        VertexId dst_node = _ldg(&d_data_slice->dst_node[0]);
+        /*if (dst_node == node && d_data_slice->quit_flag[0] == 0)
+            d_data_slice->quit_flag[0] = 1;*/
         // compute heuristic func
         Value h = GraphHeuristicFunc(node, d_data_slice);
         d_data_slice->f_cost[node] = d_data_slice->g_cost[node] + h;
@@ -195,7 +195,7 @@ struct ASTARDistanceFunctor {
     static __device__ __forceinline__ float DistanceHeuristicFunc(
         VertexId cur_vid,
         DataSlice *d_data_slice) {
-            VertexId dst_node = _ldg(d_data_slice->dst_node);
+            VertexId dst_node = _ldg(&d_data_slice->dst_node[0]);
             Value pointx2 = _ldg(d_data_slice->pointx + dst_node);
             Value pointy2 = _ldg(d_data_slice->pointy + dst_node);
             Value pointx1 = _ldg(d_data_slice->pointx + cur_vid);
@@ -241,6 +241,8 @@ struct ASTARDistanceFunctor {
         //if (to_track(s_id) || to_track(d_id))
             //printf("lable[%d] : %d -> %d @ %d + %d @ %d = %d \n", d_id, old_distance, edge_weight, edge_id, pred_distance, s_id, new_distance);
         bool result = (new_distance < old_distance);
+        //printf("s:%d d:%d e_id:%d, weight:%f, cond:%d\n", s_id, d_id, edge_id, edge_weight, result);
+        //printf("distance_s:%f, distance_d:%f, weight:%f\n", d_data_slice->g_cost[s_id], d_data_slice->g_cost[d_id], edge_weight);
 
         return result;
     }
@@ -275,6 +277,7 @@ struct ASTARDistanceFunctor {
                 s_id = d_data_slice -> original_vertex[s_id];
             util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                 s_id, d_data_slice->preds + d_id);
+            //printf("%d %d\n", s_id, d_id);
         }
     }
 
@@ -327,9 +330,10 @@ struct ASTARDistanceFunctor {
         SizeT      output_pos)
         //VertexId node, DataSlice *d_data_slice, VertexId v = 0, SizeT nid = 0)
     {
-        VertexId dst_node = _ldg(d_data_slice->dst_node);
-        if (dst_node == node && d_data_slice->quit_flag[0] == 0)
-            d_data_slice->quit_flag[0] = 1;
+        //printf("node: %d\n", node);
+        VertexId dst_node = _ldg(&d_data_slice->dst_node[0]);
+        /*if (dst_node == node && d_data_slice->quit_flag[0] == 0)
+            d_data_slice->quit_flag[0] = 1;*/
         // compute heuristic func
         Value h = DistanceHeuristicFunc(node, d_data_slice);
         d_data_slice->f_cost[node] = d_data_slice->g_cost[node] + h;
@@ -357,9 +361,7 @@ struct PQFunctor {
         Value distance;
         util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
             distance, d_data_slice->f_cost + node_id);
-        float delta;
-        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
-            delta, d_data_slice->delta);
+        float delta = _ldg(&d_data_slice->delta[0]);
         return (delta == 0) ? distance : distance / delta;
     }
 };

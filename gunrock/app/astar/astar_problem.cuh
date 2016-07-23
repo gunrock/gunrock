@@ -20,6 +20,7 @@
 #include <gunrock/util/memset_kernel.cuh>
 #include <gunrock/util/array_utils.cuh>
 #include <gunrock/priority_queue/kernel.cuh>
+#include <gunrock/util/track_utils.cuh>
 
 namespace gunrock {
 namespace app {
@@ -38,7 +39,8 @@ template <
     typename    SizeT,
     typename    Value,
     //bool        _MARK_PREDECESSORS>
-    bool        _MARK_PATHS>
+    bool        _MARK_PATHS,
+    int         DISTANCE_HEURISTIC>
 struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
     true,//_MARK_PREDECESSORS, //MARK_PREDECESSORS
     false> //ENABLE_IDEMPOTENCE
@@ -72,7 +74,10 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, Value       >    g_cost  ;     /**< Used for source distance */
         util::Array1D<SizeT, Value       >    f_cost  ;     /**< Used for source distance */
         util::Array1D<SizeT, Value       >    weights ;     /**< Used for storing edge weights */
-        util::Array1D<SizeT, VertexId    >    bfs_levels;   /**< Used for storing BFS levels */
+        util::Array1D<SizeT, VertexId    >    visit_lookup;
+        util::Array1D<SizeT, float       >    delta;
+        util::Array1D<SizeT, int         >    marker;
+        util::Array1D<SizeT, Value       >    bfs_levels;   /**< Used for storing BFS levels */
         util::Array1D<SizeT, VertexId    >    dst_node;   /**< Used for storing dst node ID */
         util::Array1D<SizeT, int     >        quit_flag;     /**< Finish flag for label propagation, indicates that all labels are stable.*/
         util::Array1D<SizeT, Value       >    sample_weight;   /**< Used for storing sample weight (avg or min)*/
@@ -90,9 +95,12 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
             g_cost          .SetName("g_cost"          );
             f_cost          .SetName("f_cost"          );
             weights         .SetName("weights"         );
+            visit_lookup    .SetName("visit_lookup"         );
+            delta         .SetName("delta"         );
+            marker         .SetName("marker"         );
             bfs_levels      .SetName("bfs_levels"      );
             dst_node        .SetName("dst_node"        );
-            quit_flag       .Setname("quit_flag"       );
+            quit_flag       .SetName("quit_flag"       );
             sample_weight   .SetName("sample_weight"   );
             original_vertex .SetName("original_vertex" );
             pointx.SetName("pointx");
@@ -116,6 +124,9 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = g_cost        .Release()) return retval;
             if (retval = f_cost        .Release()) return retval;
             if (retval = weights       .Release()) return retval;
+            if (retval = visit_lookup  .Release()) return retval;
+            if (retval = delta         .Release()) return retval;
+            if (retval = marker        .Release()) return retval;
             if (retval = dst_node      .Release()) return retval;
             if (retval = quit_flag      .Release()) return retval;
             if (retval = sample_weight .Release()) return retval;
@@ -200,19 +211,36 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = g_cost      .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = f_cost      .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = weights     .Allocate(graph->edges, util::DEVICE)) return retval;
+            if (retval = delta      .Allocate(1, util::DEVICE)) return retval;
+            if (retval = visit_lookup      .Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = marker      .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = dst_node    .Allocate(1, util::DEVICE)) return retval;
             if (retval = quit_flag  .Allocate(1, util::HOST | util::DEVICE)) return retval;
             if (retval = sample_weight.Allocate(1, util::DEVICE)) return retval;
             if (retval = this->labels.Allocate(graph->nodes, util::DEVICE)) return retval;
-            if (retval = bfs_levels  .Allocate(graph->nodes, util::DEVICE)) return retval;
-            if (retval = pointx  .Allocate(graph->nodes, util::DEVICE)) return retval;
-            if (retval = pointy  .Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (DISTANCE_HEURISTIC) {
+                if (retval = pointx  .Allocate(graph->nodes, util::DEVICE)) return retval;
+                if (retval = pointy  .Allocate(graph->nodes, util::DEVICE)) return retval;
+                if (retval = bfs_levels  .Allocate(1, util::DEVICE)) return retval;
+                pointx.SetPointer(latitudes, graph->nodes, util::HOST);
+                if (retval = pointx.Move(util::HOST, util::DEVICE)) return retval;
+                pointy.SetPointer(longitudes, graph->nodes, util::HOST);
+                if (retval = pointy.Move(util::HOST, util::DEVICE)) return retval;
+            } else {
+                if (retval = bfs_levels  .Allocate(graph->nodes, util::DEVICE)) return retval;
+                if (retval = pointx  .Allocate(1, util::DEVICE)) return retval;
+                if (retval = pointy  .Allocate(1, util::DEVICE)) return retval;
+                bfs_levels.SetPointer(graph->node_values, graph->nodes, util::HOST);
+                if (retval = bfs_levels.Move(util::HOST, util::DEVICE)) return retval;
+            }
 
+
+            float _delta = 1000000;
+            printf("delta value:%f\n", _delta);
+            delta.SetPointer(&_delta, util::HOST);
+            if (retval = delta.Move(util::HOST, util::DEVICE)) return retval;
             weights.SetPointer(graph->edge_values, graph->edges, util::HOST);
-            if (retval = weights.Move(util::HOST, util::DEVICE)) return retval;
-
-            bfs_levels.SetPointer(graph->node_values, graph->nodes, util::HOST);
-            if (retval = bfs_levels.Move(util::HOST, util::DEVICE)) return retval;
+            if (retval = weights.Move(util::HOST, util::DEVICE)) return retval; 
 
             if (MARK_PATHS)//(MARK_PREDECESSORS)
             {
@@ -251,6 +279,7 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
         float EstimatedDelta(const Csr<VertexId, Value, SizeT> &graph) {
             double  avgV = graph.average_edge_value;
             int     avgD = graph.average_degree;
+            printf("avgV:%f, avgD:%d\n", avgV, avgD);
             return avgV * 32 / avgD;
         }
 
@@ -363,30 +392,33 @@ struct ASTARProblem : ProblemBase<VertexId, SizeT, Value,
             if (this -> labels    .GetPointer(util::DEVICE) == NULL)
                 if (retval = this -> labels    .Allocate(nodes, util::DEVICE)) return retval;
 
-            //if (this->visit_lookup.GetPointer(util::DEVICE) == NULL)
-            //    if (retval = this->visit_lookup.Allocate(nodes, util::DEVICE)) return retval;
+            if (this->visit_lookup.GetPointer(util::DEVICE) == NULL)
+                if (retval = this->visit_lookup.Allocate(nodes, util::DEVICE)) return retval;
 
             if (MARK_PATHS)//(MARK_PREDECESSORS) 
-                util::MemsetIdxKernel<<<128, 128>>>(
+                util::MemsetIdxKernel<<<256, 1024>>>(
                     this->preds.GetPointer(util::DEVICE), nodes);
 
-            util::MemsetKernel<<<128, 128>>>(
+            util::MemsetKernel<<<256, 1024>>>(
                 this->g_cost   .GetPointer(util::DEVICE), 
                 util::MaxValue<Value>(), 
                 nodes);
 
-            util::MemsetKernel<<<128, 128>>>(
+            util::MemsetKernel<<<256, 1024>>>(
                 this->f_cost   .GetPointer(util::DEVICE), 
                 util::MaxValue<Value>(), 
                 nodes);
 
-            util::MemsetKernel<<<128, 128>>>(
+            util::MemsetKernel<<<256, 1024>>>(
                 this -> labels .GetPointer(util::DEVICE),
                 util::InvalidValue<VertexId>(),
                 nodes);
 
             quit_flag[0] = 0;
             if (retval = quit_flag.Move(util::HOST, util::DEVICE)) return retval;
+
+            util::MemsetKernel<<<256, 1024>>>(this->visit_lookup.GetPointer(util::DEVICE), (VertexId)-1, nodes);
+            util::MemsetKernel<<<256, 1024>>>(marker.GetPointer(util::DEVICE), (int)0, nodes);
 
             return retval;
         }
