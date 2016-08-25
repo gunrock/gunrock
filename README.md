@@ -13,7 +13,7 @@ For more details, please visit our [website](http://gunrock.github.io/), read
 our PPoPP 2016 paper,
 [Gunrock: A High-Performance Graph Processing Library on the GPU](http://escholarship.org/uc/item/6xz7z9k0),
 and check out the
-[Publications](#Publications) section. See [Release Notes](http://gunrock.github.io/gunrock/doc/latest/release_notes.html) to keep up with the changes in latest release.
+[Publications](#Publications) section. See [Release Notes](http://gunrock.github.io/gunrock/doc/latest/release_notes.html) to keep up with the our latest changes.
 
 Getting Started with Gunrock
 ----------------------------
@@ -54,7 +54,7 @@ directly using [Github](https://github.com/gunrock/gunrock/issues).
 Publications
 ------------
 
-Leyuan Wang, Yangzihao Wang, Carl Yang, and John D. Owens. **A Comparative Study on Exact Triangle Counting Algorithms on the GPU**. In Proceedings of the 1st High Performance Graph Processing Workshop, HPGP '16, May 2016. 
+Leyuan Wang, Yangzihao Wang, Carl Yang, and John D. Owens. **A Comparative Study on Exact Triangle Counting Algorithms on the GPU**. In Proceedings of the 1st High Performance Graph Processing Workshop, HPGP '16, May 2016.
 [[DOI](http://dx.doi.org/10.1145/2915516.2915521) |
 [http](http://www.escholarship.org/uc/item/9hf0m6w3)]
 
@@ -87,7 +87,7 @@ Presentations
 
 GTC 2016, Gunrock: A Fast and Programmable Multi-GPU Graph Processing Library, April 2016. [[slides](http://on-demand.gputechconf.com/gtc/2016/presentation/s6374-yangzihao-wang-gunrock.pdf)]
 
-NVIDIA [webinar](http://info.nvidianews.com/gunrock-webinar-reg-0416.html), April 2016. [[slides](tinyurl.com/owens-nv-webinar-160426)]
+NVIDIA [webinar](http://info.nvidianews.com/gunrock-webinar-reg-0416.html), April 2016. [[slides](http://tinyurl.com/owens-nv-webinar-160426)]
 
 GPU Technology Theater at SC15, Gunrock: A Fast and Programmable Multi-GPU Graph processing Library, November 2015. [[slides](http://images.nvidia.com/events/sc15/pdfs/SC5139-gunrock-multi-gpu-processing-library.pdf) | [video](http://images.nvidia.com/events/sc15/SC5139-gunrock-multi-gpu-processing-library.html)]
 
@@ -106,10 +106,10 @@ Gunrock Developers
 
 - [Carl Yang](http://web.ece.ucdavis.edu/~ctcyang/),
   University of California, Davis
-  
+
 - [Leyuan Wang](http://www.ece.ucdavis.edu/~laurawly/),
   University of California, Davis
-  
+
 - Weitang Liu, University of California, Davis
 
 - [Muhammad Osama](http://www.ece.ucdavis.edu/~mosama/),
@@ -146,12 +146,13 @@ Adam McLaughlin for his technical discussion. Thanks to Oded Green
 on his technical discussion and an optimization in CC primitive.
 
 This work was funded by the DARPA XDATA program under AFRL Contract
-FA8750-13-C-0002, by NSF awards CCF-1017399 and OCI-1032859, and by
-DARPA STTR award D14PC00023. Our
-XDATA principal investigator is Eric Whyne of
+FA8750-13-C-0002, by NSF awards CCF-1017399, OCI-1032859, and
+CCF-1629657, by DARPA STTR award D14PC00023, and by DARPA SBIR award
+W911NF-16-C-0020. Our XDATA principal investigator is Eric Whyne of
 [Data Tactics Corporation](http://www.data-tactics.com/) and our DARPA
-program managers are Dr. Christopher White (2012--2014) and [Mr. Wade
-Shen](http://www.darpa.mil/staff/mr-wade-shen) (2015--present).
+program managers are Dr. Christopher White (2012--2014) and
+[Mr. Wade Shen](http://www.darpa.mil/staff/mr-wade-shen)
+(2015--present).
 
 Copyright and Software License
 ----------------------------
@@ -160,4 +161,3 @@ Gunrock is copyright The Regents of the University of
 California, 2013--2016. The library, examples, and all source code are
 released under
 [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0).
-
