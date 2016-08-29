@@ -333,6 +333,9 @@ void RunTest(Info<VertexId, SizeT, Value> *info)
             max_queue_sizing1),
             "MST Problem Data Reset Failed", __FILE__, __LINE__);
 
+        util::GRError(enactor -> Reset(),
+            "MST Enactort Reset failed", __FILE__, __LINE__);
+
         cpu_timer.Start();
 
         // launch MST enactor
