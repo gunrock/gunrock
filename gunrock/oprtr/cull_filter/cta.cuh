@@ -271,6 +271,7 @@ struct Cta
                                         util::InvalidValue<SizeT>());
                                 } //else tile -> element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
                             } else {
+                                printf("row id%d\n", row_id);
                                 if (Functor::CondFilter(
                                     util::InvalidValue<VertexId>(),
                                     row_id,
@@ -626,12 +627,20 @@ struct Cta
                     guarded_elements);
             }
 
+            if (blockIdx.x == 0)
+                printf("before bitmaskcull. tid:%d\n", threadIdx.x);
             if (cta -> bitmask_cull && cta -> d_visited_mask != NULL)
             {
                 tile.BitmaskCull(cta);
             }
+            if (blockIdx.x == 0)
+                printf("before historycull. tid:%d\n", threadIdx.x);
             tile.HistoryCull(cta);
+            if (blockIdx.x == 0)
+                printf("before warpcull. tid:%d\n", threadIdx.x);
             tile.WarpCull(cta);
+            if (blockIdx.x == 0)
+                printf("before vertexcull. tid:%d\n", threadIdx.x);
             tile.VertexCull(cta);          // using vertex visitation status (update discovered vertices)
         }
     };

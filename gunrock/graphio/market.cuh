@@ -336,6 +336,7 @@ int ReadMarketStream(
                     ll_value = ll_row;
                     ll_col   = edges_read / nodes;
                     ll_row   = edges_read - nodes * ll_col;
+                    printf("%f\n", ll_value);
                 } 
 
                 else if (array || num_input < 2)

@@ -176,7 +176,6 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
 
             edge_weights.SetPointer(graph->edge_values, graph->edges, util::HOST);
             if (retval = edge_weights.Move(util::HOST, util::DEVICE)) return retval;
-
             if (retval = froms  .Allocate(graph->edges, util::DEVICE)) return retval;
 
             if (retval = argmax_kv  .Allocate(graph->nodes, util::DEVICE)) return retval;
@@ -208,6 +207,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
 
             mgpu::IntervalExpand(graph->edges, graph_slice->row_offsets.GetPointer(util::DEVICE),
             node_weights.GetPointer(util::DEVICE), graph->nodes, temp_val, context[0]);
+
 
             util::MemsetDivVectorKernel<<<256, 1024>>>(edge_weights.GetPointer(util::DEVICE), (Value*)temp_val, graph->edges);
 

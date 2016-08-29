@@ -144,7 +144,8 @@ public:
     */
     template<
         typename AdvanceKernelPolicy,
-        typename FilterKernelPolicy>
+        typename FilterKernelPolicy,
+        typename Filter2KernelPolicy>
         //typename MSTProblem>
     cudaError_t EnactMST()
         //ContextPtr  context,
@@ -195,7 +196,7 @@ public:
 
             // debug configurations
             //SizeT num_edges_origin = graph_slice->edges;
-            bool debug_info = 0;   // used for debug purpose
+            bool debug_info = 1;   // used for debug purpose
             //int tmp_select  = 0; // used for debug purpose
             //int tmp_length  = 0; // used for debug purpose
             unsigned int *num_selected = new unsigned int; // used in cub select
@@ -528,7 +529,7 @@ public:
                         queue -> keys[attributes -> selector^1].GetPointer(util::DEVICE),
                         (Value*) NULL,
                         (Value*) NULL, 
-                        attributes ->output_length[0],
+                        attributes->queue_length,//attributes ->output_length[0],
                         graph_slice->nodes,
                         work_progress[0],
                         context[0],
@@ -563,6 +564,16 @@ public:
                 // each vertex of a super-vertex now has a representative, but the
                 // super-vertices are not numbered in order. The vertices assigned
                 // to a super-vertex are also not placed in order in the successor
+                if (debug_info)
+                {
+                    printf("after ptrjump before radixsort\n");
+                    util::DisplayDeviceResults(
+                            data_slice -> super_idxs.GetPointer(util::DEVICE),
+                            graph_slice->nodes);
+                    util::DisplayDeviceResults(
+                            data_slice -> successors.GetPointer(util::DEVICE),
+                            graph_slice->nodes);
+                }
 
                 // bring all vertices of a super-vertex together by sorting
                 util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
@@ -670,10 +681,11 @@ public:
                 attributes->queue_index  = 0;
                 attributes->selector     = 0;
                 attributes->queue_length = current_nodes;
+                printf("current_nodes:%d\n", current_nodes);
                 attributes->queue_reset  = true;
 
                 gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, EgRmFunctor, gunrock::oprtr::advance::V2E>(
+                    <AdvanceKernelPolicy, Problem, EgRmFunctor, gunrock::oprtr::advance::V2V>(
                     statistics[0],
                     attributes[0],
                     util::InvalidValue<VertexId>(),
@@ -701,8 +713,36 @@ public:
                 if (retval = util::GRError(cudaStreamSynchronize(stream),
                     "advance::Kernel failed", __FILE__, __LINE__)) break;
 
+                printf("edges:%d\n", graph_slice->edges);
+                util::DisplayDeviceResults(
+                        queue -> keys[attributes -> selector  ].GetPointer(util::DEVICE),
+                        graph_slice->edges);
+
                 if (this -> debug) 
                     printf("  * finished mark edges in same super-vertex.\n");
+
+                if (debug_info)
+                {
+                    printf(":: edge removal in one super-vertex (d_keys_array) ::");
+                    util::DisplayDeviceResults(
+                        data_slice -> keys_array.GetPointer(util::DEVICE),
+                        graph_slice-> edges);
+
+                    printf(":: edge removal in one super-vertex (d_col_indices) ::");
+                    util::DisplayDeviceResults(
+                        data_slice -> colindices.GetPointer(util::DEVICE),
+                        graph_slice-> edges);
+
+                    printf(":: edge removal in one super-vertex (d_edge_weights) ::");
+                    util::DisplayDeviceResults(
+                        data_slice -> edge_value.GetPointer(util::DEVICE),
+                        graph_slice-> edges);
+
+                    printf(":: edge removal in one super-vertex (d_origin_edges) ::");
+                    util::DisplayDeviceResults(
+                        data_slice -> original_e.GetPointer(util::DEVICE),
+                        graph_slice-> edges);
+                }
 
                 ////////////////////////////////////////////////////////////////////////
                 // filter to remove all -1 in d_col_indices
@@ -796,6 +836,23 @@ public:
                 attributes->queue_length = graph_slice->edges;
                 attributes->queue_reset  = true;
 
+                /*util::MemsetIdxKernel<<<128, 128, 0, stream>>>(
+                queue -> keys[attributes -> selector  ].GetPointer(util::DEVICE),
+                graph_slice->edges);
+
+                util::DisplayDeviceResults(
+                queue -> keys[attributes -> selector  ].GetPointer(util::DEVICE),
+                graph_slice->edges);*/
+
+                if (retval = util::GRError(cudaStreamSynchronize(stream),
+                    "memset queue failed", __FILE__, __LINE__)) break;
+
+                printf("edges:%d\n", graph_slice->edges);
+                util::DisplayDeviceResults(
+                        queue -> keys[attributes -> selector  ].GetPointer(util::DEVICE),
+                        graph_slice->edges);
+
+
                 //gunrock::oprtr::filter::LaunchKernel
                 //    <FilterKernelPolicy, Problem, EgRmFunctor>(
                 //    statistics->filter_grid_size,
@@ -816,7 +873,7 @@ public:
                 //    queue->keys[attributes->selector^1].GetSize(),
                 //    statistics->filter_kernel_stats);
                 gunrock::oprtr::filter::LaunchKernel
-                    <FilterKernelPolicy, Problem, EgRmFunctor>(
+                    <Filter2KernelPolicy, Problem, EgRmFunctor>(
                     statistics[0],
                     attributes[0],
                     (VertexId)statistics -> iteration+1,
@@ -826,9 +883,9 @@ public:
                     data_slice->visited_mask.GetPointer(util::DEVICE),
                     (VertexId*)NULL,
                     (VertexId*)NULL,
-                    queue -> values[attributes -> selector  ].GetPointer(util::DEVICE),
-                    queue -> values[attributes -> selector^1].GetPointer(util::DEVICE),
-                    attributes -> output_length[0], // attributes -> quque_length
+                    queue -> keys[attributes -> selector  ].GetPointer(util::DEVICE),
+                    queue -> keys[attributes -> selector^1].GetPointer(util::DEVICE),
+                    attributes->queue_length,//attributes -> output_length[0], // attributes -> quque_length
                     graph_slice->nodes, // attribute -> queue_length
                     work_progress[0],
                     context[0],
@@ -952,7 +1009,7 @@ public:
                     (VertexId*)NULL, // values...
                     queue->values[attributes->selector  ].GetPointer(util::DEVICE), // NULL
                     queue->values[attributes->selector^1].GetPointer(util::DEVICE), // NULL
-                    attributes->output_length[0], // queue_length
+                    attributes->queue_length,//attributes->output_length[0], // queue_length
                     graph_slice->nodes, //queue_length
                     work_progress[0],
                     context[0],
@@ -1042,7 +1099,22 @@ public:
         5,                  // LOG_RAKING_THREADS
         5,                  // END_BITMASK_CULL
         8,                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::filter::CULL>
+        gunrock::oprtr::filter::SIMPLIFIED>
+        Filter2KernelPolicy;
+
+    typedef gunrock::oprtr::filter::KernelPolicy<
+        Problem,         // Problem data type
+        300,                // CUDA_ARCH
+        0,                  // SATURATION QUIT
+        true,               // DEQUEUE_PROBLEM_SIZE
+        (sizeof(VertexId)==4)?8:4,                  // MIN_CTA_OCCUPANCY
+        8,                  // LOG_THREADS
+        2,                  // LOG_LOAD_VEC_SIZE
+        0,                  // LOG_LOADS_PER_TILE
+        5,                  // LOG_RAKING_THREADS
+        5,                  // END_BITMASK_CULL
+        8,                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::filter::COMPACTED_CULL>
         FilterKernelPolicy;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
@@ -1141,7 +1213,7 @@ public:
 
         if (min_sm_version >= 300)
         {
-            return EnactMST<AdvanceKernelPolicy, FilterKernelPolicy>
+            return EnactMST<AdvanceKernelPolicy, FilterKernelPolicy, Filter2KernelPolicy>
                 (/*context, problem, max_grid_size*/);
         }
 

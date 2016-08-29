@@ -200,6 +200,7 @@ protected:
             num_gpus*num_gpus, util::HOST, true, 
             cudaHostAllocMapped | cudaHostAllocPortable))
             return retval;
+
         if (retval = frontier_attribute.Init(
             num_gpus*num_gpus, util::HOST, true, 
             cudaHostAllocMapped | cudaHostAllocPortable))
@@ -214,8 +215,10 @@ protected:
             {
                 if (retval = work_progress     [gpu*num_gpus + peer].Init())
                     return retval;
+
                 if (retval = frontier_attribute[gpu*num_gpus + peer].Init())
                     return retval;
+
                 EnactorStats<SizeT> *enactor_stats_ = enactor_stats + gpu*num_gpus + peer;
                 //initialize runtime stats
                 enactor_stats_ -> advance_grid_size = MaxGridSize(

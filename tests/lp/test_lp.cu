@@ -504,11 +504,12 @@ int main_(CommandLineArgs *args)
 
     // graph construction or generation related parameters
     info->info["undirected"] = true;   // require undirected input graph
+    info->info["edge_value"] = true;  // require per edge weight values
 
     cpu_timer2.Start();
     info->Init("LP", *args, csr);  // initialize Info structure
-    graphio::RemoveStandaloneNodes<VertexId, SizeT, Value>(
-        &csr, args->CheckCmdLineFlag("quiet"));
+    //graphio::RemoveStandaloneNodes<VertexId, SizeT, Value>(
+    //    &csr, args->CheckCmdLineFlag("quiet"));
         cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 

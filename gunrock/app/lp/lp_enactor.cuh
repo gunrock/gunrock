@@ -130,11 +130,11 @@ class LpEnactor :
             FilterKernelPolicy::CTA_OCCUPANCY))
             return retval;
 
-        this -> problem = problem;
-        this -> context = context;
+        //this -> problem = problem;
+        //this -> context = context;
 
-        typename Problem::DataSlice
-            *data_slice  = problem -> data_slices [0].GetPointer(util::HOST);
+        //typename Problem::DataSlice
+        //    *data_slice  = problem -> data_slices [0].GetPointer(util::HOST);
 
         // TODO:
         // One pass of connected component step to get rid of ocillation of
@@ -477,12 +477,14 @@ class LpEnactor :
                 min_sm_version = this->cuda_props[i].device_sm_version;
             }
         }
+        cudaError_t ret = cudaSuccess;
 
         if (min_sm_version >= 300) 
         {
-            return InitLp<AdvanceKernelPolicy, FilterKernelPolicy> (
+            ret = InitLp<AdvanceKernelPolicy, FilterKernelPolicy> (
                 context, problem, max_grid_size);
         }
+        return ret;
 
         // to reduce compile time, get rid of other architecture for now
         // TODO: add all the kernel policy setting for all architectures
