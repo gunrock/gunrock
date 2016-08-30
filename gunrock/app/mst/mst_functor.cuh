@@ -94,40 +94,6 @@ struct SuccFunctor
         // select one successor with minimum vertex id
         atomicMin(&d_data_slice -> successors[s_id], d_id);
     }
-
-    static __device__ __forceinline__ bool CondFilter(
-        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-        VertexId   v,  
-        VertexId   node,
-        DataSlice *d_data_slice,
-        SizeT      nid  ,
-        LabelT     label,
-        SizeT      input_pos,
-        SizeT      output_pos)
-    {
-        return true;
-    }
-
-    /**
-    * @brief Filter Kernel apply function. Point the current node to the
-    * parent node of its parent node.
-    *
-    * @param[in] node Vertex Id
-    * @param[in] problem Data slice object
-    * @param[in] v Vertex value
-    * @param[in] nid Node ID
-    */
-    static __device__ __forceinline__ void ApplyFilter(
-        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
-        VertexId   v,  
-        VertexId   node,
-        DataSlice *d_data_slice,
-        SizeT      nid  ,
-        LabelT     label,
-        SizeT      input_pos,
-        SizeT      output_pos)
-    {
-    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -203,40 +169,6 @@ struct EdgeFunctor
         util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
             d_data_slice -> original_e[edge_id], d_data_slice -> temp_index + s_id);
     }
-
-    static __device__ __forceinline__ bool CondFilter(
-        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-        VertexId   v,  
-        VertexId   node,
-        DataSlice *d_data_slice,
-        SizeT      nid  ,
-        LabelT     label,
-        SizeT      input_pos,
-        SizeT      output_pos)
-    {
-        return true;
-    }
-
-    /**
-    * @brief Filter Kernel apply function. Point the current node to the
-    * parent node of its parent node.
-    *
-    * @param[in] node Vertex Id
-    * @param[in] problem Data slice object
-    * @param[in] v Vertex value
-    * @param[in] nid Node ID
-    */
-    static __device__ __forceinline__ void ApplyFilter(
-        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
-        VertexId   v,  
-        VertexId   node,
-        DataSlice *d_data_slice,
-        SizeT      nid  ,
-        LabelT     label,
-        SizeT      input_pos,
-        SizeT      output_pos)
-    {
-    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -311,40 +243,6 @@ struct MarkFunctor
         // mark minimum spanning tree output edges
         util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
             (SizeT)1, d_data_slice ->mst_output + d_data_slice -> temp_index[s_id]);
-    }
-
-    static __device__ __forceinline__ bool CondFilter(
-        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-        VertexId   v,  
-        VertexId   node,
-        DataSlice *d_data_slice,
-        SizeT      nid  ,
-        LabelT     label,
-        SizeT      input_pos,
-        SizeT      output_pos)
-    {
-        return true;
-    }
-
-    /**
-    * @brief Filter Kernel apply function. Point the current node to the
-    * parent node of its parent node.
-    *
-    * @param[in] node Vertex Id
-    * @param[in] problem Data slice object
-    * @param[in] v Vertex value
-    * @param[in] nid Node ID
-    */
-    static __device__ __forceinline__ void ApplyFilter(
-        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
-        VertexId   v,  
-        VertexId   node,
-        DataSlice *d_data_slice,
-        SizeT      nid  ,
-        LabelT     label,
-        SizeT      input_pos,
-        SizeT      output_pos)
-    {
     }
 };
 
@@ -427,40 +325,6 @@ struct CyRmFunctor
         util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
             (SizeT)0, d_data_slice->mst_output + d_data_slice->temp_index[s_id]);
     }
-
-    static __device__ __forceinline__ bool CondFilter(
-        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-        VertexId   v,  
-        VertexId   node,
-        DataSlice *d_data_slice,
-        SizeT      nid  ,
-        LabelT     label,
-        SizeT      input_pos,
-        SizeT      output_pos)
-    {
-        return true;
-    }
-
-    /**
-    * @brief Filter Kernel apply function. Point the current node to the
-    * parent node of its parent node.
-    *
-    * @param[in] node Vertex Id
-    * @param[in] problem Data slice object
-    * @param[in] v Vertex value
-    * @param[in] nid Node ID
-    */
-    static __device__ __forceinline__ void ApplyFilter(
-        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
-        VertexId   v,  
-        VertexId   node,
-        DataSlice *d_data_slice,
-        SizeT      nid  ,
-        LabelT     label,
-        SizeT      input_pos,
-        SizeT      output_pos)
-    {
-    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -526,12 +390,18 @@ struct PJmpFunctor
         SizeT      input_pos,
         SizeT      output_pos)
     {
-        VertexId parent = d_data_slice->successors[node];
-        VertexId grandpa = d_data_slice->successors[parent];
-        if (parent != grandpa) 
+        VertexId parent;
+        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+            parent, d_data_slice -> successors + node);
+        VertexId grand_parent;
+        util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
+          grand_parent, d_data_slice -> successors + parent);
+        if (parent != grand_parent)
         {
-                d_data_slice->done_flags[0] = 0;
-                d_data_slice->successors[node] = grandpa;
+            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                0, d_data_slice -> done_flags + 0);
+            util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+                grand_parent, d_data_slice -> successors + node);
         }
     }
 };
@@ -581,17 +451,7 @@ struct EgRmFunctor
         SizeT      input_pos ,
         SizeT     &output_pos)
     {
-        //return d_data_slice -> successors[s_id] == d_data_slice -> successors[d_id];
-        if (d_data_slice -> successors[s_id] == d_data_slice -> successors[d_id])
-        {
-            d_data_slice -> keys_array[edge_id] = (VertexId)-1;
-            d_data_slice -> colindices[edge_id] = (VertexId)-1;
-            d_data_slice -> edge_value[edge_id] = (Value)-1;
-            d_data_slice -> original_e[edge_id] = (VertexId)-1;
-
-        printf("cond sid:%d, did:%d, eid:%d, ka:%d, colind:%d, ew:%d, oe:%d\n", s_id, d_id, edge_id, d_data_slice->keys_array[edge_id],d_data_slice->colindices[edge_id],d_data_slice->edge_value[edge_id],d_data_slice->original_e[edge_id]);
-        }
-        return true;
+        return d_data_slice -> successors[s_id] == d_data_slice -> successors[d_id];
     }
 
     /**
@@ -617,16 +477,15 @@ struct EgRmFunctor
         SizeT      input_pos ,
         SizeT     &output_pos)
     {
-        /*util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
             (VertexId)-1, d_data_slice -> keys_array + edge_id);
         util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-            (VertexId)-1, d_data_slice -> colindices + edge_id);*/
+            (VertexId)-1, d_data_slice -> colindices + edge_id);
         //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
         //  (Value)-1, problem->edge_value + e_id);
-        //printf("apply sid:%d, did:%d, eid:%d, ka:%d, colind:%d, ew:%d, oe:%d\n", s_id, d_id, edge_id, d_data_slice->keys_array[edge_id],d_data_slice->colindices[edge_id],d_data_slice->edge_value[edge_id],d_data_slice->original_e[edge_id]);
-        /*util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-            (VertexId)-1, d_data_slice -> original_e + edge_id);*/
-        return;
+        d_data_slice -> edge_value[edge_id] = (Value) -1;
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            (VertexId)-1, d_data_slice -> original_e + edge_id);
     }
 
     /**
@@ -674,7 +533,7 @@ struct EgRmFunctor
     {
         if (node >= d_data_slice -> nodes) return;
         if (d_data_slice -> keys_array[node] >= d_data_slice -> nodes) return;
-        printf("thread %d node %d\n", threadIdx.x, node);
+        
         util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
             d_data_slice->super_idxs[ d_data_slice->keys_array[node]],
             d_data_slice->keys_array + node);

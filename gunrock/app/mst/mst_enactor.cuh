@@ -423,7 +423,7 @@ public:
                     stream);
 
                 if (this -> debug && (retval = util::GRError(cudaStreamSynchronize(stream),
-                  "advance::Kernel failed", __FILE__, __LINE__))) break;
+                  "advance::Kernel failed", __FILE__, __LINE__))) break; 
 
                 ////////////////////////////////////////////////////////////////////////
                 // remove cycles - vertices with S(S(u)) = u forms cycles
@@ -455,7 +455,7 @@ public:
                     graph_slice->edges,
                     work_progress[0],
                     context[0],
-                    stream);
+                    stream); 
 
                 if (this -> debug)
                 {
@@ -491,6 +491,7 @@ public:
                 //while (!vertex_flag[0])
                 while (data_slice -> done_flags[0] == 0)
                 {
+                    printf("ptr jump.\n");
                     //vertex_flag[0] = 1;
                     data_slice -> done_flags[0] = 1;
                     //data_slice -> done_flags.SetPointer(vertex_flag);
@@ -558,7 +559,7 @@ public:
 
                 if (this -> debug) 
                     printf("  * finished pointer doubling: representatives.\n"
-                           " (b).Assigning IDs to Super-vertices\n");
+                           " (b).Assigning IDs to Super-vertices\n"); 
 
                 ////////////////////////////////////////////////////////////////////////
                 // each vertex of a super-vertex now has a representative, but the
@@ -682,10 +683,10 @@ public:
                 attributes->selector     = 0;
                 attributes->queue_length = current_nodes;
                 printf("current_nodes:%d\n", current_nodes);
-                attributes->queue_reset  = true;
+                attributes->queue_reset  = true;  
 
                 gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, EgRmFunctor, gunrock::oprtr::advance::V2V>(
+                    <AdvanceKernelPolicy, Problem, EgRmFunctor, gunrock::oprtr::advance::V2E>(
                     statistics[0],
                     attributes[0],
                     util::InvalidValue<VertexId>(),
@@ -707,16 +708,11 @@ public:
                     graph_slice->edges,
                     work_progress[0],
                     context[0],
-                    stream);
+                    stream); 
 
                 // Back to default stream, as Cub calls do not support GPU steam for now
                 if (retval = util::GRError(cudaStreamSynchronize(stream),
-                    "advance::Kernel failed", __FILE__, __LINE__)) break;
-
-                printf("edges:%d\n", graph_slice->edges);
-                util::DisplayDeviceResults(
-                        queue -> keys[attributes -> selector  ].GetPointer(util::DEVICE),
-                        graph_slice->edges);
+                    "advance::Kernel failed", __FILE__, __LINE__)) break; 
 
                 if (this -> debug) 
                     printf("  * finished mark edges in same super-vertex.\n");
@@ -827,7 +823,7 @@ public:
                     util::DisplayDeviceResults(
                         data_slice -> original_e.GetPointer(util::DEVICE),
                         graph_slice-> edges);
-                }
+                } 
 
                 ////////////////////////////////////////////////////////////////////////
                 // find super-vertex ids for d_keys_array and d_col_indices
@@ -835,14 +831,6 @@ public:
                 attributes->selector     = 0;
                 attributes->queue_length = graph_slice->edges;
                 attributes->queue_reset  = true;
-
-                /*util::MemsetIdxKernel<<<128, 128, 0, stream>>>(
-                queue -> keys[attributes -> selector  ].GetPointer(util::DEVICE),
-                graph_slice->edges);
-
-                util::DisplayDeviceResults(
-                queue -> keys[attributes -> selector  ].GetPointer(util::DEVICE),
-                graph_slice->edges);*/
 
                 if (retval = util::GRError(cudaStreamSynchronize(stream),
                     "memset queue failed", __FILE__, __LINE__)) break;
@@ -873,7 +861,7 @@ public:
                 //    queue->keys[attributes->selector^1].GetSize(),
                 //    statistics->filter_kernel_stats);
                 gunrock::oprtr::filter::LaunchKernel
-                    <Filter2KernelPolicy, Problem, EgRmFunctor>(
+                    <FilterKernelPolicy, Problem, EgRmFunctor>(
                     statistics[0],
                     attributes[0],
                     (VertexId)statistics -> iteration+1,
@@ -921,7 +909,7 @@ public:
 
                 ////////////////////////////////////////////////////////////////////////
                 // bring edges, weights, origin_eids together according to keys
-                util::MemsetCopyVectorKernel<<<128, 128>>>(
+                /*util::MemsetCopyVectorKernel<<<128, 128>>>(
                     data_slice -> temp_index.GetPointer(util::DEVICE),
                     data_slice -> keys_array.GetPointer(util::DEVICE),
                     graph_slice-> edges);
@@ -1075,7 +1063,8 @@ public:
                         (long long)graph_slice-> edges);
                 }
 
-                statistics->iteration++;
+                statistics->iteration++;*/
+                break;
 
             }  // end of the MST recursive loop
 
@@ -1103,18 +1092,17 @@ public:
         Filter2KernelPolicy;
 
     typedef gunrock::oprtr::filter::KernelPolicy<
-        Problem,         // Problem data type
-        300,                // CUDA_ARCH
-        0,                  // SATURATION QUIT
-        true,               // DEQUEUE_PROBLEM_SIZE
-        (sizeof(VertexId)==4)?8:4,                  // MIN_CTA_OCCUPANCY
-        8,                  // LOG_THREADS
-        2,                  // LOG_LOAD_VEC_SIZE
-        0,                  // LOG_LOADS_PER_TILE
-        5,                  // LOG_RAKING_THREADS
-        5,                  // END_BITMASK_CULL
-        8,                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::filter::COMPACTED_CULL>
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        0,                                  // SATURATION QUIT
+        true,                               // DEQUEUE_PROBLEM_SIZE
+        8,                                  // MIN_CTA_OCCUPANCY
+        8,                                  // LOG_THREADS
+        2,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        5,                                  // END_BITMASK_CULL
+        8>                                  // LOG_SCHEDULE_GRANULARITY
         FilterKernelPolicy;
 
     typedef gunrock::oprtr::advance::KernelPolicy<
