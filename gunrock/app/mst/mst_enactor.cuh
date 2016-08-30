@@ -869,17 +869,17 @@ public:
                     d_data_slice,
                     (SizeT*)NULL,
                     data_slice->visited_mask.GetPointer(util::DEVICE),
-                    (VertexId*)NULL,
-                    (VertexId*)NULL,
-                    queue -> keys[attributes -> selector  ].GetPointer(util::DEVICE),
-                    queue -> keys[attributes -> selector^1].GetPointer(util::DEVICE),
+                    queue -> values[attributes -> selector  ].GetPointer(util::DEVICE), //(VertexId*)NULL,
+                    queue -> values[attributes -> selector^1].GetPointer(util::DEVICE),//(VertexId*)NULL,
+                    (Value*)NULL, // queue -> keys[attributes -> selector  ].GetPointer(util::DEVICE),
+                    (Value*)NULL, // queue -> keys[attributes -> selector^1].GetPointer(util::DEVICE),
                     attributes->queue_length,//attributes -> output_length[0], // attributes -> quque_length
                     graph_slice->nodes, // attribute -> queue_length
                     work_progress[0],
                     context[0],
                     stream,
-                    queue -> keys[attributes -> selector  ].GetSize(),
-                    queue -> keys[attributes -> selector^1].GetSize(),
+                    queue -> values[attributes -> selector  ].GetSize(),
+                    queue -> values[attributes -> selector^1].GetSize(),
                     statistics->filter_kernel_stats,
                     true,
                     false);
@@ -909,7 +909,7 @@ public:
 
                 ////////////////////////////////////////////////////////////////////////
                 // bring edges, weights, origin_eids together according to keys
-                /*util::MemsetCopyVectorKernel<<<128, 128>>>(
+                util::MemsetCopyVectorKernel<<<128, 128>>>(
                     data_slice -> temp_index.GetPointer(util::DEVICE),
                     data_slice -> keys_array.GetPointer(util::DEVICE),
                     graph_slice-> edges);
@@ -993,17 +993,17 @@ public:
                     d_data_slice,
                     (SizeT*)NULL,
                     data_slice -> visited_mask.GetPointer(util::DEVICE),
-                    (VertexId*)NULL, // values...
-                    (VertexId*)NULL, // values...
-                    queue->values[attributes->selector  ].GetPointer(util::DEVICE), // NULL
-                    queue->values[attributes->selector^1].GetPointer(util::DEVICE), // NULL
+                    queue->values[attributes -> selector  ].GetPointer(util::DEVICE),//(VertexId*)NULL, // values...
+                    queue->values[attributes -> selector^1].GetPointer(util::DEVICE),//(VertexId*)NULL, // values...
+                    (Value*)NULL,//queue->values[attributes->selector  ].GetPointer(util::DEVICE), // NULL
+                    (Value*)NULL,//queue->values[attributes->selector^1].GetPointer(util::DEVICE), // NULL
                     attributes->queue_length,//attributes->output_length[0], // queue_length
                     graph_slice->nodes, //queue_length
                     work_progress[0],
                     context[0],
                     stream,
-                    queue->keys[attributes->selector  ].GetSize(), // values.Size
-                    queue->keys[attributes->selector^1].GetSize(), // values.Size
+                    queue->values[attributes->selector  ].GetSize(), // values.Size
+                    queue->values[attributes->selector^1].GetSize(), // values.Size
                     statistics->filter_kernel_stats,
                     true,
                     false);
@@ -1063,8 +1063,8 @@ public:
                         (long long)graph_slice-> edges);
                 }
 
-                statistics->iteration++;*/
-                break;
+                statistics->iteration++;
+                //break;
 
             }  // end of the MST recursive loop
 
