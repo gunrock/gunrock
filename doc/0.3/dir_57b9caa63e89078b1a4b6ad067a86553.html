@@ -34,12 +34,14 @@
         <script type="text/javascript">
             // parse a spec and create a visualization view
             function plot(divid, spec) {
-                vg.parse.spec(spec, function(chart) { chart({el:"#" + divid}).update(); });
+                vg.parse.spec(spec, function(chart) {
+                    chart({el:"#" + divid}).update();
+                });
             }
             function plotvl(divid, spec) {
                 var vgSpec = vl.compile(spec).spec;
                 vg.parse.spec(vgSpec, function(chart) {
-                    chart({el:"#vis"}).update();
+                    chart({el:"#" + divid}).update();
                 });
             }
             function plotjson(divid, jsonpath) {
@@ -211,9 +213,6 @@ Files</h2></td></tr>
 <tr class="memitem:random__bits_8h"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="random__bits_8h.html">random_bits.h</a></td></tr>
 <tr class="memdesc:random__bits_8h"><td class="mdescLeft">&#160;</td><td class="mdescRight">A random bits generator. <br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:sarray__utils__temp_8cuh"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="sarray__utils__temp_8cuh.html">sarray_utils_temp.cuh</a></td></tr>
-<tr class="memdesc:sarray__utils__temp_8cuh"><td class="mdescLeft">&#160;</td><td class="mdescRight">sparse array utilities for SparseArray1D <br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:select__utils_8cuh"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="select__utils_8cuh.html">select_utils.cuh</a></td></tr>
 <tr class="memdesc:select__utils_8cuh"><td class="mdescLeft">&#160;</td><td class="mdescRight">kenel utils used in minimum spanning tree algorithm. <br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -260,7 +259,7 @@ Files</h2></td></tr>
 </div>
 </div>
 <hr class="footer"/><address class="footer"><small>
-Generated on Wed Aug 31 2016 14:14:21 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Wed Aug 31 2016 14:41:28 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.10
 </small></address>

@@ -34,12 +34,14 @@
         <script type="text/javascript">
             // parse a spec and create a visualization view
             function plot(divid, spec) {
-                vg.parse.spec(spec, function(chart) { chart({el:"#" + divid}).update(); });
+                vg.parse.spec(spec, function(chart) {
+                    chart({el:"#" + divid}).update();
+                });
             }
             function plotvl(divid, spec) {
                 var vgSpec = vl.compile(spec).spec;
                 vg.parse.spec(vgSpec, function(chart) {
-                    chart({el:"#vis"}).update();
+                    chart({el:"#" + divid}).update();
                 });
             }
             function plotjson(divid, jsonpath) {
@@ -510,7 +512,7 @@ template&lt;typename VertexId , typename Value , typename SizeT &gt; </div>
 </div>
 </div>
 <hr class="footer"/><address class="footer"><small>
-Generated on Wed Aug 31 2016 14:14:21 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Wed Aug 31 2016 14:41:27 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.10
 </small></address>
