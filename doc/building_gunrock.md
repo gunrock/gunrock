@@ -1,9 +1,11 @@
 Building Gunrock {#building_gunrock}
-=====================
-Gunrock current release has been tested on Linux Mint 15 (64-bit), Ubuntu 12.04, 14.04 and 15.10 with CUDA 7.5 installed, compute architecture 3.0 and g++ 4.8. We expect Gunrock to build and run correctly on other 64-bit and 32-bit Linux distributions, Mac OS, and Windows.
+================
+
+Gunrock's current release has been tested on Linux Mint 15 (64-bit), Ubuntu 12.04, 14.04 and 15.10 with CUDA 7.5 installed, compute architecture 3.0 and g++ 4.8. We expect Gunrock to build and run correctly on other 64-bit and 32-bit Linux distributions, Mac OS, and Windows.
 
 Installation {#installation}
-----------------------------
+============
+
 **Overview:**
 * [Prerequisites](#prerequisites)
 * [Compilation](#compilation)
@@ -11,7 +13,8 @@ Installation {#installation}
 
 
 Prerequisites {#prerequisites}
-----------------------------
+=============
+
 **Required Dependencies:**
 * [CUDA](https://developer.nvidia.com/cuda-zone) (7.5 or higher) is used to implement Gunrock.
   * Refer to NVIDIA's [CUDA](https://developer.nvidia.com/cuda-downloads) homepage to download and install CUDA.
@@ -39,7 +42,8 @@ git submodule update
   * If the build cannot find your METIS library, please set the `METIS_DLL` environment variable to the full path of the library.
 
 Compilation {#compilation}
-----------------------------
+===========
+
 **Simple Gunrock Compilation:**
 * Downloading gunrock:
 ```
@@ -90,14 +94,15 @@ make
 ```
 
 Generating Datasets {#generating_datasets}
-----------------------------
+===================
+
 All dataset-related code is under the `gunrock/dataset/` subdirectory. The current version of Gunrock only supports [Matrix-market coordinate-formatted graph](http://math.nist.gov/MatrixMarket/formats.html) format. The datasets are divided into two categories according to their scale. Under the `dataset/small/` subdirectory, there are trivial graph datasets for testing the correctness of the graph primitives. All of them are ready to use. Under the `dataset/large/` subdirectory, there are large graph datasets for doing performance regression tests.
 * To download them to your local machine, just type `make` in the `dataset/large/` subdirectory.
 * You can also choose to only download one specific dataset to your local machine by stepping into the subdirectory of that dataset and typing make inside that subdirectory.
 
 
 
-##Hardware {#hardware}
-----------------------------
-**Laboratory Tested Hardware:** Gunrock with GeForce GTX 970, Tesla K40s. We have not encountered any trouble in-house with devices with CUDA capability >= 3.0.
+Hardware {#hardware}
+========
 
+**Laboratory Tested Hardware:** Gunrock with GeForce GTX 970, Tesla K40s. We have not encountered any trouble in-house with devices with CUDA capability >= 3.0.
