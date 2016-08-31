@@ -26,19 +26,30 @@
         <link href="doxygen.css" rel="stylesheet" type="text/css" />
         <link href="customdoxygen.css" rel="stylesheet" type="text/css"/>
         <script type="text/javascript" src="doxy-boot.js"></script>
-        <script src="http://vega.github.io/vega-editor/vendor/d3.min.js"></script>
-        <script src="http://vega.github.io/vega-editor/vendor/d3.geo.projection.min.js"></script>
-        <script src="http://vega.github.io/vega-editor/vendor/topojson.js"></script>
-        <script src="http://vega.github.io/vega-editor/vendor/d3.layout.cloud.js"></script>
-        <script src="http://vega.github.io/vega/vega.min.js"></script>
+        <!-- https://vega.github.io/vega-lite/usage/embed.html -->
+        <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+        <script src="http://vega.github.io/vega/vega.js" charset="utf-8"></script>
+        <script src="http://vega.github.io/vega-lite/vega-lite.js" charset="utf-8"></script>
+        <script src="http://vega.github.io/vega-editor/vendor/vega-embed.js" charset="utf-8"></script>
         <script type="text/javascript">
             // parse a spec and create a visualization view
             function plot(divid, spec) {
                 vg.parse.spec(spec, function(chart) { chart({el:"#" + divid}).update(); });
             }
+            function plotvl(divid, spec) {
+                var vgSpec = vl.compile(spec).spec;
+                vg.parse.spec(vgSpec, function(chart) {
+                    chart({el:"#vis"}).update();
+                });
+            }
             function plotjson(divid, jsonpath) {
                 $.getJSON(jsonpath, function(result) {
                     plot(divid, result);
+                });
+            }
+            function plotvljson(divid, jsonpath) {
+                $.getJSON(jsonpath, function(result) {
+                    plotvl(divid, result);
                 });
             }
         </script>
@@ -150,7 +161,7 @@ Data Structures</h2></td></tr>
 </div>
 </div>
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat May 14 2016 08:15:33 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Wed Aug 31 2016 14:14:21 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.10
 </small></address>
