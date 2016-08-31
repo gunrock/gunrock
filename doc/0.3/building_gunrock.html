@@ -128,12 +128,16 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <div class="title">Building Gunrock </div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p>Gunrock current release has been tested on Linux Mint 15 (64-bit), Ubuntu 12.04, 14.04 and 15.10 with CUDA 7.5 installed, compute architecture 3.0 and g++ 4.8. We expect Gunrock to build and run correctly on other 64-bit and 32-bit Linux distributions, Mac OS, and Windows.</p>
+<div class="textblock"><p>Gunrock's current release has been tested on Linux Mint 15 (64-bit), Ubuntu 12.04, 14.04 and 15.10 with CUDA 7.5 installed, compute architecture 3.0 and g++ 4.8. We expect Gunrock to build and run correctly on other 64-bit and 32-bit Linux distributions, Mac OS, and Windows.</p>
+<h1><a class="anchor" id="installation"></a>
+Installation </h1>
 <p><b>Overview:</b></p><ul>
 <li><a href="#prerequisites">Prerequisites</a></li>
 <li><a href="#compilation">Compilation</a></li>
 <li><a href="#hardware">Hardware</a></li>
 </ul>
+<h1><a class="anchor" id="prerequisites"></a>
+Prerequisites </h1>
 <p><b>Required Dependencies:</b></p><ul>
 <li><a href="https://developer.nvidia.com/cuda-zone">CUDA</a> (7.5 or higher) is used to implement Gunrock.<ul>
 <li>Refer to NVIDIA's <a href="https://developer.nvidia.com/cuda-downloads">CUDA</a> homepage to download and install CUDA.</li>
@@ -163,6 +167,8 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </ul>
 </li>
 </ul>
+<h1><a class="anchor" id="compilation"></a>
+Compilation </h1>
 <p><b>Simple Gunrock Compilation:</b></p><ul>
 <li>Downloading gunrock: <div class="fragment"><div class="line"><a name="l00001"></a><span class="lineno">    1</span>&#160;# Using git (recursively) download gunrock</div>
 <div class="line"><a name="l00002"></a><span class="lineno">    2</span>&#160;git clone --recursive https://github.com/gunrock/gunrock</div>
@@ -204,10 +210,14 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <p>Example for compiling gunrock with only <em>Breadth First Search (BFS)</em> primitive: </p><div class="fragment"><div class="line"><a name="l00001"></a><span class="lineno">    1</span>&#160;mkdir build &amp;&amp; cd build</div>
 <div class="line"><a name="l00002"></a><span class="lineno">    2</span>&#160;cmake -DGUNROCK_BUILD_APPLICATIONS=OFF -DGUNROCK_APP_BFS=ON ..</div>
 <div class="line"><a name="l00003"></a><span class="lineno">    3</span>&#160;make</div>
-</div><!-- fragment --><p>All dataset-related code is under the <code>gunrock/dataset/</code> subdirectory. The current version of Gunrock only supports <a href="http://math.nist.gov/MatrixMarket/formats.html">Matrix-market coordinate-formatted graph</a> format. The datasets are divided into two categories according to their scale. Under the <code>dataset/small/</code> subdirectory, there are trivial graph datasets for testing the correctness of the graph primitives. All of them are ready to use. Under the <code>dataset/large/</code> subdirectory, there are large graph datasets for doing performance regression tests.</p><ul>
+</div><!-- fragment --><h1><a class="anchor" id="generating_datasets"></a>
+Generating Datasets </h1>
+<p>All dataset-related code is under the <code>gunrock/dataset/</code> subdirectory. The current version of Gunrock only supports <a href="http://math.nist.gov/MatrixMarket/formats.html">Matrix-market coordinate-formatted graph</a> format. The datasets are divided into two categories according to their scale. Under the <code>dataset/small/</code> subdirectory, there are trivial graph datasets for testing the correctness of the graph primitives. All of them are ready to use. Under the <code>dataset/large/</code> subdirectory, there are large graph datasets for doing performance regression tests.</p><ul>
 <li>To download them to your local machine, just type <code>make</code> in the <code>dataset/large/</code> subdirectory.</li>
 <li>You can also choose to only download one specific dataset to your local machine by stepping into the subdirectory of that dataset and typing make inside that subdirectory.</li>
 </ul>
+<h1><a class="anchor" id="hardware"></a>
+Hardware </h1>
 <p><b>Laboratory Tested Hardware:</b> Gunrock with GeForce GTX 970, Tesla K40s. We have not encountered any trouble in-house with devices with CUDA capability &gt;= 3.0. </p>
 </div></div><!-- contents -->
 <!-- HTML footer for doxygen 1.8.8-->
@@ -218,7 +228,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div>
 </div>
 <hr class="footer"/><address class="footer"><small>
-Generated on Wed Aug 31 2016 15:29:01 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Wed Aug 31 2016 15:32:41 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.10
 </small></address>
