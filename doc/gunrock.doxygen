@@ -731,7 +731,8 @@ FILE_PATTERNS          = *.c \
                          *.dox \
                          *.py \
                          *.cu \
-                         *.cuh
+                         *.cuh \
+                         *.md
 
 # The RECURSIVE tag can be used to turn specify whether or not subdirectories
 # should be searched for input files as well. Possible values are YES and NO.
