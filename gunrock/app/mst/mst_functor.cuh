@@ -205,8 +205,6 @@ struct MarkFunctor
     * the destination node in the next frontier.
     */
     static __device__ __forceinline__ bool CondEdge(
-        //VertexId s_id, VertexId d_id, DataSlice *problem,
-        //VertexId e_id = 0, VertexId e_id_in = 0)
         VertexId   s_id,
         VertexId   d_id,
         DataSlice *d_data_slice,
@@ -229,8 +227,6 @@ struct MarkFunctor
     * @param[in] e_id_in Input edge index
     */
     static __device__ __forceinline__ void ApplyEdge(
-        //VertexId s_id, VertexId d_id, DataSlice *problem,
-        //VertexId e_id = 0, VertexId e_id_in = 0)
         VertexId   s_id,
         VertexId   d_id,
         DataSlice *d_data_slice,
@@ -280,8 +276,6 @@ struct CyRmFunctor
     * the destination node in the next frontier.
     */
     static __device__ __forceinline__ bool CondEdge(
-        //VertexId s_id, VertexId d_id, DataSlice *problem,
-        //VertexId e_id = 0, VertexId e_id_in = 0)
         VertexId   s_id,
         VertexId   d_id,
         DataSlice *d_data_slice,
@@ -306,8 +300,6 @@ struct CyRmFunctor
     * @param[in] e_id_in Input edge index
     */
     static __device__ __forceinline__ void ApplyEdge(
-        //VertexId s_id, VertexId d_id, DataSlice *problem,
-        //VertexId e_id = 0, VertexId e_id_in = 0)
         VertexId   s_id,
         VertexId   d_id,
         DataSlice *d_data_slice,
@@ -359,7 +351,6 @@ struct PJmpFunctor
     * it in the outgoing vertex frontier.
     */
     static __device__ __forceinline__ bool CondFilter(
-        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
         VertexId   v,  
         VertexId   node,
         DataSlice *d_data_slice,
@@ -381,7 +372,6 @@ struct PJmpFunctor
     * @param[in] nid Node ID
     */
     static __device__ __forceinline__ void ApplyFilter(
-        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid = 0)
         VertexId   v,  
         VertexId   node,
         DataSlice *d_data_slice,
@@ -440,8 +430,6 @@ struct EgRmFunctor
     * the destination node in the next frontier.
     */
     static __device__ __forceinline__ bool CondEdge(
-        //VertexId s_id, VertexId d_id, DataSlice *problem,
-        //VertexId e_id = 0, VertexId e_id_in = 0)
         VertexId   s_id,
         VertexId   d_id,
         DataSlice *d_data_slice,
@@ -466,8 +454,6 @@ struct EgRmFunctor
     * @param[in] e_id_in Input edge index
     */
     static __device__ __forceinline__ void ApplyEdge(
-        //VertexId s_id, VertexId d_id, DataSlice *problem,
-        //VertexId e_id = 0, VertexId e_id_in = 0)
         VertexId   s_id,
         VertexId   d_id,
         DataSlice *d_data_slice,
@@ -481,8 +467,6 @@ struct EgRmFunctor
             (VertexId)-1, d_data_slice -> keys_array + edge_id);
         util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
             (VertexId)-1, d_data_slice -> colindices + edge_id);
-        //util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-        //  (Value)-1, problem->edge_value + e_id);
         d_data_slice -> edge_value[edge_id] = (Value) -1;
         util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
             (VertexId)-1, d_data_slice -> original_e + edge_id);
@@ -500,7 +484,6 @@ struct EgRmFunctor
     * it in the outgoing vertex frontier.
     */
     static __device__ __forceinline__ bool CondFilter(
-        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
         VertexId   v,  
         VertexId   node,
         DataSlice *d_data_slice,
@@ -522,7 +505,6 @@ struct EgRmFunctor
     * @param[in] nid Node ID
     */
     static __device__ __forceinline__ void ApplyFilter(
-        //VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
         VertexId   v,  
         VertexId   node,
         DataSlice *d_data_slice,
@@ -531,9 +513,9 @@ struct EgRmFunctor
         SizeT      input_pos,
         SizeT      output_pos)
     {
-        if (node >= d_data_slice -> nodes) return;
-        if (d_data_slice -> keys_array[node] >= d_data_slice -> nodes) return;
-        
+        //if (node >= d_data_slice -> nodes) return;
+        //if (d_data_slice -> keys_array[node] >= d_data_slice -> edges) return;
+
         util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
             d_data_slice->super_idxs[ d_data_slice->keys_array[node]],
             d_data_slice->keys_array + node);

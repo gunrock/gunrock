@@ -144,8 +144,7 @@ public:
     */
     template<
         typename AdvanceKernelPolicy,
-        typename FilterKernelPolicy,
-        typename Filter2KernelPolicy>
+        typename FilterKernelPolicy>
         //typename MSTProblem>
     cudaError_t EnactMST()
         //ContextPtr  context,
@@ -196,7 +195,7 @@ public:
 
             // debug configurations
             //SizeT num_edges_origin = graph_slice->edges;
-            bool debug_info = 1;   // used for debug purpose
+            bool debug_info = 0;   // used for debug purpose
             //int tmp_select  = 0; // used for debug purpose
             //int tmp_length  = 0; // used for debug purpose
             unsigned int *num_selected = new unsigned int; // used in cub select
@@ -486,37 +485,13 @@ public:
                 attributes->queue_length = graph_slice->nodes;
                 attributes->queue_reset  = true;
 
-                //vertex_flag[0] = 0;
                 data_slice -> done_flags[0] = 0;
-                //while (!vertex_flag[0])
                 while (data_slice -> done_flags[0] == 0)
                 {
-                    printf("ptr jump.\n");
-                    //vertex_flag[0] = 1;
                     data_slice -> done_flags[0] = 1;
-                    //data_slice -> done_flags.SetPointer(vertex_flag);
                     if (retval = data_slice->done_flags.Move(
                         util::HOST, util::DEVICE, 1, 0, stream)) return retval;
 
-                    //gunrock::oprtr::filter::LaunchKernel
-                    //    <FilterKernelPolicy, Problem, PJmpFunctor>(
-                    //    statistics->filter_grid_size,
-                    //    FilterKernelPolicy::THREADS, 
-                    //    (size_t)0, 
-                    //    stream,
-                    //    statistics->iteration + 1,
-                    //    attributes->queue_reset,
-                    //    attributes->queue_index,
-                    //    attributes->queue_length,
-                    //    queue->keys[attributes->selector  ].GetPointer(util::DEVICE),
-                    //    (Value*)NULL,
-                    //    queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
-                    //    d_data_slice,
-                    //    (unsigned char*)NULL,
-                    //    work_progress[0],
-                    //    queue->keys[attributes->selector  ].GetSize(),
-                    //    queue->keys[attributes->selector^1].GetSize(),
-                    //    statistics->filter_kernel_stats);
                     gunrock::oprtr::filter::LaunchKernel
                         <FilterKernelPolicy, Problem, PJmpFunctor>(
                         statistics[0],
@@ -682,7 +657,6 @@ public:
                 attributes->queue_index  = 0;
                 attributes->selector     = 0;
                 attributes->queue_length = current_nodes;
-                printf("current_nodes:%d\n", current_nodes);
                 attributes->queue_reset  = true;  
 
                 gunrock::oprtr::advance::LaunchKernel
@@ -835,31 +809,6 @@ public:
                 if (retval = util::GRError(cudaStreamSynchronize(stream),
                     "memset queue failed", __FILE__, __LINE__)) break;
 
-                printf("edges:%d\n", graph_slice->edges);
-                util::DisplayDeviceResults(
-                        queue -> keys[attributes -> selector  ].GetPointer(util::DEVICE),
-                        graph_slice->edges);
-
-
-                //gunrock::oprtr::filter::LaunchKernel
-                //    <FilterKernelPolicy, Problem, EgRmFunctor>(
-                //    statistics->filter_grid_size,
-                //    FilterKernelPolicy::THREADS, 
-                //    (size_t)0, 
-                //    stream,
-                //    statistics->iteration + 1,
-                //    attributes->queue_reset,
-                //    attributes->queue_index,
-                //    attributes->queue_length,
-                //    queue->values[attributes->selector  ].GetPointer(util::DEVICE),
-                //    (Value*)NULL,
-                //    queue->values[attributes->selector^1].GetPointer(util::DEVICE),
-                //    d_data_slice,
-                //    (unsigned char*)NULL,
-                //    work_progress[0],
-                //    queue->keys[attributes->selector  ].GetSize(),
-                //    queue->keys[attributes->selector^1].GetSize(),
-                //    statistics->filter_kernel_stats);
                 gunrock::oprtr::filter::LaunchKernel
                     <FilterKernelPolicy, Problem, EgRmFunctor>(
                     statistics[0],
@@ -964,26 +913,6 @@ public:
                 attributes->queue_length = graph_slice->edges;
                 attributes->queue_reset  = true;
 
-                //gunrock::oprtr::filter::LaunchKernel
-                //    <FilterKernelPolicy, Problem, RIdxFunctor>(
-                //    statistics->filter_grid_size,
-                //    FilterKernelPolicy::THREADS, 
-                //    (size_t)0, 
-                //    stream,
-                //    statistics->iteration + 1,
-                //    attributes->queue_reset,
-                //    attributes->queue_index,
-                //    attributes->queue_length,
-                //    queue->values[attributes->selector  ].GetPointer(util::DEVICE),
-                //    (Value*)NULL,
-                //    queue->values[attributes->selector^1].GetPointer(util::DEVICE),
-                //    d_data_slice,
-                //    (unsigned char*)NULL,
-                //    work_progress[0],
-                //    queue->keys[attributes->selector  ].GetSize(),
-                //    queue->keys[attributes->selector^1].GetSize(),
-                //    statistics->filter_kernel_stats);
-
                 gunrock::oprtr::filter::LaunchKernel
                     <FilterKernelPolicy, Problem, RIdxFunctor>(
                     statistics[0],
@@ -1077,21 +1006,6 @@ public:
     }
 
     typedef gunrock::oprtr::filter::KernelPolicy<
-        Problem,         // Problem data type
-        300,                // CUDA_ARCH
-        0,                  // SATURATION QUIT
-        true,               // DEQUEUE_PROBLEM_SIZE
-        (sizeof(VertexId)==4)?8:4,                  // MIN_CTA_OCCUPANCY
-        8,                  // LOG_THREADS
-        2,                  // LOG_LOAD_VEC_SIZE
-        0,                  // LOG_LOADS_PER_TILE
-        5,                  // LOG_RAKING_THREADS
-        5,                  // END_BITMASK_CULL
-        8,                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::filter::SIMPLIFIED>
-        Filter2KernelPolicy;
-
-    typedef gunrock::oprtr::filter::KernelPolicy<
         Problem,                            // Problem data type
         300,                                // CUDA_ARCH
         0,                                  // SATURATION QUIT
@@ -1111,7 +1025,7 @@ public:
         //INSTRUMENT,         // INSTRUMENT
         8,                  // MIN_CTA_OCCUPANCY
         10,                 // LOG_THREADS
-        9,                  // LOG_BLOCKS
+        8,                  // LOG_BLOCKS
         32 * 128,           // LIGHT_EDGE_THRESHOLD
         1,                  // LOG_LOAD_VEC_SIZE
         0,                  // LOG_LOADS_PER_TILE
@@ -1119,7 +1033,7 @@ public:
         32,                 // WARP_GATHER_THRESHOLD
         128 * 4,            // CTA_GATHER_THRESHOLD
         7,                  // LOG_SCHEDULE_GRANULARITY
-        gunrock::oprtr::advance::LB>
+        gunrock::oprtr::advance::LB_LIGHT>
         AdvanceKernelPolicy;
 
     /** 
@@ -1201,7 +1115,7 @@ public:
 
         if (min_sm_version >= 300)
         {
-            return EnactMST<AdvanceKernelPolicy, FilterKernelPolicy, Filter2KernelPolicy>
+            return EnactMST<AdvanceKernelPolicy, FilterKernelPolicy>
                 (/*context, problem, max_grid_size*/);
         }
 
