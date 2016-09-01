@@ -21,34 +21,6 @@ namespace gunrock {
 namespace app {
 namespace lp {
 
-struct CustomMax
-{
-    template <typename T>
-    CUB_RUNTIME_FUNCTION __forceinline__
-    T operator()(const T &a, const T &b) const {
-        return (b > a) ? b : a;
-    }
-};
-
-template<typename VertexId, typename SizeT, typename Value>
-void ComputeNodeTC(VertexId *key, Value *value, Value *output, SizeT input_len) {
-   void *d_temp_storage = NULL;
-   size_t temp_storage_bytes = 0;
-   cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, (VertexId*)NULL, value, output, (VertexId*)NULL, cub::Sum(), input_len);
-   cudaMalloc(&d_temp_storage, temp_storage_bytes);
-   cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, (VertexId*)NULL, value, output, (VertexId*)NULL, cub::Sum(), input_len);
-}
-
-template<typename VertexId, typename SizeT, typename Value>
-void ComputeNodeWeights(VertexId *key, Value *value, Value *output, SizeT input_len) {
-    CustomMax reduction_op;
-   void *d_temp_storage = NULL;
-   size_t temp_storage_bytes = 0;
-   cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, (VertexId*)NULL, value, output, (VertexId*)NULL, reduction_op, input_len);
-   cudaMalloc(&d_temp_storage, temp_storage_bytes);
-   cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, (VertexId*)NULL, value, output, (VertexId*)NULL, reduction_op, input_len);
-}
-
 /**
  * @brief Problem structure stores device-side vectors
  *
@@ -197,22 +169,32 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
             }*/
             //if (retval = froms.Move(util::HOST, util::DEVICE)) return retval;
             
-            VertexId *temp_val = new VertexId[graph->edges];
-            util::MemsetIdxKernel<<<256, 1024>>>(
-                temp_val, graph->nodes);
-            mgpu::IntervalExpand(graph->edges, graph_slice->row_offsets.GetPointer(util::DEVICE),
-            temp_val, graph->nodes, froms.GetPointer(util::DEVICE), context[0]);
-
-            ComputeNodeTC(froms.GetPointer(util::DEVICE), edge_weights.GetPointer(util::DEVICE), node_weights.GetPointer(util::DEVICE), graph->edges);
+            util::Array1D<SizeT, VertexId> tmp_val; // Updated community ID (argmax of neighgor weights
+            if (retval = tmp_val  .Allocate(graph->edges, util::DEVICE)) return retval;
+            
+            util::MemsetIdxKernel<<<256, 1024>>>(tmp_val.GetPointer(util::DEVICE), graph->nodes);
 
             mgpu::IntervalExpand(graph->edges, graph_slice->row_offsets.GetPointer(util::DEVICE),
-            node_weights.GetPointer(util::DEVICE), graph->nodes, temp_val, context[0]);
+            tmp_val.GetPointer(util::DEVICE), graph->nodes, froms.GetPointer(util::DEVICE), context[0]);
 
+            void *d_temp_storage = NULL;
+            size_t temp_storage_bytes = 0;
+            VertexId *key = froms.GetPointer(util::DEVICE);
+            Value *value = edge_weights.GetPointer(util::DEVICE);
+            Value *uniq_out = labels_argmax.GetPointer(util::DEVICE);
+            Value *output = node_weights.GetPointer(util::DEVICE);
+            VertexId *num_out = stable_flag.GetPointer(util::DEVICE);
+            cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, (VertexId*)uniq_out, value, output, (VertexId*)num_out, cub::Sum(), graph->edges);
+            cudaMalloc(&d_temp_storage, temp_storage_bytes);
+            cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, (VertexId*)uniq_out, value, output, (VertexId*)num_out, cub::Sum(), graph->edges);
 
-            util::MemsetDivVectorKernel<<<256, 1024>>>(edge_weights.GetPointer(util::DEVICE), (Value*)temp_val, graph->edges);
+            mgpu::IntervalExpand(graph->edges, graph_slice->row_offsets.GetPointer(util::DEVICE),
+            node_weights.GetPointer(util::DEVICE), graph->nodes, tmp_val.GetPointer(util::DEVICE), context[0]);
 
-            ComputeNodeWeights(froms.GetPointer(util::DEVICE), edge_weights.GetPointer(util::DEVICE), node_weights.GetPointer(util::DEVICE), graph->edges);
-            delete[] temp_val;
+            util::MemsetDivVectorKernel<<<256, 1024>>>(edge_weights.GetPointer(util::DEVICE), (Value*)tmp_val.GetPointer(util::DEVICE), graph->edges);
+            cub::DeviceReduce::ReduceByKey(d_temp_storage, temp_storage_bytes, key, (VertexId*)uniq_out, value, output, (VertexId*)num_out, cub::Max(), graph->edges);
+
+            tmp_val.Release();
 
             return retval;
         }

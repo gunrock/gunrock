@@ -130,8 +130,8 @@ class LpEnactor :
             FilterKernelPolicy::CTA_OCCUPANCY))
             return retval;
 
-        //this -> problem = problem;
-        //this -> context = context;
+        this -> problem = problem;
+        this -> context = context;
 
         //typename Problem::DataSlice
         //    *data_slice  = problem -> data_slices [0].GetPointer(util::HOST);
@@ -297,7 +297,7 @@ class LpEnactor :
             util::MemsetIdxKernel<<<256, 1024>>>(frontier_queue->keys[0].GetPointer(util::DEVICE), graph_slice->edges);
             frontier_attribute->queue_length = graph_slice->edges;
             frontier_attribute->selector = 0;
-            while (d_data_slice->stable_flag[0] == 0 || enactor_stats->iteration < data_slice->max_iter) { 
+            while (data_slice->stable_flag[0] == 0 || enactor_stats->iteration < data_slice->max_iter) { 
                 data_slice->stable_flag[0] = 1;
                 data_slice->stable_flag.Move(util::HOST, util::DEVICE, 1, 0, stream);
                 //
@@ -483,8 +483,8 @@ class LpEnactor :
         {
             ret = InitLp<AdvanceKernelPolicy, FilterKernelPolicy> (
                 context, problem, max_grid_size);
+            return ret;
         }
-        return ret;
 
         // to reduce compile time, get rid of other architecture for now
         // TODO: add all the kernel policy setting for all architectures
