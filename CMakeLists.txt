@@ -161,7 +161,7 @@ option(GUNROCK_GENCODE_SM20
 
 option(GUNROCK_GENCODE_SM30
   "ON to generate code for Compute Capability 3.0 devices (e.g. Tesla K10)"
-  OFF)
+  ON)
 
 option(GUNROCK_GENCODE_SM35
   "ON to generate code for Compute Capability 3.5 devices (e.g. Tesla K20)"
