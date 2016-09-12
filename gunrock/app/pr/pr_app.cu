@@ -216,7 +216,7 @@ void runPageRank(GRGraph *output, PR_Parameter *parameter)
     if (!quiet) { printf(" GPU PageRank finished in %lf msec.\n", elapsed); }
 
     // Clean up
-    if (org_size) { delete org_size; org_size = NULL; }
+    if (org_size) { delete[] org_size; org_size = NULL; }
     if (problem ) { delete problem ; problem  = NULL; }
     if (enactor ) { delete enactor ; enactor  = NULL; }
 }
