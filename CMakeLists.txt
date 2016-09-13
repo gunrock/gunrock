@@ -87,6 +87,8 @@ set(GENCODE_SM37
   -gencode=arch=compute_37,code=sm_37 -gencode=arch=compute_37,code=compute_37)
 set(GENCODE_SM50
   -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_50,code=compute_50)
+set(GENCODE_SM61
+  -gencode=arch=compute_61,code=sm_61 -gencode=arch=compute_61,code=compute_61)
 #set(GENCODE -gencode=arch=compute_10,code=compute_10) # at least generate PTX
 # end /* SET GENCODE_SM */
 
@@ -161,7 +163,7 @@ option(GUNROCK_GENCODE_SM20
 
 option(GUNROCK_GENCODE_SM30
   "ON to generate code for Compute Capability 3.0 devices (e.g. Tesla K10)"
-  OFF)
+  ON)
 
 option(GUNROCK_GENCODE_SM35
   "ON to generate code for Compute Capability 3.5 devices (e.g. Tesla K20)"
@@ -174,6 +176,10 @@ option(GUNROCK_GENCODE_SM37
 option(GUNROCK_GENCODE_SM50
   "ON to generate code for Compute Capability 5.0 devices (e.g. GeForce GTX 750 TI)"
   OFF)
+
+option(GUNROCK_GENCODE_SM61
+  "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
+  ON)
 
 option(CUDA_VERBOSE_PTXAS
   "On to enable verbose output from the PTXAS assembler."
@@ -206,6 +212,10 @@ endif(GUNROCK_GENCODE_SM37)
 if (GUNROCK_GENCODE_SM50)
   set(GENCODE ${GENCODE} ${GENCODE_SM50})
 endif(GUNROCK_GENCODE_SM50)
+
+if (GUNROCK_GENCODE_SM61)
+  set(GENCODE ${GENCODE} ${GENCODE_SM61})
+endif(GUNROCK_GENCODE_SM61)
 
 if (CUDA_VERBOSE_PTXAS)
   set(VERBOSE_PTXAS --ptxas-options=-v)

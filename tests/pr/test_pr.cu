@@ -927,7 +927,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     // Clean up
-    if (org_size   ) { delete   org_size   ; org_size    = NULL; }
+    if (org_size   ) { delete[] org_size   ; org_size    = NULL; }
     if (enactor         )
     {
         if (retval = util::GRError(enactor -> Release(),

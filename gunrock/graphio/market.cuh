@@ -326,17 +326,22 @@ int ReadMarketStream(
 
             long long ll_row, ll_col;
             Value ll_value;  // used for parse float / double
+            double lf_value; // used to sscanf value variable types
             int num_input;
             if (LOAD_VALUES)
             {
-                num_input = sscanf(line, "%lld %lld %f",
-                                   &ll_row, &ll_col, &ll_value);
+                num_input = sscanf(line, "%lld %lld %lf",
+                    &ll_row, &ll_col, &lf_value);
+                if (typeid(Value) == typeid(float) || typeid(Value) == typeid(double))
+                    ll_value = (Value)lf_value;
+                else ll_value = (Value)(lf_value + 1e-10);
+
                 if (array && (num_input == 1))
                 {
                     ll_value = ll_row;
                     ll_col   = edges_read / nodes;
                     ll_row   = edges_read - nodes * ll_col;
-                    printf("%f\n", ll_value);
+                    //printf("%f\n", ll_value);
                 } 
 
                 else if (array || num_input < 2)
