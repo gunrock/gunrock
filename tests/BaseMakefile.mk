@@ -22,10 +22,12 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 # Gen targets
 #-------------------------------------------------------------------------------
 
+GEN_SM61 = -gencode=arch=compute_61,code=\"sm_61,compute_61\"
+GEN_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\"
 GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\"
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
-SM_TARGETS = $(GEN_SM35)
+SM_TARGETS = $(GEN_SM35) $(GEN_SM61)
 
 #-------------------------------------------------------------------------------
 # Libs
@@ -63,7 +65,7 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo --std=c++11 -ccbin=g++-4.8
+NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo --std=c++11 #-ccbin=g++-4.8
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500

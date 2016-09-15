@@ -87,6 +87,8 @@ set(GENCODE_SM37
   -gencode=arch=compute_37,code=sm_37 -gencode=arch=compute_37,code=compute_37)
 set(GENCODE_SM50
   -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_50,code=compute_50)
+set(GENCODE_SM61
+  -gencode=arch=compute_61,code=sm_61 -gencode=arch=compute_61,code=compute_61)
 #set(GENCODE -gencode=arch=compute_10,code=compute_10) # at least generate PTX
 # end /* SET GENCODE_SM */
 
@@ -131,10 +133,6 @@ option(GUNROCK_APP_SALSA
   "If on, builds only SALSA application."
   OFF)
 
-option(GUNROCK_APP_MST
-  "If on, builds only MST application."
-  OFF)
-
 option(GUNROCK_APP_WTF
   "If on, builds only WTF application."
   OFF)
@@ -165,7 +163,7 @@ option(GUNROCK_GENCODE_SM20
 
 option(GUNROCK_GENCODE_SM30
   "ON to generate code for Compute Capability 3.0 devices (e.g. Tesla K10)"
-  OFF)
+  ON)
 
 option(GUNROCK_GENCODE_SM35
   "ON to generate code for Compute Capability 3.5 devices (e.g. Tesla K20)"
@@ -178,6 +176,10 @@ option(GUNROCK_GENCODE_SM37
 option(GUNROCK_GENCODE_SM50
   "ON to generate code for Compute Capability 5.0 devices (e.g. GeForce GTX 750 TI)"
   OFF)
+
+option(GUNROCK_GENCODE_SM61
+  "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
+  ON)
 
 option(CUDA_VERBOSE_PTXAS
   "On to enable verbose output from the PTXAS assembler."
@@ -210,6 +212,10 @@ endif(GUNROCK_GENCODE_SM37)
 if (GUNROCK_GENCODE_SM50)
   set(GENCODE ${GENCODE} ${GENCODE_SM50})
 endif(GUNROCK_GENCODE_SM50)
+
+if (GUNROCK_GENCODE_SM61)
+  set(GENCODE ${GENCODE} ${GENCODE_SM61})
+endif(GUNROCK_GENCODE_SM61)
 
 if (CUDA_VERBOSE_PTXAS)
   set(VERBOSE_PTXAS --ptxas-options=-v)
@@ -249,7 +255,6 @@ if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(tests/sssp)
   add_subdirectory(tests/hits)
   add_subdirectory(tests/salsa)
-  add_subdirectory(tests/mst)
   add_subdirectory(tests/wtf)
   add_subdirectory(tests/topk)
   #add_subdirectory(tests/template)
@@ -285,10 +290,6 @@ else(GUNROCK_BUILD_APPLICATIONS)
   if(GUNROCK_APP_SALSA)
     add_subdirectory(tests/salsa)
   endif(GUNROCK_APP_SALSA)
-
-  if(GUNROCK_APP_MST)
-    add_subdirectory(tests/mst)
-  endif(GUNROCK_APP_MST)
 
   if(GUNROCK_APP_WTF)
     add_subdirectory(tests/wtf)
@@ -332,11 +333,6 @@ set_tests_properties(TEST_PAGERANK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 add_test(NAME TEST_TOPK COMMAND topk market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
 set_tests_properties(TEST_TOPK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
-
-# bips98_606.mtx is not fully-connected graph so use largest small graph instead
-add_test(NAME TEST_MST COMMAND mst market
-  ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx)
-set_tests_properties(TEST_MST PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
 ### shared library application interface tests
 add_test(NAME SHARED_LIB_TEST_BFS COMMAND shared_lib_bfs)
@@ -404,10 +400,6 @@ if(GUNROCK_MGPU_TESTS)
   #  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
   # set_tests_properties(TEST_TOPK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
-  # add_test(NAME TEST_MGPU_MST COMMAND mst market
-  #  ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx ${DEVICES})
-  # set_tests_properties(TEST_MST PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
-
-endif(GUNROCK_MGPU_TESTS)
+ endif(GUNROCK_MGPU_TESTS)
 
 # end /* Enable Testing for `ctest` */
