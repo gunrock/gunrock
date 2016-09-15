@@ -167,7 +167,6 @@ struct EdgeProperties
  *
  * @param[in] graph Reference to graph we process on
  * @param[in] bc_values Pointer to node bc value
- * @param[in] ebc_values Pointer to edge bc value
  * @param[in] sigmas Pointer to node sigma value
  * @param[in] source_path Pointer to a vector to store CPU computed labels for each node
  * @param[in] src VertexId of source node if there is any
@@ -180,7 +179,6 @@ template <
 void ReferenceBC(
     const Csr<VertexId, SizeT, Value> &graph,
     Value                             *bc_values,
-    Value                             *ebc_values,
     Value                             *sigmas,
     VertexId                          *source_path,
     VertexId                           src,
@@ -262,13 +260,6 @@ void ReferenceBC(
 
         std::stable_sort(coo, coo + graph.edges,
                          RowFirstTupleCompare<EdgeTupleType>);
-
-        for (idx = 0; idx < graph.edges; ++idx)
-        {
-            //std::cout << coo[idx].row << "," << coo[idx].col
-            //          << ":" << coo[idx].val << std::endl;
-            //ebc_values[idx] = coo[idx].val;
-        }
 
         if (!quiet)
         {
@@ -459,15 +450,12 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
     // Allocate host-side array (for both reference and GPU-computed results)
     Value        *reference_bc_values        = new Value   [graph->nodes];
-    Value        *reference_ebc_values       = new Value   [graph->edges];
     Value        *reference_sigmas           = new Value   [graph->nodes];
     VertexId     *reference_labels           = new VertexId[graph->nodes];
     Value        *h_sigmas                   = new Value   [graph->nodes];
     Value        *h_bc_values                = new Value   [graph->nodes];
-    Value        *h_ebc_values               = new Value   [graph->edges];
     VertexId     *h_labels                   = new VertexId[graph->nodes];
     Value        *reference_check_bc_values  = (quick_mode)                ? NULL : reference_bc_values;
-    Value        *reference_check_ebc_values = (quick_mode || (src != -1)) ? NULL : reference_ebc_values;
     Value        *reference_check_sigmas     = (quick_mode || (src == -1)) ? NULL : reference_sigmas;
     VertexId     *reference_check_labels     = (quick_mode || (src == -1)) ? NULL : reference_labels;
 
@@ -644,7 +632,6 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             ReferenceBC(
                 *graph,
                 reference_check_bc_values,
-                reference_check_ebc_values,
                 reference_check_sigmas,
                 reference_check_labels,
                 src,
@@ -666,7 +653,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     cpu_timer.Start();
     // Copy out results
     if (retval = util::GRError(problem -> Extract(
-        h_sigmas, h_bc_values, h_ebc_values, h_labels),
+        h_sigmas, h_bc_values, h_labels),
         "BC Problem Data Extraction Failed", __FILE__, __LINE__))
         return retval;
 
@@ -679,18 +666,6 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         int num_error = CompareResults(
             h_bc_values, reference_check_bc_values,
             graph->nodes, true, quiet_mode);
-        if (num_error > 0)
-        {
-            if (!quiet_mode) { printf("Number of errors occurred: %d\n", num_error); }
-        }
-        if (!quiet_mode) { printf("\n"); }
-    }
-    if (reference_check_ebc_values != NULL)
-    {
-        if (!quiet_mode) { printf("Validity Edge BC Value: "); }
-        int num_error = CompareResults(
-            h_ebc_values, reference_check_ebc_values,
-            graph->edges, true, quiet_mode);
         if (num_error > 0)
         {
             if (!quiet_mode) { printf("Number of errors occurred: %d\n", num_error); }
@@ -784,11 +759,9 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     if (enactor             ) {delete   enactor             ; enactor              = NULL;}
     if (reference_sigmas    ) {delete[] reference_sigmas    ; reference_sigmas     = NULL;}
     if (reference_bc_values ) {delete[] reference_bc_values ; reference_bc_values  = NULL;}
-    if (reference_ebc_values) {delete[] reference_ebc_values; reference_ebc_values = NULL;}
     if (reference_labels    ) {delete[] reference_labels    ; reference_labels     = NULL;}
     if (h_sigmas            ) {delete[] h_sigmas            ; h_sigmas             = NULL;}
     if (h_bc_values         ) {delete[] h_bc_values         ; h_bc_values          = NULL;}
-    if (h_ebc_values        ) {delete[] h_ebc_values        ; h_ebc_values         = NULL;}
     if (h_labels            ) {delete[] h_labels            ; h_labels             = NULL;}
     cpu_timer.Stop();
     info -> info["postprocess_time"] = cpu_timer.ElapsedMillis();
