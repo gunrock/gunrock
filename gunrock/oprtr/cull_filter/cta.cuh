@@ -630,8 +630,8 @@ struct Cta
             {
                 tile.BitmaskCull(cta);
             }
-            tile.HistoryCull(cta);
-            tile.WarpCull(cta);
+            //tile.HistoryCull(cta);
+            //tile.WarpCull(cta);
             tile.VertexCull(cta);          // using vertex visitation status (update discovered vertices)
         }
     };
