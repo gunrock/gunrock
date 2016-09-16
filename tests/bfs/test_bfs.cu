@@ -551,7 +551,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 VertexId pred = h_preds[v];
                 if (pred >= graph->nodes || pred < 0)
                 {
-                    //if (num_errors == 0)
+                    if (num_errors == 0)
                         printf("INCORRECT: pred[%lld] : %lld out of bound\n", 
                             (long long)v, (long long)pred);
                     #pragma omp atomic
@@ -560,7 +560,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 }
                 if (h_labels[v] != h_labels[pred] + 1)
                 {
-                    //if (num_errors == 0)
+                    if (num_errors == 0)
                         printf("INCORRECT: label[%lld] (%lld) != label[%lld] (%lld) + 1\n",
                             (long long)v, (long long)h_labels[v], (long long)pred, (long long)h_labels[pred]);
                     #pragma omp atomic
@@ -577,7 +577,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 }
                 if (!v_found)
                 {
-                    //if (num_errors == 0)
+                    if (num_errors == 0)
                         printf("INCORRECT: Vertex %lld not in Vertex %lld's neighbor list\n",
                             (long long)v, (long long)pred);
                     #pragma omp atomic

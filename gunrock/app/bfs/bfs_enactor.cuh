@@ -493,7 +493,8 @@ __global__ void Inverse_Expand(
     typename Problem::VertexId *d_unvisited_key_out,
     typename Problem::VertexId *d_visited_key_out,
     typename Problem::MaskT    *d_visited_mask,
-    typename Problem::VertexId *d_labels)
+    typename Problem::VertexId *d_labels,
+    typename Problem::VertexId *d_preds)
 {
     typedef typename Problem::SizeT    SizeT;
     typedef typename Problem::VertexId VertexId;
@@ -507,7 +508,7 @@ __global__ void Inverse_Expand(
 
     while (x - threadIdx.x < num_unvisited_vertices)
     {
-        VertexId key = 0;
+        VertexId key = 0, parent = 0;
         bool discoverable = false;
         bool to_process = true;
         MaskT mask_byte, mask_bit;
@@ -559,6 +560,7 @@ __global__ void Inverse_Expand(
                 if (LoadLabel<VertexId, VertexId>::Load(d_labels, neighbor) == label -1)
                 {
                     discoverable = true;
+                    parent = neighbor;
                     //printf("Found %lld from %lld, label = %lld\n",
                     //(long long)key, (long long)neighbor, (long long)label);    
                     break;
@@ -575,6 +577,8 @@ __global__ void Inverse_Expand(
                 d_visited_mask[mask_pos] = mask_byte;
             }
             d_labels[key] = label;
+            if (Problem::MARK_PREDECESSORS)
+                d_preds [key] = parent;
         }
 
         SizeT output_pos = 0;
@@ -1230,7 +1234,8 @@ struct BFSIteration : public IterationBase <
                 data_slice -> unvisited_vertices[frontier_attribute -> selector ^ 1].GetPointer(util::DEVICE),
                 output_key_pointer, //frontier_queue -> keys[frontier_attribute -> selector^1].GetPointer(util::DEVICE),
                 data_slice -> visited_mask.GetPointer(util::DEVICE),
-                data_slice -> labels.GetPointer(util::DEVICE));
+                data_slice -> labels.GetPointer(util::DEVICE),
+                data_slice -> preds.GetPointer(util::DEVICE));
             data_slice -> split_lengths.Move(util::DEVICE, util::HOST, 2, 0, stream);
             if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
                 "cudaStreamSynchronize failed", __FILE__, __LINE__))
