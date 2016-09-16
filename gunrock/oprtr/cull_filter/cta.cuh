@@ -35,7 +35,7 @@ namespace cull_filter {
 /**
 * Templated texture reference for visited mask
 */
-template <typename VisitedMask>
+/*template <typename VisitedMask>
 struct BitmaskTex
 {
    static texture<VisitedMask, cudaTextureType1D, cudaReadModeElementType> ref;
@@ -49,7 +49,7 @@ struct LabelsTex
    static texture<LabelT, cudaTextureType1D, cudaReadModeElementType> labels;
 };
 template <typename LabelT>
-texture<LabelT, cudaTextureType1D, cudaReadModeElementType> LabelsTex<LabelT>::labels;
+texture<LabelT, cudaTextureType1D, cudaReadModeElementType> LabelsTex<LabelT>::labels;*/
 
 /**
  * @brief CTA tile-processing abstraction for the filter operator.
@@ -187,10 +187,11 @@ struct Cta
                     unsigned char mask_bit = 1 << (tile->element_id[LOAD][VEC] & 7);
 
                     // Read byte from visited mask in tex
-                    unsigned char tex_mask_byte = tex1Dfetch(
-                        BitmaskTex<unsigned char>::ref,//cta->t_bitmask[0],
-                        mask_byte_offset);
+                    //unsigned char tex_mask_byte = tex1Dfetch(
+                    //    BitmaskTex<unsigned char>::ref,//cta->t_bitmask[0],
+                    //    mask_byte_offset);
                     //unsigned char tex_mask_byte = cta->d_visited_mask[mask_byte_offset];
+                    unsigned char tex_mask_byte = __ldg(cta -> d_visited_mask + mask_byte_offset);
 
                     if (mask_bit & tex_mask_byte)
                     {
@@ -630,8 +631,8 @@ struct Cta
             {
                 tile.BitmaskCull(cta);
             }
-            //tile.HistoryCull(cta);
-            //tile.WarpCull(cta);
+            tile.HistoryCull(cta);
+            tile.WarpCull(cta);
             tile.VertexCull(cta);          // using vertex visitation status (update discovered vertices)
         }
     };

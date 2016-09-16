@@ -1889,7 +1889,7 @@ public:
         barrier_markers[0].Allocate(this -> num_gpus);
         barrier_markers[1].Allocate(this -> num_gpus);
 
-        for (int gpu=0;gpu<this->num_gpus;gpu++)
+        /*for (int gpu=0;gpu<this->num_gpus;gpu++)
         {    
             if (retval = util::SetDevice(this->gpu_idx[gpu])) break;
             if (sizeof(SizeT) == 4)
@@ -1905,7 +1905,7 @@ public:
                     __FILE__, __LINE__)) break;
             }
         }            
-        if (retval) return retval;
+        if (retval) return retval;*/
 
         for (int gpu=0;gpu<this->num_gpus;gpu++)
         {

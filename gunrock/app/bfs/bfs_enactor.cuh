@@ -117,7 +117,8 @@ struct LoadLabel<int, SizeT>
     static __device__ __forceinline__ int Load
         (int *&d_labels, SizeT &pos)
     {
-        return tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<int>::labels, pos); 
+        //return tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<int>::labels, pos); 
+        return _ldg(d_labels + pos);
     }
 };
 
@@ -170,12 +171,15 @@ __global__ void Expand_Incoming_Kernel(
         if (x < num_elements)
         {
             key = _ldg(d_keys_in + x);
+            //printf("(%d, %d) : Expand_Incoming, input_keys[%d] = %d\n",
+            //    blockIdx.x, threadIdx.x, x, key);
             if (KernelPolicy::Problem::ENABLE_IDEMPOTENCE)
             {
                 mask_pos = (key & KernelPolicy::LOAD_BALANCED_CULL::ELEMENT_ID_MASK) >> (2+sizeof(MaskT));
-                tex_mask_byte = tex1Dfetch(
-                    gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,
-                    mask_pos);
+                //tex_mask_byte = tex1Dfetch(
+                //    gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,
+                //    mask_pos);
+                tex_mask_byte = _ldg(d_masks + mask_pos);
                 MaskT mask_bit = 1 << (key & ((1 << (2 + sizeof(MaskT)))-1));
                 if (!(mask_bit & tex_mask_byte))
                 {
@@ -185,7 +189,11 @@ __global__ void Expand_Incoming_Kernel(
 
             if (to_process)
             {
-                if (LoadLabel<VertexId, VertexId>::Load(d_labels, key) != util::MaxValue<VertexId>())
+                VertexId loaded_label = LoadLabel<VertexId, VertexId>::Load(d_labels, key);
+                //printf("(%d, %d) : labels[%d] = %d\n",
+                //    blockIdx.x, threadIdx.x, key, loaded_label);
+                if (loaded_label != util::MaxValue<VertexId>())
+                //if (LoadLabel<VertexId, VertexId>::Load(d_labels, key) != util::MaxValue<VertexId>())
                         to_process = false;
             }
 
@@ -301,9 +309,10 @@ __global__ void From_Unvisited_Queue_IDEM(
         l_counter = 0;
         if (x * (sizeof(MaskT) << 3) < num_nodes)
         {
-            mask_byte = tex1Dfetch(
-                gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,
-                x);
+            //mask_byte = tex1Dfetch(
+            //    gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,
+            //    x);
+            mask_byte = _ldg(d_visited_mask + x);
             if (mask_byte != util::AllOnes<MaskT>())
             for (int i=0; i<(1 << (2+sizeof(MaskT))); i++)
             {
@@ -326,8 +335,8 @@ __global__ void From_Unvisited_Queue_IDEM(
                 //if (to_process)
                 { // only works for undirected graph
                     //if (tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets, key) == tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets, key+1)) to_process = false;
-                    if (_ldg(d_row_offsets + key) == _ldg(d_row_offsets + (key+1)))
-                        continue;
+                    //if (_ldg(d_row_offsets + key) == _ldg(d_row_offsets + (key+1)))
+                    //    continue;
                 }
                 //if (to_process)
                 {
@@ -438,9 +447,10 @@ __global__ void From_Unvisited_Queue_Local_IDEM(
         {
             key = d_local_vertices[x];
             SizeT mask_pos = (key & KernelPolicy::LOAD_BALANCED_CULL::ELEMENT_ID_MASK) >> (2+sizeof(MaskT));
-            MaskT mask_byte = tex1Dfetch(
-                gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,
-                mask_pos);
+            //MaskT mask_byte = tex1Dfetch(
+            //    gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,
+            //    mask_pos);
+            MaskT mask_byte = _ldg(d_visited_mask + mask_pos);
             MaskT mask_bit = 1 << (key & ((1 << (2 + sizeof(MaskT)))-1));
             if (mask_byte & mask_bit)
                 to_process = false;
@@ -511,9 +521,10 @@ __global__ void Inverse_Expand(
         if (to_process && Problem::ENABLE_IDEMPOTENCE)
         {
             mask_pos = (key & KernelPolicy::LOAD_BALANCED_CULL::ELEMENT_ID_MASK) >> (2+sizeof(MaskT));
-            mask_byte = tex1Dfetch(
-                gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,
-                mask_pos);
+            //mask_byte = tex1Dfetch(
+            //    gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,
+            //    mask_pos);
+            mask_byte = _ldg(d_visited_mask + mask_pos);
             mask_bit = 1 << (key & ((1 << (2 + sizeof(MaskT)))-1));
             if (mask_byte & mask_bit)
                 to_process = false;
@@ -960,10 +971,10 @@ struct BFSIteration : public IterationBase <
             //    frontier_queue -> keys[frontier_attribute -> selector^1].GetPointer(util::DEVICE),
             //    (VertexId)-2,
             //    frontier_queue -> keys[frontier_attribute -> selector^1].GetSize());
-            util::Check_Exist<<<256, 256, 0, stream>>>(
-                frontier_attribute -> queue_length,
-                data_slice->gpu_idx, 2, enactor_stats -> iteration,
-                frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
+            //util::Check_Exist<<<256, 256, 0, stream>>>(
+            //    frontier_attribute -> queue_length,
+            //    data_slice->gpu_idx, 2, enactor_stats -> iteration,
+            //    frontier_queue -> keys[ frontier_attribute->selector].GetPointer(util::DEVICE));
             //util::Verify_Value<<<256, 256, 0, stream>>>(
             //    data_slice -> gpu_idx, 2, frontier_attribute -> queue_length,
             //    enactor_stats -> iteration,
@@ -982,6 +993,11 @@ struct BFSIteration : public IterationBase <
         //util::MemsetKernel<<<256, 256, 0, stream>>>(
         //    data_slice -> edge_marker.GetPointer(util::DEVICE),
         //    0, graph_slice -> edges);
+
+        //util::cpu_mt::PrintGPUArray("AdvanceInput",
+        //    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+        //    frontier_attribute -> queue_length,
+        //    thread_num, enactor_stats -> iteration, -1, stream);
         
         if (data_slice -> current_direction == FORWARD)
         {
@@ -1098,19 +1114,19 @@ struct BFSIteration : public IterationBase <
                 frontier_attribute->queue_index++;
                 frontier_attribute->selector ^= 1;
 
-                /*if (enactor_stats->retval = work_progress -> GetQueueLength(
-                    frontier_attribute->queue_index,
-                    frontier_attribute->queue_length,
-                    false,
-                    stream,
-                    true)) return;
-                if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
-                    "cudaStreamSynchronize failed", __FILE__, __LINE__))
-                    return;
-                util::cpu_mt::PrintGPUArray("FilterResult",
-                    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
-                    frontier_attribute -> queue_length,
-                    thread_num, enactor_stats -> iteration, -1, stream);*/
+                //if (enactor_stats->retval = work_progress -> GetQueueLength(
+                //    frontier_attribute->queue_index,
+                //    frontier_attribute->queue_length,
+                //    false,
+                //    stream,
+                //    true)) return;
+                //if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
+                //    "cudaStreamSynchronize failed", __FILE__, __LINE__))
+                //    return;
+                //util::cpu_mt::PrintGPUArray("FilterResult",
+                //    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+                //    frontier_attribute -> queue_length,
+                //    thread_num, enactor_stats -> iteration, -1, stream);
 
             }
 
@@ -1319,6 +1335,14 @@ struct BFSIteration : public IterationBase <
             return;
         }
 
+        //printf("Expand_Incoming, num_elements = %d, queue_size = %d, size_check = %s, labels = %p\n",
+        //    num_elements, keys_out.GetSize(), enactor -> size_check ? "true" : "false", h_data_slice -> labels.GetPointer(util::DEVICE));
+        //fflush(stdout);
+        //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("ReceivedQueue",
+        //    keys_in.GetPointer(util::DEVICE), num_elements,
+        //    h_data_slice -> gpu_idx, iteration, peer_, stream);
+
+
         bool over_sized = false;
         if (enactor -> problem -> unified_receive)
         {
@@ -1330,12 +1354,6 @@ struct BFSIteration : public IterationBase <
             received_length += num_elements;
         } else {
             //VertexId iteration_ = iteration%2;
-            //printf("Expand_Incoming, num_elements = %d, queue_size = %d, size_check = %s\n",
-            //    num_elements, keys_out.GetSize(), enactor -> size_check ? "true" : "false");
-            //fflush(stdout);
-            //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("ReceivedQueue",
-            //    keys_in.GetPointer(util::DEVICE), num_elements,
-            //    h_data_slice -> gpu_idx, iteration, peer_, stream);
             if (enactor_stats -> retval = Check_Size<SizeT, VertexId>(
                 enactor -> size_check, "incomping_queue",
                 num_elements,
@@ -1837,7 +1855,7 @@ public:
         thread_slices = new ThreadSlice [this->num_gpus];
         thread_Ids    = new CUTThread   [this->num_gpus];
 
-        for (int gpu=0;gpu<this->num_gpus;gpu++)
+        /*for (int gpu=0;gpu<this->num_gpus;gpu++)
         {
             if (retval = util::SetDevice(this->gpu_idx[gpu])) break;
             if (Problem::ENABLE_IDEMPOTENCE) {
@@ -1878,7 +1896,7 @@ public:
                     __FILE__, __LINE__)) break;
             }
         }
-        if (retval) return retval;
+        if (retval) return retval;*/
 
         for (int gpu=0;gpu<this->num_gpus;gpu++)
         {

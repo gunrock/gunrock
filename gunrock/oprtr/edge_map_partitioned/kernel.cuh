@@ -31,13 +31,13 @@ namespace edge_map_partitioned {
 /**
 * Templated texture reference for visited mask
 */
-template <typename SizeT>
+/*template <typename SizeT>
 struct RowOffsetsTex
 {
    static texture<SizeT, cudaTextureType1D, cudaReadModeElementType> row_offsets;
 };
 template <typename SizeT>
-texture<SizeT, cudaTextureType1D, cudaReadModeElementType> RowOffsetsTex<SizeT>::row_offsets;
+texture<SizeT, cudaTextureType1D, cudaReadModeElementType> RowOffsetsTex<SizeT>::row_offsets;*/
 
 
 

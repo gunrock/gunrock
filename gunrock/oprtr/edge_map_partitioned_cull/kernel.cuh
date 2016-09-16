@@ -43,7 +43,8 @@ struct LoadRowOffset<VertexId, int>
     static __device__ __forceinline__ int Load 
         (int *&d_row_offsets, VertexId &pos)
     {
-        return tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<int>::row_offsets, pos);
+        //return tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<int>::row_offsets, pos);
+        return _ldg(d_row_offsets + pos);
     }    
 };
 
@@ -569,10 +570,11 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                         MaskT mask_bit = 1 << (u & ((1 << (2+sizeof(MaskT)))-1));
 
                         // Read byte from visited mask in tex
-                        tex_mask_byte = tex1Dfetch(
-                            gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,//cta->t_bitmask[0],
-                            output_pos);//mask_byte_offset);
+                        //tex_mask_byte = tex1Dfetch(
+                        //    gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,//cta->t_bitmask[0],
+                        //    output_pos);//mask_byte_offset);
                         //tex_mask_byte = smem_storage.d_visited_mask[output_pos];
+                        tex_mask_byte = _ldg(smem_storage.d_visited_mask + output_pos);                        
 
                         if (!(mask_bit & tex_mask_byte))
                         {

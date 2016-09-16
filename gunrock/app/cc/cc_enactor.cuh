@@ -1229,7 +1229,7 @@ public:
             FilterKernelPolicy::CTA_OCCUPANCY)) 
             return retval;
 
-        for (int gpu=0;gpu<this->num_gpus;gpu++)
+        /*for (int gpu=0;gpu<this->num_gpus;gpu++)
         {
             if (retval = util::SetDevice(this->gpu_idx[gpu])) break;
             if (sizeof(SizeT) == 4)
@@ -1244,7 +1244,7 @@ public:
                     "BFSEnactor cudaBindTexture row_offsets_ref failed",
                     __FILE__, __LINE__)) break;
             }
-        }
+        }*/
 
         if (this -> debug) 
         {

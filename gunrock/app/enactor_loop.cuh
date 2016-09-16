@@ -158,6 +158,7 @@ void Iteration_Loop(
             for (i=0; i<data_slice->num_stages; i++)
                 data_slice->events_set[enactor_stats[0].iteration%4][peer][i]=false;
         }
+        //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labels", data_slice -> labels.GetPointer(util::DEVICE), graph_slice -> nodes, thread_num, iteration, -1, streams[0]);
 
         while (data_slice->wait_counter < num_gpus*2
            && (!Iteration::Stop_Condition(
@@ -532,8 +533,8 @@ void Iteration_Loop(
                 Total_Length = frontier_attribute[0].queue_length;
             if (enactor -> debug)
             {
-                printf("%d\t %lld\t \t Subqueue finished. Total_Length= %lld\n",
-                    thread_num, enactor_stats[0].iteration, (long long)Total_Length);
+                printf("%d\t %lld\t \t Subqueue finished. Total_Length= %lld, labels = %p\n",
+                    thread_num, enactor_stats[0].iteration, (long long)Total_Length, data_slice -> labels.GetPointer(util::DEVICE));
                 fflush(stdout);
             }
 

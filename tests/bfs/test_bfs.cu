@@ -811,10 +811,10 @@ template <
     //bool        SIZE_CHECK >
 cudaError_t RunTests_mark_predecessors(Info<VertexId, SizeT, Value> *info)
 {
-//    if (info->info["mark_predecessors"].get_bool())
-//        return RunTests_enable_idempotence<VertexId, SizeT, Value, /*INSTRUMENT,
-//                                    DEBUG, SIZE_CHECK,*/  true> (info);
-//    else
+    if (info->info["mark_predecessors"].get_bool())
+        return RunTests_enable_idempotence<VertexId, SizeT, Value, /*INSTRUMENT,
+                                    DEBUG, SIZE_CHECK,*/  true> (info);
+    else
         return RunTests_enable_idempotence<VertexId, SizeT, Value,/* INSTRUMENT,
                                     DEBUG, SIZE_CHECK,*/ false> (info);
 }

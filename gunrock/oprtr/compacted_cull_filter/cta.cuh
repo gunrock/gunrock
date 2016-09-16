@@ -277,10 +277,11 @@ struct Cta
             unsigned char mask_bit = 1 << (thread_work.vertices[i] & 7);
 
             // Read byte from visited mask in tex
-            unsigned char tex_mask_byte = tex1Dfetch(
-                gunrock::oprtr::cull_filter::BitmaskTex<unsigned char>::ref,//cta->t_bitmask[0],
-                mask_byte_offset);
+            // unsigned char tex_mask_byte = tex1Dfetch(
+            //    gunrock::oprtr::cull_filter::BitmaskTex<unsigned char>::ref,//cta->t_bitmask[0],
+            //    mask_byte_offset);
             //unsigned char tex_mask_byte = cta->d_visited_mask[mask_byte_offset];
+            unsigned char tex_mask_byte = _ldg(thread_work.d_visited_mask + mask_byte_offset);            
 
             if (mask_bit & tex_mask_byte)
             {

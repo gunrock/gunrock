@@ -1252,7 +1252,7 @@ public:
         thread_slices = new ThreadSlice [this->num_gpus];
         thread_Ids    = new CUTThread   [this->num_gpus];
 
-        for (int gpu=0; gpu<this->num_gpus; gpu++)
+        /*for (int gpu=0; gpu<this->num_gpus; gpu++)
         {
             if (retval = util::SetDevice(this -> gpu_idx[gpu])) return retval;
             if (sizeof(SizeT) <= 4)
@@ -1267,7 +1267,7 @@ public:
                     "BFSEnactor cudaBindTexture row_offsets_ref failed",
                     __FILE__, __LINE__)) return retval;
             }
-        }
+        }*/
 
         for (int gpu=0;gpu<this->num_gpus;gpu++)
         {
