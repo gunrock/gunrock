@@ -65,7 +65,6 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
     {
         // device storage arrays
         util::Array1D<SizeT, Value     >  bc_values;           /**< Used to store final BC values for each node */
-        util::Array1D<SizeT, Value     >  ebc_values;          /**< Used to store final BC values for each edge */
         util::Array1D<SizeT, Value     >  sigmas;              /**< Accumulated sigma values for each node */
         util::Array1D<SizeT, Value     >  deltas;              /**< Accumulated delta values for each node */
         util::Array1D<SizeT, VertexId  >  src_node;            /**< Used to store source node ID */
@@ -85,7 +84,6 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
         DataSlice() : BaseDataSlice()
         {
             bc_values   .SetName("bc_values"   );
-            ebc_values  .SetName("ebc_values"  );
             sigmas      .SetName("sigmas"      );
             deltas      .SetName("deltas"      );
             src_node    .SetName("src_node"    );
@@ -113,7 +111,6 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             cudaError_t retval = cudaSuccess;
             if (retval = util::SetDevice(this->gpu_idx)) return retval;
             if (retval = bc_values     .Release()) return retval;
-            if (retval = ebc_values    .Release()) return retval;
             if (retval = sigmas        .Release()) return retval;
             if (retval = deltas        .Release()) return retval;
             if (retval = src_node      .Release()) return retval;
@@ -185,12 +182,10 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = this->preds     .Allocate(graph->nodes, util::DEVICE)) return retval;
             //if (retval = this->temp_preds.Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = bc_values .Allocate(graph->nodes, util::DEVICE)) return retval;
-            //if (retval = ebc_values.Allocate(graph->edges, util::DEVICE)) return retval;
             if (retval = sigmas    .Allocate(graph->nodes, util::DEVICE | util::HOST)) return retval;
             if (retval = deltas    .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = src_node  .Allocate(1           , util::DEVICE)) return retval;
             util::MemsetKernel<<<128, 128>>>( bc_values.GetPointer(util::DEVICE), (Value)0.0, graph->nodes);
-            //util::MemsetKernel<<<128, 128>>>(ebc_values.GetPointer(util::DEVICE), (Value)0.0, graph->edges);
 
             forward_queue_offsets = new std::vector<SizeT>[num_gpus];
             forward_output = new util::Array1D<SizeT, VertexId>[num_gpus];
@@ -277,8 +272,6 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             // Allocate bc_values if necessary
             if (this->bc_values .GetPointer(util::DEVICE) == NULL)
                 if (retval = this->bc_values .Allocate(nodes, util::DEVICE)) return retval;
-            //if (this->ebc_values.GetPointer(util::DEVICE) == NULL)
-            //    if (retval = this->ebc_values.Allocate(edges, util::DEVICE)) return retval;
 
             // Allocate deltas if necessary
             if (this->deltas    .GetPointer(util::DEVICE) == NULL)
@@ -366,7 +359,6 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
      *
      * @param[out] h_sigmas host-side vector to store computed sigma values. (Meaningful only in single-pass BC)
      * @param[out] h_bc_values host-side vector to store Node BC_values.
-     * @param[out] h_ebc_values host-side vector to store Edge BC_values.
      * @param[out] h_labels host-side vector to store BC labels
      *
      *\return cudaError_t object Indicates the success of all CUDA calls.
@@ -374,7 +366,6 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
     cudaError_t Extract(
         Value *h_sigmas, 
         Value *h_bc_values, 
-        Value *h_ebc_values, 
         VertexId *h_labels)
     {
         cudaError_t retval = cudaSuccess;
@@ -389,11 +380,6 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = data_slices[0]->bc_values.Move(util::DEVICE, util::HOST)) return retval;
             }
 
-            if (h_ebc_values) {
-                //data_slices[0]->ebc_values.SetPointer(h_ebc_values);
-                //if (retval = data_slices[0]->ebc_values.Move(util::DEVICE, util::HOST)) return retval;
-            }
-
             if (h_sigmas) {
                 data_slices[0]->sigmas.SetPointer(h_sigmas);
                 if (retval = data_slices[0]->sigmas.Move(util::DEVICE, util::HOST)) return retval;
@@ -405,7 +391,6 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             }
         } else {
             Value **th_bc_values  = new Value*[this->num_gpus];
-            //Value **th_ebc_values = new Value*[this->num_gpus];
             Value **th_sigmas     = new Value*[this->num_gpus];
             SizeT **th_row_offsets= new SizeT*[this->num_gpus];
             VertexId **th_labels  = new VertexId*[this->num_gpus];
@@ -419,11 +404,6 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                     th_bc_values[gpu] = data_slices[gpu]->bc_values.GetPointer(util::HOST);
                 }
 
-                if (h_ebc_values) {
-                    //if (retval = data_slices[gpu]->ebc_values.Move(util::DEVICE,util::HOST)) return retval;
-                    //th_ebc_values [gpu] = data_slices [gpu]->ebc_values .GetPointer(util::HOST);
-                    th_row_offsets[gpu] = this->graph_slices[gpu]->row_offsets.GetPointer(util::HOST);
-                }
                 if (h_sigmas) {
                     if (retval = data_slices[gpu]->sigmas.Move(util::DEVICE, util::HOST)) return retval;
                     th_sigmas[gpu] = data_slices[gpu]->sigmas.GetPointer(util::HOST);
@@ -441,26 +421,16 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                 if (h_bc_values) h_bc_values[node] = th_bc_values[gpu][_node];
                 if (h_sigmas   ) h_sigmas   [node] = th_sigmas   [gpu][_node];
                 if (h_labels   ) h_labels   [node] = th_labels   [gpu][_node];
-                //if (h_ebc_values) {
-                //    SizeT n_edges=this->org_graph->row_offsets[node+1] - this->org_graph->row_offsets[node];
-                //    for (SizeT _edge=0;_edge<n_edges;_edge++)
-                //    {
-                        //h_ebc_values [ this->org_graph->row_offsets[node] + _edge] =
-                        //    th_ebc_values [gpu][th_row_offsets[gpu][_node] + _edge];
-                //    }
-                //}
             }
 
             for (int gpu=0; gpu< this->num_gpus; gpu++)
             {
                 if (retval = data_slices[gpu]->bc_values .Release(util::HOST)) return retval;
-                //if (retval = data_slices[gpu]->ebc_values.Release(util::HOST)) return retval;
                 if (retval = data_slices[gpu]->sigmas    .Release(util::HOST)) return retval;
                 if (retval = data_slices[gpu]->labels    .Release(util::HOST)) return retval;
             }
             delete[] th_row_offsets; th_row_offsets = NULL;
             delete[] th_bc_values  ; th_bc_values   = NULL;
-            //delete[] th_ebc_values ; th_ebc_values  = NULL;
             delete[] th_sigmas     ; th_sigmas      = NULL;
             delete[] th_labels     ; th_labels      = NULL;
         } //end if
@@ -599,7 +569,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
         cudaError_t retval = cudaSuccess;
         if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
-        // Reset all data but d_bc_values and d_ebc_values (Because we need to accumulate them)
+        // Reset all data but d_bc_values (Because we need to accumulate them)
         for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             //SizeT nodes = this->sub_graphs[gpu].nodes;
             //SizeT edges = this->sub_graphs[gpu].edges;
