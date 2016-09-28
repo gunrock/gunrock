@@ -159,10 +159,15 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
             
                 this->graph_slices[0]->edges /= 2;
                 this->graph_slices[0]->column_indices.SetPointer(dest_ids);
-                if (retval = this->graph_slices[0]->column_indices.Move(util::DEVICE,util::HOST)) return retval;
+                if (retval = this->graph_slices[0]->column_indices.Move(util::DEVICE,util::HOST, this->graph_slices[0]->edges, 0)) return retval;
 
                 data_slices[0]->d_edge_tc.SetPointer(edge_tc);
                 if (retval = data_slices[0]->d_edge_tc.Move(util::DEVICE,util::HOST)) return retval;
+
+
+                data_slices[0]->d_src_node_ids.UnSetPointer();
+                this->graph_slices[0]->column_indices.UnSetPointer();
+                data_slices[0]->d_edge_tc.UnSetPointer(edge_tc);
 
             } else {
             // does not support multi-GPU yet
