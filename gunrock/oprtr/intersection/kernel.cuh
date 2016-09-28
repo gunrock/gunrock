@@ -94,6 +94,7 @@ struct Dispatch
                             SizeT       *&d_degrees,
                             DataSlice   *&problem,
                             SizeT       *&d_output_counts,
+                            SizeT       *&d_output_total,
                             SizeT       &input_length,
                             SizeT       &stride,
                             SizeT       &num_vertex,
@@ -168,6 +169,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             SizeT       *&d_degrees,
                             DataSlice   *&problem,
                             SizeT       *&d_output_counts,
+                            SizeT       *&d_output_total,
                             SizeT       &input_length,
                             SizeT       &stride,
                             SizeT       &num_vertex,
@@ -195,6 +197,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             SizeT dst_nl_size = dst_end - dst_it;
             SizeT min_nl = (src_nl_size > dst_nl_size) ? dst_nl_size : src_nl_size;
             SizeT max_nl = (src_nl_size < dst_nl_size) ? dst_nl_size : src_nl_size;
+            SizeT total = min_nl + max_nl;
             if ( min_nl * ilog2((unsigned int)(max_nl)) * 10 < min_nl + max_nl ) {
                 // search
                 SizeT min_it = (src_nl_size < dst_nl_size) ? src_it : dst_it;
@@ -216,6 +219,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                     count += (diff == 0);
                 }
             }
+            d_output_total[idx] += total;
             d_output_counts[idx] += count;
         }
     }
@@ -410,6 +414,7 @@ void Inspect(
             typename KernelPolicy::SizeT        *d_degrees,
             typename ProblemData::DataSlice     *problem,
             typename KernelPolicy::SizeT        *d_output_counts,
+            typename KernelPolicy::SizeT        *d_output_total,
             typename KernelPolicy::SizeT        input_length,
             typename KernelPolicy::SizeT        stride,
             typename KernelPolicy::SizeT        num_vertex,
@@ -423,6 +428,7 @@ void Inspect(
             d_degrees,
             problem,
             d_output_counts,
+            d_output_total,
             input_length,
             stride,
             num_vertex,
@@ -484,7 +490,7 @@ void Inspect(
 
 // Kernel Entry point for performing batch intersection computation
 template <typename KernelPolicy, typename ProblemData, typename Functor>
-    long LaunchKernel(
+    float LaunchKernel(
         gunrock::app::EnactorStats              &enactor_stats,
         gunrock::app::FrontierAttribute<typename KernelPolicy::SizeT>
                                                 &frontier_attribute,
@@ -495,6 +501,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
         typename KernelPolicy::VertexId         *d_dst_node_ids,
         typename KernelPolicy::VertexId         *d_degrees,
         typename KernelPolicy::SizeT            *d_output_counts,
+        typename KernelPolicy::SizeT            *d_output_total,
         typename KernelPolicy::SizeT            input_length,
         typename KernelPolicy::SizeT            max_vertex,
         typename KernelPolicy::SizeT            max_edge,
@@ -527,6 +534,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
             d_degrees,
             data_slice,
             d_output_counts,
+            d_output_total,
             input_length,
             stride,
             max_vertex,
@@ -556,7 +564,10 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
     __LINE__);*/
 
 
-    return mgpu::Reduce(d_output_counts, input_length, context);
+    long total = mgpu::Reduce(d_output_total, input_length, context);
+    long tc_count = mgpu::Reduce(d_output_counts, input_length, context);
+    printf("tc_total:%ld\n, tc_count:%ld\n", total, tc_count);
+    return (float)tc_count / (float)total;
     //return total_counts[0];
 }
 

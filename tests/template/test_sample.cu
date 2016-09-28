@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <string>
 #include <iostream>
+#include <fstream>
 
 // utilities for correctness checking
 #include <gunrock/util/test_utils.cuh>
@@ -166,6 +167,17 @@ void RunTest(Info<VertexId, Value, SizeT> *info)
             false > Problem;
 
     Csr<VertexId, Value, SizeT>* csr = info->csr_ptr;
+    std::ofstream outputfile;
+    outputfile.open("graph.info");
+
+    outputfile << csr->nodes+1 << " " << csr->edges << std::endl;
+    for (int i = 0; i < csr->nodes+1; ++i) {
+        outputfile << csr->row_offsets[i] << std::endl;
+    }
+    for (int i = 0; i < csr->edges; ++i) {
+        outputfile << csr->column_indices[i] << std::endl;
+    }
+    outputfile.close();
 
     ContextPtr* context             = (ContextPtr*)info -> context;
     std::string partition_method    = info->info["partition_method"].get_str();
@@ -317,6 +329,7 @@ int main(int argc, char** argv)
     // graph construction or generation related parameters
     info->info["undirected"] = args.CheckCmdLineFlag("undirected");
     info->Init("Primitive_Name", args, csr);  // initialize Info structure
+
     RunTests_debug<VertexId, Value, SizeT>(info);  // run test
     return 0;
 }
