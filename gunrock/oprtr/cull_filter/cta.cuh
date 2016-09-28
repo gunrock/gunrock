@@ -191,7 +191,7 @@ struct Cta
                     //    BitmaskTex<unsigned char>::ref,//cta->t_bitmask[0],
                     //    mask_byte_offset);
                     //unsigned char tex_mask_byte = cta->d_visited_mask[mask_byte_offset];
-                    unsigned char tex_mask_byte = __ldg(cta -> d_visited_mask + mask_byte_offset);
+                    unsigned char tex_mask_byte = _ldg(cta -> d_visited_mask + mask_byte_offset);
 
                     if (mask_bit & tex_mask_byte)
                     {
