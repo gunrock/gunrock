@@ -753,20 +753,18 @@ struct DataSliceBase
      *
      * @param[in] num_gpus             Number of GPUs
      * @param[in] gpu_idx              GPU index
-     * @param[in] num_vertex_associate Number of VertexId type associate values
-     * @param[in] num_value__associate Number of Value type associate values
+     * @param[in] use_double_buffer
      * @param[in] graph                Pointer to the CSR formated sub-graph
      * @param[in] num_in_nodes         Number of incoming vertices from peers
      * @param[in] num_out_nodes        Number of outgoing vertices to peers
      * @param[in] in_sizing            Preallocation factor for incoming / outgoing vertices
+     * @param[in] skip_makeout_selection
      * \return                         Error occurred if any, otherwise cudaSuccess
      */
     cudaError_t Init(
         int    num_gpus            ,
         int    gpu_idx             ,
         bool   use_double_buffer   ,
-        //int    num_vertex_associate,
-        //int    num_value__associate,
         Csr<VertexId, SizeT, Value>
               *graph               ,
         SizeT *num_in_nodes        ,
@@ -1077,6 +1075,7 @@ struct DataSliceBase
      * @param[in] queue_sizing       Sizing scaling factor for work queue allocation. 1.0 by default. Reserved for future use.
      * @param[in] _USE_DOUBLE_BUFFER Whether to use double buffer
      * @param[in] queue_sizing1      Scaling factor for frontier_queue1
+     * @param[in] skip_scanned_edges
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */

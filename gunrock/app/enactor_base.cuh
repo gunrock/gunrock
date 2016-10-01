@@ -92,9 +92,12 @@ protected:
     /**
      * @brief Constructor
      *
-     * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
-     * @param[in] num_gpus
-     * @param[in] gpu_idx
+     * @param[in] _frontier_type The frontier type (i.e., edge/vertex/mixed)
+     * @param[in] _num_gpus
+     * @param[in] _gpu_idx
+     * @param[in] _instrument
+     * @param[in] _debug
+     * @param[in] _size_check
      */
     EnactorBase(
         FrontierType  _frontier_type,
@@ -175,7 +178,6 @@ protected:
      *
      * @tparam Problem
      *
-     * @param[in] problem The problem object for the graph primitive
      * @param[in] max_grid_size Maximum CUDA block numbers in on grid
      * @param[in] advance_occupancy CTA Occupancy for Advance operator
      * @param[in] filter_occupancy CTA Occupancy for Filter operator
@@ -185,7 +187,6 @@ protected:
      */
     //template <typename Problem>
     cudaError_t Init(
-        //Problem *problem,
         int max_grid_size,
         int advance_occupancy,
         int filter_occupancy,
@@ -277,7 +278,6 @@ protected:
      *
      * @tparam Problem
      *
-     * @param[in] problem The problem object for the graph primitive
      * @param[in] max_grid_size Maximum CUDA block numbers in on grid
      * @param[in] advance_occupancy CTA Occupancy for Advance operator
      * @param[in] filter_occupancy CTA Occupancy for Filter operator
@@ -287,7 +287,6 @@ protected:
      */
     //template <typename Problem>
     cudaError_t Setup(
-        //Problem *problem,
         int max_grid_size,
         int advance_occupancy,
         int filter_occupancy,

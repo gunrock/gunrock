@@ -145,14 +145,14 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
          *
          * @param[in] num_gpus Number of the GPUs used.
          * @param[in] gpu_idx GPU index used for testing.
-         * @param[in] num_vertex_associate Number of vertices associated.
-         * @param[in] num_value__associate Number of value associated.
          * @param[in] graph Pointer to the graph we process on.
+         * @param[in] graph_slice
          * @param[in] num_in_nodes
          * @param[in] num_out_nodes
-         * @param[in] original_vertex
          * @param[in] queue_sizing Maximum queue sizing factor.
          * @param[in] in_sizing
+         * @param[in] skip_makeout_selection
+         * @param[in] keep_node_num
          *
          * \return cudaError_t object Indicates the success of all CUDA calls.
          */
@@ -160,13 +160,10 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
             int   num_gpus,
             int   gpu_idx,
             bool  use_double_buffer,
-            //int   num_vertex_associate,
-            //int   num_value__associate,
             Csr<VertexId, SizeT, Value> *graph,
             GraphSlice<VertexId, SizeT, Value> *graph_slice,
             SizeT *num_in_nodes,
             SizeT *num_out_nodes,
-            //VertexId *original_vertex,
             float queue_sizing = 2.0,
             float in_sizing = 1.0,
             bool  skip_makeout_selection = false,

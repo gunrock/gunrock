@@ -508,7 +508,6 @@ public:
      *
      * @param[in] context CUDA Contet pointer.
      * @param[in] problem Pointer to SALSAProblem object.
-     * @param[in] max_iteration Max number of iterations.
      * @param[in] max_grid_size Max grid size for SALSA kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -541,18 +540,12 @@ public:
      *
      * @tparam SALSAProblem SALSA Problem type. @see SALSAProblem
      *
-     * @param[in] context CUDA Contet pointer.
-     * @param[in] problem Pointer to SALSAProblem object.
      * @param[in] max_iteration Max number of iterations.
-     * @param[in] max_grid_size Max grid size for SALSA kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Enact(
-        //ContextPtr                           context,
-        //SALSAProblem                        *problem,
         SizeT         max_iteration)
-        //int                                  max_grid_size = 0)
     {
         int min_sm_version = -1;
         for (int i=0;i<this->num_gpus;i++)

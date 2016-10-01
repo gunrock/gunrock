@@ -50,13 +50,22 @@ public:
     }
 };
 
+/**
+ * @brief Run test
+ *
+ * @tparam VertexId   Vertex identifier type
+ * @tparam Value      Attribute type
+ * @tparam SizeT      Graph size type
+ *
+ * @param[out] output    Pointer to output graph structure of the problem
+ * @param[in]  parameter primitive-specific test parameters
+ *
+ * \return Elapsed run time in milliseconds
+ */
 template <
     typename VertexId,
     typename SizeT,
     typename Value,
-    //bool INSTRUMENT,
-    //bool DEBUG,
-    //bool SIZE_CHECK,
     bool MARK_PREDECESSORS >
 float runSSSP(GRGraph* output, SSSP_Parameter *parameter);
 
@@ -66,20 +75,16 @@ float runSSSP(GRGraph* output, SSSP_Parameter *parameter);
  * @tparam VertexId   Vertex identifier type
  * @tparam Value      Attribute type
  * @tparam SizeT      Graph size type
- * @tparam INSTRUMENT Keep kernels statics
- * @tparam DEBUG      Keep debug statics
- * @tparam SIZE_CHECK Enable size check
  *
  * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
+ *
+ * \return Elapsed run time in milliseconds
  */
 template <
     typename    VertexId,
     typename    SizeT,
     typename    Value>
-    //bool        INSTRUMENT,
-    //bool        DEBUG,
-    //bool        SIZE_CHECK >
 float markPredecessorsSSSP(GRGraph* output, SSSP_Parameter *parameter)
 {
     if (parameter->mark_predecessors)
@@ -91,24 +96,20 @@ float markPredecessorsSSSP(GRGraph* output, SSSP_Parameter *parameter)
 /**
  * @brief Run test
  *
- * @tparam VertexId          Vertex identifier type
- * @tparam Value             Attribute type
+ * @tparam VertexId          Vertex identifier type*
  * @tparam SizeT             Graph size type
- * @tparam INSTRUMENT        Keep kernels statics
- * @tparam DEBUG             Keep debug statics
- * @tparam SIZE_CHECK        Enable size check
+ * @tparam Value             Attribute type
  * @tparam MARK_PREDECESSORS Enable mark predecessors
  *
  * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
+ *
+ * \return Elapsed run time in milliseconds
  */
 template <
     typename VertexId,
     typename SizeT,
     typename Value,
-    //bool INSTRUMENT,
-    //bool DEBUG,
-    //bool SIZE_CHECK,
     bool MARK_PREDECESSORS >
 float runSSSP(GRGraph* output, SSSP_Parameter *parameter)
 {
@@ -232,6 +233,8 @@ float runSSSP(GRGraph* output, SSSP_Parameter *parameter)
  * @param[in]  data_t  Data type configurations
  * @param[in]  context ModernGPU context
  * @param[in]  streams CUDA stream
+ *
+ * \return Elapsed run time in milliseconds
  */
 float dispatchSSSP(
     GRGraph*       grapho,

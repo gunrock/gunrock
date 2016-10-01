@@ -400,7 +400,6 @@ public:
      *
      * @param[in] context CudaContext for moderngpu library
      * @param[in] problem Pointer to HITSProblem object.
-     * @param[in] max_iteration Max iteration number for the algorithm
      * @param[in] max_grid_size Max grid size for HITS kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -433,18 +432,12 @@ public:
      *
      * @tparam HITSProblem HITS Problem type. @see HITSProblem
      *
-     * @param[in] context CudaContext for moderngpu library
-     * @param[in] problem Pointer to HITSProblem object.
      * @param[in] max_iteration Max iteration number for the algorithm
-     * @param[in] max_grid_size Max grid size for HITS kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Enact(
-        //ContextPtr  context,
-        //Problem    *problem,
         SizeT       max_iteration)
-        //int         max_grid_size = 0)
     {
         int min_sm_version = -1;
         for (int i=0;i<this->num_gpus;i++)

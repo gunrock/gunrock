@@ -525,6 +525,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[in] gpu_idx GPU index used for testing.
      * @param[in] partition_method Partition method to partition input graph.
      * @param[in] streams CUDA stream.
+     * @param[in] context
      * @param[in] queue_sizing Maximum queue sizing factor.
      * @param[in] in_sizing
      * @param[in] partition_factor Partition factor for partitioner.
@@ -704,12 +705,14 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
      * @brief Reset problem function. Must be called prior to each run.
      *
      * @param[in] src Source node to start.
-     * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
      * @param[in] delta PageRank delta factor
      * @param[in] threshold Threshold for remove node from PR computation process.
      * @param[in] max_iter Maximum number of iterations.
      * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
      * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+     * @param[in] queue_sizing1
+     * @param[in] skip_scanned_edges Whether to skip scanned edges
+     *
      *
      *  \return cudaError_t object Indicates the success of all CUDA calls.
      */

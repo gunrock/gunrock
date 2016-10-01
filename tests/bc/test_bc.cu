@@ -119,6 +119,7 @@ void Usage()
  * @param[in] sigmas
  * @param[in] bc_values
  * @param[in] nodes
+ * @param[in] quiet
  */
 template <
     typename SizeT, 
@@ -378,19 +379,16 @@ void ReferenceBC(
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- * @tparam SIZE_CHECK
  *
  * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
 template <
     typename VertexId,
     typename SizeT,
     typename Value>
-    //bool INSTRUMENT,
-    //bool DEBUG,
-    //bool SIZE_CHECK >
 cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 {
     typedef BCProblem < VertexId,

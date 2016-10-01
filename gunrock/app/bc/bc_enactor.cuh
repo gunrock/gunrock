@@ -1858,7 +1858,6 @@ public:
      * @param[in] context CudaContext pointer for ModernGPU API.
      * @param[in] problem Pointer to Problem object.
      * @param[in] max_grid_size Maximum grid size for kernel calls.
-     * @param[in] size_check Whether or not to enable size check.
      *
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
@@ -1869,15 +1868,10 @@ public:
         ContextPtr  *context,
         Problem     *problem,
         int         max_grid_size = 512)
-        //bool        size_check    = true)
     {
         cudaError_t retval = cudaSuccess;
-        //cpu_barrier = new util::cpu_mt::CPUBarrier[2];
-        //cpu_barrier[0]=util::cpu_mt::CreateBarrier(this->num_gpus);
-        //cpu_barrier[1]=util::cpu_mt::CreateBarrier(this->num_gpus);
         // Lazy initialization
         if (retval = BaseEnactor::Init(
-            //problem,
             max_grid_size,
             AdvanceKernelPolity::CTA_OCCUPANCY,
             FilterKernelPolicy::CTA_OCCUPANCY)) 
@@ -2157,6 +2151,7 @@ public:
      * @brief BC Enact kernel entry.
      *
      * @param[in] src Source node to start primitive.
+     * @param[in] traversal_mode Mode of workload strategy in advance
      *
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
@@ -2196,7 +2191,7 @@ public:
      * @param[in] context CudaContext pointer for ModernGPU API.
      * @param[in] problem Pointer to Problem object.
      * @param[in] max_grid_size Maximum grid size for kernel calls.
-     * @param[in] size_check Whether or not to enable size check.
+     * @param[in] traversal_mode Mode of workload strategy in advance
      *
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
@@ -2205,7 +2200,6 @@ public:
         Problem    *problem,
         int max_grid_size = 512,
         std::string traversal_mode = "LB")
-        //bool size_check = true)
     {
         if (this -> min_sm_version >= 300)
         {

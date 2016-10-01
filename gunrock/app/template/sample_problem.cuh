@@ -249,8 +249,15 @@ struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
      *
      * @param[in] stream_from_host Whether to stream data from host.
      * @param[in] graph Reference to the CSR graph object we process on.
-     * @param[in] _num_gpus Number of the GPUs used.
-     * @param[in] streams CUDA streams
+     * @param[in] inversegraph Reference to the CSC graph object we process on.
+     ** @param[in] num_gpus Number of the GPUs used.
+     * @param[in] gpu_idx
+     * @param[in] partition_method
+     * @param[in] streams CUDA Streams
+     * @param[in] queue_sizing
+     * @param[in] in_sizing
+     * @param[in] partition_factor
+     * @param[in] partition_seed
      *
      * \return cudaError_t object indicates the success of all CUDA functions.
      */
@@ -316,6 +323,7 @@ struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
      *
      *  @param[in] frontier_type Frontier type (i.e., edge / vertex / mixed).
      *  @param[in] queue_sizing Size scaling factor for work queue allocation.
+     *  @param[in] queue_sizing1
      *  \return cudaError_t object indicates the success of all CUDA functions.
      */
     cudaError_t Reset(

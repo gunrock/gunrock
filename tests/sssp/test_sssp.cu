@@ -274,18 +274,17 @@ void ReferenceSssp(
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
  * @tparam MARK_PREDECESSORS
  *
  * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
 template <
     typename VertexId,
     typename SizeT,
     typename Value,
-    //bool INSTRUMENT,
-    //bool DEBUG,
-    //bool SIZE_CHECK,
     bool MARK_PREDECESSORS >
 cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 {
@@ -294,10 +293,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             Value,
             MARK_PREDECESSORS > Problem;
 
-    typedef SSSPEnactor < Problem/*,
-            INSTRUMENT,
-            DEBUG,
-            SIZE_CHECK*/ > Enactor;
+    typedef SSSPEnactor < Problem > Enactor;
 
     // parse configurations from mObject info
     Csr<VertexId, SizeT, Value> *graph = info->csr_ptr;
@@ -618,19 +614,16 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- * @tparam SIZE_CHECK
  *
  * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
 template <
     typename    VertexId,
     typename    SizeT,
     typename    Value>
-    //bool        INSTRUMENT,
-    //bool        DEBUG,
-    //bool        SIZE_CHECK >
 cudaError_t RunTests_mark_predecessors(Info<VertexId, SizeT, Value> *info)
 {
     if (info->info["mark_predecessors"].get_bool())

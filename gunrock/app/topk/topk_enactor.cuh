@@ -376,18 +376,12 @@ public:
      *
      * @tparam TOPKProblem TOPK Problem type. @see TOPKProblem
      *
-     * @param[in] context CUDA context pointer.
-     * @param[in] problem Pointer to TOPKProblem object.
      * @param[in] top_nodes Top nodes to process.
-     * @param[in] max_grid_size Max grid size for TOPK kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
     */
     cudaError_t Enact(
-        //ContextPtr context,
-        //Problem   *problem,
         SizeT         top_nodes)
-        //int	    max_grid_size = 0)
     {
         int min_sm_version = -1;
         for (int i=0; i< this->num_gpus; i++)
