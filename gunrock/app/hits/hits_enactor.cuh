@@ -39,8 +39,8 @@ namespace hits {
  *
  * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA clock-count statistics
  */
-template <typename _Problem /*, bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK*/>
-class HITSEnactor : public EnactorBase<typename _Problem::SizeT/*, _DEBUG, _SIZE_CHECK*/>
+template <typename _Problem>
+class HITSEnactor : public EnactorBase<typename _Problem::SizeT>
 {
 public:
     typedef _Problem                   Problem;
@@ -50,15 +50,10 @@ public:
     typedef EnactorBase<SizeT>         BaseEnactor;
     Problem    *problem;
     ContextPtr *context;
-    //static const bool INSTRUMENT = _INSTRUMENT;
-    //static const bool DEBUG      = _DEBUG;
-    //static const bool SIZE_CHECK = _SIZE_CHECK;
 
     // Members
     protected:
 
-    //volatile int        *done;
-    //int                 *d_done;
 
     /**
      * Current iteration, also used to get the final search depth of the HITS search
@@ -67,24 +62,6 @@ public:
 
     // Methods
     protected:
-
-    /**
-     * @brief Prepare the enactor for HITS kernel call. Must be called prior to each HITS search.
-     *
-     * @param[in] problem HITS Problem object which holds the graph data and HITS problem data to compute.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    /*cudaError_t Setup(
-        Problem *problem)
-    {
-        //typedef typename ProblemData::SizeT         SizeT;
-        //typedef typename ProblemData::VertexId      VertexId;
-
-        cudaError_t retval = cudaSuccess;
-
-        return retval;
-    }*/
 
     public:
 
@@ -121,11 +98,9 @@ public:
         if (hub_or_auth == 0) {
             rank_curr = problem->data_slices[0]->hrank_curr.GetPointer(util::DEVICE);
             rank_next = problem->data_slices[0]->hrank_next.GetPointer(util::DEVICE);
-            //printf("hub\n");
         } else {
             rank_curr = problem->data_slices[0]->arank_curr.GetPointer(util::DEVICE);
             rank_next = problem->data_slices[0]->arank_next.GetPointer(util::DEVICE);
-            //printf("auth\n");
         }
 
         //swap rank_curr and rank_next
@@ -170,14 +145,10 @@ public:
     /**
      * @brief Enacts a HITS computing on the specified graph.
      *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam VertexMapPolicy Kernel policy for vertex mapping.
-     * @tparam HITSProblem HITS Problem type.
+     * @tparam AdvanceKernelPolicy Kernel policy for advance.
+     * @tparam FilterKernelPolicy Kernel policy for filter.
      *
-     * @param[in] context CudaContext for moderngpu library
-     * @param[in] problem HITSProblem object.
      * @param[in] max_iteration Max number of iterations of HITS algorithm
-     * @param[in] max_grid_size Max grid size for HITS kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -185,10 +156,7 @@ public:
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy>
     cudaError_t EnactHITS(
-        //ContextPtr       context,
-        //Problem         *problem,
         SizeT            max_iteration)
-        //int              max_grid_size = 0)
     {
         typedef HUBFunctor<
             VertexId,

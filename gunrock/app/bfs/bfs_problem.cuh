@@ -145,6 +145,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
          *
          * @param[in] num_gpus Number of the GPUs used.
          * @param[in] gpu_idx GPU index used for testing.
+         * @param[in] use_double_buffer Whether to use double buffer
          * @param[in] graph Pointer to the graph we process on.
          * @param[in] graph_slice
          * @param[in] num_in_nodes

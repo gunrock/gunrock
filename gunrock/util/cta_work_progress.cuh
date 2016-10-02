@@ -86,24 +86,7 @@ public:
 
     virtual ~CtaWorkProgress()
     {
-        //Release();
     }
-
-    /**
-     * Resets all counters.  Must be called by thread-0 through
-     * thread-(COUNTERS - 1)
-     */
-    /*template <typename SizeT>
-    __device__ __forceinline__ void Reset()
-    {
-        SizeT reset_val = 0;
-        //if (((SizeT*)d_counters)[threadIdx.x] != reset_val)
-        //    printf("d_counters = %p, d_counters[%d] %lld -> %lld, blockIdx.x = %d\n", 
-        //        d_counters, threadIdx.x, (long long)((SizeT*)d_counters)[threadIdx.x], 
-        //        (long long)reset_val, blockIdx.x);
-        util::io::ModifiedStore<util::io::st::cg>::St(
-            reset_val, ((SizeT *) d_counters) + threadIdx.x);
-    }*/
 
     //---------------------------------------------------------------------
     // Work-stealing
@@ -202,23 +185,13 @@ public:
         d_counters[QUEUE_COUNTERS + STEAL_COUNTERS] = 1;
     }
 
-    /**
-     * Resets all counters.  Must be called by thread-0 through
-     * thread-(COUNTERS - 1)
-     */
-    //template <typename SizeT>
     cudaError_t Reset_(
         SizeT        reset_val = 0,
         cudaStream_t stream = 0)
     {
         cudaError_t retval = cudaSuccess;
-        //SizeT h_counters[COUNTERS];
         for (SizeT i=0; i<COUNTERS; i++)
             (*p_counters)[i] = reset_val;
-        //cudaError_t retval = util::GRError(
-        //    cudaMemcpyAsync((SizeT*)d_counters, h_counters, sizeof(SizeT) * COUNTERS,
-        //        cudaMemcpyHostToDevice, stream),
-        //   "cudaMemcpyAsync failed", __FILE__, __LINE__);
         if (retval = p_counters -> Move(util::HOST, util::DEVICE, COUNTERS, 0, stream))
             return retval;
         progress_selector = 0;

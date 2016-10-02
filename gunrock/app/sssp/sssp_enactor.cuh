@@ -916,7 +916,6 @@ public:
      * @param[in] context CudaContext pointer for ModernGPU API.
      * @param[in] problem Pointer to Problem object.
      * @param[in] max_grid_size Maximum grid size for kernel calls.
-     * @param[in] size_check Whether or not to enable size check.
      *
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
@@ -927,7 +926,6 @@ public:
         ContextPtr  *context,
         Problem     *problem,
         int         max_grid_size = 0)
-        //bool        size_check    = true)
     {
         cudaError_t retval = cudaSuccess;
 

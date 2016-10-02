@@ -141,13 +141,14 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
          *
          * @param[in] num_gpus Number of the GPUs used.
          * @param[in] gpu_idx GPU index used for testing.
-         * @param[in] num_vertex_associate Number of vertices associated.
-         * @param[in] num_value__associate Number of value associated.
+         * @param[in] use_double_buffer Whether to use double buffer
          * @param[in] graph Pointer to the graph we process on.
+         * @param[in] graph_slice Pointer to the GraphSlice object.
          * @param[in] num_in_nodes
          * @param[in] num_out_nodes
          * @param[in] queue_sizing Maximum queue sizing factor.
          * @param[in] in_sizing
+         * @param[in] keep_node_num Whether to keep node number.
          *
          * \return cudaError_t object Indicates the success of all CUDA calls.
          */
@@ -155,8 +156,6 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             int   num_gpus,
             int   gpu_idx,
             bool  use_double_buffer,
-            //int   num_vertex_associate,
-            //int   num_value__associate,
             Csr<VertexId, SizeT, Value> *graph,
             GraphSlice<VertexId, SizeT, Value> *graph_slice,
             SizeT *num_in_nodes,
@@ -238,6 +237,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
          *
          * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
          * @param[in] graph_slice Pointer to the graph slice we process on.
+         * @param[in] use_double_buffer Whether to use double buffer.
          * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
          * @param[in] queue_sizing1 Size scaling factor for work queue allocation.
          *

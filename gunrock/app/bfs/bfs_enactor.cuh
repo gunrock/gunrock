@@ -1743,11 +1743,8 @@ static CUT_THREADPROC BFSThread(
  * @brief Problem enactor class.
  *
  * @tparam _Problem Problem type we process on.
- * @tparam _INSTRUMENT Whether or not to collect per-CTA clock-count stats.
- * @tparam _DEBUG Whether or not to enable debug mode.
- * @tparam _SIZE_CHECK Whether or not to enable size check.
  */
-template <typename _Problem/*, bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK*/>
+template <typename _Problem>
 class BFSEnactor :
     public EnactorBase<typename _Problem::SizeT/*, _DEBUG, _SIZE_CHECK*/>
 {
@@ -1763,9 +1760,6 @@ public:
     typedef typename Problem::MaskT    MaskT   ;
     typedef EnactorBase<SizeT>         BaseEnactor;
     typedef BFSEnactor<Problem>        Enactor;
-    //static const bool INSTRUMENT = _INSTRUMENT;
-    //static const bool DEBUG      = _DEBUG;
-    //static const bool SIZE_CHECK = _SIZE_CHECK;
 
     bool direction_optimized;
     float do_a, do_b;
@@ -1833,7 +1827,6 @@ public:
      * @param[in] context CudaContext pointer for ModernGPU API.
      * @param[in] problem Pointer to Problem object.
      * @param[in] max_grid_size Maximum grid size for kernel calls.
-     * @param[in] size_check Whether or not to enable size check.
      *
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
@@ -1844,7 +1837,6 @@ public:
         ContextPtr *context,
         Problem    *problem,
         int        max_grid_size = 0)
-        //bool       size_check    = true)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -1859,49 +1851,6 @@ public:
         this->problem = problem;
         thread_slices = new ThreadSlice [this->num_gpus];
         thread_Ids    = new CUTThread   [this->num_gpus];
-
-        /*for (int gpu=0;gpu<this->num_gpus;gpu++)
-        {
-            if (retval = util::SetDevice(this->gpu_idx[gpu])) break;
-            if (Problem::ENABLE_IDEMPOTENCE) {
-                SizeT num_mask_elements = problem->data_slices[gpu]->visited_mask.GetSize();
-                    //(problem->graph_slices[gpu]->nodes + sizeof(MaskT) - 1) / sizeof(MaskT);
-                cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<MaskT>();
-                gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref.channelDesc = bitmask_desc;
-                if (retval = util::GRError(cudaBindTexture(
-                    0,
-                    gunrock::oprtr::cull_filter::BitmaskTex<MaskT>::ref,
-                    problem->data_slices[gpu]->visited_mask.GetPointer(util::DEVICE),
-                    num_mask_elements * sizeof(MaskT)),
-                    "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
-            }
-
-            if (sizeof(VertexId) == 4)
-            {
-                cudaChannelFormatDesc   labels_desc = cudaCreateChannelDesc<VertexId>();
-                gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels.channelDesc = labels_desc;
-                if (retval = util::GRError(cudaBindTexture(
-                    0,
-                    gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels,
-                    problem->data_slices[gpu]->labels.GetPointer(util::DEVICE),
-                    problem->graph_slices[gpu]->nodes * sizeof(VertexId)),
-                    "BFSEnactor cudaBindTexture labels_tex_ref failed", __FILE__, __LINE__)) break;
-            }
-
-            if (sizeof(SizeT) == 4)
-            {
-                cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
-                gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
-                if (retval = util::GRError(cudaBindTexture(
-                    0,
-                    gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,
-                    problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
-                    ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
-                    "BFSEnactor cudaBindTexture row_offsets_ref failed",
-                    __FILE__, __LINE__)) break;
-            }
-        }
-        if (retval) return retval;*/
 
         for (int gpu=0;gpu<this->num_gpus;gpu++)
         {
@@ -1941,11 +1890,6 @@ public:
             return retval;
         for (int gpu=0; gpu < this->num_gpus; gpu++)
         {
-            //if (retval = util::SetDevice(this -> gpu_idx[gpu]))
-            //    return retval;
-            //if (retval = util::GRError(cudaDeviceSynchronize(),
-            //    "cudaDeviceSynchronize failed", __FILE__, __LINE__))
-            //    return retval;
             thread_slices[gpu].status = ThreadSlice::Status::Wait;
         }
         return retval;
@@ -1990,7 +1934,6 @@ public:
             while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
             {
                 sleep(0);
-                //std::this_thread::yield();
             }
         }
 

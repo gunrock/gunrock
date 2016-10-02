@@ -1093,6 +1093,7 @@ public:
      *
      * @param[in] args Command line arguments.
      * @param[in] csr_ref Reference to the CSR graph.
+     * @param[in] type normal type or qeury type
      *
      * \return int whether successfully loaded the graph (0 success, 1 error).
      */
@@ -1176,7 +1177,6 @@ public:
      /**
      * @brief SM Initialization process for Info.
      *
-     * @param[in] algorithm_name Algorithm name.
      * @param[in] args Command line arguments.
      * @param[in] csr_query_ref Reference to the CSR structure.
      * @param[in] csr_data_ref Reference to the CSR structure.

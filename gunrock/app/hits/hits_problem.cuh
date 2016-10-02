@@ -109,27 +109,6 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
     }
 
     /**
-     * @brief HITSProblem constructor
-     *
-     * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on.
-     * @param[in] inv_graph Reference to the inversed CSR graph object we process on.
-     * @param[in] num_gpus Number of the GPUs used.
-     */
-    /*HITSProblem(bool        stream_from_host,       // Only meaningful for single-GPU
-               const Csr<VertexId, Value, SizeT> &graph,
-               const Csr<VertexId, Value, SizeT> &inv_graph,
-               int         num_gpus) :
-        num_gpus(num_gpus)
-    {
-        Init(
-            stream_from_host,
-            graph,
-            inv_graph,
-            num_gpus);
-    }*/
-
-    /**
      * @brief HITSProblem default destructor
      */
     ~HITSProblem()

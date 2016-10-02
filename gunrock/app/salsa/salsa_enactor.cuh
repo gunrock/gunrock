@@ -58,25 +58,6 @@ public:
     // Methods
     protected:
 
-    /**
-     * @brief Prepare the enactor for SALSA kernel call. Must be called prior to each SALSA search.
-     *
-     * @param[in] problem SALSA Problem object which holds the graph data and SALSA problem data to compute.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    /*template <typename ProblemData>
-    cudaError_t Setup(
-        ProblemData *problem)
-    {
-        typedef typename ProblemData::SizeT         SizeT;
-        typedef typename ProblemData::VertexId      VertexId;
-
-        cudaError_t retval = cudaSuccess;
-
-        return retval;
-    }*/
-
     public:
 
     /**
@@ -164,24 +145,16 @@ public:
      *
      * @tparam AdvanceKernelPolicy Kernel policy for advance
      * @tparam FilterKernelPolicy Kernel policy for filter
-     * @tparam SALSAProblem SALSA Problem type.
      *
-     * @param[in] context CUDA context pointer.
-     * @param[in] problem SALSAProblem object.
      * @param[in] max_iteration Max number of iterations of SALSA algorithm
-     * @param[in] max_grid_size Max grid size for SALSA kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template<
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy>
-        //typename SALSAProblem>
     cudaError_t EnactSALSA(
-        //ContextPtr  *context,
-        //Problem     *problem,
         SizeT        max_iteration)
-        //int          max_grid_size = 0)
     {
         typedef HFORWARDFunctor<
             VertexId,

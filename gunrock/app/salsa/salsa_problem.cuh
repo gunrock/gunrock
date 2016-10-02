@@ -116,27 +116,6 @@ struct SALSAProblem : ProblemBase<VertexId, SizeT, Value,
     }
 
     /**
-     * @brief SALSAProblem constructor
-     *
-     * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on.
-     * @param[in] inv_graph Reference to the CSC graph object we process on.
-     * @param[in] num_gpus Number of the GPUs used.
-     */
-    /*SALSAProblem(bool        stream_from_host,       // Only meaningful for single-GPU
-               const Csr<VertexId, Value, SizeT> &graph,
-               const Csr<VertexId, Value, SizeT> &inv_graph,
-               int         num_gpus) :
-        num_gpus(num_gpus)
-    {
-        Init(
-            stream_from_host,
-            graph,
-            inv_graph,
-            num_gpus);
-    }*/
-
-    /**
      * @brief SALSAProblem default destructor
      */
     ~SALSAProblem()

@@ -192,9 +192,9 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
          *
          * @param[in] num_gpus Number of the GPUs used.
          * @param[in] gpu_idx GPU index used for testing.
-         * @param[in] num_vertex_associate Number of vertices associated.
-         * @param[in] num_value__associate Number of value associated.
+         * @param[in] use_double_buffer Whether to use double buffer.
          * @param[in] graph Pointer to the graph we process on.
+         * @param[in] graph_slice Pointer to GraphSlice object.
          * @param[in] num_in_nodes
          * @param[in] num_out_nodes
          * @param[in] queue_sizing Maximum queue sizing factor.
@@ -206,8 +206,6 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             int   num_gpus,
             int   gpu_idx,
             bool  use_double_buffer,
-            //int   num_vertex_associate,
-            //int   num_value__associate,
             Csr<VertexId, SizeT, Value> *graph,
             GraphSlice<VertexId, SizeT, Value>
                    *graph_slice,

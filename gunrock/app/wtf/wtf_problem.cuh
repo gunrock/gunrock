@@ -93,11 +93,8 @@ struct WTFProblem : ProblemBase<VertexId, SizeT, Value,
             refscore_next.Release();
             out_degrees  .Release();
             in_degrees   .Release();
-            //threshold    .Release();
-            //delta        .Release();
             cot_map      .Release();
             node_ids     .Release();
-            //src_node     .Release();
         }
 
         cudaError_t Init(
@@ -136,10 +133,6 @@ struct WTFProblem : ProblemBase<VertexId, SizeT, Value,
 
         /**
          *  @brief Performs any initialization work needed for primitive.
-         *
-         *  @param[in] frontier_type Frontier type (i.e., edge / vertex / mixed).
-         *  @param[in] queue_sizing Size scaling factor for work queue allocation.
-         *  \return cudaError_t object indicates the success of all CUDA functions.
          */
         cudaError_t Reset(
             VertexId src,
@@ -289,24 +282,6 @@ struct WTFProblem : ProblemBase<VertexId, SizeT, Value,
         selector(0)
     {
     }
-
-    /**
-     * @brief WTFProblem constructor
-     *
-     * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on.
-     * @param[in] num_gpus Number of the GPUs used.
-     */
-    /*WTFProblem(bool        stream_from_host,       // Only meaningful for single-GPU
-               const Csr<VertexId, Value, SizeT> &graph,
-               int         num_gpus) :
-        num_gpus(num_gpus)
-    {
-        Init(
-            stream_from_host,
-            graph,
-            num_gpus);
-    }*/
 
     /**
      * @brief WTFProblem default destructor
