@@ -1063,19 +1063,19 @@ struct BFSIteration : public IterationBase <
                         frontier_attribute -> queue_index), stream);
             }
 
-            /*if (enactor_stats->retval = work_progress -> GetQueueLength(
-                frontier_attribute->queue_index,
-                frontier_attribute->queue_length,
-                false,
-                stream,
-                true)) return;
-            if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
-                "cudaStreamSynchronize failed", __FILE__, __LINE__))
-                return;
-            util::cpu_mt::PrintGPUArray("AdvanceResult",
-                frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
-                frontier_attribute -> queue_length,
-                thread_num, enactor_stats -> iteration, -1, stream);*/
+            //if (enactor_stats->retval = work_progress -> GetQueueLength(
+            //    frontier_attribute->queue_index,
+            //    frontier_attribute->queue_length,
+            //    false,
+            //    stream,
+            //    true)) return;
+            //if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
+            //    "cudaStreamSynchronize failed", __FILE__, __LINE__))
+            //    return;
+            //util::cpu_mt::PrintGPUArray("AdvanceResult",
+            //    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+            //    frontier_attribute -> queue_length,
+            //    thread_num, enactor_stats -> iteration, -1, stream);
 
             if (!gunrock::oprtr::advance::isFused<AdvanceKernelPolicy::ADVANCE_MODE>())
             {

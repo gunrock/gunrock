@@ -387,6 +387,21 @@ struct Cta
                     int warp_id = threadIdx.x >> 5;
                     int hash    = tile->element_id[LOAD][VEC] & SmemStorage::WARP_HASH_MASK;//(SmemStorage::WARP_HASH_ELEMENTS - 1);
 
+                    /*if (warp_id < 0 || warp_id >= KernelPolicy::WARPS)
+                    {
+                        printf("Invalid warp_id (%d), threadIdx.x == %d, WARPS = %d\n",
+                        warp_id, threadIdx.x, KernelPolicy::WARPS);
+                        return;
+                    }
+
+                    if (hash < 0 || hash >= SmemStorage::WARP_HASH_ELEMENTS)
+                    {
+                        printf("Invalid hash (%d), element_id = %lld, WARP_HASH_ELEMENTS = %d\n",
+                            hash, (long long)tile->element_id[LOAD][VEC],
+                            SmemStorage::WARP_HASH_ELEMENTS);
+                        return;
+                    }*/
+
                     cta->smem_storage.state.vid_hashtable[warp_id][hash] = tile->element_id[LOAD][VEC];
                     VertexId retrieved = cta->smem_storage.state.vid_hashtable[warp_id][hash];
 
@@ -632,7 +647,7 @@ struct Cta
                 tile.BitmaskCull(cta);
             }
             tile.HistoryCull(cta);
-            tile.WarpCull(cta);
+            //tile.WarpCull(cta);
             tile.VertexCull(cta);          // using vertex visitation status (update discovered vertices)
         }
     };

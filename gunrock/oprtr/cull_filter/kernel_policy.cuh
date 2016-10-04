@@ -139,7 +139,7 @@ struct KernelPolicy
                                                     - sizeof(State)
                                                     - 128,                                              // Fudge-factor to guarantee occupancy
             HISTORY_HASH_ELEMENTS               = FULL_OCCUPANCY_BYTES / sizeof(VertexId), // 256,
-            HISTORY_HASH_MASK                   = HISTORY_HASH_ELEMENTS -1,
+            //HISTORY_HASH_MASK                   = HISTORY_HASH_ELEMENTS -1,
 
         };
 
