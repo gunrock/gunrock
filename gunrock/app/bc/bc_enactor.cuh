@@ -1476,6 +1476,7 @@ static CUT_THREADPROC BCThread(
                  *frontier_attribute  = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
     EnactorStats<SizeT> *enactor_stats       = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
     EnactorStats<SizeT> *s_enactor_stats     = &(enactor     -> enactor_stats      [0                    ]);
+    bool          has_error           = false;
     //util::Array1D<int, unsigned char>* barrier_markers = data_slice -> barrier_markers;
 
     if (enactor_stats[0].retval = util::SetDevice(gpu_idx))
@@ -1521,6 +1522,21 @@ static CUT_THREADPROC BCThread(
         if (enactor -> debug) 
             util::cpu_mt::PrintMessage("Forward phase finished.", 
                 thread_num, enactor_stats->iteration);
+
+        has_error =false;
+        for (int i=0; i<num_gpus * num_gpus; i++)
+        {
+            if (s_enactor_stats[i].retval != cudaSuccess)
+            {
+                has_error = true;
+                break;
+            }
+        }
+        if (has_error)
+        {
+            thread_data -> status = ThreadSlice::Status::Idle;
+            continue;
+        }
 
         if (num_gpus>1)
         {
@@ -1568,7 +1584,12 @@ static CUT_THREADPROC BCThread(
             if (enactor_stats -> retval = util::GRError(cudaEventRecord(
                 data_slice -> middle_events[0], data_slice -> streams[0]),
                 "cudaEventRecord failed", __FILE__, __LINE__))
-                break;
+                //break;
+            {
+                thread_data -> status = ThreadSlice::Status::Idle;
+                continue;
+            }
+
             //if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(data_slice -> streams[0]),
             //    "cudaStreamSynchronzie failed", __FILE__, __LINE__)) break;
             for (int peer = 0; peer < num_gpus; peer++)
@@ -1599,7 +1620,22 @@ static CUT_THREADPROC BCThread(
                     break;
                 data_slice -> middle_event_set[peer_] = true;
             }
+            
             //printf("%d events set\n", thread_num);fflush(stdout);
+            has_error =false;
+            for (int i=0; i<num_gpus * num_gpus; i++)
+            {
+                if (s_enactor_stats[i].retval != cudaSuccess)
+                {
+                    has_error = true;
+                    break;
+                }
+            }
+            if (has_error)
+            {
+                thread_data -> status = ThreadSlice::Status::Idle;
+                continue;
+            }
 
             for (int peer_ = 1; peer_ < num_gpus; peer_ ++)
             {
@@ -1647,9 +1683,26 @@ static CUT_THREADPROC BCThread(
                     middle_event_markers[peer] = 1;
                     middle_event_counter ++;
                 }
+                
+                has_error =false;
+                for (int i=0; i<num_gpus * num_gpus; i++)
+                {
+                    if (s_enactor_stats[i].retval != cudaSuccess)
+                    {
+                        has_error = true;
+                        break;
+                    }
+                }
+                if (has_error)
+                {
+                    thread_data -> status = ThreadSlice::Status::Idle;
+                    break;
+                }
+
                 if (middle_event_counter < num_gpus)
                     sleep(0);
             }
+            if (has_error) continue;
             //printf("%d events clear\n", thread_num);fflush(stdout);
 
             //data_slice->sigmas.Move(util::DEVICE, util::HOST);
@@ -1742,6 +1795,21 @@ static CUT_THREADPROC BCThread(
                 data_slice -> bc_values.GetPointer(util::DEVICE);
             data_slice -> value__associate_orgs.Move(util::HOST, util::DEVICE);
         } else {
+        }
+        
+        has_error =false;
+        for (int i=0; i<num_gpus * num_gpus; i++)
+        {
+            if (s_enactor_stats[i].retval != cudaSuccess)
+            {
+                has_error = true;
+                break;
+            }
+        }
+        if (has_error)
+        {
+            thread_data -> status = ThreadSlice::Status::Idle;
+            continue;
         }
 
         gunrock::app::Iteration_Loop
