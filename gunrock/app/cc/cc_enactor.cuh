@@ -895,7 +895,8 @@ public:
         for (int gpu=0; gpu<num_gpus; gpu++)
             if (data_slice[gpu]->turn==0)
         {
-            //printf("data_slice[%d]->turn==0\n", gpu);fflush(stdout);
+            //printf("data_slice[%d]->turn==0\n", gpu);
+            //fflush(stdout);
             return false;
         }
 
@@ -904,7 +905,10 @@ public:
         for (int i=0; i<2; i++)
         if (data_slice[gpu]->in_length[i][peer]!=0)
         {
-            //printf("data_slice[%d]->in_length[%d][%d] = %d\n", gpu, i, peer, data_slice[gpu]->in_length[i][peer]);fflush(stdout);
+            //printf("data_slice[%d]->in_length[%d][%d] = %lld\n", 
+            //    gpu, i, peer, 
+            //    (long long)data_slice[gpu]->in_length[i][peer]);
+            //fflush(stdout);
             return false;
         }
 
@@ -912,14 +916,22 @@ public:
         for (int peer=0; peer<num_gpus; peer++)
         if (data_slice[gpu]->out_length[peer]!=0)
         {
-            //printf("data_slice[%d]->out_length[%d] = %d\n", gpu, peer, data_slice[gpu]->out_length[peer]); fflush(stdout);
+            //printf("data_slice[%d] -> out_length[%d] = %lld\n", 
+            //    gpu, peer, (long long)data_slice[gpu]->out_length[peer]); 
+            //fflush(stdout);
             return false;
         }
 
         if (num_gpus > 1)
         for (int gpu=0; gpu<num_gpus; gpu++)
-        if (data_slice[gpu] -> has_change)
+        if (data_slice[gpu] -> has_change || data_slice[gpu] -> previous_change)
+        {
+            //printf("data_slice[%d] -> has_change = %s, previous_change = %s\n",
+            //    gpu, data_slice[gpu] -> has_change ? "true" : "false",
+            //    data_slice[gpu] -> previous_change ? "true" : "false");
+            //fflush(stdout);
             return false;
+        }
         //printf("CC to stop\n");fflush(stdout);
         return true;
     }
@@ -1010,7 +1022,11 @@ public:
         //printf("%d num_diff = %d\n", thread_num, data_slice -> out_length[1]);
         data_slice -> out_length[1] --;
 
-        //printf("%d\t %d\t changes = %d\n", thread_num, enactor_stats -> iteration, data_slice -> out_length[1]);
+        //printf("%d\t %lld\t changes = %lld\n", 
+        //    thread_num, enactor_stats -> iteration, 
+        //    (long long)data_slice -> out_length[1]);
+        //fflush(stdout);
+        data_slice -> previous_change = data_slice -> has_change;
         for (int i=0; i<num_gpus; i++)
             data_slice -> out_length[i] = data_slice -> out_length[1];
         if (data_slice -> out_length[1] != 0)

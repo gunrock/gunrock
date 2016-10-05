@@ -75,7 +75,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, VertexId*> vertex_associate_ins;
         int turn;
         //DataSlice *d_pointer;
-        bool has_change;
+        bool has_change, previous_change;
         bool scanned_queue_computed;
         VertexId *temp_vertex_out;
         VertexId *temp_comp_out;
@@ -101,6 +101,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             //d_pointer     = NULL;
             //work_progress = NULL;
             has_change    = true;
+            previous_change = true;
             scanned_queue_computed = false;
             temp_vertex_out = NULL;
             temp_comp_out = NULL;
@@ -291,6 +292,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
                 this -> out_length[peer] = 1;
             turn = 0;
             has_change = true;
+            previous_change = true;
 
             // Set device
             if (retval = util::SetDevice(this->gpu_idx)) return retval;
