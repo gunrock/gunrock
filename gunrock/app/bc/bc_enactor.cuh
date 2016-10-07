@@ -162,8 +162,6 @@ __global__ void Expand_Incoming_Forward_Kernel(
                 //    atomicAdd(d_sigmas + key, d_value__associate_in[x]);
                 to_process = false;
             }
-            //if ((key <= 16 && key!=label) || (key > 16 && key + label != 32))
-            //    printf("Expand Incoming : label[%d], %d -> %d\n", key, org_label, label);
             if (org_label == label || org_label == -1)
                 atomicAdd(d_sigmas + key, d_value__associate_in[x]);
         } else to_process = false;
@@ -310,11 +308,7 @@ __global__ void Assign_Middle(
         }*/
         d_labels_out[x] = d_labels_in[key];
         d_sigmas_out[x] = d_sigmas_in[key];
-
         
-        if ((key <= 16 && key!=d_labels_in[key]) || (key > 16 && key + d_labels_in[key] != 32))
-            printf("Assign Middle: label[%d] = %d\n",
-                key, d_labels_in[key]);
         x += STRIDE;
     }
 }
@@ -339,10 +333,6 @@ __global__ void Expand_Incoming_Middle(
         d_labels_out[key] = d_labels_in[x];
         d_sigmas_out[key] = d_sigmas_in[x];
        
-        if ((key <= 16 && d_labels_in[x] != key) || (key > 16 && key + d_labels_in[x] != 32)) 
-            printf("Expand Middle: label[%d] = %d\n",
-                key, d_labels_in[x]);
- 
         x += STRIDE;
     }
 }
@@ -1543,27 +1533,12 @@ static CUT_THREADPROC BCThread(
             util::cpu_mt::PrintMessage("Forward phase finished.", 
                 thread_num, enactor_stats->iteration);
 
-        has_error =false;
-        for (int i=0; i<num_gpus * num_gpus; i++)
-        {
-            if (s_enactor_stats[i].retval != cudaSuccess)
-            {
-                has_error = true;
-                break;
-            }
-        }
-        if (has_error)
-        {
-            thread_data -> status = ThreadSlice::Status::Idle;
-            continue;
-        }
-
         if (num_gpus>1)
         {
-            int middle_event_markers[8];
             data_slice -> middle_iteration = enactor_stats -> iteration;
+            int middle_event_markers[8];
             int middle_event_counter = 0;
-            for (int gpu = 0; gpu < num_gpus; gpu++)
+            /*for (int gpu = 0; gpu < num_gpus; gpu++)
                 middle_event_markers[gpu] = 0;
             while (middle_event_counter < num_gpus)
             {
@@ -1578,7 +1553,32 @@ static CUT_THREADPROC BCThread(
                 }
                 if (middle_event_counter < num_gpus)
                     sleep(0); 
+            }*/
+            has_error =false;
+            for (int gpu = 0; gpu < num_gpus; gpu++)
+            {
+                while (s_data_slice[gpu] -> middle_iteration < 0 && !has_error)
+                {
+                    sleep(0); 
+                    for (int i=0; i<num_gpus * num_gpus; i++)
+                    {
+                        if (s_enactor_stats[i].retval != cudaSuccess)
+                        {
+                            has_error = true;
+                            break;
+                        }
+                    }
+                }
+                if (has_error) break;
             }
+            if (has_error)
+            {
+                thread_data -> status = ThreadSlice::Status::Idle;
+                continue;
+            }
+            if (enactor -> debug)
+                util::cpu_mt::PrintMessage("Barrier1 past",
+                    thread_num, enactor_stats -> iteration); 
 
             int num_blocks = data_slice -> local_vertices.GetSize() / AdvanceKernelPolicy::THREADS / 2 +1;
             if (num_blocks > 480) num_blocks = 480;
@@ -1640,6 +1640,10 @@ static CUT_THREADPROC BCThread(
                     break;
                 data_slice -> middle_event_set[peer_] = true;
             }
+            if (enactor -> debug)
+                util::cpu_mt::PrintMessage("Pushed",
+                    thread_num, enactor_stats -> iteration); 
+
             
             //printf("%d events set\n", thread_num);fflush(stdout);
             has_error =false;
