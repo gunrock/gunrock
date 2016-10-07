@@ -162,6 +162,8 @@ __global__ void Expand_Incoming_Forward_Kernel(
                 //    atomicAdd(d_sigmas + key, d_value__associate_in[x]);
                 to_process = false;
             }
+            //if ((key <= 16 && key!=label) || (key > 16 && key + label != 32))
+            //    printf("Expand Incoming : label[%d], %d -> %d\n", key, org_label, label);
             if (org_label == label || org_label == -1)
                 atomicAdd(d_sigmas + key, d_value__associate_in[x]);
         } else to_process = false;
@@ -308,6 +310,11 @@ __global__ void Assign_Middle(
         }*/
         d_labels_out[x] = d_labels_in[key];
         d_sigmas_out[x] = d_sigmas_in[key];
+
+        
+        if ((key <= 16 && key!=d_labels_in[key]) || (key > 16 && key + d_labels_in[key] != 32))
+            printf("Assign Middle: label[%d] = %d\n",
+                key, d_labels_in[key]);
         x += STRIDE;
     }
 }
@@ -331,6 +338,11 @@ __global__ void Expand_Incoming_Middle(
         VertexId key = d_keys_in[x];
         d_labels_out[key] = d_labels_in[x];
         d_sigmas_out[key] = d_sigmas_in[x];
+       
+        if ((key <= 16 && d_labels_in[x] != key) || (key > 16 && key + d_labels_in[x] != 32)) 
+            printf("Expand Middle: label[%d] = %d\n",
+                key, d_labels_in[x]);
+ 
         x += STRIDE;
     }
 }
@@ -1485,6 +1497,10 @@ static CUT_THREADPROC BCThread(
         CUT_THREADEND;
     }
 
+    if (enactor -> debug)
+        util::cpu_mt::PrintMessage("Thread started",
+            thread_num);
+
     thread_data->status = ThreadSlice::Status::Idle;
     while (thread_data -> status != ThreadSlice::Status::ToKill)
     {
@@ -1497,6 +1513,10 @@ static CUT_THREADPROC BCThread(
         if (thread_data -> status == ThreadSlice::Status::ToKill)
             break;
         //thread_data->status = ThreadSlice::Status::Running;
+
+        if (enactor -> debug)
+            util::cpu_mt::PrintMessage("Enact begins",
+                thread_num);
 
         for (int peer_=0;peer_<num_gpus;peer_++)
         {
@@ -1550,7 +1570,7 @@ static CUT_THREADPROC BCThread(
                 for (int gpu = 0; gpu < num_gpus; gpu++)
                 {
                     if (middle_event_markers[gpu] == 1) continue;
-                    if (s_data_slice[gpu] -> middle_iteration != -1)
+                    if (s_data_slice[gpu] -> middle_iteration != 0)
                     {
                         middle_event_markers[gpu] = 1;
                         middle_event_counter ++;
@@ -1670,6 +1690,8 @@ static CUT_THREADPROC BCThread(
                     num_blocks = num_elements / AdvanceKernelPolicy::THREADS / 2 + 1;
                     VertexId peer_iteration = s_data_slice[peer] -> middle_iteration;
                     if (num_blocks > 480) num_blocks = 480;
+                    
+                    //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys_in", data_slice -> keys_in[peer_iteration%2][peer_].GetPointer(util::DEVICE), num_elements, thread_num, -1, peer_, data_slice -> streams[peer_]);
                     Expand_Incoming_Middle<VertexId, SizeT, Value>
                         <<<num_blocks, AdvanceKernelPolicy::THREADS, 
                         0, data_slice -> streams[peer_]>>>(
@@ -1748,6 +1770,31 @@ static CUT_THREADPROC BCThread(
             //        s_data_slice[peer] -> labels[_node] = data_slice -> labels[node];
             //    }
             //}
+            for (int peer_ = 1; peer_ < num_gpus; peer_ ++)
+            {
+                if (enactor_stats -> retval = util::GRError(
+                    cudaStreamSynchronize(data_slice -> streams[peer_]),
+                    "cudaStreamSynchronize failed", __FILE__, __LINE__))
+                    break;
+            }
+
+            // CPU barrier
+            data_slice -> middle_finish = true;
+            has_error = false;
+            for (int peer = 0; peer < num_gpus; peer++)
+            {
+                while (!s_data_slice[peer] -> middle_finish && !has_error)
+                {
+                    sleep(0);
+                    for (int i=0; i<num_gpus * num_gpus; i++)
+                    if (s_enactor_stats[i].retval != cudaSuccess)
+                    {
+                        has_error = true; break;
+                    }
+                }
+                if (has_error) break;
+            }
+            if (has_error) continue;
 
             for (int gpu = 0; gpu < num_gpus * 2; gpu++)
                 data_slice -> wait_marker[gpu] = 0; 
@@ -1764,13 +1811,6 @@ static CUT_THREADPROC BCThread(
                 data_slice -> first_backward_incoming[peer] = true;
             }
 
-            for (int peer_ = 1; peer_ < num_gpus; peer_ ++)
-            {
-                if (enactor_stats -> retval = util::GRError(
-                    cudaStreamSynchronize(data_slice -> streams[peer_]),
-                    "cudaStreamSynchronize failed", __FILE__, __LINE__))
-                    break;
-            }
             //CPU_Barrier;
             //util::cpu_mt::IncrementnWaitBarrier(&cpu_barrier[1], thread_num);
             //barrier_markers[1][thread_num] = 1;
@@ -1812,6 +1852,9 @@ static CUT_THREADPROC BCThread(
             continue;
         }
 
+        if (enactor -> debug)
+            util::cpu_mt::PrintMessage("Backward begin", 
+                thread_num, enactor_stats -> iteration);
         gunrock::app::Iteration_Loop
             <Enactor, BcBFunctor, 
             Backward_Iteration<AdvanceKernelPolicy, FilterKernelPolicy, Enactor>, 
@@ -1985,6 +2028,15 @@ public:
                     (void*)&(thread_slices[gpu]));
             thread_Ids[gpu] = thread_slices[gpu].thread_Id;
         }
+
+        for (int gpu=0; gpu < this->num_gpus; gpu++)
+        {    
+            while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
+            {    
+                sleep(0);
+                //std::this_thread::yield();
+            }    
+        } 
         return retval;
     }
 

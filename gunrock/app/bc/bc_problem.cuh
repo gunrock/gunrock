@@ -77,6 +77,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, bool      >  middle_event_set;
         util::Array1D<SizeT, cudaEvent_t> middle_events;
         VertexId                          middle_iteration;
+        bool                              middle_finish;
 
         /*
          * @brief Default constructor
@@ -93,6 +94,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
             middle_event_set.SetName("middle_event_set");
             middle_events.SetName("middle_events");
             middle_iteration      = 0;
+            middle_finish         = false;
             forward_output        = NULL;
             forward_queue_offsets = NULL;
             barrier_markers       = NULL;
@@ -303,6 +305,7 @@ struct BCProblem : ProblemBase<VertexId, SizeT, Value,
                 if (this -> num_gpus > 1) middle_event_set[gpu] = false;
             }
             middle_iteration = -1;
+            middle_finish    = false;
             return retval;
         }
     };  // DataSlice

@@ -364,6 +364,10 @@ void PushNeighbor(
     
     if (data_slice_l -> keys_out[peer_].GetPointer(util::DEVICE) != NULL)
     {
+        //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys_out",
+        //    data_slice_l -> keys_out[peer_].GetPointer(util::DEVICE),
+        //    queue_length, gpu, enactor_stats -> iteration, peer_, stream);
+
         if (enactor_stats -> retval = util::GRError(cudaMemcpyAsync(
             data_slice_p -> keys_in[t][gpu_].GetPointer(util::DEVICE),
             data_slice_l -> keys_out[peer_] .GetPointer(util::DEVICE),
