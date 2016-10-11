@@ -35,10 +35,10 @@ template <
     typename    SizeT,
     typename    Value>
 struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
-    true,//_MARK_PREDECESSORS
+    false,//_MARK_PREDECESSORS
     false> //ENABLE_IDEMPOTENCE
 {
-    static const bool MARK_PREDECESSORS     = true;
+    static const bool MARK_PREDECESSORS     = false;
     static const bool ENABLE_IDEMPOTENCE    = false;
     static const int  MAX_NUM_VERTEX_ASSOCIATES = 0;
     static const int  MAX_NUM_VALUE__ASSOCIATES = 1;

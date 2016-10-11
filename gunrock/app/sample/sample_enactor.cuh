@@ -461,8 +461,7 @@ static CUT_THREADPROC SampleThread(
         gunrock::app::Iteration_Loop
             <Enactor, Functor,
             SampleIteration<AdvanceKernelPolicy, FilterKernelPolicy, Enactor>,
-            //Problem::MARK_PREDECESSORS? 1:0, 1>
-            Problem::MARK_PATHS ? 1:0, 1>
+            0, 1>
             (thread_data);
         //printf("Sample_Thread finished\n");fflush(stdout);
         thread_data -> status = ThreadSlice::Status::Idle;

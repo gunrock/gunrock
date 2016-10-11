@@ -403,7 +403,7 @@ struct DataSliceBase
     //util::Array1D<SizeT, char        >   make_out_array          ; // compressed data structure for make_out kernel
     //util::Array1D<SizeT, char        >  *expand_incoming_array   ; // compressed data structure for expand_incoming kernel
     util::Array1D<SizeT, VertexId    >   preds                   ; // predecessors of vertices
-    //util::Array1D<SizeT, VertexId    >   temp_preds              ; // temporary storages for predecessors
+    util::Array1D<SizeT, VertexId    >   temp_preds              ; // temporary storages for predecessors
     util::Array1D<SizeT, VertexId    >   labels                  ; // Used for source distance
 
     //Frontier queues. Used to track working frontier.
@@ -481,7 +481,7 @@ struct DataSliceBase
         //make_out_array         .SetName("make_out_array"         );
         streams                .SetName("streams"                );
         preds                  .SetName("preds"                  );
-        //temp_preds             .SetName("temp_preds"             );
+        temp_preds             .SetName("temp_preds"             );
         labels                 .SetName("labels"                 );
         visited_mask           .SetName("visited_mask"           );
         org_checkpoint         .SetName("org_checkpoint"         );
@@ -733,7 +733,7 @@ struct DataSliceBase
         if (retval = to_show       .Release()) return retval;
         //if (retval = make_out_array.Release()) return retval;
         if (retval = preds         .Release()) return retval;
-        //if (retval = temp_preds    .Release()) return retval;
+        if (retval = temp_preds    .Release()) return retval;
         if (retval = labels        .Release()) return retval;
         if (retval = visited_mask  .Release()) return retval;
         if (retval = latency_data  .Release()) return retval;
