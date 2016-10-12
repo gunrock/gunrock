@@ -386,7 +386,6 @@ struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
     /**
      * @brief Reset problem function. Must be called prior to each run.
      *
-     * @param[in] src Source node to start.
      * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
      * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
      * @param[in] queue_sizing1

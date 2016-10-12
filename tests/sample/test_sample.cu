@@ -112,7 +112,6 @@ void Usage()
  * @tparam VertexId
  * @tparam SizeT
  *
- * @param[in] data_to_display Data to display.
  * @param[in] num_nodes Number of nodes in the graph.
  */
 template<typename VertexId, typename SizeT>

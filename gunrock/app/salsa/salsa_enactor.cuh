@@ -39,8 +39,8 @@ namespace salsa {
  *
  * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA clock-count statistics
  */
-template <typename _Problem/*, bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK*/>
-class SALSAEnactor : public EnactorBase <typename _Problem::SizeT/*, _DEBUG, _SIZE_CHECK*/>
+template <typename _Problem>
+class SALSAEnactor : public EnactorBase <typename _Problem::SizeT>
 {
 public:
     typedef _Problem                   Problem;
@@ -50,13 +50,6 @@ public:
     typedef EnactorBase<SizeT>         BaseEnactor;
     Problem    *problem;
     ContextPtr *context;
-    //static const bool INSTRUMENT = _INSTRUMENT;
-    //static const bool DEBUG      = _DEBUG;
-    //static const bool SIZE_CHECK = _SIZE_CHECK;
-
-    // Members
-    // Methods
-    protected:
 
     public:
 
@@ -306,11 +299,6 @@ public:
             }
         }
 
-        //util::DisplayDeviceResults(
-        //    problem->data_slices[0]->d_hub_predecessors, graph_slice->edges);
-        //util::DisplayDeviceResults(
-        //    problem->data_slices[0]->d_auth_predecessors, graph_slice->edges);
-
         while (true) 
         {
             util::MemsetIdxKernel<<<128, 128, 0, stream>>>(
@@ -318,9 +306,6 @@ public:
                 edges);
 
             frontier_attribute->queue_length     = graph_slice->edges;
-            //if (retval = work_progress->SetQueueLength(
-            //    frontier_attribute->queue_index, 
-            //    frontier_attribute->queue_length)) break;
 
             // Edge Map
             gunrock::oprtr::advance::LaunchKernel
@@ -342,8 +327,8 @@ public:
                 graph_slice->column_indices.GetPointer(util::DEVICE),
                 graph_slice->column_offsets.GetPointer(util::DEVICE),
                 graph_slice->row_indices.GetPointer(util::DEVICE),
-                graph_slice->edges, //graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
-                graph_slice->edges * 10000, //graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
+                graph_slice->edges,                    // max_in_queue
+                graph_slice->edges * 10000,                  // max_out_queue
                 work_progress[0],
                 context[0],
                 stream,
@@ -356,13 +341,6 @@ public:
                     "edge_map_forward::Kernel failed", __FILE__, __LINE__)) 
                     return retval;
             }
-
-            //if (retval = work_progress.GetQueueLength(
-            //    frontier_attribute.queue_index, frontier_attribute.queue_length)) 
-            //    break;
-            //util::DisplayDeviceResults(
-            //    graph_slice->frontier_queues.d_keys[frontier_attribute.selector], 
-            //    frontier_attribute.queue_length);
 
             NormalizeRank(0, stream);
 
@@ -386,8 +364,8 @@ public:
                 graph_slice->row_indices.GetPointer(util::DEVICE),
                 graph_slice->row_offsets.GetPointer(util::DEVICE),
                 graph_slice->column_indices.GetPointer(util::DEVICE),
-                graph_slice->edges,//frontier_queue->keys[frontier_attribute->selector  ].GetSize(),//graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
-                graph_slice->edges * 10000,//graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
+                graph_slice->edges,                   // max_in_queue
+                graph_slice->edges * 10000,                 // max_out_queue
                 work_progress[0],
                 context[0],
                 stream,
@@ -408,14 +386,6 @@ public:
                 printf(", %lld", (long long)frontier_attribute->queue_length);
             }
 
-            //if (this -> instrument) 
-            //{
-            //    if (retval = enactor_stats->advance_kernel_stats.Accumulate(
-            //        enactor_stats->advance_grid_size,
-            //        enactor_stats->total_runtimes,
-            //        enactor_stats->total_lifetimes)) break;
-            //}
-
             NormalizeRank(1, stream);
 
             enactor_stats->iteration++;
@@ -435,7 +405,6 @@ public:
     typedef gunrock::oprtr::filter::KernelPolicy<
         Problem,                            // Problem data type
         300,                                // CUDA_ARCH
-        //INSTRUMENT,                         // INSTRUMENT
         0,                                  // SATURATION QUIT
         true,                               // DEQUEUE_SALSAOBLEM_SIZE
         8,                                  // MIN_CTA_OCCUPANCY
@@ -450,7 +419,6 @@ public:
     typedef gunrock::oprtr::advance::KernelPolicy<
         Problem,                            // Problem data type
         300,                                // CUDA_ARCH
-        //INSTRUMENT,                         // INSTRUMENT
         1,                                  // MIN_CTA_OCCUPANCY
         10,                                 // LOG_THREADS
         8,                                  // LOG_BLOCKS

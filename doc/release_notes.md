@@ -12,8 +12,12 @@ performance for both single and multi-GPU execution.
 v0.4 ChangeLog
 ==============
  - Integrate direction-optimizing BFS with normal BFS.
- - Added two new strategies of advance: all_edges_advance (optimized for advance on all edges with all vertices in the input frontier), fused_advance_filter (optimized for advance followed with filter step).
- - Added three new strategies of filter: compacted_cull_filter (optimized on several culling heuristics), bypass_filter and simplified_filter (optimized for filter with no elements to remove from the input frontier).
+ - Added two new strategies of advance: all_edges_advance (optimized for
+   advance on all edges with all vertices in the input frontier),
+   fused_advance_filter (optimized for advance followed with filter step).
+ - Added three new strategies of filter: compacted_cull_filter (optimized on
+   several culling heuristics), bypass_filter and simplified_filter (optimized
+   for filter with no elements to remove from the input frontier).
  - Added multi-iteration support for BFS and SSSP.
 
 v0.4 Known Issues
