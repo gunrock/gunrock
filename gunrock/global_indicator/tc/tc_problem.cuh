@@ -167,7 +167,7 @@ struct TCProblem : ProblemBase<VertexId, SizeT, Value,
 
                 data_slices[0]->d_src_node_ids.UnSetPointer();
                 this->graph_slices[0]->column_indices.UnSetPointer();
-                data_slices[0]->d_edge_tc.UnSetPointer(edge_tc);
+                data_slices[0]->d_edge_tc.UnSetPointer();
 
             } else {
             // does not support multi-GPU yet
