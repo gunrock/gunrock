@@ -24,4 +24,5 @@ v0.4 ChangeLog
 
 v0.4 Known Issues
 =================
- - 
+ - HITS, SALSA, Who-to-Follow do not have multi-GPU support yet.
+ - Out of memory error will cause result validation to fail.
