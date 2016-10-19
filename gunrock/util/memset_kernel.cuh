@@ -164,6 +164,27 @@ __global__ void MemsetMultiplyVectorKernel(T *d_dst, T *d_src, SizeT length)
 }
 
 /**
+ * @brief Divide the source vector to the destination vector with the same length
+ * TODO: divide by zero check
+ *
+ * @tparam T datatype of the vector.
+ *
+ * @param[in] d_dst Destination device-side vector
+ * @param[in] d_src Source device-side vector
+ * @param[in] length Vector length
+ */
+template <typename T, typename SizeT>
+__global__ void MemsetDivVectorKernel(T *d_dst, T *d_src, SizeT length)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
+         idx < length; idx += STRIDE)
+    {
+        d_dst[idx] /= d_src[idx];
+    }
+}
+
+/**
  * @brief Copy the source vector to the destination vector with the same length
  *
  * @tparam T datatype of the vector.

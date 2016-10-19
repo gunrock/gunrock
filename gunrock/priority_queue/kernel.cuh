@@ -127,7 +127,7 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
         unsigned int my_vert = vertex_in[my_id];
         //if (my_vert < 0 || my_vert >= node_num) return;
         if (my_vert >= node_num) return;
-        problem->d_visit_lookup[my_vert] = my_id;
+        problem->visit_lookup[my_vert] = my_id;
     }
 
     static __device__ __forceinline__ void MarkNF(
@@ -146,12 +146,12 @@ struct Dispatch<KernelPolicy, ProblemData, PriorityQueue, Functor, true>
         if (my_id >= input_queue_length)
             return;
 
-        unsigned int bucket_max = UINT_MAX/problem->d_delta[0];
+        unsigned int bucket_max = UINT_MAX/problem->delta[0];
         unsigned int my_vert = vertex_in[my_id];
         // if (my_vert < 0 || my_vert >= node_num) { pq->d_valid_near[my_id] = 0; pq->d_valid_far[my_id] = 0; return; }
         if (my_vert >= node_num) { pq->d_valid_near[my_id] = 0; pq->d_valid_far[my_id] = 0; return; }
         unsigned int bucket_id = Functor::ComputePriorityScore(my_vert, problem);
-        bool valid = (my_id == problem->d_visit_lookup[my_vert]);
+        bool valid = (my_id == problem->visit_lookup[my_vert]);
         //printf(" valid:%d, my_id: %d, my_vert: %d\n", valid, my_id, my_vert, bucket_id);
         pq->d_valid_near[my_id] = (bucket_id < upper_priority_score_limit && bucket_id >= lower_priority_score_limit && valid) ? 1 : 0;
         pq->d_valid_far[my_id] = (bucket_id >= upper_priority_score_limit && bucket_id < bucket_max && valid) ? 1 : 0;

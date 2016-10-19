@@ -12,11 +12,15 @@
  * @brief Common device intrinsics (potentially specialized by architecture)
  */
 
-#pragma once
+//#pragma once
+
+#ifndef DEVICE_INTRINSICS_CUH
+#define DEVICE_INTRINSICS_CUH
 
 #include <gunrock/util/cuda_properties.cuh>
 #include <gunrock/util/types.cuh>
 
+#if __CUDACC_VER_MAJOR__ < 8
 // atomic addition from Jon Cohen at NVIDIA
 __device__ static double atomicAdd(double *addr, double val)
 {
@@ -30,6 +34,7 @@ __device__ static double atomicAdd(double *addr, double val)
     } while( assumed!=old );
     return old;
 }
+#endif
 
 __device__ static long long atomicCAS(long long *addr, long long comp, long long val)
 {
@@ -47,13 +52,44 @@ __device__ static long long atomicAdd(long long *addr, long long val)
         (unsigned long long )val);
 }
 
+#if __GR_CUDA_ARCH__ <= 300
 // TODO: only works if both *addr and val are non-negetive
-//__device__ static long long atomicMin(long long *addr, long long val)
-//{
-//    return (long long)atomicMin(
-//        (unsigned long long*)addr,
-//        (unsigned long long )val);
-//}
+/*__device__ static signed long long int atomicMin(signed long long int* addr, signed long long int val)
+{
+    unsigned long long int pre_value = (unsigned long long int)val;
+    unsigned long long int old_value = (unsigned long long int)val;
+    while (true)
+    {
+        old_value = atomicCAS((unsigned long long int*)addr, pre_value, (unsigned long long int)val);
+        if (old_value <= (unsigned long long int)val) break;
+        if (old_value == pre_value) break;
+        pre_value = old_value;
+    }
+    return old_value;
+}*/
+#endif
+
+__device__ static float atomicMin(float* addr, float val)
+{
+    int* addr_as_int = (int*)addr;
+    int old = *addr_as_int;
+    int expected;
+    do {
+        expected = old;
+        old = ::atomicCAS(addr_as_int, expected, __float_as_int(::fminf(val, __int_as_float(expected))));
+    } while (expected != old);
+    return __int_as_float(old);
+}
+
+template <typename T>
+__device__ __forceinline__ T _ldg(T* addr)
+{
+#if __GR_CUDA_ARCH__ >= 350
+    return __ldg(addr);
+#else 
+    return *addr;
+#endif
+}
 
 namespace gunrock {
 namespace util {
@@ -157,6 +193,7 @@ __device__ int BinarySearch(KeyType i, ArrayType *queue)
 } // namespace util
 } // namespace gunrock
 
+#endif
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++

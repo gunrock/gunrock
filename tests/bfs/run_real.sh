@@ -1,12 +1,31 @@
 #!/bin/bash
 
-#OPTION="--undirected --src=largestdegree --traversal-mode=LB_CULL --idempotence --queue-sizing=7.5 --in-sizing=4 --iteration-num=10"
-OPTION="--undirected --src=largestdegree --traversal-mode=LB_CULL --idempotence --in-sizing=1 --iteration-num=10"
-#queue-sizing at least 1.2 * num_gpus
+BASEOPTION="--src=randomize2 --queue-sizing=6.5 --in-sizing=4 --iteration-num=16"
+BASEFLAG=""
+EXECUTION="./bin/test_bfs_8.0_x86_64"
+DATADIR="/data/graphs/large"
 
-MARK=".skip_pred.undir.idempotence.LB_CULL.32bitSizeT.fw"
-EXECUTION="./bin/test_bfs_7.5_x86_64"
-DATADIR="../../dataset/large"
+
+OPTION[0]="" && FLAG[0]=".default"
+OPTION[1]=" --undirected" && FLAG[1]=".undir"
+
+OPTION[2]="" && FLAG[2]=".normal"
+OPTION[3]=" --idempotence" && FLAG[3]=".idempotence"
+
+OPTION[4]="" && FLAG[4]=".skip_pred"
+OPTION[5]=" --mark-pred" && FLAG[5]=".mark_pred"
+
+OPTION[6]="" && FLAG[6]=".top_down"
+OPTION[7]=" --direction-optimized" && FLAG[7]=".do"
+
+OPTION[8]="" && FLAG[8]=".32bit_VertexId"
+OPTION[9]=" --64bit-SizeT" && FLAG[9]=".64bit_SizeT"
+OPTION[10]=" --64bit-VertexId" && FLAG[10]=".64bit_VertexId"
+
+OPTION[11]="" && FLAG[11]=".DEF"
+OPTION[12]=" --traversal-mode=LB" && FLAG[12]=".LB"
+OPTION[13]=" --traversal-mode=TWC" && FLAG[13]=".TWC"
+OPTION[14]=" --traversal-mode=LB_CULL" && FLAG[14]=".LB_CULL"
 
 NAME[ 0]="soc-twitter-2010" && DO_A[ 0]="0.005" && DO_B[ 0]="0.1"
 NAME[ 1]="hollywood-2009"   && DO_A[ 1]="0.006" && DO_B[ 1]="0.1"
@@ -30,11 +49,11 @@ NAME[12]="germany_osm"      && DO_A[12]="1.5"   && DO_B[12]="10"
 NAME[13]="road_usa"         && DO_A[13]="1.0"   && DO_B[13]="10"
 NAME[14]="road_central"     && DO_A[14]="1.2" && DO_B[14]="10"
 
-cd ~/Projects/gunrock_dev/gunrock/tests/bfs
+# cd ~/Projects/gunrock_dev/gunrock/tests/bfs
 
-for d in {1..6}
+for d in {1..1}
 do
-    SUFFIX="CentOS6_6.k40cx${d}.rand"
+    SUFFIX="CentOS7.GTX1070x${d}"
     mkdir -p eval/$SUFFIX
     DEVICE="0"
     for i in {1..8}
@@ -44,16 +63,22 @@ do
         fi
     done
 
-    queue_sizing=2.5
-    if [ "$d" -lt "5" ]; then
-        queue_sizing=1.2
-    fi
+    #queue_sizing=2.5
+    #if [ "$d" -lt "5" ]; then
+    #    queue_sizing=1.2
+    #fi
 
-    for i in 7 #{0..14}
+    for o1 in {0..1}; do for o2 in {2..3}; do for o3 in {4..5}; do for o4 in {6..7}; do for o5 in {8..10}; do for o6 in {11..14}; do
+
+    OPTIONS=${BASEOPTION}${OPTION[${o1}]}${OPTION[${o2}]}${OPTION[${o3}]}${OPTION[${o4}]}${OPTION[${o5}]}${OPTION[${o6}]}
+    FLAGS=${BASEFLAG}${FLAG[${o1}]}${FLAG[${o2}]}${FLAG[${o3}]}${FLAG[${o4}]}${FLAG[${o5}]}${FLAG[${o6}]}
+
+    for i in {0..14}
     do
-        echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTION --queue-sizing=${queue_sizing}  --device=$DEVICE --do_a=${DO_A[$i]} --do_b=${DO_B[$i]} --jsondir=./eval/$SUFFIX "> ./eval/$SUFFIX/${NAME[$i]}${MARK}.txt"
-             $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTION --queue-sizing=${queue_sizing}  --device=$DEVICE --do_a=${DO_A[$i]} --do_b=${DO_B[$i]} --jsondir=./eval/$SUFFIX > ./eval/$SUFFIX/${NAME[$i]}${MARK}.txt
+        echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTIONS --device=$DEVICE --do_a=${DO_A[$i]} --do_b=${DO_B[$i]} --jsondir=./eval/$SUFFIX "> ./eval/$SUFFIX/${NAME[$i]}${FLAGS}.txt"
+             $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTIONS --device=$DEVICE --do_a=${DO_A[$i]} --do_b=${DO_B[$i]} --jsondir=./eval/$SUFFIX > ./eval/$SUFFIX/${NAME[$i]}${FLAGS}.txt
         sleep 1
     done
+    done; done; done; done; done; done
 done
 

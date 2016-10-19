@@ -49,9 +49,9 @@ __global__ void Expand_Incoming_Kernel(
 
     while (x < num_elements)
     {
-        VertexId key      = __ldg(keys_in + x);
-        VertexId new_pred = __ldg(vertex_associate_in + x);
-        VertexId old_pred = __ldg(vertex_associate_org + key);
+        VertexId key      = _ldg(keys_in + x);
+        VertexId new_pred = _ldg(vertex_associate_in + x);
+        VertexId old_pred = _ldg(vertex_associate_org + key);
         if (new_pred != old_pred)
         {
             if (new_pred < old_pred) vertex_associate_org[old_pred] = new_pred;
@@ -140,14 +140,14 @@ __global__ void Make_Output_Kernel(
         VertexId old_cid = 0, new_cid = 0, min_cid = 0;
         if (x < num_vertices)
         {
-            old_cid = __ldg(old_component_ids + x);
-            new_cid = __ldg(component_ids     + x);
+            old_cid = _ldg(old_component_ids + x);
+            new_cid = _ldg(component_ids     + x);
             min_cid = min(new_cid, old_cid);
             if (old_cid == min_cid)
                 to_process = false;
             else {
                 old_component_ids[x] = min_cid;
-                VertexId old_grandparent = __ldg(component_ids + old_cid);
+                VertexId old_grandparent = _ldg(component_ids + old_cid);
                 if (min_cid != old_grandparent)
                 {
                     //printf("%d\t Make_Output : not updated, old_cid = %d, min_cid = %d, old_grandparent = %d\n",
@@ -1212,7 +1212,7 @@ public:
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
     template<
-        typename AdvanceKernelPolity,
+        typename AdvanceKernelPolicy,
         typename FilterKernelPolicy>
     cudaError_t InitCC(
         ContextPtr  *context,
@@ -1225,22 +1225,25 @@ public:
         if (retval = BaseEnactor::Init(
             //problem,
             max_grid_size,
-            AdvanceKernelPolity::CTA_OCCUPANCY,
+            AdvanceKernelPolicy::CTA_OCCUPANCY,
             FilterKernelPolicy::CTA_OCCUPANCY)) 
             return retval;
 
         for (int gpu=0;gpu<this->num_gpus;gpu++)
         {
             if (retval = util::SetDevice(this->gpu_idx[gpu])) break;
-            cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
-            gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
-            if (retval = util::GRError(cudaBindTexture(
-                0,   
-                gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,
-                problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
-                ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
-                "BFSEnactor cudaBindTexture row_offsets_ref failed",
-                __FILE__, __LINE__)) break;
+            if (sizeof(SizeT) == 4)
+            {
+                cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
+                gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
+                if (retval = util::GRError(cudaBindTexture(
+                    0,   
+                    gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,
+                    problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
+                    ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
+                    "BFSEnactor cudaBindTexture row_offsets_ref failed",
+                    __FILE__, __LINE__)) break;
+            }
         }
 
         if (this -> debug) 
@@ -1263,7 +1266,7 @@ public:
             thread_slices[gpu].status       = ThreadSlice::Status::Inited;
             thread_slices[gpu].thread_Id = cutStartThread(
                 (CUT_THREADROUTINE)&(CCThread<
-                    AdvanceKernelPolity, FilterKernelPolicy,
+                    AdvanceKernelPolicy, FilterKernelPolicy,
                     CCEnactor<Problem> >),
                     (void*)&(thread_slices[gpu]));
             thread_Ids[gpu] = thread_slices[gpu].thread_Id;

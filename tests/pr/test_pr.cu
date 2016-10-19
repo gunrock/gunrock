@@ -116,7 +116,7 @@ void Usage()
         "[--iteration-num=<num>]   Number of runs to perform the test.\n"
         "[--max-iter=<num>]        Max iteration for rank score distribution\n"
         "                          before one round of PageRank run end.\n"
-        "[--partition_method=<random|biasrandom|clustered|metis>]\n"
+        "[--partition-method=<random|biasrandom|clustered|metis>]\n"
         "                          Choose partitioner (Default use random).\n"
         "[--delta=<delta>]         Delta for PageRank (Default 0.85f).\n"
         "[--error=<error>]         Error threshold for PageRank (Default 0.01f).\n"
@@ -651,33 +651,14 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     enactor -> makeout_latency     = makeout_latency;
 
     if (retval = util::SetDevice(gpu_idx[0])) return retval;
-    if (retval = util::latency::Test_BaseLine(
-        "communicate_latency", communicate_latency,
-        streams[0], problem -> data_slices[0] -> latency_data))
-        return retval;
-    if (communicate_multipy > 0)
-        printf("communicate_multipy\t = %.2fx\n",
-            communicate_multipy);
-
-    if (retval = util::latency::Test_BaseLine(
-        "expand_latency  ", expand_latency,
-        streams[0], problem -> data_slices[0] -> latency_data))
-        return retval;
-
-    if (retval = util::latency::Test_BaseLine(
-        "subqueue_latency", subqueue_latency,
-        streams[0], problem -> data_slices[0] -> latency_data))
-        return retval;
-
-    if (retval = util::latency::Test_BaseLine(
-        "fullqueue_latency", fullqueue_latency,
-        streams[0], problem -> data_slices[0] -> latency_data))
-        return retval;
-
-    if (retval = util::latency::Test_BaseLine(
-        "makeout_latency  ", makeout_latency,
-        streams[0], problem -> data_slices[0] -> latency_data))
-        return retval;
+    if (retval = util::latency::Test(
+        streams[0], problem -> data_slices[0] -> latency_data,
+        communicate_latency,
+        communicate_multipy,
+        expand_latency,
+        subqueue_latency,
+        fullqueue_latency,
+        makeout_latency)) return retval;
 
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
@@ -946,7 +927,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     // Clean up
-    if (org_size   ) { delete   org_size   ; org_size    = NULL; }
+    if (org_size   ) { delete[] org_size   ; org_size    = NULL; }
     if (enactor         )
     {
         if (retval = util::GRError(enactor -> Release(),
@@ -1107,19 +1088,19 @@ template <
     typename VertexId>
 int main_SizeT(CommandLineArgs *args)
 {
-// disabled to reduce compile time
-//    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-//        return main_Value<VertexId, long long>(args);
-//    else
+// can be disabled to reduce compile time
+    if (args -> CheckCmdLineFlag("64bit-SizeT") || sizeof(VertexId) > 4)
+        return main_Value<VertexId, long long>(args);
+    else
         return main_Value<VertexId, int      >(args);
 }
 
 int main_VertexId(CommandLineArgs *args)
 {
-    // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
-    //if (args -> CheckCmdLineFlag("64bit-VertexId"))
-    //    return main_SizeT<long long>(args);
-    //else
+    // can be disabled to reduce compile time
+    if (args -> CheckCmdLineFlag("64bit-VertexId"))
+        return main_SizeT<long long>(args);
+    else
         return main_SizeT<int      >(args);
 }
 

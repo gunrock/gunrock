@@ -211,7 +211,7 @@ public:
                      *graph_slice        = problem->graph_slices       [0];
         FrontierAttribute<SizeT>
                      *frontier_attribute = &this->frontier_attribute   [0];
-        EnactorStats *enactor_stats      = &this->enactor_stats        [0];
+        EnactorStats<SizeT> *enactor_stats      = &this->enactor_stats        [0];
         // Single-gpu graph slice
         typename Problem::DataSlice
                      *data_slice         =  problem->data_slices       [0];
@@ -219,7 +219,7 @@ public:
                      *d_data_slice       =  problem->d_data_slices     [0];
         util::DoubleBuffer<VertexId, SizeT, Value>
                      *frontier_queue     = &data_slice->frontier_queues[0];
-        util::CtaWorkProgressLifetime
+        util::CtaWorkProgressLifetime<SizeT>
                      *work_progress      = &this->work_progress        [0];
         cudaStream_t  stream             =  data_slice->streams        [0];
         ContextPtr    context            =  this -> context            [0];
@@ -268,9 +268,11 @@ public:
 
             // Edge Map
             gunrock::oprtr::advance::LaunchKernel
-                <AdvanceKernelPolicy, Problem, HForwardFunctor>(
+                <AdvanceKernelPolicy, Problem, HForwardFunctor, gunrock::oprtr::advance::V2E>(
                 enactor_stats[0],
                 frontier_attribute[0],
+                typename HForwardFunctor::LabelT(),
+                data_slice,
                 d_data_slice,
                 (VertexId*)NULL,
                 (bool*    )NULL,
@@ -288,8 +290,7 @@ public:
                 graph_slice->edges,
                 work_progress[0],
                 context[0],
-                stream,
-                gunrock::oprtr::advance::V2E);
+                stream);
 
             if (this -> debug)
             {
@@ -300,9 +301,11 @@ public:
 
             // Edge Map
             gunrock::oprtr::advance::LaunchKernel
-                <AdvanceKernelPolicy, Problem, AForwardFunctor>(
+                <AdvanceKernelPolicy, Problem, AForwardFunctor, gunrock::oprtr::advance::V2E>(
                 enactor_stats[0],
                 frontier_attribute[0],
+                typename AForwardFunctor::LabelT(),
+                data_slice,
                 d_data_slice,
                 (VertexId*)NULL,
                 (bool*    )NULL,
@@ -320,8 +323,7 @@ public:
                 graph_slice->edges,
                 work_progress[0],
                 context[0],
-                stream,
-                gunrock::oprtr::advance::V2E);
+                stream);
 
             if (this -> debug)
             {
@@ -349,9 +351,11 @@ public:
 
             // Edge Map
             gunrock::oprtr::advance::LaunchKernel
-                <AdvanceKernelPolicy, Problem, HBackwardFunctor>(
+                <AdvanceKernelPolicy, Problem, HBackwardFunctor, gunrock::oprtr::advance::E2V>(
                 enactor_stats[0],
                 frontier_attribute[0],
+                typename HBackwardFunctor::LabelT(),
+                data_slice,
                 d_data_slice,
                 (VertexId*)NULL,
                 (bool*    )NULL,
@@ -370,7 +374,6 @@ public:
                 work_progress[0],
                 context[0],
                 stream,
-                gunrock::oprtr::advance::E2V,
                 false,
                 true);
 
@@ -392,10 +395,11 @@ public:
 
             // Edge Map
             gunrock::oprtr::advance::LaunchKernel
-                <AdvanceKernelPolicy, Problem, ABackwardFunctor>(
-                //d_done,
+                <AdvanceKernelPolicy, Problem, ABackwardFunctor, gunrock::oprtr::advance::E2V>(
                 enactor_stats[0],
                 frontier_attribute[0],
+                typename ABackwardFunctor::LabelT(),
+                data_slice,
                 d_data_slice,
                 (VertexId*)NULL,
                 (bool*    )NULL,
@@ -414,7 +418,6 @@ public:
                 work_progress[0],
                 context[0],
                 stream,
-                gunrock::oprtr::advance::E2V,
                 false,
                 true);
 

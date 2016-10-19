@@ -1892,15 +1892,18 @@ public:
         for (int gpu=0;gpu<this->num_gpus;gpu++)
         {    
             if (retval = util::SetDevice(this->gpu_idx[gpu])) break;
-            cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
-            gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
-            if (retval = util::GRError(cudaBindTexture( 
-                0,
-                gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,
-                problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
-                ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
-                "BFSEnactor cudaBindTexture row_offsets_ref failed",
-                __FILE__, __LINE__)) break;
+            if (sizeof(SizeT) == 4)
+            {
+                cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
+                gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
+                if (retval = util::GRError(cudaBindTexture( 
+                    0,
+                    gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,
+                    problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
+                    ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
+                    "BFSEnactor cudaBindTexture row_offsets_ref failed",
+                    __FILE__, __LINE__)) break;
+            }
         }            
         if (retval) return retval;
 
@@ -2223,6 +2226,7 @@ public:
             else if (traversal_mode == "LB_LIGHT_CULL")
                  return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_LIGHT_CULL>
                     ::Init(*this, context, problem, max_grid_size);
+            else printf("Traversal mode %s is not supported by BC at the moment\n", traversal_mode.c_str());
         }
 
         //to reduce compile time, get rid of other architecture for now

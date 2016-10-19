@@ -19,7 +19,6 @@
 #include <gunrock/util/multithread_utils.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
-#include <gunrock/util/device_intrinsics.cuh>
 
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
@@ -128,7 +127,7 @@ struct LoadLabel<long long, SizeT>
     static __device__ __forceinline__ long long Load
         (long long *&d_labels, SizeT &pos)
     {
-        return __ldg(d_labels + pos);
+        return _ldg(d_labels + pos);
     }
 };
 
@@ -170,7 +169,7 @@ __global__ void Expand_Incoming_Kernel(
         //MaskT tex_mask_byte;
         if (x < num_elements)
         {
-            key = __ldg(d_keys_in + x);
+            key = _ldg(d_keys_in + x);
             if (KernelPolicy::Problem::ENABLE_IDEMPOTENCE)
             {
                 mask_pos = (key & KernelPolicy::LOAD_BALANCED_CULL::ELEMENT_ID_MASK) >> (2+sizeof(MaskT));
@@ -200,7 +199,7 @@ __global__ void Expand_Incoming_Kernel(
             //if (to_process)
             //{
             //    if (tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  key + 1) == tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,  key))
-                //if (__ldg(d_row_offsets + key) == __ldg(d_row_offsets + (key+1)))
+                //if (_ldg(d_row_offsets + key) == _ldg(d_row_offsets + (key+1)))
             //        to_process = false;
             //}
         } else to_process = false;
@@ -317,7 +316,7 @@ __global__ void From_Unvisited_Queue_IDEM(
                 if (key >= num_nodes) break;
 
                 //if (tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<VertexId>::labels, key) != util::MaxValue<VertexId>())
-                if (__ldg(d_labels + key) != util::MaxValue<VertexId>())
+                if (_ldg(d_labels + key) != util::MaxValue<VertexId>())
                 {
                     //to_process = false;
                     mask_byte |= mask_bit;
@@ -327,7 +326,7 @@ __global__ void From_Unvisited_Queue_IDEM(
                 //if (to_process)
                 { // only works for undirected graph
                     //if (tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets, key) == tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets, key+1)) to_process = false;
-                    if (__ldg(d_row_offsets + key) == __ldg(d_row_offsets + (key+1)))
+                    if (_ldg(d_row_offsets + key) == _ldg(d_row_offsets + (key+1)))
                         continue;
                 }
                 //if (to_process)
@@ -506,7 +505,7 @@ __global__ void Inverse_Expand(
 
         if (x < num_unvisited_vertices)
         {
-            key = __ldg(d_unvisited_key_in + x);
+            key = _ldg(d_unvisited_key_in + x);
         } else to_process = false;
 
         if (to_process && Problem::ENABLE_IDEMPOTENCE)
@@ -537,9 +536,9 @@ __global__ void Inverse_Expand(
         if (to_process)
         {
             SizeT edge_start = //tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets, key);
-                __ldg(d_inverse_row_offsets + key);
+                _ldg(d_inverse_row_offsets + key);
             SizeT edge_end = //tex1Dfetch(gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets, key+1);
-                __ldg(d_inverse_row_offsets + (key+1));
+                _ldg(d_inverse_row_offsets + (key+1));
             for (SizeT edge_id = edge_start; edge_id < edge_end; edge_id++)
             {
                 VertexId neighbor = d_inverse_column_indices[edge_id];
@@ -618,7 +617,7 @@ __global__ void Update_Mask_Kernel(
 
     while ( x < end_mask_pos)
     {
-        MaskT mask = __ldg(visited_masks + x);
+        MaskT mask = _ldg(visited_masks + x);
         VertexId v = (x << 3) * sizeof(MaskT);
         bool has_change = false;
         #pragma unroll
@@ -627,7 +626,7 @@ __global__ void Update_Mask_Kernel(
             MaskT mask_bit = 1 << i;
             if ((!(mask & mask_bit)) && (v < num_nodes))
             {
-                if (__ldg(labels + v) != util::MaxValue<VertexId>())
+                if (_ldg(labels + v) != util::MaxValue<VertexId>())
                 {
                     mask |= mask_bit;
                     has_change = true;
@@ -682,7 +681,7 @@ __global__ void Combind_Masks(
             {
                 MaskT in_mask = 0;
                 if (d_out_key_length[gpu] != 0)
-                    in_mask = __ldg(s_mask_ins[gpu] + x);
+                    in_mask = _ldg(s_mask_ins[gpu] + x);
                 //printf("(%d, %d) : in_mask = %#x\n", blockIdx.x, threadIdx.x, in_mask);
                 new_mask |= in_mask;
             }
@@ -698,7 +697,7 @@ __global__ void Combind_Masks(
                     MaskT mask_bit = 1 << i;
                     if ((update_mask & mask_bit) && (v < num_nodes))
                     {
-                        if (__ldg(d_partition_table + v) == 0)
+                        if (_ldg(d_partition_table + v) == 0)
                         {
                             l_vertices[l_vertex_counter] = v;
                             l_vertex_counter ++;

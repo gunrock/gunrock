@@ -33,6 +33,19 @@ namespace gunrock {
 namespace oprtr {
 namespace advance {
 
+// Steps for adding reduce:
+// fix block_dim=512/1024 and items_per_thread=7 or 11, make block number a variable
+// creating flag, value
+// flag comes from whether two threads' smem_storage.iter_input_start + v_index equal
+// value is sent in
+// load BlockScan with special reduce operation
+// __syncthreads()
+// block store
+// __syncthreads()
+// for each item and next per thread, if smem_storage.iter_input_start + v_index are different
+// atomicAdd/Min/Max item to global mem according to reduction type
+//
+
 /*
  * @brief Compute output frontier queue length.
  *
@@ -440,7 +453,6 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
     {
         cudaError_t retval = cudaSuccess;
         // load edge-expand-partitioned kernel
-        SizeT num_block = parameter -> frontier_attribute -> queue_length / LBPOLICY::THREADS + 1;
         if (parameter -> get_output_length)
         {
             if (retval = ComputeOutputLength(parameter))
@@ -454,6 +466,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB>
             //parameter -> frontier_attribute -> output_length[0] < LBPOLICY::LIGHT_EDGE_THRESHOLD)//)
             parameter -> frontier_attribute -> output_length[0] < 64 * 2 * LBPOLICY::THREADS)
         {
+            SizeT num_block = parameter -> frontier_attribute -> queue_length / LBPOLICY::SCRATCH_ELEMENTS + 1;
             //printf("using RelaxLightEdges\n");
             gunrock::oprtr::edge_map_partitioned::RelaxLightEdges
                 <LBPOLICY,
@@ -597,7 +610,7 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::LB_LIGHT>
         cudaError_t retval = cudaSuccess;
         // load edge-expand-partitioned kernel
         SizeT num_block = (parameter -> frontier_attribute -> queue_length +
-             LBPOLICY::THREADS - 1) / LBPOLICY::THREADS;
+             LBPOLICY::SCRATCH_ELEMENTS - 1) / LBPOLICY::SCRATCH_ELEMENTS;
 
         if (parameter -> get_output_length)
         {

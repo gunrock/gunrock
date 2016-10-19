@@ -76,10 +76,12 @@ void Usage()
         "[--instrumented]          Keep kernels statics [Default: Disable].\n"
         "                          total_queued, search_depth and barrier duty.\n"
         "                          (a relative indicator of load imbalance.)\n"
-        "[--src=<Vertex-ID|randomize|largestdegree>]\n"
+        "[--src=<Vertex-ID|largestdegree|randomize|randomize2|list>]\n"
         "                          Begins traversal from the source (Default: 0).\n"
-        "                          If randomize: from a random source vertex.\n"
         "                          If largestdegree: from largest degree vertex.\n"
+        "                          If randomize: from a random source vertex.\n"
+        "                          If randomize2: from a different random source vertex for each iteration.\n"
+        "                          If list: need to provide a source list through --source_list=n0,n1,...,nk\n"
         "[--quick]                 Skip the CPU reference validation process.\n"
         "[--mark-pred]             Keep both label info and predecessor info.\n"
         "[--disable-size-check]    Disable frontier queue size check.\n"
@@ -94,7 +96,7 @@ void Usage()
         "[--traversal-mode=<0|1>]  Set traversal strategy, 0 for Load-Balanced\n"
         "                          1 for Dynamic-Cooperative (Default: dynamic\n"
         "                          determine based on average degree).\n"
-        "[--partition_method=<random|biasrandom|clustered|metis>]\n"
+        "[--partition-method=<random|biasrandom|clustered|metis>]\n"
         "                          Choose partitioner (Default use random).\n"
         "[--quiet]                 No output (unless --json is specified).\n"
         "[--json]                  Output JSON-format statistics to STDOUT.\n"
@@ -332,7 +334,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
-    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
+    for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int(); 
 
     // TODO: remove after merge mgpu-cq
     ContextPtr   *context = (ContextPtr*)  info->context;
@@ -396,33 +398,14 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     enactor -> do_b                = do_b;
 
     if (retval = util::SetDevice(gpu_idx[0])) return retval;
-    if (retval = util::latency::Test_BaseLine(
-        "communicate_latency", communicate_latency, 
-        streams[0], problem -> data_slices[0] -> latency_data)) 
-        return retval;
-    if (communicate_multipy > 0)
-        printf("communicate_multipy\t = %.2fx\n",
-            communicate_multipy);
- 
-    if (retval = util::latency::Test_BaseLine(
-        "expand_latency  ", expand_latency, 
-        streams[0], problem -> data_slices[0] -> latency_data)) 
-        return retval;
-
-    if (retval = util::latency::Test_BaseLine(
-        "subqueue_latency", subqueue_latency, 
-        streams[0], problem -> data_slices[0] -> latency_data)) 
-        return retval;
-
-    if (retval = util::latency::Test_BaseLine(
-        "fullqueue_latency", fullqueue_latency, 
-        streams[0], problem -> data_slices[0] -> latency_data)) 
-        return retval;
-
-    if (retval = util::latency::Test_BaseLine(
-        "makeout_latency  ", makeout_latency, 
-        streams[0], problem -> data_slices[0] -> latency_data)) 
-        return retval;
+    if (retval = util::latency::Test(
+        streams[0], problem -> data_slices[0] -> latency_data,
+        communicate_latency,
+        communicate_multipy,
+        expand_latency,
+        subqueue_latency,
+        fullqueue_latency,
+        makeout_latency)) return retval;
 
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
@@ -442,6 +425,10 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     }
     if (!quiet_mode)
         printf("Using traversal-mode %s\n", traversal_mode.c_str());
+
+    json_spirit::mArray source_list;
+    if (src_type == "list")
+        source_list = info->info["source_list"].get_array();
     for (int iter = 0; iter < iterations; ++iter)
     {
         if (src_type == "random2")
@@ -452,6 +439,16 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 src = rand() % graph -> nodes;
                 if (graph -> row_offsets[src] != graph -> row_offsets[src+1])
                     src_valid = true;
+            }
+        } else if (src_type == "list")
+        {
+            if (source_list.size() == 0) 
+            {
+                if (!quiet_mode)
+                    printf("No source list found. Use 0 as source.\n");
+                src = 0;
+            } else {
+                src = source_list[iter].get_int();
             }
         }
 
@@ -881,7 +878,7 @@ template <
     typename VertexId>
 int main_SizeT(CommandLineArgs *args)
 {
-// disabled to reduce compile time
+// can be disabled to reduce compile time
     if (args -> CheckCmdLineFlag("64bit-SizeT") || sizeof(VertexId) > 4)
         return main_Value<VertexId, long long>(args);
     else
@@ -890,9 +887,17 @@ int main_SizeT(CommandLineArgs *args)
 
 int main_VertexId(CommandLineArgs *args)
 {
-// disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
+// can be disabled to reduce compile time
+// atomicMin(long long) is only available for compute capability 3.5 or higher
     if (args -> CheckCmdLineFlag("64bit-VertexId"))
+#if __GR_CUDA_ARCH__ <= 300
+    {
+        printf("64bit-VertexId disabled, because atomicMin(long long) is only supported by compute capability 3.5 or higher\n");
+        return 1;
+    }
+#else
         return main_SizeT<long long>(args);
+#endif
     else
         return main_SizeT<int      >(args);
 }

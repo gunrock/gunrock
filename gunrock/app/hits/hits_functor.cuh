@@ -28,10 +28,11 @@ namespace hits {
  * @tparam ProblemData         Problem data type which contains data slice for HITS problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT=VertexId>
 struct HUBFunctor
 {
-    typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Forward Edge Mapping condition function. Check if the destination node
@@ -45,7 +46,15 @@ struct HUBFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
         return true;
     }
@@ -61,11 +70,19 @@ struct HUBFunctor
      * @param[in] e_id output edge id
      * @param[in] e_id_in input edge id
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
-        Value val = (s_id == problem->src_node ? problem->delta/problem->out_degrees[s_id] : 0)
-                  + (1-problem->delta)*problem->arank_curr[d_id]/problem->in_degrees[d_id];
-        atomicAdd(&problem->hrank_next[s_id], val);
+        Value val = (s_id == d_data_slice->src_node ? d_data_slice->delta/d_data_slice->out_degrees[s_id] : 0)
+                  + (1-d_data_slice->delta)*d_data_slice->arank_curr[d_id]/d_data_slice->in_degrees[d_id];
+        atomicAdd(&d_data_slice->hrank_next[s_id], val);
     }
 
 };
@@ -78,10 +95,11 @@ struct HUBFunctor
  * @tparam ProblemData         Problem data type which contains data slice for HITS problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData, typename _LabelT=VertexId>
 struct AUTHFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Forward Edge Mapping condition function. Check if the destination node
@@ -95,7 +113,15 @@ struct AUTHFunctor
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
         return true;
     }
@@ -112,10 +138,18 @@ struct AUTHFunctor
      * @param[in] e_id_in input edge id
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
-        Value val = problem->hrank_curr[d_id]/ (problem->out_degrees[d_id] > 0 ? problem->out_degrees[d_id] : 1.0);
-        atomicAdd(&problem->arank_next[s_id], val);
+        Value val = d_data_slice->hrank_curr[d_id]/ (d_data_slice->out_degrees[d_id] > 0 ? d_data_slice->out_degrees[d_id] : 1.0);
+        atomicAdd(&d_data_slice->arank_next[s_id], val);
     }
 };
 

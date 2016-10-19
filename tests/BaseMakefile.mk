@@ -22,6 +22,8 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 # Gen targets
 #-------------------------------------------------------------------------------
 
+GEN_SM61 = -gencode=arch=compute_61,code=\"sm_61,compute_61\"
+GEN_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\"
 GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\"
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
@@ -43,7 +45,7 @@ BOOST_LIB_PATH = "/shared/apps/rhel-6.2/libs/boost-1.57/lib"
 #BOOST_DEPS = -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem
 BOOST_DEPS = -Xlinker $(BOOST_LIB_PATH)/libboost_system.a -Xlinker $(BOOST_LIB_PATH)/libboost_filesystem.a -Xlinker $(BOOST_LIB_PATH)/libboost_timer.a -Xlinker $(BOOST_LIB_PATH)/libboost_chrono.a #-lboost_timer -Xlinker -lboost_chrono
 OMP_DEPS = -Xcompiler -fopenmp -Xlinker -lgomp
-METIS_DEPS = -Xlinker -lmetis
+METIS_DEPS = -Xlinker -lmetis -Xcompiler -DMETIS_FOUND
 INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) -I.. -I../..
 
 #-------------------------------------------------------------------------------
@@ -65,7 +67,7 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo --std=c++11 -ccbin=g++
+NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo --std=c++11 #-ccbin=g++-4.8
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500

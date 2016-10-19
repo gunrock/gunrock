@@ -100,12 +100,12 @@ void Iteration_Loop(
                  *scanned_edges_       =   NULL;
     int           peer, peer_, peer__, gpu_, i, iteration_, wait_count;
     bool          over_sized;
-    int           communicate_latency  =   enactor -> communicate_latency;
+    SizeT         communicate_latency  =   enactor -> communicate_latency;
     float         communicate_multipy  =   enactor -> communicate_multipy;
-    int           expand_latency       =   enactor -> expand_latency;
-    int           subqueue_latency     =   enactor -> subqueue_latency;
-    int           fullqueue_latency    =   enactor -> fullqueue_latency;
-    int           makeout_latency      =   enactor -> makeout_latency;
+    SizeT         expand_latency       =   enactor -> expand_latency;
+    SizeT         subqueue_latency     =   enactor -> subqueue_latency;
+    SizeT         fullqueue_latency    =   enactor -> fullqueue_latency;
+    SizeT         makeout_latency      =   enactor -> makeout_latency;
 
     if (enactor -> debug)
     {
@@ -252,7 +252,9 @@ void Iteration_Loop(
 
                         if (expand_latency != 0)
                             util::latency::Insert_Latency(
-                            expand_latency, streams[peer_],
+                            expand_latency, 
+                            frontier_attribute_ -> queue_length,
+                            streams[peer_],
                             data_slice -> latency_data.GetPointer(util::DEVICE));
 
                         Iteration::template Expand_Incoming
@@ -294,7 +296,9 @@ void Iteration_Loop(
                     } else { //Push Neighbor
                         if (communicate_latency != 0)
                             util::latency::Insert_Latency(
-                            communicate_latency, streams[peer__],
+                            communicate_latency, 
+                            data_slice -> out_length[peer_],
+                            streams[peer__],
                             data_slice -> latency_data.GetPointer(util::DEVICE));
 
                         PushNeighbor <Enactor, GraphSliceT, DataSlice,
@@ -385,7 +389,9 @@ void Iteration_Loop(
                     }
                     if (subqueue_latency != 0)
                         util::latency::Insert_Latency(
-                        subqueue_latency, streams[peer_],
+                        subqueue_latency,
+                        frontier_attribute_ -> queue_length,
+                        streams[peer_],
                         data_slice -> latency_data.GetPointer(util::DEVICE));
 
                     Iteration::SubQueue_Core(
@@ -666,7 +672,9 @@ void Iteration_Loop(
 
                     if (fullqueue_latency != 0)
                         util::latency::Insert_Latency(
-                        fullqueue_latency, streams[peer_],
+                        fullqueue_latency, 
+                        frontier_attribute_ -> queue_length,
+                        streams[peer_],
                         data_slice -> latency_data.GetPointer(util::DEVICE));
 
                     Iteration::FullQueue_Core(
@@ -752,7 +760,8 @@ void Iteration_Loop(
 
                 if (makeout_latency != 0)
                     util::latency::Insert_Latency(
-                    makeout_latency, streams[0],
+                    makeout_latency, Total_Length,
+                    streams[0],
                     data_slice -> latency_data.GetPointer(util::DEVICE));
 
                 Iteration::template Make_Output <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES> (

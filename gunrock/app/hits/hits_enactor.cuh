@@ -14,18 +14,18 @@
 
 #pragma once
 
+#include <thread>
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
-
+#include <gunrock/util/sort_utils.cuh>
+#include <gunrock/util/sharedmem.cuh>
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel_policy.cuh>
-
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/hits/hits_problem.cuh>
 #include <gunrock/app/hits/hits_functor.cuh>
-
 #include <moderngpu.cuh>
 
 using namespace mgpu;
@@ -206,7 +206,7 @@ public:
                      *graph_slice        = problem->graph_slices       [0];
         FrontierAttribute<SizeT>
                      *frontier_attribute = &this->frontier_attribute   [0];
-        EnactorStats *enactor_stats      = &this->enactor_stats        [0];
+        EnactorStats<SizeT> *enactor_stats      = &this->enactor_stats        [0];
         // Single-gpu graph slice
         typename Problem::DataSlice
                      *data_slice         =  problem->data_slices       [0];
@@ -214,7 +214,7 @@ public:
                      *d_data_slice       =  problem->d_data_slices     [0];
         util::DoubleBuffer<VertexId, SizeT, Value>
                      *frontier_queue     = &data_slice->frontier_queues[0];
-        util::CtaWorkProgressLifetime
+        util::CtaWorkProgressLifetime<SizeT>
                      *work_progress      = &this->work_progress        [0];
         cudaStream_t  stream             =  data_slice->streams        [0];
         ContextPtr    context            =  this -> context            [0];
@@ -249,9 +249,11 @@ public:
                 //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], edge_map_queue_len);
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, AuthFunctor>(
+                    <AdvanceKernelPolicy, Problem, AuthFunctor, gunrock::oprtr::advance::V2V>(
                     enactor_stats[0],
                     frontier_attribute[0],
+                    typename AuthFunctor::LabelT(),
+                    data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*    )NULL,
@@ -269,11 +271,7 @@ public:
                     graph_slice->edges,//graph_slice->frontier_elements[frontier_attribute.selector^1],                 // max_out_queue
                     work_progress[0],
                     context[0],
-                    stream,
-                    gunrock::oprtr::advance::V2V,
-                    false,
-                    false,
-                    true);
+                    stream);
 
                 if (this -> debug)
                 {
@@ -288,10 +286,11 @@ public:
                 //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], edge_map_queue_len);
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, HubFunctor>(
-                    //d_done,
+                    <AdvanceKernelPolicy, Problem, HubFunctor, gunrock::oprtr::advance::V2V>(
                     enactor_stats[0],
                     frontier_attribute[0],
+                    typename HubFunctor::LabelT(),
+                    data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*    )NULL,
@@ -309,11 +308,7 @@ public:
                     graph_slice->edges,//graph_slice->frontier_elements[frontier_attribute.selector^1],                 // max_out_queue
                     work_progress[0],
                     context[0],
-                    stream,
-                    gunrock::oprtr::advance::V2V,
-                    false,
-                    false,
-                    true);
+                    stream);
 
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next,graph_slice->nodes);
 

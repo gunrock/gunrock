@@ -72,21 +72,22 @@ struct KernelPolicy
         LIGHT_EDGE_THRESHOLD            = _LIGHT_EDGE_THRESHOLD,
     };
 
+    enum {
+        // Amount of storage we can use for hashing scratch space under target occupancy
+        //MAX_SCRATCH_BYTES_PER_CTA       = (GR_SMEM_BYTES(CUDA_ARCH) / _MIN_CTA_OCCUPANCY)
+        //                                    - 128,                                          // Fudge-factor to guarantee occupancy
+
+        //SCRATCH_ELEMENT_SIZE            = sizeof(SizeT) * 2 + sizeof(VertexId) * 2,
+
+        SCRATCH_ELEMENTS                 = 256, //(THREADS > MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE) ? MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE : THREADS,
+    };
+
+
     /**
      * @brief Shared memory storage type for the CTA
      */
     struct SmemStorage
     {
-        enum {
-            // Amount of storage we can use for hashing scratch space under target occupancy
-            MAX_SCRATCH_BYTES_PER_CTA       = (GR_SMEM_BYTES(CUDA_ARCH) / _MIN_CTA_OCCUPANCY)
-                                                - 128,                                          // Fudge-factor to guarantee occupancy
-
-            SCRATCH_ELEMENT_SIZE            = sizeof(SizeT) * 2 + sizeof(VertexId) * 2,
-
-            SCRATCH_ELEMENTS                 = (THREADS > MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE) ? MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE : THREADS,
-        };
-
         // Scratch elements
         struct {
             SizeT                       output_offset[SCRATCH_ELEMENTS];

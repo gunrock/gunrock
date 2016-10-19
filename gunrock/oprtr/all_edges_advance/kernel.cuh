@@ -14,6 +14,7 @@
  */
 
 #pragma once
+#include <gunrock/util/device_intrinsics.cuh>
 
 #include <gunrock/oprtr/edge_map_partitioned/cta.cuh>
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
@@ -78,7 +79,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             SizeT mid_point = (lower_bound + upper_bound) >> 1;
             //printf("(%d, %d) looking for %d, current range [%d, %d], mid_point = %d\n",
             //    blockIdx.x, threadIdx.x, item_to_find, lower_bound, upper_bound, data[mid_point]);
-            if (__ldg(data + mid_point) < item_to_find)
+            if (_ldg(data + mid_point) < item_to_find)
                 lower_bound = mid_point + 1;
             else upper_bound = mid_point;
         }
@@ -87,7 +88,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         if (upper_bound == lower_bound)
         {
             /*if (data[upper_bound] == item_to_find) retval = upper_bound;
-            else*/ if (item_to_find < __ldg(data + upper_bound)) retval = upper_bound -1;
+            else*/ if (item_to_find < _ldg(data + upper_bound)) retval = upper_bound -1;
             else retval = upper_bound;
         } else retval = util::InvalidValue<SizeT>();
 
@@ -139,7 +140,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             if (x < input_queue_length)
             {
                 edge_id = (d_edges_in == NULL) ? x : d_edges_in[x];
-                des = __ldg(d_column_indices + edge_id);
+                des = _ldg(d_column_indices + edge_id);
                 src = Binary_Search(d_row_offsets, edge_id, 0, nodes);
 
                 //printf("(%d, %d) : Edge %d, %d -> %d, input_queue_len = %d\n",

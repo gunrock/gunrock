@@ -1,9 +1,22 @@
 #!/bin/bash
 
-OPTION="--iteration-num=10 --in-sizing=1.1 --partition-method=random --quick"
-MARK=".32bitSizeT"
-EXECUTION="./bin/test_cc_7.5_x86_64"
-DATADIR="../../dataset/large"
+BASEOPTION="--iteration-num=16 --in-sizing=1.1"
+BASEFLAG=""
+EXECUTION="./bin/test_cc_8.0_x86_64"
+DATADIR="/data/graphs/large"
+
+OPTION[0]="" && FLAG[0]=".default"
+OPTION[1]=" --undirected" && FLAG[1]=".undir"
+
+OPTION[8]="" && FLAG[8]=".32bit_SizeT"
+OPTION[9]=" --64bit-SizeT" && FLAG[9]=".64bit_SizeT"
+#OPTION[10]=" --64bit-VertexId" && FLAG[10]=".64bit_VertexId"
+
+OPTION[11]="" && FLAG[11]=".DEF"
+OPTION[12]=" --traversal-mode=LB" && FLAG[12]=".LB"
+OPTION[13]=" --traversal-mode=TWC" && FLAG[13]=".TWC"
+OPTION[14]=" --traversal-mode=LB_LIGHT" && FLAG[14]=".LB_LIGHT"
+OPTION[15]=" --traversal-mode=ALL_EDGES" && FLAG[15]=".ALL_EDGES"
 
 NAME[ 0]="soc-twitter-2010"
 NAME[ 1]="hollywood-2009"
@@ -21,11 +34,11 @@ NAME[12]="germany_osm"
 NAME[13]="road_usa"
 NAME[14]="road_central"
 
-cd ~/Projects/gunrock_dev/gunrock/tests/cc
+# cd ~/Projects/gunrock_dev/gunrock/tests/cc
 
-for d in {3..6}
+for d in {1..1}
 do
-    SUFFIX="CentOS6_6.k40cx${d}.rand"
+    SUFFIX="CentOS7.GTX1070x${d}"
     mkdir -p eval/$SUFFIX
     DEVICE="0"
     for i in {1..8}
@@ -35,11 +48,16 @@ do
         fi
     done
 
-    for i in {0..9}
+    for o1 in {0..1}; do for o2 in {8..9}; do for o3 in {11..15}; do
+
+    OPTIONS=${BASEOPTION}${OPTION[${o1}]}${OPTION[${o2}]}${OPTION[${o3}]}
+    FLAGS=${BASEFLAG}${FLAG[${o1}]}${FLAG[${o2}]}${FLAG[${o3}]}
+    for i in {0..14}
     do
-        echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTION --device=$DEVICE --jsondir=./eval/$SUFFIX "> ./eval/$SUFFIX/${NAME[$i]}${MARK}.txt"
-             $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTION --device=$DEVICE --jsondir=./eval/$SUFFIX > ./eval/$SUFFIX/${NAME[$i]}${MARK}.txt
+        echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTIONS --device=$DEVICE --jsondir=./eval/$SUFFIX "> ./eval/$SUFFIX/${NAME[$i]}${FLAGS}.txt"
+             $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTIONS --device=$DEVICE --jsondir=./eval/$SUFFIX > ./eval/$SUFFIX/${NAME[$i]}${FLAGS}.txt
         sleep 1
     done
+    done; done; done
 done
 

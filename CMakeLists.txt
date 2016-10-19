@@ -5,113 +5,60 @@ set(gunrock_VERSION_MINOR 3)
 set(gunrock_VERSION_PATCH 0)
 add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MINOR}.${gunrock_VERSION_PATCH}")
 
-set(gunrock_REQUIRED_CUDA_VERSION 7.5)
-set(gunrock_REQUIRED_BOOST_VERSION 1.56)
-set(gunrock_REQUIRED_METIS_VERSION 5.0)
-
 cmake_minimum_required(VERSION 2.8)
+
+# begin /* Added make check target to improve ctest command */
+add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure)
+# end /* Added make check target to improve ctest command */
+
+# begin /* Suppress "deprecated auto_ptr" warnings caused by moderngpu */
+option(WARNING_DEP_FLAG "Deprecated declarations warning flag." OFF)
+if (WARNING_DEP_FLAG)
+  # moderngpu will give auto_ptr warning.
+else (WARNING_DEP_FLAG)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-deprecated-declarations")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
+  add_definitions ("-Wno-deprecated-declarations")
+endif (WARNING_DEP_FLAG)
+# end /* Suppress "deprecated auto_ptr" warnings caused by moderngpu */
 
 option(CMAKE_VERBOSE_MAKEFILE ON)
 
+# begin /* Find and set CUDA arch */
+set(gunrock_REQUIRED_CUDA_VERSION 7.5)
 FIND_PACKAGE(CUDA ${gunrock_REQUIRED_CUDA_VERSION} REQUIRED)
-
 if(CUDA_64_BIT_DEVICE_CODE)
   set(gunrock_arch_suffix x86_64)
 else()
   set(gunrock_arch_suffix i386)
 endif()
+# end /* Find and set CUDA arch */
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-
-FIND_PACKAGE(Boost ${gunrock_REQUIRED_BOOST_VERSION}
-  REQUIRED system filesystem timer chrono)
-if (Boost_FOUND)
-  include_directories(${Boost_INCLUDE_DIRS})
-  link_directories(${Boost_LIBRARY_DIRS})
-else()
-  message(WARNING "Boost was requested but support was not found, run
-  `sudo apt-get install libboost1.58-all-dev` `/dep/install_boost.sh` for installation.")
-endif ()
-
-FIND_LIBRARY(METIS_LIB NAMES metis)
-FIND_PACKAGE(Metis ${gunrock_REQUIRED_METIS_VERSION} REQUIRED)
-SET(METIS_FOUND FALSE)
-if (METIS_LIB)
-  set(METIS_FOUND TRUE)
-  add_definitions( -DMETIS_FOUND=TRUE )
-  message(STATUS "Found Metis")
-else (METIS_LIB)
-  add_definitions( -DMETIS_FOUND=FALSE )
-  message(WARNING "Metis was requested but support was not found,
-  run `sudo apt-get install metis` or `/dep/install_metis.sh` for installation.")
-endif (METIS_LIB)
-
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  # also see how to do overrides:
-  # https://gist.github.com/robertmaynard/11297565
-
-  # updated for CUDA 7, which uses libc++ rather than libstdc++
-  # older settings: check the git history
-  set(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} 	 /opt/local/lib /opt/local/lib/libomp)
-  set(CMAKE_INCLUDE_PATH ${CMAKE_INCLUDE_PATH} 	 /opt/local/include /opt/local/include/libomp)
-
-  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-
-    #added for OpenMP on OS X using Macports
-    FIND_PATH(OPENMP_INCLUDE omp.h PATHS ${CMAKE_INCLUDE_PATH})
-    FIND_LIBRARY(OPENMP_LIB NAMES libgomp.dylib libomp.dylib libiomp5.dylib PATHS ${CMAKE_LIBRARY_PATH})
-    if (OPENMP_INCLUDE OR OPENMP_LIB)
-
-      link_directories("/opt/local/lib" "/opt/local/lib/libomp")
-      include_directories("/opt/local/include" "/opt/local/include/libomp")
-
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-      message(STATUS "Found OpenMP (-libomp)")
-    else()
-      message(WARNING "OpenMP (-libomp) was requested but support was not found")
-    endif(OPENMP_INCLUDE OR OPENMP_LIB)
-
-  endif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-
-else()
-
-  #added for OpenMP on Linux
-  FIND_PACKAGE(OpenMP)
-  if(OPENMP_FOUND)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    message(STATUS "Found OpenMP")
-  else()
-    message(WARNING "OpenMP was requested but support was not found")
-  endif()
-endif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+# begin /* Include Boost, OpenMP & Metis */
+include(${CMAKE_SOURCE_DIR}/cmake/FindBoostHeaders.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/FindBoost.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/FindOpenMP.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/FindMetis.cmake)
+# end /* Include Boost, OpenMP & Metis */
 
 # begin /* How can I pass git SHA1 to compiler as definition using cmake? */
 # http://stackoverflow.com/questions/1435953/how-can-i-pass-git-sha1-to-compiler-as-definition-using-cmake/4318642#4318642
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 include(GetGitRevisionDescription)
 get_git_head_revision(GIT_REFSPEC GIT_SHA1)
 # end /* How can I pass git SHA1 to compiler as definition using cmake? */
 
+# begin /* Include gunrock directories ./ */
 set(gunrock_INCLUDE_DIRS
   ${CMAKE_SOURCE_DIR})
 include_directories(${gunrock_INCLUDE_DIRS})
+# end /* Include gunrock directories ./ */
 
-set(mgpu_INCLUDE_DIRS
-  ${CMAKE_SOURCE_DIR}/externals/moderngpu/include
-  CACHE PATH
-  "Directory to the Modern GPU include files")
-
-set(mgpu_SOURCE_DIRS
-  ${CMAKE_SOURCE_DIR}/externals/moderngpu/src
-  CACHE PATH
-  "Directory to the Modern GPU source files")
-
-set(cub_INCLUDE_DIRS
-  ${CMAKE_SOURCE_DIR}/externals/cub
-  CACHE PATH
-  "Directory to the CUB include files")
+# begin /* Include moderngpu & cub */
+include(${CMAKE_SOURCE_DIR}/cmake/FindModernGPU.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/FindCUB.cmake)
+# end /* Include moderngpu & cub */
 
 ## Set the directory where the binaries will be stored
 set(EXECUTABLE_OUTPUT_PATH
@@ -125,6 +72,7 @@ set(LIBRARY_OUTPUT_PATH
   CACHE PATH
   "Directory where all the libraries will be stored")
 
+# begin /* SET GENCODE_SM */
 set(GENCODE_SM10
   -gencode=arch=compute_10,code=sm_10 -gencode=arch=compute_10,code=compute_10)
 set(GENCODE_SM13
@@ -139,9 +87,12 @@ set(GENCODE_SM37
   -gencode=arch=compute_37,code=sm_37 -gencode=arch=compute_37,code=compute_37)
 set(GENCODE_SM50
   -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_50,code=compute_50)
-
+set(GENCODE_SM61
+  -gencode=arch=compute_61,code=sm_61 -gencode=arch=compute_61,code=compute_61)
 #set(GENCODE -gencode=arch=compute_10,code=compute_10) # at least generate PTX
+# end /* SET GENCODE_SM */
 
+# begin /* Configure GUNROCK build options */
 option(GUNROCK_BUILD_LIB
   "On to build library"
   ON)
@@ -153,6 +104,50 @@ option(GUNROCK_BUILD_SHARED_LIBS
 option(GUNROCK_BUILD_APPLICATIONS
   "If on, builds the sample applications."
   ON)
+
+option(GUNROCK_APP_BC
+  "If on, builds only BC application."
+  OFF)
+
+option(GUNROCK_APP_BFS
+  "If on, builds only BFS application."
+  OFF)
+
+option(GUNROCK_APP_CC
+  "If on, builds only CC application."
+  OFF)
+
+option(GUNROCK_APP_PR
+  "If on, builds only PR application."
+  OFF)
+
+option(GUNROCK_APP_SSSP
+  "If on, builds only SSSP application."
+  OFF)
+
+option(GUNROCK_APP_HITS
+  "If on, builds only HITS application."
+  OFF)
+
+option(GUNROCK_APP_SALSA
+  "If on, builds only SALSA application."
+  OFF)
+
+option(GUNROCK_APP_WTF
+  "If on, builds only WTF application."
+  OFF)
+
+option(GUNROCK_APP_TOPK
+  "If on, builds only TOPK application."
+  OFF)
+
+#option(GUNROCK_APP_SAMPLE
+#  "If on, builds only SAMPLE application."
+#  OFF)
+
+option(GUNROCK_MGPU_TESTS
+  "If on, tests multi GPU primitives with ctest"
+  OFF)
 
 option(GUNROCK_GENCODE_SM10
   "ON to generate code for Compute Capability 1.0 devices (e.g. Tesla C870)"
@@ -172,7 +167,7 @@ option(GUNROCK_GENCODE_SM30
 
 option(GUNROCK_GENCODE_SM35
   "ON to generate code for Compute Capability 3.5 devices (e.g. Tesla K20)"
-  OFF)
+  ON)
 
 option(GUNROCK_GENCODE_SM37
   "ON to generate code for Compute Capability 3.7 devices (e.g. Tesla K80)"
@@ -180,6 +175,10 @@ option(GUNROCK_GENCODE_SM37
 
 option(GUNROCK_GENCODE_SM50
   "ON to generate code for Compute Capability 5.0 devices (e.g. GeForce GTX 750 TI)"
+  OFF)
+
+option(GUNROCK_GENCODE_SM61
+  "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
   OFF)
 
 option(CUDA_VERBOSE_PTXAS
@@ -214,9 +213,14 @@ if (GUNROCK_GENCODE_SM50)
   set(GENCODE ${GENCODE} ${GENCODE_SM50})
 endif(GUNROCK_GENCODE_SM50)
 
+if (GUNROCK_GENCODE_SM61)
+  set(GENCODE ${GENCODE} ${GENCODE_SM61})
+endif(GUNROCK_GENCODE_SM61)
+
 if (CUDA_VERBOSE_PTXAS)
   set(VERBOSE_PTXAS --ptxas-options=-v)
 endif (CUDA_VERBOSE_PTXAS)
+# end /* Configure GUNROCK build options */
 
 # c++11 is required
 set(CUDA_NVCC_FLAGS -std=c++11)
@@ -240,6 +244,7 @@ if(GUNROCK_BUILD_LIB)
   add_subdirectory(gunrock)
 endif(GUNROCK_BUILD_LIB)
 
+# begin /* Add premitives' subdirectories */
 if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(shared_lib_tests)
   #add_subdirectory(simple_example)
@@ -248,52 +253,86 @@ if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(tests/cc)
   add_subdirectory(tests/pr)
   add_subdirectory(tests/sssp)
-  add_subdirectory(tests/dobfs)
   add_subdirectory(tests/hits)
   add_subdirectory(tests/salsa)
-  add_subdirectory(tests/mst)
   add_subdirectory(tests/wtf)
   add_subdirectory(tests/topk)
   #add_subdirectory(tests/template)
   #add_subdirectory(tests/vis)
   #add_subdirectory(tests/mis)
-endif(GUNROCK_BUILD_APPLICATIONS)
 
+# Individual options to build specific applications
+else(GUNROCK_BUILD_APPLICATIONS)
+  if(GUNROCK_APP_BC)
+    add_subdirectory(tests/bc)
+  endif(GUNROCK_APP_BC)
+
+  if(GUNROCK_APP_BFS)
+    add_subdirectory(tests/bfs)
+  endif(GUNROCK_APP_BFS)
+
+  if(GUNROCK_APP_CC)
+    add_subdirectory(tests/cc)
+  endif(GUNROCK_APP_CC)
+
+  if(GUNROCK_APP_PR)
+    add_subdirectory(tests/pr)
+  endif(GUNROCK_APP_PR)
+
+  if(GUNROCK_APP_SSSP)
+    add_subdirectory(tests/sssp)
+  endif(GUNROCK_APP_SSSP)
+
+  if(GUNROCK_APP_HITS)
+    add_subdirectory(tests/hits)
+  endif(GUNROCK_APP_HITS)
+
+  if(GUNROCK_APP_SALSA)
+    add_subdirectory(tests/salsa)
+  endif(GUNROCK_APP_SALSA)
+
+  if(GUNROCK_APP_WTF)
+    add_subdirectory(tests/wtf)
+  endif(GUNROCK_APP_WTF)
+
+  if(GUNROCK_APP_TOPK)
+    add_subdirectory(tests/topk)
+  endif(GUNROCK_APP_TOPK)
+
+  # if(GUNROCK_APP_SAMPLE)
+  #   add_subdirectory(tests/sample)
+  # endif(GUNROCK_APP_SAMPLE)
+
+endif(GUNROCK_BUILD_APPLICATIONS)
+# end /* Add premitives' subdirectories */
+
+# begin /* Enable Testing for `ctest` */
 enable_testing()
 
 ### primitive tests with bips98_606 graph
-add_test(NAME TEST_BFS COMMAND breadth_first_search market
+add_test(NAME TEST_BFS COMMAND bfs market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
 set_tests_properties(TEST_BFS PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
-add_test(NAME TEST_BC COMMAND betweenness_centrality market
+add_test(NAME TEST_BC COMMAND bc market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
 set_tests_properties(TEST_BC PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
-add_test(NAME TEST_CC COMMAND connected_component market
+add_test(NAME TEST_CC COMMAND cc market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx)
 set_tests_properties(TEST_CC PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
-add_test(NAME TEST_SSSP COMMAND single_source_shortest_path market
+add_test(NAME TEST_SSSP COMMAND sssp market
   ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx --undirected --src=0)
 set_tests_properties(TEST_SSSP PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
-add_test(NAME TEST_PAGERANK COMMAND pagerank market
+add_test(NAME TEST_PAGERANK COMMAND pr market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
 set_tests_properties(TEST_PAGERANK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
-add_test(NAME TEST_DOBFS COMMAND direction_optimizing_bfs market
-  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected --src=0)
-set_tests_properties(TEST_DOBFS PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
-
-add_test(NAME TEST_TOPK COMMAND degree_centrality market
+add_test(NAME TEST_TOPK COMMAND topk market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
 set_tests_properties(TEST_TOPK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
-
-# bips98_606.mtx is not fully-connected graph so use largest small graph instead
-add_test(NAME TEST_MST COMMAND minimum_spanning_tree market
-  ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx)
-set_tests_properties(TEST_MST PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
 ### shared library application interface tests
 add_test(NAME SHARED_LIB_TEST_BFS COMMAND shared_lib_bfs)
@@ -316,13 +355,51 @@ add_test(NAME SHARED_LIB_TEST_PAGERANK COMMAND shared_lib_pr)
 set_tests_properties(SHARED_LIB_TEST_PAGERANK
   PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*2.*: Score.*1.2*")
 
-#add_test(NAME SimpleExample COMMAND simple_example market
+# note: Some premitives are not added as test because they don't have
+#	cpu reference code.
+
+# add_test(NAME SimpleExample COMMAND simple_example market
 #    data/simple_example/bips98_606.mtx)
-#set_tests_properties(SimpleExample
+# set_tests_properties(SimpleExample
 #    PROPERTIES PASS_REGULAR_EXPRESSION "TEST PASSED")
 
-#add_test(NAME TestBFS COMMAND test_bfs market
+# add_test(NAME TestBFS COMMAND test_bfs market
 #    data/simple_example/bips98_606.mtx --src=largestdegree)
-#set_tests_properties(TestBFS
+# set_tests_properties(TestBFS
 #    PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
+if(GUNROCK_MGPU_TESTS)
+  if(DEFINED DEVICES)
+ 	   set(DEVICES "--device=${DEVICES}")
+  else(DEFINED DEVICES)
+	   message(WARNING "GUNROCK_MGPU_TESTS was set ON, but devices were not specified. Using `-DDEVICES=0,0` (default).")
+  	 set(DEVICES "--device=0,0")
+  endif(DEFINED DEVICES)
+
+  add_test(NAME TEST_MGPU_BFS COMMAND bfs market
+    ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected --src=0)
+  set_tests_properties(TEST_BFS PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+  # add_test(NAME TEST_MGPU_BC COMMAND bc market
+  #  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected --src=0)
+  # set_tests_properties(TEST_BC PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+  add_test(NAME TEST_MGPU_CC COMMAND cc market
+    ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES})
+  set_tests_properties(TEST_CC PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+  add_test(NAME TEST_MGPU_SSSP COMMAND sssp market
+    ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx ${DEVICES} --undirected --src=0)
+  set_tests_properties(TEST_SSSP PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+  add_test(NAME TEST_MGPU_PR COMMAND pr market
+    ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
+  set_tests_properties(TEST_PAGERANK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+  # add_test(NAME TEST_MGPU_TOPK COMMAND topk market
+  #  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
+  # set_tests_properties(TEST_TOPK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+ endif(GUNROCK_MGPU_TESTS)
+
+# end /* Enable Testing for `ctest` */

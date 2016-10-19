@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/app/cc/cc_problem.cuh>
+#include <gunrock/util/device_intrinsics.cuh>
 
 namespace gunrock {
 namespace app {
@@ -253,10 +254,10 @@ struct HookMinFunctor {
             VertexId to_node;
             util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
                 from_node, d_data_slice->froms + node);
-            //from_node = __ldg(d_data_slice -> froms + node);
+            //from_node = _ldg(d_data_slice -> froms + node);
             util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
                 to_node, d_data_slice->tos + node);
-            //to_node = __ldg(d_data_slice -> tos + node);
+            //to_node = _ldg(d_data_slice -> tos + node);
             VertexId parent_from;
             VertexId parent_to;
             util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
@@ -343,18 +344,18 @@ struct HookMaxFunctor {
             VertexId to_node;
             util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
                 from_node, d_data_slice->froms + node);
-            //from_node = __ldg(d_data_slice -> froms + node);
+            //from_node = _ldg(d_data_slice -> froms + node);
             util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
                 to_node, d_data_slice->tos + node);
-            //to_node = __ldg(d_data_slice -> tos + node);
+            //to_node = _ldg(d_data_slice -> tos + node);
             VertexId parent_from;
             VertexId parent_to;
             //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
             //    parent_from, d_data_slice -> component_ids + from_node);
-            parent_from = __ldg(d_data_slice -> component_ids + from_node);
+            parent_from = _ldg(d_data_slice -> component_ids + from_node);
             //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
             //    parent_to  , d_data_slice -> component_ids + to_node);
-            parent_to = __ldg(d_data_slice -> component_ids + to_node);
+            parent_to = _ldg(d_data_slice -> component_ids + to_node);
             //VertexId max_node = parent_from > parent_to ? parent_from : parent_to;
             //VertexId min_node = parent_from + parent_to - max_node;
             //if (max_node == min_node) 
@@ -405,7 +406,7 @@ struct HookMaxFunctor {
         util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
             mark, d_data_slice -> marks + edge_id);
         if (mark) return false;
-        //if (__ldg(d_data_slice -> marks + edge_id)) return false;
+        //if (_ldg(d_data_slice -> marks + edge_id)) return false;
 
         //VertexId from_node; = s_id
         //VertexId to_node; = d_id
@@ -516,11 +517,11 @@ struct PtrJumpFunctor {
         VertexId parent;
         //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
         //    parent, d_data_slice -> component_ids + node);
-        parent = __ldg(d_data_slice -> component_ids + node);
+        parent = _ldg(d_data_slice -> component_ids + node);
         VertexId grand_parent;
         //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
         //    grand_parent, d_data_slice -> component_ids + parent);
-        grand_parent = __ldg(d_data_slice -> component_ids + parent);
+        grand_parent = _ldg(d_data_slice -> component_ids + parent);
         if (parent != grand_parent) {
             util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
                 0, d_data_slice ->vertex_flag + 0);

@@ -150,6 +150,7 @@ __global__ void Rmat_Kernel(
     }
 }
 
+template <typename SizeT>
 __global__ void Rand_Init(
     unsigned int seed,
     curandState *d_states)
@@ -245,6 +246,7 @@ cudaError_t BuildRmatGraph(
         if (retval = rand_states[gpu].Allocate(block_size * grid_size, util::DEVICE))
             return retval;
         Rand_Init
+            <SizeT>
             <<<grid_size, block_size, 0, streams[gpu]>>>
             (seed_, rand_states[gpu].GetPointer(util::DEVICE));
 
@@ -389,6 +391,7 @@ cudaError_t BuildMetaRmatGraph(
         if (retval = rand_states[gpu].Allocate(block_size * grid_size, util::DEVICE))
             return retval;
         Rand_Init
+            <SizeT>
             <<<grid_size, block_size, 0, streams[gpu]>>>
             (seed_, rand_states[gpu].GetPointer(util::DEVICE));
 

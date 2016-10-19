@@ -5,11 +5,11 @@ MARK=".32bitSizeT"
 EXECUTION="./bin/test_cc_7.5_x86_64"
 DATADIR="../../dataset/large"
 
-cd ~/Projects/gunrock_dev/gunrock/tests/cc
+# cd ~/Projects/gunrock_dev/gunrock/tests/cc
 
-for d in {1..6}
+for d in {2..3}
 do
-    SUFFIX="CentOS6_6.k40cx${d}.rand"
+    SUFFIX="ubuntu14_04.k40cx${d}.rand"
     mkdir -p eval/$SUFFIX
     DEVICE="0"
     for i in {1..8}

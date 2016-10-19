@@ -721,7 +721,7 @@ struct SSSPIteration : public IterationBase <
                     over_sized, thread_num, iteration, peer_, false)) return;
             if (enactor_stats->retval =
                 Check_Size</*true,*/ SizeT, VertexId > (
-                    true, "queue3", graph_slice->nodes+2,
+                    true, "queue3", graph_slice->nodes * 1.2 + 2,
                     &frontier_queue->keys  [selector  ],
                     over_sized, thread_num, iteration, peer_, true )) return;
             if (enactor -> problem -> use_double_buffer)
@@ -733,7 +733,7 @@ struct SSSPIteration : public IterationBase <
                         over_sized, thread_num, iteration, peer_, false)) return;
                 if (enactor_stats->retval =
                     Check_Size</*true,*/ SizeT, Value> (
-                        true, "queue3", graph_slice->nodes+2,
+                        true, "queue3", graph_slice->nodes * 1.2 + 2,
                         &frontier_queue->values[selector  ],
                         over_sized, thread_num, iteration, peer_, true )) return;
             }
@@ -959,15 +959,18 @@ public:
                     "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
             }*/
 
-            cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
-            gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
-            if (retval = util::GRError(cudaBindTexture(
-                0,
-                gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,
-                problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
-                ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
-                "BFSEnactor cudaBindTexture row_offsets_ref failed",
-                __FILE__, __LINE__)) break;
+            if (sizeof(SizeT) == 4)
+            {
+                cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
+                gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
+                if (retval = util::GRError(cudaBindTexture(
+                    0,
+                    gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,
+                    problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
+                    ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
+                    "BFSEnactor cudaBindTexture row_offsets_ref failed",
+                    __FILE__, __LINE__)) break;
+            }
         }
 
         for (int gpu=0;gpu<this->num_gpus;gpu++)
@@ -1315,7 +1318,7 @@ public:
             else if (traversal_mode == "LB_LIGHT_CULL")
                  return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_LIGHT_CULL>
                     ::Init(*this, context, problem, max_grid_size);
-
+            else printf("Traversal_mode %s is undefined for SSSP\n", traversal_mode.c_str());
 //            if (traversal_mode == 0)
 //                return InitSSSP< LBAdvanceKernelPolicy, FilterKernelPolicy>(
 //                    context, problem, max_grid_size);

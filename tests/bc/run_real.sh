@@ -1,10 +1,19 @@
 #!/bin/bash
 
-OPTION="--src=largestdegree --traversal-mode=LB_CULL --in-sizing=2.2 --iteration-num=10"
-#OPTION="--src=largestdegree --traversal-mode=LB_CULL --in-sizing=0 --iteration-num=10"
-MARK=".skip_pred.LB_CULL.32bitSizeT"
-EXECUTION="./bin/test_bc_7.5_x86_64"
-DATADIR="../../dataset/large"
+BASEOPTION="--src=randomize2 --in-sizing=1.1 --queue-sizing=1.2 --iteration-num=16"
+BASEMARK=""
+EXECUTION="./bin/test_bc_8.0_x86_64"
+DATADIR="/data/graphs/large"
+
+OPTION[8]="" && FLAG[8]=".32bit_SizeT"
+OPTION[9]=" --64bit-SizeT" && FLAG[9]=".64bit_SizeT"
+#OPTION[10]=" --64bit-VertexId" && FLAG[10]=".64bit_VertexId"
+
+OPTION[11]="" && FLAG[11]=".DEF"
+OPTION[12]=" --traversal-mode=LB" && FLAG[12]=".LB"
+OPTION[13]=" --traversal-mode=LB_CULL" && FLAG[13]=".LB_CULL"
+OPTION[14]=" --traversal-mode=LB_LIGHT" && FLAG[14]=".LB_LIGHT"
+OPTION[15]=" --traversal-mode=LB_LIGHT_CULL" && FLAG[15]=".LB_LIGHT_CULL"
 
 NAME[ 0]="soc-twitter-2010" && DO_A[ 0]="0.005" && DO_B[ 0]="0.1"
 NAME[ 1]="hollywood-2009"   && DO_A[ 1]="0.006" && DO_B[ 1]="0.1"
@@ -24,11 +33,11 @@ NAME[12]="germany_osm"      && DO_A[12]="1.5"   && DO_B[12]="10"
 NAME[13]="road_usa"         && DO_A[13]="1.0"   && DO_B[13]="10"
 NAME[14]="road_central"     && DO_A[14]="1.2"   && DO_B[14]="10"
 
-cd ~/Projects/gunrock_dev/gunrock/tests/bc
+# cd ~/Projects/gunrock_dev/gunrock/tests/bc
 
-for d in 6 #{5..6}
+for d in {1..1}
 do
-    SUFFIX="CentOS6_6.k40cx${d}.rand"
+    SUFFIX="CentOS7.GTX1070x${d}"
     mkdir -p eval/$SUFFIX
     DEVICE="0"
     for i in {1..8}
@@ -38,12 +47,18 @@ do
         fi
     done
 
-    QUEUE_SIZING=1.2 #$(echo "${d} * 1.21" | bc)
-    for i in 0  #{0..9}
+    # QUEUE_SIZING=1.2 #$(echo "${d} * 1.21" | bc)
+    for o1 in {8..9}; do for o2 in {11..15}; do
+    OPTIONS=${BASEOPTION}${OPTION[${o1}]}${OPTION[${o2}]}
+    FLAGS=${BASEFLAG}${FLAG[${o1}]}${FLAG[${o2}]}
+
+    for i in {0..14}
     do
-        echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTION --queue-sizing=$QUEUE_SIZING --device=$DEVICE --jsondir=./eval/$SUFFIX "> ./eval/$SUFFIX/${NAME[$i]}${MARK}.txt"
-             $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTION --queue-sizing=$QUEUE_SIZING --device=$DEVICE --jsondir=./eval/$SUFFIX > ./eval/$SUFFIX/${NAME[$i]}${MARK}.txt
+        echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTIONS --device=$DEVICE --jsondir=./eval/$SUFFIX "> ./eval/$SUFFIX/${NAME[$i]}${FLAGS}.txt"
+             $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTIONS --device=$DEVICE --jsondir=./eval/$SUFFIX > ./eval/$SUFFIX/${NAME[$i]}${FLAGS}.txt
         sleep 1
     done
+
+    done; done
 done
 

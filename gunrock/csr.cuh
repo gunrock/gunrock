@@ -907,7 +907,6 @@ struct Csr
                     mean += (edge_values[edge] - mean) / count;
                 }
             }
-            average_edge_value = static_cast<Value>(mean);
         }
         return average_edge_value;
     }

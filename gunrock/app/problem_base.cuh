@@ -1282,7 +1282,7 @@ public:
     float         partition_factor  ; // Partition factor
     int           partition_seed    ; // Partition seed
     int           iterations        ; // Number of repeats
-    int           traversal_mode    ; // Load-balanced or Dynamic cooperative
+    std::string   traversal_mode    ; // Load-balanced or Dynamic cooperative
 
     /**
      * @brief TestParameter_Base constructor
@@ -1310,7 +1310,7 @@ public:
         partition_factor   = -1;
         partition_seed     = -1;
         iterations         = 1;
-        traversal_mode     = -1;
+        traversal_mode     = "LB";
     }  // end TestParameter_Base()
 
     /**
