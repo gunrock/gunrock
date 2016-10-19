@@ -1,13 +1,15 @@
 #!/bin/bash
 
-OPTION="--undirected --idempotence --src=largestdegree --traversal-mode=LB_CULL --direction-optimized --queue-sizing=6.5 --in-sizing=4 --iteration-num=10 --do_a=0.00001 --do_b=0.1"
-MARK=".skip_pred.undir.idempotence.LB_CULL.32bitSizeT.do"
+OPTION="--undirected --idempotence --src=largestdegree --traversal-mode=LB_CULL --queue-sizing=7.5 --in-sizing=4 --iteration-num=10 --do_a=0.00001 --do_b=0.1"
+MARK=".skip_pred.undir.idempotence.LB_CULL.32bitSizeT.fw"
 EXECUTION="./bin/test_bfs_7.5_x86_64"
 DATADIR="/data/gunrock_dataset/large"
 
-for d in {1..4}
+cd ~/Projects/gunrock_dev/gunrock/tests/bfs
+
+for d in {1..6}
 do
-    SUFFIX="ubuntu14_04.k40cx${d}_rand"
+    SUFFIX="CentOS6_6.k40cx${d}.rand"
     mkdir -p eval/$SUFFIX
     DEVICE="0"
     for i in {1..8}
