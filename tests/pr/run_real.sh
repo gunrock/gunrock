@@ -1,9 +1,9 @@
 #!/bin/bash
 
-OPTION="--undirected --quick --normalized --traversal-mode=0 --iteration-num=10"
+OPTION="--undirected --quick --normalized --traversal-mode=LB --iteration-num=10"
 MARK=".undir.32bitSizeT.nocomp"
 EXECUTION="./bin/test_pr_7.5_x86_64"
-DATADIR="/data/gunrock_dataset/large"
+DATADIR="../../dataset/large"
 
 NAME[ 0]="soc-twitter-2010"
 NAME[ 1]="hollywood-2009"
@@ -21,9 +21,11 @@ NAME[12]="germany_osm"
 NAME[13]="road_usa"
 NAME[14]="road_central"
 
-for d in {1..4}
+cd ~/Projects/gunrock_dev/gunrock/tests/pr
+
+for d in {1..6}
 do
-    SUFFIX="ubuntu14_04.k40cx${d}_rand"
+    SUFFIX="CentOS6_6.k40cx${d}.rand"
     mkdir -p eval/$SUFFIX
     DEVICE="0"
     for i in {1..8}

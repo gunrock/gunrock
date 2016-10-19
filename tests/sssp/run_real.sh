@@ -1,9 +1,9 @@
 #!/bin/bash
 
-OPTION="--undirected --src=largestdegree --traversal-mode=LB --iteration-num=10"
-MARK=".skip_pred.undir.LB.32bitSizeT"
+OPTION="--undirected --src=largestdegree --traversal-mode=LB_CULL --iteration-num=10 --random-edge-value"
+MARK=".skip_pred.undir.LB_CULL.32bitSizeT"
 EXECUTION="./bin/test_sssp_7.5_x86_64"
-DATADIR="/data/gunrock_dataset/large"
+DATADIR="../../dataset/large"
 
 NAME[ 0]="soc-twitter-2010"  
 NAME[ 1]="hollywood-2009"    
@@ -21,9 +21,11 @@ NAME[12]="germany_osm"
 NAME[13]="road_usa"
 NAME[14]="road_central"
 
-for d in {1..4}
+cd ~/Projects/gunrock_dev/gunrock/tests/sssp
+
+for d in 2 #{1..6}
 do
-    SUFFIX="ubuntu14_04.k40cx${d}_rand"
+    SUFFIX="CentOS6_6.k40cx${d}.rand"
     mkdir -p eval/$SUFFIX
     DEVICE="0"
     for i in {1..8}
@@ -32,9 +34,9 @@ do
             DEVICE=$DEVICE",$i"
         fi
     done
-    QUEUE_SIZING=1 #$(echo "${d}+1" | bc)
+    QUEUE_SIZING=1.2 #$(echo "${d}+1" | bc)
 
-    for i in {0..14}
+    for i in 9 #{0..14}
     do
         echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTION --queue-sizing=$QUEUE_SIZING --device=$DEVICE --jsondir=./eval/$SUFFIX "> ./eval/$SUFFIX/${NAME[$i]}${MARK}.txt"
              $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTION --queue-sizing=$QUEUE_SIZING --device=$DEVICE --jsondir=./eval/$SUFFIX > ./eval/$SUFFIX/${NAME[$i]}${MARK}.txt

@@ -39,7 +39,9 @@ SM_TARGETS = $(GEN_SM35)
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
 MGPU_INC = "../../externals/moderngpu/include"
 CUB_INC = "../../externals/cub"
-BOOST_DEPS = -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem
+BOOST_LIB_PATH = "/shared/apps/rhel-6.2/libs/boost-1.57/lib"
+#BOOST_DEPS = -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem
+BOOST_DEPS = -Xlinker $(BOOST_LIB_PATH)/libboost_system.a -Xlinker $(BOOST_LIB_PATH)/libboost_filesystem.a -Xlinker $(BOOST_LIB_PATH)/libboost_timer.a -Xlinker $(BOOST_LIB_PATH)/libboost_chrono.a #-lboost_timer -Xlinker -lboost_chrono
 OMP_DEPS = -Xcompiler -fopenmp -Xlinker -lgomp
 METIS_DEPS = -Xlinker -lmetis
 INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) -I.. -I../..
@@ -63,7 +65,7 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo --std=c++11 -ccbin=g++-4.8
+NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo --std=c++11 -ccbin=g++
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
