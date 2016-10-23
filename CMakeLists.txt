@@ -180,14 +180,14 @@ option(GUNROCK_GENCODE_SM50
   OFF)
 
 #Pascal Architecture: CUDA 8
-if (CUDA_VERSION VERSION_GREATER "8.0")
-option(GUNROCK_GENCODE_SM60
-  "ON to generate code for Compute Capability 6.0 devices (e.g. Tesla P100)"
-  OFF)
+if (CUDA_VERSION VERSION_EQUAL "8.0")
+  option(GUNROCK_GENCODE_SM60
+    "ON to generate code for Compute Capability 6.0 devices (e.g. Tesla P100)"
+    OFF)
 
-option(GUNROCK_GENCODE_SM61
-  "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
-  ON)
+  option(GUNROCK_GENCODE_SM61
+    "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
+    ON)
 endif ()
 
 option(CUDA_VERBOSE_PTXAS
