@@ -180,7 +180,7 @@ option(GUNROCK_GENCODE_SM50
   OFF)
 
 #Pascal Architecture: CUDA 8
-if (CUDA_VERSION VERSION_EQUAL "8.0")
+if (CUDA_VERSION VERSION_EQUAL "8.0" OR CUDA_VERSION VERSION_GREATER "8.0")
   option(GUNROCK_GENCODE_SM60
     "ON to generate code for Compute Capability 6.0 devices (e.g. Tesla P100)"
     OFF)
