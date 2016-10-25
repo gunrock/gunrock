@@ -5,7 +5,7 @@ Release 0.4
 ?th October 2015
 
 Gunrock release 0.4 is a feature release that includes new optimizations to
-both advance and filter operators, adds multi-iteration supports for both BFS
+both advance and filter operators, adds multi-iteration support for both BFS
 and SSSP, adds better error handling, and updates several interfaces. The new
 release improves the overall performance for both single and multi-GPU
 execution.

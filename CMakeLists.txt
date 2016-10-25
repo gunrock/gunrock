@@ -87,6 +87,8 @@ set(GENCODE_SM37
   -gencode=arch=compute_37,code=sm_37 -gencode=arch=compute_37,code=compute_37)
 set(GENCODE_SM50
   -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_50,code=compute_50)
+set(GENCODE_SM60
+  -gencode=arch=compute_60,code=sm_60 -gencode=arch=compute_60,code=compute_60)
 set(GENCODE_SM61
   -gencode=arch=compute_61,code=sm_61 -gencode=arch=compute_61,code=compute_61)
 #set(GENCODE -gencode=arch=compute_10,code=compute_10) # at least generate PTX
@@ -180,9 +182,16 @@ option(GUNROCK_GENCODE_SM61
   "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
   ON)
 
-option(GUNROCK_GENCODE_SM61
-  "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
-  ON)
+#Pascal Architecture: CUDA 8
+if (CUDA_VERSION VERSION_EQUAL "8.0" OR CUDA_VERSION VERSION_GREATER "8.0")
+  option(GUNROCK_GENCODE_SM60
+    "ON to generate code for Compute Capability 6.0 devices (e.g. Tesla P100)"
+    OFF)
+
+  option(GUNROCK_GENCODE_SM61
+    "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
+    ON)
+endif ()
 
 option(CUDA_VERBOSE_PTXAS
   "On to enable verbose output from the PTXAS assembler."

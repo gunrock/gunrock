@@ -83,7 +83,7 @@ You can also compile gunrock with more specific/advanced settings using `cmake -
   * **GUNROCK_APP_TOPK** (default: OFF)
 
 * **GUNROCK_MGPU_TESTS** (default: OFF) - If on, tests multiple GPU primitives with `ctest`.
-* **GUNROCK_GENCODE_SM<>** (default: GUNROCK_GENCODE_SM30=ON) change to generate code for different compute capability.
+* **GUNROCK_GENCODE_SM<>** (default: GUNROCK_GENCODE_SM30,35,61=ON) change to generate code for a different compute capability.
 * **CUDA_VERBOSE_PTXAS** (default: OFF) - ON to enable verbose output from the PTXAS assembler.
 
 Example for compiling gunrock with only *Breadth First Search (BFS)* primitive:
