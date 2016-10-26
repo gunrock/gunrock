@@ -659,6 +659,10 @@ int main_(CommandLineArgs *args)
 
     cpu_timer2.Start();
     info->Init("SSSP", *args, csr);  // initialize Info structure
+    
+    // force edge values to be 1, don't enable this unless you really want to
+    //for (SizeT e=0; e < csr.edges; e++)
+    //    csr.edge_values[e] = 1;
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
