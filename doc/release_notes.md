@@ -4,7 +4,6 @@ Gunrock v0.4 Release Notes {#release_notes}
 Release 0.4
 ?th October 2015
 
-<<<<<<< HEAD
 Gunrock release 0.4 is a feature release that adds 
  - New optimizations to both advance and filter operators,
  - Multi-iteration supports for BFS, SSSP, BC, CC and PR,
