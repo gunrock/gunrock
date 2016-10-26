@@ -6,6 +6,11 @@ Road Map {#road_map}
    set of operators that can abstract most graph primitives while delivering
    high performance.
 
+ - **API:** We would like to make a API refatoring, to simplify parameter 
+   passing and to isolate parts of the library that dependencies are not
+   necessary. The target is to make the frontier concept more clear, and
+   to promote code reuse.
+
  - **Primitives:** Our near-term goal is to graduate several primitives in dev
    branch including A* search, weighted label propagation, subgraph matching,
    triangle counting, and clustering coefficients; implement maximal
