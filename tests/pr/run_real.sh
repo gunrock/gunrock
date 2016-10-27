@@ -3,7 +3,7 @@
 BASEOPTION="--quick --iteration-num=16"
 BASEFLAG=""
 EXECUTION="./bin/test_pr_8.0_x86_64"
-DATADIR="/data/graphs/large"
+DATADIR="/data/gunrock_dataset/large"
 
 
 OPTION[1]="" && FLAG[1]=".undir.unnormalized.nocompensate"
@@ -40,9 +40,9 @@ NAME[12]="germany_osm"
 NAME[13]="road_usa"
 NAME[14]="road_central"
 
-for d in {1..1}
+for d in {1..4}
 do
-    SUFFIX="CentOS7.GTX1070x${d}"
+    SUFFIX="ubuntu14.04_K40cx${d}"
     mkdir -p eval/$SUFFIX
     DEVICE="0"
     for i in {1..8}
@@ -58,6 +58,10 @@ do
 
     for i in {0..14}
     do
+        if [ "${o4}" -eq "13" ]; then # && [ "$i" -le "4" ]; then
+            continue
+        fi
+
         echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTIONS --device=$DEVICE --jsondir=./eval/$SUFFIX "> ./eval/$SUFFIX/${NAME[$i]}${FLAGS}.txt"
              $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTIONS --device=$DEVICE --jsondir=./eval/$SUFFIX > ./eval/$SUFFIX/${NAME[$i]}${FLAGS}.txt
         sleep 1
