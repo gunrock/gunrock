@@ -319,9 +319,6 @@ struct SampleIteration : public IterationBase <
      * @param[in] enactor_stats Pointer to the enactor statistics.
      * @param[in] graph_slice Pointer to the graph slice we process on.
      */
-
-    //TODO: YC, since all primitives have this function, should we bring this to base class?
-    // if so, where should we put this?
     static void Check_Queue_Size(
         Enactor                       *enactor,
         int                            thread_num,
@@ -347,13 +344,10 @@ struct SampleIteration : public IterationBase <
 
        if (!enactor -> size_check &&
            (!gunrock::oprtr::advance::hasPreScan<AdvanceKernelPolicy::ADVANCE_MODE>()))
-            //(AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_FORWARD ||
-            // AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_BACKWARD))
         {
             frontier_attribute -> output_length[0] = 0;
             return;
         } else if (!gunrock::oprtr::advance::isFused<AdvanceKernelPolicy::ADVANCE_MODE>())
-            //(AdvanceKernelPolicy::ADVANCE_MODE != gunrock::oprtr::advance::LB_CULL)
         {
             if (enactor_stats->retval =
                 Check_Size</*true,*/ SizeT, VertexId > (
@@ -444,7 +438,6 @@ static CUT_THREADPROC SampleThread(
                thread_data -> status == ThreadSlice::Status::Idle)
         {
             sleep(0);
-            //std::this_thread::yield();
         }
         if (thread_data -> status == ThreadSlice::Status::ToKill)
             break;
@@ -479,12 +472,12 @@ static CUT_THREADPROC SampleThread(
  * @tparam _DEBUG Whether or not to enable debug mode.
  * @tparam _SIZE_CHECK Whether or not to enable size check.
  */
-template <typename _Problem/*, bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK*/>
+template <typename _Problem>
 class SampleEnactor :
-    public EnactorBase<typename _Problem::SizeT/*, _DEBUG, _SIZE_CHECK*/>
+    public EnactorBase<typename _Problem::SizeT>
 {
-    ThreadSlice  *thread_slices;// = new ThreadSlice [this->num_gpus];
-    CUTThread    *thread_Ids   ;// = new CUTThread   [this->num_gpus];
+    ThreadSlice  *thread_slices;
+    CUTThread    *thread_Ids   ;
 
 public:
     _Problem     *problem      ;
@@ -494,9 +487,6 @@ public:
     typedef typename Problem::Value    Value   ;
     typedef EnactorBase<SizeT>         BaseEnactor;
     typedef SampleEnactor<Problem>       Enactor;
-    //static const bool INSTRUMENT = _INSTRUMENT;
-    //static const bool DEBUG      = _DEBUG;
-    //static const bool SIZE_CHECK = _SIZE_CHECK;
 
     /**
      * @brief BFSEnactor constructor
@@ -569,9 +559,8 @@ public:
     {
         cudaError_t retval = cudaSuccess;
 
-        // Lazy initialization
+        // Init parent class
         if (retval = BaseEnactor::Init(
-            //problem,
             max_grid_size,
             AdvanceKernelPolicy::CTA_OCCUPANCY,
             FilterKernelPolicy::CTA_OCCUPANCY))
@@ -580,36 +569,6 @@ public:
         this->problem = problem;
         thread_slices = new ThreadSlice [this->num_gpus];
         thread_Ids    = new CUTThread   [this->num_gpus];
-
-        //for (int gpu=0;gpu<this->num_gpus;gpu++)
-        //{
-            //if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-            /*if (BFSProblem::ENABLE_IDEMPOTENCE)
-            {
-                int bytes = (problem->graph_slices[gpu]->nodes + 8 - 1) / 8;
-                cudaChannelFormatDesc   bitmask_desc = cudaCreateChannelDesc<char>();
-                gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref.channelDesc = bitmask_desc;
-                if (retval = util::GRError(cudaBindTexture(
-                    0,
-                    gunrock::oprtr::filter::BitmaskTex<unsigned char>::ref,//ts_bitmask[gpu],
-                    problem->data_slices[gpu]->visited_mask.GetPointer(util::DEVICE),
-                    bytes),
-                    "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
-            }*/
-
-            /*if (sizeof(SizeT) == 4)
-            {
-                cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
-                gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
-                if (retval = util::GRError(cudaBindTexture(
-                    0,
-                    gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets,
-                    problem->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE),
-                    ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
-                    "BFSEnactor cudaBindTexture row_offsets_ref failed",
-                    __FILE__, __LINE__)) break;
-            }*/
-        //}
 
         for (int gpu=0;gpu<this->num_gpus;gpu++)
         {
@@ -631,7 +590,6 @@ public:
             while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
             {
                 sleep(0);
-                //std::this_thread::yield();
             }
         }
         return retval;
@@ -691,7 +649,6 @@ public:
             while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
             {
                 sleep(0);
-                //std::this_thread::yield();
             }
         }
 
