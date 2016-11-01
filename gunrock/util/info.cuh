@@ -150,6 +150,9 @@ public:
         info["do_a"               ]= 0.001;  // direction optimization parameter
         info["do_b"               ]= 0.200;  // direction optimization parameter
         info["duplicate_graph"    ]= false;  // whether to duplicate graph on every GPUs
+        info["64bit_VertexId"     ]= (sizeof(VertexId) == 8) ? true : false;
+        info["64bit_SizeT"        ]= (sizeof(SizeT   ) == 8) ? true : false;
+        info["64bit_Value"        ]= (sizeof(Value   ) == 8) ? true : false;
         // info["gpuinfo"]
         // info["device_list"]
         // info["sysinfo"]

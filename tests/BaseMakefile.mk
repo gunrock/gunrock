@@ -44,7 +44,8 @@ CUB_INC = "../../externals/cub"
 BOOST_DEPS = -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem
 OMP_DEPS = -Xcompiler -fopenmp -Xlinker -lgomp
 METIS_DEPS = -Xlinker -lmetis -Xcompiler -DMETIS_FOUND
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) -I.. -I../..
+GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=0.3.0
+INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) $(GUNROCK_DEF) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
