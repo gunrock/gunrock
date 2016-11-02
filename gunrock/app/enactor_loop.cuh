@@ -434,7 +434,7 @@ void Iteration_Loop(
                     {
                         frontier_attribute_ -> queue_length = data_slice -> in_length_out[peer_];
                     }
-                    if (!enactor -> size_check /*&& Enactor::DEBUG*/)
+                    if (!enactor -> size_check && (enactor -> debug || num_gpus > 1))
                     {
                         if (Iteration::HAS_SUBQ)
                         {
@@ -693,10 +693,21 @@ void Iteration_Loop(
                         context[peer_],
                         streams[peer_]);
                     if (enactor_stats_->retval) break;
-                    if (enactor_stats_ -> retval = util::GRError(
-                        cudaStreamSynchronize(streams[peer_]),
-                        "cudaStreamSynchronize failed", __FILE__, __LINE__))
+                    //if (enactor_stats_ -> retval = util::GRError(
+                    //    cudaStreamSynchronize(streams[peer_]),
+                    //    "cudaStreamSynchronize failed", __FILE__, __LINE__))
+                    //    break;
+                    cudaError_t t_retval = cudaErrorNotReady;
+                    while (t_retval == cudaErrorNotReady)
+                    {
+                        t_retval = cudaStreamQuery(streams[peer_]);
+                        if (t_retval == cudaErrorNotReady)
+                            sleep(0);
+                    }
+                    if (enactor_stats_ -> retval = util::GRError(tretval,
+                        "FullQueue_Core failed.", __FILE__, __LINE__))
                         break;
+
                     if (!enactor -> size_check)
                     {
                         if (enactor_stats_->retval =

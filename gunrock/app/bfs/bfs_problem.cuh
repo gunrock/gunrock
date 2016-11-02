@@ -306,6 +306,7 @@ struct BFSProblem : ProblemBase<VertexId, SizeT, Value,
                 direction_votes[i] = UNDECIDED;
 
             for (int peer=0;peer<(this->num_gpus > 1 ? this->num_gpus+1 : 1);peer++)
+            //for (int peer=0;peer< this->num_gpus+1;peer++)
             for (int i=0; i < 2; i++)
             {
                 double queue_sizing_ = (i==0 ? queue_sizing : queue_sizing1);
