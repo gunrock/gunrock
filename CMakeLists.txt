@@ -136,9 +136,10 @@ option(GUNROCK_GENCODE_SM37
 option(GUNROCK_GENCODE_SM50
   "ON to generate code for Compute Capability 5.0 devices (e.g. GeForce GTX 750 TI)"
   OFF)
+
 option(GUNROCK_GENCODE_SM61
   "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
-  ON)
+  OFF)
 
 option(CUDA_VERBOSE_PTXAS
   "On to enable verbose output from the PTXAS assembler."
