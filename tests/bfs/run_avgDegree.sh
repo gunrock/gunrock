@@ -21,7 +21,7 @@ do
     queue_sizing=$(echo "1.25 * ${d}" | bc)
 
     scale="21"
-    for edge_factor in 2 4 8 16 32 64
+    for edge_factor in 1 2 4 8 16
     do
         GRAPH="grmat --rmat_scale=${scale} --rmat_edgefactor=${edge_factor}"
         echo $EXECUTION $GRAPH $OPTION --queue-sizing=${queue_sizing} --device=$DEVICE --jsondir=./eval/$SUFFIX "> ./eval/$SUFFIX/rmat_n${scale}_${edge_factor}${MARK}.txt"
@@ -29,7 +29,7 @@ do
     done
 
     queue_sizing=1
-    for thfactor in "0.1" "0.3" "0.5" "0.7" "0.9" "1.1"
+    for thfactor in "0.2" "0.3" "0.4" "0.6" "0.8"
     do
         GRAPH="rgg --rgg_scale=${scale} --rgg_thfactor=${thfactor}"   
         echo $EXECUTION $GRAPH $OPTION --queue-sizing=${queue_sizing} --device=$DEVICE --jsondir=./eval/$SUFFIX "> ./eval/$SUFFIX/rgg_n${scale}_${thfactor}${MARK}.txt"

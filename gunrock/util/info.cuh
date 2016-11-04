@@ -571,8 +571,8 @@ public:
         csc_ptr = &csc_ref;  // set CSC pointer
         InitBase(algorithm_name, args);
         info["destination_vertex"] = (int)csr_ref.nodes-1;   //by default set it to the largest vertex ID
-        info["num_vertices"] = csr_ref.nodes;
-        info["num_edges"   ] = csr_ref.edges;
+        info["num_vertices"] = (int)csr_ref.nodes;
+        info["num_edges"   ] = (int)csr_ref.edges;
     }
 
     /**
