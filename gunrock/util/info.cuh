@@ -421,6 +421,12 @@ public:
             args.GetCmdLineArgument("do_b", do_b);
             info["do_b"] = do_b;
         }
+        if (args.CheckCmdLineFlag("tag"))
+        {
+            std::string tag = "";
+            args.GetCmdLineArgument("tag", tag);
+            info["tag"] = tag;
+        }
 
         // parse device count and device list
         info["device_list"] = GetDeviceList(args);
